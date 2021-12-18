@@ -1,0 +1,436 @@
+syntax = "proto3";
+
+package share;
+
+import "common.proto";
+import "scan.proto";
+
+service EnforcerCapService {
+  rpc IsGRPCCompressed(RPCVoid) returns (CLUSBoolean);
+}
+
+message CLUSKick {
+    string CtrlID = 1;
+    string Reason = 2;
+}
+
+message CLUSFilter {
+    string Workload = 1;
+    uint32 ID = 2;
+    uint32 Start = 3;
+    uint32 Limit = 4;
+}
+
+
+message CLUSSession {
+    uint32 ID = 1;
+    string Workload = 2;
+    uint32 EtherType = 3;
+    uint32 IPProto = 4;
+    bytes ClientMAC = 5;
+    bytes ServerMAC = 6;
+    bytes ClientIP = 7;
+    bytes ServerIP = 8;
+    uint32 ClientPort = 9;
+    uint32 ServerPort = 10;
+    uint32 ICMPCode = 11;
+    uint32 ICMPType = 12;
+    uint32 ClientState = 13;
+    uint32 ServerState = 14;
+    uint32 ClientPkts = 15;
+    uint32 ServerPkts = 16;
+    uint64 ClientBytes = 17;
+    uint64 ServerBytes = 18;
+    uint32 Application = 19;
+    uint32 Age = 20;
+    uint32 Idle = 21;
+    uint32 Life = 22;
+    bool Ingress = 23;
+    bool Tap = 24;
+    bool Mid = 25;
+    uint32 PolicyId = 26;
+    uint32 PolicyAction = 27;
+    uint32 ClientAsmPkts = 28;
+    uint32 ServerAsmPkts = 29;
+    uint64 ClientAsmBytes = 30;
+    uint64 ServerAsmBytes = 31;
+    bool HostMode = 32;
+    bytes XffIP = 33;
+    uint32 XffApp = 34;
+    uint32 XffPort = 35;
+}
+
+message CLUSSessionArray {
+    repeated CLUSSession Sessions = 1;
+}
+
+message CLUSSessionCounter {
+    uint32 CurSessions = 1;
+    uint32 CurTCPSessions = 2;
+    uint32 CurUDPSessions = 3;
+    uint32 CurICMPSessions = 4;
+    uint32 CurIPSessions = 5;
+}
+
+message CLUSDatapathCounter {
+    uint64 RXPackets = 1;
+    uint64 RXDropPackets = 2;
+    uint64 TXPackets = 3;
+    uint64 TXDropPackets = 4;
+    uint64 ErrorPackets = 5;
+    uint64 NoWorkloadPackets = 6;
+    uint64 IPv4Packets = 7;
+    uint64 IPv6Packets = 8;
+    uint64 TCPPackets = 9;
+    uint64 TCPNoSessionPackets = 10;
+    uint64 UDPPackets = 11;
+    uint64 ICMPPackets = 12;
+    uint64 OtherPackets = 13;
+    uint64 Fragments = 14;
+    uint64 TimeoutFragments = 15;
+    uint64 TotalSessions = 16;
+    uint64 TCPSessions = 17;
+    uint64 UDPSessions = 18;
+    uint64 ICMPSessions = 19;
+    uint64 IPSessions = 20;
+    uint64 DropMeters = 21;
+    uint64 ProxyMeters = 22;
+    uint64 CurMeters = 23;
+    uint64 CurLogCaches = 24;
+    uint64 FreedFragments = 25;
+    uint64 Assemblys = 26;
+    uint64 FreedAssemblys = 27;
+    repeated uint64 ParserSessions = 28;
+    repeated uint64 ParserPackets = 29;
+    uint32 PolicyType1Rules = 30;
+    uint32 PolicyType2Rules = 31;
+    uint32 PolicyDomains = 32;
+    uint32 PolicyDomainIPs = 33;
+    uint32 GoRoutines = 34;
+    bytes Lsof = 35;
+    bytes PS = 36;
+    uint64 LimitDropConns = 37;
+    uint64 LimitPassConns = 38;
+}
+
+message CLUSDerivedPolicyApp {
+    uint32 App = 1;
+    uint32 Action = 2;
+    uint32 RuleID = 3;
+}
+
+message CLUSDerivedPolicyRule {
+    uint32 ID = 1;
+    bytes SrcIP = 2;
+    bytes DstIP = 3;
+    bytes SrcIPR = 4;
+    bytes DstIPR = 5;
+    uint32 Port = 6;
+    uint32 PortR = 7;
+    uint32 IPProto = 8;
+    uint32 Action = 9;
+    bool Ingress = 10;
+    string FQDN = 11;
+    repeated CLUSDerivedPolicyApp Apps = 12;
+}
+
+message CLUSDerivedPolicyRuleArray {
+    repeated CLUSDerivedPolicyRule Rules = 1;
+}
+
+message CLUSDerivedPolicyRuleMap {
+    map<string, CLUSDerivedPolicyRuleArray> RuleMap = 1;
+}
+
+message CLUSProbeSummary {
+    uint32 ContainerMap = 1;
+    uint32 PidContainerMap = 2;
+    uint32 PidProcMap = 3;
+    uint32 NewProcesses = 4;
+    uint32 NewSuspicProc = 5;
+    uint32 ContainerStops = 6;
+    uint32 WLStorageWatch = 7 [deprecated=true];
+    uint32 PidSet = 8;
+    uint32 SessionTable = 9;
+    uint32 InotifyWatches = 10;
+    uint32 ProcBlockRoots = 11;
+    uint32 ProcBlockMarks = 12;
+    uint32 ProcBlockEntryCnt = 13;
+    uint32 ProcBlockDirMonCnt = 14;
+    uint32 FileMonEvents = 15;
+    uint32 FileMonGroups = 16;
+    uint32 FileMonFaRoots = 17;
+    uint32 FileMonFaMntRoots = 18;
+    uint32 FileMonFaDirMarks = 19;
+    uint32 FileMonFaRules = 20;
+    uint32 FileMonFaPaths = 21;
+    uint32 FileMonFaDirs = 22;
+    uint32 FileMonInWds = 23;
+    uint32 FileMonInPaths = 24;
+    uint32 FileMonInDirs = 25;
+    uint32 MaxEvalChanQueued = 26;
+    uint32 MaxGoroutines = 27;
+}
+
+message CLUSProbeProcess {
+    int32 Pid = 1;
+    int32 Ppid = 2;
+    string Name = 3;
+    uint32 Ruid = 4;
+    uint32 Euid = 5;
+    uint32 ScanTimes = 6;
+    uint64 StartTime = 7;
+    uint32 Reported = 8;
+    string Container = 9;
+}
+
+message CLUSProbeProcessArray {
+    repeated CLUSProbeProcess Processes = 1;
+}
+
+message CLUSProbeContainer {
+    string Id = 1;
+    int32 Pid = 2;
+    repeated int32 Children = 3;
+    string PortsMap = 4;
+}
+
+message CLUSProbeContainerArray {
+    repeated CLUSProbeContainer Containers = 1;
+}
+
+message CLUSFileMonitorFile {
+    string Path = 1;
+    uint64 Mask = 2;
+    bool IsDir = 3;
+    bool Protect = 4;
+    repeated string Files = 5;
+}
+
+message CLUSFileMonitorFileArray {
+    repeated CLUSFileMonitorFile Files = 1;
+}
+
+enum SnifferCmd {
+    StartSniffer = 0;
+    StopSniffer = 1;
+    RemoveSniffer = 2;
+}
+
+enum SnifferStatus {
+    Failed = 0;
+    Running = 1;
+    Stopped = 2;
+}
+
+message CLUSSnifferRequest {
+    SnifferCmd Cmd = 1;
+    string ID = 2;
+    string WorkloadID = 3;
+    uint32 FileNumber = 4;
+    uint32 FileSizeInMB = 5;
+    string Filter = 6;
+    uint32 DurationInSecond = 7;
+}
+
+message CLUSSnifferResponse {
+    string ID = 1;
+}
+
+message CLUSSnifferFilter {
+    string ID = 1;
+    string Workload = 2;
+}
+
+message CLUSSniffer {
+    string ID = 1;
+    string AgentID = 2;
+    string WorkloadID = 3;
+    SnifferStatus Status = 4;
+    string Args = 5;
+    uint32 FileNumber = 6;
+    int64 Size = 7;
+    int64 StartTime = 8;
+    int64 StopTime = 9;
+}
+
+message CLUSSnifferArray {
+    repeated CLUSSniffer sniffers = 1;
+}
+
+message CLUSSnifferDownload {
+    string ID = 1;
+}
+
+message CLUSSnifferPcap {
+    bytes Pcap = 1;
+}
+
+message CLUSContainerLogReq {
+    string Id = 1;
+    int32 Start = 2;
+    uint32 Limit = 3;
+}
+
+message CLUSContainerLogRes {
+    bytes LogZb = 1;
+}
+
+message CLUSProcess {
+    string Name = 1;
+    uint32 Pid = 2;
+    uint32 PPid = 3;
+    uint32 PGid = 4;
+    uint32 PSid = 5;
+    uint32 RUid = 6;
+    uint32 EUid = 7;
+    repeated string Cmds = 8;
+    bool Root = 9;
+    string User = 10;
+    string Status = 11;
+    int64 StartAt = 12;
+    string Action = 13;
+}
+
+message CLUSProcessArray {
+    repeated CLUSProcess Processes = 1;
+}
+
+message CLUSDerivedDlpRule {
+    string Name = 1;
+    uint32 Action = 2;
+}
+
+message CLUSDerivedDlpRuleArray {
+    string Mode = 1;
+    uint32 DefAct = 2;
+    int32 ApplyDir = 3;
+    repeated string WlMacs = 4;
+    repeated CLUSDerivedDlpRule DlpRules = 5;
+    repeated CLUSDerivedDlpRule WafRules = 6;
+    repeated uint32 rids = 7;
+    repeated uint32 wafrids = 8;
+    string RuleType = 9;
+}
+
+message CLUSDerivedDlpRuleMap {
+    map<string, CLUSDerivedDlpRuleArray> DlpRuleMap = 1;
+}
+
+message CLUSDerivedDlpRuleEntry {
+    string Name = 1;
+    uint32 ID =2;
+    repeated string Patterns = 3;
+}
+
+message CLUSDerivedDlpRuleEntryArray {
+    repeated CLUSDerivedDlpRuleEntry DlpRuleEntries = 1;
+}
+
+message CLUSDerivedDlpRuleMac {
+    string Mac = 1;
+}
+
+message CLUSDerivedDlpRuleMacArray {
+    repeated CLUSDerivedDlpRuleMac DlpRuleMacs = 1;
+}
+
+message CLUSDerivedProcessRule {
+    string Name = 1;
+    string Path = 2;
+    string Action = 3;
+    uint64 CreatedAt = 4;
+    uint64 UpdateAt = 5;
+    string GroupName = 6;
+    string CfgType = 7;
+}
+
+message CLUSDerivedProcessRuleArray {
+    repeated CLUSDerivedProcessRule Rules = 1;
+}
+
+message CLUSDerivedFileRule {
+    bool Recursive = 1;
+    string Filter = 2;
+    string Path = 3;
+    string Regex = 4;
+    string Behavior = 5;
+    string GroupName = 6;
+    repeated string Apps = 7;
+    string CfgType = 8;
+}
+
+message CLUSDerivedFileRuleArray {
+    repeated CLUSDerivedFileRule Rules = 1;
+}
+
+message CLUSWorkloadInterceptPort {
+    string Port = 1;
+    string Peer = 2;
+    bytes MAC = 3;
+    bytes UCMAC = 4;
+    bytes BCMAC = 5;
+    string InPort = 6;
+    string ExPort = 7;
+    string InPortRules = 8;
+    string ExPortRules = 9;
+    string EnforcerRules = 10;
+}
+
+message CLUSWorkloadIntercept {
+    string ID = 1;
+    bool Inline = 2;
+    bool Quarantine = 3;
+    repeated CLUSWorkloadInterceptPort Ports = 4;
+}
+
+message CLUSMeter {
+    uint32 MeterID = 1;
+    string Workload = 2;
+    bytes PeerIP = 3;
+    uint32 Count = 4;
+    uint32 LastCount = 5;
+    uint32 Idle = 6;
+    uint32 Span = 7;
+    uint32 UpperLimit = 8;
+    uint32 LowerLimit = 9;
+    bool Tap = 10;
+}
+
+message CLUSMeterArray {
+    repeated CLUSMeter Meters = 1;
+}
+
+service EnforcerService {
+  rpc Kick(CLUSKick) returns (RPCVoid);
+  rpc GetSessionList(CLUSFilter) returns (stream CLUSSessionArray);
+  rpc ClearSession(CLUSFilter) returns (RPCVoid);
+  rpc GetStats(CLUSFilter) returns (CLUSStats);
+  rpc GetSessionCounter(RPCVoid) returns (CLUSSessionCounter);
+  rpc GetDatapathCounter(RPCVoid) returns (CLUSDatapathCounter);
+  rpc GetDerivedPolicyRules(CLUSFilter) returns (CLUSDerivedPolicyRuleMap);
+  rpc ProbeSummary(RPCVoid) returns (CLUSProbeSummary);
+  rpc ProbeProcessMap(RPCVoid) returns (CLUSProbeProcessArray);
+  rpc ProbeContainerMap(RPCVoid) returns (CLUSProbeContainerArray);
+  rpc SnifferCmd(CLUSSnifferRequest) returns (CLUSSnifferResponse);
+  rpc GetSniffers(CLUSSnifferFilter) returns (CLUSSnifferArray);
+  rpc GetSnifferPcap(CLUSSnifferDownload) returns (stream CLUSSnifferPcap);
+  rpc GetContainerLogs(CLUSContainerLogReq) returns (stream CLUSContainerLogRes);
+  rpc RunDockerBench(RPCVoid) returns (RPCVoid);
+  rpc RunKubernetesBench(RPCVoid) returns (RPCVoid);
+  rpc GetFileMonitorFile(CLUSFilter) returns (CLUSFileMonitorFileArray);
+  rpc GetProcess(CLUSFilter) returns (CLUSProcessArray);
+  rpc GetProcessHistory(CLUSFilter) returns (CLUSProcessArray);
+  rpc GetDerivedDlpRules(CLUSFilter) returns (CLUSDerivedDlpRuleMap);
+  rpc GetDerivedDlpRuleEntries(CLUSFilter) returns (CLUSDerivedDlpRuleEntryArray);
+  rpc GetDerivedDlpRuleMacs(CLUSFilter) returns (CLUSDerivedDlpRuleMacArray);
+  rpc GetDerivedWorkloadProcessRule(CLUSFilter) returns (CLUSDerivedProcessRuleArray);
+  rpc GetDerivedWorkloadFileRule(CLUSFilter) returns (CLUSDerivedFileRuleArray);
+  rpc GetContainerIntercept(CLUSFilter) returns (CLUSWorkloadIntercept);
+  rpc GetMeterList(CLUSFilter) returns (stream CLUSMeterArray);
+  rpc ProfilingCmd(CLUSProfilingRequest) returns (RPCVoid);
+}
+
+service EnforcerScanService {
+  rpc ScanGetFiles(ScanRunningRequest) returns (ScanData);
+}

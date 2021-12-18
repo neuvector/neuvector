@@ -1,0 +1,786 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/container"
+	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/system"
+	"github.com/neuvector/neuvector/share/utils"
+)
+
+const clusterCheckInterval time.Duration = time.Second * 2
+
+// const LogFile string = "/var/log/ranger/monitor.log"
+var ClusterEventChan chan *ClusterEvent = make(chan *ClusterEvent, 256)
+
+var selfAddr string
+var leadAddr string
+var leadGrpcPort uint16
+
+var admitChan chan bool = make(chan bool, 1)
+var admitted bool = false
+var errNotAdmitted = errors.New("Enforcer is not able to join the cluster")
+var errCtrlNotReady = errors.New("Controller is not ready")
+
+type workloadInfo struct {
+	wl *share.CLUSWorkload
+}
+
+var wlCacheMap map[string]*workloadInfo = make(map[string]*workloadInfo)
+
+func leaveCluster() {
+	// Don't try to remove keys. Let controller do that.
+	if !agentEnv.runWithController {
+		cluster.LeaveCluster(false)
+	}
+}
+
+func waitForAdmission() error {
+	shortWait := time.Second * 2
+	longWait := time.Second * 15
+	maxRetry := 60
+	retry := 0
+
+	print := true
+	for {
+		if val, err := cluster.Get(share.CLUSCtrlNodeAdmissionKey); err != nil || string(val) != share.CLUSCtrlEnabledValue {
+			time.Sleep(shortWait)
+			retry++
+		} else {
+			break
+		}
+		if print {
+			log.Error("Node admission is not enabled yet")
+			print = false
+		}
+		if retry > maxRetry {
+			// we can get here if the license is not loaded
+			return errCtrlNotReady
+		}
+	}
+
+	log.Info("Node admission is enabled")
+
+	req := share.CLUSAdmissionRequest{
+		ID: Agent.ID, HostID: Host.ID, HostCPUs: Host.CPUs, HostMemory: Host.Memory,
+	}
+
+	retry = 0
+	for {
+		log.Info("Sending join request")
+		resp, err := requestAdmission(&req, time.Second*4)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Agent join request failed")
+			time.Sleep(shortWait)
+		} else if !resp.Allowed {
+			// Most likely the connection request is rejected due to license
+			log.WithFields(log.Fields{"reason": resp.Reason}).Error("Agent join request rejected")
+			time.Sleep(longWait)
+		} else {
+			break
+		}
+
+		retry++
+		if retry > maxRetry {
+			return errNotAdmitted
+		}
+	}
+
+	log.Info("Agent join request accepted")
+
+	return nil
+}
+
+func clusterStart(clusterCfg *cluster.ClusterConfig) error {
+	log.WithFields(log.Fields{"with_ctlr": agentEnv.runWithController}).Debug("")
+
+	var err error
+	if !agentEnv.runWithController {
+		if err = cluster.FillClusterAddrs(clusterCfg, global.SYS); err != nil {
+			return err
+		}
+		leadAddr, err = cluster.StartCluster(clusterCfg)
+		if err != nil {
+			return err
+		}
+	} else {
+		leadAddr, err = cluster.StartCluster(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = waitForAdmission(); err != nil {
+		return err
+	}
+
+	admitted = true
+	selfAddr = cluster.GetSelfAddress()
+
+	return nil
+}
+
+func s2cConfig(subject, id string, data []byte) {
+	switch subject {
+	case "workload":
+		// SET-KEY: .../workload/<workload_id>
+		var conf share.CLUSWorkloadConfig
+		json.Unmarshal(data, &conf)
+
+		task := ContainerTask{task: TASK_CONFIG_CONTAINER, id: id, macConf: &conf}
+		ContainerTaskChan <- &task
+	case "agent":
+		// SET-KEY: .../agent/<agent_id>
+		var conf share.CLUSAgentConfig
+		json.Unmarshal(data, &conf)
+
+		task := ContainerTask{task: TASK_CONFIG_AGENT, agentConf: &conf}
+		ContainerTaskChan <- &task
+	}
+}
+
+func uniconfHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
+	log.WithFields(log.Fields{
+		"type": cluster.ClusterNotifyName[nType], "key": key,
+	}).Debug("")
+
+	// Key removed only means it's recycled. All config and diagnose command should be explicit.
+	if nType == cluster.ClusterNotifyDelete {
+		return
+	}
+
+	subject := share.CLUSUniconfKey2Subject(key)
+	id := share.CLUSUniconfKey2ID(key)
+	log.WithFields(log.Fields{"subject": subject, "id": id}).Debug("")
+
+	s2cConfig(subject, id, value)
+}
+
+func logAgent(ev share.TLogEvent) {
+	clog := share.CLUSEventLog{
+		Event:     ev,
+		HostID:    Host.ID,
+		HostName:  Host.Name,
+		AgentID:   Agent.ID,
+		AgentName: Agent.Name,
+	}
+	switch ev {
+	case share.CLUSEvAgentStart:
+		clog.ReportedAt = agentEnv.startsAt
+	default:
+		clog.ReportedAt = time.Now().UTC()
+	}
+
+	evqueue.Append(&clog)
+}
+
+func logWorkload(ev share.TLogEvent, wl *share.CLUSWorkload, msg *string) {
+	// ignore NeuVector containers
+	if wl.PlatformRole == container.PlatformContainerNeuVector {
+		return
+	}
+
+	clog := share.CLUSEventLog{
+		Event:        ev,
+		HostID:       Host.ID,
+		HostName:     Host.Name,
+		AgentID:      Agent.ID,
+		AgentName:    Agent.Name,
+		WorkloadID:   wl.ID,
+		WorkloadName: wl.Name,
+	}
+	if msg != nil {
+		clog.Msg = *msg
+	}
+	switch ev {
+	case share.CLUSEvWorkloadStart:
+		clog.ReportedAt = wl.StartedAt
+	case share.CLUSEvWorkloadStop:
+		clog.ReportedAt = wl.FinishedAt
+	default:
+		clog.ReportedAt = time.Now().UTC()
+	}
+
+	evqueue.Append(&clog)
+}
+
+var curMemoryPressure uint64
+
+func memoryPressureNotification(rpt *system.MemoryPressureReport) {
+	if rpt.Level > 2 { // cap its maximum
+		rpt.Level = 2
+	}
+
+	if rpt.Level == curMemoryPressure {
+		return // skip report
+	}
+
+	log.WithFields(log.Fields{"rpt": rpt}).Info()
+	// launch falling-edge watcher
+	if curMemoryPressure == 0 {
+		go func() {
+			var err error
+			var mStats *system.CgroupMemoryStats
+
+			acc := 0
+			for acc < 7 {
+				time.Sleep(time.Minute * 1)
+				if mStats, err = global.SYS.GetContainerMemoryStats(); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("mem stat")
+					continue
+				}
+
+				limit := mStats.Usage.Limit
+				if mStats.Usage.Limit == 0 { // it's hitting node's limit
+					limit = uint64(Host.Memory)
+				}
+
+				ratio := uint64(rpt.Stats.WorkingSet * 100 / limit)
+				// log.WithFields(log.Fields{"ratio": ratio, "acc": acc, "limit": limit}).Debug()
+				if ratio <= 50 { // what is the reasonable threshold?
+					acc++
+				} else {
+					acc = 0
+				}
+			}
+
+			rptt := &system.MemoryPressureReport{
+				Level: 0, // assumption
+				Stats: *mStats,
+			}
+
+			putMemoryPressureEvent(rptt, false)
+			curMemoryPressure = 0 // reset
+		}()
+	}
+
+	curMemoryPressure = rpt.Level
+
+	//
+	putMemoryPressureEvent(rpt, true)
+}
+
+func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool) {
+	var description string
+	if rpt.Stats.Usage.Limit == 0 {
+		// it's hitting node's limit
+		ratio := uint64(rpt.Stats.WorkingSet * 100 / uint64(Host.Memory))
+		if setRisingEdge {
+			description = fmt.Sprintf("Memory usage[%d kB] is more than %d %% of the node memory[%d kB]", rpt.Stats.WorkingSet/1024, ratio, Host.Memory/1024)
+		} else {
+			description = fmt.Sprintf("Memory usage[%d kB] is normal, %d %% of the node memory[%d kB]", rpt.Stats.WorkingSet/1024, ratio, Host.Memory/1024)
+		}
+	} else {
+		ratio := uint64(rpt.Stats.WorkingSet * 100 / rpt.Stats.Usage.Limit)
+		if setRisingEdge {
+			description = fmt.Sprintf("Memory usage[%d kB] is more than %d %% of the container memory limit[%d kB]", rpt.Stats.WorkingSet/1024, ratio, rpt.Stats.Usage.Limit/1024)
+		} else {
+			description = fmt.Sprintf("Memory usage[%d kB] is normal, %d %% of the container memory limit[%d kB]", rpt.Stats.WorkingSet/1024, ratio, rpt.Stats.Usage.Limit/1024)
+		}
+	}
+
+	report := map[string]interface{}{
+		"Description":  description,
+		"Level":        rpt.Level,
+		"UsageLimit":   rpt.Stats.Usage.Limit,
+		"NetUsage":     rpt.Stats.WorkingSet,
+		"MaxUsage":     rpt.Stats.Usage.MaxUsage,
+		"ActiveAnon":   rpt.Stats.Stats["active_anon"],
+		"InactiveAnon": rpt.Stats.Stats["inactive_anon"],
+		"Cache":        rpt.Stats.Stats["cache"],
+		"PageFaults":   rpt.Stats.Stats["pgfault"],
+		"RSS":          rpt.Stats.Stats["rss"],
+		"Failcnt":      rpt.Stats.Usage.Failcnt,
+	}
+
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(report)
+	msg := b.String()
+
+	// log.WithFields(log.Fields{"msg": msg}).Debug()
+
+	clog := share.CLUSEventLog{
+		Event:      share.CLUSEvMemoryPressureAgent,
+		HostID:     Host.ID,
+		HostName:   Host.Name,
+		AgentID:    Agent.ID,
+		AgentName:  Agent.Name,
+		ReportedAt: time.Now().UTC(),
+		Msg:        msg,
+	}
+	evqueue.Append(&clog)
+}
+
+// PUT-KEY: /object/host/<host_docker_id>
+// PUT-KEY: /object/device/<host_docker_id>/<device_uuid>
+func putLocalInfo() {
+	log.Debug()
+
+	value, _ := json.Marshal(Host)
+	key := share.CLUSHostKey(Host.ID, "agent")
+	if err := cluster.Put(key, value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+
+	Agent.ClusterIP = selfAddr
+	value, _ = json.Marshal(Agent)
+	key = share.CLUSAgentKey(Host.ID, Agent.ID)
+	if err := cluster.Put(key, value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+}
+
+func deleteAgentInfo() {
+	log.Debug()
+
+	key := share.CLUSAgentKey(Host.ID, Agent.ID)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+	}
+}
+
+// PUT-KEY: /object/workload/<host_id>/<id>
+func putNetworkEP(nep *share.CLUSNetworkEP) {
+	value, _ := json.Marshal(nep)
+	key := share.CLUSNetworkEPKey(Host.ID, nep.ID)
+	if err := cluster.Put(key, value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+}
+
+func deleteNetworkEP(nepID string) {
+	key := share.CLUSNetworkEPKey(Host.ID, nepID)
+	cluster.Delete(key)
+}
+
+// PUT-KEY: /object/workload/<host_id>/<uuid>
+func putWorkload(wl *share.CLUSWorkload) {
+	value, _ := json.Marshal(wl)
+	key := share.CLUSWorkloadKey(Host.ID, wl.ID)
+	if err := cluster.Put(key, value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+}
+
+func putContainerForStop(info *container.ContainerMetaExtra, wl *share.CLUSWorkload) {
+	log.WithFields(log.Fields{"container": info.ID}).Debug("")
+
+	wl.FinishedAt = info.FinishedAt
+	wl.Running = info.Running
+	wl.ExitCode = info.ExitCode
+	wl.Pid = info.Pid
+
+	// !!! Keep interface IP so controller could easily use the IP to remove ip-workload map entries
+	// !!! when it figured the container is not running
+	// wl.Ifaces = make(map[string][]share.CLUSIPAddr)
+	// wl.Apps = make(map[string]share.CLUSApp)
+	putWorkload(wl)
+}
+
+func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
+	wl := share.CLUSWorkload{
+		ID:           info.ID,
+		Name:         info.Name,
+		SelfHostname: info.Hostname,
+		AgentID:      Agent.ID,
+		HostName:     Host.Name,
+		HostID:       Host.ID,
+		Image:        info.Image,
+		ImageID:      info.ImageID,
+		Author:       info.Author,
+		NetworkMode:  info.NetMode,
+		Privileged:   info.Privileged,
+		RunAsRoot:    info.RunAsRoot,
+		CreatedAt:    info.CreatedAt,
+		StartedAt:    info.StartedAt,
+		FinishedAt:   info.FinishedAt,
+		Running:      info.Running,
+		ExitCode:     info.ExitCode,
+		Pid:          info.Pid,
+		Inline:       false,
+		Labels:       info.Labels,
+		MemoryLimit:  info.MemoryLimit,
+		CPUs:         info.CPUs,
+		ProxyMesh:    info.ProxyMesh,
+		Sidecar:      info.Sidecar,
+		Ifaces:       make(map[string][]share.CLUSIPAddr),
+		Ports:        make(map[string]share.CLUSMappedPort),
+		Apps:         make(map[string]share.CLUSApp),
+	}
+
+	if wl.Running {
+		if info.IPAddress != "" {
+			wl.Ifaces["eth0"] = []share.CLUSIPAddr{
+				share.CLUSIPAddr{
+					IPNet: net.IPNet{
+						IP:   net.ParseIP(info.IPAddress),
+						Mask: net.CIDRMask(info.IPPrefixLen, 32),
+					},
+					// Gateway info is not used right now and is not read from
+					// pullAllContainerPorts() either
+					// Gateway: info.NetworkSettings.Gateway,
+					Scope: share.CLUSIPAddrScopeLocalhost,
+				},
+			}
+		}
+	}
+
+	svc := global.ORCH.GetService(&info.ContainerMeta)
+	wl.Service = utils.MakeServiceName(svc.Domain, svc.Name)
+	wl.Domain = svc.Domain
+	return &wl
+}
+
+func translateAppMap(apps map[share.CLUSProtoPort]*share.CLUSApp) map[string]share.CLUSApp {
+	newApps := make(map[string]share.CLUSApp, len(apps))
+	for p, app := range apps {
+		key := utils.GetPortLink(p.IPProto, p.Port)
+		newApps[key] = *app
+	}
+	return newApps
+}
+
+func translateMappedPort(ports map[share.CLUSProtoPort]*share.CLUSMappedPort) map[string]share.CLUSMappedPort {
+	newPorts := make(map[string]share.CLUSMappedPort, len(ports))
+	for p, port := range ports {
+		key := utils.GetPortLink(p.IPProto, p.Port)
+		newPorts[key] = *port
+	}
+	return newPorts
+}
+
+// Translate open port to host port map, only used for host-mode container
+func app2MappedPort(apps map[share.CLUSProtoPort]*share.CLUSApp) map[share.CLUSProtoPort]*share.CLUSMappedPort {
+	ports := make(map[share.CLUSProtoPort]*share.CLUSMappedPort, len(apps))
+	for p, _ := range apps {
+		cp := share.CLUSProtoPort{
+			Port:    p.Port,
+			IPProto: p.IPProto,
+		}
+		ports[cp] = &share.CLUSMappedPort{
+			CLUSProtoPort: cp,
+			HostIP:        net.ParseIP("0.0.0.0"),
+			HostPort:      p.Port,
+		}
+	}
+	return ports
+}
+
+func updateContainer(ev *ClusterEvent, wl *share.CLUSWorkload) {
+	if ev.capIntcp != nil {
+		wl.CapIntcp = *ev.capIntcp
+	}
+	if ev.capSniff != nil {
+		wl.CapSniff = *ev.capSniff
+	}
+	if ev.inline != nil {
+		wl.Inline = *ev.inline
+	}
+	if ev.quar != nil {
+		quar := wl.Quarantine
+		wl.Quarantine = *ev.quar
+		if !quar && wl.Quarantine {
+			logWorkload(share.CLUSEvWorkloadQuarantined, wl, ev.quarReason)
+		} else if quar && !wl.Quarantine {
+			logWorkload(share.CLUSEvWorkloadUnquarantined, wl, nil)
+		}
+	}
+
+	if ev.apps != nil {
+		wl.Apps = ev.apps
+	}
+	if ev.ports != nil {
+		wl.Ports = ev.ports
+	}
+	if ev.ifaces != nil {
+		wl.Ifaces = ev.ifaces
+	}
+	if ev.service != nil {
+		wl.Service = *ev.service
+	}
+	if ev.domain != nil {
+		wl.Domain = *ev.domain
+	}
+	if ev.role != nil {
+		wl.PlatformRole = *ev.role
+	}
+	if ev.shareNetNS != nil {
+		wl.ShareNetNS = *ev.shareNetNS
+	}
+	if ev.info != nil {
+		wl.ProxyMesh = ev.info.ProxyMesh
+	}
+}
+
+func clusterAddContainer(ev *ClusterEvent) {
+	log.WithFields(log.Fields{"container": ev.id}).Debug("")
+
+	if cache, ok := wlCacheMap[ev.id]; !ok || cache.wl.Running != ev.info.Running {
+		wl := createWorkload(ev.info)
+		if ev.role != nil {
+			wl.PlatformRole = *ev.role
+		}
+		logWorkload(share.CLUSEvWorkloadStart, wl, nil)
+
+		updateContainer(ev, wl)
+		wl.SecuredAt = time.Now().UTC()
+		logWorkload(share.CLUSEvWorkloadSecured, wl, nil)
+
+		if !wl.Running && wl.FinishedAt.IsZero() {
+			// this short-lived workload was stopped before report adding a workload event
+			// fabricate a reference time
+			wl.FinishedAt = time.Now().UTC()
+		}
+
+		putWorkload(wl)
+		wlCacheMap[ev.id] = &workloadInfo{wl: wl}
+		if !wl.Running {
+			logWorkload(share.CLUSEvWorkloadStop, wl, nil)
+		}
+	}
+}
+
+func clusterStopContainer(ev *ClusterEvent) {
+	log.WithFields(log.Fields{"container": ev.id}).Debug("")
+
+	if cache, ok := wlCacheMap[ev.id]; ok {
+		if cache.wl.Running {
+			putContainerForStop(ev.info, cache.wl)
+			logWorkload(share.CLUSEvWorkloadStop, cache.wl, nil)
+		}
+	} else {
+		// This should not happen with the new code change - 03/02/2017
+		log.WithFields(log.Fields{"id": ev.id}).Error("Miss add event!")
+		// Container might not be intercepted and reported yet.
+		wl := createWorkload(ev.info)
+		putWorkload(wl)
+		wlCacheMap[ev.id] = &workloadInfo{wl: wl}
+
+		logWorkload(share.CLUSEvWorkloadStart, wl, nil)
+		logWorkload(share.CLUSEvWorkloadStop, wl, nil)
+	}
+}
+
+func clusterDelContainer(id string) {
+	log.WithFields(log.Fields{"container": id}).Debug("")
+
+	key := share.CLUSWorkloadKey(Host.ID, id)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+	key = share.CLUSBenchReportKey(id, share.BenchContainer)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+	key = share.CLUSBenchReportKey(id, share.BenchCustomContainer)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+	key = share.CLUSBenchReportKey(id, share.BenchContainerSecret)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+	key = share.CLUSBenchReportKey(id, share.BenchContainerSetID)
+	if err := cluster.Delete(key); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+	if cache, ok := wlCacheMap[id]; ok {
+		logWorkload(share.CLUSEvWorkloadRemove, cache.wl, nil)
+		delete(wlCacheMap, id)
+	}
+}
+
+func clusterUpdateContainer(ev *ClusterEvent) {
+	log.WithFields(log.Fields{"container": ev.id}).Debug("")
+
+	cache, ok := wlCacheMap[ev.id]
+	if !ok {
+		log.Errorf("Unable to find container in cache.")
+		return
+	}
+
+	updateContainer(ev, cache.wl)
+
+	putWorkload(cache.wl)
+}
+
+func clusterRefreshContainers() {
+	log.Debug("")
+
+	// Remove non-existing containers from cluster
+	existing := utils.NewSet()
+	for id, _ := range wlCacheMap {
+		existing.Add(id)
+	}
+
+	store := share.CLUSWorkloadHostStore(Host.ID)
+	keys, _ := cluster.GetStoreKeys(store)
+	for _, key := range keys {
+		id := share.CLUSWorkloadKey2ID(key)
+		if !existing.Contains(id) {
+			cluster.Delete(key)
+		}
+	}
+
+	// Report container information
+	for _, cache := range wlCacheMap {
+		putWorkload(cache.wl)
+	}
+}
+
+func clusterEventHandler(ev *ClusterEvent) {
+	log.WithFields(log.Fields{"event": ClusterEventName[ev.event]}).Debug("start")
+	switch ev.event {
+	case EV_ADD_CONTAINER:
+		clusterAddContainer(ev)
+	case EV_STOP_CONTAINER:
+		clusterStopContainer(ev)
+	case EV_DEL_CONTAINER:
+		clusterDelContainer(ev.id)
+	case EV_REFRESH_CONTAINERS:
+		clusterRefreshContainers()
+	case EV_UPDATE_CONTAINER:
+		clusterUpdateContainer(ev)
+	}
+	log.WithFields(log.Fields{"event": ClusterEventName[ev.event]}).Debug("Done")
+}
+
+func uploadCurrentInfo() {
+	log.Debug("")
+
+	putLocalInfo()
+
+	ev := ClusterEvent{event: EV_REFRESH_CONTAINERS}
+	ClusterEventChan <- &ev
+}
+
+var clusterFailed bool = false
+
+func leadChangeHandler(newLead, oldLead string) {
+	log.WithFields(log.Fields{"newLead": newLead, "oldLead": oldLead}).Info("")
+	if shouldExit() {
+		return
+	}
+	if newLead == "" {
+		leadAddr = ""
+		clusterFailed = true
+		cluster.PauseAllWatchers(true)
+	} else {
+		leadAddr = newLead
+		if clusterFailed {
+			clusterFailed = false
+			uploadCurrentInfo()
+			if Host.CapDockerBench {
+				bench.RerunDocker()
+			}
+			if Host.CapKubeBench {
+				bench.RerunKube("", "")
+			}
+			cluster.ResumeAllWatchers()
+		}
+	}
+}
+
+func getControllerFromCluster(ip string) *share.CLUSController {
+	store := share.CLUSControllerStore
+	keys, _ := cluster.GetStoreKeys(store)
+	for _, key := range keys {
+		if value, err := cluster.Get(key); err == nil {
+			var ctrl share.CLUSController
+			json.Unmarshal(value, &ctrl)
+			if ctrl.ClusterIP == ip {
+				return &ctrl
+			}
+		} else {
+			log.WithFields(log.Fields{"err": err}).Debug("")
+		}
+	}
+	return nil
+}
+
+func getLeadGRPCEndpoint() string {
+	// Assume leadGrpcPort is not changed, so we only grab it once
+	if leadGrpcPort == 0 {
+		if ctrler := getControllerFromCluster(leadAddr); ctrler != nil {
+			leadGrpcPort = ctrler.RPCServerPort
+		}
+	}
+	if leadAddr == "" || leadGrpcPort == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s:%v", leadAddr, leadGrpcPort)
+}
+
+func clusterLoop(existing utils.Set) {
+	// Remove non-existing containers from cluster
+	store := share.CLUSWorkloadHostStore(Host.ID)
+	keys, _ := cluster.GetStoreKeys(store)
+	for _, key := range keys {
+		id := share.CLUSWorkloadKey2ID(key)
+		if !existing.Contains(id) {
+			cluster.Delete(key)
+		}
+	}
+
+	// Start event loop first so existing containers can be posted
+	go func() {
+		for {
+			if shouldExit() {
+				log.Info("Exit cluster worker")
+				break
+			}
+			select {
+			case ev := <-ClusterEventChan:
+				if ev.event != EV_CLUSTER_EXIT {
+					clusterEventHandler(ev)
+				}
+			}
+		}
+
+		logAgent(share.CLUSEvAgentStop)
+		evqueue.Flush()
+
+		// Delete agent info only, keep the host so when the new agent starts
+		// on the same host, network connection info can be retained.
+		deleteAgentInfo()
+		leaveCluster()
+	}()
+
+	sorted := sortContainerByNetMode(existing)
+
+	// Update existing containers to cluster.
+	go func() {
+		for _, info := range sorted {
+			log.WithFields(log.Fields{"id": info.ID, "name": info.Name}).Info()
+			task := ContainerTask{task: TASK_ADD_CONTAINER, id: info.ID, info: info}
+			ContainerTaskChan <- &task
+		}
+
+		// At this time, local container and devices info has been processed, corresponding
+		// container tasks have been enqueued. Now, we can start listening config and diagnose
+		// command, because they can only applied to known objects.
+		cluster.RegisterStoreWatcher(share.CLUSUniconfTargetStore(Host.ID), uniconfHandler, false)
+		cluster.RegisterStoreWatcher(share.CLUSNetworkStore, systemUpdateHandler, false)
+		cluster.RegisterStoreWatcher(share.CLUSNodeCommonProfileStore, systemUpdateHandler, agentEnv.kvCongestCtrl)
+		cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, agentEnv.kvCongestCtrl)
+		cluster.RegisterLeadChangeWatcher(leadChangeHandler, leadAddr)
+	}()
+}
+
+func closeCluster() {
+	cluster.PauseAllWatchers(true)
+
+	if len(ClusterEventChan) == 0 {
+		ev := ClusterEvent{event: EV_CLUSTER_EXIT}
+		ClusterEventChan <- &ev
+	}
+}

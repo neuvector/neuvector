@@ -1,0 +1,85 @@
+.TH "Config helpers" 3 "Mon Sep 13 2021" "Version 1.0.5" "libnetfilter_queue" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+Config helpers \- 
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "void \fBnfq_nlmsg_cfg_put_cmd\fP (struct nlmsghdr *nlh, uint16_t pf, uint8_t cmd)"
+.br
+.ti -1c
+.RI "void \fBnfq_nlmsg_cfg_put_params\fP (struct nlmsghdr *nlh, uint8_t mode, int range)"
+.br
+.ti -1c
+.RI "void \fBnfq_nlmsg_cfg_put_qmaxlen\fP (struct nlmsghdr *nlh, uint32_t queue_maxlen)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+
+.SH "Function Documentation"
+.PP 
+.SS "void nfq_nlmsg_cfg_put_cmd (struct nlmsghdr *nlh, uint16_tpf, uint8_tcmd)"
+nfq_nlmsg_cfg_put_cmd Add netlink config command to netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fIpf\fP Packet family (e\&.g\&. AF_INET) 
+.br
+\fIcmd\fP nfqueue nfnetlink command\&.
+.RE
+.PP
+Possible commands are:
+.PP
+.IP "\(bu" 2
+NFQNL_CFG_CMD_NONE: Do nothing\&. It can be useful to know if the queue subsystem is working\&.
+.IP "\(bu" 2
+NFQNL_CFG_CMD_BIND: Binds the program to a specific queue\&.
+.IP "\(bu" 2
+NFQNL_CFG_CMD_UNBIND: Unbinds the program to a specifiq queue\&.
+.PP
+.PP
+Obsolete commands:
+.IP "\(bu" 2
+NFQNL_CFG_CMD_PF_BIND: Binds to process packets belonging to the given protocol family (ie\&. PF_INET, PF_INET6, etc)\&.
+.IP "\(bu" 2
+NFQNL_CFG_CMD_PF_UNBIND: Unbinds from processing packets belonging to the given protocol family\&. Both commands are ignored by Linux kernel 3\&.8 and later versions\&. 
+.PP
+
+.PP
+Definition at line 166 of file nlmsg\&.c\&.
+.SS "void nfq_nlmsg_cfg_put_params (struct nlmsghdr *nlh, uint8_tmode, intrange)"
+nfq_nlmsg_cfg_put_params Add parameter to netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fImode\fP one of NFQNL_COPY_NONE, NFQNL_COPY_META or NFQNL_COPY_PACKET 
+.br
+\fIrange\fP value of parameter 
+.RE
+.PP
+
+.PP
+Definition at line 182 of file nlmsg\&.c\&.
+.SS "void nfq_nlmsg_cfg_put_qmaxlen (struct nlmsghdr *nlh, uint32_tqueue_maxlen)"
+nfq_nlmsg_cfg_put_qmaxlen Add queue maximum length to netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fIqueue_maxlen\fP Maximum queue length 
+.RE
+.PP
+
+.PP
+Definition at line 197 of file nlmsg\&.c\&.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libnetfilter_queue from the source code\&.

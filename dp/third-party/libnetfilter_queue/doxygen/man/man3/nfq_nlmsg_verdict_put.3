@@ -1,0 +1,122 @@
+.TH "Verdict helpers" 3 "Mon Sep 13 2021" "Version 1.0.5" "libnetfilter_queue" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+Verdict helpers \- 
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "void \fBnfq_nlmsg_verdict_put\fP (struct nlmsghdr *nlh, int id, int verdict)"
+.br
+.ti -1c
+.RI "void \fBnfq_nlmsg_verdict_put_mark\fP (struct nlmsghdr *nlh, uint32_t mark)"
+.br
+.ti -1c
+.RI "void \fBnfq_nlmsg_verdict_put_pkt\fP (struct nlmsghdr *nlh, const void *pkt, uint32_t plen)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+
+.SH "Function Documentation"
+.PP 
+.SS "void nfq_nlmsg_verdict_put (struct nlmsghdr *nlh, intid, intverdict)"
+nfq_nlmsg_verdict_put - Put a verdict into a Netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fIid\fP ID assigned to packet by netfilter 
+.br
+\fIverdict\fP verdict to return to netfilter (see \fBVerdicts\fP below) 
+.RE
+.PP
+\fBVerdicts\fP
+.RS 4
+\fBNF_DROP\fP Drop the packet\&. This is final\&. 
+.br
+ \fBNF_ACCEPT\fP Accept the packet\&. Processing of the current base chain and any called chains terminates, but the packet may still be processed by subsequently invoked base chains\&. 
+.br
+ \fBNF_STOP\fP Like \fBNF_ACCEPT\fP, but skip any further base chains using the current hook\&. 
+.br
+ \fBNF_REPEAT\fP Like \fBNF_ACCEPT\fP, but re-queue this packet to the current base chain\&. One way to prevent a re-queueing loop is to also set a packet mark using \fBnfq_nlmsg_verdict_put_mark()\fP and have the program test for this mark in \fCattr\fP[NFQA_MARK]; or have the nefilter rules do this test\&. 
+.br
+ \fBNF_QUEUE_NR\fP(\fInew_queue\fP) Like \fBNF_ACCEPT\fP, but queue this packet to queue number \fInew_queue\fP\&. As with the command-line \fBqueue\fP \fBnum\fP verdict, if no process is listening to that queue then the packet is discarded; but again like with the command-line, one may OR in a flag to bypass \fInew_queue\fP if there is no listener, as in this snippet: 
+.PP
+.nf
+       nfq_nlmsg_verdict_put(nlh, id, NF_QUEUE_NR(new_queue) |
+               NF_VERDICT_FLAG_QUEUE_BYPASS);
+
+.fi
+.PP
+.RE
+.PP
+See \fBexamples/nf-queue\&.c\fP, line \fC46\fP for an example of how to use this function in context\&. The calling sequence is \fBmain\fP --> \fBmnl_cb_run\fP --> \fBqueue_cb\fP --> \fBnfq_send_verdict\fP --> \fBnfq_nlmsg_verdict_put\fP (\fBcb\fP being short for \fBcallback\fP)\&. 
+.PP
+Definition at line 72 of file nlmsg\&.c\&.
+.SS "void nfq_nlmsg_verdict_put_mark (struct nlmsghdr *nlh, uint32_tmark)"
+nfq_nlmsg_verdict_put_mark - Put a packet mark into a netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fImark\fP Value of mark to put
+.RE
+.PP
+The mark becomes part of the packet's metadata, and may be tested by the \fInft primary expression\fP \fBmeta mark\fP 
+.PP
+\fBSee Also:\fP
+.RS 4
+\fBnft\fP(1) 
+.RE
+.PP
+
+.PP
+Definition at line 91 of file nlmsg\&.c\&.
+.SS "void nfq_nlmsg_verdict_put_pkt (struct nlmsghdr *nlh, const void *pkt, uint32_tplen)"
+nfq_nlmsg_verdict_put_pkt - Put replacement packet content into a netlink message 
+.PP
+\fBParameters:\fP
+.RS 4
+\fInlh\fP Pointer to netlink message 
+.br
+\fIpkt\fP Pointer to start of modified IP datagram 
+.br
+\fIplen\fP Length of modified IP datagram
+.RE
+.PP
+There is only ever a need to return packet content if it has been modified\&. Usually one of the nfq_*_mangle_* functions does the modifying\&.
+.PP
+This code snippet uses nfq_udp_mangle_ipv4\&. See \fBnf-queue\&.c\fP for context: 
+.PP
+.nf
+// main calls queue_cb (line 64) to process an enqueued packet:
+        // Extra variables
+        uint8_t *payload, *rep_data;
+        unsigned int match_offset, match_len, rep_len;
+
+        // The next line was commented-out (with payload void*)
+        payload = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
+        // Copy data to a packet buffer (allow 255 bytes for mangling).
+        pktb = pktb_alloc(AF_INET, payload, plen, 255);
+        // (decide that this packet needs mangling)
+        nfq_udp_mangle_ipv4(pktb, match_offset, match_len, rep_data, rep_len);
+        // nfq_udp_mangle_ipv4 updates packet length, no need to track locally
+
+        // Eventually nfq_send_verdict (line 39) gets called
+        // The received packet may or may not have been modified.
+        // Add this code before nfq_nlmsg_verdict_put call:
+        if (pktb_mangled(pktb))
+                nfq_nlmsg_verdict_put_pkt(nlh, pktb_data(pktb), pktb_len(pktb));
+
+.fi
+.PP
+ 
+.PP
+Definition at line 130 of file nlmsg\&.c\&.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libnetfilter_queue from the source code\&.

@@ -1,0 +1,185 @@
+.TH "User-space network packet buffer" 3 "Mon Sep 13 2021" "Version 1.0.5" "libnetfilter_queue" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+User-space network packet buffer \- 
+.SS "Modules"
+
+.in +1c
+.ti -1c
+.RI "\fBOther functions\fP"
+.br
+.in -1c
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "struct pkt_buff * \fBpktb_alloc\fP (int family, void *data, size_t len, size_t extra)"
+.br
+.ti -1c
+.RI "uint8_t * \fBpktb_data\fP (struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "uint32_t \fBpktb_len\fP (struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "void \fBpktb_free\fP (struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "int \fBpktb_mangle\fP (struct pkt_buff *pktb, int dataoff, unsigned int match_offset, unsigned int match_len, const char *rep_buffer, unsigned int rep_len)"
+.br
+.ti -1c
+.RI "bool \fBpktb_mangled\fP (const struct pkt_buff *pktb)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+This library provides the user-space network packet buffer\&. This abstraction is strongly inspired by Linux kernel network buffer, the so-called sk_buff\&. 
+.SH "Function Documentation"
+.PP 
+.SS "struct pkt_buff* pktb_alloc (intfamily, void *data, size_tlen, size_textra)"
+pktb_alloc - allocate a new packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIfamily\fP Indicate what family\&. Currently supported families are AF_BRIDGE, AF_INET & AF_INET6\&. 
+.br
+\fIdata\fP Pointer to packet data 
+.br
+\fIlen\fP Packet length 
+.br
+\fIextra\fP Extra memory in the tail to be allocated (for mangling)
+.RE
+.PP
+This function returns a packet buffer that contains the packet data and some extra memory room in the tail (if requested)\&.
+.PP
+\fBReturns:\fP
+.RS 4
+Pointer to a new userspace packet buffer or NULL on failure\&. 
+.RE
+.PP
+\fBErrors\fP
+.RS 4
+\fBENOMEM\fP From \fBcalloc\fP() 
+.br
+\fBEPROTONOSUPPORT\fP \fIfamily\fP was \fBAF_BRIDGE\fP and this is not an IP packet (v4 or v6) 
+.RE
+.PP
+\fBSee Also:\fP
+.RS 4
+\fBcalloc\fP(3) 
+.RE
+.PP
+
+.PP
+Definition at line 81 of file pktbuff\&.c\&.
+.SS "uint8_t* pktb_data (struct pkt_buff *pktb)"
+pktb_data - get pointer to network packet 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+Pointer to start of network packet data within \fBpktb\fP 
+.RE
+.PP
+\fB\fP
+.RS 4
+It is appropriate to use \fIpktb_data\fP as the second argument of \fBnfq_nlmsg_verdict_put_pkt()\fP 
+.RE
+.PP
+
+.PP
+Definition at line 116 of file pktbuff\&.c\&.
+.SS "void pktb_free (struct pkt_buff *pktb)"
+pktb_free - release packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.RE
+.PP
+
+.PP
+Definition at line 140 of file pktbuff\&.c\&.
+.SS "uint32_t pktb_len (struct pkt_buff *pktb)"
+pktb_len - get length of packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+Length of packet contained within \fBpktb\fP 
+.RE
+.PP
+\fB\fP
+.RS 4
+It is appropriate to use \fIpktb_len\fP as the third argument of \fBnfq_nlmsg_verdict_put_pkt()\fP 
+.RE
+.PP
+
+.PP
+Definition at line 130 of file pktbuff\&.c\&.
+.SS "int pktb_mangle (struct pkt_buff *pktb, intdataoff, unsigned intmatch_offset, unsigned intmatch_len, const char *rep_buffer, unsigned intrep_len)"
+pktb_mangle - adjust contents of a packet 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.br
+\fIdataoff\fP Supplementary offset, usually offset from layer 3 (IP) header to the layer 4 (TCP or UDP) header\&. Specify zero to access the layer 3 header\&. If \fBpktb\fP was created in family \fBAF_BRIDGE\fP, specify \fB-ETH_HLEN\fP (a negative offset) to access the layer 2 (MAC) header\&. 
+.br
+\fImatch_offset\fP Further offset to content that you want to mangle 
+.br
+\fImatch_len\fP Length of the existing content you want to mangle 
+.br
+\fIrep_buffer\fP Pointer to data you want to use to replace current content 
+.br
+\fIrep_len\fP Length of data you want to use to replace current content 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+1 for success and 0 for failure\&. Failure will occur if the \fBextra\fP argument to the \fBpktb_alloc()\fP call that created \fBpktb\fP is less than the excess of \fBrep_len\fP over \fBmatch_len\fP 
+.RE
+.PP
+\fBWarning:\fP
+.RS 4
+pktb_mangle does not update any checksums\&. Developers should use the appropriate mangler for the protocol level: \fBnfq_ip_mangle()\fP, \fBnfq_tcp_mangle_ipv4()\fP or \fBnfq_udp_mangle_ipv4()\fP\&. IPv6 versions are planned\&. 
+.br
+It is appropriate to use pktb_mangle to change the MAC header\&. 
+.RE
+.PP
+
+.PP
+Definition at line 325 of file pktbuff\&.c\&.
+.SS "bool pktb_mangled (const struct pkt_buff *pktb)"
+pktb_mangled - test whether packet has been mangled 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+\fBtrue\fP if packet has been mangled (modified), else \fBfalse\fP 
+.RE
+.PP
+\fB\fP
+.RS 4
+When assembling a verdict, it is not necessary to return the contents of un-modified packets\&. Use \fIpktb_mangled\fP to decide whether packet contents need to be returned\&. 
+.RE
+.PP
+
+.PP
+Definition at line 370 of file pktbuff\&.c\&.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libnetfilter_queue from the source code\&.

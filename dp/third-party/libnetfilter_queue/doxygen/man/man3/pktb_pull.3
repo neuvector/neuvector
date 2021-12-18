@@ -1,0 +1,90 @@
+.TH "Internal functions" 3 "Mon Sep 13 2021" "Version 1.0.5" "libnetfilter_queue" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+Internal functions \- 
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "void \fBpktb_push\fP (struct pkt_buff *pktb, unsigned int len)"
+.br
+.ti -1c
+.RI "void \fBpktb_pull\fP (struct pkt_buff *pktb, unsigned int len)"
+.br
+.ti -1c
+.RI "void \fBpktb_put\fP (struct pkt_buff *pktb, unsigned int len)"
+.br
+.ti -1c
+.RI "void \fBpktb_trim\fP (struct pkt_buff *pktb, unsigned int len)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+
+.PP
+\fBWarning:\fP
+.RS 4
+Do not use these functions\&. Instead, always use the mangle function appropriate to the level at which you are working\&. 
+.br
+\fBpktb_mangle()\fP uses all the below functions except \fIpktb_pull\fP, which is not used by anything\&. 
+.RE
+.PP
+
+.SH "Function Documentation"
+.PP 
+.SS "void pktb_pull (struct pkt_buff *pktb, unsigned intlen)"
+pktb_pull - increment pointer to packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.br
+\fIlen\fP Number of bytes to add to packet start address 
+.RE
+.PP
+
+.PP
+Definition at line 189 of file pktbuff\&.c\&.
+.SS "void pktb_push (struct pkt_buff *pktb, unsigned intlen)"
+pktb_push - decrement pointer to packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.br
+\fIlen\fP Number of bytes to subtract from packet start address 
+.RE
+.PP
+
+.PP
+Definition at line 177 of file pktbuff\&.c\&.
+.SS "void pktb_put (struct pkt_buff *pktb, unsigned intlen)"
+pktb_put - add extra bytes to the tail of the packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.br
+\fIlen\fP Number of bytes to add to packet tail (and length) 
+.RE
+.PP
+
+.PP
+Definition at line 201 of file pktbuff\&.c\&.
+.SS "void pktb_trim (struct pkt_buff *pktb, unsigned intlen)"
+pktb_trim - set new length for this packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to userspace packet buffer 
+.br
+\fIlen\fP New packet length (tail is adjusted to reflect this) 
+.RE
+.PP
+
+.PP
+Definition at line 212 of file pktbuff\&.c\&.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libnetfilter_queue from the source code\&.
