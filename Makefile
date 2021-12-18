@@ -138,7 +138,7 @@ api_image:
 	docker build -t neuvector/api -f neuvector/build/Dockerfile.api .
 
 ctrl_image: pull_fleet_base stage_ctrl
-	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/controller:public -f neuvector/build/Dockerfile.controller.nolic .
+	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/controller:public -f neuvector/build/Dockerfile.controller .
 	docker build -t neuvector/controller -f neuvector/build/Dockerfile.controller .
 
 enf_image: pull_fleet_base stage_enf
