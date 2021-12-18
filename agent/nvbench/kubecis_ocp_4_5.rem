@@ -1,0 +1,248 @@
+1.1.1 :  OpenShift 4 deploys both the openshift-apiserver and the  kube-apiserver. The kube apiserver is deployed as a static pod. The openshift-apiserver is managed as a deployment and the yaml is stored in etcd.
+         The pod specification file for the kube apiserver is created on the control plane nodes at /etc/kubernetes/manifests/kube-apiserver-pod.yaml. The kube-apiserver is mounted via hostpath to the kube-apiserver pods via /etc/kubernetes/static-pod-resources/kube-apiserver-pod.yaml with permissions 0644.
+1.1.2 :  OpenShift 4 deploys both the openshift-apiserver and the  kube-apiserver. The kube apiserver is deployed as a static pod. The openshift-apiserver is managed as a deployment and the yaml is stored in etcd.
+         The pod specification file for the kube apiserver is created on the control plane nodes at /etc/kubernetes/manifests/kube-apiserver-pod.yaml. The kube-apiserver is mounted via hostpath to the kube-apiserver pods via /etc/kubernetes/static-pod-resources/kube-apiserver-pod.yaml with ownership root:root.
+1.1.3 :  OpenShift 4 deploys two controller managers: the openshift-controller-manager and the openshift-kube-controller-manager. The kube-controller-manager is deployed as a static pod. The openshift-controller-manager is managed as a deployment and its yaml is stored in etcd.
+         The pod specification file for the openshift-kube-controller-manager is created on control plane nodes at /etc/kubernetes/manifests/kube-controller-manager-pod.yaml. It is mounted via hostpath to the controller-manager pods via /etc/kubernetes/static-pod-resources/kube-controller-manager-pod.yaml with permissions 0644.
+1.1.4 :  OpenShift 4 deploys two controller managers: the openshift-controller-manager and the openshift-kube-controller-manager. The kube-controller-manager is deployed as a static pod. The openshift-controller-manager is managed as a deployment and its yaml is stored in etcd.
+         The pod specification file for the openshift-kube-controller-manager is created on control plane nodes at /etc/kubernetes/manifests/kube-controller-manager-pod.yaml. It is mounted via hostpath to the kube-controller-manager pods via /etc/kubernetes/static-pod-resources/kube-controller-manager-pod.yaml with ownership root_root.
+1.1.5 :  In OpenShift 4 the kube-scheduler is deployed as a static pod and its pod specification file is created on control plane nodes at /etc/kubernetes/manifests/kube-scheduler-pod.yaml. It is mounted via hostpath to the kube-controller-manager pods via /etc/kubernetes/static-pod-resources/kube-scheduler-pod.yaml with permissions 0644.
+1.1.6 :  In OpenShift 4 the kube-scheduler is deployed as a static pod and its pod specification file is created on control plane nodes at /etc/kubernetes/manifests/kube-scheduler-pod.yaml. It is mounted via hostpath to the kube-controller-manager pods via /etc/kubernetes/static-pod-resources/kube-scheduler-pod.yaml with ownership root:root.
+1.1.7 :  In OpenShift 4 etcd is deployed by the cluster etcd operator. Its pod specification file is created on control plane nodes at /etc/kubernetes/manifests/etcd-pod.yaml with permissions 0644.
+1.1.8 :  In OpenShift 4 etcd is deployed as a static pod and its pod specification file is created on control plane nodes at /etc/kubernetes/manifests/etcd-pod.yaml with ownership root:root.
+1.1.9 :  Ensure that the Container Network Interface file permissions, openshift-sdn and Open vSwitch file permissions are set to 644 or more restrictive. OpenShift deploys OVS as a network overlay by default. The SDN components are deployed as DaemonSets across the master/worker nodes with controllers limited to control plane nodes. Various configurations (ConfigMaps and other files managed by the operator via hostpath but stored on the container hosts) are stored in the following locations:
+
+         CNI:
+         /host/etc/cni/net.d (all files <= 0644)
+         /host/opt/cni/bin (all files <= 0644, executables 0755)
+         /host/var/run/multus/cni/net.d
+
+         SDN:
+         /var/lib/cni/networks/openshift-sdn (all files <= 0644)
+         /var/run/openshift-sdn (all files <= 0644)
+
+         OVS:
+         /var/run/openvswitch (all files <= 0644)
+         /var/run/kubernetes (no files)
+         /etc/openvswitch (all files <= 0644)
+         /run/openvswitch (all files <= 0644)
+         /var/run/openvswitch (all files <= 0644)
+1.1.10 :  Ensure that the Container Network Interface file ownership is set to root:root. Ensure that the openshift-sdn file ownership is set to root:root and the Open vSwitch (OVS) file ownership is set to openvswitch:openvswitch. OpenShift deploys OVS as a network overlay by default. The SDN components are deployed as DaemonSets across the master/worker nodes with controllers limited to control plane nodes. Various configurations (ConfigMaps and other files managed by the operator via hostpath but stored on the container hosts) are stored in the following locations:
+
+          CNI:
+          /host/etc/cni/net.d (ownership is 0:0) = CNI_CONF_DIR
+          /host/opt/cni/bin (ownership is 0:0) = CNI_BIN_DIR
+          /host/var/run/multus/cni/net.d = multus-cni-dir, confi dir
+
+          SDN / OVS:
+          /var/run/openvswitch (ownership is 998:996 or openvswitch:openvswitch)
+          /etc/openvswitch (ownership is 998:996 or openvswitch:openvswitch)
+          /run/openvswitch (ownership is 998:996 or openvswitch:openvswitch)
+1.1.11 :  In OpenShift 4 etcd runs as a static pod on each control plane node. The etcd database is stored on the container host in /var/lib/etcd and mounted to the etcd-member container via the host path mount data-dir with the same filesystem path. The permissions for this directory on the container host is 0700.
+1.1.12 :  In OpenShift 4 etcd runs as a static pod on each control plane node. The etcd database is stored on the master nodes in /var/lib/etcd and mounted to the etcd-member container via the host path mount data-dir with the same filesystem path. The ownership for this directory (on the etcd-member container and on the container host) is root:root. In OCP 4, etcd cannot be deployed on separate nodes. For this reason, etcd ownership is managed in the same way as all other master components. This is not expected to change.
+
+          Furthermore, OCP 4.4 includes a new etcd operator. The etcd operator will help to automate restoration of master nodes. There is also a new etcdctl container in the etcd static pod for quick debugging. cluster-admin rights are required to exec into etcd containers.
+1.1.13 :  In OpenShift 4 the kubeconfig file for system:admin (admin.conf) is stored in /etc/kubernetes/kubeconfig with permissions 0644.
+1.1.14 :  In OpenShift 4 the kubeconfig file for system:admin (admin.conf) is stored in /etc/kubernetes/kubeconfig with ownership root:root.
+1.1.15 :  The kubeconfig file for kube-scheduler is stored in the ConfigMap scheduler-kubeconfig in the namespace openshift-kube-scheduler. The file kubeconfig (scheduler.conf) is referenced in the pod via hostpath and is stored in /etc/kubernetes/static-pod-resources/configmaps/scheduler-kubeconfig/kubeconfig with permissions 0644.
+1.1.16 :  The kubeconfig file for kube-scheduler is stored in the ConfigMap scheduler-kubeconfig in the namespace openshift-kube-scheduler. The file kubeconfig (scheduler.conf) is referenced in the pod via hostpath and is stored in /etc/kubernetes/static-pod-resources/configmaps/scheduler-kubeconfig/kubeconfig with ownership root:root.
+1.1.17 :  The kubeconfig file for kube-controller-manager is stored in the ConfigMap controller-manager-kubeconfig in the namespace openshift-kube-controller-manager. The file kubeconfig (controller-manager.conf) is referenced in the pod via hostpath and is stored in /etc/kubernetes/static-pod-resources/configmaps/controller-manager-kubeconfig/kubeconfig with permissions 0644.
+1.1.18 :  The kubeconfig file for kube-controller-manager is stored in the ConfigMap controller-manager-kubeconfig in the namespace openshift-kube-controller-manager. The file kubeconfig (controller-manager.conf) is referenced in the pod via hostpath and is stored in /etc/kubernetes/static-pod-resources/configmaps/controller-manager-kubeconfig/kubeconfig with ownership root:root.
+1.1.19 :  Keys for control plane components deployed as static pods, kube-apiserver, kube-controller-manager, and openshift-kube-scheduler are stored in the directory /etc/kubernetes/static-pod-certs/secrets.  The directory and file ownership are set to root:root.
+1.1.20 :  Keys for control plane components deployed as static pods, kube-apiserver, kube-controller-manager, and openshift-kube-scheduler are stored in the directory /etc/kubernetes/static-pod-certs/secrets.  Certificate files all have permissions 0600.
+1.1.21 :  Keys for control plane components deployed as static pods, kube-apiserver, kube-controller-manager, and openshift-kube-scheduler are stored in the directory /etc/kubernetes/static-pod-certs/secrets. Key files all have permissions 0600.
+1.2.1 :  OpenShift provides it's own fully integrated authentication and authorization mechanism. OpenShift allows anonymous requests to the API server to support information discovery and webhook integrations. Anonymous requests are assigned the system:unauthenticated group, which is bound to cluster-scoped roles. Verify that the default behavior is maintained. If the default behavior is changed, platform components will not work properly, in particular Elasticsearch and Prometheus.  The oauth-proxy deployed as part of these components makes anonymous use of /.well-known/oauth-authorization-server endpoint, granted by system:discovery role.
+1.2.2 :  OpenShift provides it's own fully integrated authentication and authorization mechanism. The apiserver is protected by either requiring an OAuth token issued by the platform's integrated OAuth server or signed certificates.  By default the basic-auth-file method is not enabled in OpenShift.
+1.2.3 :  OpenShift does not use token-auth-file flag. OpenShift includes a built-in OAuth server rather than relying on a static token file. The OAuth server is integrated with the API server.
+1.2.4 :  OpenShift utilizes X.509 certificates for authentication of the control-plane components. OpenShift configures the API server to use an internal certificate authority (CA) to validate the user certificate sent during TLS negotiation. If the CA validation of the certificate is successful, the request is authenticated and user information is derived from the certificate subject fields.  Certificates for control plane components like kube-apiserver, kube-controller-manager, kube-scheduler and etcd are stored with their respective static pod configurations in the directory /etc/kubernetes/static-pod-resources/*/secrets.
+1.2.5 :  OpenShift uses X.509 certificates to provide secure connections between API server and node/kubelet. OpenShift does not use kubelet-certificate-authority flag. The platform includes multiple certificate authorities (CAs) providing independent chains of trust, increasing the security posture of the cluster. The certificates generated by each CA are used to identify a particular OpenShift platform component to another OpenShift platform component. Communication between the API server and the kubelet is secured by the kubelet serving CA.
+1.2.6 :  OpenShift uses X.509 certificates to provide secure connections between API server and node/kubelet. OpenShift does not use kubelet-certificate-authority flag. The platform includes multiple certificate authorities (CAs) providing independent chains of trust, increasing the security posture of the cluster. The certificates generated by each CA are used to identify a particular OpenShift platform component to another OpenShift platform component. Communication between the API server and the kubelet is secured by the kubelet serving CA
+1.2.7 :  When the --authorization-mode argument is set to AlwaysAllow, the API Server allows all requests. It is not possible to configure an OpenShift cluster this way. The --authorization-mode flag is not used by OpenShift API Server. OpenShift is configured to use RBAC to authorize requests.  See https://docs.openshift.com/container-platform/4.3/authentication/using-rbac.html
+
+         Additional notes:
+         Requests to the API server are authenticated by X.509 certificates. External access to the API server is through the Ingress controller. A custom certificate can be added to the ingress controller.
+
+         Role-based access control (RBAC) objects determine what actions a user is allowed to perform on what objects in an OpenShift cluster. Cluster administrators manage RBAC for the cluster. Project owners can manage RBAC for their individual OpenShift projects.
+1.2.8 :  In OpenShift, the Node authorizer is enabled by default. The authorization-mode argument is not configurable for the API server. The OpenShift API server does not use the values assigned to the flag authorization-mode.
+1.2.9 :  OpenShift supports RBAC. The --authorization-mode flag is not used by OpenShift API Server.
+1.2.10:  EventRateLimit admission plugin is alpha and cannot be enabled in Openshift. It was developed to alleviate the potential issue of flooding the API server with requests. However, the kubelet has since been fixed to send fewer events. In future Kubernetes releases, api priority and fairness will be used to limit the rate at which the API server accepts requests.
+1.2.11:  OpenShift does not enable the AlwaysAdmit admission control plugin. It cannot be enabled.
+1.2.12:  When OpenShift Container Platform creates containers, it uses the container’s imagePullPolicy to determine if the image should be pulled prior to starting the container. There are three possible values for imagePullPolicy: Always, IfNotPresent, Never. If a container’s imagePullPolicy parameter is not specified, OpenShift Container Platform sets it based on the image’s tag. If the tag is latest, OpenShift Container Platform defaults imagePullPolicy to Always. Otherwise, OpenShift Container Platform defaults imagePullPolicy to IfNotPresent.
+1.2.13:  In OpenShift, RBAC roles can restrict access to pod subresources 'exec' and 'attach', while Security Context Constraints (SCCs) restrict access to run privileged containers. By default, OpenShift runs pods on worker nodes as unprivileged (with the restricted SCC). Unlike upstream Kubernetes, OpenShift does not enable the DenyEscalatingExec admission control plugin. OpenShift's Security Context Constraints (SCCs) provide the same level of restriction and have been contributed to Kubernetes as Pod Security Policies. PSPs are still beta in Kubernetes.
+1.2.14:  The ServiceAccount admission control plugin is enabled by default. Every service account has an associated user name that can be granted roles, just like a regular user. The user name for each service account is derived from its project and the name of the service account. Service accounts are required in each project to run builds, deployments, and other pods. The default service accounts that are automatically created for each project are isolated by the project namespace.
+1.2.15:  OpenShift enables both the upstream NamespaceLifecycle and OriginNamespaceLifecycle plugins.  Openshift's own OriginNamespaceLifecycle admission plugin implements the CIS recommendation of preventing resources from being created while the namespace is being terminated.
+1.2.16:  OpenShift provides the same protection via the SecurityContextConstraints admission plugin, which is enabled by default.  PodSecurityPolicy admission control plugin is disabled by default as it is still beta and not yet supported with OpenShift.
+         Security Context Constraints and Pod Security Policy cannot be used on the same cluster.
+1.2.17:  The NodeRestriction admission plugin is enabled by default in OCP 4. It cannot be disabled.
+1.2.18:  OpenShift API server is served over HTTPS with authentication and authorization; the secure API endpoint is bound to 0.0.0.0:8443 by default.
+1.2.19:  OpenShift API server is served over HTTPS with authentication and authorization; the secure API endpoint is bound to 0.0.0.0:8443 by default.
+1.2.20:  By default, traffic for the OpenShift API server is served over HTTPS with authentication and authorization; the secure API endpoint is bound to 0.0.0.0:8443.
+
+         In OCP 4 the only supported way to access the API server pod is through the load balancer and then through the internal service.
+1.2.21:  Profiling is used to collect data to identify performance bottlenecks. To ensure the collected data is not exploited, profiling endpoints are exposed at each master port and secured via RBAC (see cluster-debugger role). By default, the profiling endpoints are accessible only by users bound to cluster-admin or cluster-debugger role.
+
+         OpenShift exposes profiling in the web interface on localhost (a hostname that means this computer) if OPENSHIFT_PROFILE=web is set in master.env (?).  This configuration is only meant to be used for OpenShift core development, and is never recommended for a live cluster.
+
+         Although the profiling endpoint for API server can be completely disabled using the profiling flag under apiServerArguments, we do not recommend this as the endpoint is protected by RBAC and disabling profiling makes it more difficult to troubleshoot any problems.
+         Recommendation
+         Ensure OPENSHIFT_PROFILE is not set to web, which would expose the web interface on localhost.
+
+         Verify status for OCP 4.
+1.2.22:  OpenShift audit works at the API server level, logging all requests coming to the server. API server audit is on by default.
+1.2.23:  OpenShift audit works at the API server level, logging all requests coming to the server.  Configure via maximumFileRetentionDays.
+1.2.24:  OpenShift audit works at the API server level, logging all requests coming to the server. Configure via maximumRetainedFiles.
+1.2.25:  OpenShift audit works at the API server level, logging all requests coming to the server. Configure via maximumFileSizeMegabytes.
+1.2.26:  In OpenShift, the request-timeout flag defaults to 60 seconds. This can be increased if you wish. OpenShift configures the min-request-timeout flag via servingInfo.requestTimeoutSeconds via ???, which overrides request-timeout in certain scenarios and provides a more balanced timeout approach than a global request-timeout.  OpenShift configures requestTimeoutSeconds with a default value of 3600 seconds (one hour).
+1.2.27:  OpenShift denies access for any OAuth Access token that does not exist in its etcd data store. OpenShift does not use the service-account-lookup flag.
+1.2.28:  OpenShift API server does not use the service-account-key-file argument. The ServiceAccount token authenticator is configured with serviceAccountConfig.publicKeyFiles. OpenShift does not reuse the apiserver TLS key.
+1.2.29:  OpenShift uses X.509 certificates to provide secure communication to etcd. OpenShift configures these automatically. OpenShift does not use the etcd-certfile or etcd-keyfile flags.
+
+         /etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.crt
+
+         /etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.key
+1.2.30:  OpenShift uses X.509 certificates to provide secure connections between API server and node/kubelet by default. OpenShift does not use values assigned to the tls-cert-file or tls-private-key-file flags.  OpenShift generates these files and sets the arguments appropriately.
+
+         /etc/kubernetes/static-pod-certs/secrets/service-network-serving-certkey/tls.crt
+
+          /etc/kubernetes/static-pod-certs/secrets/service-network-serving-certkey/tls.key
+1.2.31:  OpenShift includes multiple certificate authorities (CAs) providing independent chains of trust, increasing the security posture of the cluster. The certificates generated by each CA are used to identify a particular OpenShift platform component to another OpenShift platform component. OpenShift configures the client-ca-file value and does not use value assigned to the client-ca-file flag.
+1.2.32:  OpenShift uses X.509 certificates to provide secure communication to etcd.  OpenShift does not use values assigned to etcd-cafile.  OpenShift generates this file and sets the arguments appropriately in the API server. OpenShift includes multiple certificate authorities (CAs) providing independent chains of trust, increasing the security posture of the cluster. The certificates generated by each CA are used to identify a particular OpenShift platform component to another OpenShift platform component. Communication with etcd is secured by the etcd serving CA.
+1.2.33:  OpenShift supports encryption of data at rest of etcd datastore, but it is up to the customer to configure. The ase-cbc cipher is used. Keys are stored on the filesystem of the master and automatically rotated.
+1.2.34:  OpenShift supports encryption of data at rest of etcd datastore, but it is up to the customer to configure. The ase-cbc cipher is used. Keys are stored on the filesystem of the master and automatically rotated.
+1.2.35:  The API server is only accessible through the load balancer. Ciphers for the ingress controller can be configured as of OpenShfit 4.3. The ability to configure cipher suites separately for the API server is on the roadmap.
+1.3.3 :  In OpenShift, every service account has an associated user name that can be granted roles, just like a regular user. The user name is derived from its project and name. As soon as a service account is created, two secrets are automatically added to it: an API token and credentials for the OpenShift Container Registry. The system ensures that service accounts always have an API token and registry credentials.
+1.3.4 :  By default, OpenShift starts kube-controller-manager with service-account-private-key-file=/etc/origin/master/servicaccounts.private.key.
+
+         In OpenShift, every service account has an associated user name that can be granted roles, just like a regular user. The user name is derived from its project and name. As soon as a service account is created, two secrets are automatically added to it: an API token and credentials for the OpenShift Container Registry. The system ensures that service accounts always have an API token and registry credentials.
+
+         In OpenShift 4, the kube-controller-manager is managed with the cluster Controller Manager Operator.
+1.3.5 :  OpenShift maps the master configuration serviceAccountConfig.masterCA to the kube-controller-manager root-ca-file flag, setting it to /etc/origin/master/ca-bundle.crt by default.
+1.3.6 :  Certificates for the kubelet are automatically created and rotated by the OpenShift Container Platform. The kubelet is installed automatically on every RHCOS node. The OpenShift kubelet-serving-CA manages certificates for the kubelet. Kubelet certificates are automatically issued and rotated.
+1.3.7 :  In OpenShift 4, the Controller Manager is managed by the Kubernetes Controller Manager Operator.
+         https://github.com/openshift/cluster-kube-controller-manager-operator
+
+         In Openshift 4, the Controller Manager is deployed as a static pod. Static Pods are managed by the kubelet and are always bound to one Kubelet on a specific node. The kubelet automatically creates a mirror Pod on the API server for each static pod. This means that the pods running on a node are visible on the API server, but cannot be controlled from there. The bind-address argument is not used.
+1.4.1 :  A fix to this issue: https://bugzilla.redhat.com/show_bug.cgi?id=1889488 None required. Profiling is protected by RBAC and cannot be disabled.
+1.4.2 :  By default, the --bind-address argument is not present, the readinessProbe and livenessProbe arguments are set to 10251 and the port argument is set to 0. Check the status of this issue: https://bugzilla.redhat.com/show_bug.cgi?id=1889488
+2.1 :  OpenShift uses X.509 certificates to provide secure communication to etcd. OpenShift generates these files and sets the arguments appropriately. OpenShift does not use the etcd-certfile or etcd-keyfile flags.
+2.2 :  OpenShift uses X.509 certificates to provide secure communication to etcd.  OpenShift installation generates these files and sets the arguments appropriately.
+2.3 :  OpenShift configures etcd with secure communication.  Openshift installs etcd as static pods on control plane nodes, and mounts the configuration files from /etc/etcd/ on the host.  The etcd.conf file includes peer-auto-tls configurations as referenced in /etc/etcd/etcd.conf.
+2.4 :  OpenShift configures etcd with secure communication.  Openshift installs etcd as static pods on control plane nodes, and mounts the configuration files from /etc/etcd/ on the host.  The etcd.conf file includes peer-cert-file and peer-key-file configurations as referenced in /etc/etcd/etcd.conf.
+2.5 :  OpenShift configures etcd with secure communication.  Openshift installs etcd as static pods on control plane nodes, and mounts the configuration files from /etc/etcd/ on the host.  The etcd.conf file includes peer-client-cert-auth configurations as referenced to the right.
+2.6 :  OpenShift configures etcd with secure communication.  Openshift installs etcd as static pods on control plane nodes, and mounts the configuration files from /etc/etcd/ on the host.  The etcd.conf file includes peer-auto-tls configurations as referenced in /etc/etcd/etcd.conf.
+2.7 :  OpenShift provides integrated management of certificates for internal cluster components. OpenShift 4 includes multiple CAs providing independent chains of trust, which ensure that a platform CA will never accidentally sign a certificate that can be used for the wrong purpose, increasing the security posture of the cluster. A unique CA is provided for etcd.
+3.1.1 :  For users to interact with OpenShift Container Platform, they must first authenticate to the cluster. The authentication layer identifies the user associated with requests to the OpenShift Container Platform API. The authorization layer then uses information about the requesting user to determine if the request is allowed.
+         https://docs.openshift.com/container-platform/4.3/authentication/understanding-authentication.html
+
+         The OpenShift Container Platform master includes a built-in OAuth server for token-based authentication. Developers and administrators obtain OAuth access tokens to authenticate themselves to the API. It is recommended for an administrator to configure OAuth to specify an identity provider after the cluster is installed. User access to the cluster is managed through the identity provider.
+         https://docs.openshift.com/container-platform/4.3/authentication/understanding-identity-provider.html
+
+         OpenShift includes built-in role based access control (RBAC) to determine whether a user is allowed to perform a given action within the cluster. Roles can have cluster scope or local (i.e. project) scope.
+         https://docs.openshift.com/container-platform/4.3/authentication/using-rbac.html
+
+         In addition, OpenShift ships with a Service-CA which is intended intended to support service serving certificates for complex middleware applications that require encryption. These certificates are issued as TLS web server certificates. The service-ca controller uses the x509.SHA256WithRSA signature algorithm to generate service certificates. The service CA certificate, which issues the service certificates, is valid for 26 months and is automatically rotated when there is less than six months validity left. A Pod can access the service CA certificate by mounting a ConfigMap that is annotated with service.beta.openshift.io/inject-cabundle=true. Once annotated, the cluster automatically injects the service CA certificate into the service-ca.crt key on the ConfigMap. Access to this CA certificate allows TLS clients to verify connections to services using service serving certificates. You can manually rotate the service certificate by deleting the associated secret. Deleting the secret results in a new one being automatically created, resulting in a new certificate.
+         https://docs.openshift.com/container-platform/4.3/authentication/certificates/service-serving-certificate.html
+3.2.1 :  In OpenShift, auding of the API Server is on by default. Audit provides a security-relevant chronological set of records documenting the sequence of activities that have affected system by individual users, administrators, or other components of the system. Audit works at the API server level, logging all requests coming to the server. Each audit log contains two entries:
+
+         The request line containing:
+            A Unique ID allowing to match the response line (see #2)
+            The source IP of the request
+            The HTTP method being invoked
+            The original user invoking the operation
+            The impersonated user for the operation (self meaning himself)
+            The impersonated group for the operation (lookup meaning user’s group)
+            The namespace of the request or <none>
+            The URI as requested
+
+         The response line containing:
+            The unique ID from #1
+            The response code
+
+         You can view logs for the master nodes for the OpenShift Container Platform API server or the Kubernetes API server.
+         https://docs.openshift.com/container-platform/4.3/nodes/nodes/nodes-nodes-audit-log.html
+3.2.2 :  You can configure the audit feature to set log level, retention policy, and the type of events to log.
+         You can set the log level settings for an overall component or the API server to one of the following. The setting can be different for each setting:
+
+         Normal. Normal is the default. Normal working log information, including helpful notices for auditing or common operations. Similar to glog=2.
+
+         Debug. Debug is for troubleshooting problems. A greater quanitity of notices than Normal, but contain less information than Trace. Common operations might be logged. Similar to glog=4.
+
+         Trace. Trace is for troubleshooting problems when Debug is not verbose enough. Logs every function call as part of a common operation, including tracing execution of a query. Similar to glog=6.
+
+         TraceAll. TraceAll is troubleshoting at the level of API content/decoding. Contains complete body content. In production clusters, this setting causes performance degradation and results in a significant number of logs. Similar to ` glog=8`.
+
+         https://docs.openshift.com/container-platform/4.3/nodes/nodes/nodes-nodes-audit-log.html#nodes-nodes-audit-log-basic-config_nodes-nodes-audit-log
+4.1.1 :  Kubelet is run as atomic-openshift-node systemd unit and its configuration file is created with 644 permissions.
+4.1.2 :  Kubelet is run as atomic-openshift-node systemd unit and its configuration file is created with root:root ownership.
+4.1.5 :  The node's kubeconfig is created with 644 permissions.
+4.1.6 :  The node's kubeconfig is created with root:root.
+4.1.7 :  Client CA location defined in /etc/kubernetes/kubelet.conf:
+
+         kind: KubeletConfiguration
+         apiVersion: kubelet.config.k8s.io/v1beta1
+         authentication:
+           x509:
+             clientCAFile: /etc/kubernetes/kubelet-ca.crt
+           anonymous:
+             enabled: false
+
+         /etc/kubernetes/kubelet-ca.crt has permissions 0644
+4.1.8 :  Client CA location defined in /etc/kubernetes/kubelet.conf:
+
+         kind: KubeletConfiguration
+         apiVersion: kubelet.config.k8s.io/v1beta1
+         authentication:
+           x509:
+             clientCAFile: /etc/kubernetes/kubelet-ca.crt
+           anonymous:
+             enabled: false
+
+         /etc/kubernetes/kubelet-ca.crt is owned by root:root
+4.1.9 :  /var/lib/kubelet/kubeconfig permissions set to 0600
+4.1.10 :  /var/lib/kubelet/kubeconfig ownership set to root:root
+4.2.1 :  OpenShift uses a different approach to secure anonymous authorization. OpenShift explicitly sets anonymous-auth to true, as anonymous requests are used for discovery information, webhook integrations, etc. OpenShift allows anonymous requests (then authorizes them).
+         Access to OpenShift node is authenticated with certificate.  kubelet apis are subresources of the node resource that can be restricted by RBAC roles.  Anonymous access is denied for these subresources. OpenShift provides it's own fully integrated authentication and authorization mechanism. Unsecured endpoints reveal no sensitive data. Unauthenticated requests to secured endpoints are assigned to 'system:anonymous'. system:anonymous is not bound to any roles, and thus has no visibility by default.
+4.2.2 :  Unauthenticated/Unauthorized users have no access to OpenShift nodes.  Kubelet flag authorization-mode is explicitly set to WebHook
+4.2.3 :  OpenShift provides integrated management of certificates for internal cluster components. OpenShift 4 includes multiple CAs providing independent chains of trust, which ensure that a platform CA will never accidentally sign a certificate that can be used for the wrong purpose, increasing the security posture of the cluster. Communication between the API server and the kubelet is secured by the kubelet serving CA.
+4.2.4 :  OpenShift disables the read-only port (10255) on all nodes by setting the read-only-port kubelet flag to 0 by defualt.
+4.2.5 :  OpenShift uses the kubernetes default of 4 hours for the streaming-connection-idle-timeout argument. Unless cluster administrator has added the value to the node configuration, the default will be used.  The value is a timeout for HTTP streaming sessions going through a kubelet, like the port-forward, exec, or attach pod operations. The streaming-connection-idle-timeout should not be disabled by setting it to zero, but it can be lowered. Note that if the value is set too low, then users using those features may experience a service interruption due to the timeout. kubelet flags can be added to kubeletArguments of /etc/origin/node/node-config.yaml.
+4.2.6 :  Red Hat disagrees with the CIS recommendation for the protect-kernel-defauts. OpenShift node/kubelet modifies the system tunable; using the protect-kernel-defaults flag will cause the kubelet to fail on start if the tunables don't match what the kubelet desires and the OpenShift node to fail to start.
+4.2.7 :  OpenShift sets the make-iptables-util-changes argument to true by default.
+4.2.8 :  In OpenShift 4, nodeName will be set to the node hostname that is resolvable from all nodes in the cluster.
+4.2.9 :  OpenShift sets the event-qps argument to a default value of 5. This is the default set by Kubernetes. When this value is set to > 0, event creations per second are limited to the value set. If this value is set to 0, event creations per second are unlimited.
+4.2.10 :  OpenShift instead uses the cert-dir flag, for serving HTTPS traffic, which is used in the absence of the proposed flags. OpenShift sets cert-dir flag to /etc/origin/node/certificates, and generates the certificates in this directory for the kubelet to serve HTTPS traffic.
+4.2.11 :  OpenShift automatically rotates the Kubelet certificates. RotateKubeletClientCertificate to true by default.
+4.2.12 :  OpenShift automatically rotates the Kubelet certificates. RotateKubeletClientCertificate to true by default.
+4.2.13 :  All traffic to the API server is encrypted using TLS 1.3
+5.1.1 :  OpenShift provides a set of default cluster roles that you can bind to users and groups cluster-wide or locally (per project namespace). Be mindful of the difference between local and cluster bindings. For example, if you bind the cluster-admin role to a user by using a local role binding, it might appear that this user has the privileges of a cluster administrator. This is not the case. Binding the cluster-admin to a user in a project grants super administrator privileges for only that project to the user. You can use the oc CLI to view cluster roles and bindings by using the oc describe command. For more information, see https://docs.openshift.com/container-platform/4.4/authentication/using-rbac.html#default-roles_using-rbac
+         Some of these roles such as cluster-admin provide wide-ranging privileges which should only be applied where absolutely necessary. Roles such as cluster-admin allow super-user access to perform any action on any resource. When used in a ClusterRoleBinding, it gives full control over every resource in the cluster and in all namespaces. When used in a RoleBinding, it gives full control over every resource in the rolebinding's namespace, including the namespace itself.
+         Review users and groups bound to cluster-admin and decide whether they require such access.  Consider creating least-privilege roles for users and service accounts.
+5.1.2 :  Review the users who have get, list or watch access to secrets objects in the Kubernetes API.
+5.1.3 :  Where possible replace any use of wildcards in clusterroles and roles with specific objects or actions.
+5.1.4 :  Where possible, remove create access to pod objects in the cluster.
+5.1.5 :  None required.
+5.1.6 :  Where possible, remove get, list and watch access to secret objects in the cluster.
+5.2.1 :  By default, privileged containers will not run on OpenShift worker nodes.
+5.2.2 :  By default, containers running on OpenShift worker nodes do not share the host process ID namespace.
+5.2.3 :  By default, containers running on OpenShift worker nodes do not share the host process IPC namespace.
+5.2.4 :  By default, containers running on OpenShift worker nodes do not share the host process network namespace.
+5.2.5 :  By default, privileged containers will not run on OpenShift worker nodes. The restricted SCC also prevents privilege escalation.
+5.2.6 :  By default, privileged containers will not run on OpenShift worker nodes.
+5.2.7 :  By default, containers running on OpenShift worker nodes are not granted the NET_RAW capability.
+5.2.8 :  By default, containers running on OpenShift worker nodes are granted no additional capabilities.
+5.2.9 :  By default, containers running on OpenShift worker nodes are granted no additional capabilities.
+5.3.1 :  OpenShift Container Platform uses a software-defined networking (SDN) approach to provide a unified cluster network that enables communication between Pods across the OpenShift Container Platform cluster. This Pod network is established and maintained by the OpenShift SDN, which configures an overlay network using Open vSwitch (OVS). The OpenShift SDN uses Network Policies.
+5.3.2 :  The OpenShift 4 CNI plugin uses network policies by default -- that is, it runs in ovs-networkpolicy mode. By default, all Pods in a project are accessible from other Pods and network endpoints. To isolate one or more Pods in a project, you can create NetworkPolicy objects in that project to indicate the allowed incoming connections. Project administrators can create and delete NetworkPolicy objects within their own project.
+5.4.1 :  Information about ways to provide sensitive data to pods is included in the documentation.
+         https://docs.openshift.com/container-platform/4.3/nodes/pods/nodes-pods-secrets.html
+5.4.2 :  OpenShift supports a broad ecosystem of security partners many of whom support integration with external vaults.
+5.5.1 :  You can control which images can be imported, tagged, and run in a cluster using either Allowed Registries for import or the ImagePolicy admission plug-in.The ImagePolicyWebhook admission plugin may be enabled and configured if desired.
+5.6.1 :  Follow the documentation and create namespaces for objects in your deployment as you need them.
+          Default Value:
+          By default, Kubernetes starts with two initial namespaces:
+          1. default - The default namespace for objects with no other namespace
+          2. kube-system - The namespace for objects created by the Kubernetes system 3. openshift-
+          4. openshift-* - The namespace for objects created by OpenShift
+5.6.2 :  To enable the default seccomp profile, use the reserved value /runtime/default that will make sure that the pod uses the default policy available on the host.
+5.6.3 :  Follow the Kubernetes documentation and apply security contexts to your pods. For a suggested list of security contexts, you may refer to the CIS Security Benchmark for Docker Containers.
+5.6.4 :  Ensure that namespaces are created to allow for appropriate segregation of Kubernetes resources and that all new resources are created in a specific namespace.

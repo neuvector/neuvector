@@ -1,0 +1,83 @@
+CC = gcc
+AR = ar
+AS = as
+LD = ld
+MAKE = make
+
+ROOTDIR = $(TOPDIR)/..
+
+GCC_VERSION = $(shell gcc -dumpversion)
+
+CFLAGS = -Wall -Werror -Wno-unused-result -Wno-unused-function -fstrict-aliasing -Wstrict-aliasing -g
+CFLAGS += -I./ -I$(TOPDIR)/ -I$(TOPDIR)/third-party/.objs/include
+ifdef DISABLE_OPT
+CFLAGS += -O0
+else
+CFLAGS += -Os
+endif
+
+# -no-pie is supported since gcc 6
+ifeq ("6.0",$(firstword $(sort "$(GCC_VERSION)" "6.0")))
+LDFLAGS = -no-pie -L$(TOPDIR)/third-party/.objs/lib
+else
+LDFLAGS = -L$(TOPDIR)/third-party/.objs/lib
+endif
+
+CSRCS += $(wildcard *.c)
+OBJS := $(CSRCS:%.c=%.o)
+
+OBJDIR = .objs
+DEPDIR = .deps
+
+all: $(DEPDIR) $(OBJDIR) $(LIBDIRS) $(SUBDIRS) $(OBJDIR)/$(TARGET_OBJ) $(TARGET_PROG)
+
+.PHONY: $(OBJDIR)
+.PHONY: $(DEPDIR)
+$(OBJDIR) $(DEPDIR):
+	+@[ -d $@ ] || mkdir -p $@
+
+ifdef SUBDIRS
+.PHONY: $(SUBDIRS)
+
+$(SUBDIRS):
+	@echo "==> $@"
+	$(MAKE) -C $@ $(MAKECMDGOALS)
+	@echo "<== $@"
+endif
+
+ifdef LIBDIRS
+.PHONY: $(LIBDIRS)
+
+$(LIBDIRS):
+	@echo "==> $@"
+	$(MAKE) -C $@ -f Makefile.local $(MAKECMDGOALS)
+	@echo "<== $@"
+endif
+
+
+# Compile *.o object files into an executable
+ifdef TARGET_PROG
+$(TARGET_PROG): $(addprefix $(OBJDIR)/, $(OBJS)) $(SUBDIR_OBJS)
+	$(CC) -o $@ $(LDFLAGS) $^ $(STATIC_LIBS) $(EXTRA_LDFLAGS) 
+endif
+
+# Compile *.o object files into one .o file
+ifdef TARGET_OBJ
+$(OBJDIR)/$(TARGET_OBJ): $(addprefix $(OBJDIR)/, $(OBJS)) $(SUBDIR_OBJS)
+	$(LD) -r -o $@ $^
+endif
+
+$(OBJDIR)/%.o:%.c
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -include $(ROOTDIR)/base.h -include $(ROOTDIR)/defs.h -c $< -o $@ -MD -MF $(@:.o=.d)
+	@cp $(OBJDIR)/$*.d $(DEPDIR)/$*.d
+	@sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+		-e '/^$$/ d' -e 's/$$/ :/' < $(OBJDIR)/$*.d >> $(DEPDIR)/$*.d;
+	@-rm -f $(OBJDIR)/$*.d
+
+.PHONY: clean
+clean: $(LIBDIRS) $(SUBDIRS)
+	@-rm -rf *~ $(OBJDIR)/*
+	@-rm -rf $(OBJDIR)
+	@-rm -rf $(DEPDIR)
+
+-include $(DEPDIR)/*.d

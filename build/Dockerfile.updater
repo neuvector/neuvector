@@ -1,0 +1,9 @@
+FROM 10.1.127.12:5000/neuvector/updater_base
+
+COPY stage /
+
+LABEL neuvector.image="neuvector/updater" \
+      neuvector.role="updater" \
+      neuvector.vuln_db="vuln.xxxx"
+
+ENTRYPOINT ["/usr/local/bin/upgrader"]

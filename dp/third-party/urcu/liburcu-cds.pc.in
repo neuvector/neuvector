@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Userspace RCU Concurrent Data Structures
+Description: Data structures leveraging RCU and atomic operations to provide efficient concurrency-aware storage
+Version: @PACKAGE_VERSION@
+Requires:
+Libs: -L${libdir} -lurcu-cds
+Cflags: -I${includedir} 

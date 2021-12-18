@@ -1,0 +1,227 @@
+{
+    "kind": "AdmissionReview",
+    "apiVersion": "admission.k8s.io/v1beta1",
+    "request": {
+        "uid": "2e9c253b-6520-11e9-96d1-000c29f3d008",
+        "kind": {
+            "group": "apps",
+            "version": "v1",
+            "kind": "Deployment"
+        },
+        "resource": {
+            "group": "apps",
+            "version": "v1",
+            "resource": "deployments"
+        },
+        "name": "coreoshttp",
+        "namespace": "neuvector-1",
+        "operation": "UPDATE",
+        "userInfo": {
+            "username": "kubernetes-admin",
+            "groups": [
+                "system:masters",
+                "system:authenticated"
+            ]
+        },
+        "object": {
+            "metadata": {
+                "name": "coreoshttp",
+                "namespace": "neuvector-1",
+                "uid": "f095decf-651e-11e9-96d1-000c29f3d008",
+                "resourceVersion": "5199552",
+                "generation": 1,
+                "creationTimestamp": "2019-04-22T16:51:57Z",
+                "labels": {
+                    "app": "coreoshttp",
+                    "date": "AD20140422",
+                    "namea": "iperfservera",
+                    "nameb": "iperfserverb",
+                    "namec": "iperfserverc",
+                    "version": "v1"
+                },
+                "annotations": {
+                    "deployment.kubernetes.io/revision": "1",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"extensions/v1beta1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"name\":\"coreoshttp\",\"namespace\":\"neuvector-1\"},\"spec\":{\"replicas\":1,\"template\":{\"metadata\":{\"labels\":{\"app\":\"coreoshttp\",\"namea\":\"iperfservera\",\"nameb\":\"iperfserverb\",\"namec\":\"iperfserverc\",\"version\":\"v1\"}},\"spec\":{\"containers\":[{\"command\":[\"/usr/sbin/apache2ctl\",\"-D\",\"FOREGROUND\"],\"image\":\"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"coreoshttp\",\"ports\":[{\"containerPort\":8080}]}]}}}}\n"
+                }
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "matchLabels": {
+                        "app": "coreoshttp",
+                        "namea": "iperfservera",
+                        "nameb": "iperfserverb",
+                        "namec": "iperfserverc",
+                        "version": "v1"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "coreoshttp",
+                            "namea": "iperfservera",
+                            "nameb": "iperfserverb",
+                            "namec": "iperfserverc",
+                            "version": "v1"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "coreoshttp",
+                                "image": "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
+                                "command": [
+                                    "/usr/sbin/apache2ctl",
+                                    "-D",
+                                    "FOREGROUND"
+                                ],
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "imagePullPolicy": "IfNotPresent"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "securityContext": {},
+                        "schedulerName": "default-scheduler"
+                    }
+                },
+                "strategy": {
+                    "type": "RollingUpdate",
+                    "rollingUpdate": {
+                        "maxUnavailable": 1,
+                        "maxSurge": 1
+                    }
+                },
+                "revisionHistoryLimit": 10,
+                "progressDeadlineSeconds": 2147483647
+            },
+            "status": {
+                "observedGeneration": 1,
+                "replicas": 1,
+                "updatedReplicas": 1,
+                "readyReplicas": 1,
+                "availableReplicas": 1,
+                "conditions": [
+                    {
+                        "type": "Available",
+                        "status": "True",
+                        "lastUpdateTime": "2019-04-22T16:51:57Z",
+                        "lastTransitionTime": "2019-04-22T16:51:57Z",
+                        "reason": "MinimumReplicasAvailable",
+                        "message": "Deployment has minimum availability."
+                    }
+                ]
+            }
+        },
+        "oldObject": {
+            "metadata": {
+                "name": "coreoshttp",
+                "namespace": "neuvector-1",
+                "uid": "f095decf-651e-11e9-96d1-000c29f3d008",
+                "resourceVersion": "5199552",
+                "generation": 1,
+                "creationTimestamp": "2019-04-22T16:51:57Z",
+                "labels": {
+                    "app": "coreoshttp",
+                    "namea": "iperfservera",
+                    "nameb": "iperfserverb",
+                    "namec": "iperfserverc",
+                    "version": "v1"
+                },
+                "annotations": {
+                    "deployment.kubernetes.io/revision": "1",
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"extensions/v1beta1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"name\":\"coreoshttp\",\"namespace\":\"neuvector-1\"},\"spec\":{\"replicas\":1,\"template\":{\"metadata\":{\"labels\":{\"app\":\"coreoshttp\",\"namea\":\"iperfservera\",\"nameb\":\"iperfserverb\",\"namec\":\"iperfserverc\",\"version\":\"v1\"}},\"spec\":{\"containers\":[{\"command\":[\"/usr/sbin/apache2ctl\",\"-D\",\"FOREGROUND\"],\"image\":\"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"coreoshttp\",\"ports\":[{\"containerPort\":8080}]}]}}}}\n"
+                }
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "matchLabels": {
+                        "app": "coreoshttp",
+                        "namea": "iperfservera",
+                        "nameb": "iperfserverb",
+                        "namec": "iperfserverc",
+                        "version": "v1"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "coreoshttp",
+                            "namea": "iperfservera",
+                            "nameb": "iperfserverb",
+                            "namec": "iperfserverc",
+                            "version": "v1"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "coreoshttp",
+                                "image": "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
+                                "command": [
+                                    "/usr/sbin/apache2ctl",
+                                    "-D",
+                                    "FOREGROUND"
+                                ],
+                                "ports": [
+                                    {
+                                        "containerPort": 8080,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "terminationMessagePath": "/dev/termination-log",
+                                "terminationMessagePolicy": "File",
+                                "imagePullPolicy": "IfNotPresent"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "securityContext": {},
+                        "schedulerName": "default-scheduler"
+                    }
+                },
+                "strategy": {
+                    "type": "RollingUpdate",
+                    "rollingUpdate": {
+                        "maxUnavailable": 1,
+                        "maxSurge": 1
+                    }
+                },
+                "revisionHistoryLimit": 10,
+                "progressDeadlineSeconds": 2147483647
+            },
+            "status": {
+                "observedGeneration": 1,
+                "replicas": 1,
+                "updatedReplicas": 1,
+                "readyReplicas": 1,
+                "availableReplicas": 1,
+                "conditions": [
+                    {
+                        "type": "Available",
+                        "status": "True",
+                        "lastUpdateTime": "2019-04-22T16:51:57Z",
+                        "lastTransitionTime": "2019-04-22T16:51:57Z",
+                        "reason": "MinimumReplicasAvailable",
+                        "message": "Deployment has minimum availability."
+                    }
+                ]
+            }
+        }
+    }
+}
+

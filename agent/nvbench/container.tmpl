@@ -1,0 +1,2123 @@
+#!/bin/sh
+
+host_configuration() {
+  check_1
+  check_1_1
+  check_1_1_1
+  check_1_1_2
+  check_1_1_3
+  check_1_1_4
+  check_1_1_5
+  check_1_1_6
+  check_1_1_7
+  check_1_1_8
+  check_1_1_9
+  check_1_1_10
+  check_1_1_11
+  check_1_1_12
+  check_1_1_13
+  check_1_1_14
+  check_1_1_15
+  check_1_1_16
+  check_1_1_17
+  check_1_1_18
+  check_1_2
+  check_1_2_1
+  check_1_2_2
+  check_1_end
+}
+
+host_configuration_level1() {
+  check_1
+  check_1_end
+}
+
+linux_hosts_specific_configuration() {
+  check_1_1
+  check_1_1_1
+  check_1_1_2
+  check_1_1_3
+  check_1_1_4
+  check_1_1_5
+  check_1_1_6
+  check_1_1_7
+  check_1_1_8
+  check_1_1_9
+  check_1_1_10
+  check_1_1_11
+  check_1_1_12
+  check_1_1_13
+  check_1_1_14
+  check_1_1_15
+  check_1_1_16
+  check_1_1_17
+  check_1_1_18
+}
+
+host_general_configuration() {
+  check_1
+  check_1_2
+  check_1_2_1
+  check_1_2_2
+  check_1_end
+}
+
+docker_daemon_configuration() {
+  check_2
+  check_2_1
+  check_2_2
+  check_2_3
+  check_2_4
+  check_2_5
+  check_2_6
+  check_2_7
+  check_2_8
+  check_2_9
+  check_2_10
+  check_2_11
+  check_2_12
+  check_2_13
+  check_2_14
+  check_2_15
+  check_2_16
+  check_2_17
+  check_2_18
+  check_2_end
+}
+
+docker_daemon_configuration_level1() {
+  check_2
+  check_2_end
+}
+
+docker_daemon_files() {
+  check_3
+  check_3_1
+  check_3_2
+  check_3_3
+  check_3_4
+  check_3_5
+  check_3_6
+  check_3_7
+  check_3_8
+  check_3_9
+  check_3_10
+  check_3_11
+  check_3_12
+  check_3_13
+  check_3_14
+  check_3_15
+  check_3_16
+  check_3_17
+  check_3_18
+  check_3_19
+  check_3_20
+  check_3_21
+  check_3_22
+  check_3_23
+  check_3_24
+  check_3_end
+}
+
+docker_daemon_files_level1() {
+  check_3
+  check_3_end
+}
+
+container_images() {
+  check_4
+  check_4_1
+  check_4_2
+  check_4_3
+  check_4_4
+  check_4_5
+  check_4_6
+  check_4_7
+  check_4_8
+  check_4_9
+  check_4_10
+  check_4_11
+  check_4_end
+}
+
+container_images_level1() {
+  check_4
+  check_4_end
+}
+
+container_runtime() {
+  check_5
+  check_running_containers
+  check_5_1
+  check_5_2
+  check_5_3
+  check_5_4
+  check_5_5
+  check_5_6
+  check_5_7
+  check_5_8
+  check_5_9
+  check_5_10
+  check_5_11
+  check_5_12
+  check_5_13
+  check_5_14
+  check_5_15
+  check_5_16
+  check_5_17
+  check_5_18
+  check_5_19
+  check_5_20
+  check_5_21
+  check_5_22
+  check_5_23
+  check_5_24
+  check_5_25
+  check_5_26
+  check_5_27
+  check_5_28
+  check_5_29
+  check_5_30
+  check_5_31
+  check_5_end
+}
+
+container_runtime_level1() {
+  check_5
+  check_5_end
+}
+
+docker_security_operations() {
+  check_6
+  check_6_1
+  check_6_2
+  check_6_end
+}
+
+docker_security_operations_level1() {
+  check_6
+  check_6_1
+  check_6_2
+  check_6_end
+}
+
+docker_swarm_configuration() {
+  check_7
+  check_7_1
+  check_7_2
+  check_7_3
+  check_7_4
+  check_7_5
+  check_7_6
+  check_7_7
+  check_7_8
+  check_7_9
+  check_7_10
+  check_7_end
+}
+
+docker_swarm_configuration_level1() {
+  check_7
+  check_7_end
+}
+
+docker_enterprise_configuration() {
+  check_8
+  check_product_license
+  check_8_1
+  check_8_1_1
+  check_8_1_2
+  check_8_1_3
+  check_8_1_4
+  check_8_1_5
+  check_8_1_6
+  check_8_1_7
+  check_8_2
+  check_8_2_1
+  check_8_end
+}
+
+docker_enterprise_configuration_level1() {
+  check_8
+  check_product_license
+  check_8_1
+  check_8_1_1
+  check_8_1_2
+  check_8_1_3
+  check_8_1_4
+  check_8_1_5
+  check_8_1_6
+  check_8_1_7
+  check_8_2
+  check_8_2_1
+  check_8_end
+}
+
+universal_control_plane_configuration() {
+  check_8
+  check_8_1
+  check_8_1_1
+  check_8_1_2
+  check_8_1_3
+  check_8_1_4
+  check_8_1_5
+  check_8_1_6
+  check_8_1_7
+  check_8_end
+}
+
+docker_trusted_registry_configuration() {
+  check_8
+  check_8_2
+  check_8_2_1
+  check_8_end
+}
+
+community_checks() {
+  check_c
+  check_c_1
+  check_c_1_1
+  check_c_2
+  check_c_5_3_1
+  check_c_5_3_2
+  check_c_5_3_3
+  check_c_5_3_4
+  check_c_end
+}
+
+# CIS
+cis() {
+  host_configuration
+  docker_daemon_configuration
+  docker_daemon_files
+  container_images
+  container_runtime
+  docker_security_operations
+  docker_swarm_configuration
+}
+
+cis_level1() {
+  host_configuration_level1
+  docker_daemon_configuration_level1
+  docker_daemon_files_level1
+  container_images_level1
+  container_runtime_level1
+  docker_security_operations_level1
+  docker_swarm_configuration_level1
+}
+
+# Community contributed
+community() {
+  community_checks
+}
+
+# All
+all() {
+  cis
+  docker_enterprise_configuration
+  community
+}
+<<<.Replace_container_list>>>
+
+#!/bin/bash
+
+# Returns the absolute path of a given string
+abspath () { case "$1" in /*)printf "%s\n" "$1";; *)printf "%s\n" "$PWD/$1";; esac; }
+
+# Audit rules default path
+auditrules="/etc/audit/audit.rules"
+
+# Check for required program(s)
+req_programs() {
+  for p in $1; do
+    command -v "$p" >/dev/null 2>&1 || { printf "Required program not found: %s\n" "$p"; exit 1; }
+  done
+  if command -v ss >/dev/null 2>&1; then
+    netbin=ss
+    return
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netbin=netstat
+    return
+  fi
+  echo "ss or netstat command not found."
+  exit 1
+}
+
+# Compares versions of software of the format X.Y.Z
+do_version_check() {
+  [ "$1" = "$2" ] && return 10
+
+  ver1front=$(printf "%s" "$1" | cut -d "." -f -1)
+  ver1back=$(printf "%s" "$1" | cut -d "." -f 2-)
+  ver2front=$(printf "%s" "$2" | cut -d "." -f -1)
+  ver2back=$(printf "%s" "$2" | cut -d "." -f 2-)
+
+  if [ "$ver1front" != "$1" ] || [ "$ver2front" != "$2" ]; then
+    [ "$ver1front" -gt "$ver2front" ] && return 11
+    [ "$ver1front" -lt "$ver2front" ] && return 9
+
+    [ "$ver1front" = "$1" ] || [ -z "$ver1back" ] && ver1back=0
+    [ "$ver2front" = "$2" ] || [ -z "$ver2back" ] && ver2back=0
+      do_version_check "$ver1back" "$ver2back"
+      return $?
+  fi
+  [ "$1" -gt "$2" ] && return 11 || return 9
+}
+
+# Extracts commandline args from the newest running processes named like the first parameter
+get_command_line_args() {
+  PROC="$1"
+
+  for PID in $(pgrep -f -n "$PROC"); do
+    tr "\0" " " < /proc/"$PID"/cmdline
+  done
+}
+
+# Extract the cumulative command line arguments for the docker daemon
+#
+# If specified multiple times, all matches are returned.
+# Accounts for long and short variants, call with short option.
+# Does not account for option defaults or implicit options.
+get_docker_cumulative_command_line_args() {
+  OPTION="$1"
+
+  line_arg="dockerd"
+  if ! get_command_line_args "docker daemon" >/dev/null 2>&1 ; then
+    line_arg="docker daemon"
+  fi
+
+  echo "<<<.Replace_docker_daemon_opts>>>" |
+  # normalize known long options to their short versions
+  sed \
+    -e 's/\-\-debug/-D/g' \
+    -e 's/\-\-host/-H/g' \
+    -e 's/\-\-log-level/-l/g' \
+    -e 's/\-\-version/-v/g' \
+    |
+    # normalize parameters separated by space(s) to -O=VALUE
+    sed \
+      -e 's/\-\([DHlv]\)[= ]\([^- ][^ ]\)/-\1=\2/g' \
+      |
+    # get the last interesting option
+    tr ' ' "\n" |
+    grep "^${OPTION}" |
+    # normalize quoting of values
+    sed \
+      -e 's/"//g' \
+      -e "s/'//g"
+}
+
+# Extract the effective command line arguments for the docker daemon
+#
+# Accounts for multiple specifications, takes the last option.
+# Accounts for long and short variants, call with short option
+# Does not account for option default or implicit options.
+get_docker_effective_command_line_args() {
+  OPTION="$1"
+  get_docker_cumulative_command_line_args "$OPTION" | tail -n1
+}
+
+get_docker_configuration_file() {
+  FILE="$(get_docker_effective_command_line_args '--config-file' | \
+    sed 's/.*=//g')"
+
+  if [ -f "$FILE" ]; then
+    CONFIG_FILE="$FILE"
+    return
+  fi
+  if [ -f '/etc/docker/daemon.json' ]; then
+    CONFIG_FILE='/etc/docker/daemon.json'
+    return
+  fi
+  CONFIG_FILE='/dev/null'
+}
+
+get_docker_configuration_file_args() {
+  OPTION="$1"
+
+  get_docker_configuration_file
+
+  grep "$OPTION" "$CONFIG_FILE" | sed 's/.*://g' | tr -d '" ',
+}
+
+get_service_file() {
+  SERVICE="$1"
+
+  if [ -f "/etc/systemd/system/$SERVICE" ]; then
+    echo "/etc/systemd/system/$SERVICE"
+    return
+  fi
+  if [ -f "/lib/systemd/system/$SERVICE" ]; then
+    echo "/lib/systemd/system/$SERVICE"
+    return
+  fi
+  if systemctl show -p FragmentPath "$SERVICE" 2> /dev/null 1>&2; then
+    systemctl show -p FragmentPath "$SERVICE" | sed 's/.*=//'
+    return
+  fi
+  echo "/usr/lib/systemd/system/$SERVICE"
+}
+
+yell_info() {
+yell "# --------------------------------------------------------------------------------------------
+# Docker Bench for Security v$version
+#
+# Docker, Inc. (c) 2015-$(date +"%Y")
+#
+# Checks for dozens of common best-practices around deploying Docker containers in production.
+# Based on the CIS Docker Benchmark 1.3.1.
+# --------------------------------------------------------------------------------------------"
+}
+#!/bin/bash
+
+bldred='\033[1;31m' # Bold Red
+bldgrn='\033[1;32m' # Bold Green
+bldblu='\033[1;34m' # Bold Blue
+bldylw='\033[1;33m' # Bold Yellow
+txtrst='\033[0m'
+
+if [ -n "$nocolor" ] && [ "$nocolor" = "nocolor" ]; then
+  bldred=''
+  bldgrn=''
+  bldblu=''
+  bldylw=''
+  txtrst=''
+fi
+
+logit () {
+  printf "%b\n" "$1" | tee -a "$logger"
+}
+
+info () {
+  local infoCountCheck
+  local OPTIND c
+  while getopts c args
+  do
+    case $args in
+    c) infoCountCheck="true" ;;
+    *) exit 1 ;;
+    esac
+  done
+  if [ "$infoCountCheck" = "true" ]; then
+    printf "%b\n" "${bldblu}[INFO]${txtrst} $2" | tee -a "$logger"
+    totalChecks=$((totalChecks + 1))
+    return
+  fi
+  printf "%b\n" "${bldblu}[INFO]${txtrst} $1" | tee -a "$logger"
+}
+
+pass () {
+  local passScored
+  local passCountCheck
+  local OPTIND s c
+  while getopts sc args
+  do
+    case $args in
+    s) passScored="true" ;;
+    c) passCountCheck="true" ;;
+    *) exit 1 ;;
+    esac
+  done
+  if [ "$passScored" = "true" ] || [ "$passCountCheck" = "true" ]; then
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $2" | tee -a "$logger"
+    totalChecks=$((totalChecks + 1))
+  fi
+  if [ "$passScored" = "true" ]; then
+    currentScore=$((currentScore + 1))
+  fi
+  if [ "$passScored" != "true" ] && [ "$passCountCheck" != "true" ]; then
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $1" | tee -a "$logger"
+  fi
+}
+
+warn () {
+  local warnScored
+  local OPTIND s
+  while getopts s args
+  do
+    case $args in
+    s) warnScored="true" ;;
+    *) exit 1 ;;
+    esac
+  done
+  if [ "$warnScored" = "true" ]; then
+    printf "%b\n" "${bldred}[WARN]${txtrst} $2" | tee -a "$logger"
+    totalChecks=$((totalChecks + 1))
+    currentScore=$((currentScore - 1))
+    return
+  fi
+  printf "%b\n" "${bldred}[WARN]${txtrst} $1" | tee -a "$logger"
+}
+
+note () {
+  local noteCountCheck
+  local OPTIND c
+  while getopts c args
+  do
+    case $args in
+    c) noteCountCheck="true" ;;
+    *) exit 1 ;;
+    esac
+  done
+  if [ "$noteCountCheck" = "true" ]; then
+    printf "%b\n" "${bldylw}[NOTE]${txtrst} $2" | tee -a "$logger"
+    totalChecks=$((totalChecks + 1))
+    return
+  fi
+  printf "%b\n" "${bldylw}[NOTE]${txtrst} $1" | tee -a "$logger"
+}
+
+yell () {
+  printf "%b\n" "${bldylw}$1${txtrst}\n"
+}
+
+beginjson () {
+  printf "{\n  \"dockerbenchsecurity\": \"%s\",\n  \"start\": %s,\n  \"tests\": [" "$1" "$2" | tee "$logger.json" 2>/dev/null 1>&2
+}
+
+endjson (){
+  printf "\n  ],\n  \"checks\": %s,\n  \"score\": %s,\n  \"end\": %s\n}" "$1" "$2" "$3" | tee -a "$logger.json" 2>/dev/null 1>&2
+}
+
+logjson (){
+  printf "\n  \"%s\": \"%s\"," "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+}
+
+SSEP=
+SEP=
+startsectionjson() {
+  printf "%s\n    {\n      \"id\": \"%s\",\n      \"desc\": \"%s\",\n      \"results\": [" "$SSEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  SEP=
+  SSEP=","
+}
+
+endsectionjson() {
+  printf "\n      ]\n    }" | tee -a "$logger.json" 2>/dev/null 1>&2
+}
+
+starttestjson() {
+  printf "%s\n        {\n          \"id\": \"%s\",\n          \"desc\": \"%s\",\n          " "$SEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  SEP=","
+}
+
+log_to_json() {
+  if [ $# -eq 1 ]; then
+    printf "\"result\": \"%s\"" "$1" | tee -a "$logger.json" 2>/dev/null 1>&2
+    return
+  fi
+  if [ $# -eq 2 ] && [ $# -ne 1 ]; then
+    # Result also contains details
+    printf "\"result\": \"%s\",\n          \"details\": \"%s\"" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+    return
+  fi
+  # Result also includes details and a list of items. Add that directly to details and to an array property "items"
+  # Also limit the number of items to $limit, if $limit is non-zero
+  truncItems=$3
+  if [ "$limit" != 0 ]; then
+    truncItems=""
+    ITEM_COUNT=0
+    for item in $3; do
+      truncItems="$truncItems $item"
+      ITEM_COUNT=$((ITEM_COUNT + 1));
+      if [ "$ITEM_COUNT" == "$limit" ]; then
+        truncItems="$truncItems (truncated)"
+        break;
+      fi
+    done
+  fi
+  itemsJson=$(printf "[\n            "; ISEP=""; ITEMCOUNT=0; for item in $truncItems; do printf "%s\"%s\"" "$ISEP" "$item"; ISEP=","; done; printf "\n          ]")
+  printf "\"result\": \"%s\",\n          \"details\": \"%s: %s\",\n          \"items\": %s" "$1" "$2" "$truncItems" "$itemsJson" | tee -a "$logger.json" 2>/dev/null 1>&2
+}
+
+logcheckresult() {
+  # Log to JSON
+  log_to_json "$@"
+
+  # Log remediation measure to JSON
+  if [ -n "$remediation" ] && [ "$1" != "PASS" ] && [ "$printremediation" = "1" ]; then
+    printf ",\n          \"remediation\": \"%s\"" "$remediation" | tee -a "$logger.json" 2>/dev/null 1>&2
+    if [ -n "$remediationImpact" ]; then
+      printf ",\n          \"remediation-impact\": \"%s\"" "$remediationImpact" | tee -a "$logger.json" 2>/dev/null 1>&2
+    fi
+  fi
+  printf "\n        }" | tee -a "$logger.json" 2>/dev/null 1>&2
+
+  # Save remediation measure for print log to stdout
+  if [ -n "$remediation" ] && [ "$1" != "PASS" ]; then
+    if [ -n "${checkHeader}" ]; then
+      if [ -n "${addSpaceHeader}" ]; then
+        globalRemediation="${globalRemediation}\n"
+      fi
+      globalRemediation="${globalRemediation}\n${bldblu}[INFO]${txtrst} ${checkHeader}"
+      checkHeader=""
+      addSpaceHeader="1"
+    fi
+    globalRemediation="${globalRemediation}\n${bldblu}[INFO]${txtrst} ${id} - ${remediation}"
+    if [ -n "${remediationImpact}" ]; then
+      globalRemediation="${globalRemediation} Remediation Impact: ${remediationImpact}"
+    fi
+  fi
+}
+#!/bin/bash
+
+check_4() {
+  logit ""
+  local id="4"
+  local desc="Container Images and Build File"
+  checkHeader="$id - $desc"
+  info "$checkHeader"
+  startsectionjson "$id" "$desc"
+}
+
+check_4_1() {
+  local id="4.1"
+  local desc="Ensure that a user for the container has been created (Automated)"
+  local remediation="You should ensure that the Dockerfile for each container image contains the information: USER <username or ID>. If there is no specific user created in the container base image, then make use of the useradd command to add a specific user before the USER instruction in the Dockerfile."
+  local remediationImpact="Running as a non-root user can present challenges where you wish to bind mount volumes from the underlying host. In this case, care should be taken to ensure that the user running the contained process can read and write to the bound directory, according to their requirements."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  # If container_users is empty, there are no running containers
+  if [ -z "$containers" ]; then
+    info -c "$check"
+    info "     * No containers running"
+    logcheckresult "INFO" "No containers running"
+    return
+  fi
+  # We have some containers running, set failure flag to 0. Check for Users.
+  fail=0
+  # Make the loop separator be a new-line in POSIX compliant fashion
+  set -f; IFS=$'
+  '
+  root_containers=""
+  for c in $containers; do
+    user=$(docker inspect --format 'User={{.Config.User}}' "$c")
+
+    if [ "$user" = "User=0" ] || [ "$user" = "User=root" ] || [ "$user" = "User=" ] || [ "$user" = "User=[]" ] || [ "$user" = "User=<no value>" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * Running as root: $c"
+        root_containers="$root_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * Running as root: $c"
+      root_containers="$root_containers $c"
+    fi
+  done
+  # We went through all the containers and found none running as root
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "running as root" "$root_containers"
+  # Make the loop separator go back to space
+  set +f; unset IFS
+}
+
+check_4_2() {
+  local id="4.2"
+  local desc="Ensure that containers use only trusted base images (Manual)"
+  local remediation="Configure and use Docker Content trust. View the history of each Docker image to evaluate its risk, dependent on the sensitivity of the application you wish to deploy using it. Scan Docker images for vulnerabilities at regular intervals."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_3() {
+  local id="4.3"
+  local desc="Ensure that unnecessary packages are not installed in the container (Manual)"
+  local remediation="You should not install anything within the container that is not required. You should consider using a minimal base image if you can. Some of the options available include BusyBox and Alpine. Not only can this trim your image size considerably, but there would also be fewer pieces of software which could contain vectors for attack."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_4() {
+  local id="4.4"
+  local desc="Ensure images are scanned and rebuilt to include security patches (Manual)"
+  local remediation="Images should be re-built ensuring that the latest version of the base images are used, to keep the operating system patch level at an appropriate level. Once the images have been re-built, containers should be re-started making use of the updated images."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_5() {
+  local id="4.5"
+  local desc="Ensure Content trust for Docker is Enabled (Automated)"
+  local remediation="Add DOCKER_CONTENT_TRUST variable to the /etc/environment file using command echo DOCKER_CONTENT_TRUST=1 | sudo tee -a /etc/environment."
+  local remediationImpact="This prevents users from working with tagged images unless they contain a signature."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  if [ "$DOCKER_CONTENT_TRUST" = "1" ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  warn -s "$check"
+  logcheckresult "WARN"
+}
+
+check_4_6() {
+  local id="4.6"
+  local desc="Ensure that HEALTHCHECK instructions have been added to container images (Automated)"
+  local remediation="You should follow the Docker documentation and rebuild your container images to include the HEALTHCHECK instruction."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  no_health_images=""
+  for img in $images; do
+    if docker inspect --format='{{.Config.Healthcheck}}' "$img" 2>/dev/null | grep -e "<nil>" >/dev/null 2>&1; then
+      if [ $fail -eq 0 ]; then
+        fail=1
+        warn -s "$check"
+      fi
+      imgName=$(docker inspect --format='{{.RepoTags}}' "$img" 2>/dev/null)
+      if ! [ "$imgName" = '[]' ]; then
+        warn "     * No Healthcheck found: $imgName"
+        no_health_images="$no_health_images $imgName"
+      else
+        warn "     * No Healthcheck found: $img"
+        no_health_images="$no_health_images $img"
+      fi
+    fi
+  done
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Images w/o HEALTHCHECK" "$no_health_images"
+}
+
+check_4_7() {
+  local id="4.7"
+  local desc="Ensure update instructions are not used alone in the Dockerfile (Manual)"
+  local remediation="You should use update instructions together with install instructions and version pinning for packages while installing them. This prevent caching and force the extraction of the required versions. Alternatively, you could use the --no-cache flag during the docker build process to avoid using cached layers."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  update_images=""
+  for img in $images; do
+    if docker history "$img" 2>/dev/null | grep -e "update" >/dev/null 2>&1; then
+      if [ $fail -eq 0 ]; then
+        fail=1
+        info -c "$check"
+      fi
+      imgName=$(docker inspect --format='{{.RepoTags}}' "$img" 2>/dev/null)
+      if ! [ "$imgName" = '[]' ]; then
+        info "     * Update instruction found: $imgName"
+        update_images="$update_images $imgName"
+      fi
+    fi
+  done
+  if [ $fail -eq 0 ]; then
+    pass -c "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "INFO" "Update instructions found" "$update_images"
+}
+
+check_4_8() {
+  local id="4.8"
+  local desc="Ensure setuid and setgid permissions are removed (Manual)"
+  local remediation="You should allow setuid and setgid permissions only on executables which require them. You could remove these permissions at build time by adding the following command in your Dockerfile, preferably towards the end of the Dockerfile: RUN find / -perm /6000 -type f -exec chmod a-s {} ; || true"
+  local remediationImpact="The above command would break all executables that depend on setuid or setgid permissions including legitimate ones. You should therefore be careful to modify the command to suit your requirements so that it does not reduce the permissions of legitimate programs excessively. Because of this, you should exercise a degree of caution and examine all processes carefully before making this type of modification in order to avoid outages."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_9() {
+  local id="4.9"
+  local desc="Ensure that COPY is used instead of ADD in Dockerfiles (Manual)"
+  local remediation="You should use COPY rather than ADD instructions in Dockerfiles."
+  local remediationImpact="Care needs to be taken in implementing this control if the application requires functionality that is part of the ADD instruction, for example, if you need to retrieve files from remote URLS."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  add_images=""
+  for img in $images; do
+    if docker history --format "{{ .CreatedBy }}" --no-trunc "$img" | \
+      sed '$d' | grep -q 'ADD'; then
+      if [ $fail -eq 0 ]; then
+        fail=1
+        info -c "$check"
+      fi
+      imgName=$(docker inspect --format='{{.RepoTags}}' "$img" 2>/dev/null)
+      if ! [ "$imgName" = '[]' ]; then
+        info "     * ADD in image history: $imgName"
+        add_images="$add_images $imgName"
+      fi
+    fi
+  done
+  if [ $fail -eq 0 ]; then
+    pass -c "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "INFO" "Images using ADD" "$add_images"
+}
+
+check_4_10() {
+  local id="4.10"
+  local desc="Ensure secrets are not stored in Dockerfiles (Manual)"
+  local remediation="Do not store any kind of secrets within Dockerfiles. Where secrets are required during the build process, make use of a secrets management tool, such as the buildkit builder included with Docker."
+  local remediationImpact="A proper secrets management process will be required for Docker image building."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_11() {
+  local id="4.11"
+  local desc="Ensure only verified packages are installed (Manual)"
+  local remediation="You should use a secure package distribution mechanism of your choice to ensure the authenticity of software packages."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_4_end() {
+  endsectionjson
+}
+#!/bin/bash
+
+check_5() {
+  logit ""
+  local id="5"
+  local desc="Container Runtime"
+  checkHeader="$id - $desc"
+  info "$checkHeader"
+  startsectionjson "$id" "$desc"
+}
+
+check_running_containers() {
+  # If containers is empty, there are no running containers
+  if [ -z "$containers" ]; then
+    info "  * No containers running, skipping Section 5"
+    return
+  fi
+  # Make the loop separator be a new-line in POSIX compliant fashion
+  set -f; IFS=$'
+  '
+}
+
+check_5_1() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.1"
+  local desc="Ensure that, if applicable, an AppArmor Profile is enabled (Automated)"
+  local remediation="If AppArmor is applicable for your Linux OS, you should enable it. Alternatively, Docker's default AppArmor policy can be used."
+  local remediationImpact="The container will have the security controls defined in the AppArmor profile. It should be noted that if the AppArmor profile is misconfigured, this may cause issues with the operation of the container."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  no_apparmor_containers=""
+  for c in $containers; do
+    policy=$(docker inspect --format 'AppArmorProfile={{ .AppArmorProfile }}' "$c")
+
+    if [ "$policy" = "AppArmorProfile=" ] || [ "$policy" = "AppArmorProfile=[]" ] || [ "$policy" = "AppArmorProfile=<no value>" ] || [ "$policy" = "AppArmorProfile=unconfined" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * No AppArmorProfile Found: $c"
+        no_apparmor_containers="$no_apparmor_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * No AppArmorProfile Found: $c"
+      no_apparmor_containers="$no_apparmor_containers $c"
+    fi
+  done
+  # We went through all the containers and found none without AppArmor
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with no AppArmorProfile" "$no_apparmor_containers"
+}
+
+check_5_2() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.2"
+  local desc="Ensure that, if applicable, SELinux security options are set (Automated)"
+  local remediation="Set the SELinux State. Set the SELinux Policy. Create or import a SELinux policy template for Docker containers. Start Docker in daemon mode with SELinux enabled. Start your Docker container using the security options."
+  local remediationImpact="Any restrictions defined in the SELinux policy will be applied to your containers. It should be noted that if your SELinux policy is misconfigured, this may have an impact on the correct operation of the affected containers."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  no_securityoptions_containers=""
+  for c in $containers; do
+    policy=$(docker inspect --format 'SecurityOpt={{ .HostConfig.SecurityOpt }}' "$c")
+
+    if [ "$policy" = "SecurityOpt=" ] || [ "$policy" = "SecurityOpt=[]" ] || [ "$policy" = "SecurityOpt=<no value>" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * No SecurityOptions Found: $c"
+        no_securityoptions_containers="$no_securityoptions_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * No SecurityOptions Found: $c"
+      no_securityoptions_containers="$no_securityoptions_containers $c"
+    fi
+  done
+  # We went through all the containers and found none without SELinux
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with no SecurityOptions" "$no_securityoptions_containers"
+}
+
+check_5_3() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.3"
+  local desc="Ensure that Linux kernel capabilities are restricted within containers (Automated)"
+  local remediation="You could remove all the currently configured capabilities and then restore only the ones you specifically use: docker run --cap-drop=all --cap-add={<Capability 1>,<Capability 2>} <Run arguments> <Container Image Name or ID> <Command>"
+  local remediationImpact="Restrictions on processes within a container are based on which Linux capabilities are in force. Removal of the NET_RAW capability prevents the container from creating raw sockets which is good security practice under most circumstances, but may affect some networking utilities."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  caps_containers=""
+  for c in $containers; do
+    container_caps=$(docker inspect --format 'CapAdd={{ .HostConfig.CapAdd}}' "$c")
+    caps=$(echo "$container_caps" | tr "[:lower:]" "[:upper:]" | \
+      sed 's/CAPADD/CapAdd/' | \
+      sed -r "s/AUDIT_WRITE|CHOWN|DAC_OVERRIDE|FOWNER|FSETID|KILL|MKNOD|NET_BIND_SERVICE|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYS_CHROOT|\s//g")
+
+    if [ "$caps" != 'CapAdd=' ] && [ "$caps" != 'CapAdd=[]' ] && [ "$caps" != 'CapAdd=<no value>' ] && [ "$caps" != 'CapAdd=<nil>' ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * Capabilities added: $caps to $c"
+        caps_containers="$caps_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * Capabilities added: $caps to $c"
+      caps_containers="$caps_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with extra capabilities
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Capabilities added for containers" "$caps_containers"
+}
+
+check_5_4() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.4"
+  local desc="Ensure that privileged containers are not used (Automated)"
+  local remediation="You should not run containers with the --privileged flag."
+  local remediationImpact="If you start a container without the --privileged flag, it will not have excessive default capabilities."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  privileged_containers=""
+  for c in $containers; do
+    privileged=$(docker inspect --format '{{ .HostConfig.Privileged }}' "$c")
+
+    if [ "$privileged" = "true" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * Container running in Privileged mode: $c"
+        privileged_containers="$privileged_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * Container running in Privileged mode: $c"
+      privileged_containers="$privileged_containers $c"
+    fi
+  done
+  # We went through all the containers and found no privileged containers
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers running in privileged mode" "$privileged_containers"
+}
+
+check_5_5() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.5"
+  local desc="Ensure sensitive host system directories are not mounted on containers (Automated)"
+  local remediation="You should not mount directories which are security sensitive on the host within containers, especially in read-write mode."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  # List of sensitive directories to test for. Script uses new-lines as a separator.
+  # Note the lack of identation. It needs it for the substring comparison.
+  sensitive_dirs='/
+/boot
+/dev
+/etc
+/lib
+/proc
+/sys
+/usr'
+  fail=0
+  sensitive_mount_containers=""
+  for c in $containers; do
+    volumes=$(docker inspect --format '{{ .Mounts }}' "$c")
+    if docker inspect --format '{{ .VolumesRW }}' "$c" 2>/dev/null 1>&2; then
+      volumes=$(docker inspect --format '{{ .VolumesRW }}' "$c")
+    fi
+    # Go over each directory in sensitive dir and see if they exist in the volumes
+    for v in $sensitive_dirs; do
+      sensitive=0
+      if echo "$volumes" | grep -e "{.*\s$v\s.*true\s.*}" 2>/tmp/null 1>&2; then
+        sensitive=1
+      fi
+      if [ $sensitive -eq 1 ]; then
+        # If it's the first container, fail the test
+        if [ $fail -eq 0 ]; then
+          warn -s "$check"
+          warn "     * Sensitive directory $v mounted in: $c"
+          sensitive_mount_containers="$sensitive_mount_containers $c:$v"
+          fail=1
+          continue
+        fi
+        warn "     * Sensitive directory $v mounted in: $c"
+        sensitive_mount_containers="$sensitive_mount_containers $c:$v"
+      fi
+    done
+  done
+  # We went through all the containers and found none with sensitive mounts
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with sensitive directories mounted" "$sensitive_mount_containers"
+}
+
+check_5_6() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.6"
+  local desc="Ensure sshd is not run within containers (Automated)"
+  local remediation="Uninstall the SSH daemon from the container and use docker exec to enter a container on the remote host."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  ssh_exec_containers=""
+  printcheck=0
+  for c in $containers; do
+
+    processes=$(docker exec "$c" ps -el 2>/dev/null | grep -c sshd | awk '{print $1}')
+    if [ "$processes" -ge 1 ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * Container running sshd: $c"
+        ssh_exec_containers="$ssh_exec_containers $c"
+        fail=1
+        printcheck=1
+      else
+        warn "     * Container running sshd: $c"
+        ssh_exec_containers="$ssh_exec_containers $c"
+      fi
+    fi
+
+    exec_check=$(docker exec "$c" ps -el 2>/dev/null)
+    if [ $? -eq 255 ]; then
+        if [ $printcheck -eq 0 ]; then
+          warn -s "$check"
+          printcheck=1
+        fi
+      warn "     * Docker exec fails: $c"
+      ssh_exec_containers="$ssh_exec_containers $c"
+      fail=1
+    fi
+
+  done
+  # We went through all the containers and found none with sshd
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with sshd/docker exec failures" "$ssh_exec_containers"
+}
+
+check_5_7() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.7"
+  local desc="Ensure privileged ports are not mapped within containers (Automated)"
+  local remediation="You should not map container ports to privileged host ports when starting a container. You should also, ensure that there is no such container to host privileged port mapping declarations in the Dockerfile."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  privileged_port_containers=""
+  for c in $containers; do
+    # Port format is private port -> ip: public port
+    ports=$(docker port "$c" | awk '{print $0}' | cut -d ':' -f2)
+
+    # iterate through port range (line delimited)
+    for port in $ports; do
+      if [ -n "$port" ] && [ "$port" -lt 1024 ]; then
+        # If it's the first container, fail the test
+        if [ $fail -eq 0 ]; then
+          warn -s "$check"
+          warn "     * Privileged Port in use: $port in $c"
+          privileged_port_containers="$privileged_port_containers $c:$port"
+          fail=1
+          continue
+        fi
+        warn "     * Privileged Port in use: $port in $c"
+        privileged_port_containers="$privileged_port_containers $c:$port"
+      fi
+    done
+  done
+  # We went through all the containers and found no privileged ports
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers using privileged ports" "$privileged_port_containers"
+}
+
+check_5_8() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.8"
+  local desc="Ensure that only needed ports are open on the container (Manual)"
+  local remediation="You should ensure that the Dockerfile for each container image only exposes needed ports."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  open_port_containers=""
+  for c in $containers; do
+    ports=$(docker port "$c" | awk '{print $0}' | cut -d ':' -f2)
+
+    for port in $ports; do
+      if [ -n "$port" ]; then
+        # If it's the first container, fail the test
+        if [ $fail -eq 0 ]; then
+          warn -s "$check"
+          warn "     * Port in use: $port in $c"
+          open_port_containers="$open_port_containers $c:$port"
+          fail=1
+          continue
+        fi
+        warn "     * Port in use: $port in $c"
+        open_port_containers="$open_port_containers $c:$port"
+      fi
+    done
+  done
+
+  # We went through all the containers and found none with open ports
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with open ports" "$open_port_containers"
+}
+
+check_5_9() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.9"
+  local desc="Ensure that the host's network namespace is not shared (Automated)"
+  local remediation="You should not pass the --net=host option when starting any container."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  net_host_containers=""
+  for c in $containers; do
+    mode=$(docker inspect --format 'NetworkMode={{ .HostConfig.NetworkMode }}' "$c")
+
+    if [ "$mode" = "NetworkMode=host" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "     * Container running with networking mode 'host': $c"
+        net_host_containers="$net_host_containers $c"
+        fail=1
+        continue
+      fi
+      warn "     * Container running with networking mode 'host': $c"
+      net_host_containers="$net_host_containers $c"
+    fi
+  done
+  # We went through all the containers and found no Network Mode host
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers running with networking mode 'host'" "$net_host_containers"
+}
+
+check_5_10() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.10"
+  local desc="Ensure that the memory usage for containers is limited (Automated)"
+  local remediation="You should run the container with only as much memory as it requires by using the --memory argument."
+  local remediationImpact="If correct memory limits are not set on each container, one process can expand its usage and cause other containers to run out of resources."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  mem_unlimited_containers=""
+  for c in $containers; do
+    memory=$(docker inspect --format '{{ .HostConfig.Memory }}' "$c")
+    if docker inspect --format '{{ .Config.Memory }}' "$c" 2> /dev/null 1>&2; then
+      memory=$(docker inspect --format '{{ .Config.Memory }}' "$c")
+    fi
+
+    if [ "$memory" = "0" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Container running without memory restrictions: $c"
+        mem_unlimited_containers="$mem_unlimited_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Container running without memory restrictions: $c"
+      mem_unlimited_containers="$mem_unlimited_containers $c"
+    fi
+  done
+  # We went through all the containers and found no lack of Memory restrictions
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Container running without memory restrictions" "$mem_unlimited_containers"
+}
+
+check_5_11() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.11"
+  local desc="Ensure that CPU priority is set appropriately on containers (Automated)"
+  local remediation="You should manage the CPU runtime between your containers dependent on their priority within your organization. To do so start the container using the --cpu-shares argument."
+  local remediationImpact="If you do not correctly assign CPU thresholds, the container process may run out of resources and become unresponsive. If CPU resources on the host are not constrainted, CPU shares do not place any restrictions on individual resources."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  cpu_unlimited_containers=""
+  for c in $containers; do
+    shares=$(docker inspect --format '{{ .HostConfig.CpuShares }}' "$c")
+    if docker inspect --format '{{ .Config.CpuShares }}' "$c" 2> /dev/null 1>&2; then
+      shares=$(docker inspect --format '{{ .Config.CpuShares }}' "$c")
+    fi
+
+    if [ "$shares" = "0" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Container running without CPU restrictions: $c"
+        cpu_unlimited_containers="$cpu_unlimited_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Container running without CPU restrictions: $c"
+      cpu_unlimited_containers="$cpu_unlimited_containers $c"
+    fi
+  done
+  # We went through all the containers and found no lack of CPUShare restrictions
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers running without CPU restrictions" "$cpu_unlimited_containers"
+}
+
+check_5_12() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.12"
+  local desc="Ensure that the container's root filesystem is mounted as read only (Automated)"
+  local remediation="You should add a --read-only flag at a container's runtime to enforce the container's root filesystem being mounted as read only."
+  local remediationImpact="Enabling --read-only at container runtime may break some container OS packages if a data writing strategy is not defined. You should define what the container's data should and should not persist at runtime in order to decide which strategy to use."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  fsroot_mount_containers=""
+  for c in $containers; do
+   read_status=$(docker inspect --format '{{ .HostConfig.ReadonlyRootfs }}' "$c")
+
+    if [ "$read_status" = "false" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Container running with root FS mounted R/W: $c"
+        fsroot_mount_containers="$fsroot_mount_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Container running with root FS mounted R/W: $c"
+      fsroot_mount_containers="$fsroot_mount_containers $c"
+    fi
+  done
+  # We went through all the containers and found no R/W FS mounts
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers running with root FS mounted R/W" "$fsroot_mount_containers"
+}
+
+check_5_13() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.13"
+  local desc="Ensure that incoming container traffic is bound to a specific host interface (Automated)"
+  local remediation="You should bind the container port to a specific host interface on the desired host port. Example: docker run --detach --publish 10.2.3.4:49153:80 nginx In this example, the container port 80 is bound to the host port on 49153 and would accept incoming connection only from the 10.2.3.4 external interface."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  incoming_unbound_containers=""
+  for c in $containers; do
+    for ip in $(docker port "$c" | awk '{print $3}' | cut -d ':' -f1); do
+      if [ "$ip" = "0.0.0.0" ]; then
+        # If it's the first container, fail the test
+        if [ $fail -eq 0 ]; then
+          warn -s "$check"
+          warn "      * Port being bound to wildcard IP: $ip in $c"
+          incoming_unbound_containers="$incoming_unbound_containers $c:$ip"
+          fail=1
+          continue
+        fi
+        warn "      * Port being bound to wildcard IP: $ip in $c"
+        incoming_unbound_containers="$incoming_unbound_containers $c:$ip"
+      fi
+    done
+  done
+  # We went through all the containers and found no ports bound to 0.0.0.0
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with port bound to wildcard IP" "$incoming_unbound_containers"
+}
+
+check_5_14() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.14"
+  local desc="Ensure that the 'on-failure' container restart policy is set to '5' (Automated)"
+  local remediation="If you wish a container to be automatically restarted, a sample command is docker run --detach --restart=on-failure:5 nginx"
+  local remediationImpact="If this option is set, a container will only attempt to restart itself 5 times."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  maxretry_unset_containers=""
+  for c in $containers; do
+    policy=$(docker inspect --format MaximumRetryCount='{{ .HostConfig.RestartPolicy.MaximumRetryCount }}' "$c")
+
+    if [ "$policy" != "MaximumRetryCount=5" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * MaximumRetryCount is not set to 5: $c"
+        maxretry_unset_containers="$maxretry_unset_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * MaximumRetryCount is not set to 5: $c"
+      maxretry_unset_containers="$maxretry_unset_containers $c"
+    fi
+  done
+  # We went through all the containers and they all had MaximumRetryCount=5
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with MaximumRetryCount not set to 5" "$maxretry_unset_containers"
+}
+
+check_5_15() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.15"
+  local desc="Ensure that the host's process namespace is not shared (Automated)"
+  local remediation="You should not start a container with the --pid=host argument."
+  local remediationImpact="Container processes cannot see processes on the host system."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  pidns_shared_containers=""
+  for c in $containers; do
+    mode=$(docker inspect --format 'PidMode={{.HostConfig.PidMode }}' "$c")
+
+    if [ "$mode" = "PidMode=host" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Host PID namespace being shared with: $c"
+        pidns_shared_containers="$pidns_shared_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Host PID namespace being shared with: $c"
+      pidns_shared_containers="$pidns_shared_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with PidMode as host
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers sharing host PID namespace" "$pidns_shared_containers"
+}
+
+check_5_16() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.16"
+  local desc="Ensure that the host's IPC namespace is not shared (Automated)"
+  local remediation="You should not start a container with the --ipc=host argument."
+  local remediationImpact="Shared memory segments are used in order to accelerate interprocess communications, commonly in high-performance applications. If this type of application is containerized into multiple containers, you might need to share the IPC namespace of the containers in order to achieve high performance. Under these circumstances, you should still only share container specific IPC namespaces and not the host IPC namespace."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  ipcns_shared_containers=""
+  for c in $containers; do
+    mode=$(docker inspect --format 'IpcMode={{.HostConfig.IpcMode }}' "$c")
+
+    if [ "$mode" = "IpcMode=host" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Host IPC namespace being shared with: $c"
+        ipcns_shared_containers="$ipcns_shared_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Host IPC namespace being shared with: $c"
+      ipcns_shared_containers="$ipcns_shared_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with IPCMode as host
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers sharing host IPC namespace" "$ipcns_shared_containers"
+}
+
+check_5_17() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.17"
+  local desc="Ensure that host devices are not directly exposed to containers (Manual)"
+  local remediation="You should not directly expose host devices to containers. If you do need to expose host devices to containers, you should use granular permissions as appropriate to your organization."
+  local remediationImpact="You would not be able to use host devices directly within containers."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  hostdev_exposed_containers=""
+  for c in $containers; do
+    devices=$(docker inspect --format 'Devices={{ .HostConfig.Devices }}' "$c")
+
+    if [ "$devices" != "Devices=" ] && [ "$devices" != "Devices=[]" ] && [ "$devices" != "Devices=<no value>" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        info -c "$check"
+        info "      * Container has devices exposed directly: $c"
+        hostdev_exposed_containers="$hostdev_exposed_containers $c"
+        fail=1
+        continue
+      fi
+      info "      * Container has devices exposed directly: $c"
+      hostdev_exposed_containers="$hostdev_exposed_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with devices
+  if [ $fail -eq 0 ]; then
+    pass -c "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "INFO" "Containers with host devices exposed directly" "$hostdev_exposed_containers"
+}
+
+check_5_18() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.18"
+  local desc="Ensure that the default ulimit is overwritten at runtime if needed (Manual)"
+  local remediation="You should only override the default ulimit settings if needed in a specific case."
+  local remediationImpact="If ulimits are not set correctly, overutilization by individual containers could make the host system unusable."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  no_ulimit_containers=""
+  for c in $containers; do
+    ulimits=$(docker inspect --format 'Ulimits={{ .HostConfig.Ulimits }}' "$c")
+
+    if [ "$ulimits" = "Ulimits=" ] || [ "$ulimits" = "Ulimits=[]" ] || [ "$ulimits" = "Ulimits=<no value>" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        info -c "$check"
+        info "      * Container no default ulimit override: $c"
+        no_ulimit_containers="$no_ulimit_containers $c"
+        fail=1
+        continue
+      fi
+      info "      * Container no default ulimit override: $c"
+      no_ulimit_containers="$no_ulimit_containers $c"
+    fi
+  done
+  # We went through all the containers and found none without Ulimits
+  if [ $fail -eq 0 ]; then
+    pass -c "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "INFO" "Containers with no default ulimit override" "$no_ulimit_containers"
+}
+
+check_5_19() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.19"
+  local desc="Ensure mount propagation mode is not set to shared (Automated)"
+  local remediation="Do not mount volumes in shared mode propagation."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  mountprop_shared_containers=""
+  for c in $containers; do
+    if docker inspect --format 'Propagation={{range $mnt := .Mounts}} {{json $mnt.Propagation}} {{end}}' "$c" | \
+     grep shared 2>/dev/null 1>&2; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Mount propagation mode is shared: $c"
+        mountprop_shared_containers="$mountprop_shared_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Mount propagation mode is shared: $c"
+      mountprop_shared_containers="$mountprop_shared_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with shared propagation mode
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with shared mount propagation" "$mountprop_shared_containers"
+}
+
+check_5_20() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.20"
+  local desc="Ensure that the host's UTS namespace is not shared (Automated)"
+  local remediation="You should not start a container with the --uts=host argument."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  utcns_shared_containers=""
+  for c in $containers; do
+    mode=$(docker inspect --format 'UTSMode={{.HostConfig.UTSMode }}' "$c")
+
+    if [ "$mode" = "UTSMode=host" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Host UTS namespace being shared with: $c"
+        utcns_shared_containers="$utcns_shared_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Host UTS namespace being shared with: $c"
+      utcns_shared_containers="$utcns_shared_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with UTSMode as host
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers sharing host UTS namespace" "$utcns_shared_containers"
+}
+
+check_5_21() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.21"
+  local desc="Ensure the default seccomp profile is not Disabled (Automated)"
+  local remediation="By default, seccomp profiles are enabled. You do not need to do anything unless you want to modify and use a modified seccomp profile."
+  local remediationImpact="With Docker 1.10 and greater, the default seccomp profile blocks syscalls, regardless of -- cap-add passed to the container."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  seccomp_disabled_containers=""
+  for c in $containers; do
+    if docker inspect --format 'SecurityOpt={{.HostConfig.SecurityOpt }}' "$c" | \
+      grep -E 'seccomp:unconfined|seccomp=unconfined' 2>/dev/null 1>&2; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Default seccomp profile disabled: $c"
+        seccomp_disabled_containers="$seccomp_disabled_containers $c"
+        fail=1
+      else
+        warn "      * Default seccomp profile disabled: $c"
+        seccomp_disabled_containers="$seccomp_disabled_containers $c"
+      fi
+    fi
+  done
+  # We went through all the containers and found none with default secomp profile disabled
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers with default seccomp profile disabled" "$seccomp_disabled_containers"
+}
+
+check_5_22() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.22"
+  local desc="Ensure that docker exec commands are not used with the privileged option (Automated)"
+  local remediation="You should not use the --privileged option in docker exec commands."
+  local remediationImpact="If you need enhanced capabilities within a container, then run it with all the permissions it requires. These should be specified individually."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_5_23() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.23"
+  local desc="Ensure that docker exec commands are not used with the user=root option (Manual)"
+  local remediation="You should not use the --user=root option in docker exec commands."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  note -c "$check"
+  logcheckresult "NOTE"
+}
+
+check_5_24() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.24"
+  local desc="Ensure that cgroup usage is confirmed (Automated)"
+  local remediation="You should not use the --cgroup-parent option within the docker run command unless strictly required."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  unexpected_cgroup_containers=""
+  for c in $containers; do
+    mode=$(docker inspect --format 'CgroupParent={{.HostConfig.CgroupParent }}x' "$c")
+
+    if [ "$mode" != "CgroupParent=x" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Confirm cgroup usage: $c"
+        unexpected_cgroup_containers="$unexpected_cgroup_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Confirm cgroup usage: $c"
+      unexpected_cgroup_containers="$unexpected_cgroup_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with UTSMode as host
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+    logcheckresult "WARN" "Containers using unexpected cgroup" "$unexpected_cgroup_containers"
+}
+
+check_5_25() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+  local id="5.25"
+  local desc="Ensure that the container is restricted from acquiring additional privileges (Automated)"
+  local remediation="You should start your container with the options: docker run --rm -it --security-opt=no-new-privileges ubuntu bash"
+  local remediationImpact="The no_new_priv option prevents LSMs like SELinux from allowing processes to acquire new privileges."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  addprivs_containers=""
+  for c in $containers; do
+    if ! docker inspect --format 'SecurityOpt={{.HostConfig.SecurityOpt }}' "$c" | grep 'no-new-privileges' 2>/dev/null 1>&2; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Privileges not restricted: $c"
+        addprivs_containers="$addprivs_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Privileges not restricted: $c"
+      addprivs_containers="$addprivs_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with capability to acquire additional privileges
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers without restricted privileges" "$addprivs_containers"
+}
+
+check_5_26() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.26"
+  local desc="Ensure that container health is checked at runtime (Automated)"
+  local remediation="You should run the container using the --health-cmd parameter."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  nohealthcheck_containers=""
+  for c in $containers; do
+    if ! docker inspect --format '{{ .Id }}: Health={{ .State.Health.Status }}' "$c" 2>/dev/null 1>&2; then
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Health check not set: $c"
+        nohealthcheck_containers="$nohealthcheck_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Health check not set: $c"
+      nohealthcheck_containers="$nohealthcheck_containers $c"
+    fi
+  done
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers without health check" "$nohealthcheck_containers"
+}
+
+check_5_27() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.27"
+  local desc="Ensure that Docker commands always make use of the latest version of their image (Manual)"
+  local remediation="You should use proper version pinning mechanisms (the <latest> tag which is assigned by default is still vulnerable to caching attacks) to avoid extracting cached older versions. Version pinning mechanisms should be used for base images, packages, and entire images. You can customize version pinning rules according to your requirements."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  info -c "$check"
+  logcheckresult "INFO"
+}
+
+check_5_28() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.28"
+  local desc="Ensure that the PIDs cgroup limit is used (Automated)"
+  local remediation="Use --pids-limit flag with an appropriate value when launching the container."
+  local remediationImpact="Set the PIDs limit value as appropriate. Incorrect values might leave containers unusable."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  nopids_limit_containers=""
+  for c in $containers; do
+    pidslimit="$(docker inspect --format '{{.HostConfig.PidsLimit }}' "$c")"
+
+    if [ "$pidslimit" = "0" ] || [  "$pidslimit" = "<nil>" ] || [  "$pidslimit" = "-1" ]; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * PIDs limit not set: $c"
+        nopids_limit_containers="$nopids_limit_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * PIDs limit not set: $c"
+      nopids_limit_containers="$nopids_limit_containers $c"
+    fi
+  done
+  # We went through all the containers and found all with PIDs limit
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers without PIDs cgroup limit" "$nopids_limit_containers"
+}
+
+check_5_29() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.29"
+  local desc="Ensure that Docker's default bridge 'docker0' is not used (Manual)"
+  local remediation="You should follow the Docker documentation and set up a user-defined network. All the containers should be run in this network."
+  local remediationImpact="User-defined networks need to be configured and managed in line with organizational security policy."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  docker_network_containers=""
+  networks=$(docker network ls -q 2>/dev/null)
+  for net in $networks; do
+    if docker network inspect --format '{{ .Options }}' "$net" 2>/dev/null | grep "com.docker.network.bridge.name:docker0" >/dev/null 2>&1; then
+      docker0Containers=$(docker network inspect --format='{{ range $k, $v := .Containers }} {{ $k }} {{ end }}' "$net" | \
+        sed -e 's/^ //' -e 's/  /\n/g' 2>/dev/null)
+
+      if [ -n "$docker0Containers" ]; then
+        if [ $fail -eq 0 ]; then
+          info -c "$check"
+          fail=1
+        fi
+        for c in $docker0Containers; do
+          if [ -z "$exclude" ]; then
+            cName=$(docker inspect --format '{{.Name}}' "$c" 2>/dev/null | sed 's/\///g')
+          else
+            pattern=$(echo "$exclude" | sed 's/,/|/g')
+            cName=$(docker inspect --format '{{.Name}}' "$c" 2>/dev/null | sed 's/\///g' | grep -Ev "$pattern" )
+          fi
+          if [ -n "$cName" ]; then
+            info "      * Container in docker0 network: $cName"
+            docker_network_containers="$docker_network_containers $c:$cName"
+          fi
+        done
+      fi
+    fi
+  done
+  # We went through all the containers and found none in docker0 network
+  if [ $fail -eq 0 ]; then
+    pass -c "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "INFO" "Containers using docker0 network" "$docker_network_containers"
+}
+
+check_5_30() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.30"
+  local desc="Ensure that the host's user namespaces are not shared (Automated)"
+  local remediation="You should not share user namespaces between host and containers."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  hostns_shared_containers=""
+  for c in $containers; do
+    if docker inspect --format '{{ .HostConfig.UsernsMode }}' "$c" 2>/dev/null | grep -i 'host' >/dev/null 2>&1; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Namespace shared: $c"
+        hostns_shared_containers="$hostns_shared_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Namespace shared: $c"
+      hostns_shared_containers="$hostns_shared_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with host's user namespace shared
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers sharing host user namespace" "$hostns_shared_containers"
+}
+
+check_5_31() {
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  local id="5.31"
+  local desc="Ensure that the Docker socket is not mounted inside any containers (Automated)"
+  local remediation="You should ensure that no containers mount docker.sock as a volume."
+  local remediationImpact="None."
+  local check="$id - $desc"
+  starttestjson "$id" "$desc"
+
+  fail=0
+  docker_sock_containers=""
+  for c in $containers; do
+    if docker inspect --format '{{ .Mounts }}' "$c" 2>/dev/null | grep 'docker.sock' >/dev/null 2>&1; then
+      # If it's the first container, fail the test
+      if [ $fail -eq 0 ]; then
+        warn -s "$check"
+        warn "      * Docker socket shared: $c"
+        docker_sock_containers="$docker_sock_containers $c"
+        fail=1
+        continue
+      fi
+      warn "      * Docker socket shared: $c"
+      docker_sock_containers="$docker_sock_containers $c"
+    fi
+  done
+  # We went through all the containers and found none with docker.sock shared
+  if [ $fail -eq 0 ]; then
+    pass -s "$check"
+    logcheckresult "PASS"
+    return
+  fi
+  logcheckresult "WARN" "Containers sharing docker socket" "$docker_sock_containers"
+}
+
+check_5_end() {
+  endsectionjson
+}
+check_4_1
+container_runtime
+exit 0;

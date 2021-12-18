@@ -1,0 +1,192 @@
+.TH "TCP helper functions" 3 "Mon Sep 13 2021" "Version 1.0.5" "libnetfilter_queue" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+TCP helper functions \- 
+.SS "Modules"
+
+.in +1c
+.ti -1c
+.RI "\fBInternal TCP functions\fP"
+.br
+.in -1c
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "struct tcphdr * \fBnfq_tcp_get_hdr\fP (struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "void * \fBnfq_tcp_get_payload\fP (struct tcphdr *tcph, struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "unsigned int \fBnfq_tcp_get_payload_len\fP (struct tcphdr *tcph, struct pkt_buff *pktb)"
+.br
+.ti -1c
+.RI "int \fBnfq_tcp_snprintf\fP (char *buf, size_t size, const struct tcphdr *tcph)"
+.br
+.ti -1c
+.RI "int \fBnfq_tcp_mangle_ipv4\fP (struct pkt_buff *pktb, unsigned int match_offset, unsigned int match_len, const char *rep_buffer, unsigned int rep_len)"
+.br
+.ti -1c
+.RI "int \fBnfq_tcp_mangle_ipv6\fP (struct pkt_buff *pktb, unsigned int match_offset, unsigned int match_len, const char *rep_buffer, unsigned int rep_len)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+
+.SH "Function Documentation"
+.PP 
+.SS "struct tcphdr* nfq_tcp_get_hdr (struct pkt_buff *pktb)"
+nfq_tcp_get_hdr - get the TCP header 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP pointer to user-space network packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+validated pointer to the TCP header or NULL if the TCP header was not set or if a minimal length check fails\&. 
+.RE
+.PP
+\fBNote:\fP
+.RS 4
+You have to call \fBnfq_ip_set_transport_header()\fP or \fBnfq_ip6_set_transport_header()\fP first to set the TCP header\&. 
+.RE
+.PP
+
+.PP
+Definition at line 43 of file tcp\&.c\&.
+.SS "void* nfq_tcp_get_payload (struct tcphdr *tcph, struct pkt_buff *pktb)"
+nfq_tcp_get_payload - get the TCP packet payload 
+.PP
+\fBParameters:\fP
+.RS 4
+\fItcph\fP pointer to the TCP header 
+.br
+\fIpktb\fP pointer to user-space network packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+Pointer to the TCP payload, or NULL if malformed TCP packet\&. 
+.RE
+.PP
+
+.PP
+Definition at line 62 of file tcp\&.c\&.
+.SS "unsigned int nfq_tcp_get_payload_len (struct tcphdr *tcph, struct pkt_buff *pktb)"
+nfq_tcp_get_payload_len - get the tcp packet payload 
+.PP
+\fBParameters:\fP
+.RS 4
+\fItcph\fP pointer to the TCP header 
+.br
+\fIpktb\fP pointer to user-space network packet buffer 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+Length of TCP payload (user data) 
+.RE
+.PP
+
+.PP
+Definition at line 84 of file tcp\&.c\&.
+.SS "int nfq_tcp_mangle_ipv4 (struct pkt_buff *pktb, unsigned intmatch_offset, unsigned intmatch_len, const char *rep_buffer, unsigned intrep_len)"
+nfq_tcp_mangle_ipv4 - mangle TCP/IPv4 packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP pointer to network packet buffer 
+.br
+\fImatch_offset\fP offset to content that you want to mangle 
+.br
+\fImatch_len\fP length of the existing content you want to mangle 
+.br
+\fIrep_buffer\fP pointer to data you want to use to replace current content 
+.br
+\fIrep_len\fP length of data you want to use to replace current content 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+1 for success and 0 for failure\&. See \fBpktb_mangle()\fP for failure case 
+.RE
+.PP
+\fBNote:\fP
+.RS 4
+This function updates the IPv4 length and recalculates the IPv4 & TCP checksums for you\&. 
+.RE
+.PP
+\fBWarning:\fP
+.RS 4
+After changing the length of a TCP message, the application will need to mangle sequence numbers in both directions until another change puts them in sync again 
+.RE
+.PP
+
+.PP
+Definition at line 219 of file tcp\&.c\&.
+.SS "int nfq_tcp_mangle_ipv6 (struct pkt_buff *pktb, unsigned intmatch_offset, unsigned intmatch_len, const char *rep_buffer, unsigned intrep_len)"
+nfq_tcp_mangle_ipv6 - Mangle TCP/IPv6 packet buffer 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIpktb\fP Pointer to network packet buffer 
+.br
+\fImatch_offset\fP Offset from start of TCP data of content that you want to mangle 
+.br
+\fImatch_len\fP Length of the existing content you want to mangle 
+.br
+\fIrep_buffer\fP Pointer to data you want to use to replace current content 
+.br
+\fIrep_len\fP Length of data you want to use to replace current content 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+1 for success and 0 for failure\&. See \fBpktb_mangle()\fP for failure case 
+.RE
+.PP
+\fBNote:\fP
+.RS 4
+This function updates the IPv6 length and recalculates the TCP checksum for you\&. 
+.RE
+.PP
+\fBWarning:\fP
+.RS 4
+After changing the length of a TCP message, the application will need to mangle sequence numbers in both directions until another change puts them in sync again 
+.RE
+.PP
+
+.PP
+Definition at line 254 of file tcp\&.c\&.
+.SS "int nfq_tcp_snprintf (char *buf, size_tsize, const struct tcphdr *tcph)"
+nfq_pkt_snprintf_tcp_hdr - print tcp header into one buffer in a humnan readable way 
+.PP
+\fBParameters:\fP
+.RS 4
+\fIbuf\fP pointer to buffer that is used to print the object 
+.br
+\fIsize\fP size of the buffer (or remaining room in it)\&. 
+.br
+\fItcph\fP pointer to a valid tcp header\&. 
+.RE
+.PP
+\fBReturns:\fP
+.RS 4
+Same as \fBsnprintf\fP 
+.RE
+.PP
+\fBSee Also:\fP
+.RS 4
+\fBsnprintf\fP(3) 
+.RE
+.PP
+
+.PP
+Definition at line 160 of file tcp\&.c\&.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libnetfilter_queue from the source code\&.

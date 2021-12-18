@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Userspace RCU QSBR
+Description: A userspace RCU (read-copy-update) library, quiescent state version
+Version: @PACKAGE_VERSION@
+Requires:
+Libs: -L${libdir} -lurcu-qsbr
+Cflags: -I${includedir} 

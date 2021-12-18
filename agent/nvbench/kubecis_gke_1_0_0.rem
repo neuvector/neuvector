@@ -1,0 +1,548 @@
+1.1.1 :  This control cannot be modified in GKE.
+1.1.2 :  This control cannot be modified in GKE.
+1.1.3 :  This control cannot be modified in GKE.
+1.1.4 :  This control cannot be modified in GKE.
+1.1.5 :  This control cannot be modified in GKE.
+1.1.6 :  This control cannot be modified in GKE.
+1.1.7 :  This control cannot be modified in GKE.
+1.1.8 :  This control cannot be modified in GKE.
+1.1.9 :  This control cannot be modified in GKE.
+1.1.10 :  This control cannot be modified in GKE.
+1.1.11 :  This control cannot be modified in GKE.
+1.1.12 :  This control cannot be modified in GKE.
+1.1.13 :  This control cannot be modified in GKE.
+1.1.14 :  This control cannot be modified in GKE.
+1.1.15 :  This control cannot be modified in GKE.
+1.1.16 :  This control cannot be modified in GKE.
+1.1.17 :  This control cannot be modified in GKE.
+1.1.18 :  This control cannot be modified in GKE.
+1.1.19 :  This control cannot be modified in GKE.
+1.1.20 :  This control cannot be modified in GKE.
+1.1.21 :  This control cannot be modified in GKE.
+1.2.1 :  This control cannot be modified in GKE.
+1.2.2 :  This control cannot be modified in GKE.
+1.2.3 :  This control cannot be modified in GKE.
+1.2.4 :  This control cannot be modified in GKE.
+1.2.5 :  This control cannot be modified in GKE.
+1.2.6 :  This control cannot be modified in GKE.
+1.2.7 :  This control cannot be modified in GKE.
+1.2.8 :  This control cannot be modified in GKE.
+1.2.9 :  This control cannot be modified in GKE.
+1.2.10:  This control cannot be modified in GKE.
+1.2.11:  This control cannot be modified in GKE.
+1.2.12:  This control cannot be modified in GKE.
+1.2.13:  This control cannot be modified in GKE.
+1.2.14:  This control cannot be modified in GKE.
+1.2.15:  This control cannot be modified in GKE.
+1.2.16:  This control cannot be modified in GKE.
+1.2.17:  This control cannot be modified in GKE.
+1.2.18:  This control cannot be modified in GKE.
+1.2.19:  This control cannot be modified in GKE.
+1.2.20:  This control cannot be modified in GKE.
+1.2.21:  This control cannot be modified in GKE.
+1.2.22:  This control cannot be modified in GKE.
+1.2.23:  This control cannot be modified in GKE.
+1.2.24:  This control cannot be modified in GKE.
+1.2.25:  This control cannot be modified in GKE.
+1.2.26:  This control cannot be modified in GKE.
+1.2.27:  This control cannot be modified in GKE.
+1.2.28:  This control cannot be modified in GKE.
+1.2.29:  This control cannot be modified in GKE.
+1.2.30:  This control cannot be modified in GKE.
+1.2.31:  This control cannot be modified in GKE.
+1.2.32:  This control cannot be modified in GKE.
+1.2.33:  This control cannot be modified in GKE.
+1.2.34:  This control cannot be modified in GKE.
+1.2.35:  This control cannot be modified in GKE.
+1.3.1 :  This control cannot be modified in GKE.
+1.3.2 :  This control cannot be modified in GKE.
+1.3.3 :  This control cannot be modified in GKE.
+1.3.4 :  This control cannot be modified in GKE.
+1.3.5 :  This control cannot be modified in GKE.
+1.3.6 :  This control cannot be modified in GKE.
+1.3.7 :  This control cannot be modified in GKE.
+1.4.1 :  This control cannot be modified in GKE.
+1.4.2 :  This control cannot be modified in GKE.
+2.1 :  This control cannot be modified in GKE.
+2.2 :  This control cannot be modified in GKE.
+2.3 :  This control cannot be modified in GKE.
+2.4 :  This control cannot be modified in GKE.
+2.5 :  This control cannot be modified in GKE.
+2.6 :  This control cannot be modified in GKE.
+2.7 :  This control cannot be modified in GKE.
+3.1.1 :  Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of client certificates. You can remediate the availability of client certificates in your GKE cluster. See Recommendation 6.8.2.
+3.2.1 :  This control cannot be modified in GKE.
+3.2.2 :  This control cannot be modified in GKE.
+4.1.1 :  This control cannot be modified in GKE.
+4.1.2 :  This control cannot be modified in GKE.
+4.1.3 :  Run the below command (based on the file location on your system) on each worker node. For example, chmod 644 <proxy kubeconfig file>
+4.1.4 :  Run the below command (based on the file location on your system) on each worker node. For example, chown root:root <proxy kubeconfig file>
+4.1.5 :  This control cannot be modified in GKE.
+4.1.6 :  This control cannot be modified in GKE.
+4.1.7 :  This control cannot be modified in GKE.
+4.1.8 :  This control cannot be modified in GKE.
+4.1.9 :  Run the following command (using the config file location identified in the Audit step) chmod 644 /var/lib/kubelet/config.yaml
+4.1.10 :  Run the following command (using the config file location identied in the Audit step) chown root:root /etc/kubernetes/kubelet.conf
+4.2.1 :  If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false. If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --anonymous-auth=false Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.2 :  If using a Kubelet config file, edit the file to set authorization: mode to Webhook. If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable. --authorization-mode=Webhook Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.3 :  If using a Kubelet config file, edit the file to set authentication: x509: clientCAFile to the location of the client CA file. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable. --client-ca-file=<path/to/client-ca-file> Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.4 :  If using a Kubelet config file, edit the file to set readOnlyPort to 0. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --read-only-port=0 Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.5 :  If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout to a value other than 0. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --streaming-connection-idle-timeout=5m Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.6 :  If using a Kubelet config file, edit the file to set protectKernelDefaults: true. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --protect-kernel-defaults=true Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.7 :  If using a Kubelet config file, edit the file to set makeIPTablesUtilChains: true. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove the --make-iptables-util-chains argument from the KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.8 :  Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove the --hostname-override argument from the KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.9 :  If using a Kubelet config file, edit the file to set eventRecordQPS: to an appropriate level. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.10 :  If using a Kubelet config file, edit the file to set tlsCertFile to the location of the certificate file to use to identify this Kubelet, and tlsPrivateKeyFile to the location of the corresponding private key file. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameters in KUBELET_CERTIFICATE_ARGS variable.  --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key- file=<path/to/tls-key-file> Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service
+4.2.11 :  If using a Kubelet config file, edit the file to add the line rotateCertificates: true or remove it altogether to use the default value. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove --rotate-certificates=false argument from the KUBELET_CERTIFICATE_ARGS variable. Based on your system, restart the kubelet service. For example: systemctl daemon-reload systemctl restart kubelet.service
+4.2.12 :  Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_CERTIFICATE_ARGS variable. --feature-gates=RotateKubeletServerCertificate=true Based on your system, restart the kubelet service. For example:
+4.2.13 :  This control cannot be modified in GKE.
+5.1.1 :  Identify all clusterrolebindings to the cluster-admin role. Check if they are used and if they need this role or if they could use a role with fewer privileges. Where possible, first bind users to a lower privileged role and then remove the clusterrolebinding to the cluster-admin role : kubectl delete clusterrolebinding [name]
+5.1.2 :  Where possible, remove get, list and watch access to secret objects in the cluster.
+5.1.3 :  Where possible replace any use of wildcards in clusterroles and roles with specific objects or actions.
+5.1.4 :  Where possible, remove create access to pod objects in the cluster.
+5.1.5 :  Create explicit service accounts wherever a Kubernetes workload requires specific access to the Kubernetes API server. Modify the configuration of each default service account to include this value automountServiceAccountToken: false
+5.1.6 :  Modify the definition of pods and service accounts which do not need to mount service account tokens to disable it.
+5.2.1 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.privileged field is omitted or set to false.
+5.2.2 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.hostPID field is omitted or set to false.
+5.2.3 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.hostIPC field is omitted or set to false.
+5.2.4 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.hostNetwork field is omitted or set to false.
+5.2.5 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.allowPrivilegeEscalation field is omitted or set to false.
+5.2.6 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.runAsUser.rule is set to either MustRunAsNonRoot or MustRunAs with the range of UIDs not including 0.
+5.2.7 :  Create a PSP as described in the Kubernetes documentation, ensuring that the .spec.requiredDropCapabilities is set to include either NET_RAW or ALL.
+5.2.8 :  Ensure that allowedCapabilities is not present in PSPs for the cluster unless it is set to an empty array.
+5.2.9 :  Review the use of capabilites in applications runnning on your cluster. Where a namespace contains applicaions which do not require any Linux capabities to operate consider adding a PSP which forbids the admission of containers which do not drop all capabilities.
+5.3.1 :  If the CNI plugin in use does not support network policies, consideration should be given to making use of a different plugin, or finding an alternate mechanism for restricting traffic in the Kubernetes cluster.
+5.3.2 :  Follow the documentation and create NetworkPolicy objects as you need them.
+5.4.1 :  If possible, rewrite application code to read secrets from mounted secret files, rather than from environment variables.
+5.4.2 :  Refer to the secrets management options offered by your cloud provider or a third-party secrets management solution.
+5.5.1 :  Follow the Kubernetes documentation and setup image provenance.
+5.6.1 :  Follow the documentation and create namespaces for objects in your deployment as you need them.
+5.6.2 :  Seccomp is an alpha feature currently. By default, all alpha features are disabled. So, you would need to enable alpha features in the apiserver by passing "--feature- gates=AllAlpha=true" argument. Edit the /etc/kubernetes/apiserver file on the master node and set the KUBE_API_ARGS parameter to "--feature-gates=AllAlpha=true" KUBE_API_ARGS="--feature-gates=AllAlpha=true" Based on your system, restart the kube-apiserver service. For example: systemctl restart kube-apiserver.service Use annotations to enable the docker/default seccomp profile in your pod definitions. An example is as below: apiVersion: v1 kind: Pod metadata: name: trustworthy-pod annotations: seccomp.security.alpha.kubernetes.io/pod: docker/default spec: containers: - name: trustworthy-container image: sotrustworthy:latest
+5.6.3 :  Follow the Kubernetes documentation and apply security contexts to your pods. For a suggested list of security contexts, you may refer to the CIS Security Benchmark for Docker Containers.
+5.6.4 :  Ensure that namespaces are created to allow for appropriate segregation of Kubernetes resources and that all new resources are created in a specific namespace.
+6.1.1 :  Using Command Line: gcloud services enable containerscanning.googleapis.com
+6.1.2 :  Using Command Line:
+             To change roles at the GCR bucket level:
+             Firstly, run the following if read permissions are required:
+
+               gsutil iam ch [TYPE]:[EMAIL-ADDRESS]:objectViewer
+               gs://artifacts.[PROJECT_ID].appspot.com
+
+             Then remove the excessively privileged role (Storage Admin / Storage Object Admin /
+             Storage Object Creator) using:
+
+               gsutil iam ch -d [TYPE]:[EMAIL-ADDRESS]:[ROLE]
+               gs://artifacts.[PROJECT_ID].appspot.com
+
+             where:
+               [TYPE] can be one of the following:
+                     o user, if the [EMAIL-ADDRESS] is a Google account
+                     o serviceAccount, if [EMAIL-ADDRESS] specifies a Service account
+               [EMAIL-ADDRESS] can be one of the following:
+                     o a Google account (for example, someone@example.com)
+                     o a Cloud IAM service account
+                     To modify roles defined at the project level and subsequently inherited within the GCR
+                     bucket, or the Service Account User role, extract the IAM policy file, modify it accordingly
+             and apply it using:
+
+               gcloud projects set-iam-policy [PROJECT_ID] [POLICY_FILE]
+6.1.3 :  Using Command Line:
+             For an account explicitly granted to the bucket. First, add read access to the Kubernetes
+             Service Account
+
+               gsutil iam ch [TYPE]:[EMAIL-ADDRESS]:objectViewer
+               gs://artifacts.[PROJECT_ID].appspot.com
+
+               where:
+               [TYPE] can be one of the following:
+                       o user, if the [EMAIL-ADDRESS] is a Google account
+                       o serviceAccount, if [EMAIL-ADDRESS] specifies a Service account [EMAIL-ADDRESS] can be one of the following: o a Google account (for example, someone@example.com) o a Cloud IAM service account Then remove the excessively privileged role (Storage Admin / Storage Object Admin / Storage Object Creator) using: gsutil iam ch -d [TYPE]:[EMAIL-ADDRESS]:[ROLE] gs://artifacts.[PROJECT_ID].appspot.com For an account that inherits access to the GCR Bucket through Project level permissions, modify the Projects IAM policy file accordingly, then upload it using: gcloud projects set-iam-policy [PROJECT_ID] [POLICY_FILE]
+6.1.4 :  Using Command Line:
+            First, update the cluster to enable Binary Authorization:
+
+            gcloud container cluster update [CLUSTER_NAME] \
+             --enable-binauthz
+
+            Create a Binary Authorization Policy using the Binary Authorization Policy Reference
+            (https://cloud.google.com/binary-authorization/docs/policy-yaml-reference) for guidance.
+            Import the policy file into Binary Authorization:
+
+            gcloud container binauthz policy import [YAML_POLICY]
+6.2.1 :  Using Command Line:
+            Firstly, create a minimally privileged service account:
+
+             gcloud iam service-accounts create [SA_NAME] \
+               --display-name "GKE Node Service Account"
+             export NODE_SA_EMAIL=`gcloud iam service-accounts list \
+               --format='value(email)' \
+               --filter='displayName:GKE Node Service Account'`
+
+            Grant the following roles to the service account:
+
+             export PROJECT_ID=`gcloud config get-value project`
+             gcloud projects add-iam-policy-binding $PROJECT_ID \
+               --member serviceAccount:$NODE_SA_EMAIL \
+               --role roles/monitoring.metricWriter
+             gcloud projects add-iam-policy-binding $PROJECT_ID \
+               --member serviceAccount:$NODE_SA_EMAIL \
+               --role roles/monitoring.viewer
+             gcloud projects add-iam-policy-binding $PROJECT_ID \
+               --member serviceAccount:$NODE_SA_EMAIL \
+               --role roles/logging.logWriter
+
+            To create a new Node pool using the Service account, run the following command:
+
+             gcloud container node-pools create [NODE_POOL] \
+               --service-account=[SA_NAME]@[PROJECT_ID].iam.gserviceaccount.com \
+               --cluster=[CLUSTER_NAME] --zone [COMPUTE_ZONE]
+
+            You will need to migrate your workloads to the new Node pool, and delete Node pools that
+            use the default service account to complete the remediation.
+6.2.2 :  Using Command Line:
+
+               gcloud beta container clusters update [CLUSTER_NAME] --zone [CLUSTER_ZONE] \
+                 --identity-namespace=[PROJECT_ID].svc.id.goog
+
+             Note that existing Node pools are unaffected. New Node pools default to --workload-
+             metadata-from-node=GKE_METADATA_SERVER .
+
+             Then, modify existing Node pools to enable GKE_METADATA_SERVER:
+
+               gcloud beta container node-pools update [NODEPOOL_NAME] \
+                 --cluster=[CLUSTER_NAME] --zone [CLUSTER_ZONE] \
+                 --workload-metadata-from-node=GKE_METADATA_SERVER
+
+             You may also need to modify workloads in order for them to use Workload Identity as
+             described within https://cloud.google.com/kubernetes-engine/docs/how-to/workload-
+             identity. Also consider the effects on the availability of your hosted workloads as Node
+             pools are updated, it may be more appropriate to create new Node Pools.
+6.3.1 :  Using Command Line:
+             To create a key
+
+             Create a key ring:
+
+               gcloud kms keyrings create [RING_NAME] \
+                 --location [LOCATION] \
+                 --project [KEY_PROJECT_ID]
+
+             Create a key:
+
+               gcloud kms keys create [KEY_NAME] \
+                 --location [LOCATION] \
+                 --keyring [RING_NAME] \
+                 --purpose encryption \
+                 --project [KEY_PROJECT_ID]
+
+             Grant the Kubernetes Engine Service Agent service account the Cloud KMS CryptoKey
+             Encrypter/Decrypter role:
+
+               gcloud kms keys add-iam-policy-binding [KEY_NAME] \
+                 --location [LOCATION] \
+                 --keyring [RING_NAME] \
+                 --member serviceAccount:[SERVICE_ACCOUNT_NAME] \
+                 --role roles/cloudkms.cryptoKeyEncrypterDecrypter \
+                 --project [KEY_PROJECT_ID]
+
+             To create a new cluster with Application-layer Secrets Encryption:
+
+               gcloud container clusters create [CLUSTER_NAME] \
+                 --cluster-version=latest \
+                 --zone [ZONE] \
+                 --database-encryption-key projects/[KEY_PROJECT_ID]/locations/[LOCATION]/keyRings/[RING_NAME]/cryptoKey s/[KEY_NAME] \
+                 --project [CLUSTER_PROJECT_ID]
+
+             To enable on an existing cluster:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --zone [ZONE] \
+                 --database-encryption-key projects/[KEY_PROJECT_ID]/locations/[LOCATION]/keyRings/[RING_NAME]/cryptoKey s/[KEY_NAME] \
+                 --project [CLUSTER_PROJECT_ID]
+6.4.1 : Using Command Line:
+             To update an existing cluster, create a new Node pool with the legacy GCE metadata
+             endpoint disabled:
+
+               gcloud container node-pools create [POOL_NAME] \
+                 --metadata disable-legacy-endpoints=true \
+                 --cluster [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE]
+
+             You will need to migrate workloads from any existing non-conforming Node pools, to the
+             new Node pool, then delete non-conforming Node pools to complete the remediation.
+6.4.2 :  Using Command Line:
+             gcloud beta container clusters update [CLUSTER_NAME] \
+               --identity-namespace=[PROJECT_ID].svc.id.goog
+           Note that existing Node pools are unaffected. New Node pools default to --workload-
+           metadata-from-node=GKE_METADATA_SERVER .
+
+           To modify an existing Node pool to enable GKE Metadata Server:
+
+             gcloud beta container node-pools update [NODEPOOL_NAME] \
+               --cluster=[CLUSTER_NAME] \
+               --workload-metadata-from-node=GKE_METADATA_SERVER
+
+           You may also need to modify workloads in order for them to use Workload Identity as
+           described within https://cloud.google.com/kubernetes-engine/docs/how-to/workload-
+           identity.
+6.5.1 :  Using Command Line:
+           To set the node image to cos for an existing cluster's Node pool:
+
+             gcloud container clusters upgrade [CLUSTER_NAME]\
+               --image-type cos \
+               --zone [COMPUTE_ZONE] --node-pool [POOL_NAME]
+6.5.2 :  Using Command Line:
+           To enable node auto-repair for an existing cluster with Node pool, run the following
+           command:
+
+             gcloud container node-pools update [POOL_NAME] \
+               --cluster [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+               --enable-autorepair
+6.5.3 :  Using Command Line:
+           To enable node auto-upgrade for an existing cluster's Node pool, run the following
+           command:
+
+             gcloud container node-pools update [NODE_POOL] \
+               --cluster [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+               --enable-autoupgrade
+6.5.4 :  Using Command Line:
+           Create a new cluster by running the following command:
+
+             gcloud beta container clusters create [CLUSTER_NAME] \
+               --zone [COMPUTE_ZONE] \
+               --release-channel [RELEASE_CHANNEL]
+
+           where [RELEASE_CHANNEL] is stable or regular according to your needs.
+6.5.5 :  Using Command Line:
+           To create a Node pool within the cluster with Integrity Monitoring enabled, run the
+           following command:
+
+             gcloud beta container node-pools create [NODEPOOL_NAME] \
+               --cluster [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+               --shielded-integrity-monitoring
+
+           You will also need to migrate workloads from existing non-conforming Node pools to the
+           newly created Node pool, then delete the non-conforming pools.
+6.5.6 :  Using Command Line:
+           To migrate an existing cluster, you will need to specify the --enable-shielded-nodes flag
+           on a cluster update command:
+
+             gcloud beta container clusters update [CLUSTER_NAME] \
+               --zone [CLUSTER_ZONE] \
+               --enable-shielded-nodes
+6.5.7 :  Using Command Line:
+             To create a Node pool within the cluster with Secure Boot enabled, run the following
+             command:
+
+               gcloud beta container node-pools create [NODEPOOL_NAME] \
+                 --cluster [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+                 --shielded-secure-boot
+
+             You will also need to migrate workloads from existing non-conforming Node pools to the
+             newly created Node pool, then delete the non-conforming pools.
+6.6.1 :  Using Command Line:
+             To enable intranode visibility on an existing cluster, run the following command:
+
+               gcloud beta container clusters update [CLUSTER_NAME] \
+                 --enable-intra-node-visibility
+6.6.2 :  Using Command Line:
+             To enable Alias IP on a new cluster, run the following command:
+
+               gcloud container clusters create [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --enable-ip-alias
+6.6.3 :  Using Command Line:
+             To check Master Authorized Networks status for an existing cluster, run the following
+             command;
+
+               gcloud container clusters describe [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --format json | jq '.masterAuthorizedNetworksConfig'
+
+             The output should return
+
+               {
+                 "enabled": true
+               }
+
+             if Master Authorized Networks is enabled.
+
+             If Master Authorized Networks is disabled, the
+             above command will return null ( { } ).
+6.6.4 :  Using Command Line:
+             Create a cluster with a Private Endpoint enabled and Public Access disabled by including
+             the --enable-private-endpoint flag within the cluster create command:
+
+               gcloud container clusters create [CLUSTER_NAME] \
+                 --enable-private-endpoint
+
+             Setting this flag also requires the setting of --enable-private-nodes , --enable-ip-alias
+             and --master-ipv4-cidr=[MASTER_CIDR_RANGE] .
+6.6.5 :  Using Command Line:
+             To create a cluster with Private Nodes enabled, include the --enable-private-nodes flag
+             within the cluster create command:
+
+               gcloud container clusters create [CLUSTER_NAME] \
+                 --enable-private-nodes
+
+             Setting this flag also requires the setting of --enable-ip-alias and --master-ipv4-
+             cidr=[MASTER_CIDR_RANGE] .
+6.6.6 :  Using Command Line:
+             Use the following command to generate firewall rules, setting the variables as appropriate.
+             You may want to use the target [TAG] and [SERVICE_ACCOUNT] previously identified.
+
+               gcloud compute firewall-rules create FIREWALL_RULE_NAME \
+                 --network [NETWORK] \
+                 --priority [PRIORITY] \
+                 --direction [DIRECTION] \
+                 --action [ACTION] \
+                 --target-tags [TAG] \
+                 --target-service-accounts [SERVICE_ACCOUNT] \
+                 --source-ranges [SOURCE_CIDR-RANGE] \
+                 --source-tags [SOURCE_TAGS] \
+                 --source-service-accounts=[SOURCE_SERVICE_ACCOUNT] \
+                 --destination-ranges [DESTINATION_CIDR_RANGE] \
+                 --rules [RULES]
+6.6.7 :  Using Command Line:
+             To enable Network Policy for an existing cluster, firstly enable the Network Policy add-on:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --update-addons NetworkPolicy=ENABLED
+
+             Then, enable Network Policy:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --enable-network-policy
+6.6.8 :  If services of type:LoadBalancer are discovered, consider replacing the Service with an Ingress.
+
+        To configure the Ingress and use Google-managed SSL certificates, follow the instructions
+        as listed at https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs.
+6.7.1 :  Using Command Line:
+
+             STACKDRIVER KUBERNETES ENGINE MONITORING SUPPORT (PREFERRED):
+             To enable Stackdriver Kubernetes Engine Monitoring for an existing cluster, run the
+             following command:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --enable-stackdriver-kubernetes
+
+             LEGACY STACKDRIVER SUPPORT:
+             Both Logging and Monitoring support must be enabled.
+             To enable Legacy Stackdriver Logging for an existing cluster, run the following command:
+
+               gcloud container clusters update [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+                 --logging-service logging.googleapis.com
+
+             To enable Legacy Stackdriver Monitoring for an existing cluster, run the following
+             command:
+
+               gcloud container clusters update [CLUSTER_NAME] --zone [COMPUTE_ZONE] \
+                 --monitoring-service monitoring.googleapis.com
+6.7.2 :  Using Command Line:
+             Download the example manifests:
+
+               curl https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-node-tools/master/os-audit/cos-auditd-logging.yaml \
+                 > cos-auditd-logging.yaml
+
+             Edit the example manifests if needed. Then, deploy them:
+
+               kubectl apply -f cos-auditd-logging.yaml
+
+             Verify that the logging Pods have started. If you defined a different Namespace in your
+             manifests, replace cos-auditd with the name of the namespace you're using:
+
+               kubectl get pods --namespace=cos-auditd
+6.8.1 :  Using Command Line:
+             To update an existing cluster and disable Basic Authentication by removing the static
+             password:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --no-enable-basic-auth
+6.8.2 :  Using Command Line:
+             Create a new cluster without a Client Certificate:
+
+               gcloud container clusters create [CLUSTER_NAME] \
+                 --no-issue-client-certificate
+6.8.3 :  Using Command Line:
+             Follow the G Suite Groups instructions at https://cloud.google.com/kubernetes-
+             engine/docs/how-to/role-based-access-control#google-groups-for-gke.
+
+             Then, create a cluster with
+
+               gcloud beta container clusters create my-cluster \
+                 --security-group="gke-security-groups@[yourdomain.com]"
+
+             Finally create Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings that
+             reference your G Suite Groups.
+6.8.4 :  Using Command Line:
+             To disable Legacy Authorization for an existing cluster, run the following command:
+
+               gcloud container clusters update [CLUSTER_NAME] \
+                 --zone [COMPUTE_ZONE] \
+                 --no-enable-legacy-authorization
+6.9.1 :  Using Command Line:
+             FOR NODE BOOT DISKS:
+             Create a new node pool using customer-managed encryption keys for the node boot disk, of
+             [DISK_TYPE] either pd-standard or pd-ssd :
+
+               gcloud beta container node-pools create [CLUSTER_NAME] \
+                 --disk-type [DISK_TYPE] \
+                 --boot-disk-kms-key \
+                 projects/[KEY_PROJECT_ID]/locations/[LOCATION]/keyRings/[RING_NAME]/cryptoKeys/[KEY_NAME]
+
+             Create a cluster using customer-managed encryption keys for the node boot disk, of
+             [DISK_TYPE] either pd-standard or pd-ssd :
+
+               gcloud beta container clusters create [CLUSTER_NAME] \
+                 --disk-type [DISK_TYPE] \
+                 --boot-disk-kms-key \
+                 projects/[KEY_PROJECT_ID]/locations/[LOCATION]/keyRings/[RING_NAME]/cryptoKeys/[KEY_NAME]
+
+             FOR ATTACHED DISKS:
+             Follow the instructions detailed at https://cloud.google.com/kubernetes-
+             engine/docs/how-to/using-cmek.
+6.10.1 :  Using Command Line:
+              To disable the Kubernetes Dashboard on an existing cluster, run the following command:
+
+                gcloud container clusters update [CLUSTER_NAME] \
+                  --zone [ZONE] \
+                  --update-addons=KubernetesDashboard=DISABLED
+6.10.2 :  Using Command Line:
+              Upon creating a new cluster
+
+                gcloud container clusters create [CLUSTER_NAME] \
+                  --zone [COMPUTE_ZONE]
+
+              Do not use the --enable-kubernetes-alpha argument.
+6.10.3 :  Using Command Line:
+              To enable Pod Security Policy for an existing cluster, run the following command:
+
+                gcloud beta container clusters update [CLUSTER_NAME] \
+                  --zone [COMPUTE_ZONE] \
+                  --enable-pod-security-policy
+6.10.4 :  Using Command Line:
+              To enable GKE Sandbox on an existing cluster, a new Node pool must be created.
+
+                gcloud container node-pools create [NODE_POOL_NAME] \
+                  --zone=[COMPUTE-ZONE] \
+                  --cluster=[CLUSTER_NAME] \
+                  --image-type=cos_containerd \
+                  --sandbox type=gvisor
+6.10.5 :  Using Command Line:
+              Firstly, update the cluster to enable Binary Authorization:
+
+                gcloud container cluster update [CLUSTER_NAME] \
+                  --zone [COMPUTE-ZONE] \
+                  --enable-binauthz
+
+              Create a Binary Authorization Policy using the Binary Authorization Policy Reference
+              (https://cloud.google.com/binary-authorization/docs/policy-yaml-reference) for
+              guidance.
+
+              Import the policy file into Binary Authorization:
+
+                gcloud container binauthz policy import [YAML_POLICY]
+6.10.6 :  Using Command Line:
+              Follow the instructions at https://cloud.google.com/security-command-
+              center/docs/quickstart-scc-setup.
