@@ -1,12 +1,7 @@
 package cvetools
 
 import (
-	"os"
-	"testing"
-
-	"github.com/neuvector/neuvector/scanner/common"
 	"github.com/neuvector/neuvector/share/scan"
-	"github.com/neuvector/neuvector/share/system"
 )
 
 const testTmpPath = "/tmp/scanner_test/"
@@ -44,45 +39,4 @@ func makePlatformReq(k8s, oc string) []scan.AppPackage {
 		})
 	}
 	return pkgs
-}
-
-func TestCVE_2018_1002105(t *testing.T) {
-	// acquire tool
-	sys := system.NewSystemTools()
-	cveTools = NewCveTools("", scan.NewScanUtil(sys))
-	ver, _, _, _, err := common.LoadCveDb("../../data/", testTmpPath)
-	if err != nil {
-		t.Errorf("CVEDB read error: %+v", err)
-		return
-	}
-
-	oc := ""
-	k8s := "1.10.1"
-	appvuls := cveTools.DetectAppVul(testTmpPath, makePlatformReq(k8s, ""), "")
-	if !checkVul(appvuls, "CVE-2018-1002105") {
-		t.Errorf("vulnerability false negative: db=%s k8s=%s", ver, k8s)
-	}
-
-	k8s = "1.11.5"
-	appvuls = cveTools.DetectAppVul(testTmpPath, makePlatformReq(k8s, ""), "")
-	if checkVul(appvuls, "CVE-2018-1002105") {
-		t.Errorf("vulnerability false positive: db=%s k8s=%s", ver, k8s)
-	}
-
-	// k8s vulnerable, but oc not
-	k8s = "1.11.2"
-	oc = "3.11.82"
-	appvuls = cveTools.DetectAppVul(testTmpPath, makePlatformReq(k8s, oc), "")
-	if checkVul(appvuls, "CVE-2018-1002105") {
-		t.Errorf("vulnerability false positive: db=%s k8s=%s oc=%s", ver, k8s, oc)
-	}
-
-	// both vulnerable
-	k8s = "1.11.2"
-	oc = "3.11.10"
-	appvuls = cveTools.DetectAppVul(testTmpPath, makePlatformReq(k8s, oc), "")
-	if !checkVul(appvuls, "CVE-2018-1002105") {
-		t.Errorf("vulnerability false negative: db=%s k8s=%s oc=%s", ver, k8s, oc)
-	}
-	os.RemoveAll(testTmpPath)
 }

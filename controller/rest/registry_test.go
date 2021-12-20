@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -12,83 +11,6 @@ import (
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 )
-
-type testTask struct {
-}
-
-func (r *testTask) Run(arg interface{}) interface{} {
-	t := arg.(time.Duration)
-	time.Sleep(t)
-	return t
-}
-
-func waitJobRemoved(mgr *longpollOnceMgr) {
-	for {
-		if mgr.GetJobCount() == 0 {
-			break
-		}
-		time.Sleep(time.Millisecond * 50)
-	}
-}
-
-func TestLongPoll(t *testing.T) {
-	mgr := NewLongPollOnceMgr(time.Millisecond*250, time.Millisecond*500, 2)
-
-	var task testTask
-
-	// job done
-	key := "key"
-	job, err := mgr.NewJob(key, &task, time.Millisecond)
-	if err != nil {
-		t.Errorf("Failed to create job: %v", err)
-	} else {
-		ret, _ := job.Poll()
-		if ret == nil {
-			t.Errorf("Task didn't finish")
-		}
-	}
-	waitJobRemoved(mgr)
-
-	// poll timeout
-	job, err = mgr.NewJob(key, &task, time.Millisecond*500)
-	if err != nil {
-		t.Errorf("Failed to create job: %v", err)
-	} else {
-		ret, _ := job.Poll()
-		if ret != nil {
-			t.Errorf("Task didn't timeout")
-		}
-	}
-	waitJobRemoved(mgr)
-
-	// test linger
-	job, err = mgr.NewJob(key, &task, time.Millisecond)
-	_, err = mgr.NewJob(key, &task, time.Millisecond)
-	if err != errDuplicateJob {
-		t.Errorf("Should return duplicate job: %v", err)
-	}
-	time.Sleep(time.Millisecond * 300)
-	ret, _ := job.Poll()
-	if ret == nil {
-		t.Errorf("Result didn't return during lingering time")
-	}
-	waitJobRemoved(mgr)
-
-	// test polling
-	count := 0
-	job, err = mgr.NewJob(key, &task, time.Millisecond*600)
-	for {
-		count++
-		ret, _ := job.Poll()
-		if ret != nil {
-			break
-		}
-	}
-	if count != 3 {
-		t.Errorf("Wrong polling count: %v", count)
-	}
-	waitJobRemoved(mgr)
-}
 
 func TestFilterPositive(t *testing.T) {
 	preTest()
