@@ -64,7 +64,7 @@ func appVul2FullVul(pkg scan.AppPackage, mv common.AppModuleVul) vulFullReport {
 	fv.Vf.Link = mv.Link
 	fv.Vf.Severity = mv.Severity
 	fv.Vf.FixedIn = make([]common.FeaFull, 0)
-	fv.Vf.FixedIn = append(fv.Vf.FixedIn, moduleVer2FixVer(pkg, mv.FixedVer))
+	fv.Vf.FixedIn = append(fv.Vf.FixedIn, moduleVer2FixVer(pkg, mv))
 	fv.Vf.Metadata = make(map[string]common.NVDMetadata)
 
 	if strings.HasSuffix(pkg.FileName, scan.WPVerFileSuffix) {
@@ -83,15 +83,15 @@ func appVul2FullVul(pkg scan.AppPackage, mv common.AppModuleVul) vulFullReport {
 	return fv
 }
 
-func moduleVer2FixVer(pkg scan.AppPackage, mvs []common.AppModuleVersion) common.FeaFull {
-	ft := common.FeaFull{Name: pkg.ModuleName, Namespace: pkg.AppName}
-	for i, mv := range mvs {
-		s := strings.Replace(mv.OpCode, "or", "||", -1)
+func moduleVer2FixVer(pkg scan.AppPackage, mv common.AppModuleVul) common.FeaFull {
+	ft := common.FeaFull{Name: mv.ModuleName, Namespace: pkg.AppName}
+	for i, v := range mv.FixedVer {
+		s := strings.Replace(v.OpCode, "or", "||", -1)
 		s = strings.Replace(s, "gt", ">", -1)
 		s = strings.Replace(s, "lt", "<", -1)
 		s = strings.Replace(s, "eq", "=", -1)
-		ft.Version += s + mv.Version
-		if i < (len(mvs) - 1) {
+		ft.Version += s + v.Version
+		if i < (len(mv.FixedVer) - 1) {
 			ft.Version += ";"
 		}
 	}

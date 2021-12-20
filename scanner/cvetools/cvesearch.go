@@ -945,11 +945,6 @@ func searchAffectedFeature(mv map[string][]common.VulShort, namespace string, ft
 
 			ftVer := ft.Version
 
-			// if name == "openssl" {
-			// 	ftVer, _ = common.NewVersion("1.1.1e")
-			// 	log.WithFields(log.Fields{"CVE": v}).Debug(" ------------")
-			// }
-
 			fixVer := fix.Version
 			// the naming of centos and redhat is different. centos skip the el7_5's minor version 5.
 			if strings.Contains(ft.Version.String(), "centos") {

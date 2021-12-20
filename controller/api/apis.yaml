@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 4.3.2
+  version: 4.4.1
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -66,6 +66,8 @@ tags:
     description: Operations about System
   - name: User
     description: Operations about User
+  - name: Vulnerability
+    description: Operations about Vulnerability management
   - name: Workload
     description: Operations about Workload
 
@@ -150,6 +152,8 @@ paths:
       responses:
         '200':
           description: Success
+          schema:
+            $ref: '#/definitions/RESTAdmissionRuleData'
     patch:
       tags:
         - Admission
@@ -277,6 +281,29 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAdmissionStatsData'
+  /assess/admission/rule:
+    post:
+      tags:
+        - Admission
+      summary: Test admission control rules
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Admission rule data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAdmissionRuleConfigData'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTAdmCtrlRulesTestResults'
   /auth:
     post:
       tags:
@@ -434,6 +461,174 @@ paths:
       responses:
         '200':
           description: Success
+  /cloud/aws:
+    post:
+      tags:
+        - Cloud
+      summary: Create an AWS scan project
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: AWS scan project data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAwsResourceCreate'
+      responses:
+        '200':
+          description: Success
+  /cloud/aws/{name}:
+    patch:
+      tags:
+        - Cloud
+      summary: Update an AWS scan project
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: AWS scan project name
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: AWS scan project update data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAwsResourceConfig'
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags:
+        - Cloud
+      summary: Delete an AWS scan project
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: AWS scan project name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+  /cloud/aws/{name}/scan:
+    post:
+      tags:
+        - Cloud
+      summary: Start an AWS resource scan
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: AWS scan project name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags:
+        - Cloud
+      summary: Stop an AWS resource scan
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: AWS scan project name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+  /cloud/aws/lambda/{project}/{region}/{name}:
+    get:
+      tags:
+        - Cloud
+      summary: Get AWS Lambda function detail
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: project
+          description: Project name
+          required: true
+          type: string
+        - in: path
+          name: region
+          description: Region name
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Function name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTAwsFunction'
+  /cloud/aws/project:
+    get:
+      tags:
+        - Cloud
+      summary: Get Cloud resource list
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTCloudResList'
+  /cloud/aws/project/{name}:
+    get:
+      tags:
+        - Cloud
+      summary: Get AWS Cloud Resource
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Function name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTAwsResource'
   /compliance/profile:
     get:
       tags:
@@ -1135,6 +1330,34 @@ paths:
       responses:
         '200':
           description: Success
+  /file/admission:
+    post:
+      tags:
+        - File
+      summary: Export admission control configuration as a yaml format. The exported yaml file can be imported by CRD or REST API to update the admission control settings.
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "It exports the admission control rules & state configurations when the scope is local."
+        - in: body
+          name: body
+          description: Configuration data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAdmCtrlRulesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
   /file/config:
     get:
       tags:
@@ -2282,6 +2505,31 @@ paths:
       responses:
         '200':
           description: Success
+  /scan/package:
+    post:
+      tags:
+        - Scan
+      summary: Request package scan
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Request package scan data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTScanPackageReqData'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanPkgReportData'
   /scan/registry:
     get:
       tags:
@@ -3167,6 +3415,27 @@ paths:
       responses:
         '200':
           description: Success
+  /system/license/request:
+    post:
+      tags:
+        - System
+      summary: License code request
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: License request data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTLicenseRequestData'
+      responses:
+        '200':
+          description: Success
   /system/license/update:
     post:
       tags:
@@ -3448,6 +3717,149 @@ paths:
           description: User role name
           required: true
           type: string
+      responses:
+        '200':
+          description: Success
+  /vulnerability/profile:
+    get:
+      tags:
+        - Vulnerability
+      summary: Get vulnerability profile list
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfilesData'
+  /vulnerability/profile/{name}:
+    get:
+      tags:
+        - Vulnerability
+      summary: Get vulnerability profile detail
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Profile name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileData'
+    patch:
+      tags:
+        - Vulnerability
+      summary: Configure vulnerability profile
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Vulnerability profile name
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Vulnerability profile config data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileConfigData'
+      responses:
+        '200':
+          description: Success
+  /vulnerability/profile/{name}/entry:
+    post:
+      tags:
+        - Vulnerability
+      summary: Create the vulnerability profile entry
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Name of the vulnerability profile entry
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Vulnerability profile entry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileEntryConfigData'
+      responses:
+        '200':
+          description: Success
+  /vulnerability/profile/{name}/entry/{id}:
+    patch:
+      tags:
+        - Vulnerability
+      summary: Configure vulnerability profile entry
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Vulnerability profile name
+          required: true
+          type: string
+        - in: path
+          name: id
+          description: Vulnerability profile entry id
+          required: true
+          type: integer
+          format: uint32
+        - in: body
+          name: body
+          description: Vulnerability profile entry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileEntryConfigData'
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags:
+        - Vulnerability
+      summary: Delete vulnerability profile entry
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: Vulnerability profile name
+          required: true
+          type: string
+        - in: path
+          name: id
+          description: Vulnerability profile entry id
+          required: true
+          type: integer
+          format: uint32
       responses:
         '200':
           description: Success
@@ -4111,13 +4523,66 @@ definitions:
     properties:
       k8s_options:
         $ref: '#/definitions/RESTAdmRuleOptions'
+  RESTAdmCtrlRulesExport:
+    type: object
+    properties:
+      export_config:
+        type: boolean
+        example: true
+      ids:
+        type: array
+        items:
+          type: integer
+          format: uint32
+          example: 12
+  RESTAdmCtrlRulesTestResult:
+    type: object
+    required:
+      - index
+      - name
+      - kind
+      - message
+      - allowed
+    properties:
+      index:
+        type: integer
+        example: 1
+      name:
+        type: string
+        example: "iperfserver"
+      kind:
+        type: string
+        example: "Deployment"
+      message:
+        type: string
+        example: "Assessment Creation of Kubernetes Deployment resource (iperfserver) is denied because of deny rule id 1000 with criteria: (allow privilege escalation = true) [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]"
+      allowed:
+        type: boolean
+        example: false
+  RESTAdmCtrlRulesTestResults:
+    type: object
+    properties:
+      props_unavailable:
+        type: array
+        items:
+          type: string
+          example: ["user","userGroups"]
+      results:
+        type: array
+        items:
+          $ref: '#/definitions/RESTAdmCtrlRulesTestResult'
   RESTAdmissionConfigData:
     type: object
+    required:
+      - k8s_env
     properties:
       state:
         $ref: '#/definitions/RESTAdmissionState'
       admission_options:
         $ref: '#/definitions/RESTAdmRuleTypeOptions'
+      k8s_env:
+        type: boolean
+        example: false
   RESTAdmissionRule:
     type: object
     required:
@@ -5685,6 +6150,69 @@ definitions:
           type: integer
           format: uint32
           example: 1247
+  RESTGroupCaps:
+    type: object
+    properties:
+      cap_change_mode:
+        type: boolean
+        example: false
+      cap_scorable:
+        type: boolean
+        example: false
+  RESTGroupBrief:
+    type: object
+    required:
+      - name
+      - learned
+      - reserved
+      - not_scored
+      - domain
+      - creater_domains
+      - kind
+      - platform_role
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example:
+      learned:
+        type: boolean
+        example: true
+      reserved:
+        type: boolean
+        example: false
+      policy_mode:
+        type: string
+        example:
+      profile_mode:
+        type: string
+        example:
+      not_scored:
+        type: boolean
+        example: true
+      domain:
+        type: string
+        example: ""
+      creater_domains:
+        type: array
+        items:
+          type: string
+          example: ""
+      kind:
+        type: string
+        example: ""
+      platform_role:
+        type: string
+        example: ""
+      cfg_type:
+        type: string
+        example: ""
+      cap_change_mode:
+        type: boolean
+        example: false
+      cap_scorable:
+        type: boolean
+        example: false
   RESTGroupData:
     type: object
     required:
@@ -5817,6 +6345,7 @@ definitions:
       - kernel
       - cpus
       - memory
+      - cgroup_version
       - containers
       - interfaces
       - state
@@ -5861,6 +6390,9 @@ definitions:
         type: integer
         format: int64
         example: 2089816064
+      cgroup_version:
+        type: integer
+        example: 1
       containers:
         type: integer
         example: 107
@@ -5938,6 +6470,28 @@ definitions:
     properties:
       host:
         $ref: '#/definitions/RESTHost'
+  RESTIDName:
+    type: object
+    required:
+      - id
+      - display_name
+      - policy_mode
+      - domains
+    properties:
+      id:
+        type: string
+        example: ""
+      display_name:
+        type: string
+        example: ""
+      policy_mode:
+        type: string
+        example: ""
+      domains:
+        type: array
+        items:
+          type: string
+          example: ["domain1", "domain2"]
   RESTImportTask:
     type: object
     required:
@@ -6720,7 +7274,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: "Docker Registry"
+        example: docker
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -6794,6 +7348,8 @@ definitions:
       - tag
       - image_id
       - digest
+      - size
+      - author
       - run_as_root
       - envs
       - labels
@@ -6822,6 +7378,10 @@ definitions:
       digest:
         type: string
         example: bd8ffa77cf1c910b7a90935ca4828472e1c3e303e7cd5260f13d1e09995f173a
+      size:
+        type: integer
+        format: int64
+        example: 1
       author:
         type: string
         example: ""
@@ -7101,7 +7661,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: "Docker Registry"
+        example: docker
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -7846,6 +8406,8 @@ definitions:
       - repository
       - tag
       - digest
+      - size
+      - author
       - base_os
       - cvedb_version
       - cvedb_create_time
@@ -7873,6 +8435,13 @@ definitions:
       digest:
         type: string
         example: bd8ffa77cf1c910b7a90935ca4828472e1c3e303e7cd5260f13d1e09995f173a
+      size:
+        type: integer
+        format: int64
+        example: 1
+      author:
+        type: string
+        example: ""
       base_os:
         type: string
         example: ubuntu:16.04
@@ -8575,7 +9144,6 @@ definitions:
       - profile_mode
       - domain
       - platform_role
-      - cap_change_mode
       - members
       - policy_rules
       - response_rules
@@ -8597,9 +9165,6 @@ definitions:
       platform_role:
         type: string
         example: core
-      cap_change_mode:
-        type: boolean
-        example: true
       members:
         type: array
         items:
@@ -8618,6 +9183,12 @@ definitions:
         type: boolean
         example: true
       egress_exposure:
+        type: boolean
+        example: false
+      cap_change_mode:
+        type: boolean
+        example: false
+      cap_scorable:
         type: boolean
         example: false
   RESTServiceData:
@@ -9559,6 +10130,199 @@ definitions:
       in_base_image:
         type: boolean
         example: true
+      tags:
+        type: array
+        items:
+          type: string
+          example: ""
+  RESTVulnerabilityAsset:
+    type: object
+    required:
+      - name
+      - severity
+      - description
+      - package_name
+      - link
+      - score
+      - vectors
+      - score_v3
+      - vectors_v3
+      - published_timestamp
+      - last_modified_timestamp
+      - package_versions
+      - workloads
+      - nodes
+      - images
+      - platforms
+    properties:
+      name:
+        type: string
+        example: ""
+      severity:
+        type: string
+        example: ""
+      description:
+        type: string
+        example: ""
+      packages:
+        type: object
+        properties:
+          key:
+            type: string
+            example: ""
+          value:
+            type: array
+            items:
+              $ref: '#/definitions/RESTVulnPackageVersion'
+      package_name:
+        type: string
+        example: ""
+      link:
+        type: string
+        example: ""
+      score:
+        type: number
+        format: float32
+        example: 7.2
+      vectors:
+        type: string
+        example: ""
+      score_v3:
+        type: number
+        format: float32
+        example: 7.3
+      vectors_v3:
+        type: string
+        example: ""
+      published_timestamp:
+        type: integer
+        format: int64
+        example: 1516561260
+      last_modified_timestamp:
+        type: integer
+        format: int64
+        example: 1516561253
+      package_versions:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnPackageVersion'
+      workloads:
+        type: array
+        items:
+          $ref: '#/definitions/RESTIDName'
+      nodes:
+        type: array
+        items:
+          $ref: '#/definitions/RESTIDName'
+      images:
+        type: array
+        items:
+          $ref: '#/definitions/RESTIDName'
+      platforms:
+        type: array
+        items:
+          $ref: '#/definitions/RESTIDName'
+  RESTVulnerabilityProfile:
+    type: object
+    required:
+      - name
+      - entries
+    properties:
+      name:
+        type: string
+        example: "default"
+      entries:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnerabilityProfileEntry'
+  RESTVulnerabilityProfileConfig:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        example: "default"
+      entries:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnerabilityProfileEntry'
+  RESTVulnerabilityProfileConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTVulnerabilityProfileConfig'
+  RESTVulnerabilityProfileEntryConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTVulnerabilityProfileEntry'
+  RESTVulnerabilityProfileData:
+    type: object
+    required:
+      - profile
+    properties:
+      profile:
+        $ref: '#/definitions/RESTVulnerabilityProfile'
+  RESTVulnerabilityProfilesData:
+    type: object
+    required:
+      - profiles
+    properties:
+      profiles:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnerabilityProfile'
+  RESTVulnerabilityProfileEntry:
+    type: object
+    required:
+      - id
+      - name
+      - comment
+      - days
+      - domains
+      - images
+    properties:
+      id:
+        type: integer
+        format: uint32
+        example: 1003
+      name:
+        type: string
+        example: "CVE-2020-29661"
+      comment:
+        type: string
+        example: "Accepted by admin at Dec 09, 2021 12:00:02 from Vulnerabilities page"
+      days:
+        type: integer
+        format: uint
+        example: 0
+      domains:
+        type: array
+        items:
+          type: string
+          example: ["domain1", "domain2"]
+      images:
+        type: array
+        items:
+          type: string
+          example: []
+  RESTVulnPackageVersion:
+    type: object
+    required:
+      - package_version
+      - fixed_version
+    properties:
+      package_version:
+        type: string
+        example: ""
+      fixed_version:
+        type: string
+        example: ""
   RESTWebhook:
     type: object
     required:

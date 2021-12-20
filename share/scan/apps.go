@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -37,6 +38,7 @@ const (
 	javaServerInfo     = "/ServerInfo.properties"
 	serverInfoMaxLines = 100
 	tomcatName         = "Tomcat"
+	jarMaxDepth        = 2
 
 	python            = "python"
 	ruby              = "ruby"
@@ -57,6 +59,7 @@ type AppPackage struct {
 
 type mvnProject struct {
 	Parent       mvnParent       `xml:"parent"`
+	ArtifactId   string          `xml:"artifactId"`
 	Dependencies []mvnDependency `xml:"dependencies>dependency"`
 }
 
@@ -98,8 +101,7 @@ func NewScanApps(v2 bool) *ScanApps {
 }
 
 func isAppsPkgFile(filename string) bool {
-	// log.WithFields(log.Fields{"filename": filename}).Error("==================")
-	return isNodejs(filename) || isJavaJar(filename) || isPython(filename) ||
+	return isNodejs(filename) || isJava(filename) || isPython(filename) ||
 		isRuby(filename) || isDotNet(filename) || isWordpress(filename)
 }
 
@@ -141,8 +143,14 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 
 	if isNodejs(filename) {
 		s.parseNodePackage(filename, fullpath)
-	} else if isJavaJar(filename) {
-		s.parseJarPackage(filename, fullpath)
+	} else if isJava(filename) {
+		r, err := zip.OpenReader(fullpath)
+		if err == nil {
+			s.parseJarPackage(r.Reader, filename, fullpath, 0)
+			r.Close()
+		} else {
+			log.WithFields(log.Fields{"err": err}).Error("open jar file fail")
+		}
 	} else if isPython(filename) {
 		s.parsePythonPackage(filename)
 	} else if isRuby(filename) {
@@ -229,22 +237,53 @@ func (s *ScanApps) parseNodePackage(filename, fullpath string) {
 }
 
 func isJavaJar(filename string) bool {
+	return strings.HasSuffix(filename, ".jar")
+}
+
+func isJava(filename string) bool {
 	return strings.HasSuffix(filename, ".war") ||
 		strings.HasSuffix(filename, ".jar") ||
 		strings.HasSuffix(filename, ".ear")
 }
 
-func (s *ScanApps) parseJarPackage(filename, fullpath string) {
-	r, err := zip.OpenReader(fullpath)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error("open jar file fail")
-		return
+func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, depth int) {
+	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
+	if err == nil {
+		defer os.RemoveAll(tempDir)
+	} else {
+		log.WithFields(log.Fields{"fullpath": fullpath}).Error("unable to create temp dir")
 	}
-	defer r.Close()
 
 	pkgs := make(map[string][]AppPackage)
 	for _, f := range r.File {
-		if strings.HasSuffix(f.Name, javaServerInfo) {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
+		if depth+1 < jarMaxDepth && isJava(f.Name) {
+			// Parse jar file recursively
+			if jarFile, err := f.Open(); err == nil {
+				// Unzip the jar file to disk then walk through. Can we unzip on the fly?
+				dstPath := filepath.Join(tempDir, filepath.Base(f.Name)) // retain the filename
+				if dstFile, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()); err == nil {
+					if _, err := io.Copy(dstFile, jarFile); err == nil {
+						jarReader, err := zip.OpenReader(fullpath)
+						if err == nil {
+							s.parseJarPackage(jarReader.Reader, f.Name, dstPath, depth+1)
+							jarReader.Close()
+						}
+					} else {
+						log.WithFields(log.Fields{"dst": dstPath, "filename": filename, "err": err}).Error("unable to copy jar file")
+					}
+					os.Remove(dstPath)
+				} else {
+					log.WithFields(log.Fields{"dst": dstPath, "err": err}).Error("unable to create dst file")
+				}
+				jarFile.Close()
+			} else {
+				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
+			}
+		} else if strings.HasSuffix(f.Name, javaServerInfo) {
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "file": f.Name}).Error("Open file fail")
@@ -324,7 +363,7 @@ func (s *ScanApps) parseJarPackage(filename, fullpath string) {
 
 				pkg := AppPackage{
 					AppName:    jar,
-					ModuleName: proj.Parent.GroupId + "." + proj.Parent.ArtifactId,
+					ModuleName: proj.Parent.GroupId + ":" + proj.ArtifactId, // parent group + self artifact
 					Version:    proj.Parent.Version,
 					FileName:   filename,
 				}
@@ -348,7 +387,7 @@ func (s *ScanApps) parseJarPackage(filename, fullpath string) {
 
 					pkg := AppPackage{
 						AppName:    jar,
-						ModuleName: dep.GroupId + "." + dep.ArtifactId,
+						ModuleName: dep.GroupId + ":" + dep.ArtifactId,
 						Version:    dep.Version,
 						FileName:   filename,
 					}
@@ -359,6 +398,22 @@ func (s *ScanApps) parseJarPackage(filename, fullpath string) {
 					}
 				}
 			}
+		}
+	}
+
+	// If no package found, use filename
+	if len(pkgs) == 0 && isJavaJar(filename) {
+		fn := filepath.Base(filename)
+		dash := strings.LastIndex(fn, "-")
+		dot := strings.LastIndex(fn, ".")
+		if dash > 0 && dash+1 < dot {
+			pkg := AppPackage{
+				AppName:    jar,
+				ModuleName: fmt.Sprintf("jar:%s", fn[:dash]),
+				Version:    fn[dash+1 : dot],
+				FileName:   filename,
+			}
+			pkgs[filename] = []AppPackage{pkg}
 		}
 	}
 
@@ -505,7 +560,6 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 		if token == "Microsoft.NETCore.App" || token == "Microsoft.AspNetCore.App" {
 			if i < len(tokens)-1 {
 				coreVersion = tokens[i+1]
-				// log.WithFields(log.Fields{"core": coreVersion, "filename": filename}).Error("-------")
 			}
 			break
 		}
@@ -521,7 +575,6 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 						version = version[:o]
 					}
 					coreVersion = version
-					// log.WithFields(log.Fields{"core": coreVersion, "target": target, "filename": filename}).Error("==================")
 				}
 			}
 

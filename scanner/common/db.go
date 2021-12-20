@@ -392,18 +392,34 @@ func LoadAppVulsTb(path string) (map[string][]AppModuleVul, error) {
 		s := scanner.Text()
 		err := json.Unmarshal([]byte(s), &v)
 		if err == nil {
-			var vf []AppModuleVul
-			var has bool
-			if vf, has = vul[v.ModuleName]; !has {
+			vf, ok := vul[v.ModuleName]
+			if !ok {
 				vf = make([]AppModuleVul, 0)
 			}
 			vf = append(vf, v)
 			vul[v.ModuleName] = vf
-
 		} else {
 			log.Error("Unmarshal vulnerability err")
 		}
 	}
+
+	// for org.apache.logging.log4j:log4j-core, we will also search
+	// org.apache.logging.log4j.log4j-core: for backward compatibility
+	// log4j-core: for jar file without pom.xml. Prefix jar: to avoid collision
+	for mn, vf := range vul {
+		if colon := strings.LastIndex(mn, ":"); colon > 0 {
+			m := strings.ReplaceAll(mn, ":", ".")
+			if _, ok := vul[m]; ok {
+				vul[m] = append(vul[m], vf...)
+			} else {
+				vul[m] = vf
+			}
+			if m = mn[colon+1:]; len(m) > 0 {
+				vul[fmt.Sprintf("jar:%s", m)] = vf
+			}
+		}
+	}
+
 	return vul, nil
 }
 
