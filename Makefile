@@ -172,10 +172,10 @@ fleet:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
 	@docker pull $(REPO_REL_URL)/neuvector/build
-	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector $(REPO_REL_URL)/neuvector/build $@
+	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh $(REPO_REL_URL)/neuvector/build
 
 db:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
 	@docker pull $(REPO_REL_URL)/neuvector/build
-	@docker run --rm -ia STDOUT --name build -e VULN_VER=$(VULN_VER) -v $(CURDIR):/go/src/github.com/neuvector/neuvector $(REPO_REL_URL)/neuvector/build $@
+	@docker run --rm -ia STDOUT --name build -e VULN_VER=$(VULN_VER) -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_db.sh $(REPO_REL_URL)/neuvector/build
