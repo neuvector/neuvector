@@ -118,8 +118,6 @@ stage_ctrl: stage_init copy_ctrl
 
 stage_enf: stage_init copy_enf
 
-stage_ctrlenf: stage_init copy_ctrl copy_enf
-
 stage_all: stage_init copy_ctrl copy_enf copy_mgr
 	mkdir -p ${STAGE_DIR}/etc/supervisor/conf.d
 	cp neuvector/build/supervisord.all.conf ${STAGE_DIR}/etc/supervisor/conf.d/supervisord.conf
@@ -138,15 +136,10 @@ api_image:
 	docker build -t neuvector/api -f neuvector/build/Dockerfile.api .
 
 ctrl_image: pull_fleet_base stage_ctrl
-	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/controller:public -f neuvector/build/Dockerfile.controller .
-	docker build -t neuvector/controller -f neuvector/build/Dockerfile.controller .
+	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/controller -f neuvector/build/Dockerfile.controller .
 
 enf_image: pull_fleet_base stage_enf
 	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
-
-ctrlenf_image: pull_fleet_base stage_ctrlenf
-	docker build -t neuvector/ctrlenf:public -f neuvector/build/Dockerfile.ctrlenf.nolic .
-	docker build -t neuvector/ctrlenf -f neuvector/build/Dockerfile.ctrlenf .
 
 updater_image: pull_fleet_base stage_upd
 	docker build -t neuvector/updater -f neuvector/build/Dockerfile.updater .
@@ -155,8 +148,7 @@ scanner_image: pull_fleet_base stage_scan
 	docker build -t neuvector/scanner -f neuvector/build/Dockerfile.scanner .
 
 all_image: pull_all_base stage_all
-	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/allinone:public -f neuvector/build/Dockerfile.all.nolic .
-	docker build -t neuvector/allinone -f neuvector/build/Dockerfile.all .
+	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/allinone -f neuvector/build/Dockerfile.all .
 
 ubi_scanner:
 	rm -rf ${STAGE_DIR}; mkdir -p ${STAGE_DIR}
