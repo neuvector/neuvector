@@ -57,8 +57,7 @@ func (b *RingBuffer) next(subscript int) int {
 func (b *RingBuffer) Write(datum RingElement) error {
 	if b.size >= cap(b.data) {
 		//fmt.Printf("!Full b %p, size %d, cap %d\n", b, b.size, cap(b.data))
-		// JW: return &RingBufferError{"RingBuffer is full"}
-		b.Read() // JW: dump the oldest element
+		b.Read() // dump the oldest element
 	}
 
 	b.data[b.in] = datum

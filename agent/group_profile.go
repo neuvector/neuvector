@@ -164,11 +164,6 @@ func fillGroupProfiles(name string) bool {
 			pp.DerivedGroup = name // late filled-up to save kv storages
 		}
 
-	//	grpCache.proc.Baseline = share.ProfileShield       // JW: forced Shield and update_alert
-	//	for i, _ := range grpCache.proc.Process {
-	//		grpCache.proc.Process[i].AllowFileUpdate = false
-	//	}
-
 		loadGroupProfile(name, grpCache.file)
 		for i, _ := range grpCache.file.Filters {
 			grpCache.file.Filters[i].DerivedGroup = name // late filled-up to save kv storages

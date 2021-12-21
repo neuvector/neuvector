@@ -68,7 +68,7 @@ func getUserStartUid(pid int) int {
 	var uidStart int = UserUidMin
 	dat, err := global.SYS.ReadContainerFile("/etc/login.defs", pid, 0, 0)
 	if err != nil {
-		log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get login.defs fail")
+		//log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get login.defs fail")
 		return uidStart
 	}
 

@@ -370,7 +370,7 @@ func (p *Probe) lookupInode(updated *bool, inode uint32, oldInodesMap map[uint32
 	} else {
 		p.inodesMap[inode] = &inodeEntry{dummy: true}
 	}
-	log.WithFields(log.Fields{"inode": inode, "retry": p.inodesMap[inode].retry}).Debug("Cannot map inode to process")
+	mLog.WithFields(log.Fields{"inode": inode, "retry": p.inodesMap[inode].retry}).Debug("Cannot map inode to process")
 	return "", false
 }
 
