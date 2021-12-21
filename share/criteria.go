@@ -44,11 +44,16 @@ const (
 	CriteriaKeyShareNetWithHost    string = "shareNetWithHost"
 	CriteriaKeyAllowPrivEscalation string = "allowPrivEscalation"
 	CriteriaKeyPspCompliance       string = "pspCompliance" // psp compliance violation
+	CriteriaKeyRequestLimit        string = "resourceLimit"
 )
 
 const (
-	SubCriteriaPublishDays string = "publishDays"
-	SubCriteriaCount       string = "count"
+	SubCriteriaPublishDays   string = "publishDays"
+	SubCriteriaCount         string = "count"
+	SubCriteriaCpuRequest    string = "cpuRequest"
+	SubCriteriaCpuLimit      string = "cpuLimit"
+	SubCriteriaMemoryRequest string = "memoryRequest"
+	SubCriteriaMemoryLimit   string = "memoryLimit"
 )
 
 const (
@@ -59,6 +64,7 @@ const (
 	CriteriaOpRegex             string = "regex"
 	CriteriaOpNotRegex          string = "!regex"
 	CriteriaOpBiggerEqualThan   string = ">="
+	CriteriaOpBiggerThan        string = ">"
 	CriteriaOpLessEqualThan     string = "<="
 	CriteriaOpContainsAll       string = "containsAll"
 	CriteriaOpContainsAny       string = "containsAny"
