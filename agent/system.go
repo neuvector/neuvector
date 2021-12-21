@@ -421,11 +421,6 @@ func profileConfigGroup(nType cluster.ClusterNotifyType, key string, value []byt
 	var pg share.CLUSProcessProfile
 	json.Unmarshal(value, &pg)
 	if utils.DoesGroupHavePolicyMode(name) {
-		//	pg.Baseline = share.ProfileShield       // JW: forced Shield and update_alert
-		//	for i, _ := range pg.Process {
-		//		pg.Process[i].AllowFileUpdate = false
-		//	}
-
 		if updated, last := pe.UpdateProcessPolicy(name, &pg); updated {
 			if pg.Baseline == share.ProfileShield {
 				if last == nil || last.Baseline != pg.Baseline {
