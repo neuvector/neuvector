@@ -75,13 +75,18 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 	if criteria != nil && options == nil {
 		return fmt.Errorf("Invalid criteria options")
 	}
+	numOps := utils.NewSet(share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan)
 	for _, crt := range criteria {
 		var allowedOp, allowedValue bool
 		if option, exist := options[crt.Name]; exist {
-			for _, op := range option.Ops {
-				if op == crt.Op {
-					allowedOp = true
-					break
+			if len(option.Ops) == 0 {
+				allowedOp = true
+			} else {
+				for _, op := range option.Ops {
+					if op == crt.Op {
+						allowedOp = true
+						break
+					}
 				}
 			}
 			if len(option.Values) > 0 {
@@ -92,11 +97,15 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 					}
 				}
 			} else {
-				if crt.Name == share.CriteriaKeyCVEScore || crt.Name == share.CriteriaKeyCVEHighWithFixCount ||
-					crt.Name == share.CriteriaKeyCVEHighCount || crt.Name == share.CriteriaKeyCVEMediumCount ||
-					crt.Name == share.CriteriaKeyCVEScoreCount ||
-					crt.Name == share.SubCriteriaPublishDays || crt.Name == share.SubCriteriaCount {
-					if _, err := strconv.ParseFloat(crt.Value, 32); err == nil {
+				numberVal := false
+				for _, opOption := range option.Ops {
+					if numOps.Contains(opOption) {
+						numberVal = true
+						break
+					}
+				}
+				if numberVal {
+					if _, err := strconv.ParseFloat(crt.Value, 64); err == nil {
 						allowedValue = true // meaning any valid float value is allowed
 					}
 				} else {
