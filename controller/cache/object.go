@@ -911,7 +911,7 @@ func addrWorkloadStop(id string, param interface{}) {
 			case share.CLUSIPAddrScopeGlobal:
 				// Keep the mapping for a while to identify remaining connection report
 				key := addr.IPNet.IP.String()
-				if wlp, ok := ipWLMap[key]; ok && wlp.alive {
+				if wlp, ok := ipWLMap[key]; ok && wlp.alive && wlp.wlID == wl.ID {
 					log.WithFields(log.Fields{
 						"ip": key, "workload": container.ShortContainerId(wl.ID),
 					}).Debug("delay remove ip-workload map")
@@ -950,7 +950,7 @@ func addrWorkloadStop(id string, param interface{}) {
 				case share.CLUSIPAddrScopeLocalhost:
 					// Keep the mapping for a while to identify remaining connection report
 					key := addr.IPNet.IP.String()
-					if wlp, ok := cache.ipWLMap[key]; ok && wlp.alive {
+					if wlp, ok := cache.ipWLMap[key]; ok && wlp.alive && wlp.wlID == wl.ID{
 						log.WithFields(log.Fields{
 							"ip": key, "workload": container.ShortContainerId(wl.ID),
 						}).Debug("delay remove host-scope ip-workload map")
