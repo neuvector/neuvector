@@ -33,7 +33,8 @@ type ConfigHelper interface {
 	Restore() (string, error)
 	Export(w *bufio.Writer, sections utils.Set) error
 	Import(eps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
-		tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc) error
+		tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc,
+		ignoreFed bool) error
 }
 
 var ErrInvalidFileFormat = errors.New("Invalid file format")
@@ -41,6 +42,7 @@ var ErrIORead = errors.New("Failed on IO read")
 var ErrIOWrite = errors.New("Failed on IO write")
 var ErrCluster = errors.New("Failed to access cluster")
 var ErrIncompatibleFedRole = errors.New("File is from an incompatible federal-role cluster")
+var ErrIncompatibleFedRoleEx = errors.New("It's not allowed to import from federal-managed cluster to standalone cluster. To override it, select \"Import as standalone\" and try again")
 
 type configHelper struct {
 	id          string
@@ -474,12 +476,12 @@ func (c *configHelper) sections2Endpoints(sections []string) []*cfgEndpoint {
 // 4. For stand-alone cluster, we allow it to promote to master cluster by importing a master cluster's backup file.
 //	  However, joined clusters list is not imported. Customer needs to manually trigger join-fed operation.
 func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
-	tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc) error {
+	tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, ignoreFed bool) error {
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
 	watcherPaused := false
-	err := c.importInternal(rpcEps, localCtrlerID, localCtrlerIP, &importTask, revertFedRoles, pauseResumeStoreWatcher, &watcherPaused)
+	err := c.importInternal(rpcEps, localCtrlerID, localCtrlerIP, &importTask, revertFedRoles, pauseResumeStoreWatcher, &watcherPaused, ignoreFed)
 	if watcherPaused {
 		cluster.ResumeWatcher(share.CLUSObjectStore)
 		watcherInfo := share.CLUSStoreWatcherInfo{
@@ -499,7 +501,7 @@ func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, local
 }
 
 func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, importTask *share.CLUSImportTask,
-	revertFedRoles RevertFedRolesFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, watcherPaused *bool) error {
+	revertFedRoles RevertFedRolesFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, watcherPaused *bool, ignoreFed bool) error {
 	log.Debug()
 
 	file, err := os.Open(importTask.TempFilename)
@@ -536,8 +538,17 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 			// 1. stand-alone cluster can import master cluster's exported config (so it's promoted but has no worker clusters)
 			// 2. otherwise, only exported config from the same fedRole as current cluster could be imported
 			log.WithFields(log.Fields{"fedRole": importFedRole}).Info("Will import from")
+			ignoreFed = false
 		} else {
-			return ErrIncompatibleFedRole
+			if currFedRole == api.FedRoleNone && importFedRole == api.FedRoleJoint {
+				if ignoreFed {
+					log.Info("Will import as standalone")
+				} else {
+					return ErrIncompatibleFedRoleEx
+				}
+			} else {
+				return ErrIncompatibleFedRole
+			}
 		}
 	}
 
@@ -581,6 +592,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	// Import key/value from files
 	var key, value string
 
+	policyZipRuleListKey := share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName)
 	rerr := c.loopWithLock(
 		func() (string, error) {
 			var err error
@@ -602,6 +614,15 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					if key == skipKeyPath { // this key should be skipped
 						return nil
 					}
+				}
+			}
+
+			if ignoreFed {
+				if key == share.CLUSFedMembershipKey {
+					var m share.CLUSFedMembership
+					b, _ := json.Marshal(m)
+					value = string(b)
+					log.WithFields(log.Fields{"key": key, "value": value}).Debug("=> test : 1")
 				}
 			}
 
@@ -665,8 +686,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					log.WithFields(log.Fields{"error": err, "key": key, "value": value}).Error("Failed to upgrade key/value")
 					return ErrInvalidFileFormat
 				}
-
-				if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
+				if key == policyZipRuleListKey {
 					applyTransaction(txn, importTask, true, processedLines)
 					//compress rulelist before put to cluster
 					clusHelper.PutPolicyRuleListZip(key, array)
@@ -729,7 +749,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 		return rerr
 	}
 
-	if importFedRole != currFedRole {
+	if !ignoreFed && importFedRole != currFedRole {
 		lock, err := clusHelper.AcquireLock(share.CLUSLockFedKey, clusterLockWait)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err, "key": key}).Error("Failed to acquire cluster lock")
