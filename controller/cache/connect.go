@@ -1170,13 +1170,22 @@ func connectHostDelete(id string, param interface{}) {
 				if wlGraph.DeleteNode(ep) != "" {
 					log.WithFields(log.Fields{"endpoint": ep}).Debug("Delete host ip endpoint")
 				}
+				// In case the IP was identified as workload or identical to a workload
+				ep = specialEPName(api.LearnedWorkloadPrefix, addr.IPNet.IP.String())
+				if wlGraph.DeleteNode(ep) != "" {
+					log.WithFields(log.Fields{"endpoint": ep}).Debug("Delete host ip endpoint as workload")
+				}
 			}
 		}
 	}
 	for _, ipnet := range host.TunnelIP {
 		ep := specialEPName(api.LearnedHostPrefix, ipnet.IP.String())
 		if wlGraph.DeleteNode(ep) != "" {
-			log.WithFields(log.Fields{"endpoint": ep}).Debug("Delete tunnel ip endpoint")
+			log.WithFields(log.Fields{"endpoint": ep}).Debug("Delete tunnel ip endpoint as host")
+		}
+		ep = specialEPName(api.LearnedWorkloadPrefix, ipnet.IP.String())
+		if wlGraph.DeleteNode(ep) != "" {
+			log.WithFields(log.Fields{"endpoint": ep}).Debug("Delete tunnel ip endpoint as workload")
 		}
 	}
 	ep := specialEPName(api.LearnedHostPrefix, host.ID)
