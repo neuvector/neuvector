@@ -262,7 +262,7 @@ func KickLoginSessions(ip string, port uint16, req share.CLUSKickLoginSessionsRe
 	return err
 }
 
-func GetControllerStat(ip string, port uint16)  (*share.CLUSStats, error)  {
+func GetControllerStat(ip string, port uint16) (*share.CLUSStats, error) {
 	log.WithFields(log.Fields{"target": ip}).Debug("")
 
 	client, err := getControllerServiceClient(ip, port)
@@ -274,4 +274,20 @@ func GetControllerStat(ip string, port uint16)  (*share.CLUSStats, error)  {
 	defer cancel()
 
 	return client.GetStats(ctx, &share.RPCVoid{})
+}
+
+func ResetLoginTokenTimer(ip string, port uint16, req share.CLUSLoginTokenInfo) error {
+	log.WithFields(log.Fields{"target": ip, "port": port}).Debug()
+
+	client, err := getControllerServiceClient(ip, port)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
+	defer cancel()
+
+	_, err = client.ResetLoginTokenTimer(ctx, &req)
+	return err
+
 }

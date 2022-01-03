@@ -40,6 +40,7 @@ type loginSession struct {
 	remote          string
 	loginAt         time.Time
 	lastAt          time.Time
+	lastSyncTimerAt time.Time // last time calling other controllers for syncing the timer for the token with this login session
 	eolAt           time.Time // end of life
 	timer           *time.Timer
 	domainRoles     access.DomainRole // map: domain -> role
@@ -87,6 +88,7 @@ const jwtFedTokenLife = time.Minute * 60
 const jwtFedJointTicketLife = time.Minute * 2 // for ticket used in requests from joint cluster to master cluster
 const jwtIbmSaTokenLife = time.Minute * 30
 const jwtImportStatusTokenLife = time.Minute * 10
+const syncTokenTimerTimeout = time.Duration(120) * time.Second
 
 var jwtPublicKey *rsa.PublicKey
 var jwtPrivateKey *rsa.PrivateKey
@@ -464,6 +466,24 @@ func restReq2User(r *http.Request) (*loginSession, int) {
 	if role, _ := login.domainRoles[access.AccessDomainGlobal]; role != api.UserRoleIBMSA && role != api.UserRoleImportStatus {
 		login.timer.Reset(getUserTimeout(login.timeout))
 		login.lastAt = now
+		// on other controllers, if the token is already known, its login session timer is ticking based on the last request to other controllers.
+		// simply reset the login session timer on this controller cannot prevent the timer on other controllers from calling expire().
+		// so we need to notify other controllers who know this token to reset the timer for this token's login session.
+		// however, to avoid lots of grpc calls among controllers for "reset token timer", we slow it down so that no more than one within 60 seconds.
+		if login.lastSyncTimerAt.IsZero() {
+			login.lastSyncTimerAt = now
+		} else {
+			if elapsed := time.Since(login.lastSyncTimerAt); elapsed > syncTokenTimerTimeout {
+				tokenInfo := share.CLUSLoginTokenInfo{
+					CtrlerID:     localDev.Ctrler.ID,
+					LoginID:      login.id,
+					UserFullname: login.fullname,
+					LoginToken:   token[0],
+				}
+				go resetLoginTokenTimer(tokenInfo)
+				login.lastSyncTimerAt = now
+			}
+		}
 	}
 
 	login.nvPage = ""
@@ -715,6 +735,15 @@ func kickLoginSessionsOnOtherCtrlers(kickInfo share.CLUSKickLoginSessionsRequest
 	}
 }
 
+func resetLoginTokenTimer(tokenInfo share.CLUSLoginTokenInfo) {
+	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
+	for _, ep := range eps {
+		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
+			go rpc.ResetLoginTokenTimer(ep.ClusterIP, ep.RPCServerPort, tokenInfo)
+		}
+	}
+}
+
 func kickAllLoginSessionsByServer(server string) {
 	_kickAllLoginSessionsByServer(server)
 	kickInfo := share.CLUSKickLoginSessionsRequest{
@@ -781,6 +810,32 @@ func KickLoginSessions(kickInfo *share.CLUSKickLoginSessionsRequest) {
 				}
 			}
 			_kickLoginSessions(user)
+		}
+	}
+}
+
+// for one controller to call other controllers' grpc service, which calls this function, to reset a login session
+func ResetLoginTokenTimer(tokenInfo *share.CLUSLoginTokenInfo) {
+	if tokenInfo.CtrlerID != localDev.Ctrler.ID {
+		key := share.CLUSExpiredTokenKey(tokenInfo.LoginToken)
+		if _, err := cluster.Get(key); err == nil {
+			// one controller has set this token to be expired!
+			return
+		}
+
+		userMutex.Lock()
+		defer userMutex.Unlock()
+
+		if login, ok := loginSessions[tokenInfo.LoginToken]; ok {
+			// if this controller does know this token, reset its timer.
+			if tokenInfo.LoginID == login.id {
+				login.timer.Reset(getUserTimeout(login.timeout))
+				login.lastAt = time.Now()
+			}
+		} else {
+			// if this controller doesn't know this token yet, it's fine.
+			// later when a resp api request reaches this controller, if the token is still not in kv,
+			// this controller will accept it and start a new timer for this token
 		}
 	}
 }
