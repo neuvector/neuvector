@@ -38,6 +38,7 @@ It has these top-level messages:
 	CLUSPolicySyncStatus
 	CLUSStoreWatcherInfo
 	CLUSKickLoginSessionsRequest
+	CLUSLoginTokenInfo
 	CLUSKick
 	CLUSFilter
 	CLUSSession
