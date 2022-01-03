@@ -289,7 +289,8 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 		tokens := strings.Split(scanner.Text(), ":")
 		if len(tokens) > 2 {
 			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
-			if strings.HasPrefix(tokens[2], "/kubepods.slice/") {
+			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
+			if strings.HasPrefix(tokens[2], "/kubepods") {
 				return filepath.Join("/sys/fs/cgroup", tokens[2])
 			}
 		}
