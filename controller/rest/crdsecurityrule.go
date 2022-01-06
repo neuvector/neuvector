@@ -10,11 +10,6 @@ import (
 	//	metav1 "github.com/ericchiang/k8s/apis/meta/v1"
 	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
-	log "github.com/sirupsen/logrus"
-	"github.com/spaolacci/murmur3"
-	"io/ioutil"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"net/http"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
@@ -28,6 +23,11 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
+	"github.com/spaolacci/murmur3"
+	"io/ioutil"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"net/http"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -90,6 +90,7 @@ func group2RESTConfig(group *api.RESTGroup) *api.RESTCrdGroupConfig {
 
 	r := api.RESTCrdGroupConfig{
 		Name:     group.Name,
+		Comment:  group.Comment,
 		Criteria: &criteria,
 	}
 	return &r
@@ -2570,9 +2571,10 @@ func exportProcessRule(group string, secRule *resource.NvSecurityRuleSpec, acc *
 				dupChecker.Add(key)
 				//
 				r := &resource.NvSecurityProcessRule{
-					Name:   gproc.Name,
-					Path:   gproc.Path,
-					Action: gproc.Action,
+					Name:            gproc.Name,
+					Path:            gproc.Path,
+					Action:          gproc.Action,
+					AllowFileUpdate: gproc.AllowFileUpdate,
 				}
 				secRule.ProcessRule = append(secRule.ProcessRule, *r)
 			}
