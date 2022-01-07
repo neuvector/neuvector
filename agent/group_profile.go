@@ -409,7 +409,7 @@ func fileMemberChanges(members utils.Set) {
 		c, ok := gInfo.activeContainers[id]
 		gInfoRUnlock()
 		if ok {
-			go applyFileGroupProfile(c)
+			applyFileGroupProfile(c)
 		} else {
 			log.WithFields(log.Fields{"id": id}).Debug("GRP: left")
 		}
