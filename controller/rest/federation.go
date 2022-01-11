@@ -1150,19 +1150,21 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 	if reqData.Name != nil {
-		switch fedRole {
-		case api.FedRoleMaster:
-			if joined := cacher.GetFedJoinedClusterCount(); joined > 0 {
+		if currentName := cacher.GetSystemConfigClusterName(acc); currentName != *reqData.Name {
+			switch fedRole {
+			case api.FedRoleMaster:
+				if joined := cacher.GetFedJoinedClusterCount(); joined > 0 {
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
+						"Cluster name cannot be modified when there is other cluster in the federation")
+					return
+				}
+			case api.FedRoleJoint:
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
-					"Cluster name cannot be modified when there is other cluster in the federation")
+					"Cluster name cannot be modified after joining the federation")
 				return
 			}
-		case api.FedRoleJoint:
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
-				"Cluster name cannot be modified after joining the federation")
-			return
+			updateSystemClusterName(*reqData.Name, acc)
 		}
-		updateSystemClusterName(*reqData.Name, acc)
 	}
 
 	if reqData.RestInfo != nil || reqData.UseProxy != nil {
@@ -1202,14 +1204,14 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 					}
 				}
 			}
-			if err := clusHelper.PutFedMembership(m); err == nil {
-				restRespSuccess(w, r, nil, acc, login, nil, "Patch local cluster info")
+			if err := clusHelper.PutFedMembership(m); err != nil {
+				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
 				return
 			}
 		}
 	}
 
-	restRespError(w, http.StatusBadRequest, api.RESTErrFedOperationFailed)
+	restRespSuccess(w, r, nil, acc, login, nil, "Patch local cluster info")
 }
 
 func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
