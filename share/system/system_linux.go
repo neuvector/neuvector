@@ -101,12 +101,11 @@ func NewSystemTools() *SystemTools {
 		log.Info("cgroup v2")
 		s.cgroupVersion = cgroup_v2
 		// update cgroup v2 path
-		path, _ := getCgroupPath_cgroup_v2(0)
-		if _, err := os.Stat(filepath.Join(path, "memory.current")); err != nil {
-			entries, _ := ioutil.ReadDir("/sys/fs/cgroup")
-			log.WithFields(log.Fields{"err": err, "entries": entries}).Error("Failed to find cgroup path")
+		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
+			s.cgroupMemoryDir = path
+		} else {
+			s.cgroupMemoryDir = "/sys/fs/cgroup"  // last resort
 		}
-		s.cgroupMemoryDir = path
 	} else {
 		log.Info("cgroup v1")
 		s.cgroupVersion = cgroup_v1

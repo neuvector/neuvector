@@ -86,6 +86,7 @@ var critDisplayName map[string]string = map[string]string{
 	share.CriteriaKeyShareNetWithHost:    "share host's network",
 	share.CriteriaKeyAllowPrivEscalation: "allow privilege escalation",
 	share.CriteriaKeyPspCompliance:       "PSP best practice violation",
+	share.CriteriaKeyRequestLimit:        "resource limitation",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
@@ -564,34 +565,35 @@ func isStringCriterionMet(crt *share.CLUSAdmRuleCriterion, value string) (bool, 
 }
 
 func isNumericCriterionMet(crt *share.CLUSAdmRuleCriterion, v1 interface{}, v2 interface{}) (bool, bool) {
-	var number1, number2 float32
-	var temp float64
+	var number1, number2 float64
 	var err1, err2 error
 
 	switch v := v1.(type) {
 	case *int:
-		number1 = float32(*v)
+		number1 = float64(*v)
+	case *int64:
+		number1 = float64(*v)
 	case *float32:
-		number1 = float32(*v)
+		number1 = float64(*v)
+	case *float64:
+		number1 = float64(*v)
 	case *string:
-		temp, err1 = strconv.ParseFloat(*v, 32)
-		if err1 == nil {
-			number1 = float32(temp)
-		}
+		number1, err1 = strconv.ParseFloat(*v, 64)
 	default:
 		err1 = errors.New("unsupported type")
 		log.WithFields(log.Fields{"name": crt.Name}).Error(err1.Error())
 	}
 	switch v := v2.(type) {
 	case *int:
-		number2 = float32(*v)
+		number2 = float64(*v)
+	case *int64:
+		number2 = float64(*v)
 	case *float32:
-		number2 = float32(*v)
+		number2 = float64(*v)
+	case *float64:
+		number2 = float64(*v)
 	case *string:
-		temp, err2 = strconv.ParseFloat(*v, 32)
-		if err2 == nil {
-			number2 = float32(temp)
-		}
+		number2, err2 = strconv.ParseFloat(*v, 64)
 	default:
 		err2 = errors.New("unsupported type")
 		log.WithFields(log.Fields{"name": crt.Name}).Error(err2.Error())
@@ -601,6 +603,8 @@ func isNumericCriterionMet(crt *share.CLUSAdmRuleCriterion, v1 interface{}, v2 i
 		switch crt.Op {
 		case share.CriteriaOpBiggerEqualThan:
 			return number1 >= number2, true
+		case share.CriteriaOpBiggerThan:
+			return number1 > number2, true
 		case share.CriteriaOpLessEqualThan:
 			return number1 <= number2, true
 		default:
@@ -916,6 +920,35 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 	}
 }
 
+func isResourceLimitCriterionMet(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo) (bool, bool) {
+	if len(crt.SubCriteria) > 0 {
+		cpuCfgInYaml := map[string]float64{
+			share.SubCriteriaCpuLimit:   c.CpuLimits,
+			share.SubCriteriaCpuRequest: c.CpuRequests,
+		}
+		memoryCfgInYaml := map[string]int64{
+			share.SubCriteriaMemoryLimit:   c.MemoryLimits,
+			share.SubCriteriaMemoryRequest: c.MemoryRequests,
+		}
+		for _, sc := range crt.SubCriteria {
+			if sc != nil && sc.Value != "" {
+				if value, ok := cpuCfgInYaml[sc.Name]; ok && value >= 0 {
+					met, positive := isNumericCriterionMet(sc, &value, &sc.Value)
+					if met {
+						return met, positive
+					}
+				} else if value, ok := memoryCfgInYaml[sc.Name]; ok && value >= 0 {
+					met, positive := isNumericCriterionMet(sc, &value, &sc.Value)
+					if met {
+						return met, positive
+					}
+				}
+			}
+		}
+	}
+	return false, true
+}
+
 func normalizeImageValue(value string, registryOnly bool) string {
 	var crtValue string
 	var normalized string
@@ -1226,6 +1259,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 					break
 				}
 			}
+		case share.CriteriaKeyRequestLimit:
+			met, positive = isResourceLimitCriterionMet(crt, c)
 		default:
 			met, positive = false, true
 		}
@@ -1296,7 +1331,7 @@ func setAdmCtrlStateCache(admType, category string, state *share.CLUSAdmissionSt
 
 func getOpDisplay(crt *share.CLUSAdmRuleCriterion) string {
 	switch crt.Op {
-	case share.CriteriaOpEqual, share.CriteriaOpNotEqual, share.CriteriaOpBiggerEqualThan, share.CriteriaOpLessEqualThan:
+	case share.CriteriaOpEqual, share.CriteriaOpNotEqual, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan, "":
 		return crt.Op
 	case share.CriteriaOpRegex:
 		return "matches"
@@ -1348,13 +1383,17 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 			if displayName, ok = critDisplayName[crt.Name]; !ok {
 				displayName = crt.Name
 			}
-			switch crt.Op {
-			case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
-				str = fmt.Sprintf("(%s %s {%s})", displayName, opDsiplay, crt.Value)
-			case share.CriteriaOpRegex:
-				str = fmt.Sprintf("(%s %s regex(%s) )", displayName, opDsiplay, crt.Value)
-			default:
-				str = fmt.Sprintf("(%s %s %s)", displayName, opDsiplay, crt.Value)
+			if crt.Op == "" {
+				str = fmt.Sprintf("(%s)", displayName)
+			} else {
+				switch crt.Op {
+				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
+					str = fmt.Sprintf("(%s %s {%s})", displayName, opDsiplay, crt.Value)
+				case share.CriteriaOpRegex:
+					str = fmt.Sprintf("(%s %s regex(%s) )", displayName, opDsiplay, crt.Value)
+				default:
+					str = fmt.Sprintf("(%s %s %s)", displayName, opDsiplay, crt.Value)
+				}
 			}
 			if len(strSub) > 0 {
 				str = fmt.Sprintf("(%s that %s)", str, strSub)
@@ -1831,6 +1870,8 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 						set.Add(value)
 					}
 				}
+			} else if c.Name == share.CriteriaKeyRequestLimit {
+				set.Add("")
 			} else {
 				if crtValue != "" && !set.Contains(crtValue) {
 					set.Add(crtValue)

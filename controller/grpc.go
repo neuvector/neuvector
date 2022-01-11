@@ -524,16 +524,21 @@ func (cs *ControllerService) KickLoginSessions(ctx context.Context, ops *share.C
 func (cs *ControllerService) GetStats(ctx context.Context, v *share.RPCVoid) (*share.CLUSStats, error) {
 	stats := share.CLUSStats{
 		Interval: statsInterval,
-		Total:  &share.CLUSMetry{},
-		Span1:  &share.CLUSMetry{},
-		Span12: &share.CLUSMetry{},
-		Span60: &share.CLUSMetry{},
+		Total:    &share.CLUSMetry{},
+		Span1:    &share.CLUSMetry{},
+		Span12:   &share.CLUSMetry{},
+		Span60:   &share.CLUSMetry{},
 	}
 
 	gInfo.mutex.Lock()
 	system.PopulateSystemStats(&stats, &gInfo.stats)
 	gInfo.mutex.Unlock()
 	return &stats, nil
+}
+
+func (cs *ControllerService) ResetLoginTokenTimer(ctx context.Context, ops *share.CLUSLoginTokenInfo) (*share.RPCVoid, error) {
+	rest.ResetLoginTokenTimer(ops)
+	return &share.RPCVoid{}, nil
 }
 
 func startGRPCServer(port uint16) (*cluster.GRPCServer, uint16) {

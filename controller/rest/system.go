@@ -1795,7 +1795,10 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 			switch importType {
 			case share.IMPORT_TYPE_CONFIG:
-				go cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask, tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher)
+				value := r.Header.Get("X-As-Standalone")
+				ignoreFed, _ := strconv.ParseBool(value)
+				go cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
+					tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed)
 			case share.IMPORT_TYPE_GROUP_POLICY:
 				go importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			case share.IMPORT_TYPE_ADMCTRL:

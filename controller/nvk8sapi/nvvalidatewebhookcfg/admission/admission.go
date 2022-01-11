@@ -72,11 +72,10 @@ type AdmContainerInfo struct {
 	HostPID                  bool                  `json:"host_pid,omitempty"`
 	HostIPC                  bool                  `json:"host_ipc,omitempty"`
 	AllowPrivilegeEscalation bool                  `json:"allow_privilege_escalation,omitempty"`
-	CpuLimits                int32                 `json:"cpu_limits,omitempty"`
-	CpuRequests              int32                 `json:"cpu_requests,omitempty"`
-	MemoryLimits             int32                 `json:"memory_limits,omitempty"`
-	MemoryRequests           int32                 `json:"memory_requests,omitempty"`
-
+	CpuLimits                float64               `json:"cpu_limits"`
+	CpuRequests              float64               `json:"cpu_requests"`
+	MemoryLimits             int64                 `json:"memory_limits"`
+	MemoryRequests           int64                 `json:"memory_requests"`
 }
 
 type JSONAdmContainerInfo struct { // for debugging purpose only
@@ -357,6 +356,29 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolTrueOp,
 				MatchSrc: api.MatchSrcBoth,
+			},
+			share.CriteriaKeyRequestLimit: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyRequestLimit,
+				Ops:      []string{},
+				MatchSrc: api.MatchSrcYaml,
+				SubOptions: map[string]*api.RESTAdmissionRuleOption{
+					share.SubCriteriaCpuRequest: &api.RESTAdmissionRuleOption{
+						Name: share.SubCriteriaCpuRequest,
+						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
+					},
+					share.SubCriteriaCpuLimit: &api.RESTAdmissionRuleOption{
+						Name: share.SubCriteriaCpuLimit,
+						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
+					},
+					share.SubCriteriaMemoryRequest: &api.RESTAdmissionRuleOption{
+						Name: share.SubCriteriaMemoryRequest,
+						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
+					},
+					share.SubCriteriaMemoryLimit: &api.RESTAdmissionRuleOption{
+						Name: share.SubCriteriaMemoryLimit,
+						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
+					},
+				},
 			},
 		}
 	}

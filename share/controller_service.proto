@@ -204,6 +204,13 @@ message CLUSKickLoginSessionsRequest {
     string UserName = 6;
 }
 
+message CLUSLoginTokenInfo {
+    string CtrlerID = 1;
+    string LoginID = 2;
+    string UserFullname = 3;
+    string LoginToken = 4;
+}
+
 service ControllerCtrlService {
   rpc ReqSync(CLUSSyncRequest) returns (CLUSSyncReply);
   rpc ReqSyncStream(CLUSSyncRequest) returns (stream CLUSSyncReply);
@@ -219,4 +226,5 @@ service ControllerCtrlService {
   rpc PauseResumeStoreWatcher(CLUSStoreWatcherInfo) returns (RPCVoid);
   rpc KickLoginSessions(CLUSKickLoginSessionsRequest) returns (RPCVoid);
   rpc GetStats(RPCVoid) returns (CLUSStats);
+  rpc ResetLoginTokenTimer(share.CLUSLoginTokenInfo) returns (RPCVoid);
 }

@@ -48,7 +48,7 @@ func (p *Probe) openProcMonitor() (*netlink.NetlinkSocket, error) {
 	// Reduce thread operations
 	err = ns.SetFilter(ProcFilters)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("JW: Unable to set socket filter")
+		log.WithFields(log.Fields{"error": err}).Error("Unable to set socket filter")
 	}
 	return ns, nil
 }
