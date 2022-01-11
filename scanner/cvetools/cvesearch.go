@@ -109,7 +109,7 @@ func diffFeatures(lastFeat, features []detectors.FeatureVersion) []detectors.Fea
 
 type layerScanFiles struct {
 	pkgs map[string]*detectors.FeatureFile
-	apps []scan.AppPackage
+	apps []detectors.AppFeatureVersion
 }
 
 // ScanImageData helps scanning image data
@@ -148,9 +148,15 @@ func (cv *CveTools) ScanImageData(data *share.ScanData) (*share.ScanResult, erro
 	for name, data := range pkgs {
 		files[name] = &detectors.FeatureFile{Data: data}
 	}
-	appPkg := scan.NewScanApps(true).DerivePkg(pkgs)
+	appPkgs := scan.NewScanApps(true).DerivePkg(pkgs)
 
-	namespace, serr, vuls, features, apps := cv.doScan(&layerScanFiles{pkgs: files, apps: appPkg}, nil)
+	// convert AppPackage to AppFeatureVersion
+	afvs := make([]detectors.AppFeatureVersion, len(appPkgs))
+	for i, a := range appPkgs {
+		afvs[i] = detectors.AppFeatureVersion{AppPackage: a, ModuleVuls: make([]detectors.ModuleVul, 0)}
+	}
+
+	namespace, serr, vuls, features, apps := cv.doScan(&layerScanFiles{pkgs: files, apps: afvs}, nil)
 	result.Error = serr
 	result.Vuls = vuls
 
@@ -164,19 +170,21 @@ func (cv *CveTools) ScanImageData(data *share.ScanData) (*share.ScanResult, erro
 
 // ScanAppPackage helps scanning application packages
 func (cv *CveTools) ScanAppPackage(req *share.ScanAppRequest, namespace string) (*share.ScanResult, error) {
-	var appPkg []scan.AppPackage
+	var apps []detectors.AppFeatureVersion
 
 	for _, ap := range req.Packages {
-		pckg := scan.AppPackage{
-			AppName:    ap.AppName,
-			ModuleName: ap.ModuleName,
-			Version:    ap.Version,
-			FileName:   ap.FileName,
+		afv := detectors.AppFeatureVersion{
+			AppPackage: scan.AppPackage{
+				AppName:    ap.AppName,
+				ModuleName: ap.ModuleName,
+				Version:    ap.Version,
+				FileName:   ap.FileName,
+			},
 		}
-		appPkg = append(appPkg, pckg)
+		apps = append(apps, afv)
 	}
 
-	appvuls := cv.DetectAppVul(cv.TbPath, appPkg, namespace)
+	appvuls := cv.DetectAppVul(cv.TbPath, apps, namespace)
 	vulList := getVulItemList(appvuls)
 
 	result := &share.ScanResult{
@@ -396,7 +404,7 @@ func (cv *CveTools) ScanImage(ctx context.Context, req *share.ScanImageRequest, 
 	// Merge file data, layer order in schema V1, the first is the latest layer
 	gotFirstCpe := false
 	mergedFiles := make(map[string]*detectors.FeatureFile)
-	mergedApps := make(map[string][]scan.AppPackage)
+	mergedApps := make(map[string][]detectors.AppFeatureVersion)
 	for _, l := range info.Layers {
 		isBase := baseLayers.Contains(l)
 		if lf, ok := layerFiles[l]; ok {
@@ -416,20 +424,28 @@ func (cv *CveTools) ScanImage(ctx context.Context, req *share.ScanImageRequest, 
 			}
 			for filename, apps := range lf.Apps {
 				if _, ok := mergedApps[filename]; !ok {
-					for i, _ := range apps {
-						apps[i].InBase = isBase
+					// convert AppPackage to AppFeatureVersion
+					afvs := make([]detectors.AppFeatureVersion, len(apps))
+					for i, a := range apps {
+						afvs[i] = detectors.AppFeatureVersion{
+							AppPackage: a,
+							ModuleVuls: make([]detectors.ModuleVul, 0),
+							InBase:     isBase,
+						}
 					}
-					mergedApps[filename] = apps
+
+					mergedApps[filename] = afvs
 				}
 			}
 		}
 	}
 
-	appPkgs := make([]scan.AppPackage, 0)
-	for _, apps := range mergedApps {
-		appPkgs = append(appPkgs, apps...)
+	appFVs := make([]detectors.AppFeatureVersion, 0)
+	for _, afvs := range mergedApps {
+		appFVs = append(appFVs, afvs...)
 	}
-	namespace, serr, vuls, features, apps := cv.doScan(&layerScanFiles{pkgs: mergedFiles, apps: appPkgs}, nil)
+
+	namespace, serr, vuls, features, apps := cv.doScan(&layerScanFiles{pkgs: mergedFiles, apps: appFVs}, nil)
 	if namespace != nil {
 		result.Namespace = namespace.Name
 		result.Modules = feature2Module(namespace.Name, features, apps)
@@ -463,17 +479,19 @@ func (cv *CveTools) ScanImage(ctx context.Context, req *share.ScanImageRequest, 
 					log.WithFields(log.Fields{"layer": layer, "cmd": info.Cmds[i], "base": isBase, "size": lf.Size}).Debug("scan layer")
 
 					files := make(map[string]*detectors.FeatureFile)
-					appPkgs = make([]scan.AppPackage, 0)
+					appFVs = make([]detectors.AppFeatureVersion, 0)
 					for filename, data := range lf.Pkgs {
 						files[filename] = &detectors.FeatureFile{Data: data, InBase: isBase}
 					}
 					for _, apps := range lf.Apps {
-						for i, _ := range apps {
-							apps[i].InBase = isBase
+						// convert AppPackage to AppFeatureVersion
+						afvs := make([]detectors.AppFeatureVersion, len(apps))
+						for i, a := range apps {
+							afvs[i] = detectors.AppFeatureVersion{AppPackage: a, ModuleVuls: make([]detectors.ModuleVul, 0), InBase: isBase}
 						}
-						appPkgs = append(appPkgs, apps...)
+						appFVs = append(appFVs, afvs...)
 					}
-					_, _, vuls, _, _ = cv.doScan(&layerScanFiles{pkgs: files, apps: appPkgs}, namespace)
+					_, _, vuls, _, _ = cv.doScan(&layerScanFiles{pkgs: files, apps: appFVs}, namespace)
 					l := &share.ScanLayerResult{
 						Digest: layer,
 						Vuls:   vuls,
@@ -617,9 +635,9 @@ func (cv *CveTools) ScanAwsLambda(req *share.ScanAwsLambdaRequest, imgPath strin
 	return res, err
 }
 
-func (cv *CveTools) doScan(layerFiles *layerScanFiles, imageNs *detectors.Namespace) (*detectors.Namespace, share.ScanErrorCode, []*share.ScanVulnerability, []detectors.FeatureVersion, []scan.AppPackage) {
-	//get package from layer.tar
-	features, namespace, appPkg, serr := cv.getFeatures(layerFiles, imageNs)
+func (cv *CveTools) doScan(layerFiles *layerScanFiles, imageNs *detectors.Namespace) (*detectors.Namespace, share.ScanErrorCode, []*share.ScanVulnerability, []detectors.FeatureVersion, []detectors.AppFeatureVersion) {
+	features, namespace, apps, serr := cv.getFeatures(layerFiles, imageNs)
+
 	var ns detectors.Namespace
 	if namespace != nil {
 		ns = *namespace
@@ -628,11 +646,11 @@ func (cv *CveTools) doScan(layerFiles *layerScanFiles, imageNs *detectors.Namesp
 		return namespace, serr, nil, nil, nil
 	}
 
-	errCode, vuls := cv.startScan(features, ns.Name, appPkg)
-	return namespace, errCode, vuls, features, appPkg
+	errCode, vuls := cv.startScan(features, ns.Name, apps)
+	return namespace, errCode, vuls, features, apps
 }
 
-func (cv *CveTools) startScan(features []detectors.FeatureVersion, nsName string, appPkg []scan.AppPackage) (share.ScanErrorCode, []*share.ScanVulnerability) {
+func (cv *CveTools) startScan(features []detectors.FeatureVersion, nsName string, appPkg []detectors.AppFeatureVersion) (share.ScanErrorCode, []*share.ScanVulnerability) {
 	var vss []common.VulShort
 	var vfs map[string]common.VulFull
 	var err error
@@ -774,7 +792,7 @@ func (cv *CveTools) startScan(features []detectors.FeatureVersion, nsName string
 		// build feature -> vul version map for search use
 		mv := makeFeatureMap(vss, nsName)
 
-		// get the vulnerbilitys from the hash map
+		// get the vulnerbilitys from the hash map, associate them with the modules in features.
 		avsr := getAffectedVul(mv, features, nsName)
 		updateModuleCVEStatus(nsName, features, vfs)
 
@@ -854,7 +872,7 @@ func getAffectedVul(mv map[string][]common.VulShort, features []detectors.Featur
 
 var redhatReleaseRegexp = regexp.MustCompile(`^([a-z]+):([0-9]+)`)
 
-func (cv *CveTools) getFeatures(layerFiles *layerScanFiles, imageNs *detectors.Namespace) ([]detectors.FeatureVersion, *detectors.Namespace, []scan.AppPackage, share.ScanErrorCode) {
+func (cv *CveTools) getFeatures(layerFiles *layerScanFiles, imageNs *detectors.Namespace) ([]detectors.FeatureVersion, *detectors.Namespace, []detectors.AppFeatureVersion, share.ScanErrorCode) {
 	var namespace *detectors.Namespace
 
 	// Detect namespace.
@@ -877,17 +895,19 @@ func (cv *CveTools) getFeatures(layerFiles *layerScanFiles, imageNs *detectors.N
 		return features, namespace, layerFiles.apps, share.ScanErrorCode_ScanErrPackage
 	}
 
-	//get the nginx package from os dpkg or rpm and append it to application package
+	// get the nginx package from os dpkg or rpm and append it to application package
 	for i, ft := range features {
 		if ft.Feature.Name == "nginx" {
-			nginx := scan.AppPackage{AppName: "nginx", ModuleName: "nginx", Version: ft.Version.String(), FileName: "nginx", InBase: ft.InBase}
-			layerFiles.apps = append(layerFiles.apps, nginx)
+			nginx := scan.AppPackage{AppName: "nginx", ModuleName: "nginx", Version: ft.Version.String(), FileName: "nginx"}
+			app := detectors.AppFeatureVersion{AppPackage: nginx, ModuleVuls: make([]detectors.ModuleVul, 0), InBase: ft.InBase}
+			layerFiles.apps = append(layerFiles.apps, app)
 		} else if ft.Feature.Name == "openssl" &&
-			//add the openssl to the app to compare, except ubuntu/debian/centos, because they have their patch themselves
+			// add the openssl to the app to compare, except ubuntu/debian/centos, because they have their patch themselves
 			(namespace == nil || !cv.isSupportOs(namespace.Name)) {
 			ver := ft.Version.String()
-			ssl := scan.AppPackage{AppName: "openssl", ModuleName: "openssl", Version: ver, FileName: "openssl", InBase: ft.InBase}
-			layerFiles.apps = append(layerFiles.apps, ssl)
+			ssl := scan.AppPackage{AppName: "openssl", ModuleName: "openssl", Version: ver, FileName: "openssl"}
+			app := detectors.AppFeatureVersion{AppPackage: ssl, ModuleVuls: make([]detectors.ModuleVul, 0), InBase: ft.InBase}
+			layerFiles.apps = append(layerFiles.apps, app)
 			features[i].Feature.Name = "opensslxx"
 		} else if ft.Feature.Name == "busybox" && (namespace == nil || !cv.isSupportOs(namespace.Name)) {
 			if namespace == nil {
@@ -895,8 +915,9 @@ func (cv *CveTools) getFeatures(layerFiles *layerScanFiles, imageNs *detectors.N
 				log.WithFields(log.Fields{"busybox": *namespace}).Debug("BusyBox")
 			}
 			ver := ft.Version.String()
-			bbox := scan.AppPackage{AppName: "busybox", ModuleName: "busybox", Version: ver, FileName: "busybox", InBase: ft.InBase}
-			layerFiles.apps = append(layerFiles.apps, bbox)
+			bbox := scan.AppPackage{AppName: "busybox", ModuleName: "busybox", Version: ver, FileName: "busybox"}
+			app := detectors.AppFeatureVersion{AppPackage: bbox, ModuleVuls: make([]detectors.ModuleVul, 0), InBase: ft.InBase}
+			layerFiles.apps = append(layerFiles.apps, app)
 		}
 	}
 
@@ -1212,7 +1233,7 @@ func removeSubVersion(name string) string {
 	return name
 }
 
-func feature2Module(namespace string, features []detectors.FeatureVersion, apps []scan.AppPackage) []*share.ScanModule {
+func feature2Module(namespace string, features []detectors.FeatureVersion, apps []detectors.AppFeatureVersion) []*share.ScanModule {
 	modules := make([]*share.ScanModule, len(features)+len(apps))
 
 	i := 0
@@ -1236,6 +1257,10 @@ func feature2Module(namespace string, features []detectors.FeatureVersion, apps 
 	}
 	for _, app := range apps {
 		modules[i] = &share.ScanModule{Name: app.ModuleName, Version: app.Version, Source: app.AppName}
+		for _, mv := range app.ModuleVuls {
+			cve := &share.ScanModuleVul{Name: mv.Name, Status: mv.Status}
+			modules[i].Vuls = append(modules[i].Vuls, cve)
+		}
 		i++
 	}
 

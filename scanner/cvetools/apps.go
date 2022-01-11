@@ -6,11 +6,13 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/scanner/common"
+	"github.com/neuvector/neuvector/scanner/detectors"
+	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/scan"
 )
 
-func (cv *CveTools) DetectAppVul(path string, appPkg []scan.AppPackage, namespace string) []vulFullReport {
-	if appPkg == nil || len(appPkg) == 0 {
+func (cv *CveTools) DetectAppVul(path string, apps []detectors.AppFeatureVersion, namespace string) []vulFullReport {
+	if apps == nil || len(apps) == 0 {
 		return nil
 	}
 	modVuls, err := common.LoadAppVulsTb(path)
@@ -20,33 +22,42 @@ func (cv *CveTools) DetectAppVul(path string, appPkg []scan.AppPackage, namespac
 
 	vuls := make([]vulFullReport, 0)
 
-	for _, pkg := range appPkg {
-		// log.WithFields(log.Fields{"namespace": namespace, "package": pkg}).Info()
+	for i, app := range apps {
+		// log.WithFields(log.Fields{"namespace": namespace, "package": app}).Info()
 
 		// It seems that alpine patches python vulnerabilities actively. Even the library
 		// version is vulnerable, the source codes are patched.
-		if strings.HasPrefix(namespace, "alpine:") && strings.HasPrefix(pkg.ModuleName, "python:") {
+		if strings.HasPrefix(namespace, "alpine:") && strings.HasPrefix(app.ModuleName, "python:") {
 			continue
 		}
 
-		if mv, found := modVuls[pkg.ModuleName]; found {
+		if mv, found := modVuls[app.ModuleName]; found {
 			for _, v := range mv {
 				if len(v.UnaffectedVer) > 0 {
-					if unaffected := compareAppVersion(pkg.Version, v.UnaffectedVer); unaffected {
+					if unaffected := compareAppVersion(app.Version, v.UnaffectedVer); unaffected {
 						continue
 					}
 				}
 				// ruby reports patched version. The affected version is converted from patched version.
 				// The conversion logic is not correct.
-				if strings.HasPrefix(pkg.ModuleName, "ruby:") && len(v.FixedVer) > 0 {
-					if fixed := compareAppVersion(pkg.Version, v.FixedVer); !fixed {
-						fv := appVul2FullVul(pkg, v)
+				if strings.HasPrefix(app.ModuleName, "ruby:") && len(v.FixedVer) > 0 {
+					if fixed := compareAppVersion(app.Version, v.FixedVer); !fixed {
+						fv := appVul2FullVul(app, v)
 						vuls = append(vuls, fv)
+						mcve := detectors.ModuleVul{Name: v.VulName, Status: share.ScanVulStatus_FixExists}
+						apps[i].ModuleVuls = append(apps[i].ModuleVuls, mcve)
 					}
 				} else {
-					if affected := compareAppVersion(pkg.Version, v.AffectedVer); affected {
-						fv := appVul2FullVul(pkg, v)
+					if affected := compareAppVersion(app.Version, v.AffectedVer); affected {
+						fv := appVul2FullVul(app, v)
 						vuls = append(vuls, fv)
+						if len(v.FixedVer) > 0 {
+							mcve := detectors.ModuleVul{Name: v.VulName, Status: share.ScanVulStatus_FixExists}
+							apps[i].ModuleVuls = append(apps[i].ModuleVuls, mcve)
+						} else {
+							mcve := detectors.ModuleVul{Name: v.VulName, Status: share.ScanVulStatus_Unpatched}
+							apps[i].ModuleVuls = append(apps[i].ModuleVuls, mcve)
+						}
 					}
 				}
 			}
@@ -56,25 +67,25 @@ func (cv *CveTools) DetectAppVul(path string, appPkg []scan.AppPackage, namespac
 	return vuls
 }
 
-func appVul2FullVul(pkg scan.AppPackage, mv common.AppModuleVul) vulFullReport {
+func appVul2FullVul(app detectors.AppFeatureVersion, mv common.AppModuleVul) vulFullReport {
 	var fv vulFullReport
 	fv.Vf.Name = mv.VulName
-	fv.Vf.Namespace = pkg.AppName
+	fv.Vf.Namespace = app.AppName
 	fv.Vf.Description = mv.Description
 	fv.Vf.Link = mv.Link
 	fv.Vf.Severity = mv.Severity
 	fv.Vf.FixedIn = make([]common.FeaFull, 0)
-	fv.Vf.FixedIn = append(fv.Vf.FixedIn, moduleVer2FixVer(pkg, mv))
+	fv.Vf.FixedIn = append(fv.Vf.FixedIn, moduleVer2FixVer(app, mv))
 	fv.Vf.Metadata = make(map[string]common.NVDMetadata)
 
-	if strings.HasSuffix(pkg.FileName, scan.WPVerFileSuffix) {
+	if strings.HasSuffix(app.FileName, scan.WPVerFileSuffix) {
 		fv.Ft.Feature.Name = "WordPress"
 	} else {
-		fv.Ft.Feature.Name = pkg.FileName
+		fv.Ft.Feature.Name = app.FileName
 	}
-	fv.Ft.Feature.Namespace.Name = pkg.AppName
-	fv.Ft.Version, _ = common.NewVersion(pkg.Version)
-	fv.Ft.InBase = pkg.InBase
+	fv.Ft.Feature.Namespace.Name = app.AppName
+	fv.Ft.Version, _ = common.NewVersion(app.Version)
+	fv.Ft.InBase = app.InBase
 
 	var nv common.NVDMetadata
 	nv.CVSSv2.Score = mv.Score
@@ -83,8 +94,8 @@ func appVul2FullVul(pkg scan.AppPackage, mv common.AppModuleVul) vulFullReport {
 	return fv
 }
 
-func moduleVer2FixVer(pkg scan.AppPackage, mv common.AppModuleVul) common.FeaFull {
-	ft := common.FeaFull{Name: mv.ModuleName, Namespace: pkg.AppName}
+func moduleVer2FixVer(app detectors.AppFeatureVersion, mv common.AppModuleVul) common.FeaFull {
+	ft := common.FeaFull{Name: mv.ModuleName, Namespace: app.AppName}
 	for i, v := range mv.FixedVer {
 		s := strings.Replace(v.OpCode, "or", "||", -1)
 		s = strings.Replace(s, "gt", ">", -1)

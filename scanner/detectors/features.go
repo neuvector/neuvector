@@ -20,6 +20,7 @@ import (
 
 	"github.com/neuvector/neuvector/scanner/common"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -49,6 +50,12 @@ type FeatureVersion struct {
 	MinVer     common.Version
 	ModuleVuls []ModuleVul
 	CPEs       utils.Set
+	InBase     bool
+}
+
+type AppFeatureVersion struct {
+	scan.AppPackage
+	ModuleVuls []ModuleVul
 	InBase     bool
 }
 
