@@ -54,7 +54,6 @@ type AppPackage struct {
 	ModuleName string `json:"module_name"`
 	Version    string `json:"version"`
 	FileName   string `json:"file_name"`
-	InBase     bool   `json:"in_base"`
 }
 
 type mvnProject struct {
