@@ -523,6 +523,11 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 			}
 		}
 	}
+	//during rolling upgrade, when enforcer (re)start, orchstration can be faster
+	//than agent get updated which cause neuvector device temprary to be unmanaged
+	//workload, reset unManagedWlTimer to update unmanaged workload ip to prevent
+	//neuvector device being treated as unmanaged wl
+	scheduleUnmanagedWlProc(false)
 
 	// cleanup ephemeral entries
 	for key, dev := range ipDevMap {

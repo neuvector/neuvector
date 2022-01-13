@@ -152,7 +152,7 @@ void dpi_ep_set_server_ver(dpi_packet_t *p, char *ver, int len)
 bool dpi_is_ip4_internal(uint32_t ip)
 {
     int i;
-    if (unlikely(th_internal_subnet4 == NULL)) {
+    if (unlikely(th_internal_subnet4 == NULL) || (th_internal_subnet4->count == 0) ) {
         return true;
     }
     for (i = 0; i < th_internal_subnet4->count; i++) {
@@ -197,7 +197,7 @@ bool dpi_is_policy_addr(uint32_t ip)
 {
     int i;
     if (unlikely(th_policy_addr == NULL)) {
-        return true;
+        return false;
     }
     for (i = 0; i < th_policy_addr->count; i++) {
     /*

@@ -628,11 +628,6 @@ func addWlGlobalAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrM
 		//log.WithFields(log.Fields{"ip": gipnet.IP.String(), "mask": gipnet.Mask.String()}).Debug("add global ip")
 		addPolicyAddrIPNet(newPolicyAddrMap, gipnet, share.CLUSIPAddrScopeGlobal)
 	}
-	for _, nip := range from.NatIP {
-		nipnet := &net.IPNet{IP: nip, Mask: net.CIDRMask(32, 32)}
-		//log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("add nat ip")
-		addPolicyAddrIPNet(newPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
-	}
 }
 
 func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyMap map[string]*WorkloadIPPolicyInfo,
@@ -660,19 +655,6 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 						addWlLocalAddrToPolicyAddrMap(from, newPolicyAddrMap)
 					}
 				}
-			}
-			//each enforcer add its hostip to policy address map
-			for _, addr := range e.HostIPs.ToSlice() {
-				hipnet := &net.IPNet{IP: net.ParseIP(addr.(string)), Mask: net.CIDRMask(32, 32)}
-				//log.WithFields(log.Fields{"ip": hipnet.IP.String(), "mask": hipnet.Mask.String()}).Debug("add host ip")
-				addPolicyAddrIPNet(newPolicyAddrMap, hipnet, share.CLUSIPAddrScopeNAT)
-			}
-			//each enforcer add its tunnel to policy address map
-			for _, addr := range e.TunnelIP {
-				tipnet := &net.IPNet{IP: addr.IP, Mask: net.CIDRMask(32, 32)}
-				//log.WithFields(log.Fields{"ip": tipnet.IP.String(), "mask": tipnet.Mask.String()}).Debug("add tunnel ip")
-				addPolicyAddrIPNet(newPolicyAddrMap, tipnet, share.CLUSIPAddrScopeGlobal)
-
 			}
 			continue
 		}

@@ -1710,12 +1710,6 @@ func startWorkerThread() {
 					}
 					// Assume IP doesn't change. Ignore host mode containers.
 					if (o == nil || o.IPNet.IP == nil) && (n != nil && !n.HostNet && n.IPNet.IP != nil) {
-						//when enforcer (re)start, orchstration can be faster than agent get updated
-						//which cause neuvector device temprary to be unmanaged workload, so reset
-						//unManagedWlTimer to prevent neuvector device being treated as unmanaged wl
-						if isOrchNeuvectorDevice(n.Name, n.Domain) {
-							scheduleUnmanagedWlProc(true)
-						}
 						addrOrchWorkloadAdd(&n.IPNet, n.Node)
 					} else if (n == nil || n.IPNet.IP == nil) && (o != nil && !o.HostNet && o.IPNet.IP != nil) {
 						addrOrchWorkloadStop(&o.IPNet)
