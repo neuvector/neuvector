@@ -698,7 +698,9 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
     uip_desc.sip = sip;
     uip_desc.dip = dip;
 
-    if (iptype == DP_IPTYPE_NONE) {//unknown wl
+    if (iptype == DP_IPTYPE_NONE ||
+        iptype == DP_IPTYPE_HOSTIP ||
+        iptype == DP_IPTYPE_TUNNELIP) {//unknown wl
         uint16_t thdl_ver = hdl?hdl->ver:0;
         dpi_unknown_ip_cache_t *uip_cache = rcu_map_lookup(&th_unknown_ip_map, &uip_desc);
         if (uip_cache != NULL) {
