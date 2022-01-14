@@ -37,10 +37,6 @@ func (detector *OthersFeaturesDetector) Detect(namespace string, files map[strin
 		line := scanner.Text()
 		r := pipPackagesRegexp.FindStringSubmatch(line)
 		if len(r) == 3 {
-			if r[1] == "OpenSSL" {
-				// quick way to disable openssl, other_modules is from running container, not essential.
-				continue
-			}
 			pkg.Feature.Name = strings.ToLower(r[1])
 			pkg.Version, err = common.NewVersion(r[2])
 			if err != nil {
