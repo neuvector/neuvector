@@ -42,7 +42,7 @@ var ErrIORead = errors.New("Failed on IO read")
 var ErrIOWrite = errors.New("Failed on IO write")
 var ErrCluster = errors.New("Failed to access cluster")
 var ErrIncompatibleFedRole = errors.New("File is from an incompatible federal-role cluster")
-var ErrIncompatibleFedRoleEx = errors.New("It's not allowed to import from federal-managed cluster to standalone cluster. To override it, select \"Import as standalone\" and try again")
+var ErrIncompatibleFedRoleEx = errors.New("It's not allowed to import from federal-managed cluster to standalone cluster. To override it, select <q>Import configuration as standalone cluster<q> and try again")
 
 type configHelper struct {
 	id          string
