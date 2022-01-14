@@ -2,10 +2,9 @@
 
 NeuVector Full Lifecycle Container Security Platform delivers the only cloud-native security with uncompromising end-to-end protection from DevOps vulnerability protection to automated run-time security, and featuring a true Layer 7 container firewall.
 
-
 # License
 
-Copyright © 2021 [NeuVector Inc](https://neuvector.com). All Rights Reserved
+Copyright © 2016-2022 [NeuVector Inc](https://neuvector.com). All Rights Reserved
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
