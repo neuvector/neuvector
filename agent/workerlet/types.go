@@ -7,7 +7,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 )
 
-const WalkerApp = "pathWalker"
+const WalkerApp = "/usr/local/bin/pathWalker"
 const WalkerBasePath = "/tmp/walk"
 const RequestJson = "request.json" // default request file
 const ResultJson = "result1.json"  // default output file
