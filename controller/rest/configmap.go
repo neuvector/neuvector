@@ -5,10 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ghodss/yaml"
-	log "github.com/sirupsen/logrus"
-	"io/ioutil"
-	"net"
-	"net/url"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -16,6 +12,10 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
@@ -35,6 +35,7 @@ const maxNameLength = 1024
 
 type configMapHandlerContext struct {
 	gotAllCustomRoles bool
+	pwdProfile        *share.CLUSPwdProfile
 }
 
 func handleeulacfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
@@ -662,6 +663,9 @@ func handlepwdprofilecfg(yaml_data []byte, load bool, skip *bool, context *confi
 			log.WithFields(log.Fields{"rprofile": *rprofile}).Error("invalid value")
 			continue
 		}
+		if activePwdProfileName := clusHelper.GetActivePwdProfileName(); profile.Name == activePwdProfileName && context != nil {
+			context.pwdProfile = profile
+		}
 
 		if newprofile {
 			if err := clusHelper.PutPwdProfileRev(profile, 0); err != nil {
@@ -703,8 +707,13 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		context.gotAllCustomRoles = true
 	}
 
+	var pwdProfiles map[string]*share.CLUSPwdProfile
 	activePwdProfileName := clusHelper.GetActivePwdProfileName()
-	pwdProfiles := clusHelper.GetAllPwdProfiles(accAdmin)
+	if context != nil && context.pwdProfile != nil && context.pwdProfile.Name == activePwdProfileName {
+		pwdProfiles = map[string]*share.CLUSPwdProfile{context.pwdProfile.Name: context.pwdProfile}
+	} else {
+		pwdProfiles = clusHelper.GetAllPwdProfiles(accAdmin)
+	}
 	if activePwdProfileName != "" && len(pwdProfiles) > 0 {
 		cacher.PutPwdProfiles(activePwdProfileName, pwdProfiles)
 	}
