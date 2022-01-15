@@ -94,7 +94,7 @@ func GetAllUsers(pid int, users map[int]string) (int, int, error) {
 
 	dat, err := global.SYS.ReadContainerFile("/etc/passwd", pid, 0, 0)
 	if err != nil {
-		log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get /etc/passwd fail")
+		// log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get /etc/passwd fail")
 		return 0, uidStart, err
 	}
 	uidMap, err := getUserNsUid(pid)
