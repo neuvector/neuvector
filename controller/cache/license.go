@@ -17,9 +17,9 @@ var licenseCode string
 var installationID string
 
 var licenseInfo api.RESTLicenseInfo = api.RESTLicenseInfo{
-	Name:  "N/A",
-	Email: "N/A",
-	Phone: "N/A",
+	Name:  "",
+	Email: "",
+	Phone: "",
 }
 
 func (m CacheMethod) GetCurrentLicense(acc *access.AccessControl) api.RESTLicenseInfo {
@@ -79,9 +79,9 @@ func licenseConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 	}
 	if err != nil {
 		info = api.RESTLicenseInfo{
-			Name:  "N/A",
-			Email: "N/A",
-			Phone: "N/A",
+			Name:  "",
+			Email: "",
+			Phone: "",
 		}
 	}
 	info.InstallationID = installationID
