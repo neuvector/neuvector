@@ -250,7 +250,7 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, t
 	return meta
 }
 
-func (d *containerdDriver) isPrivileged(spec *oci.Spec) bool {
+func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string) bool {
 	for _, m := range spec.Mounts {
 		switch m.Type {
 		case "sysfs":
@@ -262,7 +262,9 @@ func (d *containerdDriver) isPrivileged(spec *oci.Spec) bool {
 			}
 		}
 	}
-	return false
+
+	// 2nd chance from cri
+	return d.isPrivilegedCri(id)
 }
 
 func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
@@ -305,7 +307,7 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 
 	meta := &ContainerMetaExtra{
 		ContainerMeta: *d.getMeta(info, spec, task, attempt),
-		Privileged:    d.isPrivileged(spec),
+		Privileged:    d.isPrivileged(spec, c.ID()),
 		CreatedAt:     info.CreatedAt,
 		StartedAt:     info.CreatedAt,
 		Networks:      utils.NewSet(),
@@ -566,6 +568,50 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 		ExitCode:   int(cs.Status.ExitCode),
 	}
 	return meta, nil
+}
+
+
+
+func (d *containerdDriver) isPrivilegedCri(id string) bool {
+	if d.criClient == nil {
+		return false
+	}
+
+	type criContainerInfoRes struct {
+		Info struct {
+			Pid int  `json:"pid"`
+			Config struct {
+				MetaData struct {
+					Name string  `json:"name"`
+				} `json:"metadata"`
+
+				Image struct {
+					Name string  `json:"image"`
+				} `json:"image"`
+
+				Linux struct {
+					SecurityContext struct {
+						Privileged bool `json:"privileged"`
+					} `json:"security_context"`
+				} `json:"linux"`
+			} `json:"config"`
+		} `json:"info"`
+	}
+
+	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
+	if cs, err := crt.ContainerStatus(context.Background(), &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true}); err == nil {
+		var res criContainerInfoRes
+		jsonInfo := buildJsonFromMap(cs.GetInfo())	// from map[string]string
+		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
+			// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
+			return false
+		}
+
+		// expandable structures
+		// log.WithFields(log.Fields{"info": res.Info}).Debug()
+		return res.Info.Config.Linux.SecurityContext.Privileged
+	}
+	return false
 }
 
 //// construct a json string from map[]

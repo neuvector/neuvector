@@ -8,8 +8,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
+
+func joinLink(root, link, dir string) string {
+	var path string
+	if filepath.IsAbs(link) {
+		 path = filepath.Join(root, link)
+	} else {
+	   path = filepath.Join(dir, link)
+	   path = filepath.Join(root, path)
+	}
+	return path
+ }
 
 // Read one-liner text files, strip newline.
 func slurpFile(path string) string {
@@ -29,8 +41,11 @@ func spewFile(path string, data string, perm os.FileMode) {
 }
 
 func openFile(path string) (*os.File, error) {
-	path = fmt.Sprintf("%s%s", rootPathPrefix, path)
-	return os.Open(path)
+	rpath := filepath.Join(rootPathPrefix, path)
+	if link, err := os.Readlink(rpath); err == nil {
+		rpath = joinLink(rootPathPrefix, link, filepath.Dir(path))
+	}
+	return os.Open(rpath)
 }
 
 func statFile(path string) (os.FileInfo, error) {
