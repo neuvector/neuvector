@@ -24,7 +24,4 @@ cd scanner/task; make || exit $?; cd ../..
 echo "==> Making controller"
 cd controller; make || exit $?; cd ..
 
-echo "==> Making updater"
-cd upgrader; make || exit $?; cd ..
-
 exit 0

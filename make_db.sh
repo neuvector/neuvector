@@ -2,9 +2,6 @@
 
 # This script is invoked by build container
 
-echo "==> Making updater"
-cd upgrader; make || exit $?; cd ..
-
 echo "==> Making monitor"
 cd monitor; make || exit $?; cd ..
 

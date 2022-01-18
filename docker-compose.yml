@@ -65,9 +65,3 @@ ctrlenf:
         - /var/run/docker.sock:/var/run/docker.sock
         - /proc:/host/proc:ro
         - /sys/fs/cgroup/:/host/cgroup/:ro
-
-upgrader:
-    image: neuvector/upgrader
-    container_name: neuvector.upgrader
-    environment:
-        - CLUSTER_JOIN_ADDR=10.1.2.1

@@ -5,14 +5,6 @@ REPO_REL_URL = 10.1.127.12:5000
 STAGE_DIR = stage
 S_DATA_FILE = ubistage.tgz
 
-copy_upd:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
-	mkdir -p ${STAGE_DIR}/etc/neuvector/db
-	#
-	cp neuvector/upgrader/upgrader ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/data/cvedb.compact ${STAGE_DIR}/etc/neuvector/db/cvedb.compact
-	cp neuvector/data/cvedb.regular ${STAGE_DIR}/etc/neuvector/db/cvedb.regular
-
 copy_scan:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
 	mkdir -p ${STAGE_DIR}/etc/neuvector/db
@@ -110,8 +102,6 @@ stage_init:
 	cd neuvector/dp && ../genlic.sh >> ../../${STAGE_DIR}/licenses/neuvector-license.txt
 	cd ../..
 
-stage_upd: stage_init copy_upd
-
 stage_scan: stage_init copy_scan
 
 stage_ctrl: stage_init copy_ctrl
@@ -140,9 +130,6 @@ ctrl_image: pull_fleet_base stage_ctrl
 
 enf_image: pull_fleet_base stage_enf
 	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
-
-updater_image: pull_fleet_base stage_upd
-	docker build -t neuvector/updater -f neuvector/build/Dockerfile.updater .
 
 scanner_image: pull_fleet_base stage_scan
 	docker build -t neuvector/scanner -f neuvector/build/Dockerfile.scanner .
