@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 
 	// criRT "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	criRT "github.com/kubernetes/cri-api/pkg/apis/runtime/v1alpha2"
+	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
