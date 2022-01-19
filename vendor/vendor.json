@@ -2686,12 +2686,6 @@
 			"revisionTime": "2019-02-26T22:47:05Z"
 		},
 		{
-			"checksumSHA1": "VypeBZrGHhXqV1uP670UDOPiykc=",
-			"path": "github.com/kubernetes/cri-api/pkg/apis/runtime/v1alpha2",
-			"revision": "24ae4d4e8b036b885ee1f4930ec2b173eabb28e7",
-			"revisionTime": "2019-08-28T10:09:25Z"
-		},
-		{
 			"checksumSHA1": "OcsTt2xhzMBK0F99Jj219vV62MI=",
 			"path": "github.com/kubernetes/kubernetes/pkg/apis/admission",
 			"revision": "f49fa022dbe63faafd0da106ef7e05a29721d3f1",
@@ -4099,6 +4093,12 @@
 			"path": "k8s.io/apiserver/pkg/util/feature",
 			"revision": "ce7b605bead3751ccde20b7e5b3b53e87336c3b0",
 			"revisionTime": "2018-12-20T04:45:16Z"
+		},
+		{
+			"checksumSHA1": "0kkyTRh7ojY50m469k5ch/Bei4g=",
+			"path": "k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
+			"revision": "cff2db591d04c5ac8ac9f758fa05250a05ca5690",
+			"revisionTime": "2022-01-13T18:30:30Z"
 		},
 		{
 			"checksumSHA1": "+qgXkF+cn2uKNlOXNsLrpxvdBy0=",

@@ -18,8 +18,8 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	log "github.com/sirupsen/logrus"
 
-	criRT "github.com/kubernetes/cri-api/pkg/apis/runtime/v1alpha2"
 	"google.golang.org/grpc"
+	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
@@ -570,8 +570,6 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	return meta, nil
 }
 
-
-
 func (d *containerdDriver) isPrivilegedCri(id string) bool {
 	if d.criClient == nil {
 		return false
@@ -579,14 +577,14 @@ func (d *containerdDriver) isPrivilegedCri(id string) bool {
 
 	type criContainerInfoRes struct {
 		Info struct {
-			Pid int  `json:"pid"`
+			Pid    int `json:"pid"`
 			Config struct {
 				MetaData struct {
-					Name string  `json:"name"`
+					Name string `json:"name"`
 				} `json:"metadata"`
 
 				Image struct {
-					Name string  `json:"image"`
+					Name string `json:"image"`
 				} `json:"image"`
 
 				Linux struct {
@@ -601,7 +599,7 @@ func (d *containerdDriver) isPrivilegedCri(id string) bool {
 	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
 	if cs, err := crt.ContainerStatus(context.Background(), &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true}); err == nil {
 		var res criContainerInfoRes
-		jsonInfo := buildJsonFromMap(cs.GetInfo())	// from map[string]string
+		jsonInfo := buildJsonFromMap(cs.GetInfo()) // from map[string]string
 		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
 			// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
 			return false
