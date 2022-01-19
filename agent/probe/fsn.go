@@ -301,6 +301,11 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 	}
 
 	path := event.Name
+	if len(path) <= root.cLayerLen {
+		// log.WithFields(log.Fields{"path": path, "len": len(path), "headerLength": root.cLayerLen}).Debug()
+		return
+	}
+
 	file := event.Name[root.cLayerLen:]
 	// Op: fsnotify.[Create, Write, Remove, Rename, Chmod]
 	// log.WithFields(log.Fields{"file": file, "op": event.Op}).Debug("FSN:")
