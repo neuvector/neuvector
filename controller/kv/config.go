@@ -42,7 +42,7 @@ var ErrIORead = errors.New("Failed on IO read")
 var ErrIOWrite = errors.New("Failed on IO write")
 var ErrCluster = errors.New("Failed to access cluster")
 var ErrIncompatibleFedRole = errors.New("File is from an incompatible federal-role cluster")
-var ErrIncompatibleFedRoleEx = errors.New("It's not allowed to import from federal-managed cluster to standalone cluster. To override it, select <q>Import configuration as standalone cluster<q> and try again")
+var ErrIncompatibleFedRoleEx = errors.New(`It's not allowed to import from federal-managed cluster to standalone cluster. To override it, select "Import configuration as standalone cluster" and try again`)
 
 type configHelper struct {
 	id          string
@@ -622,7 +622,6 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					var m share.CLUSFedMembership
 					b, _ := json.Marshal(m)
 					value = string(b)
-					log.WithFields(log.Fields{"key": key, "value": value}).Debug("=> test : 1")
 				}
 			}
 
