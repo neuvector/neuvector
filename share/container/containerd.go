@@ -250,7 +250,7 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, t
 	return meta
 }
 
-func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string) bool {
+func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string, bSandBox bool) bool {
 	for _, m := range spec.Mounts {
 		switch m.Type {
 		case "sysfs":
@@ -264,7 +264,10 @@ func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string) bool {
 	}
 
 	// 2nd chance from cri
-	return d.isPrivilegedCri(id)
+	if bSandBox {
+		return d.isPrivilegedPod_CRI(id)
+	}
+	return d.isPrivilegedContainer_CRI(id)
 }
 
 func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
@@ -305,9 +308,14 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 		return nil, err
 	}
 
+	bSandBox := false
+	if kind, ok := info.Labels["io.cri-containerd.kind"]; ok && kind == "sandbox" {
+		bSandBox = true
+	}
+
 	meta := &ContainerMetaExtra{
 		ContainerMeta: *d.getMeta(info, spec, task, attempt),
-		Privileged:    d.isPrivileged(spec, c.ID()),
+		Privileged:    d.isPrivileged(spec, c.ID(), bSandBox),
 		CreatedAt:     info.CreatedAt,
 		StartedAt:     info.CreatedAt,
 		Networks:      utils.NewSet(),
@@ -570,36 +578,58 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	return meta, nil
 }
 
-func (d *containerdDriver) isPrivilegedCri(id string) bool {
+///////
+type criContainerInfoRes struct {
+	Info struct {
+		Pid    int `json:"pid"`
+		Config struct {
+			MetaData struct {
+				Name string `json:"name"`
+			} `json:"metadata"`
+
+			Image struct {
+				Name string `json:"image"`
+			} `json:"image"`
+
+			Linux struct {
+				SecurityContext struct {
+					Privileged bool `json:"privileged"`
+				} `json:"security_context"`
+			} `json:"linux"`
+		} `json:"config"`
+	} `json:"info"`
+}
+
+func (d *containerdDriver) isPrivilegedContainer_CRI(id string) bool {
 	if d.criClient == nil {
 		return false
-	}
-
-	type criContainerInfoRes struct {
-		Info struct {
-			Pid    int `json:"pid"`
-			Config struct {
-				MetaData struct {
-					Name string `json:"name"`
-				} `json:"metadata"`
-
-				Image struct {
-					Name string `json:"image"`
-				} `json:"image"`
-
-				Linux struct {
-					SecurityContext struct {
-						Privileged bool `json:"privileged"`
-					} `json:"security_context"`
-				} `json:"linux"`
-			} `json:"config"`
-		} `json:"info"`
 	}
 
 	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
 	if cs, err := crt.ContainerStatus(context.Background(), &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true}); err == nil {
 		var res criContainerInfoRes
 		jsonInfo := buildJsonFromMap(cs.GetInfo()) // from map[string]string
+		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
+			// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
+			return false
+		}
+
+		// expandable structures
+		// log.WithFields(log.Fields{"info": res.Info}).Debug()
+		return res.Info.Config.Linux.SecurityContext.Privileged
+	}
+	return false
+}
+
+func (d *containerdDriver) isPrivilegedPod_CRI(id string) bool {
+	if d.criClient == nil {
+		return false
+	}
+
+	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
+	if pod, err := crt.PodSandboxStatus(context.Background(), &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true}); err == nil {
+		var res criContainerInfoRes
+		jsonInfo := buildJsonFromMap(pod.GetInfo()) // from map[string]string
 		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
 			// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
 			return false
