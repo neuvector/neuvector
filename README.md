@@ -2,7 +2,7 @@
 
 NeuVector Full Lifecycle Container Security Platform delivers the only cloud-native security with uncompromising end-to-end protection from DevOps vulnerability protection to automated run-time security, and featuring a true Layer 7 container firewall.
 
-A viewable version of docs can be see at https://open-docs.neuvector.com.
+A viewable version of docs can be seen at https://open-docs.neuvector.com.
 
 The container images for the preview version can be pulled from the NeuVector Docker Hub registry at:
 + neuvector/manager.preview:5.0.0-preview.1
