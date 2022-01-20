@@ -11,6 +11,12 @@ The container images for the preview version can be pulled from the NeuVector Do
 + neuvector/scanner.preview:latest
 + neuvector/updater.preview:latest
 
+If deploying with the current NeuVector Helm chart (v1.8.9+), the following changes should be made to values.yml:
+
++ Update the registry to docker.io
++ Update image names/tags to the preview version on Docker hub, as shown above
++ Leave the imagePullSecrets empty
+
 # License
 
 Copyright © 2016-2022 [NeuVector Inc](https://neuvector.com). All Rights Reserved
