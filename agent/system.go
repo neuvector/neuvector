@@ -343,7 +343,7 @@ func systemConfigInternalSubnet(nType cluster.ClusterNotifyType, key string, val
 
 	if reflect.DeepEqual(gInfo.internalSubnets, newInternalSubnets) == false {
 		gInfo.internalSubnets = newInternalSubnets
-		dp.DPCtrlConfigInternalSubnet(newInternalSubnets, true)
+		dp.DPCtrlConfigInternalSubnet(newInternalSubnets)
 	}
 }
 
