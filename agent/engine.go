@@ -933,7 +933,7 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 		}
 
 		if subnetChanged {
-			dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets, true)
+			dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 		}
 
 		if intfAdded || addrChanged {
@@ -1534,7 +1534,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 				}
 
 				if subnetChanged == true {
-					dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets, true)
+					dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 				}
 			}
 		}
@@ -1765,7 +1765,7 @@ func taskStopContainer(id string, pid int) {
 
 	if dp.Connected() {
 		if subnetUpdate == true {
-			dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets, true)
+			dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 		}
 	}
 
@@ -1806,7 +1806,7 @@ func taskDPConnect() {
 	debug := &dp.DPDebug{Categories: gInfo.agentConfig.Debug}
 	dp.DPCtrlConfigAgent(debug)
 
-	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets, true)
+	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 	dp.DPCtrlConfigSpecialIPSubnet(specialSubnets)
 
 	if driver != pipe.PIPE_NOTC {

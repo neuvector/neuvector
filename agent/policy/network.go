@@ -895,7 +895,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	//if wl ip is not in addr map we know that policy is not yet pushed
 	//to DP so we can let action be OPEN
 	if reflect.DeepEqual(e.PolicyAddrMap, newPolicyAddrMap) == false {
-		dp.DPCtrlConfigInternalSubnet(newPolicyAddrMap, false)
+		dp.DPCtrlConfigPolicyAddr(newPolicyAddrMap)
 	}
 	// we don't do policy delete here as it only happens when workload is gone
 	// Policy at DP will be deleted automatically for this case
@@ -941,7 +941,7 @@ func (e *Engine) PushNetworkPolicyToDP() {
 		dp.DPCtrlConfigPolicy(&pInfo.Policy, C.CFG_ADD)
 	}
 	policyAddr := e.GetPolicyAddrMap()
-	dp.DPCtrlConfigInternalSubnet(policyAddr, false)
+	dp.DPCtrlConfigPolicyAddr(policyAddr)
 }
 
 func (e *Engine) PushFqdnInfoToDP() {
