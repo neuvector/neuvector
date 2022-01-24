@@ -508,8 +508,7 @@ func DPCtrlSetFqdnIp(fqdnip *share.CLUSFqdnIp) int {
 	return 0
 }
 
-//internal:true for internalSubnet, false for policy address map
-func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet, internal bool) {
+func DPCtrlConfigPolicyAddr(subnets map[string]share.CLUSSubnet) {
 	data_subnet := make([]DPSubnet, 0, len(subnets))
 	for _, addr := range subnets {
 		if utils.IsIPv4(addr.Subnet.IP) == false {
@@ -528,11 +527,75 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet, internal bo
 	var msg []byte
 
 	num := len(data_subnet)
-	if internal {
-		log.WithFields(log.Fields{"internal_subnet_num": num}).Debug("config internal subnet")
-	} else {
-		log.WithFields(log.Fields{"policy_address_num": num}).Debug("config policy address")
+	log.WithFields(log.Fields{"policy_address_num": num}).Debug("config policy address")
+
+	for num > 0 || first == true {
+		var flag uint = 0
+
+	retry:
+		flag = 0
+		if start == 0 {
+			flag = C.MSG_START
+		}
+		if num <= subnetPerMsg {
+			flag |= C.MSG_END
+			end = start + num
+		} else {
+			end = start + subnetPerMsg
+		}
+		data := DPPolicyAddressCfgReq{
+			PolicyAddrCfg: &DPInternalSubnetCfg{
+				Flag:    flag,
+				Subnets: data_subnet[start:end],
+			},
+		}
+
+		msg, _ = json.Marshal(data)
+		sz := len(msg)
+		if sz > maxMsgSize {
+			// a very rough way to calculate rulesPerMsg
+			newSubnetPerMsg := maxMsgSize / (sz/(end-start) + 1)
+			if newSubnetPerMsg == subnetPerMsg {
+				newSubnetPerMsg--
+			}
+			if newSubnetPerMsg == 0 {
+				log.WithFields(log.Fields{"policy_address": data_subnet[start]}).Error("policy address too large")
+				return
+			}
+			subnetPerMsg = newSubnetPerMsg
+			goto retry
+		}
+
+		if dpSendMsg(msg) == -1 {
+			log.Debug("dpSendMsg error")
+			return
+		}
+		num = num + start - end
+		start = end
+		first = false
 	}
+}
+
+func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet) {
+	data_subnet := make([]DPSubnet, 0, len(subnets))
+	for _, addr := range subnets {
+		if utils.IsIPv4(addr.Subnet.IP) == false {
+			continue
+		}
+		subnet := DPSubnet{
+			IP:   addr.Subnet.IP,
+			Mask: net.IP(addr.Subnet.Mask),
+		}
+		data_subnet = append(data_subnet, subnet)
+	}
+
+	var start, end int = 0, 0
+	var first bool = true
+	var subnetPerMsg int = 600
+	var msg []byte
+
+	num := len(data_subnet)
+	log.WithFields(log.Fields{"internal_subnet_num": num}).Debug("config internal subnet")
 
 	for num > 0 || first == true {
 		var flag uint = 0
@@ -554,18 +617,8 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet, internal bo
 				Subnets: data_subnet[start:end],
 			},
 		}
-		data1 := DPPolicyAddressCfgReq{
-			PolicyAddrCfg: &DPInternalSubnetCfg{
-				Flag:    flag,
-				Subnets: data_subnet[start:end],
-			},
-		}
 
-		if internal {
-			msg, _ = json.Marshal(data)
-		} else {
-			msg, _ = json.Marshal(data1)
-		}
+		msg, _ = json.Marshal(data)
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -574,11 +627,7 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet, internal bo
 				newSubnetPerMsg--
 			}
 			if newSubnetPerMsg == 0 {
-				if internal {
-					log.WithFields(log.Fields{"internal_subnet": data_subnet[start]}).Error("internal subnet too large")
-				} else {
-					log.WithFields(log.Fields{"policy_address": data_subnet[start]}).Error("policy address too large")
-				}
+				log.WithFields(log.Fields{"internal_subnet": data_subnet[start]}).Error("internal subnet too large")
 				return
 			}
 			subnetPerMsg = newSubnetPerMsg
