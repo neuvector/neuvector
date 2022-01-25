@@ -88,25 +88,28 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 }
 
 func getPauseImageRepoDigests() (string, error) {
-	filename := "/proc/1/root/etc/crio/crio.conf" // for Pid==Host mode only
-	dat, err := ioutil.ReadFile(filename)
-	if err != nil {
-		filename = "/proc/1/root/etc/crio/crio.conf.d/00-default.conf"
-		dat, err = ioutil.ReadFile(filename)
-		if err != nil {
-			return "", err
-		}
+	config_files := []string {
+		"/proc/1/root/etc/crio/crio.conf",
+		"/proc/1/root/etc/crio/crio.conf.d/00-default.conf",
+		"/proc/1/root/etc/crio/crio.conf.d/00-default",
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(string(dat)))
-	for scanner.Scan() {
-		// removing whitespaces, tabs and quote
-		line := strings.Replace(scanner.Text(), " ", "", -1)
-		line = strings.Replace(line, "\t", "", -1)
-		// log.WithFields(log.Fields{"line": line}).Debug("CRIO:")
-		if strings.HasPrefix(line, "pause_image=") {
-			line = strings.Replace(line, "\"", "", -1)
-			return line[len("pause_image="):], nil
+	for _, filename := range config_files {
+		dat, err := ioutil.ReadFile(filename)
+		if err != nil {
+			continue
+		}
+
+		scanner := bufio.NewScanner(strings.NewReader(string(dat)))
+		for scanner.Scan() {
+			// removing whitespaces, tabs and quote
+			line := strings.Replace(scanner.Text(), " ", "", -1)
+			line = strings.Replace(line, "\t", "", -1)
+			// log.WithFields(log.Fields{"line": line}).Debug("CRIO:")
+			if strings.HasPrefix(line, "pause_image=") {
+				line = strings.Replace(line, "\"", "", -1)
+				return line[len("pause_image="):], nil
+			}
 		}
 	}
 	return "", fmt.Errorf("no found")
@@ -393,13 +396,16 @@ func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) 
 	}
 
 	metas := make([]*ContainerMeta, 0, len(resp_container.Containers)+len(resp_sandboxes.Items))
-	for _, c := range resp_sandboxes.Items {
-		m, err := d.GetContainer(c.Id)
-		if err != nil {
-			log.WithFields(log.Fields{"sandbox": c.Id, "error": err}).Error("Fail: sandbox")
+	for _, pod := range resp_sandboxes.Items {
+		if runningOnly && pod.State != criRT.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 
+		m, err := d.GetContainer(pod.Id)
+		if err != nil {
+			log.WithFields(log.Fields{"sandbox": pod.Id, "error": err}).Error("Fail: sandbox")
+			continue
+		}
 		if runningOnly && !m.Running {
 			continue
 		}
@@ -593,12 +599,16 @@ func (d *crioDriver) ListContainerIDs() utils.Set {
 
 	// log.WithFields(log.Fields{"sandbox": resp_sandboxes, "containers": resp_containers}).Debug("")
 	for _, c := range resp_containers.Containers {
-		ids.Add(c.Id)
+		if c.GetState() == criRT.ContainerState_CONTAINER_RUNNING {
+			ids.Add(c.Id)
+		}
 	}
 
 	///
-	for _, c := range resp_sandboxes.Items {
-		ids.Add(c.Id)
+	for _, pod := range resp_sandboxes.Items {
+		if pod.GetState() == criRT.PodSandboxState_SANDBOX_READY {
+			ids.Add(pod.Id)
+		}
 	}
 	return ids
 }
