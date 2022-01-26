@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/scan"
