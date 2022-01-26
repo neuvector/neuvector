@@ -1078,7 +1078,7 @@ func updateContainerFamilyTrees(name string) {
 		c, ok := gInfo.activeContainers[cid]
 		gInfoRUnlock()
 		if ok {
-			prober.BuildProcessFamilyGroups(c.id, c.pid)
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false)
 		}
 	}
 }
