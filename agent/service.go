@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/codeskyblue/go-sh"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 

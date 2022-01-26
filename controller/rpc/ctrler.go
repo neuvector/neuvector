@@ -1,11 +1,11 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/neuvector/neuvector/share"
