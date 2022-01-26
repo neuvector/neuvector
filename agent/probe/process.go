@@ -2718,7 +2718,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 	return bPass
 }
 
-func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int) {
+func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod bool) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
 
 	p.lockProcMux()
@@ -2726,8 +2726,23 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int) {
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		log.WithFields(log.Fields{"id": id}).Error("SHD: Unknown ID")
-		return
+		if bSandboxPod {
+			// some reused sandbox will not have a new prcesses
+			c = &procContainer {
+				id: id,
+				children: utils.NewSet(rootPid),
+				outsider: utils.NewSet(), // empty
+				rootPid:  rootPid,
+				newBorn:  0,
+				userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
+				portsMap: make(map[osutil.SocketInfo]*procApp),
+				fInfo:    make(map[string]*fileInfo),
+			}
+			p.containerMap[id] = c
+		} else {
+			log.WithFields(log.Fields{"id": id}).Error("SHD: Unknown ID")
+			return
+		}
 	}
 
 	c.rootPid = rootPid
