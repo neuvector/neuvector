@@ -7,7 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 	"google.golang.org/grpc"
 
 	"github.com/neuvector/neuvector/share"

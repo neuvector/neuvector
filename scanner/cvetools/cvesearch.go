@@ -13,7 +13,7 @@ import (
 	"github.com/coreos/clair/utils/types"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/neuvector/neuvector/scanner/common"
 	"github.com/neuvector/neuvector/scanner/detectors"
