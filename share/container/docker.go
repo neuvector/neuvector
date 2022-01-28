@@ -103,19 +103,19 @@ func (d *dockerDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaEx
 	return getDevice(id, d, d.sys)
 }
 
-func (d *dockerDriver) ListContainerIDs() utils.Set {
+func (d *dockerDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	set := utils.NewSet()
 
 	containers, err := d.client.ListContainers(true, false, "")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in listing containers")
-		return set
+		return set, nil
 	}
 
 	for _, c := range containers {
 		set.Add(c.Id)
 	}
-	return set
+	return set, nil
 }
 
 func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {

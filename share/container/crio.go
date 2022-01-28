@@ -581,36 +581,46 @@ func (d *crioDriver) GetImageFile(id string) (io.ReadCloser, error) {
 	return nil, ErrMethodNotSupported
 }
 
-func (d *crioDriver) ListContainerIDs() utils.Set {
+func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ids := utils.NewSet()
+	stops := utils.NewSet()
 
 	crt := criRT.NewRuntimeServiceClient(d.criClient)
 	resp_containers, err := crt.ListContainers(context.Background(), &criRT.ListContainersRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
-		return ids
+		return ids, nil
 	}
 
 	resp_sandboxes, err := crt.ListPodSandbox(context.Background(), &criRT.ListPodSandboxRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
-		return ids
+		return ids, nil
 	}
 
 	// log.WithFields(log.Fields{"sandbox": resp_sandboxes, "containers": resp_containers}).Debug("")
 	for _, c := range resp_containers.Containers {
-		if c.GetState() == criRT.ContainerState_CONTAINER_RUNNING {
+		switch c.GetState() {
+		case criRT.ContainerState_CONTAINER_EXITED:
+			stops.Add(c.Id)
+			ids.Add(c.Id)
+		case criRT.ContainerState_CONTAINER_UNKNOWN:// do nothing
+		default:	// criRT.ContainerState_CONTAINER_RUNNING, criRT.ContainerState_CONTAINER_CREATED
 			ids.Add(c.Id)
 		}
 	}
 
 	///
 	for _, pod := range resp_sandboxes.Items {
-		if pod.GetState() == criRT.PodSandboxState_SANDBOX_READY {
+		switch pod.GetState() {
+		case criRT.PodSandboxState_SANDBOX_READY:
+			ids.Add(pod.Id)
+		case criRT.PodSandboxState_SANDBOX_NOTREADY:
+			stops.Add(pod.Id)
 			ids.Add(pod.Id)
 		}
 	}
-	return ids
+	return ids, stops
 }
 
 func (d *crioDriver) GetNetworkEndpoint(netName, container, epName string) (*NetworkEndpoint, error) {

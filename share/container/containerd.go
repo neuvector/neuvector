@@ -372,19 +372,19 @@ func (d *containerdDriver) GetImageFile(id string) (io.ReadCloser, error) {
 	return nil, ErrMethodNotSupported
 }
 
-func (d *containerdDriver) ListContainerIDs() utils.Set {
+func (d *containerdDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ids := utils.NewSet()
 
 	containers, err := d.client.Containers(context.Background())
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to list containers")
-		return ids
+		return ids, nil
 	}
 
 	for _, c := range containers {
 		ids.Add(c.ID())
 	}
-	return ids
+	return ids, nil
 }
 
 func (d *containerdDriver) GetNetworkEndpoint(netName, container, epName string) (*NetworkEndpoint, error) {
