@@ -37,23 +37,28 @@ import (
 const kubeWatchRetry = time.Second * 5
 
 const (
-	K8sAllApiGroup               = "*"
-	K8sAdmApiGroup               = "admissionregistration.k8s.io"
-	K8sCrdApiGroup               = "apiextensions.k8s.io"
-	K8sAllApiVersion             = "*"
-	K8sApiVersionV1              = "v1"
-	K8sApiVersionV1Beta1         = "v1beta1"
-	K8sApiVersionV1Beta2         = "v1beta2"
-	K8sResCronjobs               = "cronjobs"
-	K8sResDaemonsets             = "daemonsets"
-	K8sResDeployments            = "deployments"
-	K8sResDeploymentConfigs      = "deploymentconfigs"
-	K8sResJobs                   = "jobs"
-	K8sResPods                   = "pods"
-	K8sResReplicationControllers = "replicationcontrollers"
-	K8sResReplicasets            = "replicasets"
-	K8sResServices               = "services"
-	K8sResStatefulSets           = "statefulsets"
+	K8sAllApiGroup                = "*"
+	K8sAdmApiGroup                = "admissionregistration.k8s.io"
+	K8sCrdApiGroup                = "apiextensions.k8s.io"
+	K8sAllApiVersion              = "*"
+	K8sApiVersionV1               = "v1"
+	K8sApiVersionV1Beta1          = "v1beta1"
+	K8sApiVersionV1Beta2          = "v1beta2"
+	K8sResCronjobs                = "cronjobs"
+	K8sResDaemonsets              = "daemonsets"
+	K8sResDeployments             = "deployments"
+	K8sResDeploymentConfigs       = "deploymentconfigs"
+	K8sResJobs                    = "jobs"
+	K8sResPods                    = "pods"
+	K8sResNodes                   = "nodes"
+	K8sResReplicationControllers  = "replicationcontrollers"
+	K8sResReplicasets             = "replicasets"
+	K8sResServices                = "services"
+	K8sResStatefulSets            = "statefulsets"
+	K8sResRbacRoles               = "roles.rbac.authorization.k8s.io"
+	K8sResRbacClusterRoles        = "clusterroles.rbac.authorization.k8s.io"
+	K8sResRbacRolebindings        = "rolebindings.rbac.authorization.k8s.io"
+	K8sResRbacClusterRolebindings = "clusterrolebindings.rbac.authorization.k8s.io"
 )
 
 const (
@@ -62,10 +67,24 @@ const (
 )
 
 const (
-	NvAppRole            = "neuvector-binding-app"
-	NvAppRoleBinding     = "neuvector-binding-app"
-	NvAdmCtrlRole        = "neuvector-binding-admission"
-	NvAdmCtrlRoleBinding = "neuvector-binding-admission"
+	NvOperatorsRole         = "neuvector-binding-co"
+	NvOperatorsRoleBinding  = "neuvector-binding-co"
+	NvAppRole               = "neuvector-binding-app"
+	NvAppRoleBinding        = "neuvector-binding-app"
+	NvRbacRole              = "neuvector-binding-rbac"
+	NvRbacRoleBinding       = "neuvector-binding-rbac"
+	NvAdmCtrlRole           = "neuvector-binding-admission"
+	NvAdmCtrlRoleBinding    = "neuvector-binding-admission"
+	NvCrdRole               = "neuvector-binding-customresourcedefinition"
+	NvCrdRoleBinding        = "neuvector-binding-customresourcedefinition"
+	NvCrdSecRuleRole        = "neuvector-binding-nvsecurityrules"
+	NvCrdSecRoleBinding     = "neuvector-binding-nvsecurityrules"
+	NvCrdAdmCtrlRole        = "neuvector-binding-nvadmissioncontrolsecurityrules"
+	NvCrdAdmCtrlRoleBinding = "neuvector-binding-nvadmissioncontrolsecurityrules"
+	NvCrdWafRole            = "neuvector-binding-nvwafsecurityrules"
+	NvCrdWafRoleBinding     = "neuvector-binding-nvwafsecurityrules"
+	NvAdminRoleBinding      = "neuvector-admin"
+	NvViewRoleBinding       = "neuvector-binding-view"
 )
 
 const (
@@ -225,6 +244,8 @@ var StatusResForOpsSettings = []NvAdmRegRuleSetting{
 
 var k8sVersionMajor int
 var k8sVersionMinor int
+
+var cacheEventFunc common.CacheEventFunc
 
 const (
 	k8sRscTypeRole            = "k8s-role"
@@ -1215,7 +1236,7 @@ func getVersion(url string) (string, error) {
 func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error) {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
-	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, RscTypeValidatingWebhookConfiguration,
+	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdWafSecurityRule,
 		RscTypeNode:
 		return d.getResource(rt, namespace, name)
@@ -1430,6 +1451,22 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 func AdjustAdmResForOC() {
 	admResForCreateSet.Add(K8sResDeploymentConfigs)
 	admResForUpdateSet.Add(K8sResDeploymentConfigs)
+	if roleInfo, ok := nvClusterRoles[NvRbacRole]; ok {
+		rule := &k8sClusterRoleRuleInfo{
+			apiGroup:  "image.openshift.io",
+			resources: utils.NewSet(ocResImageStreams),
+			verbs:     rbacRoleVerbs,
+		}
+		roleInfo.rules = append(roleInfo.rules, rule)
+	}
+	nvClusterRoles[NvOperatorsRole] = &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
+		&k8sClusterRoleRuleInfo{
+			apiGroup:  "config.openshift.io",
+			resources: utils.NewSet(clusterOperators),
+			verbs:     utils.NewSet("get", "list"),
+		},
+	}}
+	nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
 }
 
 func AdjustAdmWebhookName() {

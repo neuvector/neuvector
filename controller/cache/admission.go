@@ -1725,21 +1725,6 @@ func (m CacheMethod) IsAdmControlEnabled(uri *string) (bool, string, int, string
 	return false, share.AdmCtrlModeMonitor, nvsysadmission.AdmCtrlActionAllow, "", ""
 }
 
-func (m CacheMethod) CacheAdmCtrlEvent(ev share.TLogEvent, result *nvsysadmission.AdmResult) error {
-	// any controller that handles admission control request could save result to queue
-	if ev >= share.CLUSEvAdmCtrlK8sConfigured && ev <= share.CLUSEvAdmCtrlK8sConfigFailed {
-		alog := share.CLUSEventLog{
-			Event:      ev,
-			Msg:        result.Msg,
-			User:       result.User,
-			ReportedAt: time.Now().UTC(),
-		}
-		cctx.EvQueue.Append(&alog)
-	}
-
-	return nil
-}
-
 func (m CacheMethod) UpdateLocalAdmCtrlStats(category string, stats int) error {
 	if category == admission.AdmRuleCatK8s {
 		switch stats {

@@ -1172,6 +1172,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/debug/registry/image/*",
 			"v1/session/summary",
 			"v1/file_monitor_file",
+			"v1/system/usage",
+			"v1/system/rbac",
 		},
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/config",
@@ -1202,6 +1204,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/controller",
 			"v1/controller/*",
 			"v1/controller/*/config",
+			"v1/controller/*/stats",
 			"v1/controller/*/counter",
 			"v1/enforcer",
 			"v1/enforcer/*",
@@ -1307,7 +1310,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/user_role/*",
 			"v1/user",
 			"v1/user/*",
-			"v1/selfuser", // Any user is allowed to use the token to retrieve his/her own user info. temporarily given PERM_AUTHORIZATION for retrieving caller's user info
+			"v1/selfuser", // Any user is allowed to use the login token to retrieve his/her own user info. temporarily given PERM_AUTHORIZATION for retrieving caller's user info
 		},
 		CONST_API_PWD_PROFILE: []string{
 			"v1/password_profile",
@@ -1320,6 +1323,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/config",
 			"v1/system/license",
 			"v1/system/summary",
+			"v1/internal/system",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/join_token",
@@ -1363,6 +1367,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/registry/*/test",
 		},
 		CONST_API_CICD_SCAN: []string{
+			"v1/scan/result/repository",
 			"v1/scan/repository",
 		},
 		CONST_API_GROUP: []string{
@@ -1405,6 +1410,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license/update",
+			"v1/system/config/webhook",
 		},
 		CONST_API_IBMSA: []string{
 			"v1/partner/ibm_sa/*/setup/*",
@@ -1488,6 +1494,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/config",
+			"v1/system/config/webhook/*",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/cluster/*/**",
@@ -1546,6 +1553,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license",
+			"v1/system/config/webhook/*",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/cluster/*",

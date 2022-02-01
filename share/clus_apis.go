@@ -1197,6 +1197,7 @@ const (
 	CLUSEvAuthUserPwdResetByAdmin // user password reset not by the owner user
 	CLUSEvMemoryPressureAgent
 	CLUSEvMemoryPressureController
+	CLUSEvK8sNvRBAC
 )
 
 const (

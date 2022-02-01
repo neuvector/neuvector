@@ -600,6 +600,7 @@ func CompileUriPermitsMapping() {
 				"v1/session/summary",
 				"v1/file_monitor_file",
 				"v1/system/usage",
+				"v1/system/rbac",
 			},
 			CONST_API_RT_SCAN: []string{
 				"v1/scan/config",

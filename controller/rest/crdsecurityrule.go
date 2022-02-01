@@ -1100,8 +1100,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 		}
 		skip, err := admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
 		if !skip {
-			var id share.TLogEvent
-			admResult := &nvsysadmission.AdmResult{}
+			alog := share.CLUSEventLog{ReportedAt: time.Now().UTC()}
 			if err == nil {
 				var msgState string
 				if cconf.Enable {
@@ -1109,13 +1108,13 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 				} else {
 					msgState = "disabled"
 				}
-				id = share.CLUSEvAdmCtrlK8sConfigured
-				admResult.Msg = fmt.Sprintf("Admission control is %s.", msgState)
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigured
+				alog.Msg = fmt.Sprintf("Admission control is %s.", msgState)
 			} else {
-				id = share.CLUSEvAdmCtrlK8sConfigFailed
-				admResult.Msg = "Failed to configure admission control state."
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
+				alog.Msg = "Failed to configure admission control state."
 			}
-			cacher.CacheAdmCtrlEvent(id, admResult)
+			evqueue.Append(&alog)
 		}
 		if err != nil {
 			status, code, _, _ := setAdmCtrlStateInCluster(&origConf.Enable, &origConf.Mode, &origConf.DefaultAction, &origConf.AdmClientMode, &origConf.FailurePolicy, origConf.CfgType)

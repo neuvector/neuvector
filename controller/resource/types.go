@@ -33,6 +33,10 @@ const (
 	RscTypeCrdClusterSecurityRule         = "nvclustersecurityrules"
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
+	RscTypeRbacRoles                      = "roles"
+	RscTypeRbacClusterRoles               = "clusterroles"
+	RscTypeRbacRolebindings               = "rolebindings"
+	RscTypeRbacClusterRolebindings        = "clusterrolebindings"
 )
 
 const (

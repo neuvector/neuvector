@@ -164,7 +164,6 @@ type CacheInterface interface {
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps) (*nvsysadmission.AdmResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
-	CacheAdmCtrlEvent(ev share.TLogEvent, result *nvsysadmission.AdmResult) error
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()
 	FlushAdmCtrlStats() error
