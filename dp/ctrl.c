@@ -2211,7 +2211,8 @@ static int dp_ctrl_bld_dlp_update_ep(json_t *msg)
     return ret;
 }
 
-uint8_t g_xff_enabled = 1;
+//to avoid false positive implicit violation, set g_xff_enabled default to 0
+uint8_t g_xff_enabled = 0;
 
 static int dp_ctrl_sys_conf(json_t *msg)
 {

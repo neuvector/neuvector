@@ -113,7 +113,8 @@ type localSystemInfo struct {
 
 var defaultPolicyMode string = share.PolicyModeLearn
 var defaultTapProxymesh bool = true
-var defaultXffEnabled bool = true
+//to avoid false positive implicit violation on dp during upgrade, set XFF default to disabled
+var defaultXffEnabled bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
