@@ -44,6 +44,8 @@ type RPCEndpoint struct {
 	RPCServerPort uint16
 }
 
+type CacheEventFunc func(ev share.TLogEvent, msg string) error
+
 var ErrObjectNotFound error = errors.New("Object not found")
 var ErrObjectAccessDenied error = errors.New("Access denied")
 var ErrObjectExists error = errors.New("Object exists")
@@ -276,6 +278,7 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvGroupAutoRemove:             {api.EventNameGroupAutoRemove, api.EventCatGroup, api.LogLevelINFO},
 	share.CLUSEvMemoryPressureAgent:         {api.EventNameMemoryPressureAgent, api.EventCatAgent, api.LogLevelWARNING},
 	share.CLUSEvMemoryPressureController:    {api.EventNameMemoryPressureController, api.EventCatController, api.LogLevelWARNING},
+	share.CLUSEvK8sNvRBAC:                   {api.EventNameK8sNvRBAC, api.EventCatConfig, api.LogLevelWARNING},
 }
 
 type LogIncidentInfo struct {

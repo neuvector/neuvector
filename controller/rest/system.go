@@ -1479,6 +1479,29 @@ func handlerMeterList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get meter list")
 }
 
+func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	emptySlice := make([]string, 0)
+	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
+		ClusterRoleErrors:        emptySlice,
+		ClusterRoleBindingErrors: emptySlice,
+		RoleBindingErrors:        emptySlice,
+	}
+	if k8sPlatform {
+		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleBindingErrors =
+			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, false)
+	}
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")
+}
+
 func configLog(ev share.TLogEvent, login *loginSession, msg string) {
 	clog := share.CLUSEventLog{
 		Event:          ev,

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
@@ -28,6 +27,7 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 var Host share.CLUSHost = share.CLUSHost{
@@ -551,12 +551,22 @@ func main() {
 	scanner = scan.Init(&sctx, Ctrler.Leader)
 	scan.ScannerChangeNotify(Ctrler.Leader)
 
+	if platform == share.PlatformKubernetes {
+		// k8s rbac watcher won't know anything about non-existing resources
+		resource.GetNvServiceAccount(cache.CacheEvent)
+
+		clusterRoleErrors, clusterRoleBindingErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, true)
+		if len(clusterRoleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {
+			msgs := clusterRoleErrors
+			msgs = append(msgs, clusterRoleBindingErrors...)
+			msgs = append(msgs, roleBindingErrors...)
+			cache.CacheEvent(share.CLUSEvK8sNvRBAC, strings.Join(msgs, "\n"))
+		}
+	}
+
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
 	orchConnector.Start()
-	if dev.Host.Platform == share.PlatformKubernetes && dev.Host.Flavor == share.FlavorOpenShift {
-		resource.AdjustAdmResForOC()
-	}
 
 	// GRPC should be started after cacher as the handler are cache functions
 	grpcServer, _ = startGRPCServer(uint16(*grpcPort))

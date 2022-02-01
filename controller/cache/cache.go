@@ -21,7 +21,6 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/ruleid"
@@ -1852,23 +1851,20 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 		},
 	}
 
-	var admResult *nvsysadmission.AdmResult
 	if isLeader() && (!enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo))) {
 		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name)
 		if skip && err == nil {
 			// meaning nv resource in k8s sync with nv's cluster status. do nothing
 		} else if !skip {
-			var id share.TLogEvent
-			admResult = &nvsysadmission.AdmResult{}
+			alog := share.CLUSEventLog{ReportedAt: time.Now().UTC()}
 			if err == nil {
-				id = share.CLUSEvAdmCtrlK8sConfigured
-				admResult.Msg = fmt.Sprintf("Admission control is re-configured because of mismatched Kubernetes resource configuration found (%s).", config.Name)
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigured
+				alog.Msg = fmt.Sprintf("Admission control is re-configured because of mismatched Kubernetes resource configuration found (%s).", config.Name)
 			} else {
-				id = share.CLUSEvAdmCtrlK8sConfigFailed
-				admResult.Msg = fmt.Sprintf("Failed to re-configure admission control after mismatched Kubernetes resource configuration found (%s).", config.Name)
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
+				alog.Msg = fmt.Sprintf("Failed to re-configure admission control after mismatched Kubernetes resource configuration found (%s).", config.Name)
 			}
-			var cacher CacheMethod
-			cacher.CacheAdmCtrlEvent(id, admResult)
+			cctx.EvQueue.Append(&alog)
 		}
 	}
 }
@@ -1920,6 +1916,21 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 
 func Close() {
 	atomic.StoreInt32(&exitingFlag, 1)
+}
+
+func CacheEvent(ev share.TLogEvent, msg string) error {
+	if isLeader() {
+		log := share.CLUSEventLog{
+			Event:          ev,
+			ReportedAt:     time.Now().UTC(),
+			ControllerID:   localDev.Ctrler.ID,
+			ControllerName: localDev.Ctrler.Name,
+			Msg:            msg,
+		}
+		cctx.EvQueue.Append(&log)
+	}
+
+	return nil
 }
 
 ////// event handlers for enforcer's kv dispatcher

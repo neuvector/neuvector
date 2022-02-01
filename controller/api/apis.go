@@ -43,7 +43,7 @@ const RESTErrFailRegistryScan int = 27
 const RESTErrFailKubernetesApi int = 28
 const RESTErrProxyError int = 29 // Not used
 const RESTErrAdmCtrlUnSupported int = 30
-const RESTErrClusterRoleForAdmCtrl int = 31
+const RESTErrK8sNvRBAC int = 31
 const RESTErrWebhookSvcForAdmCtrl int = 32
 const RESTErrNoUpdatePermission int = 33
 const RESTErrK8sApiSrvToWebhook int = 34
@@ -1936,9 +1936,9 @@ type RESTScanPkgReportData struct {
 const LicenseIDTypeHost string = "host"
 
 type RESTLicenseRequest struct {
-	Name              string `json:"name"`
-	Email             string `json:"email"`
-	Phone             string `json:"phone"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
 }
 
 type RESTLicenseRequestData struct {
@@ -1946,16 +1946,16 @@ type RESTLicenseRequestData struct {
 }
 
 type RESTLicenseInfo struct {
-	Name              string `json:"name"`
-	Email             string `json:"email"`
-	Phone             string `json:"phone"`
-	ID                string `json:"id,omitempty"`
-	IDType            string `json:"id_type,omitempty"`
-	InstallationID    string `json:"installation_id"` // nv installation id
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Phone          string `json:"phone"`
+	ID             string `json:"id,omitempty"`
+	IDType         string `json:"id_type,omitempty"`
+	InstallationID string `json:"installation_id"` // nv installation id
 }
 
 type RESTLicenseShow struct {
-	Info       *RESTLicenseInfo `json:"info"`
+	Info *RESTLicenseInfo `json:"info"`
 }
 
 type RESTLicenseShowData struct {
@@ -3035,4 +3035,10 @@ type RESTPolicyPromoteRequestData struct {
 
 type RESTAdmCtrlPromoteRequestData struct {
 	Request *RESTAdmCtrlPromoteRequest `json:"request"`
+}
+
+type RESTK8sNvRbacStatus struct {
+	ClusterRoleErrors        []string `json:"clusterrole_errors"`
+	ClusterRoleBindingErrors []string `json:"clusterrolebinding_errors"`
+	RoleBindingErrors        []string `json:"rolebinding_errors"`
 }

@@ -18,8 +18,6 @@ import (
 	apiv1beta1 "github.com/ericchiang/k8s/apis/admissionregistration/v1beta1"
 	corev1 "github.com/ericchiang/k8s/apis/core/v1"
 	metav1 "github.com/ericchiang/k8s/apis/meta/v1"
-	rbacv1 "github.com/ericchiang/k8s/apis/rbac/v1"
-	rbacv1b1 "github.com/ericchiang/k8s/apis/rbac/v1beta1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -731,85 +729,6 @@ func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) 
 	log.WithFields(log.Fields{"namespace": resource.NvAdmSvcNamespace, "service": svcname}).Debug("NodePort not found")
 
 	return err, svcInfo
-}
-
-// https://kubernetes.io/docs/reference/using-api/deprecation-guide/
-// The rbac.authorization.k8s.io/v1beta1 API version of ClusterRole, ClusterRoleBinding, Role, and RoleBinding is no longer served as of v1.22.
-func VerifyAdmClusterRole() (bool, error) {
-	roles := map[string]utils.Set{ // k8s clusterrole to resources mapping
-		resource.NvAdmCtrlRole: utils.NewSet(resource.RscNameMutatingWebhookConfigurations, resource.RscNameValidatingWebhookConfigurations),
-		resource.NvAppRole:     utils.NewSet(resource.RscNamespaces, resource.RscServices),
-	}
-
-	for role, rscsToCheck := range roles {
-		obj, err := global.ORCH.GetResource(resource.K8sRscTypeClusRole, k8s.AllNamespaces, role)
-		if err != nil {
-			log.WithFields(log.Fields{"role": role, "err": err}).Error("resource no found")
-			return false, fmt.Errorf("Cannot find clusterrole %s(%s). ", role, err.Error())
-		} else {
-			var err error
-			if r, ok := obj.(*rbacv1.ClusterRole); ok && r != nil {
-				err = resource.DeduceAdmCtrlRoleRules(rscsToCheck, r.GetRules())
-			} else if r, ok := obj.(*rbacv1b1.ClusterRole); ok && r != nil {
-				err = resource.DeduceAdmCtrlRoleRules(rscsToCheck, r.GetRules())
-			} else {
-				err = fmt.Errorf("Unknown object type for clusterrole %s. ", role)
-			}
-			if err != nil {
-				log.WithFields(log.Fields{"role": role, "error": err}).Error()
-				return false, err
-			}
-		}
-	}
-
-	return true, nil
-}
-
-func verifyAdmClusterRoleBinding(rolename, rolebindingname string) (bool, error) {
-	obj, err := global.ORCH.GetResource(resource.K8sRscTypeClusRoleBinding, k8s.AllNamespaces, rolebindingname)
-	if err != nil {
-		err = fmt.Errorf("Cannot find clusterrolebinding %s(%s). ", rolebindingname, err.Error())
-	} else {
-		if rb, ok := obj.(*rbacv1.ClusterRoleBinding); ok && rb != nil {
-			role := rb.GetRoleRef()
-			if role != nil && role.Name != nil && *role.Name == rolename {
-				for _, s := range rb.GetSubjects() {
-					// do not check serviceAccountName in case customer changes it to value other than "default"
-					if s.GetKind() == "ServiceAccount" && s.GetNamespace() == resource.NvAdmSvcNamespace {
-						return true, nil
-					}
-				}
-			}
-		} else if rb, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok && rb != nil {
-			role := rb.GetRoleRef()
-			if role != nil && role.Name != nil && *role.Name == rolename {
-				for _, s := range rb.GetSubjects() {
-					// do not check serviceAccountName in case customer changes it to value other than "default"
-					if s.GetKind() == "ServiceAccount" && s.GetNamespace() == resource.NvAdmSvcNamespace {
-						return true, nil
-					}
-				}
-			}
-		} else {
-			err = fmt.Errorf("Unknown object type for clusterrolebinding %s. ", rolebindingname)
-		}
-	}
-	log.WithFields(log.Fields{"rolebinding": rolebindingname, "err": err}).Error()
-
-	return false, err
-}
-
-func VerifyAdmClusterRoleBinding() (bool, error) {
-	roleBindingMapping := map[string]string{
-		resource.NvAdmCtrlRole: resource.NvAdmCtrlRoleBinding,
-		resource.NvAppRole:     resource.NvAppRoleBinding,
-	}
-	for rolename, rolebindingname := range roleBindingMapping {
-		if ok, err := verifyAdmClusterRoleBinding(rolename, rolebindingname); !ok {
-			return false, err
-		}
-	}
-	return true, nil
 }
 
 func TestAdmWebhookConnection(svcname string) (int, error) {

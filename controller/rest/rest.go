@@ -114,7 +114,7 @@ var restErrMessage = []string{
 	api.RESTErrFailRegistryScan:      "Fail to scan registry",
 	api.RESTErrFailKubernetesApi:     "Kubernetes API error",
 	api.RESTErrAdmCtrlUnSupported:    "Admission control is not supported on non-Kubernetes environment",
-	api.RESTErrClusterRoleForAdmCtrl: "Kubernetes clusterrole/clusterrolebinding required for NeuVector is not configured correctly",
+	api.RESTErrK8sNvRBAC:             "Kubernetes clusterrole/clusterrolebinding required for NeuVector is not configured correctly",
 	api.RESTErrWebhookSvcForAdmCtrl:  "The neuvector-svc-admission-webhook service required for NeuVector Admission Control is not configured correctly",
 	api.RESTErrNoUpdatePermission:    "NeuVector controller doesn't have UPDATE permission for service resource",
 	api.RESTErrK8sApiSrvToWebhook:    "Failed to receive a request from Kube-apiserver. Please try different client mode",
@@ -1283,6 +1283,7 @@ func StartRESTServer() {
 	r.GET("/v1/system/usage", handlerSystemUsage)             // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
 	r.GET("/v1/system/config", handlerSystemGetConfig) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
+	r.GET("/v1/system/rbac", handlerSystemGetRBAC)
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
 	r.PATCH("/v1/system/config/webhook/:name", handlerSystemWebhookConfig)  // supported 'scope' query parameter values: "fed"/"local"(default).

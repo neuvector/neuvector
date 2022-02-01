@@ -289,12 +289,14 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	if k8sPlatform {
-		var ok bool
-		if ok, err = admission.VerifyAdmClusterRole(); ok {
-			_, err = admission.VerifyAdmClusterRoleBinding()
+		var errs []string
+		k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
+		if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
+			errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
 		}
-		if err != nil {
-			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrClusterRoleForAdmCtrl, err.Error())
+		if len(errs) > 0 {
+			msg := strings.Join(errs, "<p>")
+			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
 			return
 		}
 	}
@@ -360,12 +362,14 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 	}
 
-	var ok bool
-	if ok, err = admission.VerifyAdmClusterRole(); ok {
-		_, err = admission.VerifyAdmClusterRoleBinding()
+	var errs []string
+	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
+	if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
+		errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
 	}
-	if err != nil {
-		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrClusterRoleForAdmCtrl, err.Error())
+	if len(errs) > 0 {
+		msg := strings.Join(errs, "<p>")
+		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
 		return
 	}
 	if err, svcInfo := admission.GetValidateWebhookSvcInfo(resource.NvAdmSvcName); err != nil {
@@ -485,16 +489,15 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 		skip, err := admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
 		if !skip {
-			var id share.TLogEvent
-			admResult := &nvsysadmission.AdmResult{}
+			alog := share.CLUSEventLog{ReportedAt: time.Now().UTC()}
 			if err == nil {
-				id = share.CLUSEvAdmCtrlK8sConfigured
-				admResult.Msg = fmt.Sprintf("Admission control is %s.", msgState)
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigured
+				alog.Msg = fmt.Sprintf("Admission control is %s.", msgState)
 			} else {
-				id = share.CLUSEvAdmCtrlK8sConfigFailed
-				admResult.Msg = "Failed to configure admission control state."
+				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
+				alog.Msg = "Failed to configure admission control state."
 			}
-			cacher.CacheAdmCtrlEvent(id, admResult)
+			evqueue.Append(&alog)
 		}
 		if err == nil {
 			messages := make([]string, 0, 3)
@@ -1188,13 +1191,14 @@ func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	var ok bool
-	var err error
-	if ok, err = admission.VerifyAdmClusterRole(); ok {
-		_, err = admission.VerifyAdmClusterRoleBinding()
+	var errs []string
+	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
+	if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
+		errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
 	}
-	if err != nil {
-		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrClusterRoleForAdmCtrl, err.Error())
+	if len(errs) > 0 {
+		msg := strings.Join(errs, "<p>")
+		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
 		return
 	} else {
 		if result, err := admission.TestAdmWebhookConnection(resource.NvAdmSvcName); result != admission.TestSucceeded {

@@ -4,6 +4,11 @@ import (
 	metav1 "github.com/ericchiang/k8s/apis/meta/v1"
 )
 
+const (
+	ocResImageStreams = "imagestreams"
+	clusterOperators  = "clusteroperators"
+)
+
 type ocImageStreamTag struct {
 	Name             string            `json:"name,omitempty"`
 	Annotations      map[string]string `json:"annotations"`
