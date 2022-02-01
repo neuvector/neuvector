@@ -782,6 +782,14 @@ func createDefaultXffSetting() {
 	}
 }
 
+func EnforceXffEnabledSetting() {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	if cfg.XffEnabled {
+		clusHelper.PutSystemConfigRev(cfg, rev)
+	}
+}
+
 func createDefaultVulnerabilityProfile() {
 	key := share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName)
 	profile := &share.CLUSVulnerabilityProfile{
