@@ -343,18 +343,8 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 			HostIPC:     spec.HostIPC,
 		}
 
-		if len(c.Resources.Limits) > 0 {
-			if q, ok := c.Resources.Limits[corev1.ResourceCPU]; ok {
-				if v := q.Value(); v < 9223372036854775 {
-					admContainerInfo.CpuLimits = float64(q.MilliValue()) / 1000
-				} else {
-					admContainerInfo.CpuLimits = float64(v)
-				}
-			}
-			if q, ok := c.Resources.Limits[corev1.ResourceMemory]; ok {
-				admContainerInfo.MemoryLimits = q.Value()
-			}
-		}
+		cpuRequestSpecified := false
+		memoryRequestSpecified := false
 		if len(c.Resources.Requests) > 0 {
 			if q, ok := c.Resources.Requests[corev1.ResourceCPU]; ok {
 				if v := q.Value(); v < 9223372036854775 {
@@ -362,9 +352,30 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 				} else {
 					admContainerInfo.CpuRequests = float64(v)
 				}
+				cpuRequestSpecified = true
 			}
 			if q, ok := c.Resources.Requests[corev1.ResourceMemory]; ok {
 				admContainerInfo.MemoryRequests = q.Value()
+				memoryRequestSpecified = true
+			}
+		}
+
+		if len(c.Resources.Limits) > 0 {
+			if q, ok := c.Resources.Limits[corev1.ResourceCPU]; ok {
+				if v := q.Value(); v < 9223372036854775 {
+					admContainerInfo.CpuLimits = float64(q.MilliValue()) / 1000
+				} else {
+					admContainerInfo.CpuLimits = float64(v)
+				}
+				if !cpuRequestSpecified {
+					admContainerInfo.CpuRequests = admContainerInfo.CpuLimits
+				}
+			}
+			if q, ok := c.Resources.Limits[corev1.ResourceMemory]; ok {
+				admContainerInfo.MemoryLimits = q.Value()
+				if !memoryRequestSpecified {
+					admContainerInfo.MemoryRequests = admContainerInfo.MemoryLimits
+				}
 			}
 		}
 
