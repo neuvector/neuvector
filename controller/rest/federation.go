@@ -1476,6 +1476,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	} else {
+		cfg := cacher.GetSystemConfig(acc)
 		cacheRestInfo, cacheUseProxy, cacheProxy := cacher.GetFedLocalRestInfo(acc)
 		if req.JointRestInfo != nil {
 			restInfo = *req.JointRestInfo
@@ -1484,13 +1485,28 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 		}
 		if req.UseProxy != nil {
 			useProxy = *req.UseProxy
-			if useProxy != "" {
-				proxyInfo = cacheProxy
+			if useProxy == "http" {
+				proxyInfo = share.CLUSProxy{
+					Enable:   cfg.RegistryHttpProxyEnable,
+					URL:      cfg.RegistryHttpProxy.URL,
+					Username: cfg.RegistryHttpProxy.Username,
+					Password: cfg.RegistryHttpProxy.Password,
+				}
+			} else if useProxy == "https" {
+				proxyInfo = share.CLUSProxy{
+					Enable:   cfg.RegistryHttpsProxyEnable,
+					URL:      cfg.RegistryHttpsProxy.URL,
+					Username: cfg.RegistryHttpsProxy.Username,
+					Password: cfg.RegistryHttpsProxy.Password,
+				}
+			} else {
+				useProxy = ""
 			}
 		} else {
 			useProxy = cacheUseProxy
+			proxyInfo = cacheProxy
 		}
-		if cacheProxy.Enable {
+		if proxyInfo.Enable {
 			msgProxy = "(use proxy)"
 		}
 	}
