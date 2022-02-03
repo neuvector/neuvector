@@ -90,11 +90,21 @@ func statsLoop(bPassiveContainerDetect bool) {
 			gInfoRUnlock()
 		case <-runStateTicker:
 			// Check container periodically in case container removal event is missed.
-			existing := global.RT.ListContainerIDs()
+			existing, stops := global.RT.ListContainerIDs()
 			gInfoRLock()
 			gone := gInfo.allContainers.Difference(existing)
 			creates := existing.Difference(gInfo.allContainers)
+			if stops != nil {
+				stops = gInfo.allContainers.Intersect(stops)
+			}
 			gInfoRUnlock()
+			if stops != nil {
+				for id := range stops.Iter() {
+					log.WithFields(log.Fields{"id": id.(string)}).Debug("Found stop container")
+					task := ContainerTask{task: TASK_STOP_CONTAINER, id: id.(string)}
+					ContainerTaskChan <- &task
+				}
+			}
 			for id := range gone.Iter() {
 				log.WithFields(log.Fields{"id": id.(string)}).Debug("Found non-existent container")
 				task := ContainerTask{task: TASK_DEL_CONTAINER, id: id.(string)}

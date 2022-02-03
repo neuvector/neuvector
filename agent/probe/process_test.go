@@ -34,7 +34,7 @@ func (d *dummyRTDriver) GetContainer(id string) (*container.ContainerMetaExtra, 
 func (d *dummyRTDriver) ListContainers(runningOnly bool) ([]*container.ContainerMeta, error) {
 	return nil, nil
 }
-func (d *dummyRTDriver) ListContainerIDs() utils.Set { return nil }
+func (d *dummyRTDriver) ListContainerIDs() (utils.Set, utils.Set) { return nil, nil }
 func (d *dummyRTDriver) GetImageHistory(name string) ([]*container.ImageHistory, error) {
 	return nil, nil
 }

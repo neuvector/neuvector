@@ -25,7 +25,7 @@ type Runtime interface {
 	GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtra, error)
 	GetContainer(id string) (*ContainerMetaExtra, error)
 	ListContainers(runningOnly bool) ([]*ContainerMeta, error)
-	ListContainerIDs() utils.Set
+	ListContainerIDs() (utils.Set, utils.Set)
 	GetImageHistory(name string) ([]*ImageHistory, error)
 	GetImage(name string) (*ImageMeta, error)
 	GetImageFile(id string) (io.ReadCloser, error)

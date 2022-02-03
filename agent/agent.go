@@ -479,7 +479,7 @@ func main() {
 	agentTimerWheel.Start()
 
 	// Read existing containers again, cluster start can take a while.
-	existing := global.RT.ListContainerIDs()
+	existing, _ := global.RT.ListContainerIDs()
 
 	if existing.Cardinality() > containerTaskChanSizeMin {
 		ContainerTaskChan = make(chan *ContainerTask, existing.Cardinality())
