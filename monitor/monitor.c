@@ -40,6 +40,7 @@
 #define ENV_SKIP_NV_PROTECT    "ENFORCER_SKIP_NV_PROTECT"
 #define ENV_SHOW_MONITOR_TRACE "ENF_MONITOR_TRACE"
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
+#define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
@@ -416,6 +417,9 @@ static pid_t fork_exec(int i)
         }
         if (getenv(ENV_NO_KV_CONGEST_CTL)) {
             args[a ++] = "-no_kvc";
+        }
+        if (getenv(ENV_NO_SCAN_SECRETS)) {
+            args[a ++] = "-no_scrt";
         }
         args[a] = NULL;
         break;

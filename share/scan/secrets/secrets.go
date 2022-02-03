@@ -530,11 +530,6 @@ func InspectFile(fullpath, reportPath string, config Config) ([]share.CLUSSecret
 		return res, false
 	}
 
-	if config.MaxFileSize > 0 && length > config.MaxFileSize {
-		// log.WithFields(log.Fields{"length": length, "filepath": dir + "/" + filename}).Debug("File size too big")
-		return res, false
-	}
-
 	// 3rd-layer screen: skip large-sized non-text mime-type files
 	mimeType := utils.GetFileContentType(content)
 	// log.WithFields(log.Fields{"file": reportPath, "mimeType": mimeType}).Info()
@@ -684,6 +679,16 @@ func FindSecretsByRootpath(rootPath string, envVars []byte, config Config) ([]sh
 				perm = append(perm, *p)
 			}
 
+			// an unlikely file
+			if info.Size() == 0 {
+				return nil
+			}
+
+			if config.MaxFileSize > 0 && info.Size() > int64(config.MaxFileSize) {
+				// log.WithFields(log.Fields{"length": length, "filepath": dir + "/" + filename}).Debug("File size too big")
+				return nil
+			}
+
 			// 1st-layer screen: regular files and not ELF binaries
 			if info.Mode().IsRegular() && !utils.IsExecutableLinkableFile(path) {
 				results, scanned := InspectFile(path, inpath, config)
@@ -757,6 +762,16 @@ func FindSecretsByFilePathMap(fileMap map[string]string, envVars []byte, config 
 			if p, yes := hasChangeAccessPerm(file, info.Mode()); yes {
 				// log.WithFields(log.Fields{"set-perm": p}).Debug()
 				perm = append(perm, *p)
+			}
+
+			// an unlikely file
+			if info.Size() == 0 {
+				continue
+			}
+
+			if config.MaxFileSize > 0 && info.Size() > int64(config.MaxFileSize) {
+				// log.WithFields(log.Fields{"length": length, "filepath": dir + "/" + filename}).Debug("File size too big")
+				continue
 			}
 
 			// 1st-layer screen: regular files and not ELF binaries

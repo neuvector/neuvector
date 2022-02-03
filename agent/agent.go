@@ -275,6 +275,7 @@ func main() {
 	skip_nvProtect := flag.Bool("s", false, "Skip NV Protect")
 	show_monitor_trace := flag.Bool("m", false, "Show process/file monitor traces")
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
+	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
 	flag.Parse()
 
 	if *debug {
@@ -286,6 +287,12 @@ func main() {
 	if *disable_kv_congest_ctl {
 		log.Info("KV congestion control is disabled")
 		agentEnv.kvCongestCtrl = false
+	}
+
+	agentEnv.scanSecrets = true
+	if *disable_scan_secrets {
+		log.Info("Scanning secrets on containers is disabled")
+		agentEnv.scanSecrets = false
 	}
 
 	if *join != "" {
@@ -321,7 +328,7 @@ func main() {
 		os.Exit(-2)
 	}
 
-	walkerTask = workerlet.NewWalkerTask(false, global.SYS)
+	walkerTask = workerlet.NewWalkerTask(*show_monitor_trace, global.SYS)
 
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {

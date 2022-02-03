@@ -479,9 +479,9 @@ func (w *FileWatch) addDir(finfo *osutil.FileInfoExt, files map[string]*osutil.F
 	w.fanotifier.AddMonitorDirFile(finfo.Path, finfo.Filter, finfo.Protect, finfo.UserAdded, ff, w.cbNotify, finfo)
 }
 
-func (w *FileWatch) getDirAndFileList(pid int, path, regx string, filter *filterRegex, recur, protect, userAdded bool,
+func (w *FileWatch) getDirAndFileList(pid int, path, regx, cid string, filter *filterRegex, recur, protect, userAdded bool,
 	dirList map[string]*osutil.FileInfoExt) []*osutil.FileInfoExt {
-	dirs, singles := w.getDirFileList(pid, path, regx, filter, recur, protect, userAdded)
+	dirs, singles := w.getDirFileList(pid, path, regx, cid, filter, recur, protect, userAdded)
 	for _, di := range dirs {
 		if diExist, ok := dirList[di.Path]; ok {
 			diExist.Children = append(diExist.Children, di.Children...)
@@ -503,13 +503,13 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
 		bUserAdded := filter.CustomerAdd
 		if strings.Contains(filter.Path, "*") {
-			subDirs := w.getSubDirList(pid, filter.Path)
+			subDirs := w.getSubDirList(pid, filter.Path, cid)
 			for _, sub := range subDirs {
-				singles := w.getDirAndFileList(pid, sub, filter.Regex, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+				singles := w.getDirAndFileList(pid, sub, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
 				singleFiles = append(singleFiles, singles...)
 			}
 		} else {
-			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
 			singleFiles = append(singleFiles, singles...)
 		}
 	}
@@ -521,13 +521,13 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
 		bUserAdded := filter.CustomerAdd
 		if strings.Contains(filter.Path, "*") {
-			subDirs := w.getSubDirList(pid, filter.Path)
+			subDirs := w.getSubDirList(pid, filter.Path, cid)
 			for _, sub := range subDirs {
-				singles := w.getDirAndFileList(pid, sub, filter.Regex, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+				singles := w.getDirAndFileList(pid, sub, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
 				singleFiles = append(singleFiles, singles...)
 			}
 		} else {
-			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
 			singleFiles = append(singleFiles, singles...)
 		}
 	}
@@ -797,7 +797,7 @@ const (
 )
 
 // generic get a directory file list
-func (w *FileWatch) getDirFileList(pid int, base, regexStr string, flt interface{}, recur, protect, userAdded bool) (map[string]*osutil.FileInfoExt, []*osutil.FileInfoExt) {
+func (w *FileWatch) getDirFileList(pid int, base, regexStr, cid string, flt interface{}, recur, protect, userAdded bool) (map[string]*osutil.FileInfoExt, []*osutil.FileInfoExt) {
 	dirList := make(map[string]*osutil.FileInfoExt)
 	singleFiles := make([]*osutil.FileInfoExt, 0)
 
@@ -852,7 +852,7 @@ func (w *FileWatch) getDirFileList(pid int, base, regexStr string, flt interface
 			Timeout: tmOut,
 		}
 
-		bytesValue, _, err := w.walkerTask.Run(req)
+		bytesValue, _, err := w.walkerTask.RunWithTimeout(req, cid, req.Timeout)
 		if err == nil {
 			err = json.Unmarshal(bytesValue, &res)
 		}
@@ -910,7 +910,7 @@ func (w *FileWatch) getDirFileList(pid int, base, regexStr string, flt interface
 	return dirList, singleFiles
 }
 
-func (w *FileWatch) getSubDirList(pid int, base string) []string {
+func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
 	dirList := make([]string, 0)
 	fstr := global.SYS.ContainerFilePath(pid, base)
 	regxDir, err := regexp.Compile(fstr)
@@ -943,7 +943,7 @@ func (w *FileWatch) getSubDirList(pid int, base string) []string {
 		Timeout: dirIterTimeout,
 	}
 
-	bytesValue, _, err := w.walkerTask.Run(req)
+	bytesValue, _, err := w.walkerTask.RunWithTimeout(req, cid, req.Timeout)
 	if err == nil {
 		err = json.Unmarshal(bytesValue, &res)
 	}

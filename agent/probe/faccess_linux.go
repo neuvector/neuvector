@@ -108,7 +108,7 @@ func appendDirPath(dirs []string, path string) []string {
 }
 
 /////
-func (fa *FileAccessCtrl) enumExecutables(rootpid int) (map[string]int, []string) {
+func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]int, []string) {
 	var dirs []string
 	execs := make(map[string]int)
 
@@ -130,7 +130,7 @@ func (fa *FileAccessCtrl) enumExecutables(rootpid int) (map[string]int, []string
 		Timeout: time.Duration(4 * time.Second),
 	}
 
-	bytesValue, _, err := fa.prober.walkerTask.Run(req)
+	bytesValue, _, err := fa.prober.walkerTask.RunWithTimeout(req, id, req.Timeout)
 	if err == nil {
 		err = json.Unmarshal(bytesValue, &res)
 	}
@@ -409,7 +409,7 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting string, r
 		return false
 	}
 
-	execs, dirs := fa.enumExecutables(rootpid)
+	execs, dirs := fa.enumExecutables(rootpid, id)
 
 	fa.lockMux()
 	defer fa.unlockMux()

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -115,8 +116,9 @@ func (ts *Tasker) getResultFile(request interface{}, workingFolder string) ([]by
 	return nil, nil, errors.New("Invalid type")
 }
 
+
 //////
-func (ts *Tasker) Run(request interface{}) ([]byte, []byte, error) {
+func (ts *Tasker) Run(request interface{}, cid string) ([]byte, []byte, error) {
 	if !ts.bEnable {
 		return nil, nil, fmt.Errorf("session ended")
 	}
@@ -126,6 +128,7 @@ func (ts *Tasker) Run(request interface{}) ([]byte, []byte, error) {
 		log.WithFields(log.Fields{"err": err}).Error()
 		return nil, nil, err
 	}
+	args = append(args, "-cid", cid)	// reference only
 
 	// remove working folder
 	defer os.RemoveAll(workingFolder)
@@ -155,6 +158,64 @@ func (ts *Tasker) Run(request interface{}) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 	return ts.getResultFile(request, workingFolder)
+}
+
+//////
+func (ts *Tasker) RunWithTimeout(request interface{}, cid string, timeout time.Duration) ([]byte, []byte, error) {
+	if !ts.bEnable {
+		return nil, nil, fmt.Errorf("session ended")
+	}
+
+	workingFolder, args, err := ts.putInputFile(request)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+		return nil, nil, err
+	}
+	args = append(args, "-cid", cid)	// reference only
+
+	// remove working folder
+	defer os.RemoveAll(workingFolder)
+
+	// log.WithFields(log.Fields{"cmd": ts.taskPath, "wpath": workingFolder, "args": args}).Debug()
+	cmd := exec.Command(ts.taskPath, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if ts.bShowDebug {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Start")
+		return nil, nil, err
+	}
+
+	pgid := cmd.Process.Pid
+	ts.sys.AddToolProcess(pgid, 0, ts.taskPath, workingFolder)
+
+	var msg string
+	result := make(chan error, 1)
+	go func() {
+		result <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-result:
+		ts.sys.RemoveToolProcess(pgid, false)
+		if err == nil {
+			return ts.getResultFile(request, workingFolder)
+		} else {
+			msg = fmt.Sprintf("pathwalker: error=%s", err.Error())
+			if ee, ok := err.(*exec.ExitError); ok {
+				if status := ts.sys.GetExitStatus(ee); status != 0 {
+					msg += fmt.Sprintf(", status=%d", status)
+				}
+			}
+		}
+	case <-time.After(timeout + time.Duration(10*time.Second)):	// Set a hard limit + 10 seconds
+		ts.sys.RemoveToolProcess(pgid, true)
+		return nil, nil, fmt.Errorf("pathwalker: timeout")
+	}
+	return nil, nil, fmt.Errorf(msg)
 }
 
 /////

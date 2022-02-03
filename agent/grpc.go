@@ -99,7 +99,7 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 		ObjType: req.Type,
 	}
 
-	bytesValue, _, err := walkerTask.Run(taskReq)
+	bytesValue, _, err := walkerTask.Run(taskReq, req.ID)
 	if err == nil {
 		if err = json.Unmarshal(bytesValue, &data); err != nil {
 			log.WithFields(log.Fields{"id": req.ID, "error": err}).Error()

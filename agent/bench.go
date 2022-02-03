@@ -286,8 +286,10 @@ func (b *Bench) BenchLoop() {
 					// skip kubernetes pod
 					if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
 						wls = append(wls, createWorkload(c.info))
-						group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
-						b.taskScanner.addScanTask(c.pid, name, id, group)
+						if agentEnv.scanSecrets {
+							group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
+							b.taskScanner.addScanTask(c.pid, name, id, group)
+						}
 					}
 				}
 			}
@@ -1364,7 +1366,7 @@ func (b *Bench) runFindSecrets(rootPid int, name, id, group string) {
 		TimeoutSec: 3 * 60,
 	}
 
-	permBytes, secretBytes, err := walkerTask.Run(req)
+	permBytes, secretBytes, err := walkerTask.RunWithTimeout(req, id, time.Duration(req.TimeoutSec)*time.Second)
 	if err != nil {
 		log.WithFields(log.Fields{"pid": rootPid, "id": id, "error": err}).Error()
 	} else {

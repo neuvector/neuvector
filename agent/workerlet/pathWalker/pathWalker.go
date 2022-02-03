@@ -68,6 +68,7 @@ func main() {
 	walkType := flag.String("t", "", "walk type: path, pkg, or scrt (Required)")
 	uuid := flag.String("u", "uuid", "result uuid name")
 	debugTrace := flag.Bool("d", false, "enable debug trace")
+	cid := flag.String("cid", "", "container identifier")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -81,7 +82,7 @@ func main() {
 	// create a working path from the input file
 	workPath := filepath.Join(workerlet.WalkerBasePath, *uuid)
 	os.MkdirAll(workPath, os.ModePerm)
-	log.WithFields(log.Fields{"workPath": workPath}).Debug()
+	log.WithFields(log.Fields{"workPath": workPath, "cid": *cid}).Debug()
 
 	pass := false
 	if sys.IsRunningInContainer() {
@@ -234,7 +235,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 				},
 			}
 			res.Dirs = append(res.Dirs, ddata)
-			log.WithFields(log.Fields{"dir": ddata.Dir}).Debug()
+			// log.WithFields(log.Fields{"dir": ddata.Dir}).Debug()
 		} else {
 			bExec := false
 			if info.Mode().IsRegular() {
@@ -256,7 +257,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 			if req.ExecOnly {
 				if fdata.IsExec {
 					res.Files = append(res.Files, fdata)
-					log.WithFields(log.Fields{"file": fdata.File}).Debug()
+					//log.WithFields(log.Fields{"file": fdata.File}).Debug()
 				}
 			} else {
 				if info.Mode().IsRegular() {
@@ -264,7 +265,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 					fdata.Hash = utils.FileHashCrc32(path, info.Size())
 				}
 				res.Files = append(res.Files, fdata)
-				log.WithFields(log.Fields{"file": fdata.File}).Debug()
+				// log.WithFields(log.Fields{"file": fdata.File}).Debug()
 			}
 		}
 		return nil
