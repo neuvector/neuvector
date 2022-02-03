@@ -111,7 +111,7 @@ func NewFsnCenter(p *Probe, rtStorageDriver string) (*FileNotificationCtr, bool)
 
 //// No recursive dir mark is for inotify
 //// Add all sub-directories from the top layers
-func (fsn *FileNotificationCtr) enumFiles(rootPath string, bInit bool) (utils.Set, map[string]*fileInfo) {
+func (fsn *FileNotificationCtr) enumFiles(rootPath, id string, bInit bool) (utils.Set, map[string]*fileInfo) {
 	dirs := utils.NewSet()
 	files := make(map[string]*fileInfo)
 	dirs.Add(rootPath)
@@ -127,7 +127,7 @@ func (fsn *FileNotificationCtr) enumFiles(rootPath string, bInit bool) (utils.Se
 		Path: strings.TrimPrefix(rootPath, hostRootMountPoint),
 	}
 
-	bytesValue, _, err := fsn.prober.walkerTask.Run(req)
+	bytesValue, _, err := fsn.prober.walkerTask.Run(req, id)
 	if err == nil {
 		err = json.Unmarshal(bytesValue, &res)
 	}
@@ -334,7 +334,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 
 	if (event.Op & fsnotify.Create) != 0 {
 		if fi.IsDir() {
-			dirs, _ := fsn.enumFiles(path, false)
+			dirs, _ := fsn.enumFiles(path, root.id, false)
 			// sample: mkdir -p /tmp/test/bin, only "/tmp" was reported.
 			for d := range dirs.Iter() {
 				dir := d.(string)
@@ -440,9 +440,9 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, m
 	if fsn.storageDrv == drv_btrfs {
 		// It is composed of the image files and the new created files
 		// differentiate the "..._init" folder to filter out the image files
-		root.dirs, root.files = fsn.enumBtrfsInitFiles(path)
+		root.dirs, root.files = fsn.enumBtrfsInitFiles(path, id)
 	} else {
-		root.dirs, root.files = fsn.enumFiles(path, true)
+		root.dirs, root.files = fsn.enumFiles(path, id, true)
 	}
 
 	for dir := range root.dirs.Iter() {
@@ -568,7 +568,7 @@ func (fsn *FileNotificationCtr) IsNotExistingImageFile(id, file string) (*fileIn
 	return finfo, false
 }
 
-func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath string) (utils.Set, map[string]*fileInfo) {
+func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.Set, map[string]*fileInfo) {
 	var err error
 	var bytesValue []byte
 
@@ -595,7 +595,7 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath string) (utils.Set, 
 		Path: strings.TrimPrefix(rootPath, hostRootMountPoint),
 	}
 
-	if bytesValue, _, err = fsn.prober.walkerTask.Run(req); err == nil {
+	if bytesValue, _, err = fsn.prober.walkerTask.Run(req, id); err == nil {
 		err = json.Unmarshal(bytesValue, &res)
 	}
 
@@ -619,7 +619,7 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath string) (utils.Set, 
 		Path: strings.TrimPrefix(initPath, hostRootMountPoint),
 	}
 
-	if bytesValue, _, err = fsn.prober.walkerTask.Run(req); err == nil {
+	if bytesValue, _, err = fsn.prober.walkerTask.Run(req, id); err == nil {
 		err = json.Unmarshal(bytesValue, &resInit)
 	}
 

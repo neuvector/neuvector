@@ -18,6 +18,7 @@ type AgentEnvInfo struct {
 	cgroupMemory         string
 	cgroupCPUAcct        string
 	kvCongestCtrl        bool
+	scanSecrets          bool
 }
 
 const (
