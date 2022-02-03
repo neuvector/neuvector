@@ -910,7 +910,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			// New baseline profile setting
 			if rc.NewServiceProfileBaseline != nil {
 				switch *rc.NewServiceProfileBaseline {
-				case share.ProfileBasic, share.ProfileShield:
+				case share.ProfileBasic, share.ProfileZeroDrift:
 					cconf.NewServiceProfileBaseline = *rc.NewServiceProfileBaseline
 				default:
 					e := "Invalid new service profile baseline"

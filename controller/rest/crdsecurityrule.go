@@ -1770,12 +1770,12 @@ targetpass:
 		baseline := share.ProfileBasic
 		if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
 			baseline_ := *gfwrule.Spec.ProcessProfile.Baseline
-			if baseline_ != share.ProfileBasic && baseline_ != share.ProfileCrdShield {
+			if baseline_ != share.ProfileBasic && baseline_ != share.ProfileCrdZeroDrift {
 				errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, baseline_)
 				buffer.WriteString(errMsg)
 				errCount += errNo
-			} else if baseline_ == share.ProfileCrdShield {
-				baseline = share.ProfileShield
+			} else if baseline_ == share.ProfileCrdZeroDrift {
+				baseline = share.ProfileZeroDrift
 			}
 		}
 		pprofile := api.RESTProcessProfile{
@@ -2746,8 +2746,8 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[str
 			continue
 		}
 
-		if record.ProcessProfile.Baseline == share.ProfileCrdShield {
-			baseline = share.ProfileShield
+		if record.ProcessProfile.Baseline == share.ProfileCrdZeroDrift {
+			baseline = share.ProfileZeroDrift
 		}
 		// collecting process rules
 		for i, pr := range record.ProcessRules {
