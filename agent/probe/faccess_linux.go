@@ -731,7 +731,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 			// cmds, _ := global.SYS.ReadCmdLine(pid)
 			id, profileSetting, res = fa.whiteListCheck(path, pid)
 			// mLog.WithFields(log.Fields{"path": path, "pid": pid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
-			if res != rule_denied && res != rule_allowed && profileSetting == share.ProfileShield { // not match any rule
+			if res != rule_denied && res != rule_allowed && profileSetting == share.ProfileZeroDrift { // not match any rule
 				pass, ppe = fa.checkAllowedShieldProcess(id, path, pid, res)
 				if pass {
 					res = rule_allowed_image // image file only
