@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
@@ -28,8 +27,6 @@ import (
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 )
-
-const ImageWorkingPath = "/tmp/images"
 
 const (
 	//max package file size
@@ -736,7 +733,7 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 			size = info.Size
 		}
 
-		pathMap, err := SelectiveFilesFromPath(layerPath, maxFileSize, func(path string) bool {
+		pathMap, err := selectiveFilesFromPath(layerPath, maxFileSize, func(path string) bool {
 			if libsList.Contains(path) || isAppsPkgFile(path) {
 				return true
 			}
@@ -919,27 +916,6 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	return appPkg, nil
 }
 
-// Get an unique image folder under /tmp, return "" if can not allocate a good folder
-func CreateImagePath(uid string) string {
-	var imgPath string
-
-	// existing uid
-	if uid != "" {
-		imgPath = filepath.Join(ImageWorkingPath, uid)
-	} else {
-		for i := 0; i < 16; i++ {
-			imgPath = filepath.Join(ImageWorkingPath, uuid.New().String())
-			if _, err := os.Stat(imgPath); os.IsNotExist(err) {
-				break
-			}
-		}
-	}
-
-	///
-	os.MkdirAll(imgPath, 0755)
-	return imgPath
-}
-
 ////////
 type layerSize struct {
 	layer string
@@ -1072,9 +1048,9 @@ func downloadLayers(ctx context.Context, layers []string, sizes map[string]int64
 	return results, err
 }
 
-// SelectiveFilesFromPath the specified files and folders
+// selectiveFilesFromPath the specified files and folders
 // store them in a map indexed by file paths
-func SelectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(string) bool) (map[string]string, error) {
+func selectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(string) bool) (map[string]string, error) {
 	rootLen := len(filepath.Clean(rootPath))
 	data := make(map[string]string)
 
@@ -1097,38 +1073,4 @@ func SelectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(st
 	})
 
 	return data, err
-}
-
-// CollectImageFileMap creates a virtual file map for a image to save real copy efforts
-func CollectImageFileMap(rootPath string, fmap map[string]string) (int, error) {
-	if len(rootPath) == 0 {
-		return 0, nil
-	}
-
-	//
-	rootLen := len(filepath.Clean(rootPath))
-	errorCnt := 0
-	cnt := 0
-	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if strings.Contains(err.Error(), "no such file") ||
-				strings.Contains(err.Error(), "permission denied") {
-				errorCnt++
-				if errorCnt < 1000 {
-					return nil
-				}
-			}
-			return err
-		}
-
-		if info.Mode().IsRegular() || info.Mode().IsDir() {
-			inpath := path[rootLen:] // include the root "/"
-			cnt++
-			fmap[inpath] = path // always update
-			//	log.WithFields(log.Fields{"path": inpath}).Debug()
-		}
-		return nil
-	})
-
-	return cnt, err
 }

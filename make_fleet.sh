@@ -6,7 +6,6 @@ echo "==> Unitest"
 go test github.com/neuvector/neuvector/share/... || exit $?
 go test github.com/neuvector/neuvector/controller/... || exit $?
 go test github.com/neuvector/neuvector/agent/... || exit $?
-go test github.com/neuvector/neuvector/scanner/... || exit $?
 
 echo "==> Making agent"
 cd monitor; make || exit $?; cd ..
