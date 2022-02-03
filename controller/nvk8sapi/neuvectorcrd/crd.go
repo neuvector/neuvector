@@ -37,7 +37,7 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.AdmClientModeSvc, share.AdmClientModeUrl,
 		share.AdmCtrlActionAllow, share.AdmCtrlActionDeny,
 		share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce, share.PolicyModeUnavailable,
-		share.ProfileCrdBasic, share.ProfileCrdShield,
+		share.ProfileCrdBasic, share.ProfileCrdZeroDrift,
 		share.FileAccessBehaviorMonitor, share.FileAccessBehaviorBlock,
 		share.DlpPatternContextURI, share.DlpPatternContextHEAD, share.DlpPatternContextBODY, share.DlpPatternContextPACKET,
 		share.CriteriaOpRegex, share.CriteriaOpNotRegex, share.DlpRuleKeyPattern,
@@ -282,7 +282,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 								Type: &b.schemaTypeString,
 								Enum: []*apiextv1.JSON{
 									&apiextv1.JSON{Raw: b.enumMap[share.ProfileCrdBasic]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileCrdShield]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileCrdZeroDrift]},
 								},
 							},
 						},
@@ -409,7 +409,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 								Type: &b.schemaTypeString,
 								Enum: []*apiextv1b1.JSON{
 									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileCrdBasic]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileCrdShield]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileCrdZeroDrift]},
 								},
 							},
 						},

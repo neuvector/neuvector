@@ -39,10 +39,10 @@ const (
 
 const (
 	ProfileBasic  string = "Default"
-	ProfileShield string = "Shield"
+	ProfileZeroDrift string = "Shield"
 
 	ProfileCrdBasic  string = "default"
-	ProfileCrdShield string = "shield"
+	ProfileCrdZeroDrift string = "shield"
 )
 
 const (

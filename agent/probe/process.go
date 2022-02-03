@@ -2155,7 +2155,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 
 	//	proc.action = pp.Action
 	if (proc.reported & profileReported) == 0 {
-		if setting == share.ProfileShield {
+		if setting == share.ProfileZeroDrift {
 			if !bLocked {
 				p.lockProcMux()
 			}
@@ -2660,7 +2660,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 	}
 
 	// mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
-	// Shield: allow a family member of the root process
+	// ZeroDrift: allow a family member of the root process
 	if isFamilyProcess(c.children, proc) {
 		// a family member
 		if bFromPmon {

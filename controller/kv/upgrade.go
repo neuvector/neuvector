@@ -1448,7 +1448,7 @@ func upgradeWebhookConfig() {
 
 func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 	var upd bool
-	if cfg.ProcessProfile.Baseline != share.ProfileCrdBasic && cfg.ProcessProfile.Baseline != share.ProfileCrdShield {
+	if cfg.ProcessProfile.Baseline != share.ProfileCrdBasic && cfg.ProcessProfile.Baseline != share.ProfileCrdZeroDrift {
 		cfg.ProcessProfile.Baseline = share.ProfileCrdBasic
 		upd = true
 	}

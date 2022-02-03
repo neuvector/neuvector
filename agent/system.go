@@ -422,7 +422,7 @@ func profileConfigGroup(nType cluster.ClusterNotifyType, key string, value []byt
 	json.Unmarshal(value, &pg)
 	if utils.DoesGroupHavePolicyMode(name) {
 		if updated, last := pe.UpdateProcessPolicy(name, &pg); updated {
-			if pg.Baseline == share.ProfileShield {
+			if pg.Baseline == share.ProfileZeroDrift {
 				if last == nil || last.Baseline != pg.Baseline {
 					// rebuild family trees for all match containers
 					updateContainerFamilyTrees(name)
