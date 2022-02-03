@@ -5,16 +5,6 @@ REPO_REL_URL = 10.1.127.12:5000
 STAGE_DIR = stage
 S_DATA_FILE = ubistage.tgz
 
-copy_scan:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
-	mkdir -p ${STAGE_DIR}/etc/neuvector/db
-	#
-	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scanner/scanner ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scanner/task/scannerTask ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scanner/rpmparser/rpmparser ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/data/cvedb.regular ${STAGE_DIR}/etc/neuvector/db/cvedb
-
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
 	mkdir -p ${STAGE_DIR}/etc/
@@ -35,7 +25,6 @@ copy_enf:
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/agent ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/workerlet/pathWalker/pathWalker ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scanner/rpmparser/rpmparser ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/dp/dp ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/host.tmpl ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/container.tmpl ${STAGE_DIR}/usr/local/bin/
@@ -121,7 +110,6 @@ pull_all_base:
 	docker pull $(REPO_REL_URL)/neuvector/all_base:jdk11
 
 
-
 api_image:
 	docker build -t neuvector/api -f neuvector/build/Dockerfile.api .
 
@@ -131,38 +119,11 @@ ctrl_image: pull_fleet_base stage_ctrl
 enf_image: pull_fleet_base stage_enf
 	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
 
-scanner_image: pull_fleet_base stage_scan
-	docker build -t neuvector/scanner -f neuvector/build/Dockerfile.scanner .
-
 all_image: pull_all_base stage_all
 	docker build --build-arg NV_TAG=$(NV_TAG) -t neuvector/allinone -f neuvector/build/Dockerfile.all .
-
-ubi_scanner:
-	rm -rf ${STAGE_DIR}; mkdir -p ${STAGE_DIR}
-	mkdir -p ${STAGE_DIR}/licenses/
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
-	mkdir -p ${STAGE_DIR}/etc/neuvector/certs/
-	mkdir -p ${STAGE_DIR}/etc/neuvector/certs/internal/
-	mkdir -p ${STAGE_DIR}/etc/neuvector/db/
-	docker run -itd --name cache --entrypoint true ${REPO_URL}/neuvector/scanner:latest
-	docker cp cache:/licenses/. ${STAGE_DIR}/licenses/
-	docker cp cache:/etc/neuvector/certs/internal/. ${STAGE_DIR}/etc/neuvector/certs/internal/
-	docker cp cache:/usr/local/bin/. ${STAGE_DIR}/usr/local/bin/
-	docker cp cache:/etc/neuvector/db/cvedb ${STAGE_DIR}/etc/neuvector/db/cvedb
-	docker stop cache; docker rm cache
-	rm -f ${S_DATA_FILE} || true
-	cd stage; tar -czvf ../${S_DATA_FILE} *; cd ..
-	docker build --build-arg DATA_FILE=${S_DATA_FILE} -t neuvector/scanner.ubi -f neuvector/build/Dockerfile.scanner.ubi .
-
 
 fleet:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
 	@docker pull $(REPO_REL_URL)/neuvector/build
 	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh $(REPO_REL_URL)/neuvector/build
-
-db:
-	# This is running in neuvector/
-	@echo "Making $@ ..."
-	@docker pull $(REPO_REL_URL)/neuvector/build
-	@docker run --rm -ia STDOUT --name build -e VULN_VER=$(VULN_VER) -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_db.sh $(REPO_REL_URL)/neuvector/build
