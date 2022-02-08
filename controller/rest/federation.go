@@ -371,7 +371,7 @@ func isNoAuthFedOpAllowed(expectedFedRole string, w http.ResponseWriter, r *http
 }
 
 func sendReqToMasterCluster(method, ip string, port uint, request, tag, token string, body []byte,
-	logError bool, specifiedProxy *share.CLUSProxy, acc *access.AccessControl) ([]byte, int, bool, error) {
+	logError bool, useProxy string, specifiedProxy *share.CLUSProxy, acc *access.AccessControl) ([]byte, int, bool, error) {
 
 	fedClient, _ := _fedHttpClients[""]
 	if fedClient == nil {
@@ -388,7 +388,6 @@ func sendReqToMasterCluster(method, ip string, port uint, request, tag, token st
 			InsecureSkipVerify: true,
 		},
 	}
-	var useProxy string
 	var proxy share.CLUSProxy
 	var proxyLog tProxyLog
 	if specifiedProxy != nil {
@@ -1510,6 +1509,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			msgProxy = "(use proxy)"
 		}
 	}
+	log.WithFields(log.Fields{"useProxy": useProxy, "enable": proxyInfo.Enable}).Debug()
 
 	if tokenBytes, err := base64.StdEncoding.DecodeString(req.JoinToken); err == nil {
 		if err := json.Unmarshal(tokenBytes, &joinToken); err == nil {
@@ -1565,7 +1565,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var proxyUsed bool
 	// call master cluster for joining federation
 	data, statusCode, proxyUsed, err = sendReqToMasterCluster(http.MethodPost, req.Server, req.Port,
-		"v1/fed/join_internal", _tagJoinFed, "", bodyTo, true, &proxyInfo, acc)
+		"v1/fed/join_internal", _tagJoinFed, "", bodyTo, true, useProxy, &proxyInfo, acc)
 	if err == nil {
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
@@ -1681,7 +1681,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	if bodyTo, err := json.Marshal(&reqTo); err == nil {
 		// call master cluster for leaving federation
 		_, _, _, err = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-			"v1/fed/leave_internal", _tagLeaveFed, "", bodyTo, true, nil, acc)
+			"v1/fed/leave_internal", _tagLeaveFed, "", bodyTo, true, "", nil, acc)
 		if err == nil || req.Force {
 			m := &share.CLUSFedMembership{
 				FedRole:          api.FedRoleNone,
@@ -2212,7 +2212,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		var err error = common.ErrObjectAccessDenied
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-				"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, false, nil, accReadAll); err == nil {
+				"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, false, "", nil, accReadAll); err == nil {
 				break
 			} else {
 				time.Sleep(time.Second)
@@ -2237,7 +2237,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 								bodyTo, _ := json.Marshal(&reqTo)
 								_, statusCode, _, _ = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-									"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, true, nil, accReadAll)
+									"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, true, "", nil, accReadAll)
 							}
 						}
 					}
