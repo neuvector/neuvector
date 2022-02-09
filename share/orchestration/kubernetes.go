@@ -154,6 +154,16 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 			}
 		}
 
+		// oc49, job: openshift-operator-lifecycle-manager / collect-profiles-27400290--1-4g2r
+		if d.flavor == share.FlavorOpenShift {
+			if job, ok := meta.Labels[container.KubeKeyJobName]; ok {
+				if index := strings.LastIndex(job, "-"); index != -1 {
+					job = job[:index]
+				}
+				return &Service{Domain: namespace, Name: job}
+			}
+		}
+
 		if hash, _ := meta.Labels[container.KubeKeyPodHash]; hash != "" {
 			if idx := strings.Index(pod, "-"+hash); idx != -1 {
 				return &Service{Domain: namespace, Name: pod[:idx]}
@@ -169,6 +179,13 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 				if dash = strings.LastIndex(pod[:dash], "-"); dash != -1 {
 					return &Service{Domain: namespace, Name: pod[:dash]}
 				}
+			}
+		}
+
+		// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
+		if namespace == container.KubeNamespaceSystem {
+			if component, ok := meta.Labels[container.KubeKeyComponent]; ok {
+				return &Service{Domain: namespace, Name: component}
 			}
 		}
 
