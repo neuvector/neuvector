@@ -46,6 +46,8 @@ const (
 	KubeKeyPodName         string = "io.kubernetes.pod.name"
 	KubeKeyDeployConfig    string = "deploymentconfig"
 	KubeKeyPodHash         string = "pod-template-hash"
+	KubeKeyComponent       string = "component"
+	KubeKeyJobName         string = "job-name"
 	KubeKeyContainerName   string = "io.kubernetes.container.name"
 	KubeNamespaceSystem    string = "kube-system"
 	KubeNamespaceCatalog   string = "kube-service-catalog"
