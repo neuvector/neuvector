@@ -1,3 +1,7 @@
 #!/bin/bash
 
-go test github.com/neuvector/neuvector/... || exit $?
+echo $GOPATH
+export GOPATH=$GOPATH:${PWD}
+echo $GOPATH
+go test ./... || exit $?
+
