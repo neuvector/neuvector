@@ -7,10 +7,10 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 func handlerApplicationList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -26,10 +26,10 @@ func handlerApplicationList(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var resp api.RESTListData
-	resp.List = &api.RESTList{Application: make([]string, len(utils.AppNameMap))}
+	resp.List = &api.RESTList{Application: make([]string, len(common.AppNameMap))}
 
 	i := 0
-	for _, app := range utils.AppNameMap {
+	for _, app := range common.AppNameMap {
 		resp.List.Application[i] = app
 		i++
 	}

@@ -1,8 +1,5 @@
 package utils
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"bytes"
 	"compress/gzip"
@@ -35,7 +32,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -358,94 +354,6 @@ func BenchStatusToStr(r share.BenchStatus) string {
 	} else {
 		return "Unknown status"
 	}
-}
-
-func TCPStateString(state uint8) string {
-	switch state {
-	case C.SESS_STATE_ESTABLISHED:
-		return "established"
-	case C.SESS_STATE_SYN_SENT:
-		return "syn_sent"
-	case C.SESS_STATE_SYN_RECV:
-		return "syn_recv"
-	case C.SESS_STATE_FIN_WAIT1:
-		return "fin_wait1"
-	case C.SESS_STATE_FIN_WAIT2:
-		return "fin_wait2"
-	case C.SESS_STATE_TIME_WAIT:
-		return "time_wait"
-	case C.SESS_STATE_CLOSE:
-		return "close"
-	case C.SESS_STATE_CLOSE_WAIT:
-		return "close_wait"
-	case C.SESS_STATE_LAST_ACK:
-		return "last_ack"
-	case C.SESS_STATE_LISTEN:
-		return "listen"
-	case C.SESS_STATE_CLOSING:
-		return "closing"
-	default:
-		return "unknown"
-	}
-}
-
-var AppNameMap map[uint32]string = map[uint32]string{
-	C.DPI_APP_HTTP:          "HTTP",
-	C.DPI_APP_SSL:           "SSL",
-	C.DPI_APP_SSH:           "SSH",
-	C.DPI_APP_DNS:           "DNS",
-	C.DPI_APP_DHCP:          "DHCP",
-	C.DPI_APP_NTP:           "NTP",
-	C.DPI_APP_TFTP:          "TFTP",
-	C.DPI_APP_ECHO:          "Echo",
-	C.DPI_APP_RTSP:          "RTSP",
-	C.DPI_APP_SIP:           "SIP",
-	C.DPI_APP_MYSQL:         "MySQL",
-	C.DPI_APP_REDIS:         "Redis",
-	C.DPI_APP_ZOOKEEPER:     "ZooKeeper",
-	C.DPI_APP_CASSANDRA:     "Cassandra",
-	C.DPI_APP_MONGODB:       "MongoDB",
-	C.DPI_APP_POSTGRESQL:    "PostgreSQL",
-	C.DPI_APP_KAFKA:         "Kafka",
-	C.DPI_APP_COUCHBASE:     "Couchbase",
-	C.DPI_APP_WORDPRESS:     "Wordpress",
-	C.DPI_APP_ACTIVEMQ:      "ActiveMQ",
-	C.DPI_APP_COUCHDB:       "CouchDB",
-	C.DPI_APP_ELASTICSEARCH: "ElasticSearch",
-	C.DPI_APP_MEMCACHED:     "Memcached",
-	C.DPI_APP_RABBITMQ:      "RabbitMQ",
-	C.DPI_APP_RADIUS:        "Radius",
-	C.DPI_APP_VOLTDB:        "VoltDB",
-	C.DPI_APP_CONSUL:        "Consul",
-	C.DPI_APP_SYSLOG:        "Syslog",
-	C.DPI_APP_ETCD:          "etcd",
-	C.DPI_APP_SPARK:         "Spark",
-	C.DPI_APP_APACHE:        "Apache",
-	C.DPI_APP_NGINX:         "nginx",
-	C.DPI_APP_JETTY:         "Jetty",
-	C.DPI_APP_TNS:           "Oracle",
-	C.DPI_APP_TDS:           "MSSQL",
-	C.DPI_APP_GRPC:          "GRPC",
-}
-
-var appName2IDMap map[string]uint32
-var appMutex sync.RWMutex
-
-func GetAppIDByName(name string) uint32 {
-	appMutex.Lock()
-	if appName2IDMap == nil {
-		appName2IDMap = make(map[string]uint32)
-		for id, app := range AppNameMap {
-			appName2IDMap[strings.ToUpper(app)] = id
-		}
-	}
-	appMutex.Unlock()
-
-	if id, ok := appName2IDMap[strings.ToUpper(name)]; ok {
-		return id
-	}
-
-	return 0
 }
 
 func JoinCommand(cmds []string) string {

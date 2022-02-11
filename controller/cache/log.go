@@ -19,7 +19,7 @@ import (
 	//"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -1440,7 +1440,7 @@ func threatLog2API(thrt *share.CLUSThreatLog, id string, port uint16) *api.Threa
 	}
 	rlog.ICMPType = thrt.ICMPType
 	rlog.ICMPCode = thrt.ICMPCode
-	rlog.Application = utils.AppNameMap[thrt.Application]
+	rlog.Application = common.AppNameMap[thrt.Application]
 	rlog.Monitor = thrt.Tap
 	rlog.Msg = thrt.Msg
 	rlog.Packet = thrt.Packet

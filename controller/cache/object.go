@@ -158,17 +158,17 @@ func translateWorkloadApps(wl *share.CLUSWorkload) []string {
 		noApp := false
 		noSVR := false
 
-		if name, ok := utils.AppNameMap[app.Server]; ok {
+		if name, ok := common.AppNameMap[app.Server]; ok {
 			app_set.Add(name)
 		} else {
 			noSVR = true
 		}
-		if name, ok := utils.AppNameMap[app.Application]; ok {
+		if name, ok := common.AppNameMap[app.Application]; ok {
 			app_set.Add(name)
 		} else {
 			noApp = true
 		}
-		if name, ok := utils.AppNameMap[app.Proto]; ok {
+		if name, ok := common.AppNameMap[app.Proto]; ok {
 			app_set.Add(name)
 		} else if noApp && noSVR {
 			switch app.IPProto {
@@ -955,7 +955,7 @@ func addrWorkloadStop(id string, param interface{}) {
 				case share.CLUSIPAddrScopeLocalhost:
 					// Keep the mapping for a while to identify remaining connection report
 					key := addr.IPNet.IP.String()
-					if wlp, ok := cache.ipWLMap[key]; ok && wlp.alive && wlp.wlID == wl.ID{
+					if wlp, ok := cache.ipWLMap[key]; ok && wlp.alive && wlp.wlID == wl.ID {
 						log.WithFields(log.Fields{
 							"ip": key, "workload": container.ShortContainerId(wl.ID),
 						}).Debug("delay remove host-scope ip-workload map")
@@ -1946,11 +1946,11 @@ func addAppPort(app string, port uint16, appMap map[string]string) {
 func getAppPorts(wl *share.CLUSWorkload) map[string]string {
 	appMap := make(map[string]string)
 	for _, app := range wl.Apps {
-		if name, ok := utils.AppNameMap[app.Application]; ok {
+		if name, ok := common.AppNameMap[app.Application]; ok {
 			addAppPort(name, app.Port, appMap)
-		} else if name, ok := utils.AppNameMap[app.Server]; ok {
+		} else if name, ok := common.AppNameMap[app.Server]; ok {
 			addAppPort(name, app.Port, appMap)
-		} else if name, ok := utils.AppNameMap[app.Proto]; ok {
+		} else if name, ok := common.AppNameMap[app.Proto]; ok {
 			addAppPort(name, app.Port, appMap)
 		} else {
 			switch app.IPProto {

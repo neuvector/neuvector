@@ -1,4 +1,4 @@
-find . -name LICENSE -exec sh -c '
+find . \( -name LICENSE -o -name COPYING \) -exec sh -c '
     echo "--------------------------------------------------------------------------------"
     echo -n "   "
     echo {} | cut -c 3-

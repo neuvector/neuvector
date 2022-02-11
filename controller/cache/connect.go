@@ -195,8 +195,8 @@ func conn2Violation(conn *share.CLUSConnection, server uint32) *api.Violation {
 		c.Level = api.LogLevelWARNING
 	}
 
-	appName, _ := utils.AppNameMap[conn.Application]
-	svrName, _ := utils.AppNameMap[server]
+	appName, _ := common.AppNameMap[conn.Application]
+	svrName, _ := common.AppNameMap[server]
 	c.Applications = []string{appName}
 	c.Servers = []string{svrName}
 	return c
@@ -1356,7 +1356,7 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 	}
 	conver.Apps = make([]string, 0)
 	for app := range apps.Iter() {
-		str, _ := utils.AppNameMap[app.(uint32)]
+		str, _ := common.AppNameMap[app.(uint32)]
 		conver.Apps = append(conver.Apps, str)
 	}
 	for port := range ports.Iter() {
@@ -1588,8 +1588,8 @@ func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessCon
 				CIP:          utils.Int2IPv4(key.cip).String(),
 				SIP:          utils.Int2IPv4(key.sip).String(),
 			}
-			c.Application, _ = utils.AppNameMap[key.application]
-			c.Server, _ = utils.AppNameMap[entry.server]
+			c.Application, _ = common.AppNameMap[key.application]
+			c.Server, _ = common.AppNameMap[entry.server]
 			c.Severity, _ = getCombinedThreatSeverity(entry.wafSeverity, entry.dlpSeverity, entry.severity)
 			if entry.xff > 0 {
 				c.Xff = true

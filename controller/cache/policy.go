@@ -57,7 +57,7 @@ func appIDs2Names(ids []uint32) []string {
 
 	var names []string = make([]string, 0)
 	for _, id := range ids {
-		if name, ok := utils.AppNameMap[id]; ok {
+		if name, ok := common.AppNameMap[id]; ok {
 			names = append(names, name)
 		}
 	}
