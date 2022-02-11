@@ -3,9 +3,7 @@
 # This script is invoked by build container
 
 echo "==> Unitest"
-go test github.com/neuvector/neuvector/share/... || exit $?
-go test github.com/neuvector/neuvector/controller/... || exit $?
-go test github.com/neuvector/neuvector/agent/... || exit $?
+./unitest.sh || exit $?
 
 echo "==> Making agent"
 cd monitor; make || exit $?; cd ..
