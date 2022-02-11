@@ -1217,10 +1217,10 @@ func session2REST(s *share.CLUSSession) *api.RESTSession {
 	if s.Application == 0 {
 		app = utils.GetPortLink(uint8(s.IPProto), uint16(s.ServerPort))
 	} else {
-		app, _ = utils.AppNameMap[s.Application]
+		app, _ = common.AppNameMap[s.Application]
 	}
 	if s.XffApp != 0 {
-		xffapp, _ = utils.AppNameMap[s.XffApp]
+		xffapp, _ = common.AppNameMap[s.XffApp]
 	}
 	id := uint64(s.ID)
 	if s.HostMode {
@@ -1240,8 +1240,8 @@ func session2REST(s *share.CLUSSession) *api.RESTSession {
 		ServerPort:     uint16(s.ServerPort),
 		ICMPCode:       uint8(s.ICMPCode),
 		ICMPType:       uint8(s.ICMPType),
-		ClientState:    utils.TCPStateString(uint8(s.ClientState)),
-		ServerState:    utils.TCPStateString(uint8(s.ServerState)),
+		ClientState:    common.TCPStateString(uint8(s.ClientState)),
+		ServerState:    common.TCPStateString(uint8(s.ServerState)),
 		ClientPkts:     s.ClientPkts,
 		ServerPkts:     s.ServerPkts,
 		ClientBytes:    s.ClientBytes,

@@ -320,7 +320,7 @@ func appNames2IDs(apps []string) []uint32 {
 		if strings.ToUpper(app) == strings.ToUpper(api.PolicyAppAny) {
 			return []uint32{}
 		}
-		if id := utils.GetAppIDByName(app); id != 0 {
+		if id := common.GetAppIDByName(app); id != 0 {
 			ids = append(ids, id)
 		}
 	}
@@ -339,7 +339,7 @@ func normalizeApps(apps []string) ([]string, error) {
 		if strings.ToUpper(app) == strings.ToUpper(api.PolicyAppAny) {
 			return []string{api.PolicyAppAny}, nil
 		}
-		if id := utils.GetAppIDByName(app); id != 0 {
+		if id := common.GetAppIDByName(app); id != 0 {
 			if appSet.Contains(id) {
 				return nil, fmt.Errorf("duplicated application name: %s", app)
 			}
@@ -352,7 +352,7 @@ func normalizeApps(apps []string) ([]string, error) {
 	i := 0
 	names := make([]string, appSet.Cardinality())
 	for id := range appSet.Iter() {
-		names[i], _ = utils.AppNameMap[id.(uint32)]
+		names[i], _ = common.AppNameMap[id.(uint32)]
 		i++
 	}
 
@@ -1916,7 +1916,7 @@ func derivedPolicy2Rest(r *share.CLUSDerivedPolicyRule) []*api.RESTDerivedPolicy
 			var appName string
 			if app.App > 0 {
 				var ok bool
-				if appName, ok = utils.AppNameMap[app.App]; !ok {
+				if appName, ok = common.AppNameMap[app.App]; !ok {
 					appName = "Unknown"
 				}
 			} else {
