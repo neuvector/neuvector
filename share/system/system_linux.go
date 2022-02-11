@@ -1,7 +1,6 @@
 package system
 
 // #include <unistd.h>
-// #include "../../defs.h"
 import "C"
 
 import (
@@ -28,7 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netns"
 
-	"github.com/neuvector/neuvector/share/system/ns"
+	namespace "github.com/neuvector/neuvector/share/system/ns"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 	"github.com/neuvector/neuvector/share/system/sysinfo"
 )
@@ -104,7 +103,7 @@ func NewSystemTools() *SystemTools {
 		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
 			s.cgroupMemoryDir = path
 		} else {
-			s.cgroupMemoryDir = "/sys/fs/cgroup"  // last resort
+			s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
 		}
 	} else {
 		log.Info("cgroup v1")
