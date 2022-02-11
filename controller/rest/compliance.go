@@ -15,6 +15,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -30,7 +31,7 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	metas, _ := common.GetComplianceMeta()
+	metas, _ := scanUtils.GetComplianceMeta()
 	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
 }
@@ -147,7 +148,7 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
-	_, metaMap := common.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta()
 	if _, ok := metaMap[re.TestNum]; !ok {
 		return errors.New("Unknonwn compliance ID")
 	}

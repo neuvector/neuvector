@@ -10,10 +10,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -76,7 +76,7 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 
 	r.ReportedAt = time.Now().UTC()
 	r.Platform = getHostPlatform(localDev.Host.Platform, localDev.Host.Flavor)
-	r.CVEDBVersion = common.GetScannerDB().CVEDBVersion
+	r.CVEDBVersion = scanUtils.GetScannerDB().CVEDBVersion
 	r.Registries = scan.GetRegistryCount()
 
 	cacheMutexRLock()

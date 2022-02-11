@@ -15,7 +15,6 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -874,7 +873,7 @@ func handlerRegistryImageReport(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 	}
 
-	checks := common.ImageBench2REST(rept.Cmds, rept.Secrets, rept.SetIDs, cpf.filter)
+	checks := scanUtils.ImageBench2REST(rept.Cmds, rept.Secrets, rept.SetIDs, cpf.filter)
 	rept.Checks = filterComplianceChecks(checks, cpf)
 
 	resp := api.RESTScanReportData{Report: rept}

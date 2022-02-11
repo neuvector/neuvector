@@ -13,6 +13,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -98,7 +99,7 @@ func buildComplianceFilter(ccp *share.CLUSComplianceProfile) map[string][]string
 	}
 
 	// Add checks that are not in the override list
-	_, metaMap := common.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta()
 	for _, m := range metaMap {
 		if _, ok := filter[m.TestNum]; !ok {
 			filter[m.TestNum] = m.Tags

@@ -1,4 +1,4 @@
-package common
+package scan
 
 import (
 	"fmt"
@@ -12,11 +12,8 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
-	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
-
-const ScanPlatformID = "platform"
 
 type CVEDBType map[string]*share.ScanVulnerability
 
@@ -168,7 +165,7 @@ func GetSecretBenchMessage(stype, loc, evidence string) string {
 
 func ImageBench2REST(cmds []string, secrets []*api.RESTScanSecret, setids []*api.RESTScanSetIdPerm, tagMap map[string][]string) []*api.RESTBenchItem {
 	_, metaMap := GetComplianceMeta()
-	runAsRoot, hasADD, hasHEALTHCHECK := scanUtils.ParseImageCmds(cmds)
+	runAsRoot, hasADD, hasHEALTHCHECK := ParseImageCmds(cmds)
 
 	checks := make([]*api.RESTBenchItem, 0)
 	if runAsRoot {
@@ -283,7 +280,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 				rsrts = make([]*api.RESTScanSecret, 0)
 				if layer.Secrets != nil {
 					for _, s := range layer.Secrets.Logs {
-						rsrts = append(rsrts, common.ScanSecrets2REST(s))
+						rsrts = append(rsrts, ScanSecrets2REST(s))
 					}
 				}
 			}
@@ -466,7 +463,7 @@ func GatherVulTrait(traits []*VulTrait) ([]string, []string) {
 	return highs, meds
 }
 
-// --
+// ----
 
 type VPFInterface interface {
 	GetUpdatedTime() time.Time
