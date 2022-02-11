@@ -122,6 +122,7 @@ const LearnedWorkloadPrefix string = "Workload:"
 const WorkloadTunnelIF string = "Workload:ingress"
 
 const PolicyDomainNameMaxLen int = 256
+const DlpSensorNameMaxLen int = 256
 const DlpRuleNameMaxLen int = 256
 const DlpRuleCommentMaxLen int = 256
 const DlpRulePatternMaxNum int = 16

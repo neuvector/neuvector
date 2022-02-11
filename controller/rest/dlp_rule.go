@@ -398,6 +398,13 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 
 	conf := rconf.Config
 
+	if len(conf.Name) > api.DlpSensorNameMaxLen {
+		e := fmt.Sprintf("Sensor name exceed max %d length!", api.DlpSensorNameMaxLen)
+		log.WithFields(log.Fields{"name": conf.Name, "name_length": len(conf.Name)}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
+		return
+	}
+
 	if !isObjectNameValid(conf.Name) {
 		e := "Invalid characters in name"
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
