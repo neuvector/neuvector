@@ -53,7 +53,7 @@ type imageInfoCache struct {
 	medVuls         int
 	highVulsWithFix int
 	vulScore        float32
-	vulTraits       []*common.VulTrait
+	vulTraits       []*scanUtils.VulTrait
 	vulInfo         map[string]map[string]share.CLUSScannedVulInfo // 1st key is "high"/"medium". 2nd key is "{vul_name}::{package_name}"
 	lowVulInfo      []share.CLUSScannedVulInfoSimple
 	layers          []string
@@ -376,7 +376,7 @@ func RegistryStateUpdate(name string, state *share.CLUSRegistryState) {
 	}
 }
 
-func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf common.VPFInterface) (utils.Set, []string, []string) {
+func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string) {
 	smd.scanLog.WithFields(log.Fields{"registry": name, "id": id}).Debug()
 
 	var rs *Registry
@@ -399,7 +399,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 			// Filter the vulnerabilities
 			c.filteredTime = time.Now()
-			c.vulTraits = common.ExtractVulnerability(report.Vuls)
+			c.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
 			if vpf != nil {
 				alives = vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
 			} else {
@@ -457,7 +457,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	return alives, highs, meds
 }
 
-func RegistryScanCacheRefresh(ctx context.Context, vpf common.VPFInterface) {
+func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
 	log.Debug()
 
 	regs := regMapToArray()

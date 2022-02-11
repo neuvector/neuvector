@@ -23,6 +23,8 @@ const DefaultIdleTimeout uint32 = 300
 const DefaultAdminUser string = "admin"
 const DefaultAdminPass string = "admin"
 
+const ScanPlatformID = "platform"
+
 type LocalDevice struct {
 	Host   *share.CLUSHost
 	Ctrler *share.CLUSController

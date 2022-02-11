@@ -16,7 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/neuvectorcrd"
+	nvcrd "github.com/neuvector/neuvector/controller/nvk8sapi/neuvectorcrd"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
@@ -514,7 +515,7 @@ func main() {
 	}
 
 	// pre-build compliance map
-	common.GetComplianceMeta()
+	scanUtils.GetComplianceMeta()
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.

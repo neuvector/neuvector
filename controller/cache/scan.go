@@ -58,7 +58,7 @@ type scanInfo struct {
 	version         string
 	cveDBCreateTime string
 	brief           *api.RESTScanBrief
-	vulTraits       []*common.VulTrait
+	vulTraits       []*scanUtils.VulTrait
 	filteredTime    time.Time
 	idns            []api.RESTIDName
 }
@@ -360,9 +360,9 @@ func (m CacheMethod) ScanPlatform(acc *access.AccessControl) error {
 }
 
 // With scan mutex locked
-func refreshScanCache(id string, info *scanInfo, vpf common.VPFInterface) {
+func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
 	vpf.FilterVulTraits(info.vulTraits, info.idns)
-	highs, meds := common.CountVulTrait(info.vulTraits)
+	highs, meds := scanUtils.CountVulTrait(info.vulTraits)
 	brief := fillScanBrief(info, highs, meds)
 	info.brief = brief
 	info.filteredTime = time.Now()
@@ -379,7 +379,7 @@ func refreshScanCache(id string, info *scanInfo, vpf common.VPFInterface) {
 	}
 }
 
-func scanRefresh(ctx context.Context, vpf common.VPFInterface) {
+func scanRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
 	log.Debug()
 
 	i := 0
@@ -456,9 +456,9 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		info.vulTraits = common.ExtractVulnerability(report.Vuls)
+		info.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
 		alives = vpf.FilterVulTraits(info.vulTraits, info.idns)
-		highs, meds = common.GatherVulTrait(info.vulTraits)
+		highs, meds = scanUtils.GatherVulTrait(info.vulTraits)
 		brief := fillScanBrief(info, len(highs), len(meds))
 		info.brief = brief
 		info.filteredTime = time.Now()
@@ -899,7 +899,7 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 
 				log.WithFields(log.Fields{"cvedb": newDB.CVEDBVersion, "entries": len(newDB.CVEDB)}).Info()
 
-				common.SetScannerDB(newDB)
+				scanUtils.SetScannerDB(newDB)
 				scan.ScannerDBChange(newDB)
 				scannerDBChange(newDB.CVEDBVersion)
 			} else {
@@ -1044,7 +1044,7 @@ func (m CacheMethod) GetScanStatus(acc *access.AccessControl) (*api.RESTScanStat
 			status.Scanned++
 		}
 	}
-	sdb := common.GetScannerDB()
+	sdb := scanUtils.GetScannerDB()
 	status.CVEDBVersion = sdb.CVEDBVersion
 	status.CVEDBCreateTime = sdb.CVEDBCreateTime
 	return &status, nil
@@ -1109,7 +1109,7 @@ func scanBrief2REST(info *scanInfo) *api.RESTScanBrief {
 		}
 		r.BaseOS = info.baseOS
 	}
-	sdb := common.GetScannerDB()
+	sdb := scanUtils.GetScannerDB()
 	r.CVEDBVersion = sdb.CVEDBVersion
 	r.CVEDBCreateTime = sdb.CVEDBCreateTime
 	return &r
@@ -1125,8 +1125,8 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 			refreshScanCache(id, info, vpf)
 		}
 
-		sdb := common.GetScannerDB()
-		vuls := common.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
+		sdb := scanUtils.GetScannerDB()
+		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
 		return vuls, nil
 	} else {
 		return nil, common.ErrObjectNotFound

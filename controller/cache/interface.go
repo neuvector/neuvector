@@ -4,9 +4,10 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -154,7 +155,7 @@ type CacheInterface interface {
 
 	// Vulnerability
 	GetVulnerabilityProfile(name string, acc *access.AccessControl) (*api.RESTVulnerabilityProfile, error)
-	GetVulnerabilityProfileInterface(name string) common.VPFInterface
+	GetVulnerabilityProfileInterface(name string) scanUtils.VPFInterface
 	GetAllVulnerabilityProfiles(acc *access.AccessControl) []*api.RESTVulnerabilityProfile
 
 	// Admission control - non-UI

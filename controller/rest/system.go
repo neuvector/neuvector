@@ -37,6 +37,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -168,7 +169,7 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 		summary.CompoVersions = cacher.GetComponentVersions(acc)
 	}
 	summary.Workloads, summary.RunningWorkloads, summary.RunningPods = cacher.GetWorkloadCount(accSysConfig)
-	sdb := common.GetScannerDB()
+	sdb := scanUtils.GetScannerDB()
 	summary.CVEDBVersion = sdb.CVEDBVersion
 	summary.CVEDBCreateTime = sdb.CVEDBCreateTime
 	resp := api.RESTSystemSummaryData{Summary: summary}

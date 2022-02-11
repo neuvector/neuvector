@@ -12,7 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -25,16 +25,16 @@ type ScanInterface interface {
 	GetRegistryState(name string, acc *access.AccessControl) (*share.CLUSRegistryState, error)
 	GetRegistrySummary(name string, acc *access.AccessControl) (*api.RESTRegistrySummary, error)
 	GetAllRegistrySummary(acc *access.AccessControl) []*api.RESTRegistrySummary
-	GetRegistryImageSummary(name string, vpf common.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary
-	GetRegistryVulnerabilities(name string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error)
-	GetRegistryImageReport(name, id string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error)
-	GetRegistryLayersReport(name, id string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error)
+	GetRegistryImageSummary(name string, vpf scanUtils.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary
+	GetRegistryVulnerabilities(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error)
+	GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error)
+	GetRegistryLayersReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error)
 	GetRegistryDebugImages(source string) []*api.RESTRegistryDebugImage
 	StartRegistry(name string) error
 	StopRegistry(name string) error
 
-	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf common.VPFInterface) []*nvsysadmission.ScannedImageSummary
-	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf common.VPFInterface) (utils.Set, []string, []string)
+	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary
+	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string)
 	StoreRepoScanResult(result *share.ScanResult) error
 	TestRegistry(ctx context.Context, config *share.CLUSRegistryConfig, tracer httptrace.HTTPTrace) error
 }
@@ -46,7 +46,7 @@ type imageSummary struct {
 	cache   *imageInfoCache
 }
 
-func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, c *imageInfoCache, vpf common.VPFInterface) {
+func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, c *imageInfoCache, vpf scanUtils.VPFInterface) {
 	if vpf != nil && vpf.GetUpdatedTime().After(c.filteredTime) {
 		key := share.CLUSRegistryImageDataKey(rs.config.Name, id)
 		if report := clusHelper.GetScanReport(key); report != nil {
@@ -60,7 +60,7 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 	}
 }
 
-func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, vpf common.VPFInterface) {
+func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, vpf scanUtils.VPFInterface) {
 	if sum, ok := rs.summary[id]; ok && sum.Status == api.ScanStatusFinished {
 		if c, ok := rs.cache[id]; ok {
 			if s, ok := sumMap[id]; !ok || sum.ScannedAt.After(s.summary.ScannedAt) {
@@ -71,7 +71,7 @@ func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, v
 	}
 }
 
-func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf common.VPFInterface) map[string]*imageSummary {
+func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) map[string]*imageSummary {
 	sumMap := make(map[string]*imageSummary)
 
 	var ocDomain string // for openshift only, the first portion of the repo
@@ -153,7 +153,7 @@ func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vp
 	return sumMap
 }
 
-func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf common.VPFInterface) []*nvsysadmission.ScannedImageSummary {
+func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary {
 	log.WithFields(log.Fields{"registry": reqImgRegistry, "repo": reqImgRepo, "tag": reqImgTag}).Debug()
 
 	sumMap := getScannedImages(reqImgRegistry, reqImgRepo, reqImgTag, vpf)
@@ -219,7 +219,7 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 }
 
 // cache can be nil !!
-func image2RESTSummary(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, cache *imageInfoCache, vpf common.VPFInterface) *api.RESTRegistryImageSummary {
+func image2RESTSummary(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, cache *imageInfoCache, vpf scanUtils.VPFInterface) *api.RESTRegistryImageSummary {
 	s := &api.RESTRegistryImageSummary{
 		ImageID: sum.ImageID,
 		Digest:  sum.Digest,
@@ -367,7 +367,7 @@ func images2IDNames(rs *Registry, sum *share.CLUSRegistryImageSummary) []api.RES
 	return idns
 }
 
-func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error) {
+func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error) {
 	var rs *Registry
 	var ok bool
 
@@ -391,8 +391,8 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf common.VPFInter
 			if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				sdb := common.GetScannerDB()
-				vmap[id] = common.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				sdb := scanUtils.GetScannerDB()
+				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -401,7 +401,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf common.VPFInter
 	return vmap, nmap, nil
 }
 
-func (m *scanMethod) GetRegistryImageReport(name, id string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error) {
+func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error) {
 	var rs *Registry
 	var ok bool
 
@@ -430,18 +430,18 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf common.VPFInter
 	if report := clusHelper.GetScanReport(key); report == nil {
 		return nil, common.ErrObjectNotFound
 	} else {
-		sdb := common.GetScannerDB()
+		sdb := scanUtils.GetScannerDB()
 		idns := images2IDNames(rs, sum)
 
 		var rvuls []*api.RESTVulnerability
 		if vpf != nil {
 			if c, ok := rs.cache[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
-				rvuls = common.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				rvuls = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 			} else {
 				rvuls = make([]*api.RESTVulnerability, len(report.Vuls))
 				for i, vul := range report.Vuls {
-					rvuls[i] = common.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
+					rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
 				}
 				rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
 			}
@@ -449,20 +449,20 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf common.VPFInter
 
 		rmods := make([]*api.RESTScanModule, len(report.Modules))
 		for i, m := range report.Modules {
-			rmods[i] = common.ScanModule2REST(m)
+			rmods[i] = scanUtils.ScanModule2REST(m)
 		}
 
 		var rsecrets []*api.RESTScanSecret
 		if !rs.config.DisableFiles && report.Secrets != nil {
 			rsecrets = make([]*api.RESTScanSecret, 0)
 			for _, s := range report.Secrets.Logs {
-				rsecrets = append(rsecrets, common.ScanSecrets2REST(s))
+				rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
 			}
 		}
 
 		ridperms := make([]*api.RESTScanSetIdPerm, len(report.SetIdPerms))
 		for i, p := range report.SetIdPerms {
-			ridperms[i] = common.ScanSetIdPerm2REST(p)
+			ridperms[i] = scanUtils.ScanSetIdPerm2REST(p)
 		}
 
 		rrpt := &api.RESTScanReport{
@@ -478,7 +478,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf common.VPFInter
 	}
 }
 
-func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf common.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error) {
+func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error) {
 	var rs *Registry
 	var ok bool
 
@@ -507,7 +507,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf common.VPFInte
 	if report := clusHelper.GetScanReport(key); report == nil {
 		return nil, common.ErrObjectNotFound
 	} else {
-		sdb := common.GetScannerDB()
+		sdb := scanUtils.GetScannerDB()
 		idns := images2IDNames(rs, sum)
 
 		layers := make([]*api.RESTScanLayer, len(report.Layers))
@@ -515,7 +515,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf common.VPFInte
 			// Because cache doesn't save vul. trait of layers, we have to filtered them every time.
 			rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 			for i, vul := range layer.Vuls {
-				rvuls[i] = common.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
+				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
 			}
 			rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
 
@@ -523,7 +523,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf common.VPFInte
 			if !rs.config.DisableFiles && layer.Secrets != nil {
 				rsecrets = make([]*api.RESTScanSecret, 0)
 				for _, s := range layer.Secrets.Logs {
-					rsecrets = append(rsecrets, common.ScanSecrets2REST(s))
+					rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
 				}
 			}
 			layers[j] = &api.RESTScanLayer{Digest: layer.Digest, Cmds: layer.Cmds, Vuls: rvuls /*Secrets: rsecrets,*/, Size: layer.Size}
@@ -532,7 +532,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf common.VPFInte
 	}
 }
 
-func (m *scanMethod) GetRegistryImageSummary(name string, vpf common.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary {
+func (m *scanMethod) GetRegistryImageSummary(name string, vpf scanUtils.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary {
 	list := make([]*api.RESTRegistryImageSummary, 0)
 
 	var rs *Registry

@@ -13,17 +13,17 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
 func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter) *api.RESTBenchItem {
 	var r *api.RESTBenchItem
 
-	_, metaMap := common.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta()
 
 	if c, ok := metaMap[item.TestNum]; ok {
 		r = &api.RESTBenchItem{
@@ -68,14 +68,14 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 		if len(item.Message) >= 3 { // type, evidence, location
 			r.Evidence = item.Message[1]
 			r.Location = item.Message[2]
-			msg := common.GetSecretBenchMessage(item.Message[0], item.Message[2], item.Message[1])
+			msg := scanUtils.GetSecretBenchMessage(item.Message[0], item.Message[2], item.Message[1])
 			item.Message = []string{msg}
 		}
 	case share.BenchContainerSetID:
 		if len(item.Message) >= 3 { // type, evidence, location
 			r.Evidence = item.Message[1]
 			r.Location = item.Message[2]
-			msg := common.GetSetIDBenchMessage(item.Message[0], item.Message[2], item.Message[1])
+			msg := scanUtils.GetSetIDBenchMessage(item.Message[0], item.Message[2], item.Message[1])
 			item.Message = []string{msg}
 		}
 	}
@@ -884,7 +884,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 			rpt, _ := scanner.GetRegistryImageReport(reg.Name, image.ImageID, nil, "", acc)
 			if rpt != nil {
 				cpf.object = image
-				checks := common.ImageBench2REST(rpt.Cmds, rpt.Secrets, rpt.SetIDs, cpf.filter)
+				checks := scanUtils.ImageBench2REST(rpt.Cmds, rpt.Secrets, rpt.SetIDs, cpf.filter)
 				checks = filterComplianceChecks(checks, cpf)
 				for _, item := range checks {
 					if item.Level != "PASS" && item.Level != "NOTE" {

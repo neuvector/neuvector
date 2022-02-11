@@ -1,4 +1,4 @@
-package common
+package scan
 
 import (
 	"time"
@@ -96,5 +96,4 @@ func TestVulnerabilityProfile(t *testing.T) {
 			}
 		}
 	}
-
 }
