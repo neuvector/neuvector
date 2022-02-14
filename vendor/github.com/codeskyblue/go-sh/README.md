@@ -51,7 +51,7 @@ Examples are important:
 	go: count, err := sh.Echo("one two three").Command("wc", "-w").Output()
 
 	sh(in ubuntu): timeout 1s sleep 3
-	go: c := sh.Command("sleep", "3"); c.Start(); c.WaitTimeout(time.Seocnd) # default SIGKILL
+	go: c := sh.Command("sleep", "3"); c.Start(); c.WaitTimeout(time.Second) # default SIGKILL
 	go: out, err := sh.Command("sleep", "3").SetTimeout(time.Second).Output() # set session timeout and get output)
 
 	sh: echo hello | cat
@@ -59,6 +59,9 @@ Examples are important:
 
 	sh: cat # read from stdin
 	go: out, err := sh.Command("cat").SetStdin(os.Stdin).Output()
+
+	sh: ls -l > /tmp/listing.txt # write stdout to file
+	go: err := sh.Command("ls", "-l").WriteStdout("/tmp/listing.txt")
 
 If you need to keep env and dir, it is better to create a session
 
@@ -69,6 +72,14 @@ If you need to keep env and dir, it is better to create a session
 	session.Command("echo", "hello").Run()
 	# set ShowCMD to true for easily debug
 	session.ShowCMD = true
+
+By default, pipeline returns error only if the last command exit with a non-zero status. However, you can also enable `pipefail` option like `bash`. In that case, pipeline returns error if any of the commands fail and for multiple failed commands, it returns the error of rightmost failed command.
+
+	session := sh.NewSession()
+	session.PipeFail = true
+	session.Command("cat", "unknown-file").Command("echo").Run()
+
+By default, pipelines's std-error is set to last command's std-error. However, you can also combine std-errors of all commands into pipeline's std-error using `session.PipeStdErrors = true`.
 
 for more information, it better to see docs.
 [![Go Walker](http://gowalker.org/api/v1/badge)](http://gowalker.org/github.com/codeskyblue/go-sh)

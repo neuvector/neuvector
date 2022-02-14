@@ -57,10 +57,10 @@ func NewPatternMatcher(patterns []string) (*PatternMatcher, error) {
 	return pm, nil
 }
 
-// Matches verifies the provided filepath against all patterns.
-// It returns the amount of `matches` or an error in case of any failure.
-// It is not safe to be called concurrently.
-func (pm *PatternMatcher) Matches(file string) (matches uint, err error) {
+// Matches matches path against all the patterns. Matches is not safe to be
+// called concurrently
+func (pm *PatternMatcher) Matches(file string) (bool, error) {
+	matched := false
 	file = filepath.FromSlash(file)
 	parentPath := filepath.Dir(file)
 	parentPathDirs := strings.Split(parentPath, string(os.PathSeparator))
@@ -74,7 +74,7 @@ func (pm *PatternMatcher) Matches(file string) (matches uint, err error) {
 
 		match, err := pattern.match(file)
 		if err != nil {
-			return 0, err
+			return false, err
 		}
 
 		if !match && parentPath != "." {
@@ -85,20 +85,15 @@ func (pm *PatternMatcher) Matches(file string) (matches uint, err error) {
 		}
 
 		if match {
-			// Subtract negative matches if possible
-			if matches > 0 && negative {
-				matches--
-			} else {
-				matches++
-			}
+			matched = !negative
 		}
 	}
 
-	if matches > 0 {
+	if matched {
 		logrus.Debugf("Skipping excluded path: %s", file)
 	}
 
-	return matches, nil
+	return matched, nil
 }
 
 // Exclusions returns true if any of the patterns define exclusions
@@ -233,8 +228,7 @@ func Matches(file string, patterns []string) (bool, error) {
 		return false, nil
 	}
 
-	matches, err := pm.Matches(file)
-	return matches > 0, err
+	return pm.Matches(file)
 }
 
 // CopyFile copies from src to dst until either EOF is reached

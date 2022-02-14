@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build freebsd || netbsd
 // +build freebsd netbsd
 
 package unix
@@ -81,7 +82,10 @@ func Lgetxattr(link string, attr string, dest []byte) (sz int, err error) {
 // flags are unused on FreeBSD
 
 func Fsetxattr(fd int, attr string, data []byte, flags int) (err error) {
-	d := unsafe.Pointer(&data[0])
+	var d unsafe.Pointer
+	if len(data) > 0 {
+		d = unsafe.Pointer(&data[0])
+	}
 	datasiz := len(data)
 
 	nsid, a, err := xattrnamespace(attr)
@@ -94,7 +98,10 @@ func Fsetxattr(fd int, attr string, data []byte, flags int) (err error) {
 }
 
 func Setxattr(file string, attr string, data []byte, flags int) (err error) {
-	d := unsafe.Pointer(&data[0])
+	var d unsafe.Pointer
+	if len(data) > 0 {
+		d = unsafe.Pointer(&data[0])
+	}
 	datasiz := len(data)
 
 	nsid, a, err := xattrnamespace(attr)
@@ -107,7 +114,10 @@ func Setxattr(file string, attr string, data []byte, flags int) (err error) {
 }
 
 func Lsetxattr(link string, attr string, data []byte, flags int) (err error) {
-	d := unsafe.Pointer(&data[0])
+	var d unsafe.Pointer
+	if len(data) > 0 {
+		d = unsafe.Pointer(&data[0])
+	}
 	datasiz := len(data)
 
 	nsid, a, err := xattrnamespace(attr)

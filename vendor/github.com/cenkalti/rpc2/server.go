@@ -21,6 +21,7 @@ const (
 	clientDisconnected
 )
 
+// Server responds to RPC requests made by Client.
 type Server struct {
 	handlers map[string]*handler
 	eventHub *hub.Hub
@@ -43,6 +44,7 @@ type disconnectionEvent struct {
 func (connectionEvent) Kind() hub.Kind    { return clientConnected }
 func (disconnectionEvent) Kind() hub.Kind { return clientDisconnected }
 
+// NewServer returns a new Server.
 func NewServer() *Server {
 	return &Server{
 		handlers: make(map[string]*handler),
@@ -140,7 +142,8 @@ func (s *Server) Accept(lis net.Listener) {
 	for {
 		conn, err := lis.Accept()
 		if err != nil {
-			log.Fatal("rpc.Serve: accept:", err.Error())
+			log.Print("rpc.Serve: accept:", err.Error())
+			return
 		}
 		go s.ServeConn(conn)
 	}
@@ -152,7 +155,7 @@ func (s *Server) Accept(lis net.Listener) {
 // ServeConn uses the gob wire format (see package gob) on the
 // connection.  To use an alternate codec, use ServeCodec.
 func (s *Server) ServeConn(conn io.ReadWriteCloser) {
-	s.ServeCodec(newGobCodec(conn))
+	s.ServeCodec(NewGobCodec(conn))
 }
 
 // ServeCodec is like ServeConn but uses the specified codec to
@@ -161,9 +164,8 @@ func (s *Server) ServeCodec(codec Codec) {
 	s.ServeCodecWithState(codec, NewState())
 }
 
-// ServeCodec is like ServeCodec but also gives the ability to
-// associate a state variable with the client that persists
-// across RPC calls.
+// ServeCodecWithState is like ServeCodec but also gives the ability to
+// associate a state variable with the client that persists across RPC calls.
 func (s *Server) ServeCodecWithState(codec Codec, state *State) {
 	defer codec.Close()
 

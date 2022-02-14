@@ -8,13 +8,13 @@ import (
 	"os"
 	"strings"
 
-	metav1 "github.com/ericchiang/k8s/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	log "github.com/sirupsen/logrus"
 )

@@ -3,10 +3,10 @@ package cache
 import (
 	"strings"
 
-	"github.com/coreos/clair/utils/types"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 type rancherOSCVEInfo struct {
@@ -110,11 +110,11 @@ var rancherOSCVEs = []rancherOSCVEInfo{
 func locateRancherOSCVE(os, kernel string) []*share.ScanVulnerability {
 	vulns := make([]*share.ScanVulnerability, 0)
 
-	osVer, _ := types.NewVersion(os)
-	kVer, _ := types.NewVersion(kernel)
+	osVer, _ := utils.NewVersion(os)
+	kVer, _ := utils.NewVersion(kernel)
 	for _, cve := range rancherOSCVEs {
-		cveOSVer, _ := types.NewVersion(cve.os)
-		cveKVer, _ := types.NewVersion(cve.kernel)
+		cveOSVer, _ := utils.NewVersion(cve.os)
+		cveKVer, _ := utils.NewVersion(cve.kernel)
 		osCompare := osVer.Compare(cveOSVer)
 		if osCompare < 0 || (osCompare == 0 && (cve.kernel != "" && kVer.Compare(cveKVer) < 0)) {
 			vulns = append(vulns, &share.ScanVulnerability{

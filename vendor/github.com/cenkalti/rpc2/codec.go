@@ -61,7 +61,8 @@ type message struct {
 	Error  string
 }
 
-func newGobCodec(conn io.ReadWriteCloser) *gobCodec {
+// NewGobCodec returns a new rpc2.Codec using gob encoding/decoding on conn.
+func NewGobCodec(conn io.ReadWriteCloser) Codec {
 	buf := bufio.NewWriter(conn)
 	return &gobCodec{
 		rwc:    conn,

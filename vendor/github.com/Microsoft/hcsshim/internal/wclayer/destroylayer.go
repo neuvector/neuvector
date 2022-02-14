@@ -1,23 +1,25 @@
 package wclayer
 
 import (
+	"context"
+
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 // DestroyLayer will remove the on-disk files representing the layer with the given
 // path, including that layer's containing folder, if any.
-func DestroyLayer(path string) error {
-	title := "hcsshim::DestroyLayer "
-	logrus.Debugf(title+"path %s", path)
+func DestroyLayer(ctx context.Context, path string) (err error) {
+	title := "hcsshim::DestroyLayer"
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(trace.StringAttribute("path", path))
 
-	err := destroyLayer(&stdDriverInfo, path)
+	err = destroyLayer(&stdDriverInfo, path)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s", path)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+" - failed", "")
 	}
-
-	logrus.Debugf(title+"succeeded path=%s", path)
 	return nil
 }

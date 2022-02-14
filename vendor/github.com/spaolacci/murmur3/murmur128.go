@@ -3,7 +3,6 @@ package murmur3
 import (
 	//"encoding/binary"
 	"hash"
-	"math/bits"
 	"unsafe"
 )
 
@@ -69,20 +68,20 @@ func (d *digest128) bmix(p []byte) (tail []byte) {
 		k1, k2 := t[0], t[1]
 
 		k1 *= c1_128
-		k1 = bits.RotateLeft64(k1, 31)
+		k1 = (k1 << 31) | (k1 >> 33) // rotl64(k1, 31)
 		k1 *= c2_128
 		h1 ^= k1
 
-		h1 = bits.RotateLeft64(h1, 27)
+		h1 = (h1 << 27) | (h1 >> 37) // rotl64(h1, 27)
 		h1 += h2
 		h1 = h1*5 + 0x52dce729
 
 		k2 *= c2_128
-		k2 = bits.RotateLeft64(k2, 33)
+		k2 = (k2 << 33) | (k2 >> 31) // rotl64(k2, 33)
 		k2 *= c1_128
 		h2 ^= k2
 
-		h2 = bits.RotateLeft64(h2, 31)
+		h2 = (h2 << 31) | (h2 >> 33) // rotl64(h2, 31)
 		h2 += h1
 		h2 = h2*5 + 0x38495ab5
 	}
@@ -118,7 +117,7 @@ func (d *digest128) Sum128() (h1, h2 uint64) {
 		k2 ^= uint64(d.tail[8]) << 0
 
 		k2 *= c2_128
-		k2 = bits.RotateLeft64(k2, 33)
+		k2 = (k2 << 33) | (k2 >> 31) // rotl64(k2, 33)
 		k2 *= c1_128
 		h2 ^= k2
 
@@ -148,7 +147,7 @@ func (d *digest128) Sum128() (h1, h2 uint64) {
 	case 1:
 		k1 ^= uint64(d.tail[0]) << 0
 		k1 *= c1_128
-		k1 = bits.RotateLeft64(k1, 31)
+		k1 = (k1 << 31) | (k1 >> 33) // rotl64(k1, 31)
 		k1 *= c2_128
 		h1 ^= k1
 	}
@@ -177,6 +176,12 @@ func fmix64(k uint64) uint64 {
 	return k
 }
 
+/*
+func rotl64(x uint64, r byte) uint64 {
+	return (x << r) | (x >> (64 - r))
+}
+*/
+
 // Sum128 returns the MurmurHash3 sum of data. It is equivalent to the
 // following sequence (without the extra burden and the extra allocation):
 //     hasher := New128()
@@ -190,7 +195,7 @@ func Sum128(data []byte) (h1 uint64, h2 uint64) { return Sum128WithSeed(data, 0)
 //     hasher.Write(data)
 //     return hasher.Sum128()
 func Sum128WithSeed(data []byte, seed uint32) (h1 uint64, h2 uint64) {
-	d := digest128{h1: uint64(seed), h2: uint64(seed)}
+	d := &digest128{h1: uint64(seed), h2: uint64(seed)}
 	d.seed = seed
 	d.tail = d.bmix(data)
 	d.clen = len(data)

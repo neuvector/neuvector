@@ -1,4 +1,4 @@
-// +build solaris darwin freebsd
+// +build darwin freebsd openbsd solaris
 
 /*
    Copyright The containerd Authors.
@@ -25,7 +25,6 @@ import (
 
 	"github.com/containerd/continuity/sysx"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 func copyFileInfo(fi os.FileInfo, name string) error {
@@ -53,8 +52,7 @@ func copyFileInfo(fi os.FileInfo, name string) error {
 		}
 	}
 
-	timespec := []syscall.Timespec{StatAtime(st), StatMtime(st)}
-	if err := syscall.UtimesNano(name, timespec); err != nil {
+	if err := utimesNano(name, StatAtime(st), StatMtime(st)); err != nil {
 		return errors.Wrapf(err, "failed to utime %s", name)
 	}
 
@@ -69,28 +67,39 @@ func copyFileContent(dst, src *os.File) error {
 	return err
 }
 
-func copyXAttrs(dst, src string) error {
+func copyXAttrs(dst, src string, excludes map[string]struct{}, errorHandler XAttrErrorHandler) error {
 	xattrKeys, err := sysx.LListxattr(src)
 	if err != nil {
-		return errors.Wrapf(err, "failed to list xattrs on %s", src)
+		e := errors.Wrapf(err, "failed to list xattrs on %s", src)
+		if errorHandler != nil {
+			e = errorHandler(dst, src, "", e)
+		}
+		return e
 	}
 	for _, xattr := range xattrKeys {
+		if _, exclude := excludes[xattr]; exclude {
+			continue
+		}
 		data, err := sysx.LGetxattr(src, xattr)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get xattr %q on %s", xattr, src)
+			e := errors.Wrapf(err, "failed to get xattr %q on %s", xattr, src)
+			if errorHandler != nil {
+				if e = errorHandler(dst, src, xattr, e); e == nil {
+					continue
+				}
+			}
+			return e
 		}
 		if err := sysx.LSetxattr(dst, xattr, data, 0); err != nil {
-			return errors.Wrapf(err, "failed to set xattr %q on %s", xattr, dst)
+			e := errors.Wrapf(err, "failed to set xattr %q on %s", xattr, dst)
+			if errorHandler != nil {
+				if e = errorHandler(dst, src, xattr, e); e == nil {
+					continue
+				}
+			}
+			return e
 		}
 	}
 
 	return nil
-}
-
-func copyDevice(dst string, fi os.FileInfo) error {
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		return errors.New("unsupported stat type")
-	}
-	return unix.Mknod(dst, uint32(fi.Mode()), int(st.Rdev))
 }

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/codeskyblue/go-sh"
-	"github.com/coreos/clair/utils/types"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -153,7 +152,7 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	}).Info()
 
 	writeDB := false
-	newVer, _ := types.NewVersion(data.CVEDBVersion)
+	newVer, _ := utils.NewVersion(data.CVEDBVersion)
 
 	newScanner := share.CLUSScanner{
 		ID:              data.ID,
@@ -184,7 +183,7 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	if s == nil {
 		writeDB = true
 	} else {
-		ver, _ := types.NewVersion(s.CVEDBVersion)
+		ver, _ := utils.NewVersion(s.CVEDBVersion)
 		if newVer.Compare(ver) > 0 || len(data.CVEDB) > s.CVEDBEntries {
 			writeDB = true
 		}
