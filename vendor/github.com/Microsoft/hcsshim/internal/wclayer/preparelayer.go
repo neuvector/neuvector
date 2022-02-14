@@ -1,10 +1,13 @@
 package wclayer
 
 import (
+	"context"
+	"strings"
 	"sync"
 
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 var prepareLayerLock sync.Mutex
@@ -14,12 +17,17 @@ var prepareLayerLock sync.Mutex
 // parent layers, and is necessary in order to view or interact with the layer
 // as an actual filesystem (reading and writing files, creating directories, etc).
 // Disabling the filter must be done via UnprepareLayer.
-func PrepareLayer(path string, parentLayerPaths []string) error {
-	title := "hcsshim::PrepareLayer "
-	logrus.Debugf(title+"path %s", path)
+func PrepareLayer(ctx context.Context, path string, parentLayerPaths []string) (err error) {
+	title := "hcsshim::PrepareLayer"
+	ctx, span := trace.StartSpan(ctx, title)
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
 	// Generate layer descriptors
-	layers, err := layerPathsToDescriptors(parentLayerPaths)
+	layers, err := layerPathsToDescriptors(ctx, parentLayerPaths)
 	if err != nil {
 		return err
 	}
@@ -30,11 +38,7 @@ func PrepareLayer(path string, parentLayerPaths []string) error {
 	defer prepareLayerLock.Unlock()
 	err = prepareLayer(&stdDriverInfo, path, layers)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s", path)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+" - failed", "")
 	}
-
-	logrus.Debugf(title+"succeeded path=%s", path)
 	return nil
 }

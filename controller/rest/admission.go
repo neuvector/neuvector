@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	cmetav1 "github.com/ericchiang/k8s/apis/meta/v1"
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"

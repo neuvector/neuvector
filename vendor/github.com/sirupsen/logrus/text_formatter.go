@@ -37,6 +37,11 @@ type TextFormatter struct {
 	// Force quoting of all values
 	ForceQuote bool
 
+	// DisableQuote disables quoting for all values.
+	// DisableQuote will have a lower priority than ForceQuote.
+	// If both of them are set to true, quote will be forced on all values.
+	DisableQuote bool
+
 	// Override coloring based on CLICOLOR and CLICOLOR_FORCE. - https://bixense.com/clicolors/
 	EnvironmentOverrideColors bool
 
@@ -48,7 +53,10 @@ type TextFormatter struct {
 	// the time passed since beginning of execution.
 	FullTimestamp bool
 
-	// TimestampFormat to use for display when a full timestamp is printed
+	// TimestampFormat to use for display when a full timestamp is printed.
+	// The format to use is the same than for time.Format or time.Parse from the standard
+	// library.
+	// The standard Library already provides a set of predefined format.
 	TimestampFormat string
 
 	// The fields are sorted by default for a consistent output. For applications
@@ -230,6 +238,8 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *Entry, keys []strin
 		levelColor = yellow
 	case ErrorLevel, FatalLevel, PanicLevel:
 		levelColor = red
+	case InfoLevel:
+		levelColor = blue
 	default:
 		levelColor = blue
 	}
@@ -291,6 +301,9 @@ func (f *TextFormatter) needsQuoting(text string) bool {
 	}
 	if f.QuoteEmptyFields && len(text) == 0 {
 		return true
+	}
+	if f.DisableQuote {
+		return false
 	}
 	for _, ch := range text {
 		if !((ch >= 'a' && ch <= 'z') ||

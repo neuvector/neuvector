@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 
 	"github.com/cenkalti/rpc2"
@@ -83,9 +84,9 @@ type serverResponse struct {
 	Error  interface{}      `json:"error"`
 }
 type clientRequest struct {
-	Method string        `json:"method"`
-	Params []interface{} `json:"params"`
-	Id     *uint64       `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+	Id     *uint64     `json:"id"`
 }
 
 func (c *jsonCodec) ReadHeader(req *rpc2.Request, resp *rpc2.Response) error {
@@ -149,14 +150,21 @@ func (c *jsonCodec) ReadRequestBody(x interface{}) error {
 	if c.serverRequest.Params == nil {
 		return errMissingParams
 	}
-	var params *[]interface{}
-	switch x := x.(type) {
-	case *[]interface{}:
-		params = x
-	default:
-		params = &[]interface{}{x}
+
+	var err error
+
+	// Check if x points to a slice of any kind
+	rt := reflect.TypeOf(x)
+	if rt.Kind() == reflect.Ptr && rt.Elem().Kind() == reflect.Slice {
+		// If it's a slice, unmarshal as is
+		err = json.Unmarshal(*c.serverRequest.Params, x)
+	} else {
+		// Anything else unmarshal into a slice containing x
+		params := &[]interface{}{x}
+		err = json.Unmarshal(*c.serverRequest.Params, params)
 	}
-	return json.Unmarshal(*c.serverRequest.Params, params)
+
+	return err
 }
 
 func (c *jsonCodec) ReadResponseBody(x interface{}) error {
@@ -168,12 +176,16 @@ func (c *jsonCodec) ReadResponseBody(x interface{}) error {
 
 func (c *jsonCodec) WriteRequest(r *rpc2.Request, param interface{}) error {
 	req := &clientRequest{Method: r.Method}
-	switch param := param.(type) {
-	case []interface{}:
+
+	// Check if param is a slice of any kind
+	if param != nil && reflect.TypeOf(param).Kind() == reflect.Slice {
+		// If it's a slice, leave as is
 		req.Params = param
-	default:
+	} else {
+		// Put anything else into a slice
 		req.Params = []interface{}{param}
 	}
+
 	if r.Seq == 0 {
 		// Notification
 		req.Id = nil

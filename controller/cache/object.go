@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ericchiang/k8s"
-	corev1 "github.com/ericchiang/k8s/apis/core/v1"
+	"github.com/neuvector/k8s"
+	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"

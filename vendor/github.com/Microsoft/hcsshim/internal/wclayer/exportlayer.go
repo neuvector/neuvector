@@ -1,15 +1,15 @@
 package wclayer
 
 import (
-	"io"
+	"context"
 	"io/ioutil"
 	"os"
-	"syscall"
+	"strings"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/Microsoft/hcsshim/internal/interop"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 // ExportLayer will create a folder at exportFolderPath and fill that folder with
@@ -17,24 +17,26 @@ import (
 // format includes any metadata required for later importing the layer (using
 // ImportLayer), and requires the full list of parent layer paths in order to
 // perform the export.
-func ExportLayer(path string, exportFolderPath string, parentLayerPaths []string) error {
-	title := "hcsshim::ExportLayer "
-	logrus.Debugf(title+"path %s folder %s", path, exportFolderPath)
+func ExportLayer(ctx context.Context, path string, exportFolderPath string, parentLayerPaths []string) (err error) {
+	title := "hcsshim::ExportLayer"
+	ctx, span := trace.StartSpan(ctx, title)
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("exportFolderPath", exportFolderPath),
+		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
 	// Generate layer descriptors
-	layers, err := layerPathsToDescriptors(parentLayerPaths)
+	layers, err := layerPathsToDescriptors(ctx, parentLayerPaths)
 	if err != nil {
 		return err
 	}
 
 	err = exportLayer(&stdDriverInfo, path, exportFolderPath, layers)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s folder=%s", path, exportFolderPath)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+" - failed", "")
 	}
-
-	logrus.Debugf(title+"succeeded path=%s folder=%s", path, exportFolderPath)
 	return nil
 }
 
@@ -44,104 +46,49 @@ type LayerReader interface {
 	Close() error
 }
 
-// FilterLayerReader provides an interface for extracting the contents of an on-disk layer.
-type FilterLayerReader struct {
-	context uintptr
-}
-
-// Next reads the next available file from a layer, ensuring that parent directories are always read
-// before child files and directories.
-//
-// Next returns the file's relative path, size, and basic file metadata. Read() should be used to
-// extract a Win32 backup stream with the remainder of the metadata and the data.
-func (r *FilterLayerReader) Next() (string, int64, *winio.FileBasicInfo, error) {
-	var fileNamep *uint16
-	fileInfo := &winio.FileBasicInfo{}
-	var deleted uint32
-	var fileSize int64
-	err := exportLayerNext(r.context, &fileNamep, fileInfo, &fileSize, &deleted)
-	if err != nil {
-		if err == syscall.ERROR_NO_MORE_FILES {
-			err = io.EOF
-		} else {
-			err = hcserror.New(err, "ExportLayerNext", "")
-		}
-		return "", 0, nil, err
-	}
-	fileName := interop.ConvertAndFreeCoTaskMemString(fileNamep)
-	if deleted != 0 {
-		fileInfo = nil
-	}
-	if fileName[0] == '\\' {
-		fileName = fileName[1:]
-	}
-	return fileName, fileSize, fileInfo, nil
-}
-
-// Read reads from the current file's Win32 backup stream.
-func (r *FilterLayerReader) Read(b []byte) (int, error) {
-	var bytesRead uint32
-	err := exportLayerRead(r.context, b, &bytesRead)
-	if err != nil {
-		return 0, hcserror.New(err, "ExportLayerRead", "")
-	}
-	if bytesRead == 0 {
-		return 0, io.EOF
-	}
-	return int(bytesRead), nil
-}
-
-// Close frees resources associated with the layer reader. It will return an
-// error if there was an error while reading the layer or of the layer was not
-// completely read.
-func (r *FilterLayerReader) Close() (err error) {
-	if r.context != 0 {
-		err = exportLayerEnd(r.context)
-		if err != nil {
-			err = hcserror.New(err, "ExportLayerEnd", "")
-		}
-		r.context = 0
-	}
-	return
-}
-
 // NewLayerReader returns a new layer reader for reading the contents of an on-disk layer.
 // The caller must have taken the SeBackupPrivilege privilege
 // to call this and any methods on the resulting LayerReader.
-func NewLayerReader(path string, parentLayerPaths []string) (LayerReader, error) {
-	if procExportLayerBegin.Find() != nil {
-		// The new layer reader is not available on this Windows build. Fall back to the
-		// legacy export code path.
-		exportPath, err := ioutil.TempDir("", "hcs")
+func NewLayerReader(ctx context.Context, path string, parentLayerPaths []string) (_ LayerReader, err error) {
+	ctx, span := trace.StartSpan(ctx, "hcsshim::NewLayerReader")
+	defer func() {
 		if err != nil {
-			return nil, err
+			oc.SetSpanStatus(span, err)
+			span.End()
 		}
-		err = ExportLayer(path, exportPath, parentLayerPaths)
-		if err != nil {
-			os.RemoveAll(exportPath)
-			return nil, err
-		}
-		return &legacyLayerReaderWrapper{newLegacyLayerReader(exportPath)}, nil
-	}
+	}()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
-	layers, err := layerPathsToDescriptors(parentLayerPaths)
+	exportPath, err := ioutil.TempDir("", "hcs")
 	if err != nil {
 		return nil, err
 	}
-	r := &FilterLayerReader{}
-	err = exportLayerBegin(&stdDriverInfo, path, layers, &r.context)
+	err = ExportLayer(ctx, path, exportPath, parentLayerPaths)
 	if err != nil {
-		return nil, hcserror.New(err, "ExportLayerBegin", "")
+		os.RemoveAll(exportPath)
+		return nil, err
 	}
-	return r, err
+	return &legacyLayerReaderWrapper{
+		ctx:               ctx,
+		s:                 span,
+		legacyLayerReader: newLegacyLayerReader(exportPath),
+	}, nil
 }
 
 type legacyLayerReaderWrapper struct {
+	ctx context.Context
+	s   *trace.Span
+
 	*legacyLayerReader
 }
 
-func (r *legacyLayerReaderWrapper) Close() error {
-	err := r.legacyLayerReader.Close()
+func (r *legacyLayerReaderWrapper) Close() (err error) {
+	defer r.s.End()
+	defer func() { oc.SetSpanStatus(r.s, err) }()
+
+	err = r.legacyLayerReader.Close()
 	os.RemoveAll(r.root)
 	return err
 }

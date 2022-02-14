@@ -2,6 +2,7 @@
 package rpc2
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -26,6 +27,7 @@ type Client struct {
 	handlers   map[string]*handler
 	disconnect chan struct{}
 	State      *State // additional information to associate with client
+	blocking   bool   // whether to block request handling
 }
 
 // NewClient returns a new Client to handle requests to the
@@ -33,7 +35,7 @@ type Client struct {
 // It adds a buffer to the write side of the connection so
 // the header and payload are sent as a unit.
 func NewClient(conn io.ReadWriteCloser) *Client {
-	return NewClientWithCodec(newGobCodec(conn))
+	return NewClientWithCodec(NewGobCodec(conn))
 }
 
 // NewClientWithCodec is like NewClient but uses the specified
@@ -46,6 +48,13 @@ func NewClientWithCodec(codec Codec) *Client {
 		disconnect: make(chan struct{}),
 		seq:        1, // 0 means notification.
 	}
+}
+
+// SetBlocking puts the client in blocking mode.
+// In blocking mode, received requests are processes synchronously.
+// If you have methods that may take a long time, other subsequent requests may time out.
+func (c *Client) SetBlocking(blocking bool) {
+	c.blocking = blocking
 }
 
 // Run the client's read loop.
@@ -83,12 +92,12 @@ func (c *Client) readLoop() {
 		if req.Method != "" {
 			// request comes to server
 			if err = c.readRequest(&req); err != nil {
-				log.Println("rpc2: error reading request:", err.Error())
+				debugln("rpc2: error reading request:", err.Error())
 			}
 		} else {
 			// response comes to client
 			if err = c.readResponse(&resp); err != nil {
-				log.Println("rpc2: error reading response:", err.Error())
+				debugln("rpc2: error reading response:", err.Error())
 			}
 		}
 	}
@@ -111,9 +120,38 @@ func (c *Client) readLoop() {
 	c.mutex.Unlock()
 	c.sending.Unlock()
 	if err != io.EOF && !closing && !c.server {
-		log.Println("rpc2: client protocol error:", err)
+		debugln("rpc2: client protocol error:", err)
 	}
 	close(c.disconnect)
+	if !closing {
+		c.codec.Close()
+	}
+}
+
+func (c *Client) handleRequest(req Request, method *handler, argv reflect.Value) {
+	// Invoke the method, providing a new value for the reply.
+	replyv := reflect.New(method.replyType.Elem())
+
+	returnValues := method.fn.Call([]reflect.Value{reflect.ValueOf(c), argv, replyv})
+
+	// Do not send response if request is a notification.
+	if req.Seq == 0 {
+		return
+	}
+
+	// The return value for the method is an error.
+	errInter := returnValues[0].Interface()
+	errmsg := ""
+	if errInter != nil {
+		errmsg = errInter.(error).Error()
+	}
+	resp := &Response{
+		Seq:   req.Seq,
+		Error: errmsg,
+	}
+	if err := c.codec.WriteResponse(resp, replyv.Interface()); err != nil {
+		debugln("rpc2: error writing response:", err.Error())
+	}
 }
 
 func (c *Client) readRequest(req *Request) error {
@@ -143,30 +181,11 @@ func (c *Client) readRequest(req *Request) error {
 		argv = argv.Elem()
 	}
 
-	// Invoke the method, providing a new value for the reply.
-	replyv := reflect.New(method.replyType.Elem())
-
-	// Call handler function.
-	go func(req Request) {
-		returnValues := method.fn.Call([]reflect.Value{reflect.ValueOf(c), argv, replyv})
-
-		// Do not send response if request is a notification.
-		if req.Seq == 0 {
-			return
-		}
-
-		// The return value for the method is an error.
-		errInter := returnValues[0].Interface()
-		errmsg := ""
-		if errInter != nil {
-			errmsg = errInter.(error).Error()
-		}
-		resp := &Response{
-			Seq:   req.Seq,
-			Error: errmsg,
-		}
-		c.codec.WriteResponse(resp, replyv.Interface())
-	}(*req)
+	if c.blocking {
+		c.handleRequest(*req, method, argv)
+	} else {
+		go c.handleRequest(*req, method, argv)
+	}
 
 	return nil
 }
@@ -208,7 +227,7 @@ func (c *Client) readResponse(resp *Response) error {
 		call.done()
 	}
 
-	return nil
+	return err
 }
 
 // Close waits for active calls to finish and closes the codec.
@@ -248,10 +267,22 @@ func (c *Client) Go(method string, args interface{}, reply interface{}, done cha
 	return call
 }
 
+// CallWithContext invokes the named function, waits for it to complete, and
+// returns its error status, or an error from Context timeout.
+func (c *Client) CallWithContext(ctx context.Context, method string, args interface{}, reply interface{}) error {
+	call := c.Go(method, args, reply, make(chan *Call, 1))
+	select {
+	case <-call.Done:
+		return call.Error
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
+}
+
 // Call invokes the named function, waits for it to complete, and returns its error status.
 func (c *Client) Call(method string, args interface{}, reply interface{}) error {
-	call := <-c.Go(method, args, reply, make(chan *Call, 1)).Done
-	return call.Error
+	return c.CallWithContext(context.Background(), method, args, reply)
 }
 
 func (call *Call) done() {
@@ -261,7 +292,7 @@ func (call *Call) done() {
 	default:
 		// We don't want to block here.  It is the caller's responsibility to make
 		// sure the channel has enough buffer space. See comment in Go().
-		log.Println("rpc2: discarding Call reply due to insufficient Done chan capacity")
+		debugln("rpc2: discarding Call reply due to insufficient Done chan capacity")
 	}
 }
 
@@ -273,6 +304,7 @@ func (e ServerError) Error() string {
 	return string(e)
 }
 
+// ErrShutdown is returned when the connection is closing or closed.
 var ErrShutdown = errors.New("connection is shut down")
 
 // Call represents an active RPC.
@@ -317,6 +349,7 @@ func (c *Client) send(call *Call) {
 	}
 }
 
+// Notify sends a request to the receiver but does not wait for a return value.
 func (c *Client) Notify(method string, args interface{}) error {
 	c.sending.Lock()
 	defer c.sending.Unlock()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
 
 var native = nl.NativeEndian()
@@ -89,7 +90,7 @@ func vethAdd(link netlink.Link) error {
 			attr = nl.NewRtAttr(syscall.IFLA_NET_NS_PID, val)
 		case netlink.NsFd:
 			val := nl.Uint32Attr(uint32(base.Namespace.(netlink.NsFd)))
-			attr = nl.NewRtAttr(nl.IFLA_NET_NS_FD, val)
+			attr = nl.NewRtAttr(unix.IFLA_NET_NS_FD, val)
 		}
 
 		req.AddData(attr)

@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 
-	apiextv1 "github.com/ericchiang/k8s/apis/apiextensions/v1"
-	apiextv1b1 "github.com/ericchiang/k8s/apis/apiextensions/v1beta1"
+	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
+	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
 	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"

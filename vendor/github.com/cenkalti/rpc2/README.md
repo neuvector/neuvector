@@ -19,41 +19,64 @@ Example server
 ---------------
 
 ```go
+package main
+
+import (
+	"fmt"
+	"net"
+
+	"github.com/cenkalti/rpc2"
+)
+
 type Args struct{ A, B int }
 type Reply int
 
-srv := rpc2.NewServer()
-srv.Handle("add", func(client *rpc2.Client, args *Args, reply *Reply) error {
-        // Reversed call (server to client)
-        var rep Reply
-        client.Call("mult", Args{2, 3}, &rep)
-        fmt.Println("mult result:", rep)
+func main() {
+	srv := rpc2.NewServer()
+	srv.Handle("add", func(client *rpc2.Client, args *Args, reply *Reply) error {
 
-        *reply = Reply(args.A + args.B)
-        return nil
-})
+		// Reversed call (server to client)
+		var rep Reply
+		client.Call("mult", Args{2, 3}, &rep)
+		fmt.Println("mult result:", rep)
 
-lis, _ := net.Listen("tcp", "127.0.0.1:5000")
-srv.Accept(lis)
+		*reply = Reply(args.A + args.B)
+		return nil
+	})
+
+	lis, _ := net.Listen("tcp", "127.0.0.1:5000")
+	srv.Accept(lis)
+}
 ```
 
 Example Client
 ---------------
 
 ```go
+package main
+
+import (
+	"fmt"
+	"net"
+
+	"github.com/cenkalti/rpc2"
+)
+
 type Args struct{ A, B int }
 type Reply int
 
-conn, _ := net.Dial("tcp", "127.0.0.1:5000")
+func main() {
+	conn, _ := net.Dial("tcp", "127.0.0.1:5000")
 
-clt := rpc2.NewClient(conn)
-clt.Handle("mult", func(client *rpc2.Client, args *Args, reply *Reply) error {
-        *reply = Reply(args.A * args.B)
-        return nil
-})
-go clt.Run()
+	clt := rpc2.NewClient(conn)
+	clt.Handle("mult", func(client *rpc2.Client, args *Args, reply *Reply) error {
+		*reply = Reply(args.A * args.B)
+		return nil
+	})
+	go clt.Run()
 
-var rep Reply
-clt.Call("add", Args{1, 2}, &rep)
-fmt.Println("add result:", rep)
+	var rep Reply
+	clt.Call("add", Args{1, 2}, &rep)
+	fmt.Println("add result:", rep)
+}
 ```

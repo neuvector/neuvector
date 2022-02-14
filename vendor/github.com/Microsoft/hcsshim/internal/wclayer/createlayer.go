@@ -1,23 +1,27 @@
 package wclayer
 
 import (
+	"context"
+
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 // CreateLayer creates a new, empty, read-only layer on the filesystem based on
 // the parent layer provided.
-func CreateLayer(path, parent string) error {
-	title := "hcsshim::CreateLayer "
-	logrus.Debugf(title+"ID %s parent %s", path, parent)
+func CreateLayer(ctx context.Context, path, parent string) (err error) {
+	title := "hcsshim::CreateLayer"
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("parent", parent))
 
-	err := createLayer(&stdDriverInfo, path, parent)
+	err = createLayer(&stdDriverInfo, path, parent)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s parent=%s", path, parent)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+" - failed", "")
 	}
-
-	logrus.Debugf(title+"- succeeded path=%s parent=%s", path, parent)
 	return nil
 }

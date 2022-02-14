@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ericchiang/k8s"
-	apiv1 "github.com/ericchiang/k8s/apis/admissionregistration/v1"
-	apiv1beta1 "github.com/ericchiang/k8s/apis/admissionregistration/v1beta1"
-	corev1 "github.com/ericchiang/k8s/apis/core/v1"
-	metav1 "github.com/ericchiang/k8s/apis/meta/v1"
+	"github.com/neuvector/k8s"
+	apiv1 "github.com/neuvector/k8s/apis/admissionregistration/v1"
+	apiv1beta1 "github.com/neuvector/k8s/apis/admissionregistration/v1beta1"
+	corev1 "github.com/neuvector/k8s/apis/core/v1"
+	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"

@@ -1,22 +1,24 @@
 package wclayer
 
 import (
+	"context"
+
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 // DeactivateLayer will dismount a layer that was mounted via ActivateLayer.
-func DeactivateLayer(path string) error {
-	title := "hcsshim::DeactivateLayer "
-	logrus.Debugf(title+"path %s", path)
+func DeactivateLayer(ctx context.Context, path string) (err error) {
+	title := "hcsshim::DeactivateLayer"
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(trace.StringAttribute("path", path))
 
-	err := deactivateLayer(&stdDriverInfo, path)
+	err = deactivateLayer(&stdDriverInfo, path)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s", path)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+"- failed", "")
 	}
-
-	logrus.Debugf(title+"succeeded path=%s", path)
 	return nil
 }

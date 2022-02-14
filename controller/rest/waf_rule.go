@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	cmetav1 "github.com/ericchiang/k8s/apis/meta/v1"
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/ghodss/yaml"
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"

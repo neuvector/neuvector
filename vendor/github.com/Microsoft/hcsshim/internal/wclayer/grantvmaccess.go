@@ -1,24 +1,26 @@
 package wclayer
 
 import (
-	"fmt"
+	"context"
 
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"go.opencensus.io/trace"
 )
 
 // GrantVmAccess adds access to a file for a given VM
-func GrantVmAccess(vmid string, filepath string) error {
-	title := fmt.Sprintf("hcsshim::GrantVmAccess id:%s path:%s ", vmid, filepath)
-	logrus.Debugf(title)
+func GrantVmAccess(ctx context.Context, vmid string, filepath string) (err error) {
+	title := "hcsshim::GrantVmAccess"
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("vm-id", vmid),
+		trace.StringAttribute("path", filepath))
 
-	err := grantVmAccess(vmid, filepath)
+	err = grantVmAccess(vmid, filepath)
 	if err != nil {
-		err = hcserror.Errorf(err, title, "path=%s", filepath)
-		logrus.Error(err)
-		return err
+		return hcserror.New(err, title+" - failed", "")
 	}
-
-	logrus.Debugf(title + " - succeeded")
 	return nil
 }

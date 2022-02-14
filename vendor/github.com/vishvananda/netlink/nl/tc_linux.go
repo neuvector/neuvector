@@ -1,6 +1,7 @@
 package nl
 
 import (
+	"encoding/binary"
 	"unsafe"
 )
 
@@ -50,9 +51,27 @@ const (
 )
 
 const (
+	TCA_ACT_UNSPEC = iota
+	TCA_ACT_KIND
+	TCA_ACT_OPTIONS
+	TCA_ACT_INDEX
+	TCA_ACT_STATS
+	TCA_ACT_MAX
+)
+
+const (
 	TCA_PRIO_UNSPEC = iota
 	TCA_PRIO_MQ
 	TCA_PRIO_MAX = TCA_PRIO_MQ
+)
+
+const (
+	TCA_STATS_UNSPEC = iota
+	TCA_STATS_BASIC
+	TCA_STATS_RATE_EST
+	TCA_STATS_QUEUE
+	TCA_STATS_APP
+	TCA_STATS_MAX = TCA_STATS_APP
 )
 
 const (
@@ -69,7 +88,11 @@ const (
 	SizeofTcHtbGlob      = 0x14
 	SizeofTcU32Key       = 0x10
 	SizeofTcU32Sel       = 0x10 // without keys
-	SizeofTcMirred       = 0x1c
+	SizeofTcGen          = 0x14
+	SizeofTcConnmark     = SizeofTcGen + 0x04
+	SizeofTcMirred       = SizeofTcGen + 0x08
+	SizeofTcTunnelKey    = SizeofTcGen + 0x04
+	SizeofTcSkbEdit      = SizeofTcGen
 	SizeofTcPolice       = 2*SizeofTcRateSpec + 0x20
 )
 
@@ -402,6 +425,57 @@ func (x *TcHtbGlob) Serialize() []byte {
 	return (*(*[SizeofTcHtbGlob]byte)(unsafe.Pointer(x)))[:]
 }
 
+// HFSC
+
+type Curve struct {
+	m1 uint32
+	d  uint32
+	m2 uint32
+}
+
+type HfscCopt struct {
+	Rsc Curve
+	Fsc Curve
+	Usc Curve
+}
+
+func (c *Curve) Attrs() (uint32, uint32, uint32) {
+	return c.m1, c.d, c.m2
+}
+
+func (c *Curve) Set(m1 uint32, d uint32, m2 uint32) {
+	c.m1 = m1
+	c.d = d
+	c.m2 = m2
+}
+
+func DeserializeHfscCurve(b []byte) *Curve {
+	return &Curve{
+		m1: binary.LittleEndian.Uint32(b[0:4]),
+		d:  binary.LittleEndian.Uint32(b[4:8]),
+		m2: binary.LittleEndian.Uint32(b[8:12]),
+	}
+}
+
+func SerializeHfscCurve(c *Curve) (b []byte) {
+	t := make([]byte, binary.MaxVarintLen32)
+	binary.LittleEndian.PutUint32(t, c.m1)
+	b = append(b, t[:4]...)
+	binary.LittleEndian.PutUint32(t, c.d)
+	b = append(b, t[:4]...)
+	binary.LittleEndian.PutUint32(t, c.m2)
+	b = append(b, t[:4]...)
+	return b
+}
+
+type TcHfscOpt struct {
+	Defcls uint16
+}
+
+func (x *TcHfscOpt) Serialize() []byte {
+	return (*(*[2]byte)(unsafe.Pointer(x)))[:]
+}
+
 const (
 	TCA_U32_UNSPEC = iota
 	TCA_U32_CLASSID
@@ -506,6 +580,117 @@ func (x *TcU32Sel) Serialize() []byte {
 	return buf
 }
 
+type TcGen struct {
+	Index   uint32
+	Capab   uint32
+	Action  int32
+	Refcnt  int32
+	Bindcnt int32
+}
+
+func (msg *TcGen) Len() int {
+	return SizeofTcGen
+}
+
+func DeserializeTcGen(b []byte) *TcGen {
+	return (*TcGen)(unsafe.Pointer(&b[0:SizeofTcGen][0]))
+}
+
+func (x *TcGen) Serialize() []byte {
+	return (*(*[SizeofTcGen]byte)(unsafe.Pointer(x)))[:]
+}
+
+// #define tc_gen \
+//   __u32                 index; \
+//   __u32                 capab; \
+//   int                   action; \
+//   int                   refcnt; \
+//   int                   bindcnt
+
+const (
+	TCA_ACT_GACT = 5
+)
+
+const (
+	TCA_GACT_UNSPEC = iota
+	TCA_GACT_TM
+	TCA_GACT_PARMS
+	TCA_GACT_PROB
+	TCA_GACT_MAX = TCA_GACT_PROB
+)
+
+type TcGact TcGen
+
+const (
+	TCA_ACT_BPF = 13
+)
+
+const (
+	TCA_ACT_BPF_UNSPEC = iota
+	TCA_ACT_BPF_TM
+	TCA_ACT_BPF_PARMS
+	TCA_ACT_BPF_OPS_LEN
+	TCA_ACT_BPF_OPS
+	TCA_ACT_BPF_FD
+	TCA_ACT_BPF_NAME
+	TCA_ACT_BPF_MAX = TCA_ACT_BPF_NAME
+)
+
+const (
+	TCA_BPF_FLAG_ACT_DIRECT uint32 = 1 << iota
+)
+
+const (
+	TCA_BPF_UNSPEC = iota
+	TCA_BPF_ACT
+	TCA_BPF_POLICE
+	TCA_BPF_CLASSID
+	TCA_BPF_OPS_LEN
+	TCA_BPF_OPS
+	TCA_BPF_FD
+	TCA_BPF_NAME
+	TCA_BPF_FLAGS
+	TCA_BPF_FLAGS_GEN
+	TCA_BPF_TAG
+	TCA_BPF_ID
+	TCA_BPF_MAX = TCA_BPF_ID
+)
+
+type TcBpf TcGen
+
+const (
+	TCA_ACT_CONNMARK = 14
+)
+
+const (
+	TCA_CONNMARK_UNSPEC = iota
+	TCA_CONNMARK_PARMS
+	TCA_CONNMARK_TM
+	TCA_CONNMARK_MAX = TCA_CONNMARK_TM
+)
+
+// struct tc_connmark {
+//   tc_gen;
+//   __u16 zone;
+// };
+
+type TcConnmark struct {
+	TcGen
+	Zone uint16
+}
+
+func (msg *TcConnmark) Len() int {
+	return SizeofTcConnmark
+}
+
+func DeserializeTcConnmark(b []byte) *TcConnmark {
+	return (*TcConnmark)(unsafe.Pointer(&b[0:SizeofTcConnmark][0]))
+}
+
+func (x *TcConnmark) Serialize() []byte {
+	return (*(*[SizeofTcConnmark]byte)(unsafe.Pointer(x)))[:]
+}
+
 const (
 	TCA_ACT_MIRRED = 8
 )
@@ -517,31 +702,6 @@ const (
 	TCA_MIRRED_MAX = TCA_MIRRED_PARMS
 )
 
-const (
-	TCA_EGRESS_REDIR   = 1 /* packet redirect to EGRESS*/
-	TCA_EGRESS_MIRROR  = 2 /* mirror packet to EGRESS */
-	TCA_INGRESS_REDIR  = 3 /* packet redirect to INGRESS*/
-	TCA_INGRESS_MIRROR = 4 /* mirror packet to INGRESS */
-)
-
-const (
-	TC_ACT_UNSPEC     = int32(-1)
-	TC_ACT_OK         = 0
-	TC_ACT_RECLASSIFY = 1
-	TC_ACT_SHOT       = 2
-	TC_ACT_PIPE       = 3
-	TC_ACT_STOLEN     = 4
-	TC_ACT_QUEUED     = 5
-	TC_ACT_REPEAT     = 6
-	TC_ACT_JUMP       = 0x10000000
-)
-
-// #define tc_gen \
-//   __u32                 index; \
-//   __u32                 capab; \
-//   int                   action; \
-//   int                   refcnt; \
-//   int                   bindcnt
 // struct tc_mirred {
 // 	tc_gen;
 // 	int                     eaction;   /* one of IN/EGRESS_MIRROR/REDIR */
@@ -549,11 +709,7 @@ const (
 // };
 
 type TcMirred struct {
-	Index   uint32
-	Capab   uint32
-	Action  int32
-	Refcnt  int32
-	Bindcnt int32
+	TcGen
 	Eaction int32
 	Ifindex uint32
 }
@@ -571,12 +727,61 @@ func (x *TcMirred) Serialize() []byte {
 }
 
 const (
-	TC_POLICE_UNSPEC     = TC_ACT_UNSPEC
-	TC_POLICE_OK         = TC_ACT_OK
-	TC_POLICE_RECLASSIFY = TC_ACT_RECLASSIFY
-	TC_POLICE_SHOT       = TC_ACT_SHOT
-	TC_POLICE_PIPE       = TC_ACT_PIPE
+	TCA_TUNNEL_KEY_UNSPEC = iota
+	TCA_TUNNEL_KEY_TM
+	TCA_TUNNEL_KEY_PARMS
+	TCA_TUNNEL_KEY_ENC_IPV4_SRC
+	TCA_TUNNEL_KEY_ENC_IPV4_DST
+	TCA_TUNNEL_KEY_ENC_IPV6_SRC
+	TCA_TUNNEL_KEY_ENC_IPV6_DST
+	TCA_TUNNEL_KEY_ENC_KEY_ID
+	TCA_TUNNEL_KEY_MAX = TCA_TUNNEL_KEY_ENC_KEY_ID
 )
+
+type TcTunnelKey struct {
+	TcGen
+	Action int32
+}
+
+func (x *TcTunnelKey) Len() int {
+	return SizeofTcTunnelKey
+}
+
+func DeserializeTunnelKey(b []byte) *TcTunnelKey {
+	return (*TcTunnelKey)(unsafe.Pointer(&b[0:SizeofTcTunnelKey][0]))
+}
+
+func (x *TcTunnelKey) Serialize() []byte {
+	return (*(*[SizeofTcTunnelKey]byte)(unsafe.Pointer(x)))[:]
+}
+
+const (
+	TCA_SKBEDIT_UNSPEC = iota
+	TCA_SKBEDIT_TM
+	TCA_SKBEDIT_PARMS
+	TCA_SKBEDIT_PRIORITY
+	TCA_SKBEDIT_QUEUE_MAPPING
+	TCA_SKBEDIT_MARK
+	TCA_SKBEDIT_PAD
+	TCA_SKBEDIT_PTYPE
+	TCA_SKBEDIT_MAX = TCA_SKBEDIT_MARK
+)
+
+type TcSkbEdit struct {
+	TcGen
+}
+
+func (x *TcSkbEdit) Len() int {
+	return SizeofTcSkbEdit
+}
+
+func DeserializeSkbEdit(b []byte) *TcSkbEdit {
+	return (*TcSkbEdit)(unsafe.Pointer(&b[0:SizeofTcSkbEdit][0]))
+}
+
+func (x *TcSkbEdit) Serialize() []byte {
+	return (*(*[SizeofTcSkbEdit]byte)(unsafe.Pointer(x)))[:]
+}
 
 // struct tc_police {
 // 	__u32			index;
@@ -624,4 +829,46 @@ const (
 	TCA_FW_ACT
 	TCA_FW_MASK
 	TCA_FW_MAX = TCA_FW_MASK
+)
+
+const (
+	TCA_MATCHALL_UNSPEC = iota
+	TCA_MATCHALL_CLASSID
+	TCA_MATCHALL_ACT
+	TCA_MATCHALL_FLAGS
+)
+
+const (
+	TCA_FQ_UNSPEC             = iota
+	TCA_FQ_PLIMIT             // limit of total number of packets in queue
+	TCA_FQ_FLOW_PLIMIT        // limit of packets per flow
+	TCA_FQ_QUANTUM            // RR quantum
+	TCA_FQ_INITIAL_QUANTUM    // RR quantum for new flow
+	TCA_FQ_RATE_ENABLE        // enable/disable rate limiting
+	TCA_FQ_FLOW_DEFAULT_RATE  // obsolete do not use
+	TCA_FQ_FLOW_MAX_RATE      // per flow max rate
+	TCA_FQ_BUCKETS_LOG        // log2(number of buckets)
+	TCA_FQ_FLOW_REFILL_DELAY  // flow credit refill delay in usec
+	TCA_FQ_ORPHAN_MASK        // mask applied to orphaned skb hashes
+	TCA_FQ_LOW_RATE_THRESHOLD // per packet delay under this rate
+)
+
+const (
+	TCA_FQ_CODEL_UNSPEC = iota
+	TCA_FQ_CODEL_TARGET
+	TCA_FQ_CODEL_LIMIT
+	TCA_FQ_CODEL_INTERVAL
+	TCA_FQ_CODEL_ECN
+	TCA_FQ_CODEL_FLOWS
+	TCA_FQ_CODEL_QUANTUM
+	TCA_FQ_CODEL_CE_THRESHOLD
+	TCA_FQ_CODEL_DROP_BATCH_SIZE
+	TCA_FQ_CODEL_MEMORY_LIMIT
+)
+
+const (
+	TCA_HFSC_UNSPEC = iota
+	TCA_HFSC_RSC
+	TCA_HFSC_FSC
+	TCA_HFSC_USC
 )

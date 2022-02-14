@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/ericchiang/k8s"
-	rbacv1 "github.com/ericchiang/k8s/apis/rbac/v1"
-	rbacv1b1 "github.com/ericchiang/k8s/apis/rbac/v1beta1"
+	"github.com/neuvector/k8s"
+	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
+	rbacv1b1 "github.com/neuvector/k8s/apis/rbac/v1beta1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
