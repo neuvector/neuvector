@@ -1005,8 +1005,6 @@ func TestOIDCLoginShadowUser(t *testing.T) {
 func TestJWTSignValidate(t *testing.T) {
 	preTest()
 
-	jwtReadKeys()
-
 	user := &share.CLUSUser{
 		Fullname: "gary",
 		Username: "gary",
