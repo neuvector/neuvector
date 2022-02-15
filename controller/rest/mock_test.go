@@ -2,6 +2,8 @@ package rest
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -504,6 +506,10 @@ func initTest() {
 		Ctrler: &share.CLUSController{CLUSDevice: share.CLUSDevice{ID: "c1"}},
 	}
 	evqueue = &cluster.MockEvQueue{}
+
+	// Fake the jwt key pair
+	jwtPrivateKey, _ = rsa.GenerateKey(rand.Reader, 2048)
+	jwtPublicKey = &jwtPrivateKey.PublicKey
 
 	router = httprouter.New()
 	router.GET("/v1/system/config", handlerSystemGetConfig)
