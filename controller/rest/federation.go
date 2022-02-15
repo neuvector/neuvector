@@ -956,27 +956,25 @@ func pingJointCluster(tag, uri string, jointCluster share.CLUSFedJointClusterInf
 
 	{
 		// If "use_proxy" is enabled on master cluster, when a remote cluster requests to join the fed,
-		// (1) master cluster tries testing the connectivity to remote cluster without proxy for 3 times. If all fail,
-		// (2) master cluster tries testing the connectivity to remote cluster wit proxy for 3 times if proxy is enabled on master cluster.
+		// (1) master cluster tries testing the connectivity to remote cluster wit proxy for 3 times if proxy is enabled on master cluster.
+		// (2) master cluster tries testing the connectivity to remote cluster without proxy for 3 times. If all fail,
 		// (3) After (1)/(2), master cluster remembers whether proxy is required for connecting to this remote cluster
 		// In this way, master could connect to some remote clusters that require proxy & some remote clusters that do not require proxy in the same fed
 		_, useProxy, proxy := cacher.GetFedLocalRestInfo(acc) // whether master cluster is configured to use proxy
 		if tag == _tagVerifyJointCluster {
-			proxyRequired = append(proxyRequired, false, false, false)
 			if useProxy != "" && proxy.Enable {
 				proxyRequired = append(proxyRequired, true, true, true)
 			}
 		} else {
 			if jointCluster.ProxyRequired && useProxy != "" && proxy.Enable {
 				proxyRequired = append(proxyRequired, true, true, true)
-			} else {
-				proxyRequired = append(proxyRequired, false, false, false)
 			}
 		}
+		proxyRequired = append(proxyRequired, false, false, false)
 	}
 
 	for i := 0; i < len(proxyRequired); i++ {
-		if i == (len(proxyRequired)-1) || i == (try-1) {
+		if i == (len(proxyRequired)-1) || i == (try-1) || tag == _tagVerifyJointCluster {
 			logError = true
 		}
 		_, statusCode, data, proxyUsed, err = sendReqToJointCluster(jointCluster.RestInfo, id, "", http.MethodPost,
