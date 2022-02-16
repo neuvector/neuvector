@@ -1257,7 +1257,7 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 		}
 		if _, ok := gpsMap[name]; !ok { // in existing but not in latest. so delete it
 			kv.DeletePolicyByGroupTxn(txn, name)
-			kv.DeleteResponseRuleByGroupTxn(txn, name)
+			kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
 			clusHelper.DeleteGroupTxn(txn, name)
 			clusHelper.DeleteProcessProfileTxn(txn, name)
 			clusHelper.DeleteFileMonitorTxn(txn, name)
@@ -1300,7 +1300,10 @@ func deleteFedGroupPolicy() { // delete all fed groups(caller must be fedAdmin),
 
 	gpsMap := clusHelper.GetAllGroups(share.ScopeFed, access.NewFedAdminAccessControl())
 	for name, _ := range gpsMap {
-		kv.DeleteResponseRuleByGroupTxn(txn, name)
+		kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
+		if name == api.LearnedExternal {
+			continue
+		}
 		clusHelper.DeleteGroupTxn(txn, name)
 	}
 	if ok, err := txn.Apply(); err != nil || !ok {

@@ -107,8 +107,11 @@ func DeletePolicyByCfgTypeTxn(txn *cluster.ClusterTransact, cfgType share.TCfgTy
 	writePolicyToKvClusterTxn(txn, dels, keeps)
 }
 
-func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string) int {
+func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfgType *share.TCfgType) int {
 	isFedGroup := strings.HasPrefix(name, api.FederalGroupPrefix)
+	if cfgType != nil && *cfgType == share.FederalCfg && name == api.LearnedExternal {
+		isFedGroup = true
+	}
 	delCount := 0
 	policyNames := []string{share.DefaultPolicyName, share.FedPolicyName}
 	for _, policyName := range policyNames {
@@ -153,7 +156,7 @@ func DeleteResponseRuleByGroup(name string) int {
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	delCount := deleteResponseRuleByGroupTxn(txn, name)
+	delCount := deleteResponseRuleByGroupTxn(txn, name, nil)
 	if delCount > 0 {
 		if ok, err := txn.Apply(); err != nil || !ok {
 			log.WithFields(log.Fields{"error": err, "ok": ok}).Error("Atomic write failed")
@@ -164,8 +167,8 @@ func DeleteResponseRuleByGroup(name string) int {
 	return delCount
 }
 
-func DeleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string) error {
-	deleteResponseRuleByGroupTxn(txn, name)
+func DeleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfgType share.TCfgType) error {
+	deleteResponseRuleByGroupTxn(txn, name, &cfgType)
 
 	return nil
 }
