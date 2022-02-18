@@ -2175,47 +2175,19 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 			pp.Action = share.PolicyActionAllow // can not be learned
 		}
 
-		var s *ProbeProcess
 		switch pp.Action {
 		case share.PolicyActionLearn:
 			p.reportLearnProc(svcGroup, pp)
 		case share.PolicyActionViolate:
 			proc.reported |= profileReported
 			proc.action = pp.Action
-			go func() {
-				if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-					s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, svcGroup, pp.Uuid)
-				} else {
-					s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, pp.Uuid)
-				}
-				rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_VIOLATION, Process: s, ContainerIDs: utils.NewSet(id)}
-				p.SendAggregateProbeReport(&rpt, false)
-			}()
+			go p.sendProcessIncident(false, id, pp.Uuid, svcGroup, derivedGroup, proc)
 		case share.PolicyActionDeny: // Protect mode only
 			proc.reported |= profileReported
-			if bKeepAlive {
-				// action : keep its original decision for existing process
-				go func() {
-					if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-						s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, svcGroup, pp.Uuid)
-					} else {
-						s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, pp.Uuid)
-					}
-					rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_VIOLATION, Process: s, ContainerIDs: utils.NewSet(id)}
-					p.SendAggregateProbeReport(&rpt, false)
-				}()
-			} else {
+			go p.sendProcessIncident(true, id, pp.Uuid, svcGroup, derivedGroup, proc)
+			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-				go func() {
-					if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-						s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified: execution denied", nil, false, svcGroup, pp.Uuid)
-					} else {
-						s = p.makeProcessReport(id, proc, "Process profile violation: execution denied", nil, false, derivedGroup, pp.Uuid)
-					}
-					rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_DENIED, Process: s, ContainerIDs: utils.NewSet(id)}
-					p.SendAggregateProbeReport(&rpt, false)
-				}()
 
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
 				if proc.name == "nc" || proc.name == "ncat" || proc.name == "netcat" {
@@ -2230,6 +2202,28 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "action": pp.Action, "riskType": proc.riskType}).Debug("PROC:")
 	return pp.Action, true
+}
+
+func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup string, proc *procInternal) {
+	var s *ProbeProcess
+
+	switch uuid {
+	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
+		s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, group, uuid)
+	case share.CLUSReservedUuidShieldMode:	// zero-drift incident
+		s = p.makeProcessReport(id, proc, "Process profile violation, not from root process", nil, false, group, uuid)
+	default: // rules-based incident
+		s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, uuid)
+	}
+
+	incidentType := PROBE_REPORT_PROCESS_VIOLATION
+	if bDenied {
+		incidentType = PROBE_REPORT_PROCESS_DENIED
+		s.Msg += ": execution denied"
+	}
+
+	rpt := ProbeMessage{Type: incidentType, Process: s, ContainerIDs: utils.NewSet(id)}
+	p.SendAggregateProbeReport(&rpt, false)
 }
 
 func (p *Probe) ProcessLookup(pid int) *fsmon.ProcInfo {
@@ -2701,7 +2695,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 		switch ppe.Action {
 		case share.PolicyActionLearn, share.PolicyActionOpen:
 			ppe.Action = share.PolicyActionViolate
-			ppe.Uuid = share.CLUSReservedUuidAnchorMode
+			ppe.Uuid = share.CLUSReservedUuidShieldMode
 		case share.PolicyActionAllow:
 			bPass = true
 			if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
