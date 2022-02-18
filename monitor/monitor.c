@@ -42,6 +42,8 @@
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
+#define ENV_RANCHER_EP         "RANCHER_EP"
+#define ENV_RANCHER_SSO        "RANCHER_SSO"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -192,7 +194,7 @@ static pid_t fork_exec(int i)
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit;
+    char *on_demand, *pwd_valid_unit, *rancher_ep;
     int a;
 
     switch (i) {
@@ -355,6 +357,15 @@ static pid_t fork_exec(int i)
         if ((pwd_valid_unit = getenv(ENV_PWD_VALID_UNIT)) != NULL) {
             args[a ++] = "-pwd_valid_unit";
             args[a ++] = pwd_valid_unit;
+        }
+        if ((rancher_ep = getenv(ENV_RANCHER_EP)) != NULL) {
+            args[a ++] = "-rancher_ep";
+            args[a ++] = rancher_ep;
+        }
+        if ((enable = getenv(ENV_RANCHER_SSO)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-rancher_sso";
+            }
         }
         args[a] = NULL;
         break;
