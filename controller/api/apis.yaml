@@ -1399,7 +1399,7 @@ paths:
     get:
       tags:
         - File
-      summary: Export the yaml format configuration file ( used for CRD or group policy )
+      summary: (Obsolete, please use POST method.) Export the yaml format configuration file ( used for CRD or group policy ).
       produces:
         - application/json
       parameters:
@@ -1407,6 +1407,12 @@ paths:
           name: X-Auth-Token
           required: true
           type: string
+        - in: body
+          name: body
+          description: Configuration data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTGroupExport'
       responses:
         '200':
           description: Success. Get a yaml file.
@@ -6326,9 +6332,7 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "node"
-            - "container"
+          example: "demo"
       policy_mode:
         type: string
         example: "Monitor"
