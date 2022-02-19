@@ -2060,20 +2060,56 @@ func (p *Probe) isAllowCniCommand(path string) bool {
 	return false
 }
 
+func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
+	if p.bKubePlatform {
+		return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && proc.cmds[0] == "/bin/calico-node")
+	}
+	return false
+}
+
 func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
 	}
 
-	if proc.path == "/usr/bin/pod" && proc.name == "pod" && global.RT.IsRuntimeProcess(proc.pname, nil) {
+	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
+	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+	if bRtProcP && proc.path == "/usr/bin/pod" && proc.name == "pod" {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 		return true
 	}
 
 	// both names are in the runtime list
-	if global.RT.IsRuntimeProcess(proc.name, nil) && global.RT.IsRuntimeProcess(proc.pname, nil) {
+	if bRtProc && bRtProcP {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 		return true
+	}
+
+	// network plug-in: calico-node
+	if bRtProcP && p.isAllowCalicoCommand(proc) {
+		log.WithFields(log.Fields{"name": proc.name, "path": proc.path, "pname": proc.pname}).Debug("PROC:")
+		return true
+	}
+
+	// CNI commands from node
+	if bRtProcP || p.isAllowCniCommand(proc.ppath) {
+		switch proc.name {
+		case "portmap", "containerd", "sleep", "uptime": // NV4856
+			return true
+		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
+			return true
+		}
+
+		// NV4856
+		if p.isAllowIpRuntimeCommand(proc.cmds) {
+			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
+			return true
+		}
+
+		if p.isAllowCniCommand(proc.path) {
+			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
+			return true
+		}
 	}
 
 	// nv containers only: allowing copy-out action for "kubectl cp"
@@ -2084,31 +2120,12 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 			return true
 		}
 
-		if global.RT.IsRuntimeProcess(proc.pname, nil) || p.isAllowCniCommand(proc.ppath) {
-			switch proc.name {
-			case "portmap", "containerd", "sleep", "uptime": // NV4856
-				return true
-			case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
-				return true
-			}
 
-			if len(proc.cmds) >= 3 {
-				if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
-					// from "k8s.io/pkg/kubectl/cmd/cp.go" : copyFromPod()
-					// matched to its exact Command:  []string{"tar", "cf", "-", src.File}
-					mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
-					return true
-				}
-			}
-
-			// NV4856
-			if p.isAllowIpRuntimeCommand(proc.cmds) {
+		if bRtProcP && len(proc.cmds) >= 3 {
+			if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
+				// from "k8s.io/pkg/kubectl/cmd/cp.go" : copyFromPod()
+				// matched to its exact Command:  []string{"tar", "cf", "-", src.File}
 				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
-				return true
-			}
-
-			if p.isAllowCniCommand(proc.path) {
-				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
 				return true
 			}
 		}
@@ -2171,7 +2188,8 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 			}
 		}
 
-		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) && p.isProcessException(proc, pp.DerivedGroup, id) {
+		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) &&
+		   (pp.Uuid != share.CLUSReservedUuidAnchorMode && p.isProcessException(proc, pp.DerivedGroup, id)) {
 			pp.Action = share.PolicyActionAllow // can not be learned
 		}
 
