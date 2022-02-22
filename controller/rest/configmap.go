@@ -283,9 +283,12 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	}
 
 	if rc.NewServiceProfileBaseline != nil {
-		switch *rc.NewServiceProfileBaseline {
-		case share.ProfileBasic, share.ProfileZeroDrift:
-			cconf.NewServiceProfileBaseline = *rc.NewServiceProfileBaseline
+		blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
+		switch blValue {
+		case share.ProfileBasic:
+			cconf.NewServiceProfileBaseline = share.ProfileBasic
+		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+			cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
 		default:
 			e := "Invalid new service profile baseline"
 			log.WithFields(log.Fields{"new_service_profile_baseline": *rc.NewServiceProfileBaseline}).Error(e)
