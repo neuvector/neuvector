@@ -246,6 +246,8 @@ func main() {
 	admctrlPort := flag.Uint("admctrl_port", 20443, "Admission Webhook server port")
 	crdvalidatectrlPort := flag.Uint("crdvalidatectrl_port", 30443, "general crd Webhook server port")
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
+	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
+	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
 	flag.Parse()
 
 	if *debug {
@@ -288,7 +290,10 @@ func main() {
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion()
-		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer}).Info()
+		//if flavor == "" && resource.IsRancherFlavor() {
+		//	flavor = share.FlavorRancher
+		//}
+		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
 	}
 
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
@@ -522,9 +527,12 @@ func main() {
 	orchObjChan := make(chan *resource.Event, 32)
 	orchScanChan := make(chan *resource.Event, 16)
 
+	log.WithFields(log.Fields{"rancherEP": *rancherEP, "rancherSSO": *rancherSSO}).Debug()
 	// Initialize cache
 	// - Start policy learning thread and build learnedPolicyRuleWrapper from KV
 	cctx := cache.Context{
+		//RancherEP:                *rancherEP,
+		//RancherSSO:               *rancherSSO,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
 		AuditQueue:               auditQueue,

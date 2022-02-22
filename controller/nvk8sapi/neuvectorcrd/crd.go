@@ -37,7 +37,7 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.AdmClientModeSvc, share.AdmClientModeUrl,
 		share.AdmCtrlActionAllow, share.AdmCtrlActionDeny,
 		share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce, share.PolicyModeUnavailable,
-		share.ProfileCrdBasic, share.ProfileCrdZeroDrift,
+		share.ProfileBasic, share.ProfileZeroDrift, share.ProfileDefault, share.ProfileShield,
 		share.FileAccessBehaviorMonitor, share.FileAccessBehaviorBlock,
 		share.DlpPatternContextURI, share.DlpPatternContextHEAD, share.DlpPatternContextBODY, share.DlpPatternContextPACKET,
 		share.CriteriaOpRegex, share.CriteriaOpNotRegex, share.DlpRuleKeyPattern,
@@ -281,8 +281,10 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 							"baseline": &apiextv1.JSONSchemaProps{
 								Type: &b.schemaTypeString,
 								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileCrdBasic]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileCrdZeroDrift]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileBasic]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileDefault]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileShield]},
 								},
 							},
 						},
@@ -408,8 +410,10 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 							"baseline": &apiextv1b1.JSONSchemaProps{
 								Type: &b.schemaTypeString,
 								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileCrdBasic]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileCrdZeroDrift]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileBasic]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield]},
 								},
 							},
 						},
@@ -960,8 +964,8 @@ func configK8sCrdSchema(op, verRead string, crdInfo *resource.NvCrdInfo) error {
 
 // create the CustomResourceDefinition resource(schema) that is listed by "kubectl get CustomResourceDefinition"
 func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share.CLUSAdmCtrlState) (bool, error) {
-	crdConfigured := false
-	crdExpected := false
+	crdConfigured := false // crd schema is configured or not
+	crdExpected := false   // whether the configured crd schema is up-to-date
 
 	var verRead string
 	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
@@ -976,9 +980,11 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 					schema := res.Spec.Versions[0].Schema
 					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
 						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if _, ok := spec.Properties["process_profile"]; ok {
-								if _, ok := spec.Properties["waf"]; ok {
-									crdExpected = true
+							if pp, ok := spec.Properties["process_profile"]; ok {
+								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
+									if _, ok := spec.Properties["waf"]; ok {
+										crdExpected = true
+									}
 								}
 							}
 						}
@@ -990,9 +996,11 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 					schema := res.Spec.Versions[0].Schema
 					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
 						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if _, ok := spec.Properties["process_profile"]; ok {
-								if _, ok := spec.Properties["waf"]; ok {
-									crdExpected = true
+							if pp, ok := spec.Properties["process_profile"]; ok {
+								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
+									if _, ok := spec.Properties["waf"]; ok {
+										crdExpected = true
+									}
 								}
 							}
 						}

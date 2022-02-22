@@ -2258,7 +2258,7 @@ const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"
 const CLUSReservedUuidRootEscalation string = "00000000-0000-0000-0000-000000000003" // root privilege escallation
 const CLUSReservedUuidDockerCp string = "00000000-0000-0000-0000-000000000004"       // docker cp
 const CLUSReservedUuidAnchorMode string = "00000000-0000-0000-0000-000000000005"     // rejected by anchor mode
-const CLUSReservedUuidShieldAllowed string = "00000000-0000-0000-0000-000000000006"  // allowed as a family process
+const CLUSReservedUuidShieldMode string = "00000000-0000-0000-0000-000000000006"     // rejected by non-family process
 
 type ProcRule struct {
 	Active int                     `json:"active"`
