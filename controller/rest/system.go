@@ -910,9 +910,12 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			}
 			// New baseline profile setting
 			if rc.NewServiceProfileBaseline != nil {
-				switch *rc.NewServiceProfileBaseline {
-				case share.ProfileBasic, share.ProfileZeroDrift:
-					cconf.NewServiceProfileBaseline = *rc.NewServiceProfileBaseline
+				blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
+				switch blValue {
+				case share.ProfileBasic:
+					cconf.NewServiceProfileBaseline = share.ProfileBasic
+				case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+					cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
 				default:
 					e := "Invalid new service profile baseline"
 					log.WithFields(log.Fields{"new_service_profile_baseline": *rc.NewServiceProfileBaseline}).Error(e)
@@ -1808,7 +1811,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 					Server:   login.server,
 				}
 				domainRoles := access.DomainRole{access.AccessDomainGlobal: api.UserRoleImportStatus}
-				_, tempToken, _ = jwtGenerateToken(user, domainRoles, login.remote, _interactiveSessionID, "")
+				_, tempToken, _ = jwtGenerateToken(user, domainRoles, login.remote, login.mainSessionID, "")
 			}
 
 			importTask.TotalLines = lines

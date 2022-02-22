@@ -1767,15 +1767,15 @@ targetpass:
 		if gfwrule.Spec.Target.PolicyMode != nil {
 			mode = *gfwrule.Spec.Target.PolicyMode
 		}
-		baseline := share.ProfileBasic
+		baseline := share.ProfileZeroDrift
 		if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
-			baseline_ := *gfwrule.Spec.ProcessProfile.Baseline
-			if baseline_ != share.ProfileBasic && baseline_ != share.ProfileCrdZeroDrift {
-				errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, baseline_)
+			blValue := *gfwrule.Spec.ProcessProfile.Baseline
+			if blValue == share.ProfileBasic {
+				baseline = share.ProfileBasic
+			} else if blValue != share.ProfileDefault && blValue != share.ProfileShield && blValue != share.ProfileZeroDrift {
+				errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, blValue)
 				buffer.WriteString(errMsg)
 				errCount += errNo
-			} else if baseline_ == share.ProfileCrdZeroDrift {
-				baseline = share.ProfileZeroDrift
 			}
 		}
 		pprofile := api.RESTProcessProfile{
@@ -2113,7 +2113,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		profile_mode = crdCfgRet.ProcessProfileCfg.Mode
 		crdRecord.ProfileName = crdCfgRet.TargetName
 		crdRecord.ProfileMode = profile_mode
-		crdRecord.ProcessProfile = share.CLUSCrdProcessProfile{Baseline: strings.ToLower(crdCfgRet.ProcessProfileCfg.Baseline)}
+		crdRecord.ProcessProfile = share.CLUSCrdProcessProfile{Baseline: crdCfgRet.ProcessProfileCfg.Baseline}
 		crdRecord.ProcessRules = h.crdGetProcessRules(crdCfgRet.ProcessProfileCfg)
 		crdRecord.FileRules = h.crdGetFileRules(crdCfgRet.FileProfileCfg)
 	}
@@ -2557,11 +2557,10 @@ func (h *nvCrdHandler) crdGetFileRules(profile *api.RESTFileMonitorProfile) []sh
 func exportProcessRule(group string, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if profile, err := cacher.GetProcessProfile(group, acc); err == nil {
-		baseline := share.ProfileBasic
-		if profile.Baseline != "" {
-			baseline = profile.Baseline
+		baseline := share.ProfileZeroDrift
+		if profile.Baseline == share.ProfileBasic {
+			baseline = share.ProfileBasic
 		}
-		baseline = strings.ToLower(baseline)
 		secRule.ProcessProfile.Baseline = &baseline
 		dupChecker := utils.NewSet()
 		for _, gproc := range profile.ProcessList {
@@ -2737,7 +2736,7 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[str
 		records = clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
 	}
 
-	baseline := share.ProfileBasic
+	baseline := share.ProfileZeroDrift
 	mode := h.crdGetProfileSecurityLevel(groupName, records)
 	procs := make(map[string]*share.CLUSCrdProcessRule, 0)
 	files := make(map[string]*share.CLUSCrdFileRule, 0)
@@ -2746,8 +2745,8 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[str
 			continue
 		}
 
-		if record.ProcessProfile.Baseline == share.ProfileCrdZeroDrift {
-			baseline = share.ProfileZeroDrift
+		if record.ProcessProfile.Baseline == share.ProfileBasic {
+			baseline = share.ProfileBasic
 		}
 		// collecting process rules
 		for i, pr := range record.ProcessRules {

@@ -294,16 +294,19 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 			return
 		}
 
-		if utils.IsGroupNodes(group) && *conf.Baseline != share.ProfileBasic {
+		blValue := strings.ToLower(*conf.Baseline)
+		if utils.IsGroupNodes(group) && blValue != share.ProfileBasic {
 			// nodes is not change-able, always "share.ProfileBasic"
 			log.WithFields(log.Fields{"group": group, "baseline": *conf.Baseline}).Error("Invalid profile baseline")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return
 		}
 
-		switch *conf.Baseline {
-		case share.ProfileBasic, share.ProfileZeroDrift:
-			profile.Baseline = *conf.Baseline
+		switch blValue {
+		case share.ProfileBasic:
+			profile.Baseline = share.ProfileBasic
+		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+			profile.Baseline = share.ProfileZeroDrift
 		default:
 			log.WithFields(log.Fields{"group": group, "baseline": *conf.Baseline}).Error("Invalid profile baseline")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
