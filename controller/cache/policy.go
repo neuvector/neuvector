@@ -413,6 +413,13 @@ func getWorkloadPolicyMode(wlCache *workloadCache) (string, string) {
 	}
 }
 
+func getWorkloadBaselineProfile(wlCache *workloadCache) string {
+	if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
+		return cache.group.BaselineProfile
+	}
+	return ""
+}
+
 func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 	wlAddr := share.CLUSWorkloadAddr{
 		WlID: wlCache.workload.ID,
