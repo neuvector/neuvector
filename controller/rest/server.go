@@ -1741,7 +1741,7 @@ func handlerServerDelete(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	restRespSuccess(w, r, nil, acc, login, nil, fmt.Sprintf("Delete server '%v'", name))
 
 	kickAllLoginSessionsByServer(name)
-	deleteShadownUsersByServer(name)
+	deleteShadowUsersByServer(name)
 }
 
 func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

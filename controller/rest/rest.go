@@ -133,6 +133,7 @@ var restErrMessage = []string{
 	api.RESTErrUserLoginBlocked:      "Temporarily blocked because of too many login failures",
 	api.RESTErrPasswordExpired:       "Password expired",
 	api.RESTErrPromoteFail:           "Failed to promote rules",
+	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -919,7 +920,7 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 	}
 
 	if login != nil {
-		if login.mainSessionID == _interactiveSessionID {
+		if login.mainSessionID == _interactiveSessionID || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
 			clog.User = login.fullname
 			clog.UserRoles = login.domainRoles
 		} else {
@@ -985,6 +986,20 @@ func isObjectNameWithSpaceValid(name string) bool {
 	// Object name must starts with letters or digits
 	valid, _ := regexp.MatchString("(^[a-zA-Z0-9]$)|(^[a-zA-Z0-9]+[ .:a-zA-Z0-9_-]*[.:a-zA-Z0-9_-]+$)", name)
 	return valid
+}
+
+func isUserNameValid(name string) bool {
+	if !isObjectNameWithSpaceValid(name) {
+		return false
+	}
+	// user name cannot start with "ldap1:"/"saml1:"/"oidc1:"/"rancher:"/"openshift:"
+	for _, prefix := range []string{"ldap1:", "saml1:", "oidc1:", "rancher:", "openshift:"} {
+		if strings.HasPrefix(name, prefix) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func isNamePathValid(name string) bool {

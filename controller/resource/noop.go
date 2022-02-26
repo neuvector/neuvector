@@ -95,7 +95,7 @@ func (d *noop) GetAuthServerAlias() string {
 	return ""
 }
 
-func (d *noop) GetUserRoles(username string) (map[string]string, error) {
+func (d *noop) GetUserRoles(username string, subjType uint8) (map[string]string, error) {
 	return nil, ErrMethodNotSupported
 }
 
@@ -139,9 +139,14 @@ func (d *noop) DeleteResource(rt string, res interface{}) error {
 	return ErrMethodNotSupported
 }
 
+func (d *noop) SetFlavor(flavor string) error {
+	return ErrMethodNotSupported
+}
+
 func Register(platform, flavor, network string) orchAPI.ResourceDriver {
 	switch platform {
 	case share.PlatformKubernetes:
+		_k8sFlavor = flavor
 		return newKubernetesDriver(platform, flavor, network)
 	case share.PlatformDocker:
 		return newSwarmDriver(platform, flavor, network)

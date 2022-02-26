@@ -701,6 +701,7 @@ type CLUSSystemConfig struct {
 	SingleCVEPerSyslog   bool                 `json:"single_cve_per_syslog"`
 	AuthOrder            []string             `json:"auth_order"`
 	AuthByPlatform       bool                 `json:"auth_by_platform"`
+	RancherEP            string               `json:"rancher_ep"`
 	InternalSubnets      []string             `json:"configured_internal_subnets,omitempty"`
 	WebhookEnable_UNUSED bool                 `json:"webhook_enable"`
 	WebhookUrl_UNUSED    string               `json:"webhook_url"`

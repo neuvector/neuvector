@@ -305,7 +305,6 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	var login *loginSession
 	acc := access.NewReaderAccessControl() // it's because IBM SA does not carry NV's auth token when it calls this API
 	if cfg, err := cacher.GetIBMSAConfigNV(acc); err != nil || !cfg.EpEnabled || cfg.EpStart == 1 {
 		// cfg.EpStart being 1 means the setup is already done. Do not allow setup unless IBM SA integration is enabled and cfg.EpStart = 0
@@ -327,7 +326,7 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 			resp := api.RESTIBMSASetupToken{
 				AccessToken: s.token,
 			}
-			restRespSuccess(w, r, &resp, acc, login, nil, "")
+			restRespSuccess(w, r, &resp, acc, nil, nil, "")
 			return
 		}
 	}
