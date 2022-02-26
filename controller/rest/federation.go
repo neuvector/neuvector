@@ -314,7 +314,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 		case _adminRequired:
 			ok = acc.CanWriteCluster()
 		case _localAdminRequired:
-			if acc.CanWriteCluster() && login.server == "" {
+			if acc.CanWriteCluster() && (login.server == "" || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix)) {
 				ok = true
 			}
 		case _readerRequired:
@@ -370,18 +370,23 @@ func isNoAuthFedOpAllowed(expectedFedRole string, w http.ResponseWriter, r *http
 	return true
 }
 
-func sendReqToMasterCluster(method, ip string, port uint, request, tag, token string, body []byte,
+func sendReqToMasterCluster(httpClient *http.Client, method, uri, token string, cookie *http.Cookie, body []byte,
 	logError bool, useProxy string, specifiedProxy *share.CLUSProxy, acc *access.AccessControl) ([]byte, int, bool, error) {
 
-	fedClient, _ := _fedHttpClients[""]
-	if fedClient == nil {
-		updateHttpClientPool("", true)
-		if fedClient, _ = _fedHttpClients[""]; fedClient == nil || fedClient.httpClient == nil {
-			err := errors.New("http client unavailable")
-			log.WithFields(log.Fields{"tag": tag, "error": err}).Error()
-			return nil, 0, false, err
+	var fedClient *tFedHttpClient
+	if httpClient == nil {
+		fedClient, _ = _fedHttpClients[""]
+		if fedClient == nil || fedClient.httpClient == nil {
+			updateHttpClientPool("", true)
+			if fedClient, _ = _fedHttpClients[""]; fedClient == nil || fedClient.httpClient == nil {
+				err := errors.New("http client unavailable")
+				log.WithFields(log.Fields{"url": uri, "error": err}).Error()
+				return nil, 0, false, err
+			}
 		}
+		httpClient = fedClient.httpClient
 	}
+	httpClient.Timeout = clusterAuthTimeout
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -410,17 +415,17 @@ func sendReqToMasterCluster(method, ip string, port uint, request, tag, token st
 		proxyUrl, _ := url.Parse(proxy.URL)
 		transport.Proxy = http.ProxyURL(proxyUrl)
 	}
-	fedClient.httpClient.Transport = transport
+	origTransport := httpClient.Transport
+	httpClient.Transport = transport
 
 	var req *http.Request
 	var err error
 
-	url := fmt.Sprintf("https://%s:%d/%s", ip, port, request)
 	switch method {
 	case "GET":
-		req, err = http.NewRequest(method, url, nil)
+		req, err = http.NewRequest(method, uri, nil)
 	default:
-		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, uri, bytes.NewBuffer(body))
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
@@ -428,18 +433,24 @@ func sendReqToMasterCluster(method, ip string, port uint, request, tag, token st
 	if token != "" {
 		req.Header.Set(api.RESTTokenHeader, token)
 	}
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
 
-	fedClient.lock.Lock()
-	defer fedClient.lock.Unlock()
+	if fedClient != nil {
+		fedClient.lock.Lock()
+		defer fedClient.lock.Unlock()
+	}
 
-	resp, err := fedClient.httpClient.Do(req)
+	resp, err := httpClient.Do(req)
+	httpClient.Transport = origTransport
 	if err != nil {
 		if logError {
-			log.WithFields(log.Fields{"ip": ip, "port": port, "tag": tag, "err": err, "proxy": proxyLog}).Error("Failed to make request")
+			log.WithFields(log.Fields{"url": uri, "err": err, "proxy": proxyLog, "timeout": httpClient.Timeout}).Error("Failed to make request")
 		}
 		errMsg := err.Error()
-		if idx := strings.Index(errMsg, url); idx >= 0 {
-			errMsg = errMsg[idx+len(url):]
+		if idx := strings.Index(errMsg, uri); idx >= 0 {
+			errMsg = errMsg[idx+len(uri):]
 			if len(errMsg) > 1 && errMsg[0] == '"' {
 				errMsg = errMsg[1:]
 			}
@@ -454,12 +465,12 @@ func sendReqToMasterCluster(method, ip string, port uint, request, tag, token st
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.WithFields(log.Fields{"ip": ip, "port": port, "tag": tag, "status": resp.Status, "proxy": proxyLog}).Error("Read data fail")
+		log.WithFields(log.Fields{"url": uri, "status": resp.Status, "proxy": proxyLog}).Error("Read data fail")
 		return nil, 0, proxyLog.proxyUsed, err
 	} else {
 		if resp.StatusCode != http.StatusOK {
 			if logError {
-				log.WithFields(log.Fields{"ip": ip, "port": port, "tag": tag, "status": resp.Status, "proxy": proxyLog}).Error("Request failed")
+				log.WithFields(log.Fields{"url": uri, "status": resp.Status, "proxy": proxyLog, "timeout": httpClient.Timeout}).Error("Request failed")
 			}
 			err = errors.New(resp.Status)
 		} else {
@@ -526,7 +537,11 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 	if method == http.MethodPost && request == "/v1/scan/repository" {
 		client.Timeout = repoScanLingeringDuration + time.Duration(30*time.Second)
 	} else {
-		client.Timeout = clusterAuthTimeout
+		if tag == _tagVerifyJointCluster {
+			client.Timeout = time.Duration(10 * time.Second)
+		} else {
+			client.Timeout = clusterAuthTimeout
+		}
 	}
 
 	transport := &http.Transport{
@@ -554,6 +569,7 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 			transport.Proxy = http.ProxyURL(proxyUrl)
 		}
 	}
+	origTransport := client.Transport
 	client.Transport = transport
 
 	url := fmt.Sprintf("https://%s:%d/%s", rc.Server, rc.Port, request)
@@ -578,9 +594,10 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 	}
 
 	resp, err := client.Do(req)
+	client.Transport = origTransport
 	if err != nil {
 		if logError {
-			log.WithFields(log.Fields{"cluster": rc.Server, "tag": tag, "error": err, "proxy": proxyLog}).Error("Failed to make request")
+			log.WithFields(log.Fields{"cluster": rc.Server, "tag": tag, "error": err, "proxy": proxyLog, "timeout": client.Timeout}).Error("Failed to make request")
 		}
 		return nil, 0, nil, proxyLog.proxyUsed, err
 	}
@@ -589,7 +606,7 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		if logError {
-			log.WithFields(log.Fields{"cluster": rc.Server, "tag": tag, "error": err, "proxy": proxyLog}).Error("Read data fail")
+			log.WithFields(log.Fields{"cluster": rc.Server, "tag": tag, "error": err, "proxy": proxyLog, "timeout": client.Timeout}).Error("Read data fail")
 		}
 		return nil, 0, nil, proxyLog.proxyUsed, err
 	} else if !forward { // we do decompression only when it's not a forward request because the caller will try to decompress it again
@@ -764,12 +781,15 @@ func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
 
 func revertFedRoles(acc *access.AccessControl) {
 	users := clusHelper.GetAllUsers(acc)
+	rancher := strings.ToLower(share.FlavorRancher)
 	for _, user := range users {
 		var newRole string
-		if user.Role == api.UserRoleFedAdmin {
-			newRole = api.UserRoleAdmin
-		} else if user.Role == api.UserRoleFedReader {
-			newRole = api.UserRoleReader
+		if user.Server != rancher {
+			if user.Role == api.UserRoleFedAdmin {
+				newRole = api.UserRoleAdmin
+			} else if user.Role == api.UserRoleFedReader {
+				newRole = api.UserRoleReader
+			}
 		}
 		if newRole != "" {
 			clusHelper.ConfigFedRole(user.Fullname, newRole, acc)
@@ -950,31 +970,27 @@ func pingJointCluster(tag, uri string, jointCluster share.CLUSFedJointClusterInf
 	bodyTo, _ := json.Marshal(&reqTo)
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
 	logError := false
-	var try int = 3
 	var data []byte
-	var proxyRequired []bool = make([]bool, 0, try*2)
+	var proxyRequired []bool
 
 	{
 		// If "use_proxy" is enabled on master cluster, when a remote cluster requests to join the fed,
-		// (1) master cluster tries testing the connectivity to remote cluster wit proxy for 3 times if proxy is enabled on master cluster.
-		// (2) master cluster tries testing the connectivity to remote cluster without proxy for 3 times. If all fail,
-		// (3) After (1)/(2), master cluster remembers whether proxy is required for connecting to this remote cluster
+		// (1) master cluster tries testing the connectivity to remote cluster w/ or w/o proxy for 3 times(each) if proxy is enabled on master cluster.
+		// (2) Then, master cluster remembers whether proxy is required for connecting to this remote cluster
 		// In this way, master could connect to some remote clusters that require proxy & some remote clusters that do not require proxy in the same fed
-		_, useProxy, proxy := cacher.GetFedLocalRestInfo(acc) // whether master cluster is configured to use proxy
-		if tag == _tagVerifyJointCluster {
-			if useProxy != "" && proxy.Enable {
-				proxyRequired = append(proxyRequired, true, true, true)
-			}
-		} else {
-			if jointCluster.ProxyRequired && useProxy != "" && proxy.Enable {
-				proxyRequired = append(proxyRequired, true, true, true)
+		if _, useProxy, proxy := cacher.GetFedLocalRestInfo(acc); useProxy != "" && proxy.Enable {
+			// master cluster is configured to use proxy
+			if tag == _tagVerifyJointCluster || jointCluster.ProxyRequired {
+				proxyRequired = []bool{true, false, true, false, true, false}
 			}
 		}
-		proxyRequired = append(proxyRequired, false, false, false)
+		if len(proxyRequired) == 0 {
+			proxyRequired = []bool{false, false, false}
+		}
 	}
 
 	for i := 0; i < len(proxyRequired); i++ {
-		if i == (len(proxyRequired)-1) || i == (try-1) || tag == _tagVerifyJointCluster {
+		if i == (len(proxyRequired)-1) || i == 0 || tag == _tagVerifyJointCluster {
 			logError = true
 		}
 		_, statusCode, data, proxyUsed, err = sendReqToJointCluster(jointCluster.RestInfo, id, "", http.MethodPost,
@@ -984,6 +1000,9 @@ func pingJointCluster(tag, uri string, jointCluster share.CLUSFedJointClusterInf
 				cmdResp.result = _fedClusterLeft
 				break
 			} else if statusCode == http.StatusOK {
+				if tag == _tagVerifyJointCluster {
+					log.WithFields(log.Fields{"id": id, "proxyUsed": proxyUsed}).Info("success")
+				}
 				cmdResp.result = _fedSuccess
 				pingResp := api.RESTFedPingResp{}
 				if err = json.Unmarshal(data, &pingResp); err == nil {
@@ -1275,7 +1294,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed)
 		return
 	}
-	if login.fullname != common.DefaultAdminUser {
+	if login.fullname != common.DefaultAdminUser && (login.server != "" && login.server != strings.ToLower(share.FlavorRancher)) {
 		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
 	}
 
@@ -1562,8 +1581,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var statusCode int
 	var proxyUsed bool
 	// call master cluster for joining federation
-	data, statusCode, proxyUsed, err = sendReqToMasterCluster(http.MethodPost, req.Server, req.Port,
-		"v1/fed/join_internal", _tagJoinFed, "", bodyTo, true, useProxy, &proxyInfo, acc)
+	url := fmt.Sprintf("https://%s:%d/v1/fed/join_internal", req.Server, req.Port)
+	data, statusCode, proxyUsed, err = sendReqToMasterCluster(nil, http.MethodPost, url, "", nil, bodyTo, true, useProxy, &proxyInfo, acc)
 	if err == nil {
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
@@ -1678,8 +1697,8 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	var err99 error
 	if bodyTo, err := json.Marshal(&reqTo); err == nil {
 		// call master cluster for leaving federation
-		_, _, _, err = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-			"v1/fed/leave_internal", _tagLeaveFed, "", bodyTo, true, "", nil, acc)
+		url := fmt.Sprintf("https://%s:%d/v1/fed/leave_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
+		_, _, _, err = sendReqToMasterCluster(nil, http.MethodPost, url, "", nil, bodyTo, true, "", nil, acc)
 		if err == nil || req.Force {
 			m := &share.CLUSFedMembership{
 				FedRole:          api.FedRoleNone,
@@ -2208,9 +2227,10 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		var statusCode int
 		var proxyUsed bool
 		var err error = common.ErrObjectAccessDenied
+		url := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
-			if respData, statusCode, proxyUsed, err = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-				"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, false, "", nil, accReadAll); err == nil {
+			if respData, statusCode, proxyUsed, err = sendReqToMasterCluster(nil, http.MethodPost, url,
+				"", nil, bodyTo, false, "", nil, accReadAll); err == nil {
 				break
 			} else {
 				time.Sleep(time.Second)
@@ -2234,8 +2254,8 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 								// if any fed rule is updated, re-send polling request simply for updating joint cluster info on master cluster
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 								bodyTo, _ := json.Marshal(&reqTo)
-								_, statusCode, _, _ = sendReqToMasterCluster(http.MethodPost, masterCluster.RestInfo.Server, masterCluster.RestInfo.Port,
-									"v1/fed/poll_internal", _tagPollMasterCluster, "", bodyTo, true, "", nil, accReadAll)
+								_, statusCode, _, _ = sendReqToMasterCluster(nil, http.MethodPost, url,
+									"", nil, bodyTo, true, "", nil, accReadAll)
 							}
 						}
 					}

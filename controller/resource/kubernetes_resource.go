@@ -185,6 +185,8 @@ type NvAdmRegRuleSetting struct {
 	Scope      string
 }
 
+type NvCrdInitFunc func(leader bool)
+
 //----------------------------------------------------------
 
 var NvAdmSvcName = "neuvector-svc-admission-webhook"
@@ -246,6 +248,9 @@ var k8sVersionMajor int
 var k8sVersionMinor int
 
 var cacheEventFunc common.CacheEventFunc
+
+var nvCrdInitFunc NvCrdInitFunc
+var isLeader bool
 
 const (
 	k8sRscTypeRole            = "k8s-role"
@@ -504,9 +509,9 @@ type kubernetes struct {
 	version   *k8s.Version
 	watchers  map[string]*resourceWatcher
 
-	roleCache map[k8sObjectRef]string            // role -> nv role
-	userCache map[k8sObjectRef]utils.Set         // user -> set of k8sRoleRef
-	rbacCache map[k8sObjectRef]map[string]string // user -> (domain -> nv role)
+	roleCache map[k8sObjectRef]string                // role -> nv role
+	userCache map[k8sSubjectObjRef]utils.Set         // user -> set of k8sRoleRef
+	rbacCache map[k8sSubjectObjRef]map[string]string // user -> (domain -> nv role); it's updated after rbacEvaluateUser() call
 }
 
 func newKubernetesDriver(platform, flavor, network string) *kubernetes {
@@ -514,8 +519,8 @@ func newKubernetesDriver(platform, flavor, network string) *kubernetes {
 		noop:      newNoopDriver(platform, flavor, network),
 		watchers:  make(map[string]*resourceWatcher),
 		roleCache: make(map[k8sObjectRef]string),
-		userCache: make(map[k8sObjectRef]utils.Set),
-		rbacCache: make(map[k8sObjectRef]map[string]string),
+		userCache: make(map[k8sSubjectObjRef]utils.Set),
+		rbacCache: make(map[k8sSubjectObjRef]map[string]string),
 	}
 	return d
 }
@@ -1381,6 +1386,15 @@ func (d *kubernetes) deleteResource(rt string, res interface{}) error {
 	return err
 }
 
+func (d *kubernetes) SetFlavor(flavor string) error {
+	if d.flavor == "" {
+		d.flavor = flavor
+		_k8sFlavor = flavor
+	}
+
+	return nil
+}
+
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool) bool {
 	var nvOpResources []NvAdmRegRuleSetting // is for what nv expects
 	var nsSelectorKey, nsSelectorOp string
@@ -1469,7 +1483,8 @@ func AdjustAdmResForOC() {
 	nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
 }
 
-func AdjustAdmWebhookName() {
+func AdjustAdmWebhookName(f NvCrdInitFunc) {
+	nvCrdInitFunc = f
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
 	NvCrdValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvCrdValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-crd-webhook.neuvector.svc
@@ -1494,4 +1509,25 @@ func GetK8sVersion() (int, int) {
 	}
 
 	return k8sVersionMajor, k8sVersionMinor
+}
+
+func IsRancherFlavor() bool {
+	nsName := "cattle-system"
+	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
+		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Error("resource no found")
+	} else {
+		svcnames := []string{"cattle-cluster-agent", "rancher"}
+		for _, svcname := range svcnames {
+			if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
+				log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func SetLeader(lead bool) {
+	isLeader = lead
 }

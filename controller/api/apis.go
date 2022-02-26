@@ -8,6 +8,7 @@ import (
 
 const RESTTokenHeader string = "X-Auth-Token"
 const RESTNvPageHeader string = "X-Nv-Page"
+const RESTRancherTokenHeader string = "X-R-Sess"
 const RESTMaskedValue string = "The value is masked"
 
 const RESTNvPageDashboard string = "dashboard"
@@ -62,6 +63,7 @@ const RESTErrReadOnlyRules int = 46
 const RESTErrUserLoginBlocked int = 47
 const RESTErrPasswordExpired int = 48
 const RESTErrPromoteFail int = 49
+const RESTErrPlatformAuthDisabled int = 50
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
@@ -1572,6 +1574,7 @@ type RESTSystemConfig struct {
 	SingleCVEPerSyslog        bool          `json:"single_cve_per_syslog"`
 	AuthOrder                 []string      `json:"auth_order"`
 	AuthByPlatform            bool          `json:"auth_by_platform"`
+	RancherEP                 string        `json:"rancher_ep"`
 	InternalSubnets           []string      `json:"configured_internal_subnets,omitempty"`
 	Webhooks                  []RESTWebhook `json:"webhooks"`
 	ClusterName               string        `json:"cluster_name"`

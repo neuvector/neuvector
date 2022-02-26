@@ -2,6 +2,7 @@ package rest
 
 import (
 	"crypto/rsa"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,8 @@ import (
 	"math"
 	mathRand "math/rand"
 	"net/http"
+	"net/http/cookiejar"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +24,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -30,7 +34,7 @@ import (
 
 type loginSession struct {
 	id              string // For event log to correlate login and logout events. It's from token claim's id
-	mainSessionID   string // From master token claim, i.e. master cluster login's id. Empty otherwise
+	mainSessionID   string // (1) From master token claim, i.e. master cluster login's id. (2) "rancher:{R_SESS}" (3) Empty otherwise
 	mainSessionUser string // From master token claim, i.e. master cluster login's fullname. Empty otherwise
 	token           string
 	fullname        string
@@ -73,6 +77,13 @@ type joinTicket struct {
 	ExpiresAt int64 `json:"e"`
 }
 
+type tRancherUser struct {
+	valid       bool
+	name        string
+	token       string // rancher token from R_SESS cookie
+	domainRoles access.DomainRole
+}
+
 var errTokenExpired error = errors.New("token expired")
 var recordFedAuthSessions bool = false                                      // set to true for testing: handlerDumpAuthData
 var loginFedSessions map[string]utils.Set = make(map[string]utils.Set)      // for testing: key is mainSessionID, value is a set of regular tokens
@@ -104,6 +115,7 @@ const MaxPerDomainLoginUsers int = 32
 const roleModDummyRole string = api.UserRoleReader
 
 const _interactiveSessionID = ""
+const _rancherSessionPrefix = "rancher:"
 const _halfHourBefore = time.Duration(-30) * time.Minute
 
 const (
@@ -113,6 +125,7 @@ const (
 	userTimeout
 	userTooMany
 	userKeyError
+	userNoPlatformAuth
 )
 
 const (
@@ -167,10 +180,17 @@ func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remo
 		eolAt:           time.Unix(claims.ExpiresAt, 0),
 		domainRoles:     roles,
 	}
-	if mainSessionID != _interactiveSessionID { // for federal login, give it longer timeout so it doesn't time out as easily as interactive login
+	// for federal login, give it longer timeout so it doesn't time out as easily as interactive login
+	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) {
 		s.timeout = s.timeout * 8
 	}
-	if rc := registerLoginSession(s); rc != userOK {
+
+	var rc int
+	userMutex.Lock()
+	rc = _registerLoginSession(s)
+	userMutex.Unlock()
+
+	if rc != userOK {
 		return nil, rc
 	} else {
 		return s, rc
@@ -226,13 +246,6 @@ func _registerLoginSession(login *loginSession) int {
 	return userOK
 }
 
-func registerLoginSession(login *loginSession) int {
-	userMutex.Lock()
-	defer userMutex.Unlock()
-
-	return _registerLoginSession(login)
-}
-
 func (s *loginSession) getToken() string {
 	return s.token
 }
@@ -280,7 +293,7 @@ func (s *loginSession) _delFedSessionToken() {
 		return
 	}
 	// this function is called when a fed login session token expires
-	if s.mainSessionID != _interactiveSessionID {
+	if s.mainSessionID != _interactiveSessionID && !strings.HasPrefix(s.mainSessionID, _rancherSessionPrefix) {
 		if tokenSet, exist := loginFedSessions[s.mainSessionID]; exist && tokenSet.Contains(s.token) {
 			tokenSet.Remove(s.token)
 			if tokenSet.Cardinality() == 0 {
@@ -293,7 +306,7 @@ func (s *loginSession) _delFedSessionToken() {
 // delete all fed login sessions/tokens that have the same mainSessionID as the calling login session, with userMutex locked when called
 func (s *loginSession) _delFedSessionTokens() {
 	// this function is called when when a fed user logout from master cluster
-	if s.mainSessionID != _interactiveSessionID {
+	if s.mainSessionID != _interactiveSessionID && !strings.HasPrefix(s.mainSessionID, _rancherSessionPrefix) {
 		if recordFedAuthSessions {
 			if tokenSet, exist := loginFedSessions[s.mainSessionID]; exist && tokenSet.Cardinality() > 0 {
 				for _, token := range tokenSet.ToStringSlice() {
@@ -400,29 +413,155 @@ const (
 	oidcNVGroupKey       string = "NVRoleGroup"
 )
 
+func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *access.AccessControl) (tRancherUser, error) {
+	var data []byte
+	var err error
+	var statusCode int
+	var proxyUsed bool
+	var useProxy string
+	var proxyInfo share.CLUSProxy
+	var rancherUser tRancherUser = tRancherUser{domainRoles: make(map[string]string)}
+
+	// Rancher SSO: how to enable controller to go thru proxy for communications with Rancher?
+	if useProxy == "http" {
+		proxyInfo = share.CLUSProxy{
+			Enable:   cfg.RegistryHttpProxyEnable,
+			URL:      cfg.RegistryHttpProxy.URL,
+			Username: cfg.RegistryHttpProxy.Username,
+			Password: cfg.RegistryHttpProxy.Password,
+		}
+	} else if useProxy == "https" {
+		proxyInfo = share.CLUSProxy{
+			Enable:   cfg.RegistryHttpsProxyEnable,
+			URL:      cfg.RegistryHttpsProxy.URL,
+			Username: cfg.RegistryHttpsProxy.Username,
+			Password: cfg.RegistryHttpsProxy.Password,
+		}
+	}
+	log.WithFields(log.Fields{"useProxy": useProxy, "proxyEnable": proxyInfo.Enable}).Debug()
+
+	cookie := &http.Cookie{
+		Name:  "R_SESS",
+		Value: rsessToken,
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("creating cookie jar")
+		return rancherUser, err
+	}
+	httpClient := &http.Client{
+		Jar: jar,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: clusterAuthTimeout,
+	}
+	url := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
+	data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+	if err == nil {
+		var domainRoles map[string]string
+		var rancherUsers api.UserCollection
+		if err = json.Unmarshal(data, &rancherUsers); err == nil {
+			if len(rancherUsers.Data) > 0 && rancherUsers.Data[0].Enabled != nil && *rancherUsers.Data[0].Enabled {
+				principalIDs := utils.NewSetFromSliceKind(rancherUsers.Data[0].PrincipalIDs)
+				rancherUser.name = rancherUsers.Data[0].Username
+				rancherUser.token = rsessToken
+				url = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
+				data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+				//-> if user-id changes, reset mapped roles
+				//-> if mapped role changes, reset mapped roles in token
+				if err == nil {
+					var rancherPrincipals api.PrincipalCollection
+					if err = json.Unmarshal(data, &rancherPrincipals); err == nil {
+						rancherUser.valid = true
+						for _, p := range rancherPrincipals.Data {
+							var pid string
+							var subType uint8 = resource.SUBJECT_USER
+							if principalIDs.Contains(p.ID) {
+								pid = rancherUsers.Data[0].ID
+								rancherUser.name = p.LoginName
+							} else {
+								pid = p.ID
+								subType = resource.SUBJECT_GROUP
+							}
+							if thisDomainRoles, _ := global.ORCH.GetUserRoles(pid, subType); len(thisDomainRoles) > 0 {
+								if domainRoles == nil {
+									domainRoles = thisDomainRoles
+								} else {
+									for d, rNew := range thisDomainRoles {
+										if rNew != "" {
+											if rOld, ok := domainRoles[d]; ok && rOld != rNew {
+												if (rOld == api.UserRoleReader && rNew != api.UserRoleNone) || (rOld == api.UserRoleNone) || (rNew == api.UserRoleFedAdmin) {
+													domainRoles[d] = rNew
+												}
+											} else if !ok {
+												domainRoles[d] = rNew
+											}
+										}
+									}
+								}
+							}
+						}
+						if domainRoles != nil {
+							if role, ok := domainRoles[""]; ok {
+								if role == api.UserRoleFedAdmin || role == api.UserRoleAdmin {
+									domainRoles = map[string]string{"": role}
+								} else if role == api.UserRoleFedReader || role == api.UserRoleReader {
+									for d, r := range domainRoles {
+										if d != "" && (r == api.UserRoleReader || r == api.UserRoleNone) {
+											delete(domainRoles, d)
+										}
+									}
+								}
+							}
+							rancherUser.domainRoles = domainRoles
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !rancherUser.valid || len(rancherUser.domainRoles) == 0 {
+		err = fmt.Errorf("cannot find a mapped role")
+		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "proxyUsed": proxyUsed, "url": url, "err": err}).Error()
+	}
+
+	return rancherUser, err
+}
+
 // with userMutex locked when calling this
-func restReq2User(r *http.Request) (*loginSession, int) {
+func restReq2User(r *http.Request) (*loginSession, int, string) {
+	var rsessToken string
+	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+		if header, ok := r.Header[api.RESTRancherTokenHeader]; ok && len(header) == 1 {
+			rsessToken = header[0]
+		}
+	}
+
 	token, ok := r.Header[api.RESTTokenHeader]
 	if !ok || len(token) != 1 {
-		return nil, userInvalidRequest
+		return nil, userInvalidRequest, rsessToken
 	}
 
 	if jwtPrivateKey == nil || jwtPublicKey == nil {
 		if err := jwtReadKeys(); err != nil {
-			return nil, userKeyError
+			return nil, userKeyError, rsessToken
 		}
 	}
 
 	// Validate token
 	claims, err := jwtValidateToken(token[0], "", nil)
 	if err != nil {
-		return nil, userInvalidRequest
+		return nil, userInvalidRequest, rsessToken
 	}
 
 	// Check token end-of-life
 	now := time.Now()
 	if now.Unix() >= claims.ExpiresAt {
-		return nil, userTimeout
+		return nil, userTimeout, rsessToken
 	}
 
 	// Check whether the token has been kicked by another controller or expired
@@ -440,17 +579,60 @@ func restReq2User(r *http.Request) (*loginSession, int) {
 			delete(loginSessions, token[0])
 		}
 		log.Debug("Token already expired")
-		return nil, userTimeout
+		return nil, userTimeout, rsessToken
+	}
+
+	if strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) {
+		if rsessToken != "" {
+			var nvPage string
+			if header, ok := r.Header[api.RESTNvPageHeader]; ok && len(header) == 1 {
+				nvPage = header[0]
+			}
+			if r.Method != http.MethodGet || nvPage != api.RESTNvPageDashboard {
+				expected := fmt.Sprintf("%s%s", _rancherSessionPrefix, rsessToken)
+				if claims.MainSessionID != expected {
+					log.WithFields(log.Fields{"expected": expected, "mainSessionID": claims.MainSessionID}).Error()
+					return nil, userTimeout, rsessToken
+				} else {
+					// Rancher SSO :
+					// 1. (how often) should we call rancherEP to make sure the rancher cookie is still valid?
+					// 2. Even cookie is still valid, what if the uer's role is changed?
+					accReadAll := access.NewReaderAccessControl()
+					if cfg := cacher.GetSystemConfig(accReadAll); cfg.AuthByPlatform && cfg.RancherEP != "" {
+						rancherUser, err := checkRancherUserRole(cfg, rsessToken, accReadAll)
+						if err == nil {
+							if role, ok := rancherUser.domainRoles[""]; ok && (role == api.UserRoleFedAdmin || role == api.UserRoleFedReader) {
+								if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
+									if role == api.UserRoleFedAdmin {
+										rancherUser.domainRoles[""] = api.UserRoleAdmin
+									} else {
+										rancherUser.domainRoles[""] = api.UserRoleReader
+									}
+								}
+							}
+						}
+						if err != nil || !reflect.DeepEqual(rancherUser.domainRoles, claims.Roles) {
+							return nil, userTimeout, rsessToken
+						}
+					} else {
+						return nil, userNoPlatformAuth, rsessToken
+					}
+				}
+			}
+		} else {
+			// If rancher console logs out, R_SESS cookie is cleared in browser. The SSO NV console from that R_SESS cookie doesn't work as well.
+			return nil, userTimeout, rsessToken
+		}
 	}
 
 	login, ok := loginSessions[token[0]]
 	if !ok {
-		if claims.MainSessionID == "" { // meaning it's not a master token issued by master cluster
+		if claims.MainSessionID == "" || strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) { // meaning it's not a master token issued by master cluster
 			// Check if the token is from the same "installation"
 			installID, _ := clusHelper.GetInstallationID()
 			if installID != claims.Subject {
 				log.Debug("Token from different installation")
-				return nil, userTimeout
+				return nil, userTimeout, rsessToken
 			}
 		}
 
@@ -458,7 +640,7 @@ func restReq2User(r *http.Request) (*loginSession, int) {
 		var rc int
 		login, rc = newLoginSessionFromToken(token[0], claims, now)
 		if rc != userOK {
-			return nil, rc
+			return nil, rc, rsessToken
 		}
 	}
 
@@ -491,7 +673,7 @@ func restReq2User(r *http.Request) (*loginSession, int) {
 		login.nvPage = nvPage[0]
 	}
 
-	return login, userOK
+	return login, userOK, rsessToken
 }
 
 // op is derived by HTTP request method, but the caller can overwrite it.
@@ -507,10 +689,15 @@ func getAccessControl(w http.ResponseWriter, r *http.Request, op access.AccessOP
 	userMutex.Lock()
 	defer userMutex.Unlock()
 
-	login, rc := restReq2User(r)
+	login, rc, rsessToken := restReq2User(r)
 	if rc != userOK {
+		if rsessToken != "" {
+			w.Header().Set(api.RESTRancherTokenHeader, rsessToken)
+		}
 		if rc == userTimeout {
 			restRespError(w, http.StatusRequestTimeout, api.RESTErrUnauthorized)
+		} else if rc == userNoPlatformAuth {
+			restRespError(w, http.StatusUnauthorized, api.RESTErrPlatformAuthDisabled)
 		} else {
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 		}
@@ -637,13 +824,13 @@ func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, main
 	// 7. Only interactive login with fedAdmin role on master cluster can access joint clusters
 	// 8. when an interactive fedAdmin login on master cluster access joint clusters, the remote token on joint cluster has admin role
 	// 9. when federal rules are deployed to joint clusters, there is no access control checking on joint clusters
-	roles := make(map[string]string)            // access.DomainRole
-	if mainSessionID != _interactiveSessionID { // meaning it's a remote federal login from master cluster
+	roles := make(map[string]string)                                                                        // access.DomainRole
+	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) { // meaning it's a remote federal login from master cluster
 		for d, r := range masterRoles {
 			roles[d] = r
 		}
 		roles[access.AccessDomainGlobal] = masterRoles[access.AccessDomainGlobal]
-	} else { // meaning it's an interactive local cluster login
+	} else { // meaning it's an interactive local cluster login, or redirected from rancher console
 		// Convert role->domains to domain->role
 		for role, domains := range user.RoleDomains {
 			for _, d := range domains {
@@ -664,7 +851,7 @@ func getUserTimeout(timeout uint32) time.Duration {
 	return time.Second * time.Duration(timeout)
 }
 
-func deleteShadownUsersByServer(server string) {
+func deleteShadowUsersByServer(server string) {
 	if server == "" {
 		return
 	}
@@ -840,6 +1027,7 @@ func ResetLoginTokenTimer(tokenInfo *share.CLUSLoginTokenInfo) {
 	}
 }
 
+// for openshift/rancher login only
 func KickLoginSessionsForRoleChange(name, domain string) {
 	server := global.ORCH.GetAuthServerAlias()
 	user := share.CLUSUser{
@@ -855,8 +1043,10 @@ func changeTimeoutLoginSessions(user *share.CLUSUser) {
 	defer userMutex.Unlock()
 
 	for _, login := range loginSessions {
-		if compareUserWithLogin(user, login) {
-			login._updateTimeout(user.Timeout)
+		if !strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
+			if compareUserWithLogin(user, login) {
+				login._updateTimeout(user.Timeout)
+			}
 		}
 	}
 }
@@ -1397,12 +1587,82 @@ func platformTokenRoleMapping(username string) map[string]string {
 		return nil
 	}
 
-	roles, err := global.ORCH.GetUserRoles(username)
+	roles, err := global.ORCH.GetUserRoles(username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		return nil
 	}
 
 	log.WithFields(log.Fields{"user": username}).Debug("Authorized by platform")
+	return roles
+}
+
+func consolidateCookieRoleMapping(fedRole string, ugRoles, roles map[string]string) bool {
+	if len(ugRoles) > 0 {
+		if r, ok := ugRoles[""]; ok {
+			if fedRole != api.FedRoleMaster {
+				if r == api.UserRoleFedAdmin {
+					r = api.UserRoleAdmin
+				} else if r == api.UserRoleFedReader {
+					r = api.UserRoleReader
+				}
+				ugRoles[""] = r
+			}
+			if r == api.UserRoleFedAdmin || r == api.UserRoleAdmin {
+				return true
+			}
+		} else {
+			var globalRole string
+			globalRole, _ = roles[""]
+			for d, r := range ugRoles {
+				if r == api.UserRoleFedAdmin {
+					r = api.UserRoleAdmin
+				} else if r == api.UserRoleFedReader {
+					r = api.UserRoleReader
+				}
+				if role, ok := roles[d]; ok {
+					if role != r {
+						if r == api.UserRoleAdmin && role != api.UserRoleAdmin {
+							roles[d] = r
+						} else if r == api.UserRoleReader && role == api.UserRoleNone {
+							roles[d] = r
+						}
+					}
+				} else {
+					roles[d] = r
+				}
+				if role, ok := roles[d]; ok && role == globalRole {
+					delete(roles, d)
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func platformCookieRoleMapping(username string, groups []string) map[string]string {
+	accReadAll := access.NewReaderAccessControl()
+	cfg := cacher.GetSystemConfig(accReadAll)
+	if !cfg.AuthByPlatform {
+		return nil
+	}
+
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	roles := make(map[string]string)
+	uRoles, _ := global.ORCH.GetUserRoles(username, resource.SUBJECT_USER)
+	if finalResult := consolidateCookieRoleMapping(fedRole, uRoles, roles); !finalResult {
+		for _, g := range groups {
+			gRoles, _ := global.ORCH.GetUserRoles(g, resource.SUBJECT_GROUP)
+			if finalResult := consolidateCookieRoleMapping(fedRole, gRoles, roles); finalResult {
+				break
+			}
+		}
+	}
+	log.WithFields(log.Fields{"user": username, "groups": groups}).Debug("Authorized by platform")
+	if r, ok := roles[""]; ok && (r == api.UserRoleFedAdmin || r == api.UserRoleAdmin) {
+		return map[string]string{"": r}
+	}
+
 	return roles
 }
 
@@ -1448,7 +1708,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	var role string
 	var roleDomains map[string][]string
 
-	roles, err := global.ORCH.GetUserRoles(pw.Username)
+	roles, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		roleDomains = make(map[string][]string)
 	} else {
@@ -1625,143 +1885,202 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 
-	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
-
+	var defaultPW bool
+	var localAuthed bool
+	var remote string
+	var mainSessionID string
 	var auth api.RESTAuthData
-	err := json.Unmarshal(body, &auth)
-	if err != nil || auth.Password == nil {
-		log.WithFields(log.Fields{"error": err}).Error("Request error")
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-	if len(auth.Password.Password) == 0 {
-		// Disallow empty password, this is to protect a LDAP server mis-config, https://github.com/Pylons/pyramid_ldap/issues/9
-		log.Error("Empty password")
-		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
-		return
-	}
-
-	username := auth.Password.Username
-	remote := auth.ClientIP
-	if remote == "" {
-		remote = r.RemoteAddr
-	}
-	if i := strings.Index(remote, ":"); i > 0 {
-		remote = remote[:i]
-	}
+	var user *share.CLUSUser
+	var rancherUser tRancherUser
 
 	accReadAll := access.NewReaderAccessControl()
-
-	var errLocalAuth error
-	var localAuthEnabled bool
-	var user *share.CLUSUser
-	var localAuthed, blockedForFailedLogin, blockedForExpiredPwd, userFound bool
-	var blockAfterFailedCount int
-
-	servers := getAuthServersInOrder(accReadAll)
-
-	// Succeed if one server authenticates the user
-	for _, cs := range servers {
-		log.WithFields(log.Fields{"server": cs.Name}).Debug("")
-		if cs.Name == api.AuthServerLocal {
-			localAuthEnabled = true
-			if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err == nil {
-				localAuthed = true
-				break
-			} else if userFound {
-				// when a user exists in local & ldap, 'err' will records the ldap auth result. 'errLocalAuth' is for the local auth result
-				errLocalAuth = err
+	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+		if header, ok := r.Header[api.RESTRancherTokenHeader]; ok && len(header) == 1 {
+			if rsessToken := header[0]; rsessToken != "" {
+				var err error
+				var status int = http.StatusUnauthorized
+				var code int
+				if cfg := cacher.GetSystemConfig(accReadAll); cfg.AuthByPlatform && cfg.RancherEP != "" {
+					code = api.RESTErrUnauthorized
+					rancherUser, err = checkRancherUserRole(cfg, rsessToken, accReadAll)
+				} else {
+					code = api.RESTErrPlatformAuthDisabled
+					err = fmt.Errorf("platform auth disabled")
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"err": err, "status": status, "code": code}).Error()
+					w.Header().Set(api.RESTRancherTokenHeader, rsessToken)
+					restRespError(w, status, code)
+					return
+				}
 			}
-		} else if cs.Name == api.AuthServerPlatform {
-			if user, err = platformPasswordAuth(auth.Password); err == nil {
-				break
-			}
-		} else {
-			if user, err = remotePasswordAuth(cs, auth.Password); err == nil {
-				break
-			}
-		}
-		log.WithFields(log.Fields{"user": auth.Password.Username, "error": err}).Info()
-	}
-
-	// When local auth is not enabled, allow login using default 'admin' user to prevent
-	// lock-out in case the remote server is mis-configured
-	if user == nil && !localAuthEnabled && auth.Password.Username == common.DefaultAdminUser {
-		log.Debug("Attempt to login with default admin user")
-		if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err != nil {
-			log.WithFields(log.Fields{"user": auth.Password.Username, "error": err}).Info()
-		} else {
-			localAuthed = true
 		}
 	}
 
-	if user == nil {
-		code := api.RESTErrUnauthorized
-		var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
-		var msg string
-		if userFound {
-			if errLocalAuth != nil {
-				// when a user exists in local & ldap and both auth failed, we adop the errot message from local auth
-				msg = errLocalAuth.Error()
-			} else if err != nil {
-				msg = err.Error()
-			}
-			if blockedForFailedLogin {
-				ev = share.CLUSEvAuthLoginBlocked
-				code = api.RESTErrUserLoginBlocked
-			} else if blockedForExpiredPwd {
-				ev = share.CLUSEvAuthLoginBlocked
-				code = api.RESTErrPasswordExpired
+	if rancherUser.valid {
+		var authz bool
+		role, roleDomains := rbac2UserRole(rancherUser.domainRoles)
+		adjustedRole := role
+		if role == api.UserRoleFedAdmin || role == api.UserRoleFedReader {
+			if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
+				if role == api.UserRoleFedAdmin {
+					adjustedRole = api.UserRoleAdmin
+				} else {
+					adjustedRole = api.UserRoleReader
+				}
 			}
 		}
-		log.WithFields(log.Fields{"user": auth.Password.Username, "msg": msg}).Error("User login failed")
-		authLog(ev, auth.Password.Username, remote, "", nil, msg) // when msg is empty, authLog() will compose the msg
-		restRespError(w, http.StatusUnauthorized, code)
-		return
+		mainSessionID = fmt.Sprintf("%s%s", _rancherSessionPrefix, rancherUser.token)
+		user, authz = lookupShadowUser(strings.ToLower(share.FlavorRancher), rancherUser.name, "", role, roleDomains)
+		if !authz {
+			msg := fmt.Sprintf("Failed to map to a valid role: %s", rancherUser.name)
+			restRespErrorMessage(w, http.StatusUnauthorized, api.RESTErrUnauthorized, msg)
+			return
+		}
+		user.Role = adjustedRole
+		auth = api.RESTAuthData{
+			Password: &api.RESTAuthPassword{
+				Username: rancherUser.name,
+			},
+		}
+		remote = r.RemoteAddr
 	} else {
-		// user password passes auth (could be local or remote auth)
-		if !localAuthed && userFound && blockAfterFailedCount > 0 {
-			// user password passes remote auth but not local auth(user found in local). do not increase local user's FailedLoginCount
-			retry := 0
-			for retry < retryClusterMax {
-				if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
-					if user.FailedLoginCount > 0 {
-						user.FailedLoginCount--
-						if user.FailedLoginCount < uint32(blockAfterFailedCount) {
-							// case: after restoring user's FailedLoginCount, it doesn't match the "block M minutes after N failed login attemps"
-							user.BlockLoginSince = time.Time{}
-						}
-						if err := clusHelper.PutUserRev(user, rev); err != nil {
-							retry++
+		// Read body
+		body, _ := ioutil.ReadAll(r.Body)
+
+		err := json.Unmarshal(body, &auth)
+		if err != nil || auth.Password == nil {
+			log.WithFields(log.Fields{"error": err}).Error("Request error")
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		if len(auth.Password.Password) == 0 {
+			// Disallow empty password, this is to protect a LDAP server mis-config, https://github.com/Pylons/pyramid_ldap/issues/9
+			log.Error("Empty password")
+			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+			return
+		}
+
+		username := auth.Password.Username
+		remote = auth.ClientIP
+		if remote == "" {
+			remote = r.RemoteAddr
+		}
+		if i := strings.Index(remote, ":"); i > 0 {
+			remote = remote[:i]
+		}
+
+		var errLocalAuth error
+		var localAuthEnabled bool
+		var blockedForFailedLogin, blockedForExpiredPwd, userFound bool
+		var blockAfterFailedCount int
+
+		servers := getAuthServersInOrder(accReadAll)
+
+		// Succeed if one server authenticates the user
+		for _, cs := range servers {
+			log.WithFields(log.Fields{"server": cs.Name}).Debug("")
+			if cs.Name == api.AuthServerLocal {
+				localAuthEnabled = true
+				if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err == nil {
+					localAuthed = true
+					break
+				} else if userFound {
+					// when a user exists in local & ldap, 'err' will records the ldap auth result. 'errLocalAuth' is for the local auth result
+					errLocalAuth = err
+				}
+			} else if cs.Name == api.AuthServerPlatform {
+				if user, err = platformPasswordAuth(auth.Password); err == nil {
+					break
+				}
+			} else {
+				if user, err = remotePasswordAuth(cs, auth.Password); err == nil {
+					break
+				}
+			}
+			log.WithFields(log.Fields{"user": auth.Password.Username, "error": err}).Info()
+		}
+
+		// When local auth is not enabled, allow login using default 'admin' user to prevent
+		// lock-out in case the remote server is mis-configured
+		if user == nil && !localAuthEnabled && auth.Password.Username == common.DefaultAdminUser {
+			log.Debug("Attempt to login with default admin user")
+			if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err != nil {
+				log.WithFields(log.Fields{"user": auth.Password.Username, "error": err}).Info()
+			} else {
+				localAuthed = true
+			}
+		}
+
+		if user == nil {
+			code := api.RESTErrUnauthorized
+			var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
+			var msg string
+			if userFound {
+				if errLocalAuth != nil {
+					// when a user exists in local & ldap and both auth failed, we adop the errot message from local auth
+					msg = errLocalAuth.Error()
+				} else if err != nil {
+					msg = err.Error()
+				}
+				if blockedForFailedLogin {
+					ev = share.CLUSEvAuthLoginBlocked
+					code = api.RESTErrUserLoginBlocked
+				} else if blockedForExpiredPwd {
+					ev = share.CLUSEvAuthLoginBlocked
+					code = api.RESTErrPasswordExpired
+				}
+			}
+			log.WithFields(log.Fields{"user": auth.Password.Username, "msg": msg}).Error("User login failed")
+			authLog(ev, auth.Password.Username, remote, "", nil, msg) // when msg is empty, authLog() will compose the msg
+			restRespError(w, http.StatusUnauthorized, code)
+			return
+		} else {
+			// user password passes auth (could be local or remote auth)
+			if !localAuthed && userFound && blockAfterFailedCount > 0 {
+				// user password passes remote auth but not local auth(user found in local). do not increase local user's FailedLoginCount
+				retry := 0
+				for retry < retryClusterMax {
+					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+						if user.FailedLoginCount > 0 {
+							user.FailedLoginCount--
+							if user.FailedLoginCount < uint32(blockAfterFailedCount) {
+								// case: after restoring user's FailedLoginCount, it doesn't match the "block M minutes after N failed login attemps"
+								user.BlockLoginSince = time.Time{}
+							}
+							if err := clusHelper.PutUserRev(user, rev); err != nil {
+								retry++
+							} else {
+								break
+							}
 						} else {
 							break
 						}
-					} else {
-						break
 					}
 				}
-			}
-			if retry >= retryClusterMax {
-				log.WithFields(log.Fields{"user": user.Username}).Error("Failed to update user in cluster")
+				if retry >= retryClusterMax {
+					log.WithFields(log.Fields{"user": user.Username}).Error("Failed to update user in cluster")
+				}
 			}
 		}
-	}
 
-	var defaultPW bool
-	if username == common.DefaultAdminUser && auth.Password.Password == common.DefaultAdminPass {
-		defaultPW = true
+		if username == common.DefaultAdminUser && auth.Password.Password == common.DefaultAdminPass {
+			defaultPW = true
+		}
+		mainSessionID = _interactiveSessionID
 	}
 
 	var rc int
+	var err error
 	var login *loginSession
+
 	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
 	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
 	if fedRole == api.FedRoleJoint && fedUserRoles.Contains(user.Role) {
 		rc = userInvalidRequest
 	} else {
 		// Login user accounting
-		login, rc = loginUser(user, nil, remote, _interactiveSessionID, "", fedRole)
+		login, rc = loginUser(user, nil, remote, mainSessionID, "", fedRole)
 	}
 	if rc != userOK {
 		if rc == userTimeout {
@@ -1773,12 +2092,6 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			authLog(share.CLUSEvAuthLoginFailed, auth.Password.Username, remote, "", nil, "")
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 		}
-		return
-	}
-
-	pwdDaysUntilExpire, pwdHoursUntilExpire, expired := isPasswordExpired(localAuthed, user.Fullname, user.PwdResetTime)
-	if expired {
-		restRespError(w, http.StatusUnauthorized, api.RESTErrPasswordExpired)
 		return
 	}
 
@@ -1798,10 +2111,22 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				RoleDomains: user.RoleDomains,
 			},
 		},
-		PwdDaysUntilExpire:  pwdDaysUntilExpire,
-		PwdHoursUntilExpire: pwdHoursUntilExpire,
 	}
-	resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains)
+
+	if !rancherUser.valid || rancherUser.token == "" {
+		pwdDaysUntilExpire, pwdHoursUntilExpire, expired := isPasswordExpired(localAuthed, user.Fullname, user.PwdResetTime)
+		if expired {
+			restRespError(w, http.StatusUnauthorized, api.RESTErrPasswordExpired)
+			return
+		}
+		resp.PwdDaysUntilExpire = pwdDaysUntilExpire
+		resp.PwdHoursUntilExpire = pwdHoursUntilExpire
+		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains)
+	} else {
+		resp.PwdDaysUntilExpire = -1
+		resp.PwdHoursUntilExpire = -1
+		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains) //->
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"user": user.Fullname, "err": err}).Warn("")
 		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
@@ -2161,13 +2486,13 @@ func handlerAuthRefresh(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	restRespSuccess(w, r, nil, acc, login, nil, "")
 }
 
-// delete all login sessions/tokens that have the non-empty mainSessionID. it means the joint cluster is leaving the federation
+// delete all login sessions/tokens that have the master cluster's mainSessionID. it means the joint cluster is leaving the federation
 func delAllFedSessionTokens() {
 	userMutex.Lock()
 	defer userMutex.Unlock()
 	if recordFedAuthSessions {
 		for mainSessionID, tokenSet := range loginFedSessions {
-			if mainSessionID != _interactiveSessionID {
+			if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) {
 				for _, token := range tokenSet.ToStringSlice() {
 					if s, ok := loginSessions[token]; ok {
 						s._delete()
@@ -2178,7 +2503,7 @@ func delAllFedSessionTokens() {
 		}
 	} else {
 		for _, s := range loginSessions {
-			if s.mainSessionID != _interactiveSessionID {
+			if s.mainSessionID != _interactiveSessionID && !strings.HasPrefix(s.mainSessionID, _rancherSessionPrefix) {
 				s._delete()
 			}
 		}
@@ -2245,7 +2570,7 @@ type RESTRegularAuthTestDataDetail struct {
 
 type RESTFedAuthTestDataDetail struct {
 	MainSessionID   string   `json:"main_session_id"`
-	MainSessionUser string `json:"main_session_user"`
+	MainSessionUser string   `json:"main_session_user"`
 	Tokens          []string `json:"tokens"`
 }
 
