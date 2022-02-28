@@ -1520,6 +1520,22 @@ func IsRancherFlavor() bool {
 		for _, svcname := range svcnames {
 			if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
 				log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
+				nvPermissions := []string{"*"}
+				/* Rancher SSO:
+				nvPermissions := []string{"*", "admctrl", "audit_events", "authentication", "authorization", "ci_scan",
+					"compliance", "config", "events", "reg_scan", "rt_policy", "rt_scan", "vulnerability", "security_events"}
+				nvPermissionIndex = make(map[string]int, len(nvPermissions)+1) // permission -> index in the pseudo role's [pseudo name]
+				nvIndexPermission = make(map[int]string, len(nvPermissions)+1) // index -> permission in the pseudo role's [pseudo name]
+				// reserve [0] in pseudo role's pseudo name
+				for i, p := range nvPermissions {
+					nvPermissionIndex[p] = i + 1
+					nvIndexPermission[i+1] = p
+				}*/
+				nvPermissionRscs = utils.NewSetFromSliceKind(nvPermissions)
+				nvRscsMap = map[string]utils.Set{ // apiGroup to resources
+					"read-only.neuvector.api.io": nvPermissionRscs,
+					"*":                          nvPermissionRscs,
+				}
 				return true
 			}
 		}
