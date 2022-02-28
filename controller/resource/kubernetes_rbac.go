@@ -24,6 +24,10 @@ import (
 const (
 	SUBJECT_USER  = 0
 	SUBJECT_GROUP = 1
+
+	VERB_NONE  = 0
+	VERB_READ  = 1
+	VERB_WRITE = 2
 )
 
 const globalRolePrefix string = "cattle-globalrole-"
@@ -96,30 +100,22 @@ var ocAdminVerbs utils.Set = utils.NewSet(
 	"*",
 )
 
-// Rancher SSO :
-var nvRscsMap map[string]utils.Set = map[string]utils.Set{ // apiGroup to resources
-	"read-only.neuvector.api.io": utils.NewSet("*"),
-	"*":                          utils.NewSet("*"),
-}
-
 // Rancher SSO: apiGroup									resources		verbs
 //------------------------------------------------------------------------------------------------
-// fedAdmin:  	in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"update", "*"} 		// "cattle-globalrole-....." clusterrole(with clusterrolebinding)
-// fedReader: 	in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"get} 		        // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
-// admin:  		in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"update", "*"} 		// clusterrole(with clusterrolebinding)
-// reader: 		in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}         		// clusterrole(with clusterrolebinding)
-// ns admin:  	in {"read-only.neuvector.api.io", "*"}		"*"				in {"update", "*"} 		// clusterrole(with rolebinding) or role
-// ns reader: 	in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}         		// clusterrole(with rolebinding) or role
+// fedAdmin:    in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
+// fedReader:   in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"get}   // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
+// admin:       in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // clusterrole(with clusterrolebinding)
+// reader:      in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}  // clusterrole(with clusterrolebinding)
+// ns admin:    in {"read-only.neuvector.api.io", "*"}		"*"				in {"*"}    // clusterrole(with rolebinding) or role
+// ns reader:   in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}  // clusterrole(with rolebinding) or role
 var nvReadVerbs utils.Set = utils.NewSet("get")
-var nvWriteVerbs utils.Set = utils.NewSet("update", "*")
+var nvWriteVerbs utils.Set = utils.NewSet("*")
+var nvPermissionRscs utils.Set
+var nvRscsMap map[string]utils.Set
 
-/* Rancher SSO : (phase-2) custom roles
-var nvPermissionMap map[string]utils.Set = map[string]utils.Set{ // apiGroup to resources
-	"read-only.neuvector.api.io": utils.NewSet("admctrl", "audit_events", "authentication", "authorization", "ci_scan",
-		"compliance", "config", "events", "reg_scan", "rt_policy", "rt_scan", "vulnerability", "security_events", "*"),
-	"*": utils.NewSet("*"),
-}
-*/
+//Rancher SSO : (phase-2) custom roles. Pseudo role has name "custom_:[pseudo name]"
+//var nvPermissionIndex map[string]int // For rancher only: permission -> index in the pseudo role's [pseudo name]
+//var nvIndexPermission map[int]string // For rancher only: index -> permission in the pseudo role's [pseudo name]
 
 var appRoleVerbs utils.Set = utils.NewSet("get", "list", "update", "watch")
 var rbacRoleVerbs utils.Set = utils.NewSet("get", "list", "watch")
@@ -207,22 +203,40 @@ var nvRoleBindings map[string]*k8sRoleBindingInfo = map[string]*k8sRoleBindingIn
 }
 
 // Rancher SSO : (future) custom role?
-func k8s2NVRole(rscs, readerVerbs, writerVerbs utils.Set, r2v map[string]utils.Set) string {
-	var nvRole string
-	if readerVerbs == nil {
-		// keep oc's original behavior
-		nvRole = api.UserRoleReader
-	}
-	for rsc, verbs := range r2v {
-		if rscs.Contains(rsc) {
-			if writerVerbs.Intersect(verbs).Cardinality() != 0 {
+func k8s2NVRole(rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
+	if readVerbs == nil {
+		// keep original behavior for oc platofrm login
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
 				return api.UserRoleAdmin
-			} else if readerVerbs != nil && readerVerbs.Intersect(verbs).Cardinality() != 0 {
-				nvRole = api.UserRoleReader
 			}
 		}
+		return api.UserRoleReader
+	} else {
+		var nvRole string
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) {
+				if rsc == "*" {
+					if writeVerbs.Intersect(verbs).Cardinality() != 0 {
+						return api.UserRoleAdmin
+					} else if readVerbs.Intersect(verbs).Cardinality() != 0 {
+						nvRole = api.UserRoleReader
+					}
+				} else { // for custom roles
+					/* Rancher SSO => TO DO
+					v := VERB_NONE
+					if readVerbs.Intersect(verbs).Cardinality() != 0 {
+						v = VERB_READ
+					} else if writeVerbs.Intersect(verbs).Cardinality() != 0 {
+						v = VERB_WRITE
+					}
+					nvRole = updatePseudoRole(nvRole, rsc, v)
+					*/
+				}
+			}
+		}
+		return nvRole
 	}
-	return nvRole
 }
 
 func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{}, getVerbs bool) (string, map[string]map[string]utils.Set) {
@@ -279,16 +293,16 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 	if len(ag2r2v) > 0 {
 		var nvRole string
 		var rscsMap map[string]utils.Set = ocAdminRscsMap
-		var readerdVerbs utils.Set               // users who has these verbs on specified resources are nv viewer
-		var writerVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
+		var readVerbs utils.Set                 // users who has these verbs on specified resources are nv viewer
+		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
 			rscsMap = nvRscsMap
-			readerdVerbs = nvReadVerbs
-			writerVerbs = nvWriteVerbs
+			readVerbs = nvReadVerbs
+			writeVerbs = nvWriteVerbs
 		}
 		for apiGroup, rscs := range rscsMap {
 			if r2v, ok := ag2r2v[apiGroup]; ok && len(r2v) > 0 {
-				nvRoleTemp := k8s2NVRole(rscs, readerdVerbs, writerVerbs, r2v)
+				nvRoleTemp := k8s2NVRole(rscs, readVerbs, writeVerbs, r2v)
 				if roleDomain == "" && k8sFlavor == share.FlavorRancher && strings.HasPrefix(clusRoleName, globalRolePrefix) {
 					if nvRoleTemp == api.UserRoleAdmin {
 						nvRole = api.UserRoleFedAdmin
@@ -301,6 +315,9 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 				if (nvRoleTemp == api.UserRoleAdmin && nvRole != api.UserRoleAdmin) ||
 					(nvRoleTemp == api.UserRoleReader && nvRole == api.UserRoleNone) {
 					nvRole = nvRoleTemp
+				} else if strings.HasPrefix(nvRoleTemp, "custom_:") {
+					// Rancher SSO => TO DO
+					//nvRole = mergePesudoRoles(nvRole, nvRoleTemp)
 				}
 			}
 		}
