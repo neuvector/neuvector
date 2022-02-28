@@ -151,6 +151,30 @@ func isContainerProcess(c *procContainer, pid int) bool {
 	return c.children.Contains(pid) || c.outsider.Contains(pid)
 }
 
+// check if the process is assigned to host before. if so, remove from host
+func (p *Probe) removeHostPool(pid int) {
+	if c, ok := p.containerMap[""]; ok {
+		c.children.Remove(pid)
+	}
+}
+
+func (p *Probe) addProcessPool(pid, ppid int) (*procContainer, bool) {
+	if c, ok := p.pidContainerMap[ppid]; ok && c.id != ""{
+		if c.id == p.selfID {
+			c.children.Add(pid) // the children of the nstools are ambiguous and can be in other namespaces
+		} else {
+			if c.children.Contains(ppid) {
+				c.children.Add(pid)
+			} else {
+				c.outsider.Add(pid)
+			}
+		}
+		p.removeHostPool(pid)
+		return c, true
+	}
+	return nil, false
+}
+
 /////
 func (p *Probe) isDockerDaemonProcess(proc *procInternal, id string) bool {
 	if id == "" { // host porcesses
@@ -492,6 +516,11 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 func (p *Probe) removeProcessInContainer(pid int) {
 	containerRemoved := false
 	if c, ok := p.pidContainerMap[pid]; ok {
+		if c.id == "" {
+			c.children.Remove(pid)
+			return
+		}
+
 		// retrive the rootPid
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(c.id)
@@ -925,6 +954,8 @@ func (p *Probe) handleProcFork(pid, ppid int, name string) (inContainer bool, pc
 	now := time.Now()
 
 	// log.Debug("PROC: fork: ", ppid, "->", pid)
+	p.addProcessPool(pid, ppid)
+
 	// dynamic allocation
 	proc := &procInternal{
 		name:         name,
