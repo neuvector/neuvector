@@ -41,7 +41,7 @@ const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 
 const (
 	CFGEndpointSystem           = "system"
-	CFGEndpointEULA             = "eula"
+	CFGEndpointEULA             = "eula_oss"
 	CFGEndpointScan             = "scan"
 	CFGEndpointUser             = "user"
 	CFGEndpointServer           = "server"
