@@ -837,7 +837,9 @@ func isSudoCommand(cmds []string) bool {
 
 // pidNetlink: root escalation check
 func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContainer) {
+	p.lockProcMux() // minimum section lock
 	parent, ok := p.pidProcMap[proc.ppid]
+	p.unlockProcMux() // minimum section lock
 	if !ok { // parent has not been caught
 		if !osutil.IsPidValid(proc.ppid) {
 			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Info("PROC: parent exited")
@@ -901,12 +903,18 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 			}
 
 			// skip if: pgid is one of below processes (above and below "parent" checks might not be necessary)
-			if pgrp, ok := p.pidProcMap[proc.pgid]; ok && isSudoCommand(pgrp.cmds) {
+			var pgrp, psid *procInternal
+			var ok1, ok2 bool
+			p.lockProcMux() // minimum section lock
+			pgrp, ok1 = p.pidProcMap[proc.pgid]
+			psid, ok2 = p.pidProcMap[proc.sid]
+			p.unlockProcMux() // minimum section lock
+			if ok1 && isSudoCommand(pgrp.cmds) {
 				return
 			}
 
 			// skip if: sid is one of below processes
-			if psid, ok := p.pidProcMap[proc.sid]; ok && isSudoCommand(psid.cmds) {
+			if ok2 && isSudoCommand(psid.cmds) {
 				return
 			}
 
@@ -920,7 +928,11 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 
 			// report its grand parent (useful for user to find the root cause)
 			if parent.pid != parent.ppid { // not from the lost parent link
-				if gp, ok := p.pidProcMap[parent.ppid]; ok {
+				var gp *procInternal
+				p.lockProcMux() // minimum section lock
+				gp, ok = p.pidProcMap[parent.ppid]
+				p.unlockProcMux() // minimum section lock
+				if ok {
 					if len(gp.cmds) == 0 {
 						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
 					}
@@ -1227,7 +1239,7 @@ func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 		proc.euid = euid
 		log.WithFields(log.Fields{"proc": proc}).Debug("PROC:")
 		if c, ok := p.pidContainerMap[pid]; ok {
-			p.rootEscalationCheck_uidChange(proc, c)
+			go p.rootEscalationCheck_uidChange(proc, c)
 		}
 	}
 }
