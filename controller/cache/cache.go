@@ -1718,6 +1718,17 @@ func startWorkerThread() {
 						addrOrchWorkloadStop(&o.IPNet)
 						connectOrchWorkloadDelete(&o.IPNet)
 					}
+					if n != nil {
+						if n.Domain == "kube-system" && strings.HasPrefix(n.Name, "kube-apiserver-") {
+							if k8sVer, _ := global.ORCH.GetVersion(true, false); k8sVer != "" && cctx.k8sVersion != k8sVer {
+								log.WithFields(log.Fields{"oldVer": cctx.k8sVersion, "newVer": k8sVer}).Info()
+								cctx.k8sVersion = k8sVer
+								resource.SetK8sVersion(k8sVer)
+								scanMapDelete(common.ScanPlatformID)
+								scanMapAdd(common.ScanPlatformID, "", nil, share.ScanObjectType_PLATFORM)
+							}
+						}
+					}
 				case resource.RscTypeService:
 					if isLeader() {
 						var n, o *resource.Service
@@ -1878,7 +1889,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 
 	cctx = ctx
 	localDev = ctx.LocalDev
-	cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion()
+	cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
 
