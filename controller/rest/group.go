@@ -964,6 +964,7 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 func configPolicyMode(grp *share.CLUSGroup) error {
 	if pp := clusHelper.GetProcessProfile(grp.Name); pp != nil {
 		pp.Mode = grp.ProfileMode
+		pp.Baseline = grp.BaselineProfile
 		if err := clusHelper.PutProcessProfile(grp.Name, pp); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error()
 			return err
@@ -1020,6 +1021,20 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 
+	if rc.BaselineProfile != nil {
+		blValue := strings.ToLower(*rc.BaselineProfile)
+		switch blValue {
+		case share.ProfileBasic:
+			*rc.BaselineProfile = share.ProfileBasic
+		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+			*rc.BaselineProfile = share.ProfileZeroDrift
+		default:
+			log.WithFields(log.Fields{"baseline": *rc.BaselineProfile}).Error("Invalid profile baseline")
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+	}
+
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
@@ -1044,6 +1059,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 
 		var changed bool = false
 		var policyChanged bool = false
+		var baselineChanged bool
 		if rc.PolicyMode != nil {
 			if cacher.IsGroupPolicyModeChangeable(name) {
 				if grp.PolicyMode != *rc.PolicyMode || grp.ProfileMode != *rc.PolicyMode {
@@ -1055,13 +1071,25 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 			}
 		}
 
+		if rc.BaselineProfile != nil {
+			if grp.BaselineProfile != *rc.BaselineProfile {
+				changed = true
+				baselineChanged = true
+				if utils.IsGroupNodes(name) {
+					grp.BaselineProfile = share.ProfileBasic	//	always
+				} else {
+					grp.BaselineProfile = *rc.BaselineProfile
+				}
+			}
+		}
+
 		if rc.NotScored != nil {
 			grp.NotScored = *rc.NotScored
 			changed = true
 		}
 
 		if changed {
-			if policyChanged {
+			if policyChanged || baselineChanged {
 				err := configPolicyMode(grp)
 				if err != nil {
 					restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
@@ -1467,11 +1495,23 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 
 		var changed bool = false
 		var policyChanged bool = false
+		var baselineChanged bool
 		if rc.PolicyMode != nil {
 			if grp.ProfileMode != *rc.PolicyMode && cacher.IsGroupPolicyModeChangeable(name) {
 				grp.ProfileMode = *rc.PolicyMode
 				changed = true
 				policyChanged = true
+			}
+		}
+		if rc.BaselineProfile != nil {
+			if grp.BaselineProfile != *rc.BaselineProfile {
+				changed = true
+				baselineChanged = true
+				if utils.IsGroupNodes(name) {
+					grp.BaselineProfile = share.ProfileBasic	//	always
+				} else {
+					grp.BaselineProfile = *rc.BaselineProfile
+				}
 			}
 		}
 		if rc.NotScored != nil {
@@ -1480,7 +1520,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		}
 
 		if changed {
-			if policyChanged {
+			if policyChanged || baselineChanged {
 				err := configPolicyMode(grp)
 				if err != nil {
 					restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)

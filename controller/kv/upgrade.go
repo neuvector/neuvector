@@ -142,6 +142,11 @@ func upgradeGroup(group *share.CLUSGroup) (bool, bool) {
 			group.ProfileMode = group.PolicyMode
 			upd = true
 		}
+
+		if group.BaselineProfile == "" {
+			group.BaselineProfile = share.ProfileBasic
+			upd = true
+		}
 	} else if group.PolicyMode != "" || group.ProfileMode != "" {
 		// This is to take care upgrade case where PolicyMode was set incorrectly
 		group.PolicyMode = ""
