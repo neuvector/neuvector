@@ -82,10 +82,9 @@ type k8sClusterRoleInfo struct {
 }
 
 var ocAdminRscsMap map[string]utils.Set = map[string]utils.Set{ // apiGroup to resources
-	"":           utils.NewSet("pods", "services", "*"),
-	"extensions": utils.NewSet("daemonsets", "deployments", "replicasets", "*"),
-	"apps":       utils.NewSet("statefulsets", "*"),
-	"*":          utils.NewSet("*"),
+	"":     utils.NewSet("pods", "services", "*"),
+	"apps": utils.NewSet("daemonsets", "deployments", "replicasets", "statefulsets", "*"),
+	"*":    utils.NewSet("*"),
 }
 
 var ocAdminVerbs utils.Set = utils.NewSet(
