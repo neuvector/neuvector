@@ -1494,21 +1494,25 @@ func AdjustAdmWebhookName(f NvCrdInitFunc) {
 
 func GetK8sVersion() (int, int) {
 	if k8sVersionMajor == 0 && k8sVersionMinor == 0 {
-		k8sVer, _ := global.ORCH.GetVersion()
-		ss := strings.Split(k8sVer, ".")
-		if len(ss) >= 1 {
-			var err error
-			k8sVersionMajor, err = strconv.Atoi(ss[0])
-			if err != nil {
-				k8sVersionMajor = 1
-			}
-		}
-		if len(ss) >= 2 {
-			k8sVersionMinor, _ = strconv.Atoi(ss[1])
-		}
+		k8sVer, _ := global.ORCH.GetVersion(false, false)
+		SetK8sVersion(k8sVer)
 	}
 
 	return k8sVersionMajor, k8sVersionMinor
+}
+
+func SetK8sVersion(k8sVer string) {
+	ss := strings.Split(k8sVer, ".")
+	if len(ss) >= 1 {
+		var err error
+		k8sVersionMajor, err = strconv.Atoi(ss[0])
+		if err != nil {
+			k8sVersionMajor = 1
+		}
+	}
+	if len(ss) >= 2 {
+		k8sVersionMinor, _ = strconv.Atoi(ss[1])
+	}
 }
 
 func IsRancherFlavor() bool {

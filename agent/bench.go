@@ -201,8 +201,8 @@ func (b *Bench) BenchLoop() {
 			b.doDockerHostBench()
 
 		case <-b.kubeTimer.C:
-			// Check version only once
-			k8sVer, ocVer := global.ORCH.GetVersion()
+			// Check version whenever the benchmark is rerun
+			k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 			if masterScript == "" {
 				// 1.11- : 1.3.0
 				// 1.13- : 1.4.1
