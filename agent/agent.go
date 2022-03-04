@@ -332,7 +332,7 @@ func main() {
 
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
-		k8sVer, ocVer := global.ORCH.GetVersion()
+		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer}).Info()
 	}
 

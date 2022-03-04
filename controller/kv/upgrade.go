@@ -57,6 +57,15 @@ func upgradeSystemConfig(cfg *share.CLUSSystemConfig) (bool, bool) {
 	if cfg.NewServiceProfileBaseline == "" {
 		cfg.NewServiceProfileBaseline = common.DefaultSystemConfig.NewServiceProfileBaseline
 		upd = true
+	} else {
+		blValue := strings.ToLower(cfg.NewServiceProfileBaseline)
+		if blValue == share.ProfileDefault || blValue == share.ProfileShield {
+			blValue = share.ProfileZeroDrift
+		}
+		if blValue != cfg.NewServiceProfileBaseline {
+			cfg.NewServiceProfileBaseline = blValue
+			upd = true
+		}
 	}
 	if cfg.ClusterName == "" {
 		cfg.ClusterName = common.DefaultSystemConfig.ClusterName
@@ -131,6 +140,11 @@ func upgradeGroup(group *share.CLUSGroup) (bool, bool) {
 
 		if group.ProfileMode == "" {
 			group.ProfileMode = group.PolicyMode
+			upd = true
+		}
+
+		if group.BaselineProfile == "" {
+			group.BaselineProfile = share.ProfileBasic
 			upd = true
 		}
 	} else if group.PolicyMode != "" || group.ProfileMode != "" {
@@ -260,9 +274,24 @@ func upgradeProcessProfile(cfg *share.CLUSProcessProfile) (bool, bool) {
 		upd = true
 	}
 
-	if utils.DoesGroupHavePolicyMode(cfg.Group) && cfg.Baseline == "" {
-		cfg.Baseline = share.ProfileBasic
-		upd = true
+	if utils.DoesGroupHavePolicyMode(cfg.Group) {
+		if cfg.Baseline == "" {
+			if utils.IsGroupNodes(cfg.Group) {
+				cfg.Baseline = share.ProfileBasic
+			} else {
+				cfg.Baseline = share.ProfileZeroDrift
+			}
+			upd = true
+		} else {
+			blValue := strings.ToLower(cfg.Baseline)
+			if blValue == share.ProfileDefault || blValue == share.ProfileShield {
+				blValue = share.ProfileZeroDrift
+			}
+			if blValue != cfg.Baseline {
+				cfg.Baseline = blValue
+				upd = true
+			}
+		}
 	}
 
 	for i, _ := range cfg.Process {
@@ -1448,8 +1477,8 @@ func upgradeWebhookConfig() {
 
 func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 	var upd bool
-	if cfg.ProcessProfile.Baseline != share.ProfileCrdBasic && cfg.ProcessProfile.Baseline != share.ProfileCrdZeroDrift {
-		cfg.ProcessProfile.Baseline = share.ProfileCrdBasic
+	if cfg.ProcessProfile.Baseline != share.ProfileBasic && cfg.ProcessProfile.Baseline != share.ProfileZeroDrift {
+		cfg.ProcessProfile.Baseline = share.ProfileZeroDrift
 		upd = true
 	}
 	return upd, upd

@@ -71,8 +71,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb := &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "mike", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -80,7 +80,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check mike is cluster admin
-	rbac, _ := d.GetUserRoles("mike")
+	rbac, _ := d.GetUserRoles("mike", SUBJECT_USER)
 	expect := map[string]string{"": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -94,9 +94,9 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "mike", domain: ""},
-			k8sObjectRef{name: "jane", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
+			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -104,7 +104,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check new role
-	rbac, _ = d.GetUserRoles("jane")
+	rbac, _ = d.GetUserRoles("jane", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -118,8 +118,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "jane", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -127,7 +127,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check jane is cluster admin
-	rbac, _ = d.GetUserRoles("jane")
+	rbac, _ = d.GetUserRoles("jane", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -136,7 +136,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check mike is gone
-	rbac, _ = d.GetUserRoles("mike")
+	rbac, _ = d.GetUserRoles("mike", SUBJECT_USER)
 	if rbac != nil {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
 		t.Logf("  Expect: %+v\n", nil)
@@ -149,8 +149,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "12", name: "reader", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "jane", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -158,7 +158,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check jane is cluster admin
-	rbac, _ = d.GetUserRoles("jane")
+	rbac, _ = d.GetUserRoles("jane", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -172,8 +172,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "13", name: "ns2-reader", domain: "ns2", role: k8sObjectRef{name: "ns2-audit", domain: "ns2"},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "jane", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -181,7 +181,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check jane is cluster admin
-	rbac, _ = d.GetUserRoles("jane")
+	rbac, _ = d.GetUserRoles("jane", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -195,8 +195,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -207,8 +207,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -216,7 +216,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader and ns1 admin
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -230,8 +230,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -239,7 +239,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader and admin of ns1 and ns2
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin, "ns2": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -253,8 +253,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -262,7 +262,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader and admin of ns1
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -276,8 +276,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -285,7 +285,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader and ns1 and ns2 admin
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin, "ns2": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -303,7 +303,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader, ns1 admin and ns2 reader (hidden)
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -321,7 +321,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is cluster reader, ns1 reader (hidden) and ns2 reader (hidden)
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	expect = map[string]string{"": api.UserRoleReader}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
@@ -335,8 +335,8 @@ func TestRBAC(t *testing.T) {
 	rt = K8sRscTypeClusRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -344,8 +344,8 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is ns1 and ns2 reader
-	rbac, _ = d.GetUserRoles("gary")
-	expect = map[string]string{"ns1": api.UserRoleReader, "ns2": api.UserRoleReader}
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
+	expect = map[string]string{"": "", "ns1": api.UserRoleReader, "ns2": api.UserRoleReader}
 	if !reflect.DeepEqual(rbac, expect) {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
 		t.Logf("  Expect: %+v\n", expect)
@@ -358,8 +358,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -370,8 +370,8 @@ func TestRBAC(t *testing.T) {
 	rt = k8sRscTypeRoleBinding
 	rb = &k8sRoleBinding{
 		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
-		users: []k8sObjectRef{
-			k8sObjectRef{name: "gary", domain: ""},
+		users: []k8sSubjectObjRef{
+			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -379,7 +379,7 @@ func TestRBAC(t *testing.T) {
 	}
 
 	// Test: check gary is gone
-	rbac, _ = d.GetUserRoles("gary")
+	rbac, _ = d.GetUserRoles("gary", SUBJECT_USER)
 	if rbac != nil {
 		t.Errorf("Unexpacted rbac - cache: %+v", d.rbacCache)
 		t.Logf("  Expect: %+v\n", nil)

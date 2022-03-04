@@ -151,6 +151,30 @@ func isContainerProcess(c *procContainer, pid int) bool {
 	return c.children.Contains(pid) || c.outsider.Contains(pid)
 }
 
+// check if the process is assigned to host before. if so, remove from host
+func (p *Probe) removeHostPool(pid int) {
+	if c, ok := p.containerMap[""]; ok {
+		c.children.Remove(pid)
+	}
+}
+
+func (p *Probe) addProcessPool(pid, ppid int) (*procContainer, bool) {
+	if c, ok := p.pidContainerMap[ppid]; ok && c.id != ""{
+		if c.id == p.selfID {
+			c.children.Add(pid) // the children of the nstools are ambiguous and can be in other namespaces
+		} else {
+			if c.children.Contains(ppid) {
+				c.children.Add(pid)
+			} else {
+				c.outsider.Add(pid)
+			}
+		}
+		p.removeHostPool(pid)
+		return c, true
+	}
+	return nil, false
+}
+
 /////
 func (p *Probe) isDockerDaemonProcess(proc *procInternal, id string) bool {
 	if id == "" { // host porcesses
@@ -492,6 +516,11 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 func (p *Probe) removeProcessInContainer(pid int) {
 	containerRemoved := false
 	if c, ok := p.pidContainerMap[pid]; ok {
+		if c.id == "" {
+			c.children.Remove(pid)
+			return
+		}
+
 		// retrive the rootPid
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(c.id)
@@ -808,7 +837,9 @@ func isSudoCommand(cmds []string) bool {
 
 // pidNetlink: root escalation check
 func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContainer) {
+	p.lockProcMux() // minimum section lock
 	parent, ok := p.pidProcMap[proc.ppid]
+	p.unlockProcMux() // minimum section lock
 	if !ok { // parent has not been caught
 		if !osutil.IsPidValid(proc.ppid) {
 			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Info("PROC: parent exited")
@@ -872,12 +903,18 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 			}
 
 			// skip if: pgid is one of below processes (above and below "parent" checks might not be necessary)
-			if pgrp, ok := p.pidProcMap[proc.pgid]; ok && isSudoCommand(pgrp.cmds) {
+			var pgrp, psid *procInternal
+			var ok1, ok2 bool
+			p.lockProcMux() // minimum section lock
+			pgrp, ok1 = p.pidProcMap[proc.pgid]
+			psid, ok2 = p.pidProcMap[proc.sid]
+			p.unlockProcMux() // minimum section lock
+			if ok1 && isSudoCommand(pgrp.cmds) {
 				return
 			}
 
 			// skip if: sid is one of below processes
-			if psid, ok := p.pidProcMap[proc.sid]; ok && isSudoCommand(psid.cmds) {
+			if ok2 && isSudoCommand(psid.cmds) {
 				return
 			}
 
@@ -891,7 +928,11 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 
 			// report its grand parent (useful for user to find the root cause)
 			if parent.pid != parent.ppid { // not from the lost parent link
-				if gp, ok := p.pidProcMap[parent.ppid]; ok {
+				var gp *procInternal
+				p.lockProcMux() // minimum section lock
+				gp, ok = p.pidProcMap[parent.ppid]
+				p.unlockProcMux() // minimum section lock
+				if ok {
 					if len(gp.cmds) == 0 {
 						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
 					}
@@ -925,6 +966,8 @@ func (p *Probe) handleProcFork(pid, ppid int, name string) (inContainer bool, pc
 	now := time.Now()
 
 	// log.Debug("PROC: fork: ", ppid, "->", pid)
+	p.addProcessPool(pid, ppid)
+
 	// dynamic allocation
 	proc := &procInternal{
 		name:         name,
@@ -1196,7 +1239,7 @@ func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 		proc.euid = euid
 		log.WithFields(log.Fields{"proc": proc}).Debug("PROC:")
 		if c, ok := p.pidContainerMap[pid]; ok {
-			p.rootEscalationCheck_uidChange(proc, c)
+			go p.rootEscalationCheck_uidChange(proc, c)
 		}
 	}
 }
@@ -2060,20 +2103,56 @@ func (p *Probe) isAllowCniCommand(path string) bool {
 	return false
 }
 
+func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
+	if p.bKubePlatform {
+		return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && proc.cmds[0] == "/bin/calico-node")
+	}
+	return false
+}
+
 func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
 	}
 
-	if proc.path == "/usr/bin/pod" && proc.name == "pod" && global.RT.IsRuntimeProcess(proc.pname, nil) {
+	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
+	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+	if bRtProcP && proc.path == "/usr/bin/pod" && proc.name == "pod" {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 		return true
 	}
 
 	// both names are in the runtime list
-	if global.RT.IsRuntimeProcess(proc.name, nil) && global.RT.IsRuntimeProcess(proc.pname, nil) {
+	if bRtProc && bRtProcP {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 		return true
+	}
+
+	// network plug-in: calico-node
+	if bRtProcP && p.isAllowCalicoCommand(proc) {
+		log.WithFields(log.Fields{"name": proc.name, "path": proc.path, "pname": proc.pname}).Debug("PROC:")
+		return true
+	}
+
+	// CNI commands from node
+	if bRtProcP || p.isAllowCniCommand(proc.ppath) {
+		switch proc.name {
+		case "portmap", "containerd", "sleep", "uptime": // NV4856
+			return true
+		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
+			return true
+		}
+
+		// NV4856
+		if p.isAllowIpRuntimeCommand(proc.cmds) {
+			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
+			return true
+		}
+
+		if p.isAllowCniCommand(proc.path) {
+			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
+			return true
+		}
 	}
 
 	// nv containers only: allowing copy-out action for "kubectl cp"
@@ -2084,31 +2163,12 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 			return true
 		}
 
-		if global.RT.IsRuntimeProcess(proc.pname, nil) || p.isAllowCniCommand(proc.ppath) {
-			switch proc.name {
-			case "portmap", "containerd", "sleep", "uptime": // NV4856
-				return true
-			case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
-				return true
-			}
 
-			if len(proc.cmds) >= 3 {
-				if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
-					// from "k8s.io/pkg/kubectl/cmd/cp.go" : copyFromPod()
-					// matched to its exact Command:  []string{"tar", "cf", "-", src.File}
-					mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
-					return true
-				}
-			}
-
-			// NV4856
-			if p.isAllowIpRuntimeCommand(proc.cmds) {
+		if bRtProcP && len(proc.cmds) >= 3 {
+			if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
+				// from "k8s.io/pkg/kubectl/cmd/cp.go" : copyFromPod()
+				// matched to its exact Command:  []string{"tar", "cf", "-", src.File}
 				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
-				return true
-			}
-
-			if p.isAllowCniCommand(proc.path) {
-				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
 				return true
 			}
 		}
@@ -2171,51 +2231,24 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 			}
 		}
 
-		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) && p.isProcessException(proc, pp.DerivedGroup, id) {
+		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) &&
+		   (pp.Uuid != share.CLUSReservedUuidAnchorMode && p.isProcessException(proc, pp.DerivedGroup, id)) {
 			pp.Action = share.PolicyActionAllow // can not be learned
 		}
 
-		var s *ProbeProcess
 		switch pp.Action {
 		case share.PolicyActionLearn:
 			p.reportLearnProc(svcGroup, pp)
 		case share.PolicyActionViolate:
 			proc.reported |= profileReported
 			proc.action = pp.Action
-			go func() {
-				if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-					s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, svcGroup, pp.Uuid)
-				} else {
-					s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, pp.Uuid)
-				}
-				rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_VIOLATION, Process: s, ContainerIDs: utils.NewSet(id)}
-				p.SendAggregateProbeReport(&rpt, false)
-			}()
+			go p.sendProcessIncident(false, id, pp.Uuid, svcGroup, derivedGroup, proc)
 		case share.PolicyActionDeny: // Protect mode only
 			proc.reported |= profileReported
-			if bKeepAlive {
-				// action : keep its original decision for existing process
-				go func() {
-					if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-						s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, svcGroup, pp.Uuid)
-					} else {
-						s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, pp.Uuid)
-					}
-					rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_VIOLATION, Process: s, ContainerIDs: utils.NewSet(id)}
-					p.SendAggregateProbeReport(&rpt, false)
-				}()
-			} else {
+			go p.sendProcessIncident(true, id, pp.Uuid, svcGroup, derivedGroup, proc)
+			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-				go func() {
-					if pp.Uuid == share.CLUSReservedUuidAnchorMode {
-						s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified: execution denied", nil, false, svcGroup, pp.Uuid)
-					} else {
-						s = p.makeProcessReport(id, proc, "Process profile violation: execution denied", nil, false, derivedGroup, pp.Uuid)
-					}
-					rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_DENIED, Process: s, ContainerIDs: utils.NewSet(id)}
-					p.SendAggregateProbeReport(&rpt, false)
-				}()
 
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
 				if proc.name == "nc" || proc.name == "ncat" || proc.name == "netcat" {
@@ -2230,6 +2263,28 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "action": pp.Action, "riskType": proc.riskType}).Debug("PROC:")
 	return pp.Action, true
+}
+
+func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup string, proc *procInternal) {
+	var s *ProbeProcess
+
+	switch uuid {
+	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
+		s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, group, uuid)
+	case share.CLUSReservedUuidShieldMode:	// zero-drift incident
+		s = p.makeProcessReport(id, proc, "Process profile violation, not from root process", nil, false, group, uuid)
+	default: // rules-based incident
+		s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, uuid)
+	}
+
+	incidentType := PROBE_REPORT_PROCESS_VIOLATION
+	if bDenied {
+		incidentType = PROBE_REPORT_PROCESS_DENIED
+		s.Msg += ": execution denied"
+	}
+
+	rpt := ProbeMessage{Type: incidentType, Process: s, ContainerIDs: utils.NewSet(id)}
+	p.SendAggregateProbeReport(&rpt, false)
 }
 
 func (p *Probe) ProcessLookup(pid int) *fsmon.ProcInfo {
@@ -2701,7 +2756,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 		switch ppe.Action {
 		case share.PolicyActionLearn, share.PolicyActionOpen:
 			ppe.Action = share.PolicyActionViolate
-			ppe.Uuid = share.CLUSReservedUuidAnchorMode
+			ppe.Uuid = share.CLUSReservedUuidShieldMode
 		case share.PolicyActionAllow:
 			bPass = true
 			if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {

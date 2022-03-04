@@ -163,17 +163,18 @@ func group2EndpointREST(cache *groupCache) *api.RESTConversationEndpoint {
 
 func group2BriefREST(cache *groupCache, withCap bool) *api.RESTGroupBrief {
 	g := &api.RESTGroupBrief{
-		Name:           cache.group.Name,
-		Comment:        cache.group.Comment,
-		Learned:        cache.group.CfgType == share.Learned,
-		Reserved:       cache.group.Reserved,
-		PolicyMode:     cache.group.PolicyMode,
-		ProfileMode:    cache.group.ProfileMode,
-		NotScored:      cache.group.NotScored,
-		Domain:         cache.group.Domain,
-		CreaterDomains: cache.group.CreaterDomains,
-		Kind:           cache.group.Kind,
-		PlatformRole:   cache.group.PlatformRole,
+		Name:            cache.group.Name,
+		Comment:         cache.group.Comment,
+		Learned:         cache.group.CfgType == share.Learned,
+		Reserved:        cache.group.Reserved,
+		PolicyMode:      cache.group.PolicyMode,
+		ProfileMode:     cache.group.ProfileMode,
+		NotScored:       cache.group.NotScored,
+		Domain:          cache.group.Domain,
+		CreaterDomains:  cache.group.CreaterDomains,
+		Kind:            cache.group.Kind,
+		PlatformRole:    cache.group.PlatformRole,
+		BaselineProfile: cache.group.BaselineProfile,
 	}
 	if withCap {
 		g.CapChgMode = &cache.capChgMode
@@ -860,7 +861,7 @@ func createServiceIPGroup(r *resource.Service) *share.CLUSGroup {
 	return cg
 }
 
-func createLearnedGroup(wlc *workloadCache, policyMode string, notScored bool, comment string, acc *access.AccessControl) error {
+func createLearnedGroup(wlc *workloadCache, policyMode, baseline string, notScored bool, comment string, acc *access.AccessControl) error {
 	var criteria []share.CLUSCriteriaEntry
 
 	criteria = append(criteria, share.CLUSCriteriaEntry{
@@ -888,6 +889,7 @@ func createLearnedGroup(wlc *workloadCache, policyMode string, notScored bool, c
 		Kind:         share.GroupKindContainer,
 		PlatformRole: wlc.workload.PlatformRole,
 		CapIntcp:     wlc.workload.CapIntcp,
+		BaselineProfile: baseline,
 	}
 
 	if !acc.Authorize(cg, nil) {
@@ -925,6 +927,13 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 		policyMode = *svc.PolicyMode
 	}
 
+	var baseline string
+	if svc.BaselineProfile == nil || *svc.BaselineProfile == "" {
+		baseline = getNewServiceProfileBaseline()	// default
+	} else {
+		baseline = *svc.BaselineProfile
+	}
+
 	var notScored bool
 	if svc.NotScored != nil {
 		notScored = *svc.NotScored
@@ -946,7 +955,7 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 		return common.ErrObjectExists
 	}
 
-	return createLearnedGroup(wlc, policyMode, notScored, comment, acc)
+	return createLearnedGroup(wlc, policyMode, baseline, notScored, comment, acc)
 }
 
 func groupRemoveEvent(ev share.TLogEvent, group string) {
@@ -1143,7 +1152,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache){
 		if isLeader() {
 			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
-				createLearnedGroup(wlc, getNewServicePolicyMode(), false, "", access.NewAdminAccessControl())
+				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 			}
 			// Members is calculated when group change is handled
 			// Service address is updated when group change is handled. It cannot be written
@@ -1657,6 +1666,7 @@ func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 		NotScored:    gc.group.NotScored,
 		Domain:       gc.group.Domain,
 		PlatformRole: gc.group.PlatformRole,
+		BaselineProfile: gc.group.BaselineProfile,
 	}
 	if withCap {
 		sv.CapChgMode = &gc.capChgMode

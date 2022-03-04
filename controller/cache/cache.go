@@ -164,6 +164,8 @@ var wlEphemeral []*workloadEphemeral
 type Context struct {
 	k8sVersion               string
 	ocVersion                string
+	RancherEP                string // from yaml/helm chart
+	RancherSSO               bool   // from yaml/helm chart
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -231,6 +233,8 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 
 	cacher.isLeader = isLeader
 	cacher.leadAddr = leadAddr
+
+	resource.SetLeader(isLeader)
 
 	if leadAddr != "" {
 		cacher.leaderElectedAt = time.Now()
@@ -989,8 +993,8 @@ func (m CacheMethod) GetAllControllerRPCEndpoints(acc *access.AccessControl) []*
 func (m CacheMethod) GetPlatform() (string, string, string) {
 	// Host in localDev can be set by orch connector, this logic can help us correctly identify platform type
 	// in case agent cannot figure it out.
-	if localDev.Host.Flavor == share.FlavorOpenShift {
-		return getHostPlatform(share.PlatformKubernetes, share.FlavorOpenShift), cctx.k8sVersion, cctx.ocVersion
+	if localDev.Host.Flavor == share.FlavorOpenShift || localDev.Host.Flavor == share.FlavorRancher {
+		return getHostPlatform(share.PlatformKubernetes, localDev.Host.Flavor), cctx.k8sVersion, cctx.ocVersion
 	}
 
 	return hostPlatform, cctx.k8sVersion, cctx.ocVersion
@@ -1714,6 +1718,17 @@ func startWorkerThread() {
 						addrOrchWorkloadStop(&o.IPNet)
 						connectOrchWorkloadDelete(&o.IPNet)
 					}
+					if n != nil {
+						if n.Domain == "kube-system" && strings.HasPrefix(n.Name, "kube-apiserver-") {
+							if k8sVer, _ := global.ORCH.GetVersion(true, false); k8sVer != "" && cctx.k8sVersion != k8sVer {
+								log.WithFields(log.Fields{"oldVer": cctx.k8sVersion, "newVer": k8sVer}).Info()
+								cctx.k8sVersion = k8sVer
+								resource.SetK8sVersion(k8sVer)
+								scanMapDelete(common.ScanPlatformID)
+								scanMapAdd(common.ScanPlatformID, "", nil, share.ScanObjectType_PLATFORM)
+							}
+						}
+					}
 				case resource.RscTypeService:
 					if isLeader() {
 						var n, o *resource.Service
@@ -1874,7 +1889,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 
 	cctx = ctx
 	localDev = ctx.LocalDev
-	cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion()
+	cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
 

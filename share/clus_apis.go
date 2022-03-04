@@ -41,7 +41,7 @@ const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 
 const (
 	CFGEndpointSystem           = "system"
-	CFGEndpointEULA             = "eula"
+	CFGEndpointEULA             = "eula_oss"
 	CFGEndpointScan             = "scan"
 	CFGEndpointUser             = "user"
 	CFGEndpointServer           = "server"
@@ -701,6 +701,7 @@ type CLUSSystemConfig struct {
 	SingleCVEPerSyslog   bool                 `json:"single_cve_per_syslog"`
 	AuthOrder            []string             `json:"auth_order"`
 	AuthByPlatform       bool                 `json:"auth_by_platform"`
+	RancherEP            string               `json:"rancher_ep"`
 	InternalSubnets      []string             `json:"configured_internal_subnets,omitempty"`
 	WebhookEnable_UNUSED bool                 `json:"webhook_enable"`
 	WebhookUrl_UNUSED    string               `json:"webhook_url"`
@@ -968,20 +969,21 @@ const (
 )
 
 type CLUSGroup struct {
-	Name           string              `json:"name"`
-	Comment        string              `json:"comment"`
-	Learned_UNUSED bool                `json:"learned"`
-	Reserved       bool                `json:"reserved"`
-	Criteria       []CLUSCriteriaEntry `json:"criteria"`
-	Domain         string              `json:"domain"`
-	CreaterDomains []string            `json:"creater_domains"`
-	PolicyMode     string              `json:"policy_mode,omitempty"`
-	ProfileMode    string              `json:"profile_mode,omitempty"`
-	NotScored      bool                `json:"not_scored,omitempty"`
-	Kind           string              `json:"kind,omitempty"`
-	PlatformRole   string              `json:"platform_role"`
-	CapIntcp       bool                `json:"cap_intcp"`
-	CfgType        TCfgType            `json:"cfg_type"`
+	Name            string              `json:"name"`
+	Comment         string              `json:"comment"`
+	Learned_UNUSED  bool                `json:"learned"`
+	Reserved        bool                `json:"reserved"`
+	Criteria        []CLUSCriteriaEntry `json:"criteria"`
+	Domain          string              `json:"domain"`
+	CreaterDomains  []string            `json:"creater_domains"`
+	PolicyMode      string              `json:"policy_mode,omitempty"`
+	ProfileMode     string              `json:"profile_mode,omitempty"`
+	NotScored       bool                `json:"not_scored,omitempty"`
+	Kind            string              `json:"kind,omitempty"`
+	PlatformRole    string              `json:"platform_role"`
+	CapIntcp        bool                `json:"cap_intcp"`
+	CfgType         TCfgType            `json:"cfg_type"`
+	BaselineProfile string              `json:"baseline_profile"`
 }
 
 type CLUSPolicyRule struct {
@@ -2258,7 +2260,7 @@ const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"
 const CLUSReservedUuidRootEscalation string = "00000000-0000-0000-0000-000000000003" // root privilege escallation
 const CLUSReservedUuidDockerCp string = "00000000-0000-0000-0000-000000000004"       // docker cp
 const CLUSReservedUuidAnchorMode string = "00000000-0000-0000-0000-000000000005"     // rejected by anchor mode
-const CLUSReservedUuidShieldAllowed string = "00000000-0000-0000-0000-000000000006"  // allowed as a family process
+const CLUSReservedUuidShieldMode string = "00000000-0000-0000-0000-000000000006"     // rejected by non-family process
 
 type ProcRule struct {
 	Active int                     `json:"active"`

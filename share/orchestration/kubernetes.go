@@ -1,9 +1,12 @@
 package orchestration
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -14,11 +17,13 @@ import (
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 
+	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/system"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 	"github.com/neuvector/neuvector/share/utils"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -26,8 +31,72 @@ const (
 	kubeEnvServicePort string = "_SERVICE_PORT"
 )
 
+const (
+	K8S_VER = iota
+	OC_VER_V3
+	OC_VER_V4
+)
+
 const reStrPodNameSvc1 string = "^.*-[a-f0-9]{6,10}-[a-z0-9]{5}$"
 const reStrPodNameSvc2 string = "^.*-[0-9]{1,5}-[a-z0-9]{5}$"
+
+type k8sVersion struct {
+	Major        string `json:"major"`
+	Minor        string `json:"minor"`
+	GitVersion   string `json:"gitVersion"`
+	GitCommit    string `json:"gitCommit"`
+	GitTreeState string `json:"gitTreeState"`
+	BuildDate    string `json:"buildDate"`
+	GoVersion    string `json:"goVersion"`
+	Compiler     string `json:"compiler"`
+	Platform     string `json:"platform"`
+}
+type openshifVersion struct {
+	Major      string `json:"major"`
+	Minor      string `json:"minor"`
+	GitVersion string `json:"gitVersion"`
+}
+
+type clusterOperatorSpec struct {
+}
+
+type clusterOperatorStatus struct {
+	Conditions     []clusterOperatorStatusCondition `json:"conditions,omitempty"`
+	Versions       []operandVersion                 `json:"versions,omitempty"`
+	RelatedObjects []objectReference                `json:"relatedObjects,omitempty"`
+	Extension      runtime.RawExtension             `json:"extension"`
+}
+
+type clusterOperatorStatusCondition struct {
+	Type               clusterStatusConditionType `json:"type"`
+	Status             conditionStatus            `json:"status"`
+	LastTransitionTime metav1.Time                `json:"lastTransitionTime"`
+	Reason             string                     `json:"reason,omitempty"`
+	Message            string                     `json:"message,omitempty"`
+}
+
+type clusterStatusConditionType string
+
+type operandVersion struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+type objectReference struct {
+	Group     string `json:"group"`
+	Resource  string `json:"resource"`
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
+}
+
+type conditionStatus string
+
+type clusterOperator struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	Spec              clusterOperatorSpec   `json:"spec"`
+	Status            clusterOperatorStatus `json:"status"`
+}
 
 var rePodNameSvc1 *regexp.Regexp
 var rePodNameSvc2 *regexp.Regexp
@@ -55,6 +124,120 @@ type kubernetes struct {
 
 	k8sVer, ocVer string
 	sys           *system.SystemTools
+}
+
+func getVersion(tag string, verToGet int, useToken bool) string {
+	var url string
+
+	switch verToGet {
+	case K8S_VER:
+		url = "https://kubernetes.default/version"
+	case OC_VER_V3:
+		url = "https://kubernetes.default/version/openshift"
+	case OC_VER_V4:
+		url = "https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/openshift-apiserver"
+	default:
+		return ""
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	var err error
+	var req *http.Request
+	var resp *http.Response
+
+	if req, err = http.NewRequest("GET", url, nil); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("New Request fail")
+		return ""
+	}
+	if useToken {
+		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Read File fail")
+			return ""
+		} else {
+			req.Header.Set("Authorization", "Bearer "+string(data))
+		}
+	}
+	if resp, err = client.Do(req); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Get Version fail")
+		return ""
+	} else if resp != nil && resp.StatusCode != http.StatusOK {
+		log.WithFields(log.Fields{"tag": tag, "code": resp.StatusCode}).Error()
+	}
+	defer resp.Body.Close()
+
+	var data []byte
+	data, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Read data fail")
+		return ""
+	}
+
+	var version string
+	switch verToGet {
+	case K8S_VER:
+		var ocv k8sVersion
+		err = json.Unmarshal(data, &ocv)
+		if err == nil {
+			version = strings.TrimLeft(ocv.GitVersion, "v")
+		}
+	case OC_VER_V3:
+		var ocv openshifVersion
+		err = json.Unmarshal(data, &ocv)
+		if err == nil {
+			version = strings.TrimLeft(ocv.GitVersion, "v")
+		}
+	case OC_VER_V4:
+		var ocv clusterOperator
+		err = json.Unmarshal(data, &ocv)
+		if err == nil {
+			for _, v := range ocv.Status.Versions {
+				if v.Name == "operator" {
+					version = v.Version
+					break
+				}
+			}
+		}
+	}
+	if version != "" {
+		return version
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Unmarshal fail")
+	}
+
+	return ""
+}
+
+func GetK8sVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
+	var k8sVer string
+	var ocVer string
+
+	if reGetK8sVersion {
+		if version := getVersion("k8s", K8S_VER, false); version != "" {
+			k8sVer = version
+		} else {
+			k8sVer = getVersion("k8s", K8S_VER, true)
+		}
+	}
+
+	if reGetOcVersion {
+		useToken := []bool{false, true}
+		for idx, verToGet := range []int{OC_VER_V3, OC_VER_V4} {
+			if version := getVersion("oc", verToGet, useToken[idx]); version != "" {
+				ocVer = version
+				break
+			}
+		}
+	}
+
+	return k8sVer, ocVer
 }
 
 // Check of container is deployed by Kubernetes or simply "docker run"
@@ -91,7 +274,18 @@ func (d *kubernetes) getServiceIPs(envs map[string]string) []net.IP {
 	}
 }
 
-func (d *kubernetes) GetVersion() (string, string) {
+func (d *kubernetes) GetVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
+	if d.flavor != share.FlavorOpenShift {
+		reGetOcVersion = false
+	}
+	k8sVer, ocVer := GetK8sVersion(reGetK8sVersion, reGetOcVersion)
+	if reGetK8sVersion {
+		d.k8sVer = k8sVer
+	}
+	if reGetOcVersion {
+		d.ocVer = ocVer
+	}
+
 	return d.k8sVer, d.ocVer
 }
 

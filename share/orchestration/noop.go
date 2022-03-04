@@ -29,7 +29,7 @@ type noop struct {
 	platform, flavor, network string
 }
 
-func (d *noop) GetVersion() (string, string) {
+func (d *noop) GetVersion(reqK8sVersion, reGetOcVersion bool) (string, string) {
 	return "", ""
 }
 

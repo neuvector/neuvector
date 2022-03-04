@@ -129,7 +129,7 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 		}
 	} else {
 		// Do we need get version again? Can k8s be upgraded without restarting controller?
-		cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion()
+		cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 		result, err = rpc.ScanPlatform(scanner, cctx.k8sVersion, cctx.ocVersion, scanReqTimeout)
 	}
 	if result == nil || result.Error == share.ScanErrorCode_ScanErrNetwork || err != nil {
@@ -644,6 +644,9 @@ func scanMapDelete(taskId string) {
 		} else if info.objType == share.ScanObjectType_HOST {
 			key = share.CLUSScanDataHostKey(taskId)
 			skey = share.CLUSScanStateHostKey(taskId)
+		} else if info.objType == share.ScanObjectType_PLATFORM {
+			key = share.CLUSScanDataPlatformKey(taskId)
+			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
 		cluster.Delete(key)
 		cluster.Delete(skey)

@@ -221,9 +221,9 @@ func (d *kubernetes) Logout(username, token string) error {
 }
 
 func (d *kubernetes) GetAuthServerAlias() string {
-	if d.flavor != share.FlavorOpenShift {
-		return ""
+	if d.flavor == share.FlavorOpenShift || d.flavor == share.FlavorRancher {
+		return strings.ToLower(d.flavor)
 	}
 
-	return "openshift"
+	return ""
 }
