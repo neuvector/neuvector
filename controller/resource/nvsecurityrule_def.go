@@ -104,10 +104,10 @@ type NvSecurityRuleSpec struct {
 	Target         NvSecurityTarget          `json:"target"`
 	IngressRule    []NvSecurityRuleDetail    `json:"ingress"`
 	EgressRule     []NvSecurityRuleDetail    `json:"egress"`
-	ProcessProfile *NvSecurityProcessProfile `json:"process_profile"`
+	ProcessProfile *NvSecurityProcessProfile `json:"process_profile,omitempty"`
 	ProcessRule    []NvSecurityProcessRule   `json:"process"`
 	FileRule       []NvSecurityFileRule      `json:"file"`
-	WafGroup       *NvSecurityWafGroup       `json:"waf"` // per-group's waf sensor mapping data
+	WafGroup       *NvSecurityWafGroup       `json:"waf,omitempty"` // per-group's waf sensor mapping data
 }
 
 type NvSecurityRulePartial struct {

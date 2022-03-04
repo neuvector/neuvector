@@ -163,9 +163,10 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 }
 
 // Create all the group and return group added
-func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig) []string {
+func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targetGroup string) ([]string, bool) {
 	// record the groups in a new record, then later compare with cached record to add/del
 	var groupAdded []string
+	var targetGroupWAF bool
 	for _, group := range groups {
 		if group.Name == api.LearnedExternal {
 			// for node/external just add to list without create, remove "nodes"
@@ -280,10 +281,13 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig) []str
 				continue
 			}
 			groupAdded = append(groupAdded, group.Name)
+			if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
+				targetGroupWAF = true
+			}
 		}
 	}
 
-	return groupAdded
+	return groupAdded, targetGroupWAF
 }
 
 func (h *nvCrdHandler) crdDeleteRules(delRules map[string]uint32) {
@@ -1620,6 +1624,7 @@ func (h *nvCrdHandler) validateCrdWafGroup(spec *resource.NvSecurityRuleSpec) (s
 			}
 		}
 	}
+
 	return buffer.String(), errCnt
 }
 
@@ -2101,7 +2106,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		}
 	}
 
-	groupNew := h.crdHandleGroupsAdd(crdCfgRet.GroupCfgs)
+	groupNew, targetGroupWAF := h.crdHandleGroupsAdd(crdCfgRet.GroupCfgs, crdCfgRet.TargetName)
 	absentGroup := findAbsentGroups(crdRecord, groupNew)
 
 	h.crdHandleGroupRecordDel(crdRecord, absentGroup, false)
@@ -2122,7 +2127,9 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	ruleNew := h.crdHandleRules(crdCfgRet.RuleCfgs, crdRecord)
 	crdRecord.Groups = groupNew
 	crdRecord.Rules = *ruleNew
-	crdRecord.WafGroupSensors = h.crdHandleWafGroup(crdCfgRet.WafGroupCfg, share.GroundCfg)
+	if targetGroupWAF {
+		crdRecord.WafGroupSensors = h.crdHandleWafGroup(crdCfgRet.WafGroupCfg, share.GroundCfg)
+	}
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
 	if crdRecord.ProfileName != "" {
 		profile_mode = h.crdRebuildGroupProfiles(crdRecord.ProfileName, nil, share.ReviewTypeCRD)
