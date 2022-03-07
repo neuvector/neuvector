@@ -67,6 +67,7 @@ type ClusterHelper interface {
 	PutGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSGroup) error
 	DeleteGroup(name string) error
 	DeleteGroupTxn(txn *cluster.ClusterTransact, name string) error
+	MoveGroups(oldgrp, newgrp, service string) error
 
 	GetPolicyRuleList() []*share.CLUSRuleHead
 	PutPolicyRuleList(crhs []*share.CLUSRuleHead) error
@@ -2564,4 +2565,71 @@ func (m clusterHelper) PutImportTask(importTask *share.CLUSImportTask) error {
 	key := share.CLUSImportOpKey(share.CLUSImportStatusSubKey)
 	value, _ := json.Marshal(importTask)
 	return cluster.Put(key, value)
+}
+
+func (m clusterHelper) MoveGroups(oldgrp, newgrp, service string) error {
+	// prevent the re-entry if the oldgrp was deleted
+	if !cluster.Exist(share.CLUSGroupKey(oldgrp)) {
+		return nil
+	}
+
+	lock, err := m.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+		return err
+	}
+	defer m.ReleaseLock(lock)
+
+	// Move all related structures into a new group name
+	// 1. Profile groups
+	// (a) custom check
+	if cc, rev := m.GetCustomCheckConfig(oldgrp); cc != nil {
+		if err := m.PutCustomCheckConfig(newgrp, cc, rev); err == nil {
+			m.DeleteCustomCheckConfig(oldgrp)
+		}
+	}
+
+	// (b) file monitor
+	if fm, _ := m.GetFileMonitorProfile(oldgrp); fm != nil {
+		fm.Group = newgrp
+		if err := m.PutFileMonitorProfileIfNotExist(newgrp, fm); err == nil {
+			m.DeleteFileMonitor(oldgrp)
+		}
+	}
+
+	// (c) file access rules
+	if fa, _ := m.GetFileAccessRule(oldgrp); fa != nil{
+		fa.Group = newgrp
+		if m.PutFileAccessRuleIfNotExist(newgrp, fa); err != nil {
+			m.DeleteFileAccessRule(oldgrp)
+		}
+	}
+
+	// (d) process profile
+	if pg := m.GetProcessProfile(oldgrp); pg != nil {
+		pg.Group = newgrp
+		if err := m.PutProcessProfileIfNotExist(newgrp, pg); err == nil {
+			m.DeleteProcessProfile(oldgrp)
+		}
+	}
+
+	// 2. Other endpoints ...
+
+	// 3. at last, move Group
+	accAll := access.NewAdminAccessControl()
+	if cg, _, _ := m.GetGroup(oldgrp, accAll); cg != nil {
+		cg.Name = newgrp
+		for i, _ := range cg.Criteria {
+			if cg.Criteria[i].Key == share.CriteriaKeyService {
+				cg.Criteria[i].Value = service
+				break
+			}
+		}
+		if err := m.PutGroup(cg, true); err == nil {
+			m.DeleteGroup(oldgrp)
+			log.WithFields(log.Fields{"group": oldgrp}).Debug("deleted")
+			return nil
+		}
+	}
+	return nil
 }

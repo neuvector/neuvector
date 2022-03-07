@@ -12,6 +12,10 @@ type unknown struct {
 	envParser *utils.EnvironParser
 }
 
+func (d *unknown) GetServiceFromLabels(labels map[string]string) *Service {
+	return nil
+}
+
 func (d *unknown) GetService(meta *container.ContainerMeta) *Service {
 	return baseDriver.GetService(meta)
 }

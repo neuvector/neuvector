@@ -41,11 +41,17 @@ func (d *rancher) isDeployedBy(meta *container.ContainerMeta) bool {
 	return false
 }
 
-func (d *rancher) GetService(meta *container.ContainerMeta) *Service {
-	if service, _ := meta.Labels[container.RancherKeyStackServiceName]; service != "" {
+func (d *rancher) GetServiceFromLabels(labels map[string]string) *Service {
+	if service, _ := labels[container.RancherKeyStackServiceName]; service != "" {
 		return &Service{Name: service}
 	}
+	return nil
+}
 
+func (d *rancher) GetService(meta *container.ContainerMeta) *Service {
+	if svc := d.GetServiceFromLabels(meta.Labels); svc != nil {
+		return svc
+	}
 	return baseDriver.GetService(meta)
 }
 

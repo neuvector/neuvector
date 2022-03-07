@@ -1119,6 +1119,35 @@ func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 	updateInternalIPNet(ipnet, share.CLUSIPAddrScopeGlobal, true)
 }
 
+func fixWorkloadService(wl share.CLUSWorkload) (string, string, bool) {
+	// sync-up service name with enforcers
+	if svc := global.ORCH.GetServiceFromLabels(wl.Labels); svc != nil {
+		service := utils.MakeServiceName(svc.Domain, svc.Name)
+		if service != wl.Service {
+			return service, wl.Service, true
+		}
+	}
+
+	// force an update if existing a wrongly-established group name
+	if pod, ok := wl.Labels[container.KubeKeyPodName]; ok {
+		if strings.HasSuffix(pod, wl.HostName) {
+			// patch a wild-guess removal at the GetServiceFromLabels()
+			// for example: ubuntu2110-k8123worker0-auto, remove its tail with -auto
+			if first := strings.LastIndex(pod, "-"); first != -1 {
+				pod = pod[:first]
+			}
+
+			svc := utils.MakeServiceName(wl.Domain, pod)
+			key := share.CLUSGroupKey(makeLearnedGroupName(svc))
+			// a pod name should not be a group name
+			if cluster.Exist(key) {
+				return wl.Service, svc, true
+			}
+		}
+	}
+	return wl.Service, "", false
+}
+
 func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
@@ -1146,6 +1175,19 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 				cacheMutexUnlock()
 			}
 			return
+		}
+
+		// At initial stage, we need to sync-up the service name generator at enforcers.
+		// It is necessary to correct those service names from the previous values stored
+		// in the kv store during a rolling-upgrade process
+		if wl.Domain == container.KubeNamespaceSystem {
+			if service, unxpected, ok := fixWorkloadService(wl); ok {
+				log.WithFields(log.Fields{"unxpected": unxpected, "service": service}).Debug()
+				wl.Service = service
+				group_wl := makeLearnedGroupName(utils.NormalizeForURL(unxpected))
+				group_up := makeLearnedGroupName(utils.NormalizeForURL(service))
+				clusHelper.MoveGroups(group_wl, group_up, service)
+			}
 		}
 
 		// Update workload cache

@@ -329,16 +329,17 @@ pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
        |        "io.kubernetes.container.name": "php-redis"
        |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
 */
-func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
-	namespace, _ := meta.Labels[container.KubeKeyPodNamespace]
 
-	if dc, _ := meta.Labels[container.KubeKeyDeployConfig]; dc != "" {
+func (d *kubernetes) GetServiceFromLabels(labels map[string]string) *Service {
+	namespace, _ := labels[container.KubeKeyPodNamespace]
+
+	if dc, _ := labels[container.KubeKeyDeployConfig]; dc != "" {
 		return &Service{Domain: namespace, Name: dc}
 	}
 
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
-	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
+	if pod, _ := labels[container.KubeKeyPodName]; pod != "" {
 
 		if d.flavor == share.FlavorRancher && namespace == container.KubeRancherPodNamespace {
 			for _, prefix := range rancherPodNamePrefix {
@@ -350,7 +351,7 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 
 		// oc49, job: openshift-operator-lifecycle-manager / collect-profiles-27400290--1-4g2r
 		if d.flavor == share.FlavorOpenShift {
-			if job, ok := meta.Labels[container.KubeKeyJobName]; ok {
+			if job, ok := labels[container.KubeKeyJobName]; ok {
 				if index := strings.LastIndex(job, "-"); index != -1 {
 					job = job[:index]
 				}
@@ -358,7 +359,7 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 			}
 		}
 
-		if hash, _ := meta.Labels[container.KubeKeyPodHash]; hash != "" {
+		if hash, _ := labels[container.KubeKeyPodHash]; hash != "" {
 			if idx := strings.Index(pod, "-"+hash); idx != -1 {
 				return &Service{Domain: namespace, Name: pod[:idx]}
 			}
@@ -378,8 +379,13 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 
 		// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
 		if namespace == container.KubeNamespaceSystem {
-			if component, ok := meta.Labels[container.KubeKeyComponent]; ok {
+			if component, ok := labels[container.KubeKeyComponent]; ok {
 				return &Service{Domain: namespace, Name: component}
+			}
+			if name, ok := labels[container.KubeKeyContainerName]; ok {
+				if strings.HasPrefix(pod, name) {
+					return &Service{Domain: namespace, Name: name}
+				}
 			}
 		}
 
@@ -391,6 +397,13 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 		return &Service{Domain: namespace, Name: pod}
 	}
 
+	return nil
+}
+
+func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
+	if svc := d.GetServiceFromLabels(meta.Labels); svc != nil {
+		return svc
+	}
 	return baseDriver.GetService(meta)
 }
 
