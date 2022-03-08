@@ -1,81 +1,15 @@
 package global
 
 import (
-	"crypto/tls"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	log "github.com/sirupsen/logrus"
 )
-
-type k8sVersion struct {
-	Major        string `json:"major"`
-	Minor        string `json:"minor"`
-	GitVersion   string `json:"gitVersion"`
-	GitCommit    string `json:"gitCommit"`
-	GitTreeState string `json:"gitTreeState"`
-	BuildDate    string `json:"buildDate"`
-	GoVersion    string `json:"goVersion"`
-	Compiler     string `json:"compiler"`
-	Platform     string `json:"platform"`
-}
-type openshifVersion struct {
-	Major      string `json:"major"`
-	Minor      string `json:"minor"`
-	GitVersion string `json:"gitVersion"`
-}
-
-type clusterOperatorSpec struct {
-}
-
-type clusterOperatorStatus struct {
-	Conditions     []clusterOperatorStatusCondition `json:"conditions,omitempty"`
-	Versions       []operandVersion                 `json:"versions,omitempty"`
-	RelatedObjects []objectReference                `json:"relatedObjects,omitempty"`
-	Extension      runtime.RawExtension             `json:"extension"`
-}
-
-type clusterOperatorStatusCondition struct {
-	Type               clusterStatusConditionType `json:"type"`
-	Status             conditionStatus            `json:"status"`
-	LastTransitionTime metav1.Time                `json:"lastTransitionTime"`
-	Reason             string                     `json:"reason,omitempty"`
-	Message            string                     `json:"message,omitempty"`
-}
-
-type clusterStatusConditionType string
-
-type operandVersion struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
-
-type objectReference struct {
-	Group     string `json:"group"`
-	Resource  string `json:"resource"`
-	Namespace string `json:"namespace,omitempty"`
-	Name      string `json:"name"`
-}
-
-type conditionStatus string
-
-type clusterOperator struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Spec              clusterOperatorSpec   `json:"spec"`
-	Status            clusterOperatorStatus `json:"status"`
-}
 
 type orchHub struct {
 	orchAPI.Driver
@@ -87,105 +21,6 @@ type RegisterDriverFunc func(platform, flavor, network string) orchAPI.ResourceD
 var SYS *system.SystemTools
 var RT container.Runtime
 var ORCH *orchHub
-
-const k8sVersionUrl = "https://kubernetes.default/version"
-const ocVersion3xUrl = "https://kubernetes.default/version/openshift"
-const ocVersion4xUrl = "https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/openshift-apiserver"
-
-func getVersion(tag, url string, useToken bool) string {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
-	var err error
-	var req *http.Request
-	var resp *http.Response
-
-	if req, err = http.NewRequest("GET", url, nil); err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("New Request fail")
-		return ""
-	}
-	if useToken {
-		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
-			log.WithFields(log.Fields{"error": err}).Debug("Read File fail")
-			return ""
-		} else {
-			req.Header.Set("Authorization", "Bearer "+string(data))
-		}
-	}
-	if resp, err = client.Do(req); err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Get Version fail")
-		return ""
-	} else if resp != nil && resp.StatusCode != http.StatusOK {
-		log.WithFields(log.Fields{"tag": tag, "code": resp.StatusCode}).Error()
-	}
-	defer resp.Body.Close()
-
-	var data []byte
-	data, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Read data fail")
-		return ""
-	}
-
-	var version string
-	switch url {
-	case k8sVersionUrl:
-		var ocv k8sVersion
-		err = json.Unmarshal(data, &ocv)
-		if err == nil {
-			version = strings.TrimLeft(ocv.GitVersion, "v")
-		}
-	case ocVersion3xUrl:
-		var ocv openshifVersion
-		err = json.Unmarshal(data, &ocv)
-		if err == nil {
-			version = strings.TrimLeft(ocv.GitVersion, "v")
-		}
-	case ocVersion4xUrl:
-		var ocv clusterOperator
-		err = json.Unmarshal(data, &ocv)
-		if err == nil {
-			for _, v := range ocv.Status.Versions {
-				if v.Name == "operator" {
-					version = v.Version
-					break
-				}
-			}
-		}
-	}
-	if version != "" {
-		return version
-	}
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Unmarshal fail")
-	}
-
-	return ""
-}
-
-func getK8sVersion() string {
-	if version := getVersion("k8s", k8sVersionUrl, false); version != "" {
-		return version
-	} else {
-		return getVersion("k8s", k8sVersionUrl, true)
-	}
-}
-
-func getOcVersion() string {
-	useToken := []bool{false, true}
-	for idx, versionUrl := range []string{ocVersion3xUrl, ocVersion4xUrl} {
-		if version := getVersion("oc", versionUrl, useToken[idx]); version != "" {
-			return version
-		}
-	}
-
-	return ""
-}
 
 func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, string, string, []*container.ContainerMeta, error) {
 	var err error
@@ -212,8 +47,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	}
 	*/
 
-	k8sVer := getK8sVersion()
-	ocVer := getOcVersion()
+	k8sVer, ocVer := orchAPI.GetK8sVersion(true, true)
 
 	if platform == "" && k8sVer != "" {
 		platform = share.PlatformKubernetes

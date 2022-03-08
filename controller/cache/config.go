@@ -2,8 +2,9 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -11,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type webhookCache struct {
@@ -231,6 +233,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		SingleCVEPerSyslog:        systemConfigCache.SingleCVEPerSyslog,
 		AuthOrder:                 systemConfigCache.AuthOrder,
 		AuthByPlatform:            systemConfigCache.AuthByPlatform,
+		RancherEP:                 systemConfigCache.RancherEP,
 		InternalSubnets:           systemConfigCache.InternalSubnets,
 		ClusterName:               systemConfigCache.ClusterName,
 		ControllerDebug:           systemConfigCache.ControllerDebug,
@@ -382,6 +385,9 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	}
 
 	systemConfigCache = cfg
+	if systemConfigCache.RancherEP == "" {
+		systemConfigCache.RancherEP = cctx.RancherEP
+	}
 
 	fedCacheMutexLock()
 	fedHttpsProxyCache = systemConfigCache.RegistryHttpsProxy
@@ -412,8 +418,34 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 func configInit() {
 	acc := access.NewReaderAccessControl()
-	cfg, _ := clusHelper.GetSystemConfigRev(acc)
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
+	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+		if cctx.RancherSSO {
+			systemConfigCache.AuthByPlatform = true
+		}
+		if cctx.RancherEP != "" && systemConfigCache.RancherEP == "" {
+			if u, err := url.ParseRequestURI(cctx.RancherEP); err == nil {
+				systemConfigCache.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			}
+		}
+		retry := 0
+		for retry < 3 {
+			if cfg.AuthByPlatform == systemConfigCache.AuthByPlatform && cfg.RancherEP == systemConfigCache.RancherEP {
+				break
+			}
+			cfg.AuthByPlatform = systemConfigCache.AuthByPlatform
+			cfg.RancherEP = systemConfigCache.RancherEP
+			if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+				if cfg, rev = clusHelper.GetSystemConfigRev(acc); cfg == nil {
+					break
+				}
+				retry++
+			} else {
+				break
+			}
+		}
+	}
 	if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 		var param interface{} = &cfg.IBMSAConfig
 		cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)

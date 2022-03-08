@@ -276,6 +276,8 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 	if getNetServiceStatus() {
 		r.PolicyMode = r.ProfileMode
 	}
+	r.BaselineProfile = getWorkloadBaselineProfile(cache)
+
 	if cache.scanBrief == nil {
 		r.ScanSummary = &api.RESTScanBrief{}
 	}

@@ -22,7 +22,7 @@ type Service struct {
 }
 
 type Driver interface {
-	GetVersion() (string, string)
+	GetVersion(reGetK8sVersion, reGetOcVersion bool) (string, string)
 	SetIPAddrScope(ports map[string][]share.CLUSIPAddr, meta *container.ContainerMeta, nets map[string]*container.Network)
 	GetService(meta *container.ContainerMeta) *Service
 	GetPlatformRole(meta *container.ContainerMeta) (string, bool) // return platform type and if container should be secured
@@ -52,7 +52,7 @@ type ResourceDriver interface {
 	Login(username, password string) (string, string, error)
 	Logout(username, token string) error
 	GetAuthServerAlias() string
-	GetUserRoles(username string) (map[string]string, error)
+	GetUserRoles(username string, subjType uint8) (map[string]string, error)
 	ListUsers() []UserRBAC
 	RegisterResource(rt string) error
 	ListResource(rt string) ([]interface{}, error)
@@ -63,6 +63,7 @@ type ResourceDriver interface {
 	AddResource(rt string, res interface{}) error
 	UpdateResource(rt string, res interface{}) error
 	DeleteResource(rt string, res interface{}) error
+	SetFlavor(flavor string) error // only for Rancher
 }
 
 // --

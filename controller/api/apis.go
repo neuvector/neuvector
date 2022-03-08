@@ -8,6 +8,7 @@ import (
 
 const RESTTokenHeader string = "X-Auth-Token"
 const RESTNvPageHeader string = "X-Nv-Page"
+const RESTRancherTokenHeader string = "X-R-Sess"
 const RESTMaskedValue string = "The value is masked"
 
 const RESTNvPageDashboard string = "dashboard"
@@ -62,6 +63,7 @@ const RESTErrReadOnlyRules int = 46
 const RESTErrUserLoginBlocked int = 47
 const RESTErrPasswordExpired int = 48
 const RESTErrPromoteFail int = 49
+const RESTErrPlatformAuthDisabled int = 50
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
@@ -856,6 +858,7 @@ type RESTWorkloadBrief struct {
 	ServiceMeshSidecar bool                 `json:"service_mesh_sidecar"`
 	Privileged         bool                 `json:"privileged"`
 	RunAsRoot          bool                 `json:"run_as_root"`
+	BaselineProfile    string               `json:"baseline_profile"`
 }
 
 type RESTWorkload struct {
@@ -1018,18 +1021,19 @@ type RESTGroupCaps struct {
 }
 
 type RESTGroupBrief struct {
-	Name           string   `json:"name"`
-	Comment        string   `json:"comment"`
-	Learned        bool     `json:"learned"`
-	Reserved       bool     `json:"reserved"`
-	PolicyMode     string   `json:"policy_mode,omitempty"`
-	ProfileMode    string   `json:"profile_mode,omitempty"`
-	NotScored      bool     `json:"not_scored"`
-	Domain         string   `json:"domain"`
-	CreaterDomains []string `json:"creater_domains"`
-	Kind           string   `json:"kind"`
-	PlatformRole   string   `json:"platform_role"`
-	CfgType        string   `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	Name            string   `json:"name"`
+	Comment         string   `json:"comment"`
+	Learned         bool     `json:"learned"`
+	Reserved        bool     `json:"reserved"`
+	PolicyMode      string   `json:"policy_mode,omitempty"`
+	ProfileMode     string   `json:"profile_mode,omitempty"`
+	NotScored       bool     `json:"not_scored"`
+	Domain          string   `json:"domain"`
+	CreaterDomains  []string `json:"creater_domains"`
+	Kind            string   `json:"kind"`
+	PlatformRole    string   `json:"platform_role"`
+	CfgType         string   `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	BaselineProfile string   `json:"baseline_profile"`
 	RESTGroupCaps
 }
 
@@ -1574,6 +1578,7 @@ type RESTSystemConfig struct {
 	SingleCVEPerSyslog        bool          `json:"single_cve_per_syslog"`
 	AuthOrder                 []string      `json:"auth_order"`
 	AuthByPlatform            bool          `json:"auth_by_platform"`
+	RancherEP                 string        `json:"rancher_ep"`
 	InternalSubnets           []string      `json:"configured_internal_subnets,omitempty"`
 	Webhooks                  []RESTWebhook `json:"webhooks"`
 	ClusterName               string        `json:"cluster_name"`
@@ -1627,11 +1632,12 @@ type RESTInternalSubnetsData struct {
 }
 
 type RESTServiceConfig struct {
-	Name       string  `json:"name"`
-	Domain     string  `json:"domain"`
-	Comment    *string `json:"comment"`
-	PolicyMode *string `json:"policy_mode,omitempty"`
-	NotScored  *bool   `json:"not_scored,omitempty"`
+	Name            string  `json:"name"`
+	Domain          string  `json:"domain"`
+	Comment         *string `json:"comment"`
+	PolicyMode      *string `json:"policy_mode,omitempty"`
+	BaselineProfile *string     `json:"baseline_profile,omitempty"`
+	NotScored       *bool   `json:"not_scored,omitempty"`
 }
 
 type RESTServiceConfigData struct {
@@ -1652,6 +1658,7 @@ type RESTService struct {
 	ServiceAddr     *RESTIPPort          `json:"service_addr,omitempty"`
 	IngressExposure bool                 `json:"ingress_exposure"`
 	EgressExposure  bool                 `json:"egress_exposure"`
+	BaselineProfile string               `json:"baseline_profile"`
 	RESTGroupCaps
 }
 
@@ -1664,9 +1671,10 @@ type RESTServiceData struct {
 }
 
 type RESTServiceBatchConfig struct {
-	Services   []string `json:"services,omitempty"`
-	PolicyMode *string  `json:"policy_mode,omitempty"`
-	NotScored  *bool    `json:"not_scored,omitempty"`
+	Services        []string    `json:"services,omitempty"`
+	PolicyMode      *string     `json:"policy_mode,omitempty"`
+	BaselineProfile *string     `json:"baseline_profile,omitempty"`
+	NotScored       *bool       `json:"not_scored,omitempty"`
 }
 
 type RESTServiceBatchConfigData struct {

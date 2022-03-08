@@ -289,10 +289,11 @@ func main() {
 
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
-		k8sVer, ocVer := global.ORCH.GetVersion()
-		//if flavor == "" && resource.IsRancherFlavor() {
-		//	flavor = share.FlavorRancher
-		//}
+		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
+		if flavor == "" && resource.IsRancherFlavor() {
+			flavor = share.FlavorRancher
+			global.ORCH.SetFlavor(flavor)
+		}
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
 	}
 
@@ -350,7 +351,7 @@ func main() {
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName()
+		resource.AdjustAdmWebhookName(nvcrd.Init)
 	}
 
 	// Assign controller interface/IP scope
@@ -527,12 +528,11 @@ func main() {
 	orchObjChan := make(chan *resource.Event, 32)
 	orchScanChan := make(chan *resource.Event, 16)
 
-	log.WithFields(log.Fields{"rancherEP": *rancherEP, "rancherSSO": *rancherSSO}).Debug()
 	// Initialize cache
 	// - Start policy learning thread and build learnedPolicyRuleWrapper from KV
 	cctx := cache.Context{
-		//RancherEP:                *rancherEP,
-		//RancherSSO:               *rancherSSO,
+		RancherEP:                *rancherEP,
+		RancherSSO:               *rancherSSO,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
 		AuditQueue:               auditQueue,
@@ -563,6 +563,7 @@ func main() {
 	if platform == share.PlatformKubernetes {
 		// k8s rbac watcher won't know anything about non-existing resources
 		resource.GetNvServiceAccount(cache.CacheEvent)
+		resource.SetLeader(Ctrler.Leader)
 
 		clusterRoleErrors, clusterRoleBindingErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, true)
 		if len(clusterRoleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {

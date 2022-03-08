@@ -755,7 +755,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			log.WithFields(log.Fields{"create": ruser.Fullname, "locale": ruser.Locale}).Error("invalid locale")
 			continue
 		}
-		if !isObjectNameWithSpaceValid(ruser.Fullname) {
+		if !isUserNameValid(ruser.Fullname) {
 			e := "Invalid characters in username"
 			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 			continue

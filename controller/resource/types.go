@@ -126,7 +126,7 @@ type Image struct {
 type RBAC struct {
 	Name   string
 	Domain string
-	Roles  map[string]string
+	Roles  map[string]string // domain -> role
 }
 
 type CRD struct {

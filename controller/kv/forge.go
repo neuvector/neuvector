@@ -45,6 +45,7 @@ func forgeKVData() {
 			Domain:      domain,
 			Kind:        share.GroupKindContainer,
 			CapIntcp:    true,
+			BaselineProfile: share.ProfileBasic,
 		}
 
 		if err := clusHelper.PutGroup(cg, true); err != nil {
