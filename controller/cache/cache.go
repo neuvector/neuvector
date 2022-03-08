@@ -288,8 +288,13 @@ func deriveWorkloadState(cache *workloadCache) string {
 	} else if cache.workload.Inline {
 		return api.WorkloadStateProtect
 	}
+	//when getNetServiceStatus() is true, policymode
+	//is global so we use per group level profile mode
+	mode, profmode := getWorkloadPolicyMode(cache)
+	if getNetServiceStatus() {
+		mode = profmode
+	}
 
-	mode, _ := getWorkloadPolicyMode(cache)
 	switch mode {
 	case share.PolicyModeEvaluate:
 		return api.WorkloadStateMonitor

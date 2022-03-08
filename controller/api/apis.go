@@ -1530,6 +1530,8 @@ type RESTSystemConfigConfig struct {
 	IBMSAEpEnabled            *bool           `json:"ibmsa_ep_enabled,omitempty"`
 	IBMSAEpDashboardURL       *string         `json:"ibmsa_ep_dashboard_url,omitempty"`
 	XffEnabled                *bool           `json:"xff_enabled,omitempty"`
+	NetServiceStatus          *bool           `json:"net_service_status,omitempty"`
+	NetServicePolicyMode      *string         `json:"net_service_policy_mode,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
@@ -1586,6 +1588,8 @@ type RESTSystemConfig struct {
 	IBMSAEpDashboardURL       string        `json:"ibmsa_ep_dashboard_url"`
 	IBMSAEpConnectedAt        string        `json:"ibmsa_ep_connected_at"`
 	XffEnabled                bool          `json:"xff_enabled"`
+	NetServiceStatus          bool          `json:"net_service_status"`
+	NetServicePolicyMode      string        `json:"net_service_policy_mode"`
 }
 
 type RESTIBMSAConfig struct {

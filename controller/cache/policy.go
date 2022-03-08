@@ -406,10 +406,20 @@ func getHostPolicyMode(cache *hostCache) (string, string) {
 }
 
 func getWorkloadPolicyMode(wlCache *workloadCache) (string, string) {
-	if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
-		return cache.group.PolicyMode, cache.group.ProfileMode
+	//if global net service status is enabled, use global net service 
+	//policy mode, profile still use per group mode 
+	if getNetServiceStatus() {
+		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
+			return getNetServicePolicyMode(), cache.group.ProfileMode
+		} else {
+			return getNetServicePolicyMode(), api.WorkloadStateDiscover
+		}
 	} else {
-		return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
+			return cache.group.PolicyMode, cache.group.ProfileMode
+		} else {
+			return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+		}
 	}
 }
 

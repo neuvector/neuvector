@@ -229,7 +229,14 @@ func workload2Filter(cache *workloadCache) *common.WorkloadFilter {
 		ImageID:      wl.ImageID,
 		Domain:       wl.Domain,
 	}
-	r.PolicyMode, _ = getWorkloadPolicyMode(cache)
+	//when getNetServiceStatus() is true, policymode
+	//is global so we use per group level profile mode
+	polmode, profmode := getWorkloadPolicyMode(cache)
+	if getNetServiceStatus() {
+		r.PolicyMode = profmode
+	} else {
+		r.PolicyMode = polmode
+	}
 	return r
 }
 
@@ -263,8 +270,12 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		RunAsRoot:          wl.RunAsRoot,
 	}
 
+	//when getNetServiceStatus() is true, policymode
+	//is global so we use per group level profile mode
 	r.PolicyMode, r.ProfileMode = getWorkloadPolicyMode(cache)
-
+	if getNetServiceStatus() {
+		r.PolicyMode = r.ProfileMode
+	}
 	if cache.scanBrief == nil {
 		r.ScanSummary = &api.RESTScanBrief{}
 	}
