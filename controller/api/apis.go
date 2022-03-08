@@ -1521,6 +1521,7 @@ type RESTSystemConfigConfig struct {
 	SingleCVEPerSyslog        *bool           `json:"single_cve_per_syslog"`
 	AuthOrder                 *[]string       `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool           `json:"auth_by_platform,omitempty"`
+	RancherEP                 *string         `json:"rancher_ep,omitempty"`
 	WebhookEnable             *bool           `json:"webhook_status,omitempty"` // deprecated, kept for backward-compatibility, skip docs
 	WebhookUrl                *string         `json:"webhook_url,omitempty"`    // deprecated, kept for backward-compatibility, skip docs
 	Webhooks                  *[]*RESTWebhook `json:"webhooks,omitempty"`
@@ -1632,7 +1633,7 @@ type RESTServiceConfig struct {
 	Domain          string  `json:"domain"`
 	Comment         *string `json:"comment"`
 	PolicyMode      *string `json:"policy_mode,omitempty"`
-	BaselineProfile *string     `json:"baseline_profile,omitempty"`
+	BaselineProfile *string `json:"baseline_profile,omitempty"`
 	NotScored       *bool   `json:"not_scored,omitempty"`
 }
 
@@ -1667,10 +1668,10 @@ type RESTServiceData struct {
 }
 
 type RESTServiceBatchConfig struct {
-	Services        []string    `json:"services,omitempty"`
-	PolicyMode      *string     `json:"policy_mode,omitempty"`
-	BaselineProfile *string     `json:"baseline_profile,omitempty"`
-	NotScored       *bool       `json:"not_scored,omitempty"`
+	Services        []string `json:"services,omitempty"`
+	PolicyMode      *string  `json:"policy_mode,omitempty"`
+	BaselineProfile *string  `json:"baseline_profile,omitempty"`
+	NotScored       *bool    `json:"not_scored,omitempty"`
 }
 
 type RESTServiceBatchConfigData struct {

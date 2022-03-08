@@ -1066,6 +1066,16 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 				}
 				cconf.AuthByPlatform = *rc.AuthByPlatform
 			}
+			if rc.RancherEP != nil {
+				if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
+					e := "Invalid endpoint URL"
+					log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				} else {
+					cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				}
+			}
 
 			/*
 				if rc.InternalSubnets != nil {
