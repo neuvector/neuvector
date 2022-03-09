@@ -397,6 +397,15 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	if rc.AuthByPlatform != nil {
 		cconf.AuthByPlatform = *rc.AuthByPlatform
 	}
+	if rc.RancherEP != nil {
+		if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
+			err := fmt.Errorf("Invalid endpoint URL")
+			log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(err)
+			return err
+		} else {
+			cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+		}
+	}
 
 	// webhook
 	if webhooks, _, err := configWebhooks(rc.WebhookUrl, rc.Webhooks, cconf.Webhooks, share.UserCreated, acc); err != nil {

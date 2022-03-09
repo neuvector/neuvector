@@ -385,9 +385,6 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	}
 
 	systemConfigCache = cfg
-	if systemConfigCache.RancherEP == "" {
-		systemConfigCache.RancherEP = cctx.RancherEP
-	}
 
 	fedCacheMutexLock()
 	fedHttpsProxyCache = systemConfigCache.RegistryHttpsProxy
@@ -420,13 +417,14 @@ func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
-	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+	if isLeader() && localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if cctx.RancherSSO {
 			systemConfigCache.AuthByPlatform = true
 		}
 		if cctx.RancherEP != "" && systemConfigCache.RancherEP == "" {
 			if u, err := url.ParseRequestURI(cctx.RancherEP); err == nil {
-				systemConfigCache.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				cctx.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				systemConfigCache.RancherEP = cctx.RancherEP
 			}
 		}
 		retry := 0
