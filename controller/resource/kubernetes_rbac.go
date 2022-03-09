@@ -753,12 +753,12 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 			for u := range users.Iter() {
 				d.rbacEvaluateUser(u.(k8sSubjectObjRef))
 			}
+		}
 
-			if _, ok := nvClusterRoles[o.name]; ok && o.domain == "" {
-				msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is deleted.`, o.name)
-				log.Warn(msg)
-				cacheRbacEvent(d.flavor, msg, false)
-			}
+		if _, ok := nvClusterRoles[o.name]; ok && o.domain == "" {
+			msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is deleted.`, o.name)
+			log.Warn(msg)
+			cacheRbacEvent(d.flavor, msg, false)
 		}
 	} else {
 		n = res.(*k8sRole)
