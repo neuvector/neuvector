@@ -790,6 +790,14 @@ func EnforceXffEnabledSetting() {
 	}
 }
 
+func createDefaultNetServiceSetting() {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	cfg.NetServiceStatus = false
+	cfg.NetServicePolicyMode = share.PolicyModeLearn
+	clusHelper.PutSystemConfigRev(cfg, rev)
+}
+
 func createDefaultVulnerabilityProfile() {
 	key := share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName)
 	profile := &share.CLUSVulnerabilityProfile{

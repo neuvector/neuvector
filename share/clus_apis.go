@@ -716,6 +716,8 @@ type CLUSSystemConfig struct {
 	IBMSAOnboardData     CLUSIBMSAOnboardData `json:"ibmsa_onboard_data"`
 	XffEnabled           bool                 `json:"xff_enabled"`
 	CfgType              TCfgType             `json:"cfg_type"`
+	NetServiceStatus     bool                 `json:"net_service_status"`
+	NetServicePolicyMode string               `json:"net_service_policy_mode"`
 }
 
 type CLUSEULA struct {

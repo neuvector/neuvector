@@ -366,7 +366,7 @@ func (m CacheMethod) GetFedFileMonitorProfileCache() ([]*share.CLUSFileMonitorPr
 		}
 		p := &share.CLUSFileMonitorProfile{
 			Group:   groupName,
-			Mode:    g.PolicyMode,
+			Mode:    g.ProfileMode,
 			Filters: fmfs,
 			CfgType: g.CfgType,
 		}

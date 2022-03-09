@@ -1106,6 +1106,29 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 				cconf.XffEnabled = *rc.XffEnabled
 			}
 
+			//global network service status
+			if rc.NetServiceStatus != nil {
+				cconf.NetServiceStatus = *rc.NetServiceStatus
+			}
+
+			// global network service policy mode
+			if rc.NetServicePolicyMode != nil {
+				if *rc.NetServicePolicyMode == share.PolicyModeEnforce &&
+					licenseAllowEnforce() == false {
+					restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+					return
+				}
+				switch *rc.NetServicePolicyMode {
+				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+					cconf.NetServicePolicyMode = *rc.NetServicePolicyMode
+				default:
+					e := "Invalid network service policy mode"
+					log.WithFields(log.Fields{"net_service_policy_mode": *rc.NetServicePolicyMode}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				}
+			}
+
 			// registry proxy
 			if rc.RegistryHttpProxy != nil {
 				if rc.RegistryHttpProxy.URL != "" {
