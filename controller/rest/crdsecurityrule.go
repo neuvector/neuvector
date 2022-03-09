@@ -1773,14 +1773,16 @@ targetpass:
 			mode = *gfwrule.Spec.Target.PolicyMode
 		}
 		baseline := share.ProfileZeroDrift
-		if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
-			blValue := *gfwrule.Spec.ProcessProfile.Baseline
-			if blValue == share.ProfileBasic {
-				baseline = share.ProfileBasic
-			} else if blValue != share.ProfileDefault && blValue != share.ProfileShield && blValue != share.ProfileZeroDrift {
-				errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, blValue)
-				buffer.WriteString(errMsg)
-				errCount += errNo
+		if utils.DoesGroupHavePolicyMode(gfwrule.Spec.Target.Selector.Name) {
+			if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
+				blValue := *gfwrule.Spec.ProcessProfile.Baseline
+				if blValue == share.ProfileBasic {
+					baseline = share.ProfileBasic
+				} else if blValue != share.ProfileDefault && blValue != share.ProfileShield && blValue != share.ProfileZeroDrift {
+					errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, blValue)
+					buffer.WriteString(errMsg)
+					errCount += errNo
+				}
 			}
 		}
 		pprofile := api.RESTProcessProfile{
@@ -2449,11 +2451,10 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				Target: resource.NvSecurityTarget{
 					Selector: *tgroup,
 				},
-				IngressRule:    make([]resource.NvSecurityRuleDetail, 0),
-				EgressRule:     make([]resource.NvSecurityRuleDetail, 0),
-				ProcessProfile: &resource.NvSecurityProcessProfile{},
-				ProcessRule:    make([]resource.NvSecurityProcessRule, 0),
-				FileRule:       make([]resource.NvSecurityFileRule, 0),
+				IngressRule: make([]resource.NvSecurityRuleDetail, 0),
+				EgressRule:  make([]resource.NvSecurityRuleDetail, 0),
+				ProcessRule: make([]resource.NvSecurityProcessRule, 0),
+				FileRule:    make([]resource.NvSecurityFileRule, 0),
 			},
 		}
 		// If Learned group add the policy mode in crd
@@ -2564,11 +2565,14 @@ func (h *nvCrdHandler) crdGetFileRules(profile *api.RESTFileMonitorProfile) []sh
 func exportProcessRule(group string, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if profile, err := cacher.GetProcessProfile(group, acc); err == nil {
-		baseline := share.ProfileZeroDrift
-		if profile.Baseline == share.ProfileBasic {
-			baseline = share.ProfileBasic
+		if utils.DoesGroupHavePolicyMode(group) {
+			baseline := share.ProfileZeroDrift
+			if profile.Baseline == share.ProfileBasic {
+				baseline = share.ProfileBasic
+			}
+			secRule.ProcessProfile = &resource.NvSecurityProcessProfile{Baseline: &baseline}
+			secRule.ProcessProfile.Baseline = &baseline
 		}
-		secRule.ProcessProfile.Baseline = &baseline
 		dupChecker := utils.NewSet()
 		for _, gproc := range profile.ProcessList {
 			key := fmt.Sprintf("%s::%s::%s", gproc.Name, gproc.Path, gproc.Action)
