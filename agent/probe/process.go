@@ -839,10 +839,10 @@ func isSudoCommand(cmds []string) bool {
 func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContainer) {
 	p.lockProcMux() // minimum section lock
 	parent, ok := p.pidProcMap[proc.ppid]
-	p.unlockProcMux() // minimum section lock
 	if !ok { // parent has not been caught
 		if !osutil.IsPidValid(proc.ppid) {
 			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Info("PROC: parent exited")
+			p.unlockProcMux() // minimum section lock
 			return
 		}
 
@@ -865,6 +865,7 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 		p.addContainerProcess(c, parent.pid) // add parent
 		log.WithFields(log.Fields{"pid": parent.pid, "ruid": parent.ruid}).Debug("PROC: patch parent")
 	}
+	p.unlockProcMux() // minimum section lock
 
 	if (parent.reported & escalatReported) > 0 {
 		return
@@ -1229,6 +1230,10 @@ func (p *Probe) handleProcExit(pid int) *procInternal {
 // after FORK event but before EXEC
 func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 	if proc, ok := p.pidProcMap[pid]; ok {
+		if (proc.reported & escalatReported) > 0 {
+			return
+		}
+
 		if proc.ruid == ruid && proc.euid == euid {
 			// no change, skip further comparisons
 			return
