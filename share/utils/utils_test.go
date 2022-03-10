@@ -234,3 +234,35 @@ func TestCompareSliceWithoutOrder(t *testing.T) {
 	}
 
 }
+
+func TestBytesDisplay(t *testing.T) {
+	var num int64 = 356
+	if str := DisplayBytes(num); str != "356 Bytes" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+
+	num = 44356
+	if str := DisplayBytes(num); str !=  "43 KB" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+
+	num = 44356000
+	if str := DisplayBytes(num); str != "42 MB" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+
+	num = 44356000000
+	if str := DisplayBytes(num); str != "41 GB" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+
+	num = 44356000000000
+	if str := DisplayBytes(num); str != "40 TB" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+
+	num = 4435600000000000
+	if str := DisplayBytes(num); str != "4034 TB" {
+		t.Errorf("(%v) and (%v) is not equal\n", num, str)
+	}
+}

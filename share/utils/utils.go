@@ -1157,3 +1157,22 @@ func FileHashCrc32(path string, size int64) uint32 {
 	}
 	return crc
 }
+
+func DisplayBytes(num int64) string {
+	if kb := num >> 10; kb > 0 {
+		if mb := kb >> 10; mb > 0 {
+			if gb := mb >> 10; gb > 0 {
+				if tb := gb >> 10; tb > 0 {
+					return fmt.Sprintf("%d TB", tb)
+				} else {
+					return fmt.Sprintf("%d GB", gb)
+				}
+			} else {
+				return fmt.Sprintf("%d MB", mb)
+			}
+		} else {
+			return fmt.Sprintf("%d KB", kb)
+		}
+	}
+	return fmt.Sprintf("%d Bytes", num)
+}
