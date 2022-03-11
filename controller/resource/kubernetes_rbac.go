@@ -299,15 +299,13 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 			readVerbs = nvReadVerbs
 			writeVerbs = nvWriteVerbs
 		}
+		gAdjusted := map[string]string{api.UserRoleAdmin: api.UserRoleFedAdmin, api.UserRoleReader: api.UserRoleFedReader}
 		for apiGroup, rscs := range rscsMap {
 			if r2v, ok := ag2r2v[apiGroup]; ok && len(r2v) > 0 {
 				nvRoleTemp := k8s2NVRole(rscs, readVerbs, writeVerbs, r2v)
 				if roleDomain == "" && k8sFlavor == share.FlavorRancher && strings.HasPrefix(clusRoleName, globalRolePrefix) {
-					if nvRoleTemp == api.UserRoleAdmin {
-						nvRole = api.UserRoleFedAdmin
-						break
-					} else if nvRoleTemp == api.UserRoleReader {
-						nvRole = api.UserRoleFedReader
+					if adjusted, ok := gAdjusted[nvRoleTemp]; ok {
+						nvRole = adjusted
 						break
 					}
 				}

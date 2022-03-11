@@ -12,7 +12,6 @@ import (
 	mathRand "math/rand"
 	"net/http"
 	"net/http/cookiejar"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -79,6 +78,7 @@ type joinTicket struct {
 
 type tRancherUser struct {
 	valid       bool
+	id          string
 	name        string
 	token       string // rancher token from R_SESS cookie
 	domainRoles access.DomainRole
@@ -132,6 +132,9 @@ const (
 	jwtRegularTokenType = iota
 	jwtFedMasterTokenType
 )
+
+var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
+var rancherCookieMutex sync.RWMutex
 
 // With userMutex locked when calling this because it does loginSession lookup first
 func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (*loginSession, int) {
@@ -438,7 +441,6 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 			Password: cfg.RegistryHttpsProxy.Password,
 		}
 	}
-	log.WithFields(log.Fields{"useProxy": useProxy, "proxyEnable": proxyInfo.Enable}).Debug()
 
 	cookie := &http.Cookie{
 		Name:  "R_SESS",
@@ -464,9 +466,20 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		var domainRoles map[string]string
 		var rancherUsers api.UserCollection
 		if err = json.Unmarshal(data, &rancherUsers); err == nil {
-			if len(rancherUsers.Data) > 0 && rancherUsers.Data[0].Enabled != nil && *rancherUsers.Data[0].Enabled {
-				principalIDs := utils.NewSetFromSliceKind(rancherUsers.Data[0].PrincipalIDs)
-				rancherUser.name = rancherUsers.Data[0].Username
+			idx := -1
+			for i, data := range rancherUsers.Data {
+				if data.Me && data.Enabled != nil && *data.Enabled {
+					if idx >= 0 {
+						log.WithFields(log.Fields{"i": i, "id": data.ID, "name": data.Username}).Warn("multiple users")
+					} else {
+						idx = i
+					}
+				}
+			}
+			if idx >= 0 {
+				principalIDs := utils.NewSetFromSliceKind(rancherUsers.Data[idx].PrincipalIDs)
+				rancherUser.id = rancherUsers.Data[idx].ID
+				rancherUser.name = rancherUsers.Data[idx].Username
 				rancherUser.token = rsessToken
 				url = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
 				data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
@@ -480,7 +493,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 							var pid string
 							var subType uint8 = resource.SUBJECT_USER
 							if principalIDs.Contains(p.ID) {
-								pid = rancherUsers.Data[0].ID
+								pid = rancherUsers.Data[idx].ID
 								rancherUser.name = p.LoginName
 							} else {
 								pid = p.ID
@@ -502,6 +515,8 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 										}
 									}
 								}
+							} else {
+								log.WithFields(log.Fields{"id": pid, "subType": subType}).Debug("no deduced role")
 							}
 						}
 						if domainRoles != nil {
@@ -520,13 +535,18 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 						}
 					}
 				}
+			} else {
+				log.WithFields(log.Fields{"len": len(rancherUsers.Data)}).Error("no enabled user")
 			}
 		}
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"data": string(data), "url": url, "err": err}).Error()
 	}
 
 	if !rancherUser.valid || len(rancherUser.domainRoles) == 0 {
 		err = fmt.Errorf("cannot find a mapped role")
-		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "proxyUsed": proxyUsed, "url": url, "err": err}).Error()
+		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "useProxy": useProxy, "proxyEnable": proxyInfo.Enable, "proxyUsed": proxyUsed}).Error()
 	}
 
 	return rancherUser, err
@@ -582,46 +602,40 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 		return nil, userTimeout, rsessToken
 	}
 
+	cacheRancherCookie := false
 	if strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) {
+		rc := userInvalidRequest
 		if rsessToken != "" {
-			var nvPage string
-			if header, ok := r.Header[api.RESTNvPageHeader]; ok && len(header) == 1 {
-				nvPage = header[0]
-			}
-			if r.Method != http.MethodGet || nvPage != api.RESTNvPageDashboard {
-				expected := fmt.Sprintf("%s%s", _rancherSessionPrefix, rsessToken)
-				if claims.MainSessionID != expected {
-					log.WithFields(log.Fields{"expected": expected, "mainSessionID": claims.MainSessionID}).Error()
-					return nil, userTimeout, rsessToken
-				} else {
-					// Rancher SSO :
-					// 1. (how often) should we call rancherEP to make sure the rancher cookie is still valid?
-					// 2. Even cookie is still valid, what if the uer's role is changed?
-					accReadAll := access.NewReaderAccessControl()
-					if cfg := cacher.GetSystemConfig(accReadAll); cfg.AuthByPlatform && cfg.RancherEP != "" {
-						rancherUser, err := checkRancherUserRole(cfg, rsessToken, accReadAll)
-						if err == nil {
-							if role, ok := rancherUser.domainRoles[""]; ok && (role == api.UserRoleFedAdmin || role == api.UserRoleFedReader) {
-								if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
-									if role == api.UserRoleFedAdmin {
-										rancherUser.domainRoles[""] = api.UserRoleAdmin
-									} else {
-										rancherUser.domainRoles[""] = api.UserRoleReader
-									}
-								}
-							}
-						}
-						if err != nil || !reflect.DeepEqual(rancherUser.domainRoles, claims.Roles) {
-							return nil, userTimeout, rsessToken
+			expected := fmt.Sprintf("%s%s", _rancherSessionPrefix, rsessToken)
+			if claims.MainSessionID != expected {
+				log.WithFields(log.Fields{"expected": expected, "mainSessionID": claims.MainSessionID}).Error()
+			} else {
+				// Rancher SSO :
+				// 1. (how often) should we call rancherEP to make sure the rancher cookie is still valid? 1 minute
+				// 2. Even cookie is still valid, what if the uer's role is changed?
+				accReadAll := access.NewReaderAccessControl()
+				if cfg := cacher.GetSystemConfig(accReadAll); cfg.AuthByPlatform && cfg.RancherEP != "" {
+					var ok bool
+					rancherCookieMutex.RLock()
+					_, ok = rancherCookieCache[rsessToken]
+					rancherCookieMutex.RUnlock()
+					if !ok {
+						rc = userTimeout
+						if _, err := checkRancherUserRole(cfg, rsessToken, accReadAll); err == nil {
+							cacheRancherCookie = true
+							rc = userOK
 						}
 					} else {
-						return nil, userNoPlatformAuth, rsessToken
+						rc = userOK
 					}
+				} else {
+					rc = userNoPlatformAuth
 				}
 			}
-		} else {
-			// If rancher console logs out, R_SESS cookie is cleared in browser. The SSO NV console from that R_SESS cookie doesn't work as well.
-			return nil, userTimeout, rsessToken
+		}
+		// If rancher console logs out, R_SESS cookie is cleared in browser. The SSO NV console from that R_SESS cookie doesn't work as well.
+		if rc != userOK {
+			return nil, rc, rsessToken
 		}
 	}
 
@@ -672,6 +686,11 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	if nvPage, ok := r.Header[api.RESTNvPageHeader]; ok && len(nvPage) == 1 {
 		login.nvPage = nvPage[0]
 	}
+	if cacheRancherCookie {
+		rancherCookieMutex.Lock()
+		rancherCookieCache[rsessToken] = time.Now().Add(time.Minute).Unix()
+		rancherCookieMutex.Unlock()
+	}
 
 	return login, userOK, rsessToken
 }
@@ -691,16 +710,21 @@ func getAccessControl(w http.ResponseWriter, r *http.Request, op access.AccessOP
 
 	login, rc, rsessToken := restReq2User(r)
 	if rc != userOK {
-		if rsessToken != "" {
-			w.Header().Set(api.RESTRancherTokenHeader, rsessToken)
-		}
-		if rc == userTimeout {
-			restRespError(w, http.StatusRequestTimeout, api.RESTErrUnauthorized)
-		} else if rc == userNoPlatformAuth {
-			restRespError(w, http.StatusUnauthorized, api.RESTErrPlatformAuthDisabled)
+		status := http.StatusUnauthorized
+		code := api.RESTErrUnauthorized
+		if rsessToken == "" {
+			if rc == userTimeout {
+				status = http.StatusRequestTimeout
+			}
 		} else {
-			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+			code = api.RESTErrRancherUnauthorized
+			if rc == userTimeout {
+				status = http.StatusRequestTimeout
+			} else if rc == userNoPlatformAuth {
+				code = api.RESTErrPlatformAuthDisabled
+			}
 		}
+		restRespError(w, status, code)
 		return nil, nil
 	}
 
@@ -747,11 +771,14 @@ func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[str
 	evqueue.Append(&clog)
 }
 
-func lookupShadowUser(server, username, email, role string, roleDomains map[string][]string) (*share.CLUSUser, bool) {
+func lookupShadowUser(server, username, userid, email, role string, roleDomains map[string][]string) (*share.CLUSUser, bool) {
 	var newUser *share.CLUSUser
 
 	now := time.Now()
 	fullname := utils.MakeUserFullname(server, username)
+	if userid != "" {
+		fullname = fmt.Sprintf("%s(%s)", fullname, userid)
+	}
 
 	retry := 0
 	for retry < retryClusterMax {
@@ -1553,7 +1580,7 @@ func remotePasswordAuth(cs *share.CLUSServer, pw *api.RESTAuthPassword) (*share.
 			log.WithFields(log.Fields{"server": cs.Name, "user": pw.Username, "role": role}).Debug("Authorized by group role mapping")
 		}
 
-		user, authz := lookupShadowUser(cs.Name, pw.Username, "", role, roleDomains)
+		user, authz := lookupShadowUser(cs.Name, pw.Username, "", "", role, roleDomains)
 		if authz {
 			return user, nil
 		}
@@ -1685,7 +1712,7 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 		}
 	}
 
-	user, authz := lookupShadowUser(cs.Name, username, email, role, roleDomains)
+	user, authz := lookupShadowUser(cs.Name, username, "", email, role, roleDomains)
 	if authz {
 		return user, nil
 	}
@@ -1715,7 +1742,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 		role, roleDomains = rbac2UserRole(roles)
 	}
 
-	user, authz := lookupShadowUser(server, pw.Username, "", role, roleDomains)
+	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains)
 	if authz {
 		return user, nil
 	}
@@ -1892,27 +1919,27 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	var auth api.RESTAuthData
 	var user *share.CLUSUser
 	var rancherUser tRancherUser
+	var rsessToken string
+	var cacheRancherCookie bool
 
 	accReadAll := access.NewReaderAccessControl()
 	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if header, ok := r.Header[api.RESTRancherTokenHeader]; ok && len(header) == 1 {
-			if rsessToken := header[0]; rsessToken != "" {
+			if rsessToken = header[0]; rsessToken != "" {
 				var err error
-				var status int = http.StatusUnauthorized
 				var code int
 				if cfg := cacher.GetSystemConfig(accReadAll); cfg.AuthByPlatform && cfg.RancherEP != "" {
 					code = api.RESTErrUnauthorized
 					rancherUser, err = checkRancherUserRole(cfg, rsessToken, accReadAll)
 				} else {
 					code = api.RESTErrPlatformAuthDisabled
-					err = fmt.Errorf("platform auth disabled")
+					log.Error("platform auth disabled")
 				}
 				if err != nil {
-					log.WithFields(log.Fields{"err": err, "status": status, "code": code}).Error()
-					w.Header().Set(api.RESTRancherTokenHeader, rsessToken)
-					restRespError(w, status, code)
+					restRespError(w, http.StatusUnauthorized, code)
 					return
 				}
+				cacheRancherCookie = true
 			}
 		}
 	}
@@ -1920,24 +1947,19 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	if rancherUser.valid {
 		var authz bool
 		role, roleDomains := rbac2UserRole(rancherUser.domainRoles)
-		adjustedRole := role
-		if role == api.UserRoleFedAdmin || role == api.UserRoleFedReader {
-			if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
-				if role == api.UserRoleFedAdmin {
-					adjustedRole = api.UserRoleAdmin
-				} else {
-					adjustedRole = api.UserRoleReader
-				}
+		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
+			fedAdjusted := map[string]string{api.UserRoleFedAdmin: api.UserRoleAdmin, api.UserRoleFedReader: api.UserRoleReader}
+			if adjusted, ok := fedAdjusted[role]; ok {
+				role = adjusted
 			}
 		}
 		mainSessionID = fmt.Sprintf("%s%s", _rancherSessionPrefix, rancherUser.token)
-		user, authz = lookupShadowUser(strings.ToLower(share.FlavorRancher), rancherUser.name, "", role, roleDomains)
+		user, authz = lookupShadowUser(share.FlavorRancher, rancherUser.name, rancherUser.id, "", role, roleDomains)
 		if !authz {
-			msg := fmt.Sprintf("Failed to map to a valid role: %s", rancherUser.name)
+			msg := fmt.Sprintf("Failed to map to a valid role: %s(%s)", rancherUser.name, rancherUser.id)
 			restRespErrorMessage(w, http.StatusUnauthorized, api.RESTErrUnauthorized, msg)
 			return
 		}
-		user.Role = adjustedRole
 		auth = api.RESTAuthData{
 			Password: &api.RESTAuthPassword{
 				Username: rancherUser.name,
@@ -2113,6 +2135,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		},
 	}
 
+	if cacheRancherCookie {
+		rancherCookieMutex.Lock()
+		rancherCookieCache[rsessToken] = time.Now().Add(time.Minute).Unix()
+		rancherCookieMutex.Unlock()
+	}
 	if !rancherUser.valid || rancherUser.token == "" {
 		pwdDaysUntilExpire, pwdHoursUntilExpire, expired := isPasswordExpired(localAuthed, user.Fullname, user.PwdResetTime)
 		if expired {
