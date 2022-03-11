@@ -397,7 +397,7 @@ func sendReqToMasterCluster(httpClient *http.Client, method, uri, token string, 
 	var proxyLog tProxyLog
 	if specifiedProxy != nil {
 		proxy = *specifiedProxy
-	} else {
+	} else if cookie == nil {
 		_, useProxy, proxy = cacher.GetFedLocalRestInfo(acc)
 	}
 	proxyLog = tProxyLog{
@@ -780,19 +780,11 @@ func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
 }
 
 func revertFedRoles(acc *access.AccessControl) {
+	fedAdjusted := map[string]string{api.UserRoleFedAdmin: api.UserRoleAdmin, api.UserRoleFedReader: api.UserRoleReader}
 	users := clusHelper.GetAllUsers(acc)
-	rancher := strings.ToLower(share.FlavorRancher)
 	for _, user := range users {
-		var newRole string
-		if user.Server != rancher {
-			if user.Role == api.UserRoleFedAdmin {
-				newRole = api.UserRoleAdmin
-			} else if user.Role == api.UserRoleFedReader {
-				newRole = api.UserRoleReader
-			}
-		}
-		if newRole != "" {
-			clusHelper.ConfigFedRole(user.Fullname, newRole, acc)
+		if adjusted, ok := fedAdjusted[user.Role]; ok {
+			clusHelper.ConfigFedRole(user.Fullname, adjusted, acc)
 		}
 	}
 
@@ -1244,6 +1236,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	defer clusHelper.ReleaseLock(lock)
 
+	// local users & rancher users who have admin permission can promote the cluster
 	acc, login := isFedOpAllowed(api.FedRoleNone, _localAdminRequired, w, r)
 	if acc == nil || login == nil {
 		return
@@ -1294,7 +1287,8 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed)
 		return
 	}
-	if login.fullname != common.DefaultAdminUser && (login.server != "" && login.server != strings.ToLower(share.FlavorRancher)) {
+	// do not promote current user to fedAdmin if it's not local user
+	if login.fullname != common.DefaultAdminUser && login.server == "" {
 		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
 	}
 
@@ -1355,9 +1349,9 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	if user != nil {
 		kickLoginSessions(user)
 	}
-	if login.fullname != common.DefaultAdminUser {
-		user, _, _ := clusHelper.GetUserRev(login.fullname, accFedAdmin)
-		if user != nil {
+	// if current user is local non-default admin user or rancher user, kick all related sessions
+	if login.fullname != common.DefaultAdminUser || login.server != "" {
+		if user, _, _ := clusHelper.GetUserRev(login.fullname, accFedAdmin); user != nil {
 			kickLoginSessions(user)
 		}
 	}

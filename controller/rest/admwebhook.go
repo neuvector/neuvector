@@ -165,6 +165,14 @@ Loop:
 			}
 			admResCacheMutex.Unlock()
 			checkAggrLogsCache(false)
+
+			rancherCookieMutex.Lock()
+			for rsessToken, validUntil := range rancherCookieCache {
+				if time.Now().Unix() > validUntil {
+					delete(rancherCookieCache, rsessToken)
+				}
+			}
+			rancherCookieMutex.Unlock()
 		case <-cSig:
 			checkAggrLogsCache(true)
 			auditQueue.Flush()

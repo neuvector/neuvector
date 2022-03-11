@@ -64,6 +64,7 @@ const RESTErrUserLoginBlocked int = 47
 const RESTErrPasswordExpired int = 48
 const RESTErrPromoteFail int = 49
 const RESTErrPlatformAuthDisabled int = 50
+const RESTErrRancherUnauthorized int = 51
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"

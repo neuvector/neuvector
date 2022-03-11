@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -553,16 +552,6 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		if e := isValidRoleDomains(ruser.Fullname, newRole, newRoleDomains, false); e != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
 			return
-		}
-
-		// Rancher SSO: comment out the following code if we also support overriding shadow Rancher user's nv role
-		if user.Server == strings.ToLower(share.FlavorRancher) {
-			if newRole != user.Role || !reflect.DeepEqual(newRoleDomains, user.RoleDomains) {
-				e := "Cannot override Rancher user's role'"
-				log.WithFields(log.Fields{"user": fullname}).Error(e)
-				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, e)
-				return
-			}
 		}
 
 		err = nil
