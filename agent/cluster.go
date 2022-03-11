@@ -275,16 +275,16 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 		// it's hitting node's limit
 		ratio := uint64(rpt.Stats.WorkingSet * 100 / uint64(Host.Memory))
 		if setRisingEdge {
-			description = fmt.Sprintf("Memory usage[%d kB] is more than %d %% of the node memory[%d kB]", rpt.Stats.WorkingSet/1024, ratio, Host.Memory/1024)
+			description = fmt.Sprintf("Memory usage[%s] is more than %d %% of the node memory[%s]", utils.DisplayBytes(int64(rpt.Stats.WorkingSet)), ratio, utils.DisplayBytes(int64(Host.Memory)))
 		} else {
-			description = fmt.Sprintf("Memory usage[%d kB] is normal, %d %% of the node memory[%d kB]", rpt.Stats.WorkingSet/1024, ratio, Host.Memory/1024)
+			description = fmt.Sprintf("Memory usage[%s] is normal, %d %% of the node memory[%s]", utils.DisplayBytes(int64(rpt.Stats.WorkingSet)), ratio, utils.DisplayBytes(int64(Host.Memory)))
 		}
 	} else {
 		ratio := uint64(rpt.Stats.WorkingSet * 100 / rpt.Stats.Usage.Limit)
 		if setRisingEdge {
-			description = fmt.Sprintf("Memory usage[%d kB] is more than %d %% of the container memory limit[%d kB]", rpt.Stats.WorkingSet/1024, ratio, rpt.Stats.Usage.Limit/1024)
+			description = fmt.Sprintf("Memory usage[%s] is more than %d %% of the container memory limit[%s]", utils.DisplayBytes(int64(rpt.Stats.WorkingSet)), ratio, utils.DisplayBytes(int64(rpt.Stats.Usage.Limit)))
 		} else {
-			description = fmt.Sprintf("Memory usage[%d kB] is normal, %d %% of the container memory limit[%d kB]", rpt.Stats.WorkingSet/1024, ratio, rpt.Stats.Usage.Limit/1024)
+			description = fmt.Sprintf("Memory usage[%s] is normal, %d %% of the container memory limit[%s]", utils.DisplayBytes(int64(rpt.Stats.WorkingSet)), ratio, utils.DisplayBytes(int64(rpt.Stats.Usage.Limit)))
 		}
 	}
 
