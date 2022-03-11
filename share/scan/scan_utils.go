@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
@@ -28,13 +29,24 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+var RPMPkgFiles utils.Set = utils.NewSet(
+	"var/lib/rpm/Packages",
+	"usr/lib/sysimage/rpm/Packages",
+	"var/lib/rpm/Packages.db",
+	"usr/lib/sysimage/rpm/Packages.db",
+	"var/lib/rpm/rpmdb.sqlite",
+	"usr/lib/sysimage/rpm/rpmdb.sqlite",
+)
+
+const (
+	dpkgStatus    = "var/lib/dpkg/status"
+	dpkgStatusDir = "var/lib/dpkg/status.d/" // used by distroless images
+	apkPackages   = "lib/apk/db/installed"
+)
+
 const (
 	//max package file size
 	maxFileSize      = 300 * 1024 * 1024
-	rpmPackages      = "var/lib/rpm/Packages"
-	dpkgStatus       = "var/lib/dpkg/status"
-	dpkgStatusDir    = "var/lib/dpkg/status.d/" // used by distroless images
-	apkPackages      = "lib/apk/db/installed"
 	hostPackage      = "/usr/local/bin/host_package.sh"
 	containerPackage = "/usr/local/bin/container_package.sh"
 	manifestJson     = "manifest.json"
@@ -43,10 +55,9 @@ const (
 	dockerfile       = "root/buildinfo/Dockerfile-"
 )
 
-//lib map name --> binary
 var libsList utils.Set = utils.NewSet(
+	// rpm files are added as union
 	dpkgStatus,
-	rpmPackages,
 	apkPackages,
 	"etc/lsb-release",
 	"etc/os-release",
@@ -56,7 +67,7 @@ var libsList utils.Set = utils.NewSet(
 	"etc/system-release",
 	"etc/fedora-release",
 	"etc/apt/sources.list",
-)
+).Union(RPMPkgFiles)
 
 var scanErrString = []string{
 	share.ScanErrorCode_ScanErrNone:                "succeeded",
@@ -125,8 +136,8 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 		lib := itr.(string)
 		path := s.sys.ContainerFilePath(pid, prefix+lib)
 
-		//Extract necessary packages
-		if lib == rpmPackages {
+		// Extract necessary packages
+		if RPMPkgFiles.Contains(lib) {
 			data, err = getRpmPackages(path, kernel)
 			if err != nil {
 				continue
@@ -246,55 +257,55 @@ func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
 	return apps.marshal(), walkErr
 }
 
-func isRpmKernelPackage(line string) string {
-	tokens := strings.Split(line, ":")
-	if len(tokens) != 2 {
-		return ""
-	}
+type RPMPackage struct {
+	Name    string `json:"n"`
+	Epoch   int    `json:"e"`
+	Version string `json:"v"`
+	Release string `json:"r"`
+}
 
-	if strings.HasPrefix(tokens[0], "kernel ") ||
-		strings.HasPrefix(tokens[0], "kernel-tools-libs ") ||
-		strings.HasPrefix(tokens[0], "kernel-tools ") ||
-		strings.HasPrefix(tokens[0], "kernel-headers ") {
-		return strings.TrimSpace(tokens[1])
+func isRpmKernelPackage(p *rpmdb.PackageInfo) string {
+	if p.Name == "kernel " ||
+		p.Name == "kernel-tools-libs" ||
+		p.Name == "kernel-tools" ||
+		p.Name == "kernel-headers" {
+		return fmt.Sprintf("%s-%s", p.Version, p.Release)
 	} else {
 		return ""
 	}
 }
 
 func getRpmPackages(fullpath, kernel string) ([]byte, error) {
-	if _, err := os.Stat(fullpath); os.IsNotExist(err) {
-		return nil, err
-	}
-
-	// Query RPM
-	// We actually extract binary package names instead of source package names here because RHSA refers to package names
-	// In the dpkg system, we extract the source instead
-	out, err := utils.Exec(os.TempDir(), "rpmparser", fullpath)
+	db, err := rpmdb.Open(fullpath)
 	if err != nil {
-		log.Errorf("could not query RPM: %s. output: %s", err, string(out))
-		// Do not bubble up because we probably won't be able to fix it,
-		// the database must be corrupted
+		log.WithFields(log.Fields{"file": fullpath, "kernel": kernel}).Error("Failed to open rpm packages")
 		return nil, err
 	}
 
-	// filter kernels that are not running
-	if kernel != "" {
-		buf := new(bytes.Buffer)
-		scanner := bufio.NewScanner(bytes.NewReader(out))
-		for scanner.Scan() {
-			line := scanner.Text()
+	pkgs, err := db.ListPackages()
+	if err != nil {
+		log.WithFields(log.Fields{"file": fullpath, "kernel": kernel}).Error("Failed to read rpm packages")
+		return nil, err
+	}
 
-			kpkg := isRpmKernelPackage(line)
-			if kpkg == "" || strings.HasPrefix(kernel, kpkg) {
-				buf.WriteString(line)
-				buf.WriteString("\n")
+	log.WithFields(log.Fields{"file": fullpath, "kernel": kernel, "packages": len(pkgs)}).Info()
+
+	list := make([]RPMPackage, 0, len(pkgs))
+	for _, p := range pkgs {
+		if p.Name != "gpg-pubkey" {
+			if kernel == "" {
+				list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+			} else {
+				// filter kernels that are not running
+				if k := isRpmKernelPackage(p); k == "" || strings.HasPrefix(kernel, k) {
+					list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+				}
 			}
 		}
-		return buf.Bytes(), nil
-	} else {
-		return out, nil
 	}
+
+	value, _ := json.Marshal(&list)
+	return value, nil
 }
 
 func isDpkgKernelPackage(line string) string {
@@ -320,6 +331,8 @@ func getDpkgStatus(fullpath, kernel string) ([]byte, error) {
 		return nil, err
 	}
 	defer inputFile.Close()
+
+	log.WithFields(log.Fields{"file": fullpath, "kernel": kernel}).Info()
 
 	skipPackage := false
 
@@ -753,31 +766,31 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 			return nil, share.ScanErrorCode_ScanErrPackage
 		}
 
-		// for layer scan
+		// for file content
 		curLayerFiles := make(map[string][]byte)
 		curLayerApps := NewScanApps(true)
-		for filename, tmpfile := range pathMap {
-			var dat []byte
-			if filename == rpmPackages {
-				dat, err = getRpmPackages(tmpfile, "")
+		for filename, fullpath := range pathMap {
+			var data []byte
+			if RPMPkgFiles.Contains(filename) {
+				data, err = getRpmPackages(fullpath, "")
 				if err != nil {
 					continue
 				}
 			} else if filename == dpkgStatus || strings.HasPrefix(filename, dpkgStatusDir) {
 				// get the dpkg status file
-				dat, err = getDpkgStatus(tmpfile, "")
+				data, err = getDpkgStatus(fullpath, "")
 				if err != nil {
 					continue
 				}
 			} else if isAppsPkgFile(filename) {
-				curLayerApps.extractAppPkg(filename, tmpfile)
+				curLayerApps.extractAppPkg(filename, fullpath)
 				continue
 			} else {
 				// Files have been selectively picked above.
-				dat, err = ioutil.ReadFile(tmpfile)
+				data, err = ioutil.ReadFile(fullpath)
 			}
 
-			curLayerFiles[filename] = dat
+			curLayerFiles[filename] = data
 		}
 
 		layerFiles[layer] = &LayerFiles{Size: size, Pkgs: curLayerFiles, Apps: curLayerApps.data()}

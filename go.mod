@@ -69,6 +69,7 @@ require (
 	github.com/hashicorp/go-version v1.4.0
 	github.com/hashicorp/serf v0.9.7
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/neuvector/k8s v1.2.1-0.20220214174348-d0b3f377461e
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
