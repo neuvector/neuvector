@@ -738,10 +738,10 @@ func (p *Probe) evalNewRunningApp(pid int) {
 	}
 
 	///////////// Normal decision path  /////////////////
-	p.evaluateApplication(proc, c.id, false, false)
+	p.lockProcMux() // minimum section lock
+	p.evaluateApplication(proc, c.id, false)
 
 	// update its results
-	p.lockProcMux() // minimum section lock
 	if _, ok := p.pidProcMap[pid]; ok {
 		p.pidProcMap[pid] = proc
 	}
@@ -1634,13 +1634,8 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 }
 
 //
-func (p *Probe) isAgentChildren(proc *procInternal, id string, bLocked bool) bool {
+func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
 	if id == p.selfID {
-		if !bLocked {
-			p.lockProcMux()
-			defer p.unlockProcMux()
-		}
-
 		if c, ok := p.containerMap[p.selfID]; ok {
 			return isFamilyProcess(c.children, proc)
 		}
@@ -1648,8 +1643,8 @@ func (p *Probe) isAgentChildren(proc *procInternal, id string, bLocked bool) boo
 	return false
 }
 
-// Application event handler
-func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive, bLocked bool) {
+// Application event handler: locked by calling functions
+func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bool) {
 	if proc.path == "" || proc.path == "/" {
 		// path is required, it can not be either "" or "/".
 		// log.WithFields(log.Fields{"proc": proc}).Debug("PROC: ignored, no path")
@@ -1657,7 +1652,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive, b
 	}
 
 	// only allowing the NS op from the agent's root session
-	if p.isAgentChildren(proc, id, bLocked) && p.isAgentNsOperation(proc) {
+	if p.isAgentChildren(proc, id) && p.isAgentNsOperation(proc) {
 		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored agent NS ops")
 		return
 	}
@@ -1711,7 +1706,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive, b
 
 	risky := proc.action == share.PolicyActionCheckApp
 	if proc.name != "ps" {
-		if action, ok = p.procProfileEval(id, proc, bKeepAlive, bLocked); !ok {
+		if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
 			return // policy is not ready
 		}
 
@@ -2115,7 +2110,7 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 	return false
 }
 
-func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
+func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc bool) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
 	}
@@ -2140,7 +2135,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 	}
 
 	// CNI commands from node
-	if bRtProcP || p.isAllowCniCommand(proc.ppath) {
+	if bRtProcP || (bParentHostProc && p.isAllowCniCommand(proc.ppath)) {
 		switch proc.name {
 		case "portmap", "containerd", "sleep", "uptime": // NV4856
 			return true
@@ -2157,6 +2152,18 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 		if p.isAllowCniCommand(proc.path) {
 			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
 			return true
+		}
+	}
+
+	// maintainance jobs running from node
+	if bParentHostProc {
+		switch proc.pname {
+		case "udisksd":
+			return proc.name == "dumpe2fs"
+		case "qualys-cloud-agent":
+			if filepath.Dir(proc.ppath) == "/usr/local/qualys/cloud-agent/bin" {
+				return true
+			}
 		}
 	}
 
@@ -2187,7 +2194,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string) bool {
 	return false
 }
 
-func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLocked bool) (string, bool) {
+func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) (string, bool) {
 	pp := &share.CLUSProcessProfileEntry{
 		Name:   proc.name,
 		User:   proc.user,
@@ -2221,24 +2228,23 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive, bLock
 	//	proc.action = pp.Action
 	if (proc.reported & profileReported) == 0 {
 		if setting == share.ProfileZeroDrift {
-			if !bLocked {
-				p.lockProcMux()
-			}
-
 			if pass := p.IsAllowedShieldProcess(id, mode, proc, pp, true); pass {
 				if pp.Action != share.PolicyActionLearn {
 					pp.Action = share.PolicyActionAllow
 				}
 			}
-
-			if !bLocked {
-				p.unlockProcMux()
-			}
 		}
 
-		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) &&
-		   (pp.Uuid != share.CLUSReservedUuidAnchorMode && p.isProcessException(proc, pp.DerivedGroup, id)) {
-			pp.Action = share.PolicyActionAllow // can not be learned
+		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) {
+		   if pp.Uuid != share.CLUSReservedUuidAnchorMode {
+				var bParentHostProc bool
+				if c, ok := p.pidContainerMap[proc.ppid]; ok{
+					bParentHostProc = c.id == ""
+				}
+				if p.isProcessException(proc, pp.DerivedGroup, id, bParentHostProc) {
+					pp.Action = share.PolicyActionAllow // can not be learned
+				}
+			}
 		}
 
 		switch pp.Action {
@@ -2399,7 +2405,7 @@ func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 				//  These processes has not been justified by policy, all the actions and riskinfo are default values
 				//  assume no ousiders during the initial stage, only justify insider processes
 				if p.isInsiderProcess(id, proc.pid) {
-					p.evaluateApplication(proc, id, true, true)
+					p.evaluateApplication(proc, id, true)
 					// update its results
 					if p, ok := p.pidProcMap[proc.pid]; ok {
 						p.reported = proc.reported
@@ -2516,7 +2522,7 @@ func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
 				}
 
 				// No need to inhert parent's action. Done at the evalNewRunningApp()
-				p.evaluateApplication(proc, idn, true, true)
+				p.evaluateApplication(proc, idn, true)
 			}
 		}
 	}
@@ -2704,18 +2710,22 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 
 	bNotImageButNewlyAdded := false
 	bImageFile = true
-	if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec {
+	if global.SYS.IsContainerFile(c.rootPid, ppe.Path) {
 		bImageFile = false
-		if fi, ok := c.fInfo[ppe.Path]; ok {
-			bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
-			if ppe.Action == share.PolicyActionAllow && fi.fileType == file_not_exist { // not from image
-				bNotImageButNewlyAdded = true
-				c.fInfo[ppe.Path] = finfo // updated
+	} else {
+		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec {
+			bImageFile = false
+			if fi, ok := c.fInfo[ppe.Path]; ok {
+				bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
+				if ppe.Action == share.PolicyActionAllow && fi.fileType == file_not_exist { // not from image
+					bNotImageButNewlyAdded = true
+					c.fInfo[ppe.Path] = finfo // updated
+				}
+				mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD:")
+			} else {
+				mLog.WithFields(log.Fields{"file": ppe.Path, "finfo": finfo}).Debug("SHD: new file")
+				bModified = true
 			}
-			mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD:")
-		} else {
-			mLog.WithFields(log.Fields{"file": ppe.Path, "finfo": finfo}).Debug("SHD: new file")
-			bModified = true
 		}
 	}
 
