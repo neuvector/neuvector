@@ -77,7 +77,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() *apiextv1.JSONSchemaP
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"name", "criteria"},
+		Required: []string{"name"},
 		Properties: map[string]*apiextv1.JSONSchemaProps{
 			"name": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
@@ -117,7 +117,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSc
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"name", "criteria"},
+		Required: []string{"name"},
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
 			"name": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
