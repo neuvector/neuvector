@@ -82,6 +82,8 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 	ControllerDebug: []string{},
 	TapProxymesh:    true,
 	XffEnabled:      true,
+	NetServiceStatus:     false,
+	NetServicePolicyMode: share.PolicyModeLearn,
 }
 
 func ActionString(action uint8) string {

@@ -134,6 +134,7 @@ var restErrMessage = []string{
 	api.RESTErrPasswordExpired:       "Password expired",
 	api.RESTErrPromoteFail:           "Failed to promote rules",
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
+	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {

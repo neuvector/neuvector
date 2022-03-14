@@ -176,12 +176,28 @@ func getNewServicePolicyMode() string {
 	return systemConfigCache.NewServicePolicyMode
 }
 
+func getNetServiceStatus() bool {
+	return systemConfigCache.NetServiceStatus
+}
+
+func getNetServicePolicyMode() string {
+	return systemConfigCache.NetServicePolicyMode
+}
+
 func getNewServiceProfileBaseline() string {
 	return systemConfigCache.NewServiceProfileBaseline
 }
 
 func (m CacheMethod) GetNewServicePolicyMode() string {
 	return getNewServicePolicyMode()
+}
+
+func (m CacheMethod) GetNetServiceStatus() bool {
+	return getNetServiceStatus()
+}
+
+func (m CacheMethod) GetNetServicePolicyMode() string {
+	return getNetServicePolicyMode()
 }
 
 func (m CacheMethod) GetNewServiceProfileBaseline() string {
@@ -227,6 +243,8 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		IBMSAEpDashboardURL:       systemConfigCache.IBMSAConfigNV.EpDashboardURL,
 		IBMSAEpConnectedAt:        api.RESTTimeString(systemConfigCache.IBMSAConfigNV.EpConnectedAt),
 		XffEnabled:                systemConfigCache.XffEnabled,
+		NetServiceStatus:          systemConfigCache.NetServiceStatus,
+		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -343,7 +361,14 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			// customer explicitly disables IBM SA endpoint
 			cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil)
 		}
-
+		//if global network policy mode enabled/disabled or mode changes
+		//shedule policy calculation
+		if cfg.NetServiceStatus != systemConfigCache.NetServiceStatus {
+			scheduleIPPolicyCalculation(true)
+		} else if systemConfigCache.NetServiceStatus &&
+			cfg.NetServicePolicyMode != systemConfigCache.NetServicePolicyMode {
+				scheduleIPPolicyCalculation(true)
+		}
 	case cluster.ClusterNotifyDelete:
 		// Triggered at configuration import
 		cfg = common.DefaultSystemConfig
@@ -360,9 +385,6 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	}
 
 	systemConfigCache = cfg
-	if systemConfigCache.RancherEP == "" {
-		systemConfigCache.RancherEP = cctx.RancherEP
-	}
 
 	fedCacheMutexLock()
 	fedHttpsProxyCache = systemConfigCache.RegistryHttpsProxy
@@ -395,13 +417,14 @@ func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
-	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+	if isLeader() && localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if cctx.RancherSSO {
 			systemConfigCache.AuthByPlatform = true
 		}
 		if cctx.RancherEP != "" && systemConfigCache.RancherEP == "" {
 			if u, err := url.ParseRequestURI(cctx.RancherEP); err == nil {
-				systemConfigCache.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				cctx.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				systemConfigCache.RancherEP = cctx.RancherEP
 			}
 		}
 		retry := 0

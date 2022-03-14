@@ -397,6 +397,15 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	if rc.AuthByPlatform != nil {
 		cconf.AuthByPlatform = *rc.AuthByPlatform
 	}
+	if rc.RancherEP != nil {
+		if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
+			err := fmt.Errorf("Invalid endpoint URL")
+			log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(err)
+			return err
+		} else {
+			cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+		}
+	}
 
 	// webhook
 	if webhooks, _, err := configWebhooks(rc.WebhookUrl, rc.Webhooks, cconf.Webhooks, share.UserCreated, acc); err != nil {
@@ -426,6 +435,25 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	//xff status
 	if rc.XffEnabled != nil {
 		cconf.XffEnabled = *rc.XffEnabled
+	}
+
+	//global network service status
+	if rc.NetServiceStatus != nil {
+		cconf.NetServiceStatus = *rc.NetServiceStatus
+	}
+	// global network service policy mode
+	if rc.NetServicePolicyMode != nil {
+		if *rc.NetServicePolicyMode == share.PolicyModeEnforce &&
+			licenseAllowEnforce() == false {
+			return errors.New("Invalid network service license for protect mode")
+		}
+		switch *rc.NetServicePolicyMode {
+		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+			cconf.NetServicePolicyMode = *rc.NetServicePolicyMode
+		default:
+			log.WithFields(log.Fields{"net_service_policy_mode": *rc.NetServicePolicyMode}).Error("Invalid network service policy mode")
+			return errors.New("Invalid network service policy mode")
+		}
 	}
 
 	// registry proxy

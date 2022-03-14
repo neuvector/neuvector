@@ -718,7 +718,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"4665644B", addAdmCtrlStateStatusUri},
 
-	{"2C05EB31", nil},
+	{"2C05EB31", createDefaultNetServiceSetting},
+
+	{"4C746652", nil},
 }
 
 func latestKVVersion() string {

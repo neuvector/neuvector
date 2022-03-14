@@ -208,6 +208,8 @@ type CacheInterface interface {
 	GetDlpRuleSensorGroupById(id uint32) (string, string, *[]string)
 	GetNewServicePolicyMode() string
 	GetUnusedGroupAging() uint8
+	GetNetServiceStatus() bool
+	GetNetServicePolicyMode() string
 
 	// Waf rule
 	GetAllWafSensors(acc *access.AccessControl) []*api.RESTWafSensor

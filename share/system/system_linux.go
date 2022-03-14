@@ -618,6 +618,11 @@ func (s *SystemTools) ContainerFilePath(pid int, path string) string {
 	return fmt.Sprintf("%s%d/root%s", s.procDir, pid, path)
 }
 
+func (s *SystemTools) IsContainerFile(pid int, path string) bool {
+	_, err := os.Stat(s.ContainerFilePath(pid, path))
+	return os.IsNotExist(err)
+}
+
 func (s *SystemTools) ReadContainerFile(filePath string, pid, start, length int) ([]byte, error) {
 	wholePath := s.ContainerFilePath(pid, filePath)
 
