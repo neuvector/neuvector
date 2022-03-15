@@ -200,6 +200,59 @@ func (d *kubernetes) Login(username, password string) (string, string, error) {
 	return username, access_token, nil
 }
 
+type OpenShiftUser struct {
+	Kind       string   `json:"kind"`
+	ApiVersion string   `json:"apiVersion"`
+	Groups     []string `json:"groups"`
+}
+
+func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
+	groups := make([]string, 0)
+
+	cfg := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	c := &http.Client{
+		Transport: cfg,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	url := fmt.Sprintf("%s/apis/user.openshift.io/v1/users/~", d.client.Endpoint)
+	r, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return groups, err
+	}
+
+	r.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.Do(r)
+	if err != nil {
+		return groups, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return groups, err
+	}
+
+	var user OpenShiftUser
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		log.WithFields(log.Fields{"body": body, "err": err}).Error("Unable convert body to json")
+		return groups, err
+	}
+
+	log.WithFields(log.Fields{"url": url, "user": user}).Debug("getPlatformUserGroups")
+	for _, group := range user.Groups {
+		groups = append(groups, group)
+	}
+
+	return groups, nil
+}
+
 func (d *kubernetes) Logout(username, token string) error {
 	if d.flavor != share.FlavorOpenShift {
 		return ErrMethodNotSupported
