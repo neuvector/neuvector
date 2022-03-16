@@ -815,11 +815,11 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	var rconf api.RESTSystemConfigConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
-	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil) {
+	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
-	} else if rconf.Config != nil {
+	} else if rconf.Config != nil || rconf.NetConfig != nil {
 		// rconf.Config takes higher priority than rconf.FedConfig
 		scope = share.ScopeLocal
 		dummy.CfgType = share.UserCreated
@@ -830,7 +830,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	var rc *api.RESTSystemConfigConfig
-	if scope == share.ScopeLocal {
+	if scope == share.ScopeLocal && rconf.Config != nil {
 		rc = rconf.Config
 		if rc.NewServicePolicyMode != nil && *rc.NewServicePolicyMode == share.PolicyModeEnforce &&
 			licenseAllowEnforce() == false {
@@ -853,6 +853,11 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 	}
 
+	var nc *api.RESTSysNetConfigConfig
+	if scope == share.ScopeLocal && rconf.NetConfig != nil {
+		nc = rconf.NetConfig
+	}
+
 	retry := 0
 	kick := false
 	for retry < retryClusterMax {
@@ -869,7 +874,32 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			return
 		}
 
-		if scope == share.ScopeLocal {
+		if scope == share.ScopeLocal && nc != nil {
+			//global network service status
+			if nc.NetServiceStatus != nil {
+				cconf.NetServiceStatus = *nc.NetServiceStatus
+			}
+
+			// global network service policy mode
+			if nc.NetServicePolicyMode != nil {
+				if *nc.NetServicePolicyMode == share.PolicyModeEnforce &&
+					licenseAllowEnforce() == false {
+					restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+					return
+				}
+				switch *nc.NetServicePolicyMode {
+				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+					cconf.NetServicePolicyMode = *nc.NetServicePolicyMode
+				default:
+					e := "Invalid network service policy mode"
+					log.WithFields(log.Fields{"net_service_policy_mode": *nc.NetServicePolicyMode}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				}
+			}
+		}
+
+		if scope == share.ScopeLocal && rc != nil {
 			// Cluster name is read-only if the cluster is in fed
 			if rc.ClusterName != nil {
 				var newName string
@@ -1116,29 +1146,6 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 				cconf.XffEnabled = *rc.XffEnabled
 			}
 
-			//global network service status
-			if rc.NetServiceStatus != nil {
-				cconf.NetServiceStatus = *rc.NetServiceStatus
-			}
-
-			// global network service policy mode
-			if rc.NetServicePolicyMode != nil {
-				if *rc.NetServicePolicyMode == share.PolicyModeEnforce &&
-					licenseAllowEnforce() == false {
-					restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-					return
-				}
-				switch *rc.NetServicePolicyMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NetServicePolicyMode = *rc.NetServicePolicyMode
-				default:
-					e := "Invalid network service policy mode"
-					log.WithFields(log.Fields{"net_service_policy_mode": *rc.NetServicePolicyMode}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				}
-			}
-
 			// registry proxy
 			if rc.RegistryHttpProxy != nil {
 				if rc.RegistryHttpProxy.URL != "" {
@@ -1199,7 +1206,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
 				}
 			}
-		} else {
+		} else if scope == share.ScopeFed  && rconf.FedConfig != nil {
 			// webhook for fed system config
 			if rconf.FedConfig.Webhooks != nil {
 				if webhooks, errCode, err := configWebhooks(nil, rconf.FedConfig.Webhooks, cconf.Webhooks, share.FederalCfg, acc); err != nil {
