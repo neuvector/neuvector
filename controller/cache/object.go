@@ -1411,7 +1411,7 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 }
 
 func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	value, _ = kv.UpgradeAndConvert(key, value)
+	value, _, _ = kv.UpgradeAndConvert(key, value)
 
 	config := share.CLUSConfigKey2Config(key)
 

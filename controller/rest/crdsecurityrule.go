@@ -153,6 +153,9 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 			h.crdDeleteRules(gw.Rules)
 			h.crdHandleGroupRecordDel(gw, gw.Groups, false)
 			h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, gw.ProfileName)
+		case resource.NvDlpSecurityRuleKind:
+			deleteDlpSensor(nil, gw.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil)
+			h.crdDeleteRecord(k8sKind, recordName)
 		case resource.NvWafSecurityRuleKind:
 			deleteWafSensor(nil, gw.WafSensor, share.ReviewTypeCRD, true, h.acc, nil)
 			h.crdDeleteRecord(k8sKind, recordName)
@@ -166,10 +169,10 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targetGroup string) ([]string, bool) {
 	// record the groups in a new record, then later compare with cached record to add/del
 	var groupAdded []string
-	var targetGroupWAF bool
+	var targetGroupDlpWAF bool
 	for _, group := range groups {
 		if group.Name == api.LearnedExternal {
-			// for node/external just add to list without create, remove "nodes"
+			// for 'external' group, just add to list without create
 			continue
 		} else if group.Name == api.AllHostGroup {
 			cg, _, err := clusHelper.GetGroup(group.Name, h.acc)
@@ -282,12 +285,12 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 			}
 			groupAdded = append(groupAdded, group.Name)
 			if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
-				targetGroupWAF = true
+				targetGroupDlpWAF = true
 			}
 		}
 	}
 
-	return groupAdded, targetGroupWAF
+	return groupAdded, targetGroupDlpWAF
 }
 
 func (h *nvCrdHandler) crdDeleteRules(delRules map[string]uint32) {
@@ -372,6 +375,7 @@ func (h *nvCrdHandler) crdDeleteGroup(delGroup []string) {
 		}
 		kv.DeletePolicyByGroup(name)
 		kv.DeleteResponseRuleByGroup(name)
+		clusHelper.DeleteDlpGroup(name)
 		clusHelper.DeleteWafGroup(name)
 		if err := clusHelper.DeleteGroup(name); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error()
@@ -397,6 +401,14 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 		}
 		clusHelper.PutGroupTxn(txn, cg)
 
+		dlpGroup := clusHelper.GetDlpGroup(name)
+		if dlpGroup == nil {
+			log.WithFields(log.Fields{"name": name}).Error("DLP group doesn't exist")
+			continue
+		}
+		dlpGroup.CfgType = share.UserCreated
+		clusHelper.PutDlpGroupTxn(txn, dlpGroup)
+
 		wafGroup := clusHelper.GetWafGroup(name)
 		if wafGroup == nil {
 			log.WithFields(log.Fields{"name": name}).Error("WAF group doesn't exist")
@@ -404,6 +416,33 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 		}
 		wafGroup.CfgType = share.UserCreated
 		clusHelper.PutWafGroupTxn(txn, wafGroup)
+	}
+
+	txn.Apply()
+}
+
+func (h *nvCrdHandler) crdUpdateDlpSensors() {
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	defSensor := clusHelper.GetDlpSensor(share.CLUSDlpDefaultSensor)
+	if defSensor != nil {
+		var modified bool
+		for _, rule := range defSensor.RuleList {
+			if rule.CfgType == share.GroundCfg {
+				rule.CfgType = share.UserCreated
+				modified = true
+			}
+		}
+		if modified {
+			clusHelper.PutDlpSensorTxn(txn, defSensor)
+		}
+	}
+	for _, sensor := range clusHelper.GetAllDlpSensors() {
+		if sensor.CfgType == share.GroundCfg {
+			sensor.CfgType = share.UserCreated
+			clusHelper.PutDlpSensorTxn(txn, sensor)
+		}
 	}
 
 	txn.Apply()
@@ -1131,6 +1170,77 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 	return nil
 }
 
+func (h *nvCrdHandler) crdHandleDlpGroup(dlpGroupCfg *api.RESTCrdDlpGroupConfig, cfgType share.TCfgType) []string {
+	if dlpGroupCfg != nil && dlpGroupCfg.RepSensors != nil {
+		sensors := make([]string, 0, len(*dlpGroupCfg.RepSensors))
+		settings := make([]*share.CLUSDlpSetting, 0, len(*dlpGroupCfg.RepSensors))
+		for _, setting := range *dlpGroupCfg.RepSensors {
+			sensors = append(sensors, setting.Name)
+			settings = append(settings, &share.CLUSDlpSetting{
+				Name:   setting.Name,
+				Action: setting.Action,
+			})
+		}
+		dlpGroup := &share.CLUSDlpGroup{
+			Name:    dlpGroupCfg.Name,
+			Sensors: settings,
+			CfgType: cfgType,
+		}
+		if dlpGroupCfg.Status != nil {
+			dlpGroup.Status = *dlpGroupCfg.Status
+		}
+
+		clusHelper.PutDlpGroup(dlpGroup, false)
+		return sensors
+	}
+	return nil
+}
+
+// caller must own CLUSLockPolicyKey lock
+func (h *nvCrdHandler) crdHandleDlpSensor(scope string, dlpSensorConf *api.RESTDlpSensorConfig,
+	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
+
+	var err error
+	var comment string
+	var ruleList []api.RESTDlpRule
+	var cfgType share.TCfgType = share.GroundCfg
+
+	if reviewType == share.ReviewTypeImportDLP {
+		cfgType = share.UserCreated
+	}
+	if dlpSensorConf.Comment != nil {
+		comment = *dlpSensorConf.Comment
+	}
+
+	conf := &api.RESTDlpSensorConfig{
+		Name:    dlpSensorConf.Name,
+		Rules:   &ruleList,
+		Comment: &comment,
+	}
+
+	if dlpSensorConf.Rules == nil || len(*dlpSensorConf.Rules) == 0 {
+		ruleList = make([]api.RESTDlpRule, 0)
+	} else {
+		ruleList = make([]api.RESTDlpRule, len(*dlpSensorConf.Rules))
+		for idx, ruleConf := range *dlpSensorConf.Rules {
+			ruleList[idx] = api.RESTDlpRule{
+				Name:     ruleConf.Name,
+				Patterns: ruleConf.Patterns,
+				CfgType:  cfgTypeMap2Api[cfgType],
+			}
+		}
+	}
+	conf.Rules = &ruleList
+	sensor := clusHelper.GetDlpSensor(dlpSensorConf.Name)
+	if sensor == nil {
+		err = createDlpSensor(nil, conf, cfgType)
+	} else {
+		err = updateDlpSensor(nil, conf, reviewType, sensor)
+	}
+
+	return err
+}
+
 func (h *nvCrdHandler) crdHandleWafGroup(wafGroupCfg *api.RESTCrdWafGroupConfig, cfgType share.TCfgType) []string {
 	if wafGroupCfg != nil && wafGroupCfg.RepSensors != nil {
 		sensors := make([]string, 0, len(*wafGroupCfg.RepSensors))
@@ -1267,7 +1377,7 @@ func groupNameHashFromCriteria(gCriteria []api.RESTCriteriaEntry, reviewType sha
 */
 
 func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGroups *[]api.RESTCrdGroupConfig, recordName string,
-	reviewType share.TReviewType, reviewTypeDisplay string) (string, int) {
+	crdCfgRet *resource.NvSecurityParse, reviewType share.TReviewType, reviewTypeDisplay string) (string, int) {
 
 	var err int
 	var retMsg string
@@ -1326,8 +1436,8 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 			if err, msg, hasAddrCT := validateGroupConfigCriteria(groupCfg, access.NewAdminAccessControl()); err > 0 {
 				retMsg = fmt.Sprintf("%s Rule format error:   Group %s validate error %s", reviewTypeDisplay, groupCfg.Name, msg)
 				return retMsg, err
-			} else if hasAddrCT {
-				retMsg = fmt.Sprintf("%s Rule format error:   Group %s with address criterion cannot have WAF policy", reviewTypeDisplay, groupCfg.Name)
+			} else if hasAddrCT && crdCfgRet != nil && (crdCfgRet.DlpGroupCfg != nil || crdCfgRet.WafGroupCfg != nil) {
+				retMsg = fmt.Sprintf("%s Rule format error:   Group %s with address criterion cannot have DLP/WAF policy", reviewTypeDisplay, groupCfg.Name)
 				return retMsg, 1
 			}
 		}
@@ -1606,13 +1716,24 @@ func (h *nvCrdHandler) validateCrdFileRules(rules []*api.RESTFileMonitorFilter) 
 
 }
 
-func (h *nvCrdHandler) validateCrdWafGroup(spec *resource.NvSecurityRuleSpec) (string, int) {
+func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec) (string, int) {
 	var errCnt int
 	var buffer bytes.Buffer
 
-	if spec.WafGroup == nil {
-		spec.WafGroup = &resource.NvSecurityWafGroup{Settings: make([]api.RESTCrdWafGroupSetting, 0)}
-	} else {
+	if spec.DlpGroup != nil {
+		for _, s := range spec.DlpGroup.Settings {
+			if s.Name == share.CLUSDlpDefaultSensor {
+				buffer.WriteString(fmt.Sprintf(" validate error: cannot use reserved sensor name%s \n", s.Name))
+				errCnt++
+			}
+			if s.Action != share.PolicyActionAllow && s.Action != share.PolicyActionDeny {
+				buffer.WriteString(fmt.Sprintf(" validate error: action %s \n", s.Action))
+				errCnt++
+			}
+		}
+	}
+
+	if spec.WafGroup != nil {
 		for _, s := range spec.WafGroup.Settings {
 			if s.Name == share.CLUSWafDefaultSensor {
 				buffer.WriteString(fmt.Sprintf(" validate error: cannot use reserved sensor name%s \n", s.Name))
@@ -1661,8 +1782,30 @@ func (h *nvCrdHandler) parseCurCrdContent(gfwrule *resource.NvSecurityRule, revi
 		recordName = gfwrule.Spec.Target.Selector.Name
 	}
 
-	// 1. Get the target group and do validation. crdCfgRet.GroupCfgs collects all the mentioned groups in this security rule.
-	errMsg, errNo = h.parseCrdGroup(&gfwrule.Spec.Target.Selector, &crdCfgRet.GroupCfgs, recordName, reviewType, reviewTypeDisplay)
+	// 1. Get the DLP/WAF group settings
+	errMsg, errNo = h.validateCrdDlpWafGroup(&gfwrule.Spec)
+	if errNo > 0 {
+		buffer.WriteString(errMsg)
+		errCount += errNo
+	} else {
+		if gfwrule.Spec.DlpGroup != nil {
+			crdCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{
+				Name:       crdCfgRet.TargetName,
+				Status:     &gfwrule.Spec.DlpGroup.Status,
+				RepSensors: &gfwrule.Spec.DlpGroup.Settings,
+			}
+		}
+		if gfwrule.Spec.WafGroup != nil {
+			crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{
+				Name:       crdCfgRet.TargetName,
+				Status:     &gfwrule.Spec.WafGroup.Status,
+				RepSensors: &gfwrule.Spec.WafGroup.Settings,
+			}
+		}
+	}
+
+	// 2. Get the target group and do validation. crdCfgRet.GroupCfgs collects all the mentioned groups in this security rule.
+	errMsg, errNo = h.parseCrdGroup(&gfwrule.Spec.Target.Selector, &crdCfgRet.GroupCfgs, recordName, &crdCfgRet, reviewType, reviewTypeDisplay)
 	if errNo > 0 {
 		errCount++
 		return nil, errCount, errMsg, recordName
@@ -1723,9 +1866,9 @@ targetpass:
 	}
 	//Pare target group done.
 
-	// 2. Get the ingress policy and From Group, the target group will be used as To Group
+	// 3. Get the ingress policy and From Group, the target group will be used as To Group
 	for _, ruleDetail := range gfwrule.Spec.IngressRule {
-		errMsg, errNo = h.parseCrdGroup(&ruleDetail.Selector, &crdCfgRet.GroupCfgs, recordName, reviewType, reviewTypeDisplay)
+		errMsg, errNo = h.parseCrdGroup(&ruleDetail.Selector, &crdCfgRet.GroupCfgs, recordName, nil, reviewType, reviewTypeDisplay)
 		if errNo > 0 {
 			errCount++
 			return nil, errCount, errMsg, recordName
@@ -1744,9 +1887,9 @@ targetpass:
 		crdCfgRet.RuleCfgs = append(crdCfgRet.RuleCfgs, ruleCfg)
 	}
 
-	// 3. Get the egress policy and To Group, the target group will be used as From Group
+	// 4. Get the egress policy and To Group, the target group will be used as From Group
 	for _, ruleDetail := range gfwrule.Spec.EgressRule {
-		errMsg, errNo = h.parseCrdGroup(&ruleDetail.Selector, &crdCfgRet.GroupCfgs, recordName, reviewType, reviewTypeDisplay)
+		errMsg, errNo = h.parseCrdGroup(&ruleDetail.Selector, &crdCfgRet.GroupCfgs, recordName, nil, reviewType, reviewTypeDisplay)
 		if errNo > 0 {
 			errCount++
 			return nil, errCount, errMsg, recordName
@@ -1765,7 +1908,7 @@ targetpass:
 		crdCfgRet.RuleCfgs = append(crdCfgRet.RuleCfgs, ruleCfg)
 	}
 
-	// importing process and file profiles
+	// 5. Get process and file profiles
 	if gfwrule.Spec.Target.Selector.Name != "" && utils.HasGroupProfiles(gfwrule.Spec.Target.Selector.Name) {
 		// Process profile
 		mode := "" // user-created group
@@ -1841,19 +1984,6 @@ targetpass:
 			}
 		}
 		crdCfgRet.FileProfileCfg = &fprofile
-	}
-
-	// 4. Get the WAF group settings
-	errMsg, errNo = h.validateCrdWafGroup(&gfwrule.Spec)
-	if errNo > 0 {
-		buffer.WriteString(errMsg)
-		errCount += errNo
-	} else {
-		crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{
-			Name:       crdCfgRet.TargetName,
-			Status:     &gfwrule.Spec.WafGroup.Status,
-			RepSensors: &gfwrule.Spec.WafGroup.Settings,
-		}
 	}
 
 	return &crdCfgRet, errCount, buffer.String(), recordName
@@ -2029,6 +2159,74 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 	return crdCfgRet, errCount, buffer.String(), recordName
 }
 
+// for CRD DLP sensor import
+func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityRule, reviewType share.TReviewType,
+	reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
+
+	if dlpSecRule == nil || dlpSecRule.Metadata == nil || dlpSecRule.Metadata.Name == nil {
+		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
+		return nil, 1, errMsg, ""
+	}
+
+	var cfgType string = api.CfgTypeUserCreated
+	if reviewType == share.ReviewTypeCRD {
+		cfgType = api.CfgTypeGround
+	}
+
+	var buffer bytes.Buffer
+	errCount := 0
+	crdCfgRet := &resource.NvSecurityParse{}
+	name := *dlpSecRule.Metadata.Name
+	recordName := fmt.Sprintf("%s-default-%s", *dlpSecRule.Kind, name)
+	if dlpSecRule.Spec.Sensor != nil {
+		sensor := dlpSecRule.Spec.Sensor
+		if sensor.Name != name {
+			errMsg := fmt.Sprintf("%s file format error:  mismatched name in sensor and metadata %s", reviewTypeDisplay, name)
+			return nil, 1, errMsg, recordName
+		}
+		if !isObjectNameValid(sensor.Name) {
+			errMsg := fmt.Sprintf("%s file format error:  invalid characters in name %s", reviewTypeDisplay, name)
+			return nil, 1, errMsg, recordName
+		}
+		if sensor.Name == share.CLUSDlpDefaultSensor || strings.HasPrefix(sensor.Name, api.FederalGroupPrefix) {
+			errMsg := fmt.Sprintf("%s file format error:   cannot create sensor with reserved name %s", reviewTypeDisplay, name)
+			return nil, 1, errMsg, recordName
+		}
+		if cs, _ := cacher.GetDlpSensor(sensor.Name, access.NewReaderAccessControl()); cs != nil && cs.Predefine {
+			errMsg := fmt.Sprintf("%s file format error:   cannot modify predefined sensor %s", reviewTypeDisplay, name)
+			return nil, 1, errMsg, recordName
+		}
+		if sensor.Comment != nil && len(*sensor.Comment) > api.DlpRuleCommentMaxLen {
+			errMsg := fmt.Sprintf("%s file format error:   comment exceed max %d characters!", reviewTypeDisplay, api.DlpRuleCommentMaxLen)
+			return nil, 1, errMsg, recordName
+		}
+
+		ruleList := make([]api.RESTDlpRule, len(sensor.RuleList))
+		for idx, rule := range sensor.RuleList {
+			ruleList[idx] = api.RESTDlpRule{
+				Name:     *rule.Name,
+				Patterns: rule.Patterns,
+				CfgType:  cfgType,
+			}
+		}
+		if err := validateDlpRuleConfig(ruleList); err != nil {
+			errMsg := fmt.Sprintf("%s file format error:  %s", reviewTypeDisplay, err.Error())
+			return nil, 1, errMsg, recordName
+		}
+		crdCfgRet.DlpSensorCfg = &api.RESTDlpSensorConfig{
+			Name:    sensor.Name,
+			Comment: sensor.Comment,
+			Rules:   &ruleList,
+		}
+	} else {
+		crdCfgRet.DlpSensorCfg = &api.RESTDlpSensorConfig{
+			Name: *dlpSecRule.Metadata.Name,
+		}
+	}
+
+	return crdCfgRet, errCount, buffer.String(), recordName
+}
+
 // for CRD WAF sensor import
 func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityRule, reviewType share.TReviewType,
 	reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
@@ -2108,7 +2306,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		}
 	}
 
-	groupNew, targetGroupWAF := h.crdHandleGroupsAdd(crdCfgRet.GroupCfgs, crdCfgRet.TargetName)
+	groupNew, targetGroupDlpWAF := h.crdHandleGroupsAdd(crdCfgRet.GroupCfgs, crdCfgRet.TargetName)
 	absentGroup := findAbsentGroups(crdRecord, groupNew)
 
 	h.crdHandleGroupRecordDel(crdRecord, absentGroup, false)
@@ -2129,7 +2327,8 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	ruleNew := h.crdHandleRules(crdCfgRet.RuleCfgs, crdRecord)
 	crdRecord.Groups = groupNew
 	crdRecord.Rules = *ruleNew
-	if targetGroupWAF {
+	if targetGroupDlpWAF {
+		crdRecord.DlpGroupSensors = h.crdHandleDlpGroup(crdCfgRet.DlpGroupCfg, share.GroundCfg)
 		crdRecord.WafGroupSensors = h.crdHandleWafGroup(crdCfgRet.WafGroupCfg, share.GroundCfg)
 	}
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
@@ -2157,6 +2356,22 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
 }
 
+// Process DLP sensor get from the crd. caller must own CLUSLockPolicyKey lock
+func (h *nvCrdHandler) crdDlpSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string) {
+	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
+	if crdRecord == nil {
+		crdRecord = &share.CLUSCrdSecurityRule{
+			Name:      recordName,
+			DlpSensor: crdCfgRet.DlpSensorCfg.Name,
+		}
+	}
+
+	log.WithFields(log.Fields{"name": recordName}).Debug()
+	// handle dlp part of crd (dlp sensor definition, not per-group's sensors association)
+	h.crdHandleDlpSensor(share.ScopeLocal, crdCfgRet.DlpSensorCfg, crdRecord, share.ReviewTypeCRD)
+	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+}
+
 // Process WAF sensor get from the crd. caller must own CLUSLockPolicyKey lock
 func (h *nvCrdHandler) crdWafSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string) {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
@@ -2179,6 +2394,7 @@ func (h *nvCrdHandler) parseCrdContent(raw []byte) (*resource.NvSecurityParse, i
 	var secRulePartial resource.NvSecurityRulePartial
 	var gfwrule resource.NvSecurityRule
 	var admCtrlSecRule resource.NvAdmCtrlSecurityRule
+	var dlpSecRule resource.NvDlpSecurityRule
 	var wafSecRule resource.NvWafSecurityRule
 	var buffer bytes.Buffer
 	var errMsg, recordName string
@@ -2195,6 +2411,8 @@ func (h *nvCrdHandler) parseCrdContent(raw []byte) (*resource.NvSecurityParse, i
 				err = json.Unmarshal(raw, &gfwrule)
 			case resource.NvAdmCtrlSecurityRuleKind:
 				err = json.Unmarshal(raw, &admCtrlSecRule)
+			case resource.NvDlpSecurityRuleKind:
+				err = json.Unmarshal(raw, &dlpSecRule)
 			case resource.NvWafSecurityRuleKind:
 				err = json.Unmarshal(raw, &wafSecRule)
 			default:
@@ -2215,6 +2433,8 @@ func (h *nvCrdHandler) parseCrdContent(raw []byte) (*resource.NvSecurityParse, i
 			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 		case resource.NvAdmCtrlSecurityRuleKind:
 			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdAdmCtrlContent(&admCtrlSecRule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+		case resource.NvDlpSecurityRuleKind:
+			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdDlpContent(&dlpSecRule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 		case resource.NvWafSecurityRuleKind:
 			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdWafContent(&wafSecRule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 		}
@@ -2231,6 +2451,8 @@ func (h *nvCrdHandler) parseCrdContent(raw []byte) (*resource.NvSecurityParse, i
 			err1 = global.ORCH.DeleteResource(resource.RscTypeCrdClusterSecurityRule, &r)
 		case resource.NvAdmCtrlSecurityRuleKind:
 			err1 = global.ORCH.DeleteResource(resource.RscTypeCrdAdmCtrlSecurityRule, &admCtrlSecRule)
+		case resource.NvDlpSecurityRuleKind:
+			err1 = global.ORCH.DeleteResource(resource.RscTypeCrdDlpSecurityRule, &dlpSecRule)
 		case resource.NvWafSecurityRuleKind:
 			err1 = global.ORCH.DeleteResource(resource.RscTypeCrdWafSecurityRule, &wafSecRule)
 		}
@@ -2266,6 +2488,9 @@ func (h *nvCrdHandler) crdGFwRuleHandler(req *admissionv1beta1.AdmissionRequest)
 				h.crdDeleteAdmCtrlRules()
 				setAdmCtrlStateInCluster(nil, nil, nil, nil, nil, share.UserCreated)
 				h.crdDeleteRecord(req.Kind.Kind, recordName)
+			case resource.NvDlpSecurityRuleKind:
+				deleteDlpSensor(nil, crdRecord.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil)
+				h.crdDeleteRecord(req.Kind.Kind, recordName)
 			case resource.NvWafSecurityRuleKind:
 				deleteWafSensor(nil, crdRecord.WafSensor, share.ReviewTypeCRD, true, h.acc, nil)
 				h.crdDeleteRecord(req.Kind.Kind, recordName)
@@ -2298,6 +2523,8 @@ func (h *nvCrdHandler) crdGFwRuleHandler(req *admissionv1beta1.AdmissionRequest)
 				if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
 					h.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName)
 				}
+			case resource.NvDlpSecurityRuleKind:
+				h.crdDlpSensorRecord(crdCfgRet, kind, recordName)
 			case resource.NvWafSecurityRuleKind:
 				h.crdWafSensorRecord(crdCfgRet, kind, recordName)
 			default:
@@ -2474,8 +2701,8 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 			exportFileRule(gname, &(resptmp.Spec), acc)
 		}
 
-		// export group's waf data
-		exportWafGroup(gname, &(resptmp.Spec), acc)
+		// export group's dlp/waf data
+		exportDlpWafGroup(gname, &resptmp, acc)
 
 		for _, idx := range group.PolicyRules {
 			if policy_ids.Contains(idx) {
@@ -2615,14 +2842,31 @@ func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *acces
 			}
 		}
 		return true
+	} else {
+		log.WithFields(log.Fields{"name": group, "err": err}).Error()
 	}
 
-	log.WithFields(log.Fields{"name": group}).Debug("failed")
 	return false
 }
 
-func exportWafGroup(group string, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *access.AccessControl) {
 	log.WithFields(log.Fields{"name": group}).Debug()
+	if dlpGroup, err := cacher.GetDlpGroup(group, acc); err == nil {
+		settings := make([]api.RESTCrdDlpGroupSetting, len(dlpGroup.Sensors))
+		for idx, s := range dlpGroup.Sensors {
+			settings[idx] = api.RESTCrdDlpGroupSetting{
+				Name:   s.Name,
+				Action: s.Action,
+			}
+		}
+		secRule.Spec.DlpGroup = &resource.NvSecurityDlpGroup{
+			Status:   dlpGroup.Status,
+			Settings: settings,
+		}
+	} else {
+		log.WithFields(log.Fields{"name": group, "err": err}).Error("dlp")
+	}
+
 	if wafGroup, err := cacher.GetWafGroup(group, acc); err == nil {
 		settings := make([]api.RESTCrdWafGroupSetting, len(wafGroup.Sensors))
 		for idx, s := range wafGroup.Sensors {
@@ -2631,15 +2875,13 @@ func exportWafGroup(group string, secRule *resource.NvSecurityRuleSpec, acc *acc
 				Action: s.Action,
 			}
 		}
-		secRule.WafGroup = &resource.NvSecurityWafGroup{
+		secRule.Spec.WafGroup = &resource.NvSecurityWafGroup{
 			Status:   wafGroup.Status,
 			Settings: settings,
 		}
-		return true
+	} else {
+		log.WithFields(log.Fields{"name": group, "err": err}).Error("waf")
 	}
-
-	log.WithFields(log.Fields{"name": group}).Debug("failed")
-	return false
 }
 
 func (h *nvCrdHandler) crdReadyToDeleteProfiles(targetCrdName string, group *api.RESTGroup) bool {
@@ -2884,6 +3126,8 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		// In this way we are sure the final crd admission control rules are exactly what's configured in k8s
 		crdHandler.crdDeleteAdmCtrlRules()
 		setAdmCtrlStateInCluster(nil, nil, nil, nil, nil, share.UserCreated)
+	case resource.NvDlpSecurityRuleKind:
+		crdHandler.crdUpdateDlpSensors()
 	case resource.NvWafSecurityRuleKind:
 		crdHandler.crdUpdateWafSensors()
 	}
@@ -2925,6 +3169,10 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 				r := obj.(*resource.NvAdmCtrlSecurityRule)
 				metadataName = *r.Metadata.Name
 				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdAdmCtrlContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+			case resource.NvDlpSecurityRuleKind:
+				r := obj.(*resource.NvDlpSecurityRule)
+				metadataName = *r.Metadata.Name
+				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdDlpContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 			case resource.NvWafSecurityRuleKind:
 				r := obj.(*resource.NvWafSecurityRule)
 				metadataName = *r.Metadata.Name
@@ -2946,6 +3194,8 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 					if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
 						crdHandler.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordname)
 					}
+				case resource.NvDlpSecurityRuleKind:
+					crdHandler.crdDlpSensorRecord(crdCfgRet, kind, recordname)
 				case resource.NvWafSecurityRuleKind:
 					crdHandler.crdWafSensorRecord(crdCfgRet, kind, recordname)
 				}

@@ -1892,14 +1892,12 @@ func (m CacheMethod) SetNvDeployStatusInCluster(resName string, value bool) {
 		if state == nil {
 			return
 		}
-		if v, exist := state.NvDeployStatus[resName]; exist && v != value {
+		if v, exist := state.NvDeployStatus[resName]; !exist || v != value {
 			state.NvDeployStatus[resName] = value
 			// we should be notified by consul watcher and update cache in the handler function
 			if err := clusHelper.PutAdmissionStateRev(resource.NvAdmSvcName, state, rev); err == nil {
 				return
 			}
-		} else {
-			return
 		}
 		retry++
 	}

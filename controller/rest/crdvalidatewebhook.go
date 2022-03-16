@@ -20,7 +20,8 @@ func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
 	req := ar.Request
 
 	switch req.Kind.Kind {
-	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind, resource.NvAdmCtrlSecurityRuleKind, resource.NvWafSecurityRuleKind:
+	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind, resource.NvAdmCtrlSecurityRuleKind,
+		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind:
 		h.crdGFwRuleHandler(req)
 	}
 	return

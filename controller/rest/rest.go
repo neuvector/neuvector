@@ -1293,6 +1293,8 @@ func StartRESTServer() {
 	r.POST("/v1/file/group/config", handlerGroupCfgImport)    // for providing similar function as crd import but do not rely on crd webhook. supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/admission", handlerAdmCtrlExport)        // supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/admission/config", handlerAdmCtrlImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/dlp", handlerDlpExport)                  // supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/dlp/config", handlerDlpImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
 	r.POST("/v1/file/waf", handlerWafExport)                  // supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/waf/config", handlerWafImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
 	r.GET("/v1/internal/system", handlerInternalSystem)       // skip API document
