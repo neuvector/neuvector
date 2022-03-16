@@ -63,7 +63,8 @@ type ResourceDriver interface {
 	AddResource(rt string, res interface{}) error
 	UpdateResource(rt string, res interface{}) error
 	DeleteResource(rt string, res interface{}) error
-	SetFlavor(flavor string) error // only for Rancher
+	SetFlavor(flavor string) error                        // only for Rancher
+	GetPlatformUserGroups(token string) ([]string, error) // for OpenShift
 }
 
 // --
