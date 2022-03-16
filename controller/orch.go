@@ -5,12 +5,12 @@ import (
 
 	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
 	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	log "github.com/sirupsen/logrus"
 )
 
 type orchConnInterface interface {
@@ -82,6 +82,10 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 				resource.NvAdmCtrlSecurityRuleName: &resource.NvCrdInfo{
 					LockKey:   share.CLUSLockAdmCtrlKey,
 					KvCrdKind: resource.NvAdmCtrlSecurityRuleKind,
+				},
+				resource.NvDlpSecurityRuleName: &resource.NvCrdInfo{
+					LockKey:   share.CLUSLockPolicyKey,
+					KvCrdKind: resource.NvDlpSecurityRuleKind,
 				},
 				resource.NvWafSecurityRuleName: &resource.NvCrdInfo{
 					LockKey:   share.CLUSLockPolicyKey,
@@ -167,6 +171,7 @@ func (c *orchConn) Start() {
 		resource.RscTypeCrdSecurityRule,
 		resource.RscTypeCrdClusterSecurityRule,
 		resource.RscTypeCrdAdmCtrlSecurityRule,
+		resource.RscTypeCrdDlpSecurityRule,
 		resource.RscTypeCrdWafSecurityRule,
 	}
 	for _, r := range rscTypes {
@@ -175,7 +180,7 @@ func (c *orchConn) Start() {
 		}
 	}
 
-    if regImage {
+	if regImage {
 		r = resource.RscTypeImage
 		if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
 			log.WithFields(log.Fields{"watch": r, "error": err}).Error("")

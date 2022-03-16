@@ -174,6 +174,13 @@ var nvClusterRoles map[string]*k8sClusterRoleInfo = map[string]*k8sClusterRoleIn
 			verbs:     crdPolicyRoleVerbs,
 		},
 	}},
+	NvCrdDlpRole: &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
+		&k8sClusterRoleRuleInfo{
+			apiGroup:  "neuvector.com",
+			resources: utils.NewSet(RscTypeCrdDlpSecurityRule),
+			verbs:     crdPolicyRoleVerbs,
+		},
+	}},
 	NvCrdWafRole: &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
 		&k8sClusterRoleRuleInfo{
 			apiGroup:  "neuvector.com",
@@ -190,6 +197,7 @@ var nvClusterRoleBindings map[string]string = map[string]string{ // rolebindings
 	NvCrdRoleBinding:        NvCrdRole,
 	NvCrdSecRoleBinding:     NvCrdSecRuleRole,
 	NvCrdAdmCtrlRoleBinding: NvCrdAdmCtrlRole,
+	NvCrdDlpRoleBinding:     NvCrdDlpRole,
 	NvCrdWafRoleBinding:     NvCrdWafRole,
 	NvViewRoleBinding:       "view",
 }
@@ -1359,7 +1367,7 @@ func VerifyNvK8sRBAC(flavor string, existOnly bool) ([]string, []string, []strin
 
 	var k8sRbac403 bool
 	k8sClusterRoleBindings := []string{NvRbacRoleBinding, NvAppRoleBinding, NvAdmCtrlRoleBinding,
-		NvCrdRoleBinding, NvCrdSecRoleBinding, NvCrdAdmCtrlRoleBinding, NvCrdWafRoleBinding}
+		NvCrdRoleBinding, NvCrdSecRoleBinding, NvCrdAdmCtrlRoleBinding, NvCrdDlpRoleBinding, NvCrdWafRoleBinding}
 	if flavor == share.FlavorOpenShift {
 		k8sClusterRoleBindings = append(k8sClusterRoleBindings, NvOperatorsRoleBinding)
 	}

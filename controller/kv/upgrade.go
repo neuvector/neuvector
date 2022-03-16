@@ -210,7 +210,7 @@ func upgradeRegistry(cfg *share.CLUSRegistryConfig) (bool, bool) {
 	return upd, false
 }
 
-func upgradeAdmCtrlState(state *share.CLUSAdmissionState) (bool, bool) {
+func upgradeAdmCtrlState(config string, state *share.CLUSAdmissionState) (bool, bool) {
 	var upd bool
 	if state.DefaultAction == "" {
 		state.DefaultAction = share.AdmCtrlActionAllow
@@ -220,28 +220,35 @@ func upgradeAdmCtrlState(state *share.CLUSAdmissionState) (bool, bool) {
 		state.AdmClientMode = share.AdmClientModeSvc
 		upd = true
 	}
-	if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
-		if ctrlState.Uri != "" && ctrlState.NvStatusUri == "" {
-			ss := strings.Split(ctrlState.Uri, "/")
-			if len(ss) >= 3 && ss[2] == admission.NvAdmValidateType {
-				ss[2] = admission.UriAdmCtrlNvStatus
-				ctrlState.NvStatusUri = strings.Join(ss, "/")
-				upd = true
+	svcName := resource.NvCrdSvcName
+	if config == share.CFGEndpointAdmissionControl {
+		svcName = resource.NvAdmSvcName
+		if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
+			if ctrlState.Uri != "" && ctrlState.NvStatusUri == "" {
+				ss := strings.Split(ctrlState.Uri, "/")
+				if len(ss) >= 3 && ss[2] == admission.NvAdmValidateType {
+					ss[2] = admission.UriAdmCtrlNvStatus
+					ctrlState.NvStatusUri = strings.Join(ss, "/")
+					upd = true
+				}
 			}
 		}
+	}
+	svcFound := false
+	if _, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, svcName); err == nil {
+		// state.NvDeployStatus[svcName] = true
+		svcFound = true
 	}
 	if len(state.NvDeployStatus) == 0 {
 		state.NvDeployStatus = map[string]bool{
 			resource.NvDeploymentName: true,
-			resource.NvAdmSvcName:     false,
-			resource.NvCrdSvcName:     false,
+			svcName:                   false,
 		}
-		for _, name := range []string{resource.NvAdmSvcName, resource.NvCrdSvcName} {
-			if _, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, name); err == nil {
-				state.NvDeployStatus[name] = true
-				upd = true
-			}
-		}
+		upd = true
+	}
+	if status, ok := state.NvDeployStatus[svcName]; !ok || status != svcFound {
+		state.NvDeployStatus[svcName] = svcFound
+		upd = true
 	}
 	if state.CfgType == 0 {
 		state.CfgType = share.UserCreated
@@ -464,7 +471,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 				if token == share.CLUSAdmissionCfgState {
 					var state share.CLUSAdmissionState
 					json.Unmarshal(value, &state)
-					if upd, wrt := upgradeAdmCtrlState(&state); upd {
+					if upd, wrt := upgradeAdmCtrlState(config, &state); upd {
 						return &state, wrt
 					}
 				} else {
@@ -536,9 +543,9 @@ func upgrade(key string, value []byte) ([]byte, error) {
 }
 
 // This is called whenever we read from kv store or get notified by kv changes.
-func UpgradeAndConvert(key string, value []byte) ([]byte, error) {
+func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	if len(value) == 0 {
-		return value, nil
+		return value, nil, false
 	}
 	var v interface{}
 	var wrt bool
@@ -550,7 +557,7 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error) {
 		uzb = utils.GunzipBytes(value)
 		if uzb == nil {
 			log.Error("Failed to unzip data")
-			return value, nil
+			return value, nil, false
 		} else {
 			v, wrt = doUpgrade(key, uzb)
 			unzipped = true
@@ -563,13 +570,19 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error) {
 		if !unzipped {
 			// Write back to the cluster if needed.
 			newv, _ := json.Marshal(v)
-			cluster.Put(key, newv)
+			if err := cluster.Put(key, newv); err != nil {
+				wrt = false
+			}
 		} else {
 			//need to zip rulelist before put to cluster
 			tmpv, _ := json.Marshal(v)
 			new_zb := utils.GzipBytes(tmpv)
-			cluster.PutBinary(key, new_zb)
+			if err := cluster.PutBinary(key, new_zb); err != nil {
+				wrt = false
+			}
 		}
+	} else {
+		wrt = false
 	}
 
 	object := share.CLUSObjectKey2Object(key)
@@ -626,13 +639,14 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error) {
 
 	if v == nil {
 		if !unzipped {
-			return value, nil
+			return value, nil, wrt
 		} else {
 			//return unzipped rulelist
-			return uzb, nil
+			return uzb, nil, wrt
 		}
 	} else {
-		return json.Marshal(v)
+		value, err := json.Marshal(v)
+		return value, err, wrt
 	}
 }
 
@@ -1478,6 +1492,9 @@ func upgradeWebhookConfig() {
 }
 
 func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
+	if len(cfg.Groups) == 1 && !utils.HasGroupProfiles(cfg.Groups[0]) {
+		return false, false
+	}
 	var upd bool
 	if cfg.ProcessProfile.Baseline != share.ProfileBasic && cfg.ProcessProfile.Baseline != share.ProfileZeroDrift {
 		cfg.ProcessProfile.Baseline = share.ProfileZeroDrift

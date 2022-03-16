@@ -201,10 +201,14 @@ type ClusterHelper interface {
 	ConfigFedRole(userName, role string, acc *access.AccessControl) error
 
 	GetDlpSensor(name string) *share.CLUSDlpSensor
+	GetAllDlpSensors() []*share.CLUSDlpSensor
 	PutDlpSensor(sensor *share.CLUSDlpSensor, create bool) error
+	PutDlpSensorTxn(txn *cluster.ClusterTransact, sensor *share.CLUSDlpSensor) error
 	DeleteDlpSensor(name string) error
+	DeleteDlpSensorTxn(txn *cluster.ClusterTransact, name string) error
 	GetDlpGroup(group string) *share.CLUSDlpGroup
 	PutDlpGroup(group *share.CLUSDlpGroup, create bool) error
+	PutDlpGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSDlpGroup) error
 	DeleteDlpGroup(group string) error
 
 	GetWafSensor(name string) *share.CLUSWafSensor
@@ -373,7 +377,10 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	if err != nil || value == nil {
 		return nil, rev, err
 	} else {
-		value, err = UpgradeAndConvert(key, value)
+		var wrt bool
+		if value, err, wrt = UpgradeAndConvert(key, value); wrt {
+			value, rev, err = cluster.GetRev(key)
+		}
 		return value, rev, err
 	}
 }
@@ -2097,6 +2104,20 @@ func (m clusterHelper) GetDlpSensor(sensor string) *share.CLUSDlpSensor {
 	return nil
 }
 
+func (m clusterHelper) GetAllDlpSensors() []*share.CLUSDlpSensor {
+	keys, _ := cluster.GetStoreKeys(share.CLUSConfigDlpRuleStore)
+	sensors := make([]*share.CLUSDlpSensor, 0, len(keys))
+	for _, key := range keys {
+		if value, _, _ := m.get(key); value != nil {
+			var sensor share.CLUSDlpSensor
+			json.Unmarshal(value, &sensor)
+			sensors = append(sensors, &sensor)
+		}
+	}
+
+	return sensors
+}
+
 func (m clusterHelper) PutDlpSensor(sensor *share.CLUSDlpSensor, create bool) error {
 	key := share.CLUSDlpRuleConfigKey(sensor.Name)
 	value, _ := json.Marshal(sensor)
@@ -2107,9 +2128,22 @@ func (m clusterHelper) PutDlpSensor(sensor *share.CLUSDlpSensor, create bool) er
 	}
 }
 
+func (m clusterHelper) PutDlpSensorTxn(txn *cluster.ClusterTransact, sensor *share.CLUSDlpSensor) error {
+	key := share.CLUSDlpRuleConfigKey(sensor.Name)
+	value, _ := json.Marshal(sensor)
+	txn.Put(key, value)
+	return nil
+}
+
 func (m clusterHelper) DeleteDlpSensor(sensor string) error {
 	key := share.CLUSDlpRuleConfigKey(sensor)
 	return cluster.Delete(key)
+}
+
+func (m clusterHelper) DeleteDlpSensorTxn(txn *cluster.ClusterTransact, name string) error {
+	key := share.CLUSDlpRuleConfigKey(name)
+	txn.Delete(key)
+	return nil
 }
 
 func (m clusterHelper) GetDlpGroup(group string) *share.CLUSDlpGroup {
@@ -2130,6 +2164,13 @@ func (m clusterHelper) PutDlpGroup(group *share.CLUSDlpGroup, create bool) error
 	} else {
 		return cluster.Put(key, value)
 	}
+}
+
+func (m clusterHelper) PutDlpGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSDlpGroup) error {
+	key := share.CLUSDlpGroupConfigKey(group.Name)
+	value, _ := json.Marshal(group)
+	txn.Put(key, value)
+	return nil
 }
 
 func (m clusterHelper) DeleteDlpGroup(group string) error {

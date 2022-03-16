@@ -2381,6 +2381,7 @@ type RESTDlpRule struct {
 	Name     string                 `json:"name"`
 	ID       uint32                 `json:"id"`
 	Patterns []RESTDlpCriteriaEntry `json:"patterns"`
+	CfgType  string                 `json:"cfg_type"`
 }
 
 type RESTDlpRuleDetail struct {
@@ -2434,6 +2435,7 @@ type RESTDlpSensor struct {
 	RuleList  []*RESTDlpRule `json:"rules"`
 	Comment   string         `json:"comment"`
 	Predefine bool           `json:"predefine"`
+	CfgType   string         `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
 }
 
 type RESTDlpSensorData struct {
@@ -2463,6 +2465,21 @@ type RESTDlpRuleConfig struct {
 
 type RESTDlpRuleConfigData struct {
 	Config *RESTDlpRuleConfig `json:"config"`
+}
+
+type RESTCrdDlpGroupSetting struct {
+	Name   string `json:"name"`
+	Action string `json:"action"`
+}
+
+type RESTCrdDlpGroupConfig struct {
+	Name       string                    `json:"name"`
+	Status     *bool                     `json:"status,omitempty"`
+	RepSensors *[]RESTCrdDlpGroupSetting `json:"replace,omitempty"` //replace list used by GUI
+}
+
+type RESTDlpSensorExport struct {
+	Names []string `json:"names"`
 }
 
 type RESTDerivedWorkloadDlpRule struct {

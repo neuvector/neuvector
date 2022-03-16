@@ -806,6 +806,8 @@ func CompileUriPermitsMapping() {
 				"v1/workload/request/*",
 				"v1/dlp/sensor",
 				"v1/waf/sensor",
+				"v1/file/dlp",
+				"v1/file/dlp/config",
 				"v1/file/waf",
 				"v1/file/waf/config",
 				"v1/system/request",

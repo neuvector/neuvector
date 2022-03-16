@@ -81,6 +81,8 @@ const (
 	NvCrdSecRoleBinding     = "neuvector-binding-nvsecurityrules"
 	NvCrdAdmCtrlRole        = "neuvector-binding-nvadmissioncontrolsecurityrules"
 	NvCrdAdmCtrlRoleBinding = "neuvector-binding-nvadmissioncontrolsecurityrules"
+	NvCrdDlpRole            = "neuvector-binding-nvdlpsecurityrules"
+	NvCrdDlpRoleBinding     = "neuvector-binding-nvdlpsecurityrules"
 	NvCrdWafRole            = "neuvector-binding-nvwafsecurityrules"
 	NvCrdWafRoleBinding     = "neuvector-binding-nvwafsecurityrules"
 	NvAdminRoleBinding      = "neuvector-admin"
@@ -220,7 +222,7 @@ var AdmResForOpsSettings = []NvAdmRegRuleSetting{
 	},
 }
 
-var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdWafSecurityRule)
+var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule)
 var CrdResForOpsSettings = []NvAdmRegRuleSetting{
 	NvAdmRegRuleSetting{
 		Operations: utils.NewSet(Create, Update, Delete),
@@ -431,6 +433,17 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvAdmCtrlSecurityRule) },
 				func() k8s.ResourceList { return new(NvAdmCtrlSecurityRuleList) },
 				xlateCrdAdmCtrlRule,
+			},
+		},
+	},
+	RscTypeCrdDlpSecurityRule: k8sResource{
+		apiGroup: "neuvector.com",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(NvDlpSecurityRule) },
+				func() k8s.ResourceList { return new(NvDlpSecurityRuleList) },
+				xlateCrdDlpSecurityRule,
 			},
 		},
 	},
@@ -790,6 +803,22 @@ func xlateCrdAdmCtrlRule(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
+func xlateCrdDlpSecurityRule(obj k8s.Resource) (string, interface{}) {
+	if o, ok := obj.(*NvDlpSecurityRule); ok {
+		if o.Metadata == nil {
+			return "", nil
+		}
+		meta := o.Metadata
+		r := &CRD{
+			UID:  meta.GetUid(),
+			Name: meta.GetName(),
+		}
+		return r.UID, o
+	}
+
+	return "", nil
+}
+
 func xlateCrdWafSecurityRule(obj k8s.Resource) (string, interface{}) {
 	if o, ok := obj.(*NvWafSecurityRule); ok {
 		if o.Metadata == nil {
@@ -965,8 +994,15 @@ func (d *kubernetes) RegisterResource(rt string) error {
 
 		_, err := d.discoverResource(rt)
 		return err
+	case RscTypeCrdDlpSecurityRule:
+		d.lock.Lock()
+		k8s.Register("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRule{})
+		k8s.RegisterList("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRuleList{})
+		d.lock.Unlock()
+
+		_, err := d.discoverResource(rt)
+		return err
 	case RscTypeCrdWafSecurityRule:
-		log.WithFields(log.Fields{"resource": rt}).Debug("2001")
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRuleList{})
@@ -1242,7 +1278,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
-		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdWafSecurityRule,
+		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
 		RscTypeNode:
 		return d.getResource(rt, namespace, name)
 	}
@@ -1355,7 +1391,8 @@ func (d *kubernetes) updateResource(rt string, res interface{}) error {
 func (d *kubernetes) DeleteResource(rt string, res interface{}) error {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
-	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdWafSecurityRule:
+	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule,
+		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule:
 		return d.deleteResource(rt, res)
 	}
 	return ErrResourceNotSupported
