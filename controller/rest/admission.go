@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -155,12 +155,13 @@ func setAdmCtrlStateInCluster(enable *bool, mode, defaultAction, admClientMode, 
 		}
 
 		origConf = &share.CLUSAdmissionState{
-			Enable:        cconf.Enable,
-			Mode:          cconf.Mode,
-			DefaultAction: cconf.DefaultAction,
-			AdmClientMode: cconf.AdmClientMode,
-			FailurePolicy: cconf.FailurePolicy,
-			CfgType:       cconf.CfgType,
+			Enable:         cconf.Enable,
+			Mode:           cconf.Mode,
+			DefaultAction:  cconf.DefaultAction,
+			AdmClientMode:  cconf.AdmClientMode,
+			FailurePolicy:  cconf.FailurePolicy,
+			NvDeployStatus: cconf.NvDeployStatus,
+			CfgType:        cconf.CfgType,
 		}
 		// we should be notified by consul watcher and update cache in the handler function
 		if enable != nil {
