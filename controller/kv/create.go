@@ -372,14 +372,11 @@ func CreateAdmCtrlStateByName(svcName string, enable bool) {
 		if len(state.NvDeployStatus) == 0 && svcName == resource.NvAdmSvcName {
 			state.NvDeployStatus = map[string]bool{
 				resource.NvDeploymentName: true,
-				resource.NvAdmSvcName:     false,
-				resource.NvCrdSvcName:     false,
+				svcName:                   false,
 			}
-			for _, name := range []string{resource.NvAdmSvcName, resource.NvCrdSvcName} {
-				if _, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, name); err == nil {
-					state.NvDeployStatus[name] = true
-					modified = true
-				}
+			if _, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, svcName); err == nil {
+				state.NvDeployStatus[svcName] = true
+				modified = true
 			}
 		}
 		if ctrlState == nil || ctrlState.Uri == "" {
