@@ -1759,6 +1759,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 
 	roles, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
+		log.WithFields(log.Fields{"user": pw.Username}).Debug("No role available for this user.")
 		roleDomains = make(map[string][]string)
 	} else {
 		for k, v := range roles {
@@ -1768,8 +1769,9 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 				allRoles[k] = v
 			}
 		}
-		role, roleDomains = rbac2UserRole(allRoles)
 	}
+
+	role, roleDomains = rbac2UserRole(allRoles)
 
 	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains)
 	if authz {
