@@ -59,7 +59,7 @@ func TestVulnerabilityProfile(t *testing.T) {
 		domains []string
 		image   string
 	}{
-		{api.RESTVulnerability{Name: "CVE-2021-YYYY", PublishedTS: time.Now().AddDate(0, 0, -10).Unix()}, nil, "nginx:3"},
+		{api.RESTVulnerability{Name: "CVE-2021-YYYY", PublishedTS: time.Now().AddDate(0, 0, -11).Unix()}, nil, "nginx:3"},
 		{api.RESTVulnerability{Name: "CVE-2021-YYYY", PublishedTS: time.Now().AddDate(0, 0, -5).Unix()}, nil, "alpine:3"},
 		{api.RESTVulnerability{Name: "CVE-2021-1234"}, []string{""}, ""},
 		{api.RESTVulnerability{Name: "CVE-2021-1234"}, []string{"dev-1"}, ""},
