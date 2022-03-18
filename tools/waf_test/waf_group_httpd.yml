@@ -1,0 +1,40 @@
+﻿apiVersion: v1
+items:
+- apiVersion: neuvector.com/v1
+  kind: NvSecurityRule
+  metadata:
+    name: httpdtest-group
+    namespace: httpdtest
+  spec:
+    egress: []
+    file: []
+    ingress: []
+    process: []
+    process_profile:
+      baseline: default
+    target:
+      policymode: N/A
+      selector:
+        comment: ""
+        criteria:
+        - key: domain
+          op: =
+          value: httpdtest
+        - key: service
+          op: =
+          value: httpd-deployment.httpdtest
+        name: httpdtest-group
+        original_name: ""
+    waf:
+      settings:
+      - action: deny
+        name: sensor.cross
+      - action: deny
+        name: sensor.execution
+      - action: deny
+        name: sensor.injection
+      - action: deny
+        name: sensor.traversal
+      status: true
+kind: List
+metadata: null

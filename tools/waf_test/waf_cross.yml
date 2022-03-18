@@ -1,0 +1,69 @@
+﻿apiVersion: v1
+items:
+- apiVersion: neuvector.com/v1
+  kind: NvWafSecurityRule
+  metadata:
+    name: sensor.cross
+  spec:
+    sensor:
+      comment: to detect cross site scripting attempt
+      name: sensor.cross
+      rules:
+      - name: mailman
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/mailman\/.*\?.*=.*script
+      - name: ApacheTomcatServlet
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/servlet.*\/org\.apache\.
+      - name: INDICATOR-COMPROMISE
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \x0aReferer\x3ares\x3a\/C\x3a
+      - name: LinuxFileServerCross
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: '[?&]scriptName=[^&]*?([\x22\x27\x3c\x3e\x28\x29]|script|onload|src)'
+      - name: LinuxFileServerRequestForgery
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/cgi-bin\/cgictl\?action=setTaskSettings
+        - context: body
+          key: pattern
+          op: regex
+          value: settings=.*
+        - context: body
+          key: pattern
+          op: regex
+          value: taskId=.*
+      - name: Macromedia
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/error\/500error\.jsp.*et=.*<script
+      - name: PHP-Wiki
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/modules\.php?.*name=Wiki.*<script
+      - name: javascript
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: img src=javascript
+kind: List
+metadata: null

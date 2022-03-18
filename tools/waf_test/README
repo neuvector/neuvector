@@ -1,0 +1,43 @@
+script in waf_test directory works on k8s cluster
+
+1. Copy whole waf_test directory to your k8s cluster's master node
+
+2. To set up WAF test environment from scratch run following inside your k8s cluster's master node
+
+./setup_waf_test.sh
+
+it creates following:
+#httpd service backend
+service/httpdtest-service created
+deployment.apps/httpd-deployment created
+
+#deploy WAF rules
+nvwafsecurityrule.neuvector.com/sensor.traversal created
+nvwafsecurityrule.neuvector.com/sensor.injection created
+nvwafsecurityrule.neuvector.com/sensor.cross created
+nvwafsecurityrule.neuvector.com/sensor.execution created
+nvsecurityrule.neuvector.com/httpdtest-group created
+
+#send attack traffic
+===>TEST Log4j
+===>TEST CCBill
+===>TEST formmail
+===>TEST SQLSleepFunction
+===>TEST WebcenterFatWireSatellite
+===>TEST HyperSeek
+===>TEST autohtml.php
+===>TEST anaconda
+===>TEST webplus
+===>TEST LinuxFileServerRequestForgery
+===>TEST mailman
+===>TEST ApacheTomcatServlet
+
+3. Monitor manager webportal's security event to verify attack is detected
+
+4. To demolish WAF test environment, run
+
+./rm_waf_test.sh
+
+5. To only send attack traffic, run
+
+./curl_waf_attack.sh IP Port

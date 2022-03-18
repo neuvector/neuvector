@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpdtest-service
+  namespace: httpdtest
+  labels:
+    app: httpd
+spec:
+  ports:
+    - port: 80
+      name: tcp-80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: httpd
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: httpd
+  name: httpd-deployment
+  namespace: httpdtest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpd
+  template:
+    metadata:
+      labels:
+        app: httpd
+    spec:
+      containers:
+        - image: httpd:latest
+          imagePullPolicy: IfNotPresent
+          name: httpd
+          ports:
+            - containerPort: 80
+              protocol: TCP
+#          resources:
+#	   requests:
+#              cpu: "1.0"
+#              memory: "1G"
+#            limits:
+#              cpu: "1.0"
+#              memory: "1G"
+

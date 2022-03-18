@@ -1,0 +1,73 @@
+﻿apiVersion: v1
+items:
+- apiVersion: neuvector.com/v1
+  kind: NvWafSecurityRule
+  metadata:
+    name: sensor.traversal
+  spec:
+    sensor:
+      comment: to detect directory traversal attempt
+      name: sensor.traversal
+      rules:
+      - name: HOMEDRIVE
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: '%HOMEDRIVE%'
+      - name: HOMEPATH
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: '%HOMEPATH%'
+      - name: autohtml.php
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/autohtml\.php.*\.\.\/\.\.\/
+      - name: yabb
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/YaBB.*\.\.\/
+      - name: Amaya
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/sendtemp\.pl.*templ=
+      - name: HyperSeek
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/hsx\.cgi.*\.\.\/\.\.\/
+      - name: anaconda
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/apexec\.pl.*template=\.\.\/
+      - name: technote
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/technote\/main\.cgi.*filename=.*\.\.\/\.\.\/
+      - name: webplus
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/webplus\?script.*\.\.\/
+      - name: webspirs.cgi
+        patterns:
+        - context: url
+          key: pattern
+          op: regex
+          value: \/webspirs\.cgi.*\.\.\/\.\.\/
+kind: List
+metadata: null
