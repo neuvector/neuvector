@@ -6,8 +6,8 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"math/rand"
+	"net"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -37,15 +37,15 @@ func forgeKVData() {
 		})
 
 		cg := &share.CLUSGroup{
-			Name:        "nv." + svc,
-			CfgType:     share.Learned,
-			Criteria:    criteria,
-			PolicyMode:  share.PolicyModeLearn,
-			ProfileMode: share.PolicyModeLearn,
-			Domain:      domain,
-			Kind:        share.GroupKindContainer,
-			CapIntcp:    true,
-			BaselineProfile: share.ProfileBasic,
+			Name:            "nv." + svc,
+			CfgType:         share.Learned,
+			Criteria:        criteria,
+			PolicyMode:      share.PolicyModeLearn,
+			ProfileMode:     share.PolicyModeLearn,
+			Domain:          domain,
+			Kind:            share.GroupKindContainer,
+			CapIntcp:        true,
+			BaselineProfile: share.ProfileZeroDrift, // for learned groups, default to zero-drift mode
 		}
 
 		if err := clusHelper.PutGroup(cg, true); err != nil {
@@ -89,6 +89,7 @@ func forgeKVData() {
 //of workloads per node(WLPERNODEMAX)
 const NODEMAX int = 600
 const WLPERNODEMAX int = 250
+
 var FAKEWLID string = "9321f8a6951c550e2d1634b32b859ed6ed167752b8a8552f95dad7eb33de8e2a"
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -100,10 +101,10 @@ func printOneGroupIPPolicyFake(p *share.CLUSGroupIPPolicy) {
 func StringWithCharset(length int, charset string) string {
 	b := make([]byte, length)
 	for i := range b {
-	  b[i] = charset[seededRand.Intn(len(charset))]
+		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
- }
+}
 
 func getDefaultGroupPolicyFake() share.CLUSGroupIPPolicy {
 	var gip [4]byte
@@ -113,13 +114,13 @@ func getDefaultGroupPolicyFake() share.CLUSGroupIPPolicy {
 		ID: share.DefaultGroupRuleID,
 	}
 
-	policy.From = make([]*share.CLUSWorkloadAddr, 0, NODEMAX * WLPERNODEMAX)
-	for i := 0; i < NODEMAX; i++ {//loop around node
+	policy.From = make([]*share.CLUSWorkloadAddr, 0, NODEMAX*WLPERNODEMAX)
+	for i := 0; i < NODEMAX; i++ { //loop around node
 		hip[0] = 10
 		hip[1] = 1
 		hip[2] = 6
-		hip[3] = byte(i%255)
-		for j := 0; j < WLPERNODEMAX; j++ {//loop around wl within a node
+		hip[3] = byte(i % 255)
+		for j := 0; j < WLPERNODEMAX; j++ { //loop around wl within a node
 			wlAddr := share.CLUSWorkloadAddr{
 				WlID: StringWithCharset(len(FAKEWLID), FAKEWLID),
 			}
@@ -147,20 +148,20 @@ func getDefaultGroupPolicyFake() share.CLUSGroupIPPolicy {
 }
 
 func CalculateIPPolicyFromCacheFake() []share.CLUSGroupIPPolicy {
-	groupIPPolicies := make([]share.CLUSGroupIPPolicy, 0, NODEMAX * WLPERNODEMAX+1)
+	groupIPPolicies := make([]share.CLUSGroupIPPolicy, 0, NODEMAX*WLPERNODEMAX+1)
 	groupIPPolicies = append(groupIPPolicies, getDefaultGroupPolicyFake())
 
 	var gip [4]byte
 	var hip [4]byte
 
-	for i := 0; i < NODEMAX; i++ {//loop around node
+	for i := 0; i < NODEMAX; i++ { //loop around node
 		hip[0] = 10
 		hip[1] = 1
 		hip[2] = 6
-		hip[3] = byte(i%255)
-		for j := 0; j < WLPERNODEMAX; j++ {//loop around wl within a node
+		hip[3] = byte(i % 255)
+		for j := 0; j < WLPERNODEMAX; j++ { //loop around wl within a node
 			policy := share.CLUSGroupIPPolicy{
-				ID:     uint32( ((i+1) * (j+1)) % share.PolicyGroundRuleIDMax),
+				ID:     uint32(((i + 1) * (j + 1)) % share.PolicyGroundRuleIDMax),
 				Action: C.DP_POLICY_ACTION_ALLOW,
 			}
 			wlAddrFrom := share.CLUSWorkloadAddr{
@@ -170,8 +171,8 @@ func CalculateIPPolicyFromCacheFake() []share.CLUSGroupIPPolicy {
 
 			gip[0] = 192
 			gip[1] = 168
-			gip[2] = byte((i+1) % 255)
-			gip[3] = byte((j+1) % 255)
+			gip[2] = byte((i + 1) % 255)
+			gip[3] = byte((j + 1) % 255)
 			wlAddrFrom.GlobalIP = append(wlAddrFrom.GlobalIP, net.IPv4(gip[0], gip[1], gip[2], gip[3]))
 			wlAddrFrom.NatIP = append(wlAddrFrom.NatIP, net.IPv4(hip[0], hip[1], hip[2], hip[3]))
 
@@ -184,8 +185,8 @@ func CalculateIPPolicyFromCacheFake() []share.CLUSGroupIPPolicy {
 
 			gip[0] = 192
 			gip[1] = 168
-			gip[2] = byte( (i+2) % 255)
-			gip[3] = byte( (j+1) % 255)
+			gip[2] = byte((i + 2) % 255)
+			gip[3] = byte((j + 1) % 255)
 
 			wlAddrTo.GlobalIP = append(wlAddrTo.GlobalIP, net.IPv4(gip[0], gip[1], gip[2], gip[3]))
 

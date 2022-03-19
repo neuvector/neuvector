@@ -28,10 +28,11 @@ import (
 )
 
 var cfgTypeMap2Api = map[share.TCfgType]string{
-	share.Learned:     api.CfgTypeLearned,
-	share.UserCreated: api.CfgTypeUserCreated,
-	share.GroundCfg:   api.CfgTypeGround,
-	share.FederalCfg:  api.CfgTypeFederal,
+	share.Learned:       api.CfgTypeLearned,
+	share.UserCreated:   api.CfgTypeUserCreated,
+	share.GroundCfg:     api.CfgTypeGround,
+	share.FederalCfg:    api.CfgTypeFederal,
+	share.SystemDefined: api.CfgSystemDefined,
 }
 
 var cfgTypeMapping = map[string]share.TCfgType{
@@ -39,6 +40,7 @@ var cfgTypeMapping = map[string]share.TCfgType{
 	api.CfgTypeUserCreated: share.UserCreated,
 	api.CfgTypeGround:      share.GroundCfg,
 	api.CfgTypeFederal:     share.FederalCfg,
+	api.CfgSystemDefined:   share.SystemDefined,
 }
 
 func compareRESTRules(r1, r2 *api.RESTPolicyRule) bool {

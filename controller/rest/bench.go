@@ -313,6 +313,9 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	if err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
+	} else if cgroup.CfgType == api.CfgTypeGround {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+		return
 	} else if cgroup.Kind != share.GroupKindContainer && cgroup.Kind != share.GroupKindNode {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
