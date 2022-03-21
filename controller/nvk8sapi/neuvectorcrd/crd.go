@@ -77,7 +77,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() *apiextv1.JSONSchemaP
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"name", "criteria"},
+		Required: []string{"name"},
 		Properties: map[string]*apiextv1.JSONSchemaProps{
 			"name": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
@@ -117,7 +117,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSc
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"name", "criteria"},
+		Required: []string{"name"},
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
 			"name": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
@@ -222,6 +222,74 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() *apiextv1b1.JSON
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
+	schema := &apiextv1b1.JSONSchemaProps{
+		Type: &b.schemaTypeObject,
+		Properties: map[string]*apiextv1b1.JSONSchemaProps{
+			"status": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeBoolean,
+			},
+			"settings": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeArray,
+				Items: &apiextv1b1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1b1.JSONSchemaProps{
+						Type:     &b.schemaTypeObject,
+						Required: []string{"name", "action"},
+						Properties: map[string]*apiextv1b1.JSONSchemaProps{
+							"name": &apiextv1b1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+							},
+							"action": &apiextv1b1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+								Enum: []*apiextv1b1.JSON{
+									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1Schema() *apiextv1.JSONSchemaProps {
+	schema := &apiextv1.JSONSchemaProps{
+		Type: &b.schemaTypeObject,
+		Properties: map[string]*apiextv1.JSONSchemaProps{
+			"status": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeBoolean,
+			},
+			"settings": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeArray,
+				Items: &apiextv1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1.JSONSchemaProps{
+						Type:     &b.schemaTypeObject,
+						Required: []string{"name", "action"},
+						Properties: map[string]*apiextv1.JSONSchemaProps{
+							"name": &apiextv1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+							},
+							"action": &apiextv1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+								Enum: []*apiextv1.JSON{
+									&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+									&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type: &b.schemaTypeObject,
@@ -314,35 +382,8 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 							},
 						},
 					},
-					"waf": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeObject,
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"status": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
-							},
-							"settings": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
-								Items: &apiextv1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
-										Required: []string{"name", "action"},
-										Properties: map[string]*apiextv1.JSONSchemaProps{
-											"name": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-											},
-											"action": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-												Enum: []*apiextv1.JSON{
-													&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-													&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					"dlp": b.buildNvSeurityCrdDlpWafV1Schema(),
+					"waf": b.buildNvSeurityCrdDlpWafV1Schema(),
 				},
 			},
 		},
@@ -443,35 +484,8 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 							},
 						},
 					},
-					"waf": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeObject,
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"status": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
-							},
-							"settings": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
-								Items: &apiextv1b1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1b1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
-										Required: []string{"name", "action"},
-										Properties: map[string]*apiextv1b1.JSONSchemaProps{
-											"name": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-											},
-											"action": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-												Enum: []*apiextv1b1.JSON{
-													&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-													&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					"dlp": b.buildNvSeurityCrdDlpWafV1B1Schema(),
+					"waf": b.buildNvSeurityCrdDlpWafV1B1Schema(),
 				},
 			},
 		},
@@ -692,7 +706,7 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSecurityCrdWafV1Schema() *apiextv1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type: &b.schemaTypeObject,
 		Properties: map[string]*apiextv1.JSONSchemaProps{
@@ -770,7 +784,7 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdWafV1Schema() *apiextv1.JSONSchema
 }
 
 // for k8a 1.18(-)
-func (b *nvCrdSchmaBuilder) buildNvSecurityCrdWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type: &b.schemaTypeObject,
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
@@ -860,8 +874,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
-	case resource.NvWafSecurityRuleName:
-		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdWafV1Schema()
+	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1Schema()
 	}
 	return v1
 }
@@ -879,8 +893,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1B1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
-	case resource.NvWafSecurityRuleName:
-		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdWafV1B1Schema()
+	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1B1Schema()
 	}
 	return v1
 }
@@ -964,15 +978,15 @@ func configK8sCrdSchema(op, verRead string, crdInfo *resource.NvCrdInfo) error {
 
 // create the CustomResourceDefinition resource(schema) that is listed by "kubectl get CustomResourceDefinition"
 func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share.CLUSAdmCtrlState) (bool, error) {
-	crdConfigured := false // crd schema is configured or not
-	crdExpected := false   // whether the configured crd schema is up-to-date
+	crdSchemaConfigured := false // crd schema is configured or not
+	crdSchemaExpected := false   // whether the configured crd schema is up-to-date
 
 	var verRead string
 	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
 	if err == nil {
-		crdConfigured = true
-		if crdInfo.MetaName == resource.NvAdmCtrlSecurityRuleName || crdInfo.MetaName == resource.NvWafSecurityRuleName {
-			crdExpected = true
+		crdSchemaConfigured = true
+		if crdInfo.MetaName == resource.NvAdmCtrlSecurityRuleName || crdInfo.MetaName == resource.NvDlpSecurityRuleName || crdInfo.MetaName == resource.NvWafSecurityRuleName {
+			crdSchemaExpected = true
 		} else {
 			if res, ok := obj.(*apiextv1.CustomResourceDefinition); ok && res.Spec != nil {
 				verRead = *res.Metadata.ResourceVersion
@@ -983,7 +997,9 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 							if pp, ok := spec.Properties["process_profile"]; ok {
 								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
 									if _, ok := spec.Properties["waf"]; ok {
-										crdExpected = true
+										if _, ok := spec.Properties["dlp"]; ok {
+											crdSchemaExpected = true
+										}
 									}
 								}
 							}
@@ -999,7 +1015,9 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 							if pp, ok := spec.Properties["process_profile"]; ok {
 								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
 									if _, ok := spec.Properties["waf"]; ok {
-										crdExpected = true
+										if _, ok := spec.Properties["dlp"]; ok {
+											crdSchemaExpected = true
+										}
 									}
 								}
 							}
@@ -1013,10 +1031,10 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 		}
 	}
 
-	if !crdConfigured && !ctrlState.Enable {
+	if !crdSchemaConfigured && !ctrlState.Enable {
 		return true, err
-	} else if crdConfigured && crdExpected && ctrlState.Enable {
-		log.WithFields(log.Fields{"enable": ctrlState.Enable, "CrdConfigured": crdConfigured, "crd": crdInfo.MetaName}).
+	} else if crdSchemaConfigured && crdSchemaExpected && ctrlState.Enable {
+		log.WithFields(log.Fields{"enable": ctrlState.Enable, "crdSchemaConfigured": crdSchemaConfigured, "crd": crdInfo.MetaName}).
 			Debug("skip because crd schema is already defined")
 		return true, err
 	}
@@ -1025,21 +1043,21 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 	if !ctrlState.Enable {
 		op = resource.Delete
 	} else {
-		if !crdConfigured {
+		if !crdSchemaConfigured {
 			op = resource.Create
-		} else if !crdExpected {
+		} else if !crdSchemaExpected {
 			op = resource.Update
 		}
 	}
 	retry := 0
 	for retry < 3 {
 		if err = configK8sCrdSchema(op, verRead, crdInfo); err == nil {
-			log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName}).Info("configured crd in k8s")
+			log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName}).Info("configured crd schema in k8s")
 			return false, nil
 		}
 		retry++
 	}
-	log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName, "error": err}).Error("failed to configure crd in k8s")
+	log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName, "error": err}).Error("failed to configure crd schema in k8s")
 
 	return true, err
 }
@@ -1091,6 +1109,19 @@ func Init(leader bool) {
 			SpecNamesListKind: resource.NvAdmCtrlSecurityRuleListKind,
 			LockKey:           share.CLUSLockAdmCtrlKey,
 			KvCrdKind:         resource.NvAdmCtrlSecurityRuleKind,
+		},
+		&resource.NvCrdInfo{
+			RscType:           resource.RscTypeCrdDlpSecurityRule,
+			MetaName:          resource.NvDlpSecurityRuleName,
+			SpecScope:         resource.NvClusterSecurityRuleScope,
+			SpecGroup:         common.OEMClusterSecurityRuleGroup,
+			SpecVersion:       resource.NvDlpSecurityRuleVersion,
+			SpecNamesPlural:   resource.NvDlpSecurityRulePlural,
+			SpecNamesKind:     resource.NvDlpSecurityRuleKind,
+			SpecNamesSingular: resource.NvDlpSecurityRuleSingular,
+			SpecNamesListKind: resource.NvDlpSecurityRuleListKind,
+			LockKey:           share.CLUSLockPolicyKey,
+			KvCrdKind:         resource.NvDlpSecurityRuleKind,
 		},
 		&resource.NvCrdInfo{
 			RscType:           resource.RscTypeCrdWafSecurityRule,

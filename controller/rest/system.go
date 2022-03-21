@@ -1870,6 +1870,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				go importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			case share.IMPORT_TYPE_ADMCTRL:
 				go importAdmCtrl(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+			case share.IMPORT_TYPE_DLP:
+				go importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			case share.IMPORT_TYPE_WAF:
 				go importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			}
@@ -1903,6 +1905,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "group policy"
 	case share.IMPORT_TYPE_ADMCTRL:
 		msgToken = "admission control configurations"
+	case share.IMPORT_TYPE_DLP:
+		msgToken = "DLP configurations"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF configurations"
 	}
@@ -1946,6 +1950,8 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		msgToken = "group policy"
 	case share.IMPORT_TYPE_ADMCTRL:
 		msgToken = "admission control configurations/rules"
+	case share.IMPORT_TYPE_DLP:
+		msgToken = "DLP rules"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF rules"
 	}
@@ -1994,6 +2000,12 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 				SpecNamesKind: resource.NvAdmCtrlSecurityRuleKind,
 				LockKey:       share.CLUSLockAdmCtrlKey,
 				KvCrdKind:     resource.NvAdmCtrlSecurityRuleKind,
+			},
+			&resource.NvCrdInfo{
+				RscType:       resource.RscTypeCrdDlpSecurityRule,
+				SpecNamesKind: resource.NvDlpSecurityRuleKind,
+				LockKey:       share.CLUSLockPolicyKey,
+				KvCrdKind:     resource.NvDlpSecurityRuleKind,
 			},
 			&resource.NvCrdInfo{
 				RscType:       resource.RscTypeCrdWafSecurityRule,

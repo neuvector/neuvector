@@ -614,7 +614,6 @@ func main() {
 	// start rest server
 	rest.LoadInitCfg(Ctrler.Leader) // Load config from ConfigMap
 
-	nvcrd.Init(Ctrler.Leader)
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	go rest.CrdQueueProc()
 	go rest.StartRESTServer()

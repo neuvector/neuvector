@@ -32,6 +32,7 @@ const (
 	RscTypeCrdSecurityRule                = "nvsecurityrules"
 	RscTypeCrdClusterSecurityRule         = "nvclustersecurityrules"
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
+	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
 	RscTypeRbacRoles                      = "roles"
 	RscTypeRbacClusterRoles               = "clusterroles"

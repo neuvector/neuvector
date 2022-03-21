@@ -29,6 +29,13 @@ const NvAdmCtrlSecurityRuleKind = "NvAdmissionControlSecurityRule"
 const NvAdmCtrlSecurityRuleListKind = "NvAdmissionControlSecurityRuleList"
 const NvAdmCtrlSecurityRuleSingular = "nvadmissioncontrolsecurityrule"
 
+const NvDlpSecurityRuleName = "nvdlpsecurityrules.neuvector.com"
+const NvDlpSecurityRuleVersion = "v1"
+const NvDlpSecurityRulePlural = "nvdlpsecurityrules"
+const NvDlpSecurityRuleKind = "NvDlpSecurityRule"
+const NvDlpSecurityRuleListKind = "NvDlpSecurityRuleList"
+const NvDlpSecurityRuleSingular = "nvdlpsecurityrule"
+
 const NvWafSecurityRuleName = "nvwafsecurityrules.neuvector.com"
 const NvWafSecurityRuleVersion = "v1"
 const NvWafSecurityRulePlural = "nvwafsecurityrules"
@@ -57,9 +64,11 @@ type NvSecurityParse struct {
 	FileProfileCfg    *api.RESTFileMonitorProfile
 	GroupCfgs         []api.RESTCrdGroupConfig
 	RuleCfgs          []api.RESTPolicyRuleConfig
+	DlpGroupCfg       *api.RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
 	WafGroupCfg       *api.RESTCrdWafGroupConfig // per-group's waf sensor configuration
 	AdmCtrlCfg        *NvCrdAdmCtrlConfig
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
+	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
 }
 
@@ -95,6 +104,11 @@ type NvSecurityFileRule struct {
 	App       []string `json:"app"`
 }
 
+type NvSecurityDlpGroup struct {
+	Status   bool                         `json:"status"`
+	Settings []api.RESTCrdDlpGroupSetting `json:"settings"`
+}
+
 type NvSecurityWafGroup struct {
 	Status   bool                         `json:"status"`
 	Settings []api.RESTCrdWafGroupSetting `json:"settings"`
@@ -107,6 +121,7 @@ type NvSecurityRuleSpec struct {
 	ProcessProfile *NvSecurityProcessProfile `json:"process_profile,omitempty"`
 	ProcessRule    []NvSecurityProcessRule   `json:"process"`
 	FileRule       []NvSecurityFileRule      `json:"file"`
+	DlpGroup       *NvSecurityDlpGroup       `json:"dlp,omitempty"` // per-group's dlp sensor mapping data
 	WafGroup       *NvSecurityWafGroup       `json:"waf,omitempty"` // per-group's waf sensor mapping data
 }
 
@@ -220,6 +235,46 @@ func (m *NvAdmCtrlSecurityRuleList) GetMetadata() *metav1.ListMeta {
 	return m.Metadata
 }
 
+// DLP
+type NvSecurityDlpRule struct {
+	Name     *string                    `json:"name"`
+	Patterns []api.RESTDlpCriteriaEntry `json:"patterns"`
+}
+
+type NvSecurityDlpSensor struct {
+	Name     string               `json:"name"`
+	Comment  *string              `json:"comment"`
+	RuleList []*NvSecurityDlpRule `json:"rules"`
+}
+
+type NvSecurityDlpSpec struct {
+	Sensor *NvSecurityDlpSensor `json:"sensor"`
+}
+
+type NvDlpSecurityRule struct {
+	Kind       *string            `json:"kind,omitempty"`
+	ApiVersion *string            `json:"apiVersion,omitempty"`
+	Metadata   *metav1.ObjectMeta `json:"metadata"`
+	Spec       NvSecurityDlpSpec  `json:"spec"`
+}
+
+type NvDlpSecurityRuleList struct {
+	Kind             *string              `json:"kind,omitempty"`
+	ApiVersion       *string              `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ListMeta     `json:"metadata"`
+	Items            []*NvDlpSecurityRule `json:"items"`
+	XXX_unrecognized []byte               `json:"-"`
+}
+
+func (m *NvDlpSecurityRule) GetMetadata() *metav1.ObjectMeta {
+	return m.Metadata
+}
+
+func (m *NvDlpSecurityRuleList) GetMetadata() *metav1.ListMeta {
+	return m.Metadata
+}
+
+// WAF
 type NvSecurityWafRule struct {
 	Name     *string                    `json:"name"`
 	Patterns []api.RESTWafCriteriaEntry `json:"patterns"`

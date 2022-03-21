@@ -186,7 +186,7 @@ func initCache() {
 		if _, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, resource.NvAdmSvcName); err == nil {
 			svcAvailable = true
 		}
-		setAdmCtrlStateInCluster(admission.NvAdmValidateType, resource.NvCrdSvcName, admStateCache.Enable, &svcAvailable)
+		setAdmCtrlStateInCluster(admission.NvAdmValidateType, resource.NvAdmSvcName, admStateCache.Enable, &svcAvailable)
 	}
 	updateNvDeployStatus(nil)
 
@@ -306,21 +306,24 @@ func setAdmCtrlStateInCluster(admType, svcName string, enable bool, svcAvailable
 	retry := 0
 	for retry < retryClusterMax {
 		if state, rev := clusHelper.GetAdmissionStateRev(svcName); state != nil {
-			crdStateModified := false
+			updated := false
 			if svcName == resource.NvCrdSvcName {
 				if state.FailurePolicy != resource.IgnoreLower || state.TimeoutSeconds != resource.DefTimeoutSeconds {
 					state.FailurePolicy = resource.IgnoreLower
 					state.TimeoutSeconds = resource.DefTimeoutSeconds
-					crdStateModified = true
+					updated = true
 				}
 			}
-			if crdStateModified || state.Enable != enable || state.CtrlStates[admType].Enable != enable ||
-				(svcAvailable != nil && *svcAvailable != state.NvDeployStatus[svcName]) {
+			if state.Enable != enable || state.CtrlStates[admType].Enable != enable {
 				state.Enable = enable
 				state.CtrlStates[admType].Enable = enable
-				if svcAvailable != nil {
-					state.NvDeployStatus[svcName] = *svcAvailable
-				}
+				updated = true
+			}
+			if svcAvailable != nil && *svcAvailable != state.NvDeployStatus[svcName] {
+				state.NvDeployStatus[svcName] = *svcAvailable
+				updated = true
+			}
+			if updated {
 				if err := clusHelper.PutAdmissionStateRev(svcName, state, rev); err == nil {
 					break
 				}
@@ -445,6 +448,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 				}
 				evalAdmCtrlRulesForAllowedNS(false)
 				setAdmCtrlStateInCluster(admission.NvAdmValidateType, resource.NvAdmSvcName, false, nil)
+				setAdmCtrlStateInCluster(admission.NvAdmValidateType, resource.NvCrdSvcName, false, nil)
 			} else {
 				evalAllowedNS := (admStateCache.Enable != state.Enable)
 				for admType, ctrlState := range state.CtrlStates {
@@ -1892,14 +1896,12 @@ func (m CacheMethod) SetNvDeployStatusInCluster(resName string, value bool) {
 		if state == nil {
 			return
 		}
-		if v, exist := state.NvDeployStatus[resName]; exist && v != value {
+		if v, exist := state.NvDeployStatus[resName]; !exist || v != value {
 			state.NvDeployStatus[resName] = value
 			// we should be notified by consul watcher and update cache in the handler function
 			if err := clusHelper.PutAdmissionStateRev(resource.NvAdmSvcName, state, rev); err == nil {
 				return
 			}
-		} else {
-			return
 		}
 		retry++
 	}

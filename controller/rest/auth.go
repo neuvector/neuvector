@@ -1735,12 +1735,43 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	var role string
 	var roleDomains map[string][]string
 
+	// get groups associated with this user
+	allRoles := make(map[string]string)
+	groups, err := global.ORCH.GetPlatformUserGroups(token)
+	if err == nil {
+		for _, group := range groups {
+			roles, err := global.ORCH.GetUserRoles(group, resource.SUBJECT_GROUP)
+			if err == nil {
+				for k, v := range roles {
+					// not to override admin role
+					// a subsequent record with reader-role will overwrite admin-role
+					if r, found := allRoles[k]; found && r == "admin" {
+						log.WithFields(log.Fields{"allRoles": allRoles}).Debug("Skip overwrite role.")
+					} else {
+						allRoles[k] = v
+					}
+				}
+			}
+		}
+
+		log.WithFields(log.Fields{"groups": groups, "allRoles": allRoles}).Debug("GetPlatformUserGroups")
+	}
+
 	roles, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
+		log.WithFields(log.Fields{"user": pw.Username}).Debug("No role available for this user.")
 		roleDomains = make(map[string][]string)
 	} else {
-		role, roleDomains = rbac2UserRole(roles)
+		for k, v := range roles {
+			if r, found := allRoles[k]; found && r == "admin" {
+				log.WithFields(log.Fields{"allRoles": allRoles}).Debug("Skip overwrite role.")
+			} else {
+				allRoles[k] = v
+			}
+		}
 	}
+
+	role, roleDomains = rbac2UserRole(allRoles)
 
 	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains)
 	if authz {

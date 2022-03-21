@@ -143,6 +143,10 @@ func (d *noop) SetFlavor(flavor string) error {
 	return ErrMethodNotSupported
 }
 
+func (d *noop) GetPlatformUserGroups(token string) ([]string, error) {
+	return nil, ErrMethodNotSupported
+}
+
 func Register(platform, flavor, network string) orchAPI.ResourceDriver {
 	switch platform {
 	case share.PlatformKubernetes:

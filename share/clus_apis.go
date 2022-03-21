@@ -1867,8 +1867,10 @@ type CLUSCrdSecurityRule struct {
 	ProcessProfile  CLUSCrdProcessProfile `json:"process_profile"`
 	ProcessRules    []CLUSCrdProcessRule  `json:"process_rules"`
 	FileRules       []CLUSCrdFileRule     `json:"file_rules"`
+	DlpGroupSensors []string              `json:"dlp_group_sensors"` // dlp sensors associated with the target group
 	WafGroupSensors []string              `json:"waf_group_sensors"` // waf sensors associated with the target group
 	AdmCtrlRules    map[string]uint32     `json:"admctrl_rules"`     // map key is the generated name of admission control rule, valud is assigned rule id
+	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
 }
 
@@ -2153,6 +2155,7 @@ type CLUSDlpRule struct {
 	Name     string                 `json:"name"`
 	ID       uint32                 `json:"id"`
 	Patterns []CLUSDlpCriteriaEntry `json:"patterns"`
+	CfgType  TCfgType               `json:"cfg_type"`
 }
 
 type CLUSDlpSensor struct {
@@ -2163,6 +2166,7 @@ type CLUSDlpSensor struct {
 	PreRuleList   map[string][]*CLUSDlpRule `json:"pre_rule_list,omitempty"`
 	Comment       string                    `json:"comment,omitempty"`
 	Predefine     bool                      `json:"predefine,omitempty"`
+	CfgType       TCfgType                  `json:"cfg_type"`
 }
 
 type CLUSDlpSetting struct {
@@ -2187,6 +2191,7 @@ type CLUSDlpGroup struct {
 	Name    string            `json:"name"`
 	Status  bool              `json:"status"`
 	Sensors []*CLUSDlpSetting `json:"sensors"`
+	CfgType TCfgType          `json:"cfg_type"`
 }
 
 //waf
@@ -2481,6 +2486,7 @@ const (
 	PREFIX_IMPORT_CONFIG       = "import_"
 	PREFIX_IMPORT_GROUP_POLICY = "group_import_"
 	PREFIX_IMPORT_ADMCTRL      = "admctrl_import_"
+	PREFIX_IMPORT_DLP          = "dlp_import_"
 	PREFIX_IMPORT_WAF          = "waf_import_"
 )
 
@@ -2488,6 +2494,7 @@ const (
 	IMPORT_TYPE_CONFIG       = ""
 	IMPORT_TYPE_GROUP_POLICY = "group"
 	IMPORT_TYPE_ADMCTRL      = "admctrl"
+	IMPORT_TYPE_DLP          = "dlp"
 	IMPORT_TYPE_WAF          = "waf"
 )
 
@@ -2542,6 +2549,7 @@ const (
 	ReviewTypeCRD           = iota + 1
 	ReviewTypeImportGroup   // interactive import
 	ReviewTypeImportAdmCtrl // interactive import
+	ReviewTypeImportDLP     // interactive import
 	ReviewTypeImportWAF     // interactive import
 )
 
@@ -2549,5 +2557,6 @@ const (
 	ReviewTypeDisplayCRD       = "CRD"
 	ReviewTypeDisplayGroup     = "Group Policy"                     // interactive import
 	ReviewTypeDisplayAdmission = "Admission Control Configurations" // interactive import
+	ReviewTypeDisplayDLP       = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF       = "WAF Configurations"               // interactive import
 )
