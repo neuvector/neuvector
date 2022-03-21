@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const wafCalculatingDelayFast = time.Duration(time.Second * 2)
@@ -1067,8 +1067,9 @@ func (m *CacheMethod) GetWafGroup(group string, acc *access.AccessControl) (*api
 				Name:    cg.Name,
 				Status:  cg.Status,
 				Sensors: make([]*api.RESTWafSetting, 0),
-				CfgType: cfgTypeMapping[cg.CfgType],
 			}
+			resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
+
 			for _, cs := range cg.Sensors {
 				rdsa := &api.RESTWafSetting{
 					Name:   cs.Name,
@@ -1105,8 +1106,8 @@ func (m *CacheMethod) GetAllWafGroup(acc *access.AccessControl) []*api.RESTWafGr
 			Name:    cg.Name,
 			Status:  cg.Status,
 			Sensors: make([]*api.RESTWafSetting, 0),
-			CfgType: cfgTypeMapping[cg.CfgType],
 		}
+		resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
 
 		for _, cs := range cg.Sensors {
 			rdsa := &api.RESTWafSetting{

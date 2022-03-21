@@ -1076,7 +1076,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 				changed = true
 				baselineChanged = true
 				if utils.IsGroupNodes(name) {
-					grp.BaselineProfile = share.ProfileBasic	//	always
+					grp.BaselineProfile = share.ProfileBasic //	always
 				} else {
 					grp.BaselineProfile = *rc.BaselineProfile
 				}
@@ -1508,7 +1508,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 				changed = true
 				baselineChanged = true
 				if utils.IsGroupNodes(name) {
-					grp.BaselineProfile = share.ProfileBasic	//	always
+					grp.BaselineProfile = share.ProfileBasic //	always
 				} else {
 					grp.BaselineProfile = *rc.BaselineProfile
 				}
@@ -1675,11 +1675,14 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 		if err == nil {
 			var updatedGroups utils.Set
+			var hasDlpWafSetting bool
+			targetGroupDlpWAF := make(map[string]bool, len(parsedGrpCfg))
 			targetGroups := make([]string, 0, len(parsedGrpCfg))
 			// [2]: import all non-reserved groups referenced in the yaml file
 			for _, grpCfgRet := range parsedGrpCfg {
 				// do same job as crdHandleGroupsAdd(crdCfgRet.GroupCfgs) but only import target group
-				if updatedGroups, err = importGroup(scope, grpCfgRet.GroupCfgs); err == nil {
+				if updatedGroups, hasDlpWafSetting, err = importGroup(scope, grpCfgRet.TargetName, grpCfgRet.GroupCfgs); err == nil {
+					targetGroupDlpWAF[grpCfgRet.TargetName] = hasDlpWafSetting
 					if updatedGroups.Contains(grpCfgRet.TargetName) {
 						targetGroups = append(targetGroups, grpCfgRet.TargetName)
 					} else if grpCfgRet.TargetName == api.LearnedExternal || grpCfgRet.TargetName == api.AllHostGroup || grpCfgRet.TargetName == api.AllContainerGroup {
@@ -1726,8 +1729,18 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 					}
 					crdHandler.crdHandlePolicyMode(grpCfgRet.PolicyModeCfg, profile_mode)
 
-					// [4]: import waf group data
-					crdHandler.crdHandleWafGroup(grpCfgRet.WafGroupCfg, share.UserCreated)
+					if hasDlpWafSetting, ok := targetGroupDlpWAF[grpCfgRet.TargetName]; ok && hasDlpWafSetting {
+						if grpCfgRet.DlpGroupCfg == nil {
+							grpCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]api.RESTCrdDlpGroupSetting, 0)}
+						}
+						if grpCfgRet.WafGroupCfg == nil {
+							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
+						}
+						// [4]: import dlp group data
+						crdHandler.crdHandleDlpGroup(grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
+						// [5]: import waf group data
+						crdHandler.crdHandleWafGroup(grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
+					}
 
 					progress += inc
 					importTask.Percentage = int(progress)
@@ -1747,7 +1760,8 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 }
 
 // Create/update all the imported groups except for the reserved group, external/nodes/containers/Workload:ingress
-func importGroup(scope string, groups []api.RESTCrdGroupConfig) (utils.Set, error) {
+func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (utils.Set, bool, error) {
+	var targetGroupDlpWAF bool
 	updatedGroups := utils.NewSet()
 	acc := access.NewAdminAccessControl()
 	txn := cluster.Transact()
@@ -1824,6 +1838,9 @@ func importGroup(scope string, groups []api.RESTCrdGroupConfig) (utils.Set, erro
 				cg.Domain = ct.Value
 			}
 		}
+		if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
+			targetGroupDlpWAF = true
+		}
 		clusHelper.PutGroupTxn(txn, cg)
 		updatedGroups.Add(cg.Name)
 	}
@@ -1836,7 +1853,7 @@ func importGroup(scope string, groups []api.RESTCrdGroupConfig) (utils.Set, erro
 		updatedGroups.Clear()
 	}
 
-	return updatedGroups, err
+	return updatedGroups, targetGroupDlpWAF, err
 }
 
 func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {

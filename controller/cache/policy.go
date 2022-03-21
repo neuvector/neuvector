@@ -24,10 +24,11 @@ import (
 )
 
 var cfgTypeMapping = map[share.TCfgType]string{
-	share.Learned:     api.CfgTypeLearned,
-	share.UserCreated: api.CfgTypeUserCreated,
-	share.GroundCfg:   api.CfgTypeGround,
-	share.FederalCfg:  api.CfgTypeFederal,
+	share.Learned:       api.CfgTypeLearned,
+	share.UserCreated:   api.CfgTypeUserCreated,
+	share.GroundCfg:     api.CfgTypeGround,
+	share.FederalCfg:    api.CfgTypeFederal,
+	share.SystemDefined: api.CfgSystemDefined,
 }
 
 type policyCacheType struct {
@@ -406,8 +407,8 @@ func getHostPolicyMode(cache *hostCache) (string, string) {
 }
 
 func getWorkloadPolicyMode(wlCache *workloadCache) (string, string) {
-	//if global net service status is enabled, use global net service 
-	//policy mode, profile still use per group mode 
+	//if global net service status is enabled, use global net service
+	//policy mode, profile still use per group mode
 	if getNetServiceStatus() {
 		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
 			return getNetServicePolicyMode(), cache.group.ProfileMode

@@ -144,7 +144,11 @@ func upgradeGroup(group *share.CLUSGroup) (bool, bool) {
 		}
 
 		if group.BaselineProfile == "" {
-			group.BaselineProfile = share.ProfileBasic
+			if group.Name == api.AllHostGroup {
+				group.BaselineProfile = share.ProfileBasic // group "nodes" is always at "basic" baseline profile(not configurable by design)
+			} else {
+				group.BaselineProfile = share.ProfileZeroDrift // for learned groups, default to zero-drift mode
+			}
 			upd = true
 		}
 	} else if group.PolicyMode != "" || group.ProfileMode != "" {
@@ -734,7 +738,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"2C05EB31", createDefaultNetServiceSetting},
 
-	{"4C746652", nil},
+	{"4C746652", resetDefDlpSensorCfgType},
+
+	{"825C9419", nil},
 }
 
 func latestKVVersion() string {
@@ -1501,4 +1507,10 @@ func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 		upd = true
 	}
 	return upd, upd
+}
+
+func resetDefDlpSensorCfgType() {
+	for _, cdr := range PreDlpSensors {
+		clusHelper.GetDlpSensor(cdr.Name)
+	}
 }

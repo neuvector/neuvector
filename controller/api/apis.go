@@ -1540,8 +1540,8 @@ type RESTSystemConfigConfig struct {
 }
 
 type RESTSysNetConfigConfig struct {
-	NetServiceStatus          *bool           `json:"net_service_status,omitempty"`
-	NetServicePolicyMode      *string         `json:"net_service_policy_mode,omitempty"`
+	NetServiceStatus     *bool   `json:"net_service_status,omitempty"`
+	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
 }
 
 type RESTSystemConfigConfigCfgMap struct {
@@ -2401,12 +2401,14 @@ type RESTDlpSetting struct {
 	Name    string `json:"name"`
 	Action  string `json:"action"`
 	Comment string `json:"comment,omitempty"`
+	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
 }
 
 type RESTDlpGroup struct {
 	Name    string            `json:"name"`
 	Status  bool              `json:"status"`
 	Sensors []*RESTDlpSetting `json:"sensors"`
+	CfgType string            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
 }
 
 type RESTDlpGroupData struct {
@@ -2473,9 +2475,8 @@ type RESTCrdDlpGroupSetting struct {
 }
 
 type RESTCrdDlpGroupConfig struct {
-	Name       string                    `json:"name"`
-	Status     *bool                     `json:"status,omitempty"`
-	RepSensors *[]RESTCrdDlpGroupSetting `json:"replace,omitempty"` //replace list used by GUI
+	Status     bool                     `json:"status,omitempty"`
+	RepSensors []RESTCrdDlpGroupSetting `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpSensorExport struct {
@@ -2624,9 +2625,8 @@ type RESTCrdWafGroupSetting struct {
 }
 
 type RESTCrdWafGroupConfig struct {
-	Name       string                    `json:"name"`
-	Status     *bool                     `json:"status,omitempty"`
-	RepSensors *[]RESTCrdWafGroupSetting `json:"replace,omitempty"` //replace list used by GUI
+	Status     bool                     `json:"status,omitempty"`
+	RepSensors []RESTCrdWafGroupSetting `json:"replace,omitempty"` //replace list used by GUI
 }
 
 const (
