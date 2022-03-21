@@ -22,11 +22,9 @@ import (
 const (
 	AppFileName = "apps_pkg"
 
-	nodeModules1 = "/usr/lib/node_modules"
-	nodeModules2 = "/usr/local/lib/node_modules"
-	nodeModules  = "node_modules"
-	nodePackage  = "package.json"
-	nodeJs       = "node.js"
+	nodeModules = "node_modules"
+	nodePackage = "package.json"
+	nodeJs      = "node.js"
 
 	wpname           = "Wordpress"
 	WPVerFileSuffix  = "wp-includes/version.php"

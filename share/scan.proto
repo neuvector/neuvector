@@ -63,6 +63,7 @@ message ScanVulnerability {
     repeated string CVEs = 15;
     string FeedRating = 16;
     bool InBase = 17;
+    string DBKey = 18;
 }
 
 message ScanLayerResult {

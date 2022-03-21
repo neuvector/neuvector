@@ -47,6 +47,7 @@ type VulTrait struct {
 	pkgName  string
 	pkgVer   string
 	fixVer   string
+	dbKey    string
 	pubTS    int64
 	severity int8
 	filtered bool
@@ -71,8 +72,6 @@ func GetScannerDB() *share.CLUSScannerDB {
 
 // Functions can be used in both controllers and scanner
 func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) *api.RESTVulnerability {
-	baseOS = normalizeBaseOS(baseOS)
-
 	v := &api.RESTVulnerability{
 		Name:           vul.Name,
 		Score:          vul.Score,
@@ -91,19 +90,32 @@ func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) 
 		InBaseImage:    vul.InBase,
 	}
 
-	// lookup os base cve
-	key := fmt.Sprintf("%s:%s", baseOS, v.Name)
-	if vr, ok := cvedb[key]; ok {
-		fillVulFields(vr, v)
-	} else {
-		// lookup apps
-		key = fmt.Sprintf("apps:%s", v.Name)
+	// Fill verbose vulnerability info, new scanner should return DBKey for each cve,
+	// so the guess work based on baseOS is only needed for short-term compatibility
+	var filled bool
+	if vul.DBKey != "" {
+		if vr, ok := cvedb[vul.DBKey]; ok {
+			fillVulFields(vr, v)
+			filled = true
+		}
+	}
+
+	if !filled {
+		baseOS = normalizeBaseOS(baseOS)
+
+		key := fmt.Sprintf("%s:%s", baseOS, v.Name)
 		if vr, ok := cvedb[key]; ok {
 			fillVulFields(vr, v)
 		} else {
-			// fix metadata
-			if vr, ok := cvedb[v.Name]; ok {
+			// lookup apps
+			key = fmt.Sprintf("apps:%s", v.Name)
+			if vr, ok := cvedb[key]; ok {
 				fillVulFields(vr, v)
+			} else {
+				// fix metadata
+				if vr, ok := cvedb[v.Name]; ok {
+					fillVulFields(vr, v)
+				}
 			}
 		}
 	}
@@ -346,6 +358,9 @@ func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {
 	}
 }
 
+// cvedb lookup now uses DBKey in each vulnerability entry.
+// This function is kept for short-term compatibility.
+// No need to update!!
 func normalizeBaseOS(baseOS string) string {
 	if a := strings.Index(baseOS, ":"); a > 0 {
 		baseOS = baseOS[:a]
@@ -377,18 +392,29 @@ func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag str
 			FixedVersion:   vt.fixVer,
 		}
 
-		// lookup os base cve
-		key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
-		if vr, ok := cvedb[key]; ok {
-			fillVulFields(vr, vul)
-		} else {
-			// lookup apps
-			key = fmt.Sprintf("apps:%s", vul.Name)
+		// Fill verbose vulnerability info, new scanner should return DBKey for each cve,
+		// so the guess work based on baseOS is only needed for short-term compatibility
+		var filled bool
+		if vt.dbKey != "" {
+			if vr, ok := cvedb[vt.dbKey]; ok {
+				fillVulFields(vr, vul)
+				filled = true
+			}
+		}
+
+		if !filled {
+			key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
 			if vr, ok := cvedb[key]; ok {
 				fillVulFields(vr, vul)
 			} else {
-				if vr, ok := cvedb[vul.Name]; ok {
+				// lookup apps
+				key = fmt.Sprintf("apps:%s", vul.Name)
+				if vr, ok := cvedb[key]; ok {
 					fillVulFields(vr, vul)
+				} else {
+					if vr, ok := cvedb[vul.Name]; ok {
+						fillVulFields(vr, vul)
+					}
 				}
 			}
 		}
@@ -424,6 +450,7 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 		traits[i] = &VulTrait{
 			Name:     v.Name,
 			severity: s,
+			dbKey:    v.DBKey,
 			pubTS:    pubTS,
 			pkgName:  v.PackageName, pkgVer: v.PackageVersion, fixVer: v.FixedVersion,
 		}
