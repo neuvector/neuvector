@@ -456,6 +456,16 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		}
 	}
 
+	if rc.ModeAutoD2M != nil && rc.ModeAutoD2MDuration != nil {
+		cconf.ModeAutoD2M = *rc.ModeAutoD2M
+		cconf.ModeAutoD2MDuration = *rc.ModeAutoD2MDuration
+	}
+
+	if rc.ModeAutoM2P != nil && rc.ModeAutoM2PDuration != nil {
+		cconf.ModeAutoM2P = *rc.ModeAutoM2P
+		cconf.ModeAutoM2PDuration = *rc.ModeAutoM2PDuration
+	}
+
 	// registry proxy
 	if rc.RegistryHttpProxy != nil {
 		if rc.RegistryHttpProxy.URL != "" {

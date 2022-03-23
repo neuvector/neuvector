@@ -1928,6 +1928,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	licenseInit()
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
 	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
+	automode_init(ctx)
 
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()

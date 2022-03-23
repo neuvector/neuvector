@@ -37,6 +37,8 @@ type groupCache struct {
 	ingressDMZ          int
 	egressDMZ           int
 	timerTask           string
+	atmo_d2m            int64
+	atmo_m2p            int64
 }
 
 func isIPSvcGrpInternal(group *share.CLUSGroup) bool {
