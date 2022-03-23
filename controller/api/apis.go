@@ -2400,6 +2400,7 @@ type RESTDlpRulesData struct {
 type RESTDlpSetting struct {
 	Name    string `json:"name"`
 	Action  string `json:"action"`
+	Exist   bool   `json:"exist"`
 	Comment string `json:"comment,omitempty"`
 	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
 }
@@ -2419,12 +2420,18 @@ type RESTDlpGroupsData struct {
 	DlpGroups []*RESTDlpGroup `json:"dlp_groups"`
 }
 
+type RESTDlpConfig struct {
+	Name    string `json:"name"`
+	Action  string `json:"action"`
+	Comment string `json:"comment,omitempty"`
+}
+
 type RESTDlpGroupConfig struct {
 	Name       string            `json:"name"`
 	Status     *bool             `json:"status,omitempty"`
 	DelSensors *[]string         `json:"delete,omitempty"`  //delete list used by CLI
-	Sensors    *[]RESTDlpSetting `json:"sensors,omitempty"` //change list used by CLI
-	RepSensors *[]RESTDlpSetting `json:"replace,omitempty"` //replace list used by GUI
+	Sensors    *[]RESTDlpConfig  `json:"sensors,omitempty"` //change list used by CLI
+	RepSensors *[]RESTDlpConfig  `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpGroupConfigData struct {

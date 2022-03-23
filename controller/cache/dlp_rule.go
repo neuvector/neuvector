@@ -90,8 +90,14 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 		log.WithFields(log.Fields{"sensor": sensor}).Debug("Update")
 
 	case cluster.ClusterNotifyDelete:
+		updategrp := false
 		cacheMutexLock()
 		if dlpsensor, ok := dlpSensors[sensor]; ok {
+			for cg, _ := range dlpsensor.Groups {
+				if dlpGroupSensors[cg] != nil && dlpGroupSensors[cg].Contains(sensor) {
+					updategrp = true
+				}
+			}
 			for _, cdrename := range dlpsensor.RuleListNames {
 				if dlpRuleSensors[cdrename] != nil {
 					dlpRuleSensors[cdrename].Remove(sensor)
@@ -100,6 +106,9 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 			delete(dlpSensors, sensor)
 		}
 		cacheMutexUnlock()
+		if updategrp {
+			scheduleDlpRuleCalculation(true)
+		}
 		deleteDlpRuleNetwork(sensor)
 	}
 }
@@ -1053,6 +1062,9 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 				rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
 				if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 					rdsa.Comment = dlpsensor.Comment
+					rdsa.Exist = true
+				} else {
+					rdsa.Exist = false
 				}
 				resp.Sensors = append(resp.Sensors, rdsa)
 			}
@@ -1087,6 +1099,12 @@ func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGr
 				Action: cs.Action,
 			}
 			rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
+			if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
+				rdsa.Comment = dlpsensor.Comment
+				rdsa.Exist = true
+			} else {
+				rdsa.Exist = false
+			}
 			resp.Sensors = append(resp.Sensors, rdsa)
 		}
 		ret = append(ret, &resp)
