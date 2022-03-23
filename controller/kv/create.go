@@ -531,6 +531,7 @@ var SsnSensorDlpRule = &share.CLUSDlpSensor{
 	},
 	Comment:   commentSsnSensor,
 	Predefine: true,
+	CfgType:   share.SystemDefined,
 }
 
 var CreditCardSensorDlpRule = &share.CLUSDlpSensor{
@@ -549,6 +550,7 @@ var CreditCardSensorDlpRule = &share.CLUSDlpSensor{
 	},
 	Comment:   commentCcSensor,
 	Predefine: true,
+	CfgType:   share.SystemDefined,
 }
 
 var PreDlpSensors = []*share.CLUSDlpSensor{

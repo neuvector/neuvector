@@ -1085,6 +1085,11 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	if cached, err := cacher.GetDlpGroup(conf.Name, acc); cached == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
+	} else {
+		if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+			restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+			return
+		}
 	}
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
