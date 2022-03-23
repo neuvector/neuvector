@@ -267,6 +267,7 @@ type RPMPackage struct {
 func isRpmKernelPackage(p *rpmdb.PackageInfo) string {
 	if p.Name == "kernel " ||
 		p.Name == "kernel-tools-libs" ||
+		p.Name == "kernel-default" ||
 		p.Name == "kernel-tools" ||
 		p.Name == "kernel-headers" {
 		return fmt.Sprintf("%s-%s", p.Version, p.Release)

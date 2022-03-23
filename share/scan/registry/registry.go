@@ -25,14 +25,6 @@ type Registry struct {
 	Client *httptrace.TraceClient
 }
 
-/*
- * Create a new Registry with the given URL and credentials, then Ping()s it
- * before returning it to verify that the registry is available.
- *
- * You can, alternately, construct a Registry manually by populating the fields.
- * This passes http.DefaultTransport to WrapTransport when creating the
- * http.Client.
- */
 func NewSecure(registryUrl, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
