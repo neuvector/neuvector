@@ -74,6 +74,12 @@ func (tc TraceClient) Do(req *http.Request) (*http.Response, error) {
 	return tc.response(resp, err)
 }
 
+func (tc TraceClient) RoundTrip(req *http.Request) (*http.Response, error) {
+	tc.Trace.SendRequest(req.Method, req.URL.String())
+	resp, err := tc.Client.Transport.RoundTrip(req)
+	return tc.response(resp, err)
+}
+
 func (tc TraceClient) Head(url string) (*http.Response, error) {
 	tc.Trace.SendRequest(http.MethodHead, url)
 	resp, err := tc.Client.Head(url)
