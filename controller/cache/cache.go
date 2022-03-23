@@ -1724,7 +1724,21 @@ func startWorkerThread() {
 						connectOrchWorkloadDelete(&o.IPNet)
 					}
 					if n != nil {
-						if n.Domain == "kube-system" && strings.HasPrefix(n.Name, "kube-apiserver-") {
+						queryK8sVer := false
+						if localDev.Host.Flavor == share.FlavorOpenShift {
+							if n.Domain == "openshift-apiserver" && strings.HasPrefix(n.Name, "apiserver-") {
+								queryK8sVer = true
+							}
+						} else if n.Domain == "kube-system" {
+							if strings.HasPrefix(n.Name, "kube-apiserver-") {
+								queryK8sVer = true
+							} else if strings.Index(cctx.k8sVersion, "-eks-") > 0 && strings.HasPrefix(n.Name, "kube-proxy-") {
+								queryK8sVer = true
+							} else if strings.Index(cctx.k8sVersion, "-gke.") > 0 && strings.HasPrefix(n.Name, "kube-dns-autoscaler-") {
+								queryK8sVer = true
+							}
+						}
+						if queryK8sVer {
 							if k8sVer, _ := global.ORCH.GetVersion(true, false); k8sVer != "" && cctx.k8sVersion != k8sVer {
 								log.WithFields(log.Fields{"oldVer": cctx.k8sVersion, "newVer": k8sVer}).Info()
 								cctx.k8sVersion = k8sVer
