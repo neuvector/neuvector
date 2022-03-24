@@ -738,9 +738,7 @@ var phases []kvVersions = []kvVersions{
 
 	{"2C05EB31", createDefaultNetServiceSetting},
 
-	{"4C746652", resetDefDlpSensorCfgType},
-
-	{"825C9419", nil},
+	{"4C746652", nil},
 }
 
 func latestKVVersion() string {
@@ -1507,10 +1505,4 @@ func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 		upd = true
 	}
 	return upd, upd
-}
-
-func resetDefDlpSensorCfgType() {
-	for _, cdr := range PreDlpSensors {
-		clusHelper.GetDlpSensor(cdr.Name)
-	}
 }
