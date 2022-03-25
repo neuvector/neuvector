@@ -1085,6 +1085,11 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	if cached, err := cacher.GetDlpGroup(conf.Name, acc); cached == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
+	} else {
+		if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+			restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+			return
+		}
 	}
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
@@ -1130,8 +1135,6 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 				if clusHelper.GetDlpSensor(rs.Name) == nil {
 					e := "DLP sensor does not exist"
 					log.WithFields(log.Fields{"sensor": rs}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
 				}
 				cs := share.CLUSDlpSetting{Name: rs.Name, Action: rs.Action}
 				if ret, ok := common.MergeDlpSensors(cg.Sensors, &cs); ok {
@@ -1189,8 +1192,6 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 					if clusHelper.GetDlpSensor(rs.Name) == nil {
 						e := "DLP sensor doesn't exist"
 						log.WithFields(log.Fields{"sensor": rs}).Error(e)
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return
 					}
 					cs := share.CLUSDlpSetting{Name: rs.Name, Action: rs.Action}
 					if ret, ok := common.MergeDlpSensors(cg.Sensors, &cs); ok {

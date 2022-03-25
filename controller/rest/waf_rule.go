@@ -13,10 +13,10 @@ import (
 	"sort"
 	"strings"
 
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/ghodss/yaml"
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -387,7 +387,6 @@ var defaultSensorAllWafRule = &share.CLUSWafSensor{
 	PreRuleList: make(map[string][]*share.CLUSWafRule),
 	Comment:     commentDefaultWafSensor,
 	Predefine:   true,
-	CfgType:     share.SystemDefined,
 }
 
 //lock is alreay hold when call this function
@@ -924,9 +923,11 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	if cached, err := cacher.GetWafGroup(conf.Name, acc); cached == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
-	} else if cached.CfgType == api.CfgTypeGround {
-		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return
+	} else {
+		if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+			restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+			return
+		}
 	}
 
 	var lock cluster.LockInterface

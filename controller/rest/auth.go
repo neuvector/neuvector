@@ -1754,7 +1754,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 			}
 		}
 
-		log.WithFields(log.Fields{"groups": groups, "allRoles": allRoles}).Debug("GetPlatformUserGroups")
+		log.WithFields(log.Fields{"groups": groups, "allRoles": allRoles}).Debug("combined group roles ")
 	}
 
 	roles, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
@@ -1772,6 +1772,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	}
 
 	role, roleDomains = rbac2UserRole(allRoles)
+	log.WithFields(log.Fields{"role": role, "roleDomains": roleDomains, "allRoles": allRoles}).Debug("combined roles")
 
 	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains)
 	if authz {

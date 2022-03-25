@@ -2688,7 +2688,6 @@ static void dp_ctrl_update_fqdn_ip(void)
 {
     struct cds_lfht_node *name_node;
 
-    rcu_read_lock();
     // Iterate through fqdn map
     RCU_MAP_FOR_EACH(&g_fqdn_hdl->fqdn_name_map, name_node) {
         fqdn_name_entry_t *name_entry = STRUCT_OF(name_node, fqdn_name_entry_t, node);
@@ -2734,7 +2733,6 @@ static void dp_ctrl_update_fqdn_ip(void)
 
         dp_ctrl_notify_ctrl(g_notify_msg, len);
     }
-    rcu_read_unlock();
 }
 
 // -- ctrl loop

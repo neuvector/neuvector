@@ -171,26 +171,34 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 	var groupAdded []string
 	var targetGroupDlpWAF bool
 	for _, group := range groups {
-		if group.Name == api.LearnedExternal {
-			// for 'external' group, just add to list without create
-			continue
-		} else if group.Name == api.AllHostGroup {
+		if group.Name == api.LearnedExternal || group.Name == api.AllHostGroup {
+			updateKV := false
 			cg, _, err := clusHelper.GetGroup(group.Name, h.acc)
 			if cg == nil {
 				log.WithFields(log.Fields{"error": err}).Error()
 				cg = &share.CLUSGroup{
-					Name:       api.AllHostGroup,
-					CfgType:    share.GroundCfg,
-					Comment:    group.Comment,
-					Reserved:   true,
-					Criteria:   []share.CLUSCriteriaEntry{},
-					Kind:       share.GroupKindNode,
-					PolicyMode: share.PolicyModeLearn, // default
+					Name:     group.Name,
+					CfgType:  share.GroundCfg,
+					Comment:  group.Comment,
+					Reserved: true,
+					Criteria: []share.CLUSCriteriaEntry{},
 				}
-			} else {
+				if group.Name == api.AllHostGroup {
+					cg.Kind = share.GroupKindNode
+					cg.PolicyMode = share.PolicyModeLearn   // default
+					cg.ProfileMode = share.PolicyModeLearn  // default
+					cg.BaselineProfile = share.ProfileBasic // group "nodes" is always at "basic" baseline profile(not configurable by design)
+				} else {
+					cg.Kind = share.GroupKindExternal
+				}
+				updateKV = true
+			} else if cg.CfgType != share.GroundCfg {
 				cg.CfgType = share.GroundCfg // update its type
+				updateKV = true
 			}
-			clusHelper.PutGroup(cg, false)
+			if updateKV {
+				clusHelper.PutGroup(cg, false)
+			}
 			groupAdded = append(groupAdded, group.Name)
 			continue
 		}
@@ -243,7 +251,7 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 			groupAdded = append(groupAdded, group.Name)
 		} else {
 			// new group add
-			cg := share.CLUSGroup{
+			cg = &share.CLUSGroup{
 				Name:           group.Name,
 				CfgType:        share.GroundCfg,
 				CreaterDomains: h.acc.GetAdminDomains(share.PERMS_RUNTIME_POLICIES),
@@ -278,15 +286,15 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 					cg.Domain = ct.Value
 				}
 			}
-			if err := clusHelper.PutGroup(&cg, true); err != nil {
+			if err := clusHelper.PutGroup(cg, true); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error()
 				//return errors.New("Put groupd error")
 				continue
 			}
 			groupAdded = append(groupAdded, group.Name)
-			if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
-				targetGroupDlpWAF = true
-			}
+		}
+		if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
+			targetGroupDlpWAF = true
 		}
 	}
 
@@ -394,7 +402,7 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 			log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 			continue
 		}
-		if utils.IsGroupLearned(name) {
+		if utils.IsGroupLearned(name) || name == api.LearnedExternal {
 			cg.CfgType = share.Learned
 		} else {
 			cg.CfgType = share.UserCreated
@@ -1170,26 +1178,23 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 	return nil
 }
 
-func (h *nvCrdHandler) crdHandleDlpGroup(dlpGroupCfg *api.RESTCrdDlpGroupConfig, cfgType share.TCfgType) []string {
-	if dlpGroupCfg != nil && dlpGroupCfg.RepSensors != nil {
-		sensors := make([]string, 0, len(*dlpGroupCfg.RepSensors))
-		settings := make([]*share.CLUSDlpSetting, 0, len(*dlpGroupCfg.RepSensors))
-		for _, setting := range *dlpGroupCfg.RepSensors {
-			sensors = append(sensors, setting.Name)
-			settings = append(settings, &share.CLUSDlpSetting{
+func (h *nvCrdHandler) crdHandleDlpGroup(name string, dlpGroupCfg *api.RESTCrdDlpGroupConfig, cfgType share.TCfgType) []string {
+	if dlpGroupCfg != nil {
+		sensors := make([]string, len(dlpGroupCfg.RepSensors))
+		settings := make([]*share.CLUSDlpSetting, len(dlpGroupCfg.RepSensors))
+		for idx, setting := range dlpGroupCfg.RepSensors {
+			sensors[idx] = setting.Name
+			settings[idx] = &share.CLUSDlpSetting{
 				Name:   setting.Name,
 				Action: setting.Action,
-			})
+			}
 		}
 		dlpGroup := &share.CLUSDlpGroup{
-			Name:    dlpGroupCfg.Name,
+			Name:    name,
 			Sensors: settings,
 			CfgType: cfgType,
 		}
-		if dlpGroupCfg.Status != nil {
-			dlpGroup.Status = *dlpGroupCfg.Status
-		}
-
+		dlpGroup.Status = dlpGroupCfg.Status
 		clusHelper.PutDlpGroup(dlpGroup, false)
 		return sensors
 	}
@@ -1241,26 +1246,23 @@ func (h *nvCrdHandler) crdHandleDlpSensor(scope string, dlpSensorConf *api.RESTD
 	return err
 }
 
-func (h *nvCrdHandler) crdHandleWafGroup(wafGroupCfg *api.RESTCrdWafGroupConfig, cfgType share.TCfgType) []string {
-	if wafGroupCfg != nil && wafGroupCfg.RepSensors != nil {
-		sensors := make([]string, 0, len(*wafGroupCfg.RepSensors))
-		settings := make([]*share.CLUSWafSetting, 0, len(*wafGroupCfg.RepSensors))
-		for _, setting := range *wafGroupCfg.RepSensors {
-			sensors = append(sensors, setting.Name)
-			settings = append(settings, &share.CLUSWafSetting{
+func (h *nvCrdHandler) crdHandleWafGroup(name string, wafGroupCfg *api.RESTCrdWafGroupConfig, cfgType share.TCfgType) []string {
+	if wafGroupCfg != nil {
+		sensors := make([]string, len(wafGroupCfg.RepSensors))
+		settings := make([]*share.CLUSWafSetting, len(wafGroupCfg.RepSensors))
+		for idx, setting := range wafGroupCfg.RepSensors {
+			sensors[idx] = setting.Name
+			settings[idx] = &share.CLUSWafSetting{
 				Name:   setting.Name,
 				Action: setting.Action,
-			})
+			}
 		}
 		wafGroup := &share.CLUSWafGroup{
-			Name:    wafGroupCfg.Name,
+			Name:    name,
 			Sensors: settings,
 			CfgType: cfgType,
 		}
-		if wafGroupCfg.Status != nil {
-			wafGroup.Status = *wafGroupCfg.Status
-		}
-
+		wafGroup.Status = wafGroupCfg.Status
 		clusHelper.PutWafGroup(wafGroup, false)
 		return sensors
 	}
@@ -1400,11 +1402,11 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 			retMsg = fmt.Sprintf("%s Rule format error:   Group %s validate error %s", reviewTypeDisplay, groupCfg.Name, msg)
 			return retMsg, err
 		}
-	} else if groupCfg.Name == api.LearnedExternal ||
-		(strings.HasPrefix(groupCfg.Name, api.LearnedWorkloadPrefix) && groupCfg.Name[len(api.LearnedWorkloadPrefix):] == api.EndpointIngress) {
-		// Learned already processed, now skip external
+	} else if strings.HasPrefix(groupCfg.Name, api.LearnedWorkloadPrefix) &&
+		groupCfg.Name[len(api.LearnedWorkloadPrefix):] == api.EndpointIngress {
+		// Learned already processed, now skip Workload:ingress
 		return "", 0
-	} else if groupCfg.Name == api.AllHostGroup { // reserved group
+	} else if groupCfg.Name == api.AllHostGroup || groupCfg.Name == api.LearnedExternal { // reserved group
 		if groupCfg.Criteria == nil || len(*groupCfg.Criteria) == 0 {
 			// correct criteria
 			*curGroups = append(*curGroups, *crdgroupCfg)
@@ -1438,7 +1440,7 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 				return retMsg, err
 			} else if hasAddrCT && crdCfgRet != nil && (crdCfgRet.DlpGroupCfg != nil || crdCfgRet.WafGroupCfg != nil) {
 				retMsg = fmt.Sprintf("%s Rule format error:   Group %s with address criterion cannot have DLP/WAF policy", reviewTypeDisplay, groupCfg.Name)
-				return retMsg, 1
+				return retMsg, api.RESTErrInvalidRequest
 			}
 		}
 		// make sure Criteria didn't duplicate
@@ -1480,6 +1482,10 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 	// 2. If the crd group already exists, keep the existing crd group unchanged.
 	// 3. If group doesn't exist yet, create a crd nv.ip.xxx group that has "domain" key(if applicable) in criteria (i.e. drop "address" & other criteria).
 	if g, _, _ := clusHelper.GetGroup(groupCfg.Name, acc); g != nil {
+		if g.Kind != share.GroupKindContainer && (crdCfgRet != nil && (crdCfgRet.DlpGroupCfg != nil || crdCfgRet.WafGroupCfg != nil)) {
+			retMsg = fmt.Sprintf("%s Rule format error:   Group %s cannot have DLP/WAF policy", reviewTypeDisplay, groupCfg.Name)
+			return retMsg, api.RESTErrInvalidRequest
+		}
 		rg_criteria := criteria2REST(g.Criteria)
 		if isNvIpGroup {
 			// found existing nv.ip.xxx group(learned or crd). use its criteria as this group's criteria.
@@ -1790,16 +1796,14 @@ func (h *nvCrdHandler) parseCurCrdContent(gfwrule *resource.NvSecurityRule, revi
 	} else {
 		if gfwrule.Spec.DlpGroup != nil {
 			crdCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{
-				Name:       crdCfgRet.TargetName,
-				Status:     &gfwrule.Spec.DlpGroup.Status,
-				RepSensors: &gfwrule.Spec.DlpGroup.Settings,
+				Status:     gfwrule.Spec.DlpGroup.Status,
+				RepSensors: gfwrule.Spec.DlpGroup.Settings,
 			}
 		}
 		if gfwrule.Spec.WafGroup != nil {
 			crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{
-				Name:       crdCfgRet.TargetName,
-				Status:     &gfwrule.Spec.WafGroup.Status,
-				RepSensors: &gfwrule.Spec.WafGroup.Settings,
+				Status:     gfwrule.Spec.WafGroup.Status,
+				RepSensors: gfwrule.Spec.WafGroup.Settings,
 			}
 		}
 	}
@@ -2311,7 +2315,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 
 	h.crdHandleGroupRecordDel(crdRecord, absentGroup, false)
 
-	log.WithFields(log.Fields{"name": recordName, "target": crdCfgRet.TargetName}).Debug()
+	log.WithFields(log.Fields{"name": recordName, "target": crdCfgRet.TargetName, "targetDlpWAF": targetGroupDlpWAF}).Debug()
 	var profile_mode string
 	if crdCfgRet.ProcessProfileCfg != nil {
 		// nodes, containers, service or user-defined groups
@@ -2328,8 +2332,14 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	crdRecord.Groups = groupNew
 	crdRecord.Rules = *ruleNew
 	if targetGroupDlpWAF {
-		crdRecord.DlpGroupSensors = h.crdHandleDlpGroup(crdCfgRet.DlpGroupCfg, share.GroundCfg)
-		crdRecord.WafGroupSensors = h.crdHandleWafGroup(crdCfgRet.WafGroupCfg, share.GroundCfg)
+		if crdCfgRet.DlpGroupCfg == nil {
+			crdCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]api.RESTCrdDlpGroupSetting, 0)}
+		}
+		if crdCfgRet.WafGroupCfg == nil {
+			crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
+		}
+		crdRecord.DlpGroupSensors = h.crdHandleDlpGroup(crdCfgRet.TargetName, crdCfgRet.DlpGroupCfg, share.GroundCfg)
+		crdRecord.WafGroupSensors = h.crdHandleWafGroup(crdCfgRet.TargetName, crdCfgRet.WafGroupCfg, share.GroundCfg)
 	}
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
 	if crdRecord.ProfileName != "" {
@@ -2702,7 +2712,9 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		// export group's dlp/waf data
-		exportDlpWafGroup(gname, &resptmp, acc)
+		if group.Kind == share.GroupKindContainer {
+			exportDlpWafGroup(gname, &resptmp, acc)
+		}
 
 		for _, idx := range group.PolicyRules {
 			if policy_ids.Contains(idx) {
@@ -2897,7 +2909,7 @@ func (h *nvCrdHandler) crdReadyToDeleteProfiles(targetCrdName string, group *api
 	}
 
 	// can not removed default group: "nodes" and "containers"
-	if profileName == api.AllHostGroup || profileName == api.AllContainerGroup {
+	if profileName == api.AllHostGroup || profileName == api.AllContainerGroup || profileName == api.LearnedExternal {
 		return false
 	}
 

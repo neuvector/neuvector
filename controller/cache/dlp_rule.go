@@ -2,18 +2,18 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
-	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const dlpCalculatingDelayFast = time.Duration(time.Second * 2)
@@ -90,8 +90,14 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 		log.WithFields(log.Fields{"sensor": sensor}).Debug("Update")
 
 	case cluster.ClusterNotifyDelete:
+		updategrp := false
 		cacheMutexLock()
 		if dlpsensor, ok := dlpSensors[sensor]; ok {
+			for cg, _ := range dlpsensor.Groups {
+				if dlpGroupSensors[cg] != nil && dlpGroupSensors[cg].Contains(sensor) {
+					updategrp = true
+				}
+			}
 			for _, cdrename := range dlpsensor.RuleListNames {
 				if dlpRuleSensors[cdrename] != nil {
 					dlpRuleSensors[cdrename].Remove(sensor)
@@ -100,6 +106,9 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 			delete(dlpSensors, sensor)
 		}
 		cacheMutexUnlock()
+		if updategrp {
+			scheduleDlpRuleCalculation(true)
+		}
 		deleteDlpRuleNetwork(sensor)
 	}
 }
@@ -716,9 +725,9 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 				cpt.Context = share.DlpPatternContextDefault
 			}
 			rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-				Key:   	 cpt.Key,
-				Value: 	 cpt.Value,
-				Op:    	 cpt.Op,
+				Key:     cpt.Key,
+				Value:   cpt.Value,
+				Op:      cpt.Op,
 				Context: cpt.Context,
 			})
 		}
@@ -741,9 +750,9 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 					cpt.Context = share.DlpPatternContextDefault
 				}
 				rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-					Key:   	 cpt.Key,
-					Value: 	 cpt.Value,
-					Op:    	 cpt.Op,
+					Key:     cpt.Key,
+					Value:   cpt.Value,
+					Op:      cpt.Op,
 					Context: cpt.Context,
 				})
 			}
@@ -774,6 +783,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
 		}
+		resp.CfgType, _ = cfgTypeMapping[cdr.CfgType]
 
 		for name, _ := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
@@ -791,9 +801,9 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 						cpt.Context = share.DlpPatternContextDefault
 					}
 					rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-						Key:   	 cpt.Key,
-						Value: 	 cpt.Value,
-						Op:    	 cpt.Op,
+						Key:     cpt.Key,
+						Value:   cpt.Value,
+						Op:      cpt.Op,
 						Context: cpt.Context,
 					})
 				}
@@ -811,9 +821,9 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 							cpt.Context = share.DlpPatternContextDefault
 						}
 						rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-							Key:   	 cpt.Key,
-							Value: 	 cpt.Value,
-							Op:    	 cpt.Op,
+							Key:     cpt.Key,
+							Value:   cpt.Value,
+							Op:      cpt.Op,
 							Context: cpt.Context,
 						})
 					}
@@ -833,9 +843,9 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 							cpt.Context = share.DlpPatternContextDefault
 						}
 						rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-							Key:   	 cpt.Key,
-							Value: 	 cpt.Value,
-							Op:    	 cpt.Op,
+							Key:     cpt.Key,
+							Value:   cpt.Value,
+							Op:      cpt.Op,
 							Context: cpt.Context,
 						})
 					}
@@ -852,9 +862,9 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 								cpt.Context = share.DlpPatternContextDefault
 							}
 							rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-								Key:   	 cpt.Key,
-								Value: 	 cpt.Value,
-								Op:    	 cpt.Op,
+								Key:     cpt.Key,
+								Value:   cpt.Value,
+								Op:      cpt.Op,
 								Context: cpt.Context,
 							})
 						}
@@ -900,6 +910,7 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
 		}
+		resp.CfgType, _ = cfgTypeMapping[cdr.CfgType]
 		for name, _ := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
 		}
@@ -915,9 +926,9 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 						cpt.Context = share.DlpPatternContextDefault
 					}
 					rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-						Key:   	 cpt.Key,
-						Value: 	 cpt.Value,
-						Op:    	 cpt.Op,
+						Key:     cpt.Key,
+						Value:   cpt.Value,
+						Op:      cpt.Op,
 						Context: cpt.Context,
 					})
 				}
@@ -935,9 +946,9 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 							cpt.Context = share.DlpPatternContextDefault
 						}
 						rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-							Key:   	 cpt.Key,
-							Value: 	 cpt.Value,
-							Op:    	 cpt.Op,
+							Key:     cpt.Key,
+							Value:   cpt.Value,
+							Op:      cpt.Op,
 							Context: cpt.Context,
 						})
 					}
@@ -957,9 +968,9 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 							cpt.Context = share.DlpPatternContextDefault
 						}
 						rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-							Key:   	 cpt.Key,
-							Value: 	 cpt.Value,
-							Op:    	 cpt.Op,
+							Key:     cpt.Key,
+							Value:   cpt.Value,
+							Op:      cpt.Op,
 							Context: cpt.Context,
 						})
 					}
@@ -976,9 +987,9 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 								cpt.Context = share.DlpPatternContextDefault
 							}
 							rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-								Key:   	 cpt.Key,
-								Value: 	 cpt.Value,
-								Op:    	 cpt.Op,
+								Key:     cpt.Key,
+								Value:   cpt.Value,
+								Op:      cpt.Op,
 								Context: cpt.Context,
 							})
 						}
@@ -1029,7 +1040,6 @@ func GetDlpOutsideGrpSensorAction(cg, sn string, out2ingrp map[string]map[string
 	return share.DlpRuleActionAllow
 }
 
-
 func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api.RESTDlpGroup, error) {
 	log.WithFields(log.Fields{"group": group}).Debug("")
 	cacheMutexRLock()
@@ -1042,13 +1052,19 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 				Status:  cg.Status,
 				Sensors: make([]*api.RESTDlpSetting, 0),
 			}
+			resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
+
 			for _, cs := range cg.Sensors {
 				rdsa := &api.RESTDlpSetting{
 					Name:   cs.Name,
 					Action: cs.Action,
 				}
+				rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
 				if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 					rdsa.Comment = dlpsensor.Comment
+					rdsa.Exist = true
+				} else {
+					rdsa.Exist = false
 				}
 				resp.Sensors = append(resp.Sensors, rdsa)
 			}
@@ -1075,11 +1091,19 @@ func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGr
 			Status:  cg.Status,
 			Sensors: make([]*api.RESTDlpSetting, 0),
 		}
+		resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
 
 		for _, cs := range cg.Sensors {
 			rdsa := &api.RESTDlpSetting{
 				Name:   cs.Name,
 				Action: cs.Action,
+			}
+			rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
+			if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
+				rdsa.Comment = dlpsensor.Comment
+				rdsa.Exist = true
+			} else {
+				rdsa.Exist = false
 			}
 			resp.Sensors = append(resp.Sensors, rdsa)
 		}

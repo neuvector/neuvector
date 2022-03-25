@@ -91,7 +91,6 @@ func (r *Registry) Manifest(ctx context.Context, repository, reference string) (
 		return nil, err
 	}
 
-	// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
 	signedManifest := &manifestV1.SignedManifest{}
 	err = signedManifest.UnmarshalJSON(body)
 	if err != nil {
@@ -113,7 +112,6 @@ func (r *Registry) ManifestV2(ctx context.Context, repository, reference string)
 		return nil, "", err
 	}
 
-	// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
 	deserialized := &manifestV2.DeserializedManifest{}
 	err = deserialized.UnmarshalJSON(body)
 	if err != nil {

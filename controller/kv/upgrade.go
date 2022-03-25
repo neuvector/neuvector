@@ -144,7 +144,11 @@ func upgradeGroup(group *share.CLUSGroup) (bool, bool) {
 		}
 
 		if group.BaselineProfile == "" {
-			group.BaselineProfile = share.ProfileBasic
+			if group.Name == api.AllHostGroup {
+				group.BaselineProfile = share.ProfileBasic // group "nodes" is always at "basic" baseline profile(not configurable by design)
+			} else {
+				group.BaselineProfile = share.ProfileZeroDrift // for learned groups, default to zero-drift mode
+			}
 			upd = true
 		}
 	} else if group.PolicyMode != "" || group.ProfileMode != "" {
