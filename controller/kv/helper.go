@@ -611,17 +611,20 @@ func (m clusterHelper) GetAllGroups(scope string, acc *access.AccessControl) map
 	store := share.CLUSConfigGroupStore
 	keys, _ := cluster.GetStoreKeys(store)
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
-			var group share.CLUSGroup
-			json.Unmarshal(value, &group)
+		gprName := share.CLUSGroupKey2Name(key)
+		if (getFed && strings.HasPrefix(gprName, api.FederalGroupPrefix)) || (getLocal && !strings.HasPrefix(gprName, api.FederalGroupPrefix)) {
+			if value, _, _ := m.get(key); value != nil {
+				var group share.CLUSGroup
+				json.Unmarshal(value, &group)
 
-			if !acc.Authorize(&group, nil) {
-				continue
-			}
+				if !acc.Authorize(&group, nil) {
+					continue
+				}
 
-			if (group.CfgType == share.FederalCfg && getFed) || (group.CfgType != share.FederalCfg && getLocal) ||
-				group.Name == api.LearnedExternal {
-				groups[group.Name] = &group
+				if (group.CfgType == share.FederalCfg && getFed) || (group.CfgType != share.FederalCfg && getLocal) ||
+					group.Name == api.LearnedExternal {
+					groups[group.Name] = &group
+				}
 			}
 		}
 	}
