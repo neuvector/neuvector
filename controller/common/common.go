@@ -552,6 +552,13 @@ func MergeProcess(list []*share.CLUSProcessProfileEntry, p *share.CLUSProcessPro
 			}
 		}
 
+		if p.ProbeCmd != "" {
+			if pp.ProbeCmd != p.ProbeCmd {
+				pp.ProbeCmd = p.ProbeCmd // updated with the latest fetching result
+				changed = true
+			}
+		}
+
 		//  New data, exclude from comparing different UID(s) to avoid duplicate entries
 		//	if p.Uid > 0 && p.Uid != pp.Uid {
 		//		pp.Uid = p.Uid

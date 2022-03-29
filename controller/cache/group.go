@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -1196,6 +1197,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
+		updateK8sPodEvent(wlc.learnedGroupName)
 		dispatchHelper.WorkloadJoin(wlc.workload.HostID, wlc.learnedGroupName, id, dptCustomGrpAdds, isLeader())
 	}
 }
@@ -1770,4 +1772,11 @@ func (m CacheMethod) GetService(name string, view string, withCap bool, acc *acc
 		return group2Service(cache, view, withCap), nil
 	}
 	return nil, common.ErrObjectNotFound
+}
+
+func isNeuvectorContainerName(name string) bool {
+	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner)-pod`, name); err == nil {
+		return matched
+	}
+	return false
 }

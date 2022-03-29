@@ -1131,6 +1131,66 @@ func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 	updateInternalIPNet(ipnet, share.CLUSIPAddrScopeGlobal, true)
 }
 
+func addK8sPodEvent(pod resource.Pod) {
+	log.WithFields(log.Fields{"Name": pod.Name}).Debug()
+	var cmds [][]string
+	if len(pod.LivenessCmds) > 0 {
+		cmds = append(cmds, pod.LivenessCmds)
+	}
+
+	if len(pod.ReadinessCmds) > 0 {
+		cmds = append(cmds, pod.ReadinessCmds)
+	}
+
+	var name_alt string
+	if pos := strings.LastIndex(pod.Name, "-"); pos != -1 {
+		name_alt = fmt.Sprintf("nv.%s.%s", pod.Name[:pos], pod.Domain)
+	}
+
+	p := &k8sPodEvent{
+		pod:      pod,
+		group:    fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain),	// group name
+		groupAlt: name_alt, 	// a likely group name
+		cmds:     cmds,			// probe commands
+		cleanAt:  time.Now().Unix() + 60*30, // expired after 30 minutes
+	}
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+	var bFound bool
+	for group, _  := range groupCacheMap {
+		if group == p.group || group == p.groupAlt {
+			log.WithFields(log.Fields{"group": group}).Debug()
+			bFound = true
+			addK8sProbeApps(group, p.cmds)
+			delete(cacher.k8sPodEvents, p.group)
+			break
+		}
+	}
+
+	if !bFound {
+		cacher.k8sPodEvents[p.group] = p
+	}
+}
+
+func updateK8sPodEvent(group string) {
+	now := time.Now().Unix()
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+	for name, p := range cacher.k8sPodEvents {
+		if group == p.group || group == p.groupAlt {
+			log.WithFields(log.Fields{"name": name, "group": group}).Debug()
+			addK8sProbeApps(group, p.cmds)
+			delete(cacher.k8sPodEvents, name)
+		} else {
+			if now > p.cleanAt {
+				log.WithFields(log.Fields{"name": name}).Debug("Clean")
+				delete(cacher.k8sPodEvents, name)
+			}
+		}
+	}
+}
+
 func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
