@@ -64,7 +64,7 @@ const defaultClusterName string = "cluster.local"
 
 var DefaultSystemConfig = share.CLUSSystemConfig{
 	NewServicePolicyMode:      share.PolicyModeLearn,
-	NewServiceProfileBaseline: share.ProfileBasic,
+	NewServiceProfileBaseline: share.ProfileZeroDrift,
 	UnusedGroupAging:          share.UnusedGroupAgingDefault,
 	CLUSSyslogConfig: share.CLUSSyslogConfig{
 		SyslogIP:         nil,
