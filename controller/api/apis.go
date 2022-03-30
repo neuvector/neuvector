@@ -2407,11 +2407,12 @@ type RESTDlpRulesData struct {
 }
 
 type RESTDlpSetting struct {
-	Name    string `json:"name"`
-	Action  string `json:"action"`
-	Exist   bool   `json:"exist"`
-	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the DLP sensor's cfgType
+	Name        string `json:"name"`
+	Action      string `json:"action"`
+	Exist       bool   `json:"exist"`
+	Predefine   bool   `json:"predefine"`
+	Comment     string `json:"comment,omitempty"`
+	CfgType     string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the DLP sensor's cfgType
 }
 
 type RESTDlpGroup struct {

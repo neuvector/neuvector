@@ -1061,6 +1061,10 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 					Action: cs.Action,
 				}
 				rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
+				presen := getPreDlpRuleFromDefaultSensor(cs.Name)
+				if presen != nil {
+					rdsa.Predefine = true
+				}
 				if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 					rdsa.Comment = dlpsensor.Comment
 					rdsa.Exist = true
@@ -1100,6 +1104,10 @@ func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGr
 				Action: cs.Action,
 			}
 			rdsa.CfgType, _ = cfgTypeMapping[cg.CfgType]
+			presen := getPreDlpRuleFromDefaultSensor(cs.Name)
+			if presen != nil {
+				rdsa.Predefine = true
+			}
 			if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 				rdsa.Comment = dlpsensor.Comment
 				rdsa.Exist = true
