@@ -1243,16 +1243,26 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	var secRuleList resource.NvWafSecurityRuleList
 	var secRule resource.NvWafSecurityRule
 	var secRules []*resource.NvWafSecurityRule = []*resource.NvWafSecurityRule{nil}
-	if err1 := json.Unmarshal(json_data, &secRuleList); err1 != nil || len(secRuleList.Items) == 0 {
-		if err2 := json.Unmarshal(json_data, &secRule); err2 != nil {
-			msg := "Invalid security rule(s)"
-			log.WithFields(log.Fields{"error1": err1, "error2": err2}).Error(msg)
-			postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_WAF)
-			return nil
+	var invalidCrdKind bool
+	var err error
+	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
+		if err = json.Unmarshal(json_data, &secRule); err == nil {
+			secRules[0] = &secRule
 		}
-		secRules[0] = &secRule
 	} else {
 		secRules = secRuleList.Items
+	}
+	for _, r := range secRules {
+		if r.Kind == nil || *r.Kind != resource.NvWafSecurityRuleKind {
+			invalidCrdKind = true
+			break
+		}
+	}
+	if invalidCrdKind || len(secRules) == 0 {
+		msg := "Invalid security rule(s)"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_WAF)
+		return nil
 	}
 
 	var inc float32
@@ -1266,7 +1276,6 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	importTask.Status = share.IMPORT_RUNNING
 	clusHelper.PutImportTask(&importTask)
 
-	var err error
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
 	if crdHandler.AcquireLock(clusterLockWait) {
