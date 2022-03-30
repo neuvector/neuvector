@@ -88,7 +88,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), snapshotter: snapshotter,
 	}
 
-	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim")
+	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim", "containerd-shim-runc-v1", "containerd-shim-runc-v2")
 	return &driver, nil
 }
 

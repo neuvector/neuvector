@@ -109,6 +109,8 @@ type Pod struct {
 	OwnerUID  string
 	OwnerName string
 	OwnerType string
+	LivenessCmds  []string
+	ReadinessCmds []string
 }
 
 type ImageTag struct {
