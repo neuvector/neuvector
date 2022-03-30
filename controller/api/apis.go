@@ -1494,6 +1494,7 @@ const (
 	WebhookDefaultName = "default"
 	WebhookTypeSlack   = "Slack"
 	WebhookTypeJSON    = "JSON"
+	WebhookTypeTeams   = "Teams"
 )
 
 type RESTWebhook struct {
