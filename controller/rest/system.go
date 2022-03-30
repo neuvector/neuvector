@@ -363,7 +363,7 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 		log.WithFields(log.Fields{"name": h.Name, "url": h.Url, "error": err}).Error("Invalid webhook URL")
 		return api.RESTErrInvalidRequest, errors.New("Invalid webhook URL")
 	}
-	if h.Type != "" && h.Type != api.WebhookTypeSlack && h.Type != api.WebhookTypeJSON {
+	if h.Type != "" && h.Type != api.WebhookTypeSlack && h.Type != api.WebhookTypeJSON && h.Type != api.WebhookTypeTeams {
 		log.WithFields(log.Fields{"name": h.Name, "type": h.Type}).Error("Invalid webhook type")
 		return api.RESTErrInvalidRequest, errors.New("Invalid webhook type")
 	}
@@ -1216,7 +1216,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
 				}
 			}
-		} else if scope == share.ScopeFed  && rconf.FedConfig != nil {
+		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
 			// webhook for fed system config
 			if rconf.FedConfig.Webhooks != nil {
 				if webhooks, errCode, err := configWebhooks(nil, rconf.FedConfig.Webhooks, cconf.Webhooks, share.FederalCfg, acc); err != nil {
