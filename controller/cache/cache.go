@@ -92,6 +92,7 @@ type workloadCache struct {
 	platformRole     string
 	displayName      string
 	podName          string
+	serviceAccount   string
 	scanBrief        *api.RESTScanBrief
 	children         utils.Set
 }
@@ -160,6 +161,7 @@ var effectiveInternalSubnets map[string]share.CLUSSubnet = make(map[string]share
 var cachedSpecialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var effectiveSpecialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var wlEphemeral []*workloadEphemeral
+var nodePodSAMap map[string]map[string]string = make(map[string]map[string]string) // key is node name, value is map[workload id]{service account of the pod}
 
 type Context struct {
 	k8sVersion               string
@@ -1734,36 +1736,60 @@ func startWorkerThread() {
 						connectOrchWorkloadDelete(&o.IPNet)
 					}
 					if n != nil {
-						queryK8sVer := false
-						if localDev.Host.Flavor == share.FlavorOpenShift {
-							if n.Domain == "openshift-apiserver" && strings.HasPrefix(n.Name, "apiserver-") {
-								queryK8sVer = true
-							}
-						} else if n.Domain == "kube-system" {
-							if strings.HasPrefix(n.Name, "kube-apiserver-") {
-								queryK8sVer = true
-							} else if strings.Index(cctx.k8sVersion, "-eks-") > 0 && strings.HasPrefix(n.Name, "kube-proxy-") {
-								queryK8sVer = true
-							} else if strings.Index(cctx.k8sVersion, "-gke.") > 0 && strings.HasPrefix(n.Name, "kube-dns-autoscaler-") {
-								queryK8sVer = true
-							}
-						}
-						if queryK8sVer {
-							if k8sVer, _ := global.ORCH.GetVersion(true, false); k8sVer != "" && cctx.k8sVersion != k8sVer {
-								log.WithFields(log.Fields{"oldVer": cctx.k8sVersion, "newVer": k8sVer}).Info()
-								cctx.k8sVersion = k8sVer
-								resource.SetK8sVersion(k8sVer)
-								scanMapDelete(common.ScanPlatformID)
-								scanMapAdd(common.ScanPlatformID, "", nil, share.ScanObjectType_PLATFORM)
-							}
-						}
 						if o == nil { // create
+							queryK8sVer := false
+							if localDev.Host.Flavor == share.FlavorOpenShift {
+								if n.Domain == "openshift-apiserver" && strings.HasPrefix(n.Name, "apiserver-") {
+									queryK8sVer = true
+								}
+							} else if n.Domain == "kube-system" {
+								if strings.HasPrefix(n.Name, "kube-apiserver-") {
+									queryK8sVer = true
+								} else if strings.Index(cctx.k8sVersion, "-eks-") > 0 && strings.HasPrefix(n.Name, "kube-proxy-") {
+									queryK8sVer = true
+								} else if strings.Index(cctx.k8sVersion, "-gke.") > 0 && strings.HasPrefix(n.Name, "kube-dns-autoscaler-") {
+									queryK8sVer = true
+								}
+							}
+							if queryK8sVer {
+								QueryK8sVersion()
+							}
+
 							if !isNeuvectorContainerName(n.Name) {
 								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
 									addK8sPodEvent(*n)
 								}
 							}
 						}
+						if n.SA != "" && n.ContainerID != "" {
+							cacheMutexLock()
+							if wl, ok := wlCacheMap[n.ContainerID]; ok {
+								if wl.serviceAccount != n.SA {
+									wl.serviceAccount = n.SA
+									if wl.workload.ShareNetNS != "" {
+										if parent, ok := wlCacheMap[wl.workload.ShareNetNS]; ok {
+											parent.serviceAccount = n.SA
+										}
+									}
+								}
+							} else {
+								var podSAMap map[string]string
+								if podSAMap, ok = nodePodSAMap[n.Node]; podSAMap == nil {
+									podSAMap = make(map[string]string, 1)
+									nodePodSAMap[n.Node] = podSAMap
+								}
+								podSAMap[n.ContainerID] = n.SA
+							}
+							cacheMutexUnlock()
+						}
+					} else if o != nil && n == nil { // delete
+						cacheMutexLock()
+						if podSAMap, ok := nodePodSAMap[o.Node]; podSAMap != nil {
+							if _, ok = podSAMap[o.ContainerID]; ok {
+								delete(podSAMap, o.ContainerID)
+							}
+						}
+						cacheMutexUnlock()
 					}
 				case resource.RscTypeService:
 					if isLeader() {
@@ -1984,6 +2010,16 @@ func CacheEvent(ev share.TLogEvent, msg string) error {
 	}
 
 	return nil
+}
+
+func QueryK8sVersion() {
+	if k8sVer, _ := global.ORCH.GetVersion(true, false); k8sVer != "" && k8sVer != cctx.k8sVersion {
+		log.WithFields(log.Fields{"oldVer": cctx.k8sVersion, "newVer": k8sVer}).Info()
+		cctx.k8sVersion = k8sVer
+		resource.SetK8sVersion(k8sVer)
+		scanMapDelete(common.ScanPlatformID)
+		scanMapAdd(common.ScanPlatformID, "", nil, share.ScanObjectType_PLATFORM)
+	}
 }
 
 ////// event handlers for enforcer's kv dispatcher

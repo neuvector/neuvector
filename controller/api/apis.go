@@ -879,6 +879,7 @@ type RESTWorkload struct {
 	MemoryLimit  int64                    `json:"memory_limit"`
 	CPUs         string                   `json:"cpus"`
 	Children     []*RESTWorkload          `json:"children"`
+	ServiceAccount string                 `json:"service_account"`
 }
 
 type RESTWorkloadDetail struct {

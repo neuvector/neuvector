@@ -351,7 +351,7 @@ func main() {
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init)
+		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion)
 	}
 
 	// Assign controller interface/IP scope
