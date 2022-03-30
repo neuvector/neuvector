@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -37,6 +38,8 @@ type groupCache struct {
 	ingressDMZ          int
 	egressDMZ           int
 	timerTask           string
+	atmo_d2m            int64
+	atmo_m2p            int64
 }
 
 func isIPSvcGrpInternal(group *share.CLUSGroup) bool {
@@ -479,7 +482,7 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			groupCacheMap[group.Name] = cache
 		}
 		if ok := isCreateDlpGroup(&group); ok {
-			createDlpGroup(group.Name)
+			createDlpGroup(group.Name, group.CfgType)
 		}
 		if ok := isCreateWafGroup(&group); ok {
 			createWafGroup(group.Name, group.CfgType)
@@ -878,17 +881,17 @@ func createLearnedGroup(wlc *workloadCache, policyMode, baseline string, notScor
 	}
 
 	cg := &share.CLUSGroup{
-		Name:         wlc.learnedGroupName,
-		Comment:      comment,
-		CfgType:      share.Learned,
-		Criteria:     criteria,
-		PolicyMode:   policyMode,
-		ProfileMode:  policyMode,
-		NotScored:    notScored,
-		Domain:       wlc.workload.Domain,
-		Kind:         share.GroupKindContainer,
-		PlatformRole: wlc.workload.PlatformRole,
-		CapIntcp:     wlc.workload.CapIntcp,
+		Name:            wlc.learnedGroupName,
+		Comment:         comment,
+		CfgType:         share.Learned,
+		Criteria:        criteria,
+		PolicyMode:      policyMode,
+		ProfileMode:     policyMode,
+		NotScored:       notScored,
+		Domain:          wlc.workload.Domain,
+		Kind:            share.GroupKindContainer,
+		PlatformRole:    wlc.workload.PlatformRole,
+		CapIntcp:        wlc.workload.CapIntcp,
 		BaselineProfile: baseline,
 	}
 
@@ -929,7 +932,7 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 
 	var baseline string
 	if svc.BaselineProfile == nil || *svc.BaselineProfile == "" {
-		baseline = getNewServiceProfileBaseline()	// default
+		baseline = getNewServiceProfileBaseline() // default
 	} else {
 		baseline = *svc.BaselineProfile
 	}
@@ -1149,7 +1152,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// order of cluster watch update for workload and group is not guaranteed.
 	// Would it cause issue?
 	// Join and create learned group.
-	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache){
+	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
 			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
@@ -1196,6 +1199,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
+		updateK8sPodEvent(wlc.learnedGroupName)
 		dispatchHelper.WorkloadJoin(wlc.workload.HostID, wlc.learnedGroupName, id, dptCustomGrpAdds, isLeader())
 	}
 }
@@ -1660,12 +1664,12 @@ func (p ByResponseRuleOrder) Less(i, j int) bool {
 func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 	idx := len(api.LearnedGroupPrefix)
 	sv := api.RESTService{
-		Name:         gc.group.Name[idx:],
-		PolicyMode:   gc.group.PolicyMode,
-		ProfileMode:  gc.group.ProfileMode,
-		NotScored:    gc.group.NotScored,
-		Domain:       gc.group.Domain,
-		PlatformRole: gc.group.PlatformRole,
+		Name:            gc.group.Name[idx:],
+		PolicyMode:      gc.group.PolicyMode,
+		ProfileMode:     gc.group.ProfileMode,
+		NotScored:       gc.group.NotScored,
+		Domain:          gc.group.Domain,
+		PlatformRole:    gc.group.PlatformRole,
 		BaselineProfile: gc.group.BaselineProfile,
 	}
 	if withCap {
@@ -1770,4 +1774,11 @@ func (m CacheMethod) GetService(name string, view string, withCap bool, acc *acc
 		return group2Service(cache, view, withCap), nil
 	}
 	return nil, common.ErrObjectNotFound
+}
+
+func isNeuvectorContainerName(name string) bool {
+	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner)-pod`, name); err == nil {
+		return matched
+	}
+	return false
 }

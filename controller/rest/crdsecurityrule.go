@@ -433,22 +433,21 @@ func (h *nvCrdHandler) crdUpdateDlpSensors() {
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	defSensor := clusHelper.GetDlpSensor(share.CLUSDlpDefaultSensor)
-	if defSensor != nil {
+	for _, sensor := range clusHelper.GetAllDlpSensors() {
 		var modified bool
-		for _, rule := range defSensor.RuleList {
-			if rule.CfgType == share.GroundCfg {
-				rule.CfgType = share.UserCreated
-				modified = true
+		if sensor.CfgType == share.GroundCfg {
+			sensor.CfgType = share.UserCreated
+			modified = true
+		}
+		if sensor.Name == share.CLUSDlpDefaultSensor {
+			for _, rule := range sensor.RuleList {
+				if rule.CfgType == share.GroundCfg {
+					rule.CfgType = share.UserCreated
+					modified = true
+				}
 			}
 		}
 		if modified {
-			clusHelper.PutDlpSensorTxn(txn, defSensor)
-		}
-	}
-	for _, sensor := range clusHelper.GetAllDlpSensors() {
-		if sensor.CfgType == share.GroundCfg {
-			sensor.CfgType = share.UserCreated
 			clusHelper.PutDlpSensorTxn(txn, sensor)
 		}
 	}
@@ -460,22 +459,21 @@ func (h *nvCrdHandler) crdUpdateWafSensors() {
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	defSensor := clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
-	if defSensor != nil {
+	for _, sensor := range clusHelper.GetAllWafSensors() {
 		var modified bool
-		for _, rule := range defSensor.RuleList {
-			if rule.CfgType == share.GroundCfg {
-				rule.CfgType = share.UserCreated
-				modified = true
+		if sensor.CfgType == share.GroundCfg {
+			sensor.CfgType = share.UserCreated
+			modified = true
+		}
+		if sensor.Name == share.CLUSWafDefaultSensor {
+			for _, rule := range sensor.RuleList {
+				if rule.CfgType == share.GroundCfg {
+					rule.CfgType = share.UserCreated
+					modified = true
+				}
 			}
 		}
 		if modified {
-			clusHelper.PutWafSensorTxn(txn, defSensor)
-		}
-	}
-	for _, sensor := range clusHelper.GetAllWafSensors() {
-		if sensor.CfgType == share.GroundCfg {
-			sensor.CfgType = share.UserCreated
 			clusHelper.PutWafSensorTxn(txn, sensor)
 		}
 	}

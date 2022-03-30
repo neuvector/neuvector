@@ -387,6 +387,7 @@ var defaultSensorAllWafRule = &share.CLUSWafSensor{
 	PreRuleList: make(map[string][]*share.CLUSWafRule),
 	Comment:     commentDefaultWafSensor,
 	Predefine:   true,
+	CfgType:     share.SystemDefined,
 }
 
 //lock is alreay hold when call this function

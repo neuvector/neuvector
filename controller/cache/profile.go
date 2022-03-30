@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -402,4 +403,32 @@ func AddProcessReport(gproc map[string][]*share.CLUSProcessProfileEntry) bool {
 	processEntries = append(processEntries, gproc)
 	processEntryMux.Unlock()
 	return true
+}
+
+func addK8sProbeApps(group string, probeCmds [][]string) {
+	gproc := make(map[string][]*share.CLUSProcessProfileEntry)
+	var procs []*share.CLUSProcessProfileEntry
+	for _, cmds := range probeCmds {
+		exe := filepath.Base(cmds[0])
+		path := filepath.Clean(cmds[0])
+		if exe == path {
+			// it does not have a complete path
+			path = "*"
+		}
+		proc := &share.CLUSProcessProfileEntry{
+			Name:      exe,
+			Path:      path,
+			ProbeCmd:  strings.TrimSuffix(strings.Join(cmds, ","), ","),
+			Action:    share.PolicyActionLearn,
+			CfgType:   share.Learned,
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+		}
+		procs = append(procs, proc)
+	}
+
+	if len(procs) > 0 {
+		gproc[group] = procs
+		AddProcessReport(gproc)
+	}
 }

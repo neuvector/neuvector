@@ -212,6 +212,22 @@ func (m CacheMethod) GetUnusedGroupAging() uint8 {
 	return getUnusedGroupAging()
 }
 
+func getModeAutoD2M() (bool, int64) {
+	return systemConfigCache.ModeAutoD2M, systemConfigCache.ModeAutoD2MDuration
+}
+
+func (m CacheMethod) GetModeAutoD2M() (bool, int64) {
+	return getModeAutoD2M()
+}
+
+func getModeAutoM2P() (bool, int64) {
+	return systemConfigCache.ModeAutoM2P, systemConfigCache.ModeAutoM2PDuration
+}
+
+func (m CacheMethod) GetModeAutoM2P() (bool, int64) {
+	return getModeAutoM2P()
+}
+
 func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemConfig {
 	if !acc.Authorize(&systemConfigCache, nil) {
 		return nil
@@ -245,6 +261,10 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		XffEnabled:                systemConfigCache.XffEnabled,
 		NetServiceStatus:          systemConfigCache.NetServiceStatus,
 		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
+		ModeAutoD2M:               systemConfigCache.ModeAutoD2M,
+		ModeAutoD2MDuration:  	   systemConfigCache.ModeAutoD2MDuration,
+		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
+		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -369,6 +389,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			cfg.NetServicePolicyMode != systemConfigCache.NetServicePolicyMode {
 				scheduleIPPolicyCalculation(true)
 		}
+		automodeConfigUpdate(cfg, systemConfigCache)
 	case cluster.ClusterNotifyDelete:
 		// Triggered at configuration import
 		cfg = common.DefaultSystemConfig

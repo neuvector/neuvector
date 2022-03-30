@@ -670,6 +670,22 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 		if o.Spec != nil {
 			r.Node = o.Spec.GetNodeName()
 			r.HostNet = o.Spec.GetHostNetwork()
+			for _, c := range o.Spec.GetContainers() {
+				liveness := c.GetLivenessProbe()
+				readiness := c.GetReadinessProbe()
+				if liveness != nil || readiness != nil {
+					if handler := liveness.GetHandler(); handler != nil {
+						if exec := handler.GetExec(); exec != nil {
+							r.LivenessCmds = exec.GetCommand()
+						}
+					}
+					if handler := readiness.GetHandler(); handler != nil {
+						if exec := handler.GetExec(); exec != nil {
+							r.ReadinessCmds = exec.GetCommand()
+						}
+					}
+				}
+			}
 		}
 		if o.Status != nil {
 			if ip := net.ParseIP(o.Status.GetPodIP()); ip != nil {

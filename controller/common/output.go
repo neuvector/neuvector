@@ -238,6 +238,12 @@ func (w *Webhook) Notify(elog interface{}, target, level, category, cluster, tit
 			fields["text"] = logText
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
 			data, _ = json.Marshal(fields)
+		} else if target == api.WebhookTypeTeams {
+			fields := make(map[string]string)
+			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
+			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
+			data, _ = json.Marshal(fields)
 		} else if target == api.WebhookTypeJSON {
 			extra := fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster)
 			data, _ = json.Marshal(elog)

@@ -1494,6 +1494,7 @@ const (
 	WebhookDefaultName = "default"
 	WebhookTypeSlack   = "Slack"
 	WebhookTypeJSON    = "JSON"
+	WebhookTypeTeams   = "Teams"
 )
 
 type RESTWebhook struct {
@@ -1537,6 +1538,10 @@ type RESTSystemConfigConfig struct {
 	IBMSAEpDashboardURL       *string         `json:"ibmsa_ep_dashboard_url,omitempty"`
 	XffEnabled                *bool           `json:"xff_enabled,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
+	ModeAutoD2M               *bool           `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration       *int64          `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P               *bool           `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration       *int64          `json:"mode_auto_m2p_duration"`
 }
 
 type RESTSysNetConfigConfig struct {
@@ -1602,6 +1607,10 @@ type RESTSystemConfig struct {
 	XffEnabled                bool          `json:"xff_enabled"`
 	NetServiceStatus          bool          `json:"net_service_status"`
 	NetServicePolicyMode      string        `json:"net_service_policy_mode"`
+	ModeAutoD2M               bool          `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration       int64         `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P               bool          `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration       int64         `json:"mode_auto_m2p_duration"`
 }
 
 type RESTIBMSAConfig struct {
@@ -2403,7 +2412,7 @@ type RESTDlpSetting struct {
 	Exist       bool   `json:"exist"`
 	Predefine   bool   `json:"predefine"`
 	Comment     string `json:"comment,omitempty"`
-	CfgType     string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType     string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the DLP sensor's cfgType
 }
 
 type RESTDlpGroup struct {
@@ -2428,11 +2437,11 @@ type RESTDlpConfig struct {
 }
 
 type RESTDlpGroupConfig struct {
-	Name       string            `json:"name"`
-	Status     *bool             `json:"status,omitempty"`
-	DelSensors *[]string         `json:"delete,omitempty"`  //delete list used by CLI
-	Sensors    *[]RESTDlpConfig  `json:"sensors,omitempty"` //change list used by CLI
-	RepSensors *[]RESTDlpConfig  `json:"replace,omitempty"` //replace list used by GUI
+	Name       string           `json:"name"`
+	Status     *bool            `json:"status,omitempty"`
+	DelSensors *[]string        `json:"delete,omitempty"`  //delete list used by CLI
+	Sensors    *[]RESTDlpConfig `json:"sensors,omitempty"` //change list used by CLI
+	RepSensors *[]RESTDlpConfig `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpGroupConfigData struct {
@@ -2591,7 +2600,7 @@ type RESTWafSetting struct {
 	Action  string `json:"action"`
 	Exist   bool   `json:"exist"`
 	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the WAF sensor's cfgType
 }
 
 type RESTWafGroup struct {

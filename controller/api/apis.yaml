@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 4.4.4
+  version: 5.0.0
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -68,6 +68,8 @@ tags:
     description: Operations about User
   - name: Vulnerability
     description: Operations about Vulnerability management
+  - name: WAF Rule
+    description: Operations about waf Rule
   - name: Workload
     description: Operations about Workload
 
@@ -171,6 +173,27 @@ paths:
           required: true
           schema:
             $ref: '#/definitions/RESTAdmissionRuleConfigData'
+      responses:
+        '200':
+          description: Success
+  /admission/rule/promote:
+    post:
+      tags:
+        - Admission
+      summary: Promote admission control rule
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Admission control rule data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAdmCtrlPromoteRequestData'
       responses:
         '200':
           description: Success
@@ -461,174 +484,6 @@ paths:
       responses:
         '200':
           description: Success
-  /cloud/aws:
-    post:
-      tags:
-        - Cloud
-      summary: Create an AWS scan project
-      consumes:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: body
-          name: body
-          description: AWS scan project data
-          required: true
-          schema:
-            $ref: '#/definitions/RESTAwsResourceCreate'
-      responses:
-        '200':
-          description: Success
-  /cloud/aws/{name}:
-    patch:
-      tags:
-        - Cloud
-      summary: Update an AWS scan project
-      consumes:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: AWS scan project name
-          required: true
-          type: string
-        - in: body
-          name: body
-          description: AWS scan project update data
-          required: true
-          schema:
-            $ref: '#/definitions/RESTAwsResourceConfig'
-      responses:
-        '200':
-          description: Success
-    delete:
-      tags:
-        - Cloud
-      summary: Delete an AWS scan project
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: AWS scan project name
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-  /cloud/aws/{name}/scan:
-    post:
-      tags:
-        - Cloud
-      summary: Start an AWS resource scan
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: AWS scan project name
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-    delete:
-      tags:
-        - Cloud
-      summary: Stop an AWS resource scan
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: AWS scan project name
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-  /cloud/aws/lambda/{project}/{region}/{name}:
-    get:
-      tags:
-        - Cloud
-      summary: Get AWS Lambda function detail
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: project
-          description: Project name
-          required: true
-          type: string
-        - in: path
-          name: region
-          description: Region name
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: Function name
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-          schema:
-            $ref: '#/definitions/RESTAwsFunction'
-  /cloud/aws/project:
-    get:
-      tags:
-        - Cloud
-      summary: Get Cloud resource list
-      produces:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-          schema:
-            $ref: '#/definitions/RESTCloudResList'
-  /cloud/aws/project/{name}:
-    get:
-      tags:
-        - Cloud
-      summary: Get AWS Cloud Resource
-      produces:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: path
-          name: name
-          description: Function name
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-          schema:
-            $ref: '#/definitions/RESTAwsResource'
   /compliance/profile:
     get:
       tags:
@@ -1358,6 +1213,33 @@ paths:
       responses:
         '200':
           description: Success. Get a yaml file.
+  /file/admission/config:
+    post:
+      tags:
+        - File
+      description: Importing admission config. The payload body is the content of the admission config yaml file.
+      summary: import admission config
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: admission config yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
   /file/config:
     get:
       tags:
@@ -1395,6 +1277,116 @@ paths:
       responses:
         '200':
           description: Success. Upload a configure file.
+  /file/dlp:
+    post:
+      tags:
+        - File
+      summary: Export DLP configuration as a yaml format
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "It exports the DLP configurations when the scope is local."
+        - in: body
+          name: body
+          description: Configuration data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTDlpSensorExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /file/dlp/config:
+    post:
+      tags:
+        - File
+      description: Importing DLP config. The payload body is the content of the DLP config yaml file.
+      summary: import DLP config
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: DLP config yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+  /file/waf:
+    post:
+      tags:
+        - File
+      summary: Export waf configuration as a yaml format
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "It exports the waf configurations when the scope is local."
+        - in: body
+          name: body
+          description: Configuration data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTWafSensorExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /file/waf/config:
+    post:
+      tags:
+        - File
+      description: Importing waf config. The payload body is the content of the waf config yaml file.
+      summary: import waf config
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: waf config yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
   /file/group:
     get:
       tags:
@@ -1437,6 +1429,22 @@ paths:
         '200':
           description: Success. Get a yaml file.
   /file/group/config:
+    get:
+      tags:
+        - File
+      summary: Get import status
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTImportTaskData'
     post:
       tags:
         - File
@@ -2086,6 +2094,27 @@ paths:
       responses:
         '200':
           description: Success
+  /policy/rules/promote:
+    post:
+      tags:
+        - Policy
+      summary: Promote policy
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Policy promote data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTPolicyPromoteRequestData'
+      responses:
+        '200':
+          description: Success
   /process_profile:
     get:
       tags:
@@ -2511,31 +2540,6 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/package:
-    post:
-      tags:
-        - Scan
-      summary: Request package scan
-      consumes:
-        - application/json
-      produces:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: body
-          name: body
-          description: Request package scan data
-          required: true
-          schema:
-            $ref: '#/definitions/RESTScanPackageReqData'
-      responses:
-        '200':
-          description: Success
-          schema:
-            $ref: '#/definitions/RESTScanPkgReportData'
   /scan/registry:
     get:
       tags:
@@ -3371,6 +3375,23 @@ paths:
       responses:
         '200':
           description: Success
+  /system/rbac:
+    get:
+      tags:
+        - System
+      summary: Get missing Kubernetes RBAC
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTK8sNvRbacStatus'
   /system/request:
     post:
       tags:
@@ -3418,27 +3439,6 @@ paths:
           name: X-Auth-Token
           required: true
           type: string
-      responses:
-        '200':
-          description: Success
-  /system/license/request:
-    post:
-      tags:
-        - System
-      summary: License code request
-      consumes:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-        - in: body
-          name: body
-          description: License request data
-          required: true
-          schema:
-            $ref: '#/definitions/RESTLicenseRequestData'
       responses:
         '200':
           description: Success
@@ -3869,6 +3869,224 @@ paths:
       responses:
         '200':
           description: Success
+  /waf/sensor:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf rule list
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "The default value is local which returns local waf rule list."
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafSensorsData'
+    post:
+      tags:
+        - WAF Rule
+      summary: Create waf sensor
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Sensor data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTDlpSensorConfigData'
+      responses:
+        '200':
+          description: Success
+  /waf/sersor/{name}:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf sensor detail
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf sensor name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafSensorData'
+    patch:
+      tags:
+        - WAF Rule
+      summary: Update a waf sensor
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf sensor name
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: waf sensor data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTWafSensorConfigData'
+      responses:
+        '200':
+          description: Success
+    delete:
+      tags:
+        - WAF Rule
+      summary: Delete a waf sensor
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf sensor name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+  /waf/group:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf group list
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "The default value is local. It returns local waf group list."
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafGroupsData'
+  /waf/group/{name}:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf group detail
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf group name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafGroupData'
+    patch:
+      tags:
+        - WAF Rule
+      summary: Update a waf group
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf group name
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: waf group data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTWafGroupConfigData'
+      responses:
+        '200':
+          description: Success
+  /waf/rule:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf rule list
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafRulesData'
+  /waf/rule/{name}:
+    get:
+      tags:
+        - WAF Rule
+      summary: Get waf rule detail
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: name
+          description: waf rule name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWafRuleData'
   /workload:
     get:
       tags:
@@ -4529,6 +4747,24 @@ definitions:
     properties:
       k8s_options:
         $ref: '#/definitions/RESTAdmRuleOptions'
+  RESTAdmCtrlPromoteRequest:
+    type: object
+    required:
+      - ids
+    properties:
+      ids:
+        type: array
+        items:
+          type: integer
+          format: uint32
+          example: 12
+  RESTAdmCtrlPromoteRequestData:
+    type: object
+    required:
+      - request
+    properties:
+      request:
+        $ref: '#/definitions/RESTAdmCtrlPromoteRequest'
   RESTAdmCtrlRulesExport:
     type: object
     properties:
@@ -5587,6 +5823,33 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/RESTControllerConfig'
+  RESTCrdDlpGroupSetting:
+    type: object
+    required:
+      - name
+      - action
+    properties:
+      name:
+        type: string
+        example: ""
+      action:
+        type: string
+        example: ""
+  RESTCrdDlpGroupConfig:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        example: ""
+      status:
+        type: boolean
+        example: false
+      replace:
+        type: array
+        items:
+          $ref: '#/definitions/RESTCrdDlpGroupSetting'
   RESTCriteriaEntry:
     type: object
     required:
@@ -5596,13 +5859,13 @@ definitions:
     properties:
       key:
         type: string
-        example: image
+        example: "pattern"
       value:
         type: string
-        example: kafkadocker_kafka
+        example: "[0-9]"
       op:
         type: string
-        example: =
+        example: "regex"
   RESTCustomCheck:
     type: object
     required:
@@ -5734,18 +5997,22 @@ definitions:
       - name
       - id
       - patterns
+      - cfg_type
     properties:
       name:
         type: string
-        example: "rule.ssn"
+        example: "testrule413251424153561246153614615462515134635"
       id:
         type: integer
         format: uint32
-        example: 101
+        example: 4001
       patterns:
         type: array
         items:
           $ref: '#/definitions/RESTCriteriaEntry'
+      cfg_type:
+        type: string
+        example: "ground"
   RESTDlpRuleData:
     type: object
     required:
@@ -5787,6 +6054,7 @@ definitions:
       - rules
       - comment
       - predefine
+      - cfg_type
     properties:
       name:
         type: string
@@ -5795,9 +6063,7 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "external"
-            - "nodes"
+          example: ["external", "nodes"]
       rules:
         type: array
         items:
@@ -5808,6 +6074,9 @@ definitions:
       predefine:
         type: boolean
         example: true
+      cfg_type:
+        type: string
+        example: "ground"
   RESTDlpSensorConfig:
     type: object
     required:
@@ -5845,6 +6114,16 @@ definitions:
     properties:
       sensor:
         $ref: '#/definitions/RESTDlpSensor'
+  RESTDlpSensorExport:
+    type: object
+    required:
+      - names
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: [""]
   RESTDlpSensorsData:
     type: object
     required:
@@ -5898,7 +6177,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ""
+          example: [""]
   RESTDomainConfig:
     type: object
     properties:
@@ -5937,7 +6216,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ""
+          example: [""]
   RESTDomainEntryConfigData:
     type: object
     required:
@@ -6043,7 +6322,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ""
+          example: [""]
   RESTFileMonitorFileData:
     type: object
     required:
@@ -6169,6 +6448,7 @@ definitions:
     type: object
     required:
       - name
+      - comment
       - learned
       - reserved
       - not_scored
@@ -6177,10 +6457,14 @@ definitions:
       - kind
       - platform_role
       - cfg_type
+      - baseline_profile
     properties:
       name:
         type: string
-        example:
+        example: ""
+      comment:
+        type: string
+        example: ""
       learned:
         type: boolean
         example: true
@@ -6189,10 +6473,10 @@ definitions:
         example: false
       policy_mode:
         type: string
-        example:
+        example: ""
       profile_mode:
         type: string
-        example:
+        example: ""
       not_scored:
         type: boolean
         example: true
@@ -6211,6 +6495,9 @@ definitions:
         type: string
         example: ""
       cfg_type:
+        type: string
+        example: "ground"
+      baseline_profile:
         type: string
         example: ""
       cap_change_mode:
@@ -6505,26 +6792,26 @@ definitions:
     properties:
       tid:
         type: string
-        example: ""
+        example: "c5af897b62a258212ece91c0551d3a4a"
       ctrler_id:
         type: string
-        example: ""
+        example: "6e60452b244b90456f3450c9fed0a50f57f4b849dcb74a5fad289e8116f32f36"
       last_update_time:
         type: string
         format: date-time
-        example: "1995-09-07T10:40:52Z"
+        example: "2022-03-17T17:31:55.832768041Z"
       percentage:
         type: integer
-        example:
+        example: 100
       triggered_by:
         type: string
-        example:
+        example: "admin"
       status:
         type: string
-        example:
+        example: "done"
       temp_token:
         type: string
-        example:
+        example: ""
   RESTImportTaskData:
     type: object
     required:
@@ -6604,22 +6891,35 @@ definitions:
       password:
         type: string
         example: "password"
+  RESTK8sNvRbacStatus:
+    type: object
+    required:
+      - clusterrole_errors
+      - clusterrolebinding_errors
+      - rolebinding_errors
+    properties:
+      clusterrole_errors:
+        type: array
+        items:
+          type: string
+          example: "Kubernetes clusterrole \"neuvector-binding-customresourcedefinition\" is required to grant create,get,update,watch permission(s) on customresourcedefinitions resource(s)."
+      clusterrolebinding_errors:
+        type: array
+        items:
+          type: string
+          example: "Cannot find Kubernetes clusterrolebinding \"neuvector-binding-nvwafsecurityrules\"(kubernetes api: Failure 404 clusterrolebindings.rbac.authorization.k8s.io \"neuvector-binding-nvwafsecurityrules\" not found)."
+      rolebinding_errors:
+        type: array
+        items:
+          type: string
+          example: ""
   RESTLicenseInfo:
     type: object
     required:
       - name
       - email
       - phone
-      - license_model
-      - instance_id
-      - instance_key
-      - issue
-      - expire
       - installation_id
-      - node_limit
-      - scan
-      - enforce
-      - serverless
     properties:
       name:
         type: string
@@ -6636,48 +6936,9 @@ definitions:
       id_type:
         type: string
         example: ""
-      licence_type:
-        type: string
-        example: "system"
-      license_model:
-        type: string
-        example: ""
-      instance_id:
-        type: string
-        example: ""
-      instance_key:
-        type: string
-        example: ""
-      issue:
-        type: string
-        example: "2020-11-13T05:03:47Z"
-      expire:
-        type: string
-        example: "2021-03-31"
       installation_id:
         type: string
         example: "ae2049871b8dd5b002fb7980f3a8c59f"
-      grace_period:
-        type: integer
-        example: 3
-      node_limit:
-        type: integer
-        example: 2
-      cpu_limit:
-        type: integer
-        example: 1
-      multi_cluster_limit:
-        type: integer
-        example: 1
-      scan:
-        type: boolean
-        example: false
-      enforce:
-        type: boolean
-        example: true
-      serverless:
-        type: boolean
-        example: true
   RESTLicenseKey:
     type: object
     properties:
@@ -6690,11 +6951,6 @@ definitions:
       - name
       - email
       - phone
-      - months
-      - node_limit
-      - multi_cluster_limit
-      - scan
-      - enforce
     properties:
       name:
         type: string
@@ -6705,24 +6961,6 @@ definitions:
       phone:
         type: string
         example: ""
-      months:
-        type: integer
-        example: 2
-      node_limit:
-        type: integer
-        example: 3
-      cpu_limit:
-        type: integer
-        example: 1
-      multi_cluster_limit:
-        type: integer
-        example: 2
-      scan:
-        type: boolean
-        example: true
-      enforce:
-        type: boolean
-        example: false
   RESTLicenseRequestData:
     type: object
     required:
@@ -6734,13 +6972,9 @@ definitions:
     type: object
     required:
       - info
-      - day_to_expire
     properties:
       info:
         $ref: '#/definitions/RESTLicenseInfo'
-      day_to_expire:
-        type: integer
-        example: 5
   RESTLicenseShowData:
     type: object
     required:
@@ -6840,6 +7074,24 @@ definitions:
       status:
         type: string
         example: ""
+  RESTPolicyPromoteRequest:
+    type: object
+    required:
+      - ids
+    properties:
+      ids:
+        type: array
+        items:
+          type: integer
+          format: uint32
+          example: 12
+  RESTPolicyPromoteRequestData:
+    type: object
+    required:
+      - request
+    properties:
+      request:
+        $ref: '#/definitions/RESTPolicyPromoteRequest'
   RESTPolicyRule:
     type: object
     required:
@@ -9144,8 +9396,10 @@ definitions:
     type: object
     required:
       - name
+      - comment
       - policy_mode
       - profile_mode
+      - not_scored
       - domain
       - platform_role
       - members
@@ -9153,16 +9407,23 @@ definitions:
       - response_rules
       - ingress_exposure
       - egress_exposure
+      - baseline_profile
     properties:
       name:
         type: string
         example: iperfc
+      comment:
+        type: string
+        example: ""
       policy_mode:
         type: string
         example: Learn
       profile_mode:
         type: string
         example: Learn
+      not_scored:
+        type: boolean
+        example: false
       domain:
         type: string
         example: ""
@@ -9189,6 +9450,9 @@ definitions:
       egress_exposure:
         type: boolean
         example: false
+      baseline_profile:
+        type: string
+        example: ""
       cap_change_mode:
         type: boolean
         example: false
@@ -9216,6 +9480,7 @@ definitions:
     required:
       - name
       - domain
+      - comment
     properties:
       name:
         type: string
@@ -9223,9 +9488,18 @@ definitions:
       domain:
         type: string
         example: ""
+      comment:
+        type: string
+        example: ""
       policy_mode:
         type: string
         example: ""
+      baseline_profile:
+        type: string
+        example: ""
+      not_scored:
+        type: boolean
+        example: true
   RESTServiceConfigData:
     type: object
     required:
@@ -9244,6 +9518,12 @@ definitions:
       policy_mode:
         type: string
         example: Monitor
+      baseline_profile:
+        type: string
+        example: ""
+      not_scored:
+        type: boolean
+        example: false
   RESTServiceBatchConfigData:
     type: object
     required:
@@ -9353,10 +9633,20 @@ definitions:
         $ref: '#/definitions/RESTMetry'
       span_60:
         $ref: '#/definitions/RESTMetry'
+  RESTSysNetConfigConfig:
+    type: object
+    properties:
+      net_service_status:
+        type: boolean
+        example: true
+      net_service_policy_mode:
+        type: string
+        example: ""
   RESTSystemConfig:
     type: object
     required:
       - new_service_policy_mode
+      - new_service_profile_baseline
       - unused_group_aging
       - syslog_ip
       - syslog_ip_proto
@@ -9365,8 +9655,10 @@ definitions:
       - syslog_status
       - syslog_categories
       - syslog_in_json
+      - single_cve_per_syslog
       - auth_order
       - auth_by_platform
+      - rancher_ep
       - webhooks
       - cluster_name
       - controller_debug
@@ -9380,10 +9672,15 @@ definitions:
       - ibmsa_ep_dashboard_url
       - ibmsa_ep_connected_at
       - xff_enabled
+      - net_service_status
+      - net_service_policy_mode
     properties:
       new_service_policy_mode:
         type: string
         example: Discover
+      new_service_profile_baseline:
+        type: string
+        example: "zero-drift"
       unused_group_aging:
         type: integer
         format: uint8
@@ -9413,6 +9710,9 @@ definitions:
       syslog_in_json:
         type: boolean
         example: true
+      single_cve_per_syslog:
+        type: boolean
+        example: false
       auth_order:
         type: array
         items:
@@ -9421,6 +9721,9 @@ definitions:
       auth_by_platform:
         type: boolean
         example: true
+      rancher_ep:
+        type: string
+        example: ""
       configured_internal_subnets:
         type: array
         items:
@@ -9467,6 +9770,12 @@ definitions:
       xff_enabled:
         type: boolean
         example: false
+      net_service_status:
+        type: boolean
+        example: false
+      net_service_policy_mode:
+        type: string
+        example: "Monitor"
   RESTSystemConfigData:
     type: object
     required:
@@ -9480,7 +9789,6 @@ definitions:
   RESTSystemConfigConfig:
     type: object
     required:
-      - cluster_name
       - single_cve_per_syslog
     properties:
       new_service_policy_mode:
@@ -9526,6 +9834,15 @@ definitions:
       auth_by_platform:
         type: boolean
         example: true
+      rancher_ep:
+        type: string
+        example: ""
+      webhook_status:
+        type: string
+        example:
+      webhook_url:
+        type: string
+        example: "https://hooks.slack.com/services/T00000000"
       webhooks:
         type: array
         items:
@@ -9560,16 +9877,120 @@ definitions:
       xff_enabled:
         type: boolean
         example: false
+  RESTSystemConfigConfigCfgMap:
+    type: object
+    required:
+      - single_cve_per_syslog
+      - always_reload
+    properties:
+      new_service_policy_mode:
+        type: string
+        example: Discover
+      unused_group_aging:
+        type: integer
+        format: uint8
+        example: 123
+      syslog_ip:
+        type: string
+        example: ""
+      syslog_ip_proto:
+        type: integer
+        format: uint8
+        example: 6
+      syslog_port:
+        type: integer
+        format: uint16
+        example: 514
+      syslog_level:
+        type: string
+        example: INFO
+      syslog_status:
+        type: boolean
+        example: false
+      syslog_categories:
+        type: array
+        items:
+          type: string
+          example: ["event", "violation", "threat", "incident"]
+      syslog_in_json:
+        type: boolean
+        example: true
+      single_cve_per_syslog:
+        type: boolean
+        example: true
+      auth_order:
+        type: array
+        items:
+          type: string
+          example: ""
+      auth_by_platform:
+        type: boolean
+        example: true
+      rancher_ep:
+        type: string
+        example: ""
+      webhook_status:
+        type: string
+        example: ""
+      webhook_url:
+        type: string
+        example: "https://hooks.slack.com/services/T00000000"
+      webhooks:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWebhook'
+      cluster_name:
+        type: string
+        example: cluster1
+      controller_debug:
+        type: array
+        items:
+          type: string
+          example: all
+      monitor_service_mesh:
+        type: boolean
+        example: true
+      registry_http_proxy_status:
+        type: boolean
+        example: true
+      registry_https_proxy_status:
+        type: boolean
+        example: false
+      registry_http_proxy:
+        $ref: '#/definitions/RESTProxy'
+      registry_https_proxy:
+        $ref: '#/definitions/RESTProxy'
+      ibmsa_ep_enabled:
+        type: boolean
+        example: false
+      ibmsa_ep_dashboard_url:
+        type: string
+        example: ""
+      xff_enabled:
+        type: boolean
+        example: false
+      net_service_status:
+        type: boolean
+        example: true
+      net_service_policy_mode:
+        type: string
+        example: ""
+      always_reload:
+        type: boolean
+        example: false
   RESTSystemConfigConfigData:
     type: object
     required:
       - config
       - fed_config
+      - net_config
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
       fed_config:
         $ref: '#/definitions/RESTSystemConfigConfig'
+      net_config:
+        $ref: '#/definitions/RESTSysNetConfigConfig'
   RESTSystemSummary:
     type: object
     required:
@@ -10327,6 +10748,271 @@ definitions:
       fixed_version:
         type: string
         example: ""
+  RESTWafConfig:
+    type: object
+    required:
+      - name
+      - action
+    properties:
+      name:
+        type: string
+        example: ""
+      action:
+        type: string
+        example: ""
+      comment:
+        type: string
+        example: ""
+  RESTWafCriteriaEntry:
+    type: object
+    required:
+      - key
+      - value
+      - op
+    properties:
+      key:
+        type: string
+        example: "pattern"
+      value:
+        type: string
+        example: "[0-9]"
+      op:
+        type: string
+        example: "regex"
+      context:
+        type: string
+        example: "packet"
+  RESTWafGroupConfig:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        example: ""
+      status:
+        type: boolean
+        example: false
+      delete:
+        type: array
+        items:
+          type: string
+          example: ""
+      sensors:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafConfig'
+      replace:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafConfig'
+  RESTWafGroupConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTWafGroupConfig'
+  RESTWafGroup:
+    type: object
+    required:
+      - name
+      - status
+      - sensors
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: "nv.kube-proxy.kube-system"
+      status:
+        type: boolean
+        example: true
+      sensors:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafSetting'
+      cfg_type:
+        type: string
+        example: "learned"
+  RESTWafGroupData:
+    type: object
+    required:
+      - waf_group
+    properties:
+      waf_group:
+        $ref: '#/definitions/RESTWafGroup'
+  RESTWafGroupsData:
+    type: object
+    required:
+      - waf_groups
+    properties:
+      waf_groups:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafGroup'
+  RESTWafRule:
+    type: object
+    required:
+      - name
+      - id
+      - patterns
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: "test"
+      id:
+        type: integer
+        format: uint32
+        example: 40003
+      patterns:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafCriteriaEntry'
+      cfg_type:
+        type: string
+        example: "user_created"
+  RESTWafRuleData:
+    type: object
+    required:
+      - rule
+    properties:
+      rule:
+        $ref: '#/definitions/RESTWafRuleDetail'
+  RESTWafRuleDetail:
+    type: object
+    required:
+      - sensors
+      - rules
+    properties:
+      sensors:
+        type: array
+        items:
+          type: string
+          example: "test"
+      rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+  RESTWafRulesData:
+    type: object
+    required:
+      - rules
+    properties:
+      rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+  RESTWafSensor:
+    type: object
+    required:
+      - name
+      - groups
+      - rules
+      - comment
+      - predefine
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: "test4321546242574254672462572452615362453"
+      groups:
+        type: array
+        items:
+          type: string
+          example: "nv.kube-proxy.kube-system"
+      rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+      comment:
+        type: string
+        example: ""
+      predefine:
+        type: boolean
+        example: false
+      cfg_type:
+        type: string
+        example: "user_created"
+  RESTWafSensorConfig:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        example: ""
+      change:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+      delete:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+      rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafRule'
+      comment:
+        type: string
+        example: ""
+  RESTWafSensorConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTWafSensorConfig'
+  RESTWafSensorData:
+    type: object
+    required:
+      - sensor
+    properties:
+      sensor:
+        $ref: '#/definitions/RESTWafSensor'
+  RESTWafSensorExport:
+    type: object
+    required:
+      - names
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: "test4321546242574254672462572452615362453"
+  RESTWafSensorsData:
+    type: object
+    required:
+      - sensors
+    properties:
+      sensors:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWafSensor'
+  RESTWafSetting:
+    type: object
+    required:
+      - name
+      - action
+      - exist
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: "test"
+      action:
+        type: string
+        example: "deny"
+      exist:
+        type: boolean
+        example: true
+      comment:
+        type: string
+        example: ""
+      cfg_type:
+        type: string
+        example: "user_created"
   RESTWebhook:
     type: object
     required:
@@ -10569,6 +11255,7 @@ definitions:
       - service_mesh_sidecar
       - privileged
       - run_as_root
+      - baseline_profile
     properties:
       id:
         type: string
@@ -10645,6 +11332,9 @@ definitions:
       run_as_root:
         type: boolean
         example: true
+      baseline_profile:
+        type: string
+        example: ""
   RESTWorkloadConfig:
     type: object
     required:

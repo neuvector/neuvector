@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,9 +21,11 @@ import (
 const (
 	AppFileName = "apps_pkg"
 
-	nodeModules = "node_modules"
-	nodePackage = "package.json"
-	nodeJs      = "node.js"
+	nodeModules1 = "/usr/lib/node_modules"
+	nodeModules2 = "/usr/local/lib/node_modules"
+	nodeModules  = "node_modules"
+	nodePackage  = "package.json"
+	nodeJs       = "node.js"
 
 	wpname           = "Wordpress"
 	WPVerFileSuffix  = "wp-includes/version.php"
@@ -37,6 +38,15 @@ const (
 	serverInfoMaxLines = 100
 	tomcatName         = "Tomcat"
 	jarMaxDepth        = 2
+
+	javaPOMproperty    = "/pom.properties"
+	javaPOMgroupId     = "groupId="
+	javaPOMartifactId  = "artifactId="
+	javaPOMversion     = "version="
+	javaManifest       = "MANIFEST.MF"
+	javaMnfstVendorId  = "Implementation-Vendor-Id:"
+	javaMnfstVersion   = "Implementation-Version:"
+	javaMnfstTitle     = "Implementation-Title:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -306,7 +316,43 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 					}
 				}
 			}
-		} else if strings.HasSuffix(f.Name, javaPOMXML) {
+		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
+			var groupId, version, artifactId string
+			rc, err := f.Open()
+			if err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("open pom file fail")
+				continue
+			}
+			defer rc.Close()
+
+			scanner := bufio.NewScanner(rc)
+			for scanner.Scan() {
+				line := scanner.Text()
+				switch {
+				case strings.HasPrefix(line, javaPOMgroupId):
+					groupId = strings.TrimSpace(strings.TrimPrefix(line, javaPOMgroupId))
+				case strings.HasPrefix(line, javaPOMversion):
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaPOMversion))
+				case strings.HasPrefix(line, javaPOMartifactId):
+					artifactId = strings.TrimSpace(strings.TrimPrefix(line, javaPOMartifactId))
+				}
+
+				if len(groupId) > 0  && len(version) > 0 && len(artifactId) > 0 {
+					break
+				}
+			}
+
+			pkg := AppPackage{
+				AppName:    jar,
+				FileName:   filename,
+				ModuleName: fmt.Sprintf("%s:%s", groupId, artifactId),
+				Version:    version,
+			}
+
+			pkgs[filename] = []AppPackage{pkg}
+			break	// higher priority
+		} else if strings.HasSuffix(f.Name, javaManifest) {
+			var vendorId, version, title string
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open pom.xml file fail")
@@ -314,87 +360,31 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 			}
 			defer rc.Close()
 
-			txt := make([]byte, pomReadSize)
-			n, err := io.ReadFull(rc, txt)
-			if err != nil && err != io.ErrUnexpectedEOF {
-				log.WithFields(log.Fields{"err": err}).Error("read pom.xml file fail")
-				continue
-			}
-			d := xml.NewDecoder(bytes.NewReader(txt[:n]))
-			if d == nil {
-				log.WithFields(log.Fields{"file": f.Name}).Error("New pom.xml decoder fail")
-				continue
-			}
-			var proj mvnProject
-			err = d.Decode(&proj)
-			if err != nil {
-				log.WithFields(log.Fields{"file": f.Name}).Error("Decode pom.xml fail")
-				continue
-			}
-
-			verMap := make(map[string]string)
-			scanner := bufio.NewScanner(bytes.NewReader(txt[:n]))
+			scanner := bufio.NewScanner(rc)
 			for scanner.Scan() {
 				line := scanner.Text()
-				match := verRegexp.FindAllStringSubmatch(line, 1)
-				if len(match) > 0 {
-					s := match[0]
-					v1 := s[1]
-					ver := s[2]
-					v2 := s[3]
-					if v1 == v2 && v1 != "version" {
-						verMap[v1] = ver
-					}
+				switch {
+				case strings.HasPrefix(line, javaMnfstVendorId):
+					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
+				case strings.HasPrefix(line, javaMnfstVersion):
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
+				case strings.HasPrefix(line, javaMnfstTitle):
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
+				}
+
+				if len(vendorId) > 0  && len(title) > 0 && len(version) > 0 {
+					break
 				}
 			}
 
-			if proj.Parent.GroupId != "" && proj.Parent.ArtifactId != "" && proj.Parent.Version != "" {
-				if strings.HasPrefix(proj.Parent.Version, "${") && strings.HasSuffix(proj.Parent.Version, "}") {
-					rver := proj.Parent.Version[2 : len(proj.Parent.Version)-1]
-					v, ok := verMap[rver]
-					if !ok {
-						continue
-					}
-					proj.Parent.Version = v
-				}
-
-				pkg := AppPackage{
-					AppName:    jar,
-					ModuleName: proj.Parent.GroupId + ":" + proj.ArtifactId, // parent group + self artifact
-					Version:    proj.Parent.Version,
-					FileName:   filename,
-				}
-				if list, ok := pkgs[filename]; ok {
-					pkgs[filename] = append(list, pkg)
-				} else {
-					pkgs[filename] = []AppPackage{pkg}
-				}
+			pkg := AppPackage{
+				AppName:    jar,
+				FileName:   filename,
+				ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
+				Version:    version,
 			}
 
-			for _, dep := range proj.Dependencies {
-				if dep.GroupId != "" && dep.ArtifactId != "" && dep.Version != "" && dep.Scope != "test" {
-					if strings.HasPrefix(dep.Version, "${") && strings.HasSuffix(dep.Version, "}") {
-						rver := dep.Version[2 : len(dep.Version)-1]
-						v, ok := verMap[rver]
-						if !ok {
-							continue
-						}
-						dep.Version = v
-					}
-
-					pkg := AppPackage{
-						AppName:    jar,
-						ModuleName: dep.GroupId + ":" + dep.ArtifactId,
-						Version:    dep.Version,
-						FileName:   filename,
-					}
-					if list, ok := pkgs[filename]; ok {
-						pkgs[filename] = append(list, pkg)
-					} else {
-						pkgs[filename] = []AppPackage{pkg}
-					}
-				}
-			}
+			pkgs[filename] = []AppPackage{pkg}
 		}
 	}
 

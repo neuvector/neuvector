@@ -181,6 +181,14 @@ type Context struct {
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 }
 
+type k8sPodEvent struct {
+	pod      resource.Pod
+	group    string     // group name, index
+	groupAlt string     // likely group name
+	cmds     [][]string // k8s probe commands
+	cleanAt  int64      // terminated time
+}
+
 var cctx *Context
 var localDev *common.LocalDevice
 
@@ -196,6 +204,7 @@ type CacheMethod struct {
 	isScanner       bool
 	leaderElectedAt time.Time
 	disablePCAP     bool
+	k8sPodEvents    map[string]*k8sPodEvent
 }
 
 var cacher CacheMethod
@@ -1716,6 +1725,7 @@ func startWorkerThread() {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Pod)
 					}
+
 					// Assume IP doesn't change. Ignore host mode containers.
 					if (o == nil || o.IPNet.IP == nil) && (n != nil && !n.HostNet && n.IPNet.IP != nil) {
 						addrOrchWorkloadAdd(&n.IPNet, n.Node)
@@ -1745,6 +1755,13 @@ func startWorkerThread() {
 								resource.SetK8sVersion(k8sVer)
 								scanMapDelete(common.ScanPlatformID)
 								scanMapAdd(common.ScanPlatformID, "", nil, share.ScanObjectType_PLATFORM)
+							}
+						}
+						if o == nil { // create
+							if !isNeuvectorContainerName(n.Name) {
+								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
+									addK8sPodEvent(*n)
+								}
 							}
 						}
 					}
@@ -1911,6 +1928,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
+	cacher.k8sPodEvents = make(map[string]*k8sPodEvent)
 
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
@@ -1942,6 +1960,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	licenseInit()
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
 	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
+	automode_init(ctx)
 
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()
