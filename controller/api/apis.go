@@ -2402,7 +2402,7 @@ type RESTDlpSetting struct {
 	Action  string `json:"action"`
 	Exist   bool   `json:"exist"`
 	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the DLP sensor's cfgType
 }
 
 type RESTDlpGroup struct {
@@ -2427,11 +2427,11 @@ type RESTDlpConfig struct {
 }
 
 type RESTDlpGroupConfig struct {
-	Name       string            `json:"name"`
-	Status     *bool             `json:"status,omitempty"`
-	DelSensors *[]string         `json:"delete,omitempty"`  //delete list used by CLI
-	Sensors    *[]RESTDlpConfig  `json:"sensors,omitempty"` //change list used by CLI
-	RepSensors *[]RESTDlpConfig  `json:"replace,omitempty"` //replace list used by GUI
+	Name       string           `json:"name"`
+	Status     *bool            `json:"status,omitempty"`
+	DelSensors *[]string        `json:"delete,omitempty"`  //delete list used by CLI
+	Sensors    *[]RESTDlpConfig `json:"sensors,omitempty"` //change list used by CLI
+	RepSensors *[]RESTDlpConfig `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpGroupConfigData struct {
@@ -2590,7 +2590,7 @@ type RESTWafSetting struct {
 	Action  string `json:"action"`
 	Exist   bool   `json:"exist"`
 	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the WAF sensor's cfgType
 }
 
 type RESTWafGroup struct {

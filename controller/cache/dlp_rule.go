@@ -125,11 +125,12 @@ func isCreateDlpGroup(group *share.CLUSGroup) bool {
 	return false
 }
 
-func createDlpGroup(group string) {
+func createDlpGroup(group string, cfgType share.TCfgType) {
 	dlpgroup := &share.CLUSDlpGroup{
 		Name:    group,
 		Status:  true,
 		Sensors: make([]*share.CLUSDlpSetting, 0),
+		CfgType: cfgType,
 	}
 	if err := clusHelper.PutDlpGroup(dlpgroup, true); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Put dlp group fail")
