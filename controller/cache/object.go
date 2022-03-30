@@ -1543,10 +1543,12 @@ func registerEventHandlers() {
 	})
 	evhdls.Register(EV_GROUP_ADD, []eventHandlerFunc{
 		connectGroupAdd,
+		automodeGroupAdd,
 	})
 	evhdls.Register(EV_GROUP_DELETE, []eventHandlerFunc{
 		connectGroupDelete,
 		customGroupDelete,
+		automodeGroupDelete,
 	})
 	evhdls.Register(EV_WORKLOAD_AGENT_CHANGE, []eventHandlerFunc{
 		scanWorkloadAgentChange,
