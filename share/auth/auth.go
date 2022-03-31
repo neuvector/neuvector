@@ -22,10 +22,11 @@ var DefaultOIDCScopes []string = []string{oidc.ScopeOpenID, "profile", "email"}
 var MandateOIDCScopes []string = []string{oidc.ScopeOpenID}
 
 const (
-	ldapGroupFilter = "(%s=%s)"
-	adGroupFilter   = "(&(sAMAccountType=268435456)(%s=%s))"
-	ldapUserFilter  = "(%s=%s)"
-	adUserFilter    = "(&(sAMAccountType=805306368)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(%s=%s))"
+	ldapGroupFilter     = "(%s=%s)"
+	adGroupFilter       = "(&(sAMAccountType=268435456)(%s=%s))"
+	adNestedGroupFilter = "(&(member:1.2.840.113556.1.4.1941:=%s)(objectClass=group)(objectCategory=group))"
+	ldapUserFilter      = "(%s=%s)"
+	adUserFilter        = "(&(sAMAccountType=805306368)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(%s=%s))"
 
 	stateTimeout = int64(20 * 60)
 )
@@ -82,7 +83,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	}
 
 	if cldap.Type == api.ServerLDAPTypeMSAD {
-		client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(dn))
+		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, ldap.EscapeFilter(dn))
 	} else {
 		client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(username))
 	}
