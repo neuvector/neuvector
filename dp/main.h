@@ -5,8 +5,7 @@
 #include <sys/epoll.h>
 #include <netinet/ether.h>
 #include <arpa/inet.h>
-
-#include "libnetfilter_queue/libnetfilter_queue.h"
+#include <libnetfilter_queue/libnetfilter_queue.h>
 
 #include "urcu.h"
 #include "urcu/hlist.h"
