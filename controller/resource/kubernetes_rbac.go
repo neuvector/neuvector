@@ -217,8 +217,10 @@ var nvRoleBindings map[string]*k8sRoleBindingInfo = map[string]*k8sRoleBindingIn
 
 // Rancher SSO : (future) custom role?
 func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
+
+	// keep original behavior for oc platofrm login
 	if k8sFlavor == share.FlavorOpenShift {
-		// keep original behavior for oc platofrm login
+
 		for rsc, verbs := range r2v {
 			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
 				return api.UserRoleAdmin
@@ -226,12 +228,22 @@ func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map
 		}
 
 		for rsc, verbs := range r2v {
-			if rscs.Contains(rsc) && readVerbs.Intersect(verbs).Cardinality() != 0 {
+			if rscs.Contains(rsc) && ocReaderVerbs.Intersect(verbs).Cardinality() != 0 {
 				return api.UserRoleReader
 			}
 		}
 
 		return api.UserRoleNone
+	}
+
+	if readVerbs == nil {
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
+				return api.UserRoleAdmin
+			}
+		}
+
+		return api.UserRoleReader
 	} else {
 		var nvRole string
 		for rsc, verbs := range r2v {
@@ -316,7 +328,7 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 	if len(ag2r2v) > 0 {
 		var nvRole string
 		var rscsMap map[string]utils.Set = ocAdminRscsMap
-		var readVerbs utils.Set = ocReaderVerbs // users who has these verbs on specified resources are nv viewer
+		var readVerbs utils.Set
 		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
 			rscsMap = nvRscsMap
