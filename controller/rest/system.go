@@ -815,11 +815,11 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	var rconf api.RESTSystemConfigConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
-	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil) {
+	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil && rconf.AtmoConfig == nil) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
-	} else if rconf.Config != nil || rconf.NetConfig != nil {
+	} else if rconf.Config != nil || rconf.NetConfig != nil || rconf.AtmoConfig != nil {
 		// rconf.Config takes higher priority than rconf.FedConfig
 		scope = share.ScopeLocal
 		dummy.CfgType = share.UserCreated
@@ -896,6 +896,18 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 					return
 				}
+			}
+		}
+
+		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
+			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
+				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
+				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+			}
+
+			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
+				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
+				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
 			}
 		}
 
@@ -1144,16 +1156,6 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			//xff status
 			if rc.XffEnabled != nil {
 				cconf.XffEnabled = *rc.XffEnabled
-			}
-
-			if rc.ModeAutoD2M != nil && rc.ModeAutoD2MDuration != nil {
-				cconf.ModeAutoD2M = *rc.ModeAutoD2M
-				cconf.ModeAutoD2MDuration = *rc.ModeAutoD2MDuration
-			}
-
-			if rc.ModeAutoM2P != nil && rc.ModeAutoM2PDuration != nil {
-				cconf.ModeAutoM2P = *rc.ModeAutoM2P
-				cconf.ModeAutoM2PDuration = *rc.ModeAutoM2PDuration
 			}
 
 			// registry proxy
