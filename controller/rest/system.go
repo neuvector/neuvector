@@ -363,7 +363,7 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 		log.WithFields(log.Fields{"name": h.Name, "url": h.Url, "error": err}).Error("Invalid webhook URL")
 		return api.RESTErrInvalidRequest, errors.New("Invalid webhook URL")
 	}
-	if h.Type != "" && h.Type != api.WebhookTypeSlack && h.Type != api.WebhookTypeJSON {
+	if h.Type != "" && h.Type != api.WebhookTypeSlack && h.Type != api.WebhookTypeJSON && h.Type != api.WebhookTypeTeams {
 		log.WithFields(log.Fields{"name": h.Name, "type": h.Type}).Error("Invalid webhook type")
 		return api.RESTErrInvalidRequest, errors.New("Invalid webhook type")
 	}
@@ -815,11 +815,11 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	var rconf api.RESTSystemConfigConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
-	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil) {
+	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil && rconf.AtmoConfig == nil) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
-	} else if rconf.Config != nil || rconf.NetConfig != nil {
+	} else if rconf.Config != nil || rconf.NetConfig != nil || rconf.AtmoConfig != nil {
 		// rconf.Config takes higher priority than rconf.FedConfig
 		scope = share.ScopeLocal
 		dummy.CfgType = share.UserCreated
@@ -896,6 +896,18 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 					return
 				}
+			}
+		}
+
+		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
+			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
+				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
+				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+			}
+
+			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
+				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
+				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
 			}
 		}
 
@@ -1206,7 +1218,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
 				}
 			}
-		} else if scope == share.ScopeFed  && rconf.FedConfig != nil {
+		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
 			// webhook for fed system config
 			if rconf.FedConfig.Webhooks != nil {
 				if webhooks, errCode, err := configWebhooks(nil, rconf.FedConfig.Webhooks, cconf.Webhooks, share.FederalCfg, acc); err != nil {

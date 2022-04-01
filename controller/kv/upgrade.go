@@ -468,6 +468,18 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 			if upd, wrt := upgradeFileMonitorProfile(&cfg); upd {
 				return &cfg, wrt
 			}
+		case share.CFGEndpointDlpGroup:
+			var cfg share.CLUSDlpGroup
+			json.Unmarshal(value, &cfg)
+			if upd, wrt := upgradeDlpGroup(&cfg); upd {
+				return &cfg, wrt
+			}
+		case share.CFGEndpointDlpRule:
+			var cfg share.CLUSDlpSensor
+			json.Unmarshal(value, &cfg)
+			if upd, wrt := upgradeDlpSensor(&cfg); upd {
+				return &cfg, wrt
+			}
 		case share.CFGEndpointAdmissionControl, share.CFGEndpointCrd:
 			scope := share.CLUSPolicyKey2AdmCfgPolicySubkey(key, false)
 			if scope == share.DefaultPolicyName {
@@ -738,7 +750,7 @@ var phases []kvVersions = []kvVersions{
 
 	{"2C05EB31", createDefaultNetServiceSetting},
 
-	{"4C746652", resetDefDlpSensorCfgType},
+	{"4C746652", resetDlpCfgType},
 
 	{"825C9419", nil},
 }
@@ -1509,8 +1521,46 @@ func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 	return upd, upd
 }
 
-func resetDefDlpSensorCfgType() {
-	for _, cdr := range PreDlpSensors {
-		clusHelper.GetDlpSensor(cdr.Name)
+func upgradeDlpGroup(cfg *share.CLUSDlpGroup) (bool, bool) {
+	if cfg.CfgType == 0 {
+		key := share.CLUSGroupKey(cfg.Name)
+		if value, err := cluster.Get(key); err == nil {
+			var group share.CLUSGroup
+			json.Unmarshal(value, &group)
+			cfg.CfgType = group.CfgType
+			return true, true
+		}
 	}
+	return false, false
+}
+
+func upgradeDlpSensor(cfg *share.CLUSDlpSensor) (bool, bool) {
+	if cfg.CfgType == 0 {
+		if cfg.Predefine {
+			cfg.CfgType = share.SystemDefined
+			if cfg.Name == defaultSensorAllDlpRule.Name {
+				for _, cdr_list := range cfg.PreRuleList {
+					for _, cdr := range cdr_list {
+						if cdr.CfgType == 0 {
+							cdr.CfgType = share.SystemDefined
+						}
+					}
+				}
+				for _, cdr := range cfg.RuleList {
+					if cdr.CfgType == 0 {
+						cdr.CfgType = share.UserCreated
+					}
+				}
+			}
+		} else {
+			cfg.CfgType = share.UserCreated
+		}
+		return true, true
+	}
+	return false, false
+}
+
+func resetDlpCfgType() {
+	clusHelper.GetAllDlpSensors()
+	clusHelper.GetAllGroups(share.ScopeLocal, access.NewReaderAccessControl())
 }

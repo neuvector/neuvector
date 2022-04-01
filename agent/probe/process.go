@@ -2729,6 +2729,18 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 		}
 	}
 
+	if bFromPmon && global.RT.IsRuntimeProcess(proc.pname, nil) {
+		// k8s probe app command: treat it as an insider process
+		if ppe.Action == share.PolicyActionAllow && ppe.ProbeCmd != "" {
+			// meet the qualification
+			if ppe.Name == proc.name && ppe.ProbeCmd == strings.TrimSuffix(strings.Join(proc.cmds, ","), ",") {
+				c.outsider.Remove(proc.pid)
+				c.children.Add(proc.pid)
+				mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug("SHD:")
+			}
+		}
+	}
+
 	// mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
 	// ZeroDrift: allow a family member of the root process
 	if isFamilyProcess(c.children, proc) {

@@ -326,6 +326,7 @@ func workload2REST(cache *workloadCache) *api.RESTWorkload {
 		MemoryLimit:       wl.MemoryLimit,
 		CPUs:              wl.CPUs,
 		Children:          make([]*api.RESTWorkload, 0),
+		ServiceAccount:    cache.serviceAccount,
 	}
 
 	if wl.Running {
@@ -1131,6 +1132,80 @@ func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 	updateInternalIPNet(ipnet, share.CLUSIPAddrScopeGlobal, true)
 }
 
+func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
+	if wlCache.serviceAccount == "" && strings.HasPrefix(wlName, "k8s_") && !strings.HasPrefix(wlName, "k8s_POD_") {
+		var podSAMap map[string]string
+		if podSAMap, _ = nodePodSAMap[node]; podSAMap == nil {
+			podSAMap = make(map[string]string, 1)
+			nodePodSAMap[node] = podSAMap
+		}
+		if sa, ok := podSAMap[wlID]; ok {
+			wlCache.serviceAccount = sa
+			delete(podSAMap, wlID)
+		}
+	}
+}
+
+func addK8sPodEvent(pod resource.Pod) {
+	log.WithFields(log.Fields{"Name": pod.Name}).Debug()
+	var cmds [][]string
+	if len(pod.LivenessCmds) > 0 {
+		cmds = append(cmds, pod.LivenessCmds)
+	}
+
+	if len(pod.ReadinessCmds) > 0 {
+		cmds = append(cmds, pod.ReadinessCmds)
+	}
+
+	var name_alt string
+	if pos := strings.LastIndex(pod.Name, "-"); pos != -1 {
+		name_alt = fmt.Sprintf("nv.%s.%s", pod.Name[:pos], pod.Domain)
+	}
+
+	p := &k8sPodEvent{
+		pod:      pod,
+		group:    fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain), // group name
+		groupAlt: name_alt,                                      // a likely group name
+		cmds:     cmds,                                          // probe commands
+		cleanAt:  time.Now().Unix() + 60*30,                     // expired after 30 minutes
+	}
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+	var bFound bool
+	for group, _ := range groupCacheMap {
+		if group == p.group || group == p.groupAlt {
+			log.WithFields(log.Fields{"group": group}).Debug()
+			bFound = true
+			addK8sProbeApps(group, p.cmds)
+			delete(cacher.k8sPodEvents, p.group)
+			break
+		}
+	}
+
+	if !bFound {
+		cacher.k8sPodEvents[p.group] = p
+	}
+}
+
+func updateK8sPodEvent(group string) {
+	now := time.Now().Unix()
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+	for name, p := range cacher.k8sPodEvents {
+		if group == p.group || group == p.groupAlt {
+			log.WithFields(log.Fields{"name": name, "group": group}).Debug()
+			addK8sProbeApps(group, p.cmds)
+			delete(cacher.k8sPodEvents, name)
+		} else {
+			if now > p.cleanAt {
+				log.WithFields(log.Fields{"name": name}).Debug("Clean")
+				delete(cacher.k8sPodEvents, name)
+			}
+		}
+	}
+}
+
 func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
@@ -1183,6 +1258,8 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 				workloadAgentChange = true
 			}
 
+			setServiceAccount(wl.HostName, wl.ID, wl.Name, wlCache)
+
 			wlCache.workload = &wl
 			wlCache.state = ""
 
@@ -1216,6 +1293,9 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 				wlCache = initWorkloadCache()
 				wlCacheMap[wl.ID] = wlCache
 			}
+
+			setServiceAccount(wl.HostName, wl.ID, wl.Name, wlCache)
+
 			wlCache.workload = &wl
 
 			newWorkload = true
@@ -1232,9 +1312,12 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			// Update parent's children list. Create a dummy parent if not exist
 			if wl.ShareNetNS != "" {
 				if parent, ok := wlCacheMap[wl.ShareNetNS]; !ok {
-					wlCacheMap[wl.ShareNetNS] = initWorkloadCache()
+					wlParent := initWorkloadCache()
+					wlParent.serviceAccount = wlCache.serviceAccount
+					wlCacheMap[wl.ShareNetNS] = wlParent
 					wlCacheMap[wl.ShareNetNS].children.Add(wl.ID)
 				} else {
+					parent.serviceAccount = wlCache.serviceAccount
 					parent.children.Add(wl.ID)
 				}
 			}
@@ -1543,10 +1626,12 @@ func registerEventHandlers() {
 	})
 	evhdls.Register(EV_GROUP_ADD, []eventHandlerFunc{
 		connectGroupAdd,
+		automodeGroupAdd,
 	})
 	evhdls.Register(EV_GROUP_DELETE, []eventHandlerFunc{
 		connectGroupDelete,
 		customGroupDelete,
+		automodeGroupDelete,
 	})
 	evhdls.Register(EV_WORKLOAD_AGENT_CHANGE, []eventHandlerFunc{
 		scanWorkloadAgentChange,

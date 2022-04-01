@@ -879,6 +879,7 @@ type RESTWorkload struct {
 	MemoryLimit  int64                    `json:"memory_limit"`
 	CPUs         string                   `json:"cpus"`
 	Children     []*RESTWorkload          `json:"children"`
+	ServiceAccount string                 `json:"service_account"`
 }
 
 type RESTWorkloadDetail struct {
@@ -1494,6 +1495,7 @@ const (
 	WebhookDefaultName = "default"
 	WebhookTypeSlack   = "Slack"
 	WebhookTypeJSON    = "JSON"
+	WebhookTypeTeams   = "Teams"
 )
 
 type RESTWebhook struct {
@@ -1544,16 +1546,25 @@ type RESTSysNetConfigConfig struct {
 	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
 }
 
+type RESTSysAtmoConfigConfig struct {
+	ModeAutoD2M               *bool           `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration       *int64          `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P               *bool           `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration       *int64          `json:"mode_auto_m2p_duration"`
+}
+
 type RESTSystemConfigConfigCfgMap struct {
 	RESTSystemConfigConfig
 	RESTSysNetConfigConfig
+	RESTSysAtmoConfigConfig
 	AlwaysReload bool `json:"always_reload"`
 }
 
 type RESTSystemConfigConfigData struct {
-	Config    *RESTSystemConfigConfig `json:"config"`
-	FedConfig *RESTSystemConfigConfig `json:"fed_config"`
-	NetConfig *RESTSysNetConfigConfig `json:"net_config"`
+	Config     *RESTSystemConfigConfig  `json:"config"`
+	FedConfig  *RESTSystemConfigConfig  `json:"fed_config"`
+	NetConfig  *RESTSysNetConfigConfig  `json:"net_config"`
+	AtmoConfig *RESTSysAtmoConfigConfig `json:"atmo_config"`
 }
 
 type RESTUnquarReq struct {
@@ -1602,6 +1613,10 @@ type RESTSystemConfig struct {
 	XffEnabled                bool          `json:"xff_enabled"`
 	NetServiceStatus          bool          `json:"net_service_status"`
 	NetServicePolicyMode      string        `json:"net_service_policy_mode"`
+	ModeAutoD2M               bool          `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration       int64         `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P               bool          `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration       int64         `json:"mode_auto_m2p_duration"`
 }
 
 type RESTIBMSAConfig struct {
@@ -2398,10 +2413,12 @@ type RESTDlpRulesData struct {
 }
 
 type RESTDlpSetting struct {
-	Name    string `json:"name"`
-	Action  string `json:"action"`
-	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	Name        string `json:"name"`
+	Action      string `json:"action"`
+	Exist       bool   `json:"exist"`
+	Predefine   bool   `json:"predefine"`
+	Comment     string `json:"comment,omitempty"`
+	CfgType     string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the DLP sensor's cfgType
 }
 
 type RESTDlpGroup struct {
@@ -2419,12 +2436,18 @@ type RESTDlpGroupsData struct {
 	DlpGroups []*RESTDlpGroup `json:"dlp_groups"`
 }
 
+type RESTDlpConfig struct {
+	Name    string `json:"name"`
+	Action  string `json:"action"`
+	Comment string `json:"comment,omitempty"`
+}
+
 type RESTDlpGroupConfig struct {
-	Name       string            `json:"name"`
-	Status     *bool             `json:"status,omitempty"`
-	DelSensors *[]string         `json:"delete,omitempty"`  //delete list used by CLI
-	Sensors    *[]RESTDlpSetting `json:"sensors,omitempty"` //change list used by CLI
-	RepSensors *[]RESTDlpSetting `json:"replace,omitempty"` //replace list used by GUI
+	Name       string           `json:"name"`
+	Status     *bool            `json:"status,omitempty"`
+	DelSensors *[]string        `json:"delete,omitempty"`  //delete list used by CLI
+	Sensors    *[]RESTDlpConfig `json:"sensors,omitempty"` //change list used by CLI
+	RepSensors *[]RESTDlpConfig `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpGroupConfigData struct {
@@ -2583,7 +2606,7 @@ type RESTWafSetting struct {
 	Action  string `json:"action"`
 	Exist   bool   `json:"exist"`
 	Comment string `json:"comment,omitempty"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround. It's from the WAF sensor's cfgType
 }
 
 type RESTWafGroup struct {

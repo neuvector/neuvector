@@ -427,6 +427,7 @@ var preDlpRuleSsn = []*share.CLUSDlpRule{
 				Value: "\\b(?!\\b(\\d)\\1+-?(\\d)\\1+-?(\\d)\\1+\\b)(?!123-?45-?6789|219-?09-?9999|078-?05-?1120)(?!666|000|9\\d{2})\\d{3}-?(?!00)\\d{2}-?(?!0{4})\\d{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -440,6 +441,7 @@ var preDlpRuleCcAxp = []*share.CLUSDlpRule{
 				Value: "\\b3[47]\\d{2}([ -]?)(?!(\\d)\\2{5}|123456|234567|345678)\\d{6}\\1(?!(\\d)\\3{4}|12345|56789)\\d{5}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -453,6 +455,7 @@ var preDlpRuleCcDiscover = []*share.CLUSDlpRule{
 				Value: "\\b6(?:011\\d{2}|5\\d{4}|4[4-9]\\d{3}|22(?:1(?:2[6-9]|[3-9]\\d)|[2-8]\\d{2}|9(?:[01]\\d|2[0-5])))\\d{10}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -466,6 +469,7 @@ var preDlpRuleCcMaster = []*share.CLUSDlpRule{
 				Value: "\\b5([1-5]\\d{2})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -479,6 +483,7 @@ var preDlpRuleCcVisa = []*share.CLUSDlpRule{
 				Value: "\\b4(\\d{3})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -492,6 +497,7 @@ var preDlpRuleCcDinerV1 = []*share.CLUSDlpRule{
 				Value: "\\b(36|38)[0-9]{2}(\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -505,6 +511,7 @@ var preDlpRuleCcDinerV2 = []*share.CLUSDlpRule{
 				Value: "\\b30[0-5][0-9](\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -518,6 +525,7 @@ var preDlpRuleCcJcb = []*share.CLUSDlpRule{
 				Value: "\\b3[0-9]{3}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}\\b",
 			},
 		},
+		CfgType: share.SystemDefined,
 	},
 }
 
@@ -614,6 +622,7 @@ var defaultSensorAllDlpRule = &share.CLUSDlpSensor{
 	},
 	Comment:   commentDefaultSensor,
 	Predefine: true,
+	CfgType:   share.SystemDefined,
 }
 
 func CreateDefDlpRules(withlock bool) {

@@ -718,6 +718,10 @@ type CLUSSystemConfig struct {
 	CfgType              TCfgType             `json:"cfg_type"`
 	NetServiceStatus     bool                 `json:"net_service_status"`
 	NetServicePolicyMode string               `json:"net_service_policy_mode"`
+	ModeAutoD2M          bool                 `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration  int64                `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P          bool                 `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration  int64                `json:"mode_auto_m2p_duration"`
 }
 
 type CLUSEULA struct {
@@ -1491,6 +1495,7 @@ type CLUSProcessProfileEntry struct {
 	Uuid            string    `json:"uuid"`
 	DerivedGroup    string    `json:"dgroup"`
 	AllowFileUpdate bool      `json:"allow_update"`
+	ProbeCmd        string	  `json:"probe_cmd"`
 }
 
 type CLUSProcessProfile struct {

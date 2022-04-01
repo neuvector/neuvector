@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/neuvector/k8s"
@@ -189,6 +190,8 @@ type NvAdmRegRuleSetting struct {
 
 type NvCrdInitFunc func(leader bool)
 
+type NvQueryK8sVerFunc func()
+
 //----------------------------------------------------------
 
 var NvAdmSvcName = "neuvector-svc-admission-webhook"
@@ -252,7 +255,10 @@ var k8sVersionMinor int
 var cacheEventFunc common.CacheEventFunc
 
 var nvCrdInitFunc NvCrdInitFunc
+var nvQueryK8sVerFunc NvQueryK8sVerFunc
 var isLeader bool
+
+var watchFailedFlag int32
 
 const (
 	k8sRscTypeRole            = "k8s-role"
@@ -670,6 +676,28 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 		if o.Spec != nil {
 			r.Node = o.Spec.GetNodeName()
 			r.HostNet = o.Spec.GetHostNetwork()
+			for _, c := range o.Spec.GetContainers() {
+				liveness := c.GetLivenessProbe()
+				readiness := c.GetReadinessProbe()
+				if liveness != nil || readiness != nil {
+					if handler := liveness.GetHandler(); handler != nil {
+						if exec := handler.GetExec(); exec != nil {
+							r.LivenessCmds = exec.GetCommand()
+						}
+					}
+					if handler := readiness.GetHandler(); handler != nil {
+						if exec := handler.GetExec(); exec != nil {
+							r.ReadinessCmds = exec.GetCommand()
+						}
+					}
+				}
+			}
+			if r.SA = o.Spec.GetServiceAccountName(); r.SA == "" {
+				r.SA = o.Spec.GetServiceAccount()
+			}
+			if r.SA == "" {
+				r.SA = "default" // see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+			}
 		}
 		if o.Status != nil {
 			if ip := net.ParseIP(o.Status.GetPodIP()); ip != nil {
@@ -681,6 +709,17 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 			}
 			if o.Status.GetPhase() == "Running" {
 				r.Running = true
+			}
+
+			if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
+				if cs := o.Status.ContainerStatuses[0]; cs != nil {
+					containerID := cs.GetContainerID()
+					for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
+						if strings.HasPrefix(containerID, prefix) {
+							r.ContainerID = containerID[len(prefix):]
+						}
+					}
+				}
 			}
 		}
 		return r.UID, r
@@ -1130,6 +1169,13 @@ func (d *kubernetes) startWatchResource(rt string, wcb orchAPI.WatchCallback, sc
 				d.watchers[rt] = w
 				d.lock.Unlock()
 
+				if flag := atomic.LoadInt32(&watchFailedFlag); flag == 1 && rt == RscTypePod {
+					if nvQueryK8sVerFunc != nil {
+						nvQueryK8sVerFunc()
+					}
+					atomic.StoreInt32(&watchFailedFlag, 0)
+				}
+
 				go d.watchResource(rt, maker, watcher, wcb, errCh)
 			}
 
@@ -1137,6 +1183,9 @@ func (d *kubernetes) startWatchResource(rt string, wcb orchAPI.WatchCallback, sc
 			case e := <-errCh:
 				// If watch returns error because the context is closed, the error won't reach
 				// here because the go routine has exited - so we can make error callback here
+				if rt == RscTypePod {
+					atomic.StoreInt32(&watchFailedFlag, 1)
+				}
 
 				if scb != nil {
 					scb(ConnStateDisconnected, e)
@@ -1520,8 +1569,9 @@ func AdjustAdmResForOC() {
 	nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
 }
 
-func AdjustAdmWebhookName(f NvCrdInitFunc) {
-	nvCrdInitFunc = f
+func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc) {
+	nvCrdInitFunc = f1
+	nvQueryK8sVerFunc = f2
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
 	NvCrdValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvCrdValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-crd-webhook.neuvector.svc

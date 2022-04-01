@@ -99,6 +99,12 @@ var ocAdminVerbs utils.Set = utils.NewSet(
 	"*",
 )
 
+var ocReaderVerbs utils.Set = utils.NewSet(
+	"get",
+	"list",
+	"watch",
+)
+
 // Rancher SSO: apiGroup									resources		verbs
 //------------------------------------------------------------------------------------------------
 // fedAdmin:    in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
@@ -210,14 +216,33 @@ var nvRoleBindings map[string]*k8sRoleBindingInfo = map[string]*k8sRoleBindingIn
 }
 
 // Rancher SSO : (future) custom role?
-func k8s2NVRole(rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
-	if readVerbs == nil {
-		// keep original behavior for oc platofrm login
+func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
+
+	// keep original behavior for oc platofrm login
+	if k8sFlavor == share.FlavorOpenShift {
+
 		for rsc, verbs := range r2v {
 			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
 				return api.UserRoleAdmin
 			}
 		}
+
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && ocReaderVerbs.Intersect(verbs).Cardinality() != 0 {
+				return api.UserRoleReader
+			}
+		}
+
+		return api.UserRoleNone
+	}
+
+	if readVerbs == nil {
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
+				return api.UserRoleAdmin
+			}
+		}
+
 		return api.UserRoleReader
 	} else {
 		var nvRole string
@@ -247,11 +272,13 @@ func k8s2NVRole(rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set)
 }
 
 func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{}, getVerbs bool) (string, map[string]map[string]utils.Set) {
+
 	ag2r2v := make(map[string]map[string]utils.Set) // apiGroup -> (resource -> verbs)
 	if rules, ok := objs.([]*rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
 			verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
 			rscs := rule.GetResources()
+
 			if verbs.Cardinality() == 0 && len(rscs) == 0 {
 				continue
 			}
@@ -260,6 +287,7 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 				apiGroup = apiGroups[0]
 			}
 			r2v, ok := ag2r2v[apiGroup]
+
 			if !ok {
 				r2v = make(map[string]utils.Set)
 				ag2r2v[apiGroup] = r2v
@@ -300,7 +328,7 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 	if len(ag2r2v) > 0 {
 		var nvRole string
 		var rscsMap map[string]utils.Set = ocAdminRscsMap
-		var readVerbs utils.Set                 // users who has these verbs on specified resources are nv viewer
+		var readVerbs utils.Set
 		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
 			rscsMap = nvRscsMap
@@ -310,7 +338,8 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 		gAdjusted := map[string]string{api.UserRoleAdmin: api.UserRoleFedAdmin, api.UserRoleReader: api.UserRoleFedReader}
 		for apiGroup, rscs := range rscsMap {
 			if r2v, ok := ag2r2v[apiGroup]; ok && len(r2v) > 0 {
-				nvRoleTemp := k8s2NVRole(rscs, readVerbs, writeVerbs, r2v)
+				nvRoleTemp := k8s2NVRole(k8sFlavor, rscs, readVerbs, writeVerbs, r2v)
+
 				if roleDomain == "" && k8sFlavor == share.FlavorRancher && strings.HasPrefix(clusRoleName, globalRolePrefix) {
 					if adjusted, ok := gAdjusted[nvRoleTemp]; ok {
 						nvRole = adjusted
@@ -1014,6 +1043,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		name:    user.name,
 		subType: user.subType,
 	}
+
 	if roleRefs, ok := d.userCache[user]; !ok {
 		if rbac, ok := d.rbacCache[subj]; ok {
 			delete(d.rbacCache, subj)
@@ -1031,8 +1061,10 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		}
 	} else {
 		rbac := make(map[string]string) // domain -> nvRole
+
 		for r := range roleRefs.Iter() {
 			roleRef := r.(k8sRoleRef)
+
 			if newNVRole, ok := d.roleCache[roleRef.role]; ok {
 				if oldNVRole, ok := rbac[roleRef.domain]; !ok {
 					rbac[roleRef.domain] = newNVRole

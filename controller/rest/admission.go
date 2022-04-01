@@ -1349,7 +1349,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRule resource.NvAdmCtrlSecurityRule
-	if err := json.Unmarshal(json_data, &secRule); err != nil {
+	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.Kind == nil || *secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)

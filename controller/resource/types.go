@@ -99,16 +99,20 @@ type Service struct {
 }
 
 type Pod struct {
-	UID       string
-	Name      string
-	Domain    string
-	Node      string
-	IPNet     net.IPNet
-	HostNet   bool
-	Running   bool
-	OwnerUID  string
-	OwnerName string
-	OwnerType string
+	UID           string
+	Name          string
+	Domain        string
+	Node          string
+	IPNet         net.IPNet
+	HostNet       bool
+	Running       bool
+	OwnerUID      string
+	OwnerName     string
+	OwnerType     string
+	LivenessCmds  []string
+	ReadinessCmds []string
+	SA            string // service account of this pod
+	ContainerID   string // workload id
 }
 
 type ImageTag struct {
