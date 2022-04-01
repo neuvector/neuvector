@@ -279,7 +279,6 @@ func isRpmKernelPackage(p *rpmdb.PackageInfo) string {
 func getRpmPackages(fullpath, kernel string) ([]byte, error) {
 	db, err := rpmdb.Open(fullpath)
 	if err != nil {
-		log.WithFields(log.Fields{"file": fullpath, "kernel": kernel}).Error("Failed to open rpm packages")
 		return nil, err
 	}
 
@@ -326,7 +325,6 @@ func isDpkgKernelPackage(line string) string {
 }
 
 func getDpkgStatus(fullpath, kernel string) ([]byte, error) {
-	buf := new(bytes.Buffer)
 	inputFile, err := os.Open(fullpath)
 	if err != nil {
 		return nil, err
@@ -337,6 +335,7 @@ func getDpkgStatus(fullpath, kernel string) ([]byte, error) {
 
 	skipPackage := false
 
+	buf := new(bytes.Buffer)
 	scanner := bufio.NewScanner(inputFile)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())

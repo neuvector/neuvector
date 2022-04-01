@@ -447,7 +447,7 @@ func addrHostAdd(id string, param interface{}) {
 			}
 			// Because tunnel IP could be in the same subnet of containers, don't add it to host
 			// subnet but workload subnet. When the node joins, try to clean both workload and
-			// node IP endpint.
+			// node IP endpoint.
 			updateInternalIPNet(&ipnet, share.CLUSIPAddrScopeGlobal, false)
 		}
 	}
