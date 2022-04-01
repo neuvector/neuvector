@@ -154,7 +154,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			// NVSHAS-5589, on some containers, we somehow identify the base os as the host's os.
 			// The container shares host mount and pid namespace, but it still shouldn't result in this.
 			// The real cause is unknown, switching the namespace fixes the problem.
-			if strings.HasSuffix(lib, "release") {
+			if pid != 1 && strings.HasSuffix(lib, "release") {
 				data, err = s.sys.NsGetFile(prefix+lib, pid, false, 0, 0)
 			} else {
 				data, err = s.sys.ReadContainerFile(prefix+lib, pid, 0, 0)
