@@ -113,6 +113,7 @@ type localSystemInfo struct {
 
 var defaultPolicyMode string = share.PolicyModeLearn
 var defaultTapProxymesh bool = true
+
 //to avoid false positive implicit violation on dp during upgrade, set XFF default to disabled
 var defaultXffEnabled bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
@@ -1134,7 +1135,7 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 			epname := fmt.Sprintf("%s-endpoint", n.Name)
 			if _, ok = gInfo.networkLBs[netID]; !ok {
 				if ep, err := global.RT.GetNetworkEndpoint(netID, cname, epname); err != nil {
-					log.WithFields(log.Fields{"error": err, "container": cname, "endpoint": epname}).Error("Error reading container network endpint")
+					log.WithFields(log.Fields{"error": err, "container": cname, "endpoint": epname}).Error("Error reading container network endpoint")
 				} else {
 					gInfo.networkLBs[netID] = ep
 
