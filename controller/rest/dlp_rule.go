@@ -1239,25 +1239,6 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
 	}
 
-	if len(rdlpsensor.GroupList) > 0 {
-		e := "Sensor belong to group!"
-		log.WithFields(log.Fields{"groups": (rdlpsensor.GroupList), "name": name}).Error(e)
-		if reviewType != share.ReviewTypeCRD {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrObjectNotFound, e)
-			return fmt.Errorf(e)
-		}
-	}
-
-	//this is to check whether it is used by CLUSDlpGroup
-	ingroup := cacher.DlpSensorInGroups(name)
-	if ingroup {
-		log.WithFields(log.Fields{"name": name}).Error("sensor belong to clusdlpgroup!")
-		if reviewType != share.ReviewTypeCRD {
-			restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-			return fmt.Errorf(restErrMessage[api.RESTErrObjectNotFound])
-		}
-	}
-
 	var lock cluster.LockInterface
 	if !lockOwned {
 		if lock, err = lockClusKey(w, share.CLUSLockPolicyKey); err != nil {
