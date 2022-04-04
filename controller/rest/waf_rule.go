@@ -1031,32 +1031,6 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		return fmt.Errorf(e)
 	}
 
-	/*if name == share.CLUSDlpCcSensor || name == share.CLUSDlpSsnSensor {
-		e := "Cannot delete predefined sensor!"
-		log.WithFields(log.Fields{"name": name}).Error(e)
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return
-	}*/
-
-	if len(rwafsensor.GroupList) > 0 {
-		e := "Sensor belong to group!"
-		log.WithFields(log.Fields{"groups": (rwafsensor.GroupList), "name": name}).Error(e)
-		if reviewType != share.ReviewTypeCRD {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrObjectNotFound, e)
-			return fmt.Errorf(e)
-		}
-	}
-
-	//this is to check whether it is used by CLUSWafGroup
-	ingroup := cacher.WafSensorInGroups(name)
-	if ingroup {
-		log.WithFields(log.Fields{"name": name}).Error("sensor belong to cluswafgroup!")
-		if reviewType != share.ReviewTypeCRD {
-			restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-			return fmt.Errorf(restErrMessage[api.RESTErrObjectNotFound])
-		}
-	}
-
 	var lock cluster.LockInterface
 	if !lockOwned {
 		if lock, err = lockClusKey(w, share.CLUSLockPolicyKey); err != nil {
