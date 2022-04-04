@@ -1133,7 +1133,10 @@ func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 }
 
 func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
-	if wlCache.serviceAccount == "" && strings.HasPrefix(wlName, "k8s_") && !strings.HasPrefix(wlName, "k8s_POD_") {
+	if localDev.Host.Platform != share.PlatformKubernetes {
+		return
+	}
+	if wlCache.serviceAccount == "" {
 		var podSAMap map[string]string
 		if podSAMap, _ = nodePodSAMap[node]; podSAMap == nil {
 			podSAMap = make(map[string]string, 1)

@@ -717,6 +717,7 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 					for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
 						if strings.HasPrefix(containerID, prefix) {
 							r.ContainerID = containerID[len(prefix):]
+							break
 						}
 					}
 				}
