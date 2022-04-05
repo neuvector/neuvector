@@ -664,6 +664,7 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 			UID:    meta.GetUid(),
 			Name:   meta.GetName(),
 			Domain: meta.GetNamespace(),
+			Labels: meta.GetLabels(),
 		}
 		if len(meta.OwnerReferences) >= 1 {
 			if owner := meta.OwnerReferences[0]; owner != nil {

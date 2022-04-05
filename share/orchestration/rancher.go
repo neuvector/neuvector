@@ -41,6 +41,10 @@ func (d *rancher) isDeployedBy(meta *container.ContainerMeta) bool {
 	return false
 }
 
+func (d *rancher) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+	return nil
+}
+
 func (d *rancher) GetService(meta *container.ContainerMeta) *Service {
 	if service, _ := meta.Labels[container.RancherKeyStackServiceName]; service != "" {
 		return &Service{Name: service}

@@ -22,6 +22,10 @@ func (d *ecs) isDeployedBy(meta *container.ContainerMeta) bool {
 	return false
 }
 
+func (d *ecs) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+	return nil
+}
+
 func (d *ecs) GetService(meta *container.ContainerMeta) *Service {
 	cluster, _ := meta.Labels[container.ECSCluster]
 	task, _ := meta.Labels[container.ECSTaskDefinition]

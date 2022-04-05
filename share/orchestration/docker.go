@@ -70,6 +70,10 @@ type base struct {
 	noop
 }
 
+func (d *base) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+	return nil
+}
+
 func (d *base) GetService(meta *container.ContainerMeta) *Service {
 	project, _ := meta.Labels[container.DockerComposeProjectKey]
 	service, _ := meta.Labels[container.DockerComposeServiceKey]
