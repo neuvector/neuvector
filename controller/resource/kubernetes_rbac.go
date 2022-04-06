@@ -218,33 +218,7 @@ var nvRoleBindings map[string]*k8sRoleBindingInfo = map[string]*k8sRoleBindingIn
 // Rancher SSO : (future) custom role?
 func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
 
-	// keep original behavior for oc platofrm login
-	if k8sFlavor == share.FlavorOpenShift {
-
-		for rsc, verbs := range r2v {
-			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
-				return api.UserRoleAdmin
-			}
-		}
-
-		for rsc, verbs := range r2v {
-			if rscs.Contains(rsc) && ocReaderVerbs.Intersect(verbs).Cardinality() != 0 {
-				return api.UserRoleReader
-			}
-		}
-
-		return api.UserRoleNone
-	}
-
-	if readVerbs == nil {
-		for rsc, verbs := range r2v {
-			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
-				return api.UserRoleAdmin
-			}
-		}
-
-		return api.UserRoleReader
-	} else {
+	if k8sFlavor == share.FlavorRancher {
 		var nvRole string
 		for rsc, verbs := range r2v {
 			if rscs.Contains(rsc) {
@@ -269,6 +243,25 @@ func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map
 		}
 		return nvRole
 	}
+
+	//
+	// Both Kubernetes and OpenShift mapping goes here, keep these two using the same behavior.
+	// As v5.0, we do not support Kubernetes login.
+	// When it comes to support Kubernetes login, we should consider to provide more granular on the mapping.
+	//
+	for rsc, verbs := range r2v {
+		if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
+			return api.UserRoleAdmin
+		}
+	}
+
+	for rsc, verbs := range r2v {
+		if rscs.Contains(rsc) && readVerbs.Intersect(verbs).Cardinality() != 0 {
+			return api.UserRoleReader
+		}
+	}
+
+	return api.UserRoleNone
 }
 
 func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{}, getVerbs bool) (string, map[string]map[string]utils.Set) {
@@ -328,7 +321,7 @@ func deduceRoleRules(k8sFlavor, clusRoleName, roleDomain string, objs interface{
 	if len(ag2r2v) > 0 {
 		var nvRole string
 		var rscsMap map[string]utils.Set = ocAdminRscsMap
-		var readVerbs utils.Set
+		var readVerbs utils.Set = ocReaderVerbs
 		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
 			rscsMap = nvRscsMap
