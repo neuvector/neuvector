@@ -1,6 +1,0 @@
-*
-!docker-bench-security.sh
-!functions/
-!tests/
-!log/
-log/*
