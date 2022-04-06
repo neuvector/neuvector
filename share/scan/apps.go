@@ -151,9 +151,8 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 	if isNodejs(filename) {
 		s.parseNodePackage(filename, fullpath)
 	} else if isJava(filename) {
-		r, err := zip.OpenReader(fullpath)
-		if err == nil {
-			s.parseJarPackage(r.Reader, filename, fullpath, 0)
+		if r, err := zip.OpenReader(fullpath); err == nil {
+			s.parseJarPackage(r.Reader, filename, filename, fullpath, 0)
 			r.Close()
 		} else {
 			log.WithFields(log.Fields{"err": err}).Error("open jar file fail")
@@ -253,12 +252,18 @@ func isJava(filename string) bool {
 		strings.HasSuffix(filename, ".ear")
 }
 
-func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, depth int) {
+func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
 		defer os.RemoveAll(tempDir)
 	} else {
 		log.WithFields(log.Fields{"fullpath": fullpath}).Error("unable to create temp dir")
+	}
+
+	// the real filepath
+	path := filename
+	if depth > 0 {
+		path = tfile + ":" + filename
 	}
 
 	pkgs := make(map[string][]AppPackage)
@@ -274,12 +279,13 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 				dstPath := filepath.Join(tempDir, filepath.Base(f.Name)) // retain the filename
 				if dstFile, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()); err == nil {
 					if _, err := io.Copy(dstFile, jarFile); err == nil {
-						jarReader, err := zip.OpenReader(fullpath)
-						if err == nil {
-							s.parseJarPackage(jarReader.Reader, f.Name, dstPath, depth+1)
+						dstFile.Close()
+						if jarReader, err := zip.OpenReader(dstPath); err == nil {
+							s.parseJarPackage(jarReader.Reader, tfile, f.Name, dstPath, depth+1)
 							jarReader.Close()
 						}
 					} else {
+						dstFile.Close()
 						log.WithFields(log.Fields{"dst": dstPath, "filename": filename, "err": err}).Error("unable to copy jar file")
 					}
 					os.Remove(dstPath)
@@ -309,9 +315,9 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 								AppName:    tomcatName,
 								ModuleName: tomcatName,
 								Version:    ver,
-								FileName:   filename,
+								FileName:   path,
 							}
-							pkgs[filename] = []AppPackage{pkg}
+							pkgs[path] = []AppPackage{pkg}
 						}
 					}
 				}
@@ -320,7 +326,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 			var groupId, version, artifactId string
 			rc, err := f.Open()
 			if err != nil {
-				log.WithFields(log.Fields{"err": err}).Error("open pom file fail")
+				log.WithFields(log.Fields{"err": err}).Error("open pom property fail")
 				continue
 			}
 			defer rc.Close()
@@ -344,18 +350,17 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 
 			pkg := AppPackage{
 				AppName:    jar,
-				FileName:   filename,
+				FileName:   path,
 				ModuleName: fmt.Sprintf("%s:%s", groupId, artifactId),
 				Version:    version,
 			}
-
-			pkgs[filename] = []AppPackage{pkg}
+			pkgs[path] = []AppPackage{pkg}
 			break	// higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
 			var vendorId, version, title string
 			rc, err := f.Open()
 			if err != nil {
-				log.WithFields(log.Fields{"err": err}).Error("open pom.xml file fail")
+				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
 			defer rc.Close()
@@ -377,14 +382,17 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 				}
 			}
 
+			if len(vendorId) == 0 {
+				vendorId = "jar"
+			}
+
 			pkg := AppPackage{
 				AppName:    jar,
-				FileName:   filename,
+				FileName:   path,
 				ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
 				Version:    version,
 			}
-
-			pkgs[filename] = []AppPackage{pkg}
+			pkgs[path] = []AppPackage{pkg}
 		}
 	}
 
@@ -398,14 +406,14 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, filename, fullpath string, dept
 				AppName:    jar,
 				ModuleName: fmt.Sprintf("jar:%s", fn[:dash]),
 				Version:    fn[dash+1 : dot],
-				FileName:   filename,
+				FileName:   path,
 			}
-			pkgs[filename] = []AppPackage{pkg}
+			pkgs[path] = []AppPackage{pkg}
 		}
 	}
 
-	for filename, list := range pkgs {
-		s.pkgs[filename] = list
+	for filename, pkg := range pkgs {
+		s.pkgs[filename] = pkg
 	}
 }
 
