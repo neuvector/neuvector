@@ -1150,7 +1150,6 @@ func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
 }
 
 func addK8sPodEvent(pod resource.Pod) {
-	log.WithFields(log.Fields{"Name": pod.Name}).Debug()
 	var cmds [][]string
 	if len(pod.LivenessCmds) > 0 {
 		cmds = append(cmds, pod.LivenessCmds)
@@ -1160,6 +1159,12 @@ func addK8sPodEvent(pod resource.Pod) {
 		cmds = append(cmds, pod.ReadinessCmds)
 	}
 
+	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
+	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Labels); svc != nil {
+		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
+	}
+	log.WithFields(log.Fields{"Name": pod.Name, "groupName": groupName}).Debug()
+
 	var name_alt string
 	if pos := strings.LastIndex(pod.Name, "-"); pos != -1 {
 		name_alt = fmt.Sprintf("nv.%s.%s", pod.Name[:pos], pod.Domain)
@@ -1167,10 +1172,10 @@ func addK8sPodEvent(pod resource.Pod) {
 
 	p := &k8sPodEvent{
 		pod:      pod,
-		group:    fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain), // group name
-		groupAlt: name_alt,                                      // a likely group name
-		cmds:     cmds,                                          // probe commands
-		cleanAt:  time.Now().Unix() + 60*30,                     // expired after 30 minutes
+		group:    groupName,                      // group name
+		groupAlt: name_alt,                       // a likely group name
+		cmds:     cmds,                           // probe commands
+		cleanAt:  time.Now().Unix() + 60*30,      // expired after 30 minutes
 	}
 
 	cacheMutexLock()

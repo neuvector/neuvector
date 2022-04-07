@@ -113,6 +113,7 @@ type Pod struct {
 	ReadinessCmds []string
 	SA            string // service account of this pod
 	ContainerID   string // workload id
+	Labels        map[string]string
 }
 
 type ImageTag struct {

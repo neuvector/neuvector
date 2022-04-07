@@ -318,6 +318,64 @@ var rancherPodNamePrefix = []string{
 	"core-services-network-manager-",
 }
 
+func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+	if len(labels) == 0 {
+		return nil
+	}
+
+	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
+	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
+	if d.flavor == share.FlavorRancher && namespace == container.KubeRancherPodNamespace {
+		for _, prefix := range rancherPodNamePrefix {
+			if strings.HasPrefix(pod, prefix) {
+				return &Service{Domain: namespace, Name: strings.TrimSuffix(prefix, "-")}
+			}
+		}
+	}
+
+	// oc49, job: openshift-operator-lifecycle-manager / collect-profiles-27400290--1-4g2r
+	if d.flavor == share.FlavorOpenShift {
+		if job, ok := labels[container.KubeKeyJobName]; ok {
+			if index := strings.LastIndex(job, "-"); index != -1 {
+				job = job[:index]
+			}
+			return &Service{Domain: namespace, Name: job}
+		}
+	}
+
+	if hash, _ := labels[container.KubeKeyPodHash]; hash != "" {
+		if idx := strings.Index(pod, "-"+hash); idx != -1 {
+			return &Service{Domain: namespace, Name: pod[:idx]}
+		}
+	}
+
+	if rePodNameSvc1 == nil || rePodNameSvc2 == nil {
+		rePodNameSvc1 = regexp.MustCompile(reStrPodNameSvc1)
+		rePodNameSvc2 = regexp.MustCompile(reStrPodNameSvc2)
+	}
+	if rePodNameSvc1.MatchString(pod) || rePodNameSvc2.MatchString(pod) {
+		if dash := strings.LastIndex(pod, "-"); dash != -1 {
+			if dash = strings.LastIndex(pod[:dash], "-"); dash != -1 {
+				return &Service{Domain: namespace, Name: pod[:dash]}
+			}
+		}
+	}
+
+	// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
+	if namespace == container.KubeNamespaceSystem {
+		if component, ok := labels[container.KubeKeyComponent]; ok {
+			return &Service{Domain: namespace, Name: component}
+		}
+	}
+
+	// Remove the last tokens - not correct in some cases at all
+	if first := strings.LastIndex(pod, "-"); first != -1 {
+		return &Service{Domain: namespace, Name: pod[:first]}
+	}
+
+	return &Service{Domain: namespace, Name: pod}
+}
+
 /*
 pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
     "io.kubernetes.container.name": "POD"
@@ -339,56 +397,7 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
 	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
-
-		if d.flavor == share.FlavorRancher && namespace == container.KubeRancherPodNamespace {
-			for _, prefix := range rancherPodNamePrefix {
-				if strings.HasPrefix(pod, prefix) {
-					return &Service{Domain: namespace, Name: strings.TrimSuffix(prefix, "-")}
-				}
-			}
-		}
-
-		// oc49, job: openshift-operator-lifecycle-manager / collect-profiles-27400290--1-4g2r
-		if d.flavor == share.FlavorOpenShift {
-			if job, ok := meta.Labels[container.KubeKeyJobName]; ok {
-				if index := strings.LastIndex(job, "-"); index != -1 {
-					job = job[:index]
-				}
-				return &Service{Domain: namespace, Name: job}
-			}
-		}
-
-		if hash, _ := meta.Labels[container.KubeKeyPodHash]; hash != "" {
-			if idx := strings.Index(pod, "-"+hash); idx != -1 {
-				return &Service{Domain: namespace, Name: pod[:idx]}
-			}
-		}
-
-		if rePodNameSvc1 == nil || rePodNameSvc2 == nil {
-			rePodNameSvc1 = regexp.MustCompile(reStrPodNameSvc1)
-			rePodNameSvc2 = regexp.MustCompile(reStrPodNameSvc2)
-		}
-		if rePodNameSvc1.MatchString(pod) || rePodNameSvc2.MatchString(pod) {
-			if dash := strings.LastIndex(pod, "-"); dash != -1 {
-				if dash = strings.LastIndex(pod[:dash], "-"); dash != -1 {
-					return &Service{Domain: namespace, Name: pod[:dash]}
-				}
-			}
-		}
-
-		// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
-		if namespace == container.KubeNamespaceSystem {
-			if component, ok := meta.Labels[container.KubeKeyComponent]; ok {
-				return &Service{Domain: namespace, Name: component}
-			}
-		}
-
-		// Remove the last tokens - not correct in some cases at all
-		if first := strings.LastIndex(pod, "-"); first != -1 {
-			return &Service{Domain: namespace, Name: pod[:first]}
-		}
-
-		return &Service{Domain: namespace, Name: pod}
+		return d.GetServiceFromPodLabels( namespace, pod, meta.Labels)
 	}
 
 	return baseDriver.GetService(meta)
