@@ -4,10 +4,10 @@ NeuVector Full Lifecycle Container Security Platform delivers the only cloud-nat
 
 A viewable version of docs can be seen at https://open-docs.neuvector.com.
 
-The container images for the preview version can be pulled from the NeuVector Docker Hub registry at:
-+ neuvector/manager.preview:5.0.0-preview.3
-+ neuvector/controller.preview:5.0.0-preview.3
-+ neuvector/enforcer.preview:5.0.0-preview.3
+The container images for the beta version can be pulled from the NeuVector Docker Hub registry at:
++ neuvector/manager:5.0.0-b1
++ neuvector/controller:5.0.0-b1
++ neuvector/enforcer:5.0.0-b1
 + neuvector/scanner.preview:latest
 + neuvector/updater.preview:latest
 
