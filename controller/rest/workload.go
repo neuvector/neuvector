@@ -155,7 +155,74 @@ func handlerWorkloadBrief(w http.ResponseWriter, r *http.Request, ps httprouter.
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get container brief")
 }
 
-func handlerWorkloadList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func workloadV1ToV2(wlV1 *api.RESTWorkload) *api.RESTWorkloadV2 {
+	if wlV1 == nil {
+		return nil
+	}
+
+	wlV2 := &api.RESTWorkloadV2{
+		WlBrief: api.RESTWorkloadBriefV2{
+			ID:           wlV1.ID,
+			Name:         wlV1.Name,
+			DisplayName:  wlV1.DisplayName,
+			HostName:     wlV1.HostName,
+			HostID:       wlV1.HostID,
+			Image:        wlV1.Image,
+			ImageID:      wlV1.ImageID,
+			Domain:       wlV1.Domain,
+			State:        wlV1.State,
+			Service:      wlV1.Service,
+			Author:       wlV1.Author,
+			ServiceGroup: wlV1.ServiceGroup,
+		},
+		WlSecurity: api.RESTWorkloadSecurityV2{
+			CapSniff:           wlV1.CapSniff,
+			CapQuar:            wlV1.CapQuar,
+			CapChgMode:         wlV1.CapChgMode,
+			ServiceMesh:        wlV1.ServiceMesh,
+			ServiceMeshSidecar: wlV1.ServiceMeshSidecar,
+			NetworkMode:        wlV1.NetworkMode,
+			PolicyMode:         wlV1.PolicyMode,
+			ProfileMode:        wlV1.ProfileMode,
+			BaselineProfile:    wlV1.BaselineProfile,
+			QuarReason:         wlV1.QuarReason,
+			ScanSummary:        wlV1.ScanSummary,
+			Ifaces:             wlV1.Ifaces,
+			Ports:              wlV1.Ports,
+			Applications:       wlV1.Applications,
+		},
+		WlRtSttributes: api.RESTWorkloadRtAttribesV2{
+			PodName:        wlV1.PodName,
+			ShareNSWith:    wlV1.ShareNSWith,
+			Privileged:     wlV1.Privileged,
+			RunAsRoot:      wlV1.RunAsRoot,
+			Labels:         wlV1.Labels,
+			MemoryLimit:    wlV1.MemoryLimit,
+			CPUs:           wlV1.CPUs,
+			ServiceAccount: wlV1.ServiceAccount,
+		},
+		AgentID:      wlV1.AgentID,
+		PlatformRole: wlV1.PlatformRole,
+		CreatedAt:    wlV1.CreatedAt,
+		StartedAt:    wlV1.StartedAt,
+		FinishedAt:   wlV1.FinishedAt,
+		Running:      wlV1.Running,
+		SecuredAt:    wlV1.SecuredAt,
+		ExitCode:     wlV1.ExitCode,
+	}
+
+	wlChildrenV2 := make([]*api.RESTWorkloadV2, 0, len(wlV1.Children))
+	for _, cV1 := range wlV1.Children {
+		if cV2 := workloadV1ToV2(cV1); cV2 != nil {
+			wlChildrenV2 = append(wlChildrenV2, cV2)
+		}
+	}
+	wlV2.Children = wlChildrenV2
+
+	return wlV2
+}
+
+func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	query := restParseQuery(r)
 	if query.brief {
 		handlerWorkloadBrief(w, r, ps)
@@ -243,7 +310,26 @@ func handlerWorkloadList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	log.WithFields(log.Fields{"entries": len(resp.Workloads)}).Debug("Response")
 
-	restRespSuccess(w, r, &resp, acc, login, nil, "Get container list")
+	if apiVer == "v2" {
+		var respV2 api.RESTWorkloadsDataV2
+		respV2.Workloads = make([]*api.RESTWorkloadV2, 0, len(resp.Workloads))
+		for _, wlV1 := range resp.Workloads {
+			if wlV2 := workloadV1ToV2(wlV1); wlV2 != nil {
+				respV2.Workloads = append(respV2.Workloads, wlV2)
+			}
+		}
+		restRespSuccess(w, r, &respV2, acc, login, nil, "Get container list")
+	} else {
+		restRespSuccess(w, r, &resp, acc, login, nil, "Get container list")
+	}
+}
+
+func handlerWorkloadList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerWorkloadListBase("v1", w, r, ps)
+}
+
+func handlerWorkloadListV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerWorkloadListBase("v2", w, r, ps)
 }
 
 func handlerWorkloadShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

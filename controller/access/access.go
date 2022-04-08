@@ -642,6 +642,7 @@ func CompileUriPermitsMapping() {
 			},
 			CONST_API_WORKLOAD: []string{
 				"v1/workload",
+				"v2/workload",
 				"v1/workload/*",
 				"v1/workload/*/stats",
 				"v1/workload/*/config",
@@ -748,6 +749,7 @@ func CompileUriPermitsMapping() {
 				"v1/partner/ibm_sa_config",
 				"v1/file/config",
 				"v1/system/config",
+				"v2/system/config",
 				"v1/system/license",
 				"v1/system/summary",
 				"v1/internal/system",
