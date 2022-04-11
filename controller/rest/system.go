@@ -177,7 +177,7 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get system summary")
 }
 
-func handlerSystemGetConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
@@ -226,10 +226,77 @@ func handlerSystemGetConfig(w http.ResponseWriter, r *http.Request, ps httproute
 		if scope == share.ScopeAll && fedConf != nil && len(fedConf.Webhooks) > 0 {
 			rconf.Webhooks = append(fedConf.Webhooks, rconf.Webhooks...)
 		}
-		resp.Config = rconf
+		if apiVer == "v2" {
+			respV2 := &api.RESTSystemConfigDataV2{
+				Config: &api.RESTSystemConfigV2{
+					NewSvc: api.RESTSystemConfigNewSvcV2{
+						NewServicePolicyMode:      rconf.NewServicePolicyMode,
+						NewServiceProfileBaseline: rconf.NewServiceProfileBaseline,
+					},
+					Syslog: api.RESTSystemConfigSyslogV2{
+						SyslogServer:       rconf.SyslogServer,
+						SyslogIPProto:      rconf.SyslogIPProto,
+						SyslogPort:         rconf.SyslogPort,
+						SyslogLevel:        rconf.SyslogLevel,
+						SyslogEnable:       rconf.SyslogEnable,
+						SyslogCategories:   rconf.SyslogCategories,
+						SyslogInJSON:       rconf.SyslogInJSON,
+						SingleCVEPerSyslog: rconf.SingleCVEPerSyslog,
+					},
+					Auth: api.RESTSystemConfigAuthV2{
+						AuthOrder:      rconf.AuthOrder,
+						AuthByPlatform: rconf.AuthByPlatform,
+						RancherEP:      rconf.RancherEP,
+					},
+					Misc: api.RESTSystemConfigMiscV2{
+						InternalSubnets:    rconf.InternalSubnets,
+						UnusedGroupAging:   rconf.UnusedGroupAging,
+						ClusterName:        rconf.ClusterName,
+						ControllerDebug:    rconf.ControllerDebug,
+						MonitorServiceMesh: rconf.MonitorServiceMesh,
+						XffEnabled:         rconf.XffEnabled,
+					},
+					Webhooks: rconf.Webhooks,
+					Proxy: api.RESTSystemConfigProxyV2{
+						RegistryHttpProxyEnable:  rconf.RegistryHttpProxyEnable,
+						RegistryHttpsProxyEnable: rconf.RegistryHttpsProxyEnable,
+						RegistryHttpProxy:        rconf.RegistryHttpProxy,
+						RegistryHttpsProxy:       rconf.RegistryHttpsProxy,
+					},
+					IBMSA: api.RESTSystemConfigIBMSAV2{
+						IBMSAEpEnabled:      rconf.IBMSAEpEnabled,
+						IBMSAEpStart:        rconf.IBMSAEpStart,
+						IBMSAEpDashboardURL: rconf.IBMSAEpDashboardURL,
+						IBMSAEpConnectedAt:  rconf.IBMSAEpConnectedAt,
+					},
+					NetSvc: api.RESTSystemConfigNetSvcV2{
+						NetServiceStatus:     rconf.NetServiceStatus,
+						NetServicePolicyMode: rconf.NetServicePolicyMode,
+					},
+					ModeAuto: api.RESTSystemConfigModeAutoV2{
+						ModeAutoD2M:         rconf.ModeAutoD2M,
+						ModeAutoD2MDuration: rconf.ModeAutoD2MDuration,
+						ModeAutoM2P:         rconf.ModeAutoM2P,
+						ModeAutoM2PDuration: rconf.ModeAutoM2PDuration,
+					},
+				},
+			}
+			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
+			return
+		} else {
+			resp.Config = rconf
+		}
 	}
 
 	restRespSuccess(w, r, resp, acc, login, nil, "Get system configuration")
+}
+
+func handlerSystemGetConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemGetConfigBase("v1", w, r, ps)
+}
+
+func handlerSystemGetConfigV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemGetConfigBase("v2", w, r, ps)
 }
 
 func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

@@ -1300,7 +1300,8 @@ func StartRESTServer() {
 	r.GET("/v1/internal/system", handlerInternalSystem)       // skip API document
 	r.GET("/v1/system/usage", handlerSystemUsage)             // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
-	r.GET("/v1/system/config", handlerSystemGetConfig) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
+	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
+	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
 	r.GET("/v1/system/rbac", handlerSystemGetRBAC)
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
@@ -1337,6 +1338,7 @@ func StartRESTServer() {
 	r.GET("/v1/enforcer/:id/probe_containers", handlerProbeContainerMap) // debug
 	// r.GET("/v1/enforcer/:id/logs", handlerAgentGetLogs)               // debug
 	r.GET("/v1/workload", handlerWorkloadList)
+	r.GET("/v2/workload", handlerWorkloadListV2) // starting from 5.0, rest client should call this api.
 	r.GET("/v1/workload/:id", handlerWorkloadShow)
 	r.GET("/v1/workload/:id/stats", handlerWorkloadStats)
 	r.GET("/v1/workload/:id/config", handlerWorkloadGetConfig)
