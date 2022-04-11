@@ -313,6 +313,7 @@ func workload2REST(cache *workloadCache) *api.RESTWorkload {
 	r := &api.RESTWorkload{
 		RESTWorkloadBrief: *workload2BriefREST(cache),
 		AgentID:           wl.AgentID,
+		AgentName:         getAgentName(wl.AgentID),
 		NetworkMode:       wl.NetworkMode,
 		CreatedAt:         api.RESTTimeString(wl.CreatedAt),
 		StartedAt:         api.RESTTimeString(wl.StartedAt),
