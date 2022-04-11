@@ -8,8 +8,8 @@ The container images for the beta version can be pulled from the NeuVector Docke
 + neuvector/manager:5.0.0-b1
 + neuvector/controller:5.0.0-b1
 + neuvector/enforcer:5.0.0-b1
-+ neuvector/scanner.preview:latest
-+ neuvector/updater.preview:latest
++ neuvector/scanner:latest
++ neuvector/updater:latest
 
 If deploying with the current NeuVector Helm chart (v1.8.9+), the following changes should be made to values.yml:
 
