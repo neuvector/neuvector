@@ -831,7 +831,7 @@ type RESTIDName struct {
 	Domains     []string `json:"domains"`
 }
 
-type RESTWorkloadBrief struct {
+type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	ID                 string               `json:"id"`
 	Name               string               `json:"name"`
 	DisplayName        string               `json:"display_name"`
@@ -862,9 +862,10 @@ type RESTWorkloadBrief struct {
 	BaselineProfile    string               `json:"baseline_profile"`
 }
 
-type RESTWorkload struct {
+type RESTWorkload struct { // obsolete, use v2 instead
 	RESTWorkloadBrief
 	AgentID        string                   `json:"enforcer_id"`
+	AgentName      string                   `json:"enforcer_name"`
 	NetworkMode    string                   `json:"network_mode"`
 	CreatedAt      string                   `json:"created_at"`
 	StartedAt      string                   `json:"started_at"`
@@ -909,39 +910,40 @@ type RESTWorkloadBriefV2 struct {
 }
 
 type RESTWorkloadSecurityV2 struct {
-	CapSniff           bool                     `json:"cap_sniff"`
-	CapQuar            bool                     `json:"cap_quarantine"`
-	CapChgMode         bool                     `json:"cap_change_mode"`
-	ServiceMesh        bool                     `json:"service_mesh"`
-	ServiceMeshSidecar bool                     `json:"service_mesh_sidecar"`
-	NetworkMode        string                   `json:"network_mode"`
-	PolicyMode         string                   `json:"policy_mode"`
-	ProfileMode        string                   `json:"profile_mode"`
-	BaselineProfile    string                   `json:"baseline_profile"`
-	QuarReason         string                   `json:"quarantine_reason,omitempty"`
-	ScanSummary        *RESTScanBrief           `json:"scan_summary"`
-	Ifaces             map[string][]*RESTIPAddr `json:"interfaces"`
-	Ports              []*RESTWorkloadPorts     `json:"ports"`
-	Applications       []string                 `json:"applications"`
+	CapSniff           bool           `json:"cap_sniff"`
+	CapQuar            bool           `json:"cap_quarantine"`
+	CapChgMode         bool           `json:"cap_change_mode"`
+	ServiceMesh        bool           `json:"service_mesh"`
+	ServiceMeshSidecar bool           `json:"service_mesh_sidecar"`
+	PolicyMode         string         `json:"policy_mode"`
+	ProfileMode        string         `json:"profile_mode"`
+	BaselineProfile    string         `json:"baseline_profile"`
+	QuarReason         string         `json:"quarantine_reason,omitempty"`
+	ScanSummary        *RESTScanBrief `json:"scan_summary"`
 }
 
 type RESTWorkloadRtAttribesV2 struct {
-	PodName        string            `json:"pod_name"`
-	ShareNSWith    string            `json:"share_ns_with,omitempty"`
-	Privileged     bool              `json:"privileged"`
-	RunAsRoot      bool              `json:"run_as_root"`
-	Labels         map[string]string `json:"labels"`
-	MemoryLimit    int64             `json:"memory_limit"`
-	CPUs           string            `json:"cpus"`
-	ServiceAccount string            `json:"service_account"`
+	PodName        string                   `json:"pod_name"`
+	ShareNSWith    string                   `json:"share_ns_with,omitempty"`
+	Privileged     bool                     `json:"privileged"`
+	RunAsRoot      bool                     `json:"run_as_root"`
+	Labels         map[string]string        `json:"labels"`
+	MemoryLimit    int64                    `json:"memory_limit"`
+	CPUs           string                   `json:"cpus"`
+	ServiceAccount string                   `json:"service_account"`
+	NetworkMode    string                   `json:"network_mode"`
+	Ifaces         map[string][]*RESTIPAddr `json:"interfaces"`
+	Ports          []*RESTWorkloadPorts     `json:"ports"`
+	Applications   []string                 `json:"applications"`
 }
 
 type RESTWorkloadV2 struct {
-	WlBrief        RESTWorkloadBriefV2      `json:"wl_brief"`
-	WlSecurity     RESTWorkloadSecurityV2   `json:"wl_security"`
-	WlRtSttributes RESTWorkloadRtAttribesV2 `json:"wl_rt_attributes"`
+	WlBrief        RESTWorkloadBriefV2      `json:"brief"`
+	WlSecurity     RESTWorkloadSecurityV2   `json:"security"`
+	WlRtSttributes RESTWorkloadRtAttribesV2 `json:"rt_attributes"`
 	Children       []*RESTWorkloadV2        `json:"children"`
 	AgentID        string                   `json:"enforcer_id"`
+	AgentName      string                   `json:"enforcer_name"`
 	PlatformRole   string                   `json:"platform_role"`
 	CreatedAt      string                   `json:"created_at"`
 	StartedAt      string                   `json:"started_at"`

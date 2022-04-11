@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
+	log "github.com/sirupsen/logrus"
 )
 
 type ProcProfileBrief struct {
@@ -451,7 +451,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"rpmparser", "/usr/local/bin/rpmparser"},
 		{"scanner", "/usr/local/bin/scanner"},
 		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
@@ -515,7 +514,6 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"rpmparser", "/usr/local/bin/rpmparser"},
 		{"scanner", "/usr/local/bin/scanner"},
 		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
@@ -597,7 +595,6 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"rpmparser", "/usr/local/bin/rpmparser"},
 		{"scanner", "/usr/local/bin/scanner"},
 		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
