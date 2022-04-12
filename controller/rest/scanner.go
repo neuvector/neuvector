@@ -674,11 +674,9 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 				va.Packages[pkg][j] = v.(api.RESTVulnPackageVersion)
 				j++
 			}
-			sort.Slice(va.PackageVersions, func(s, t int) bool {
-				return va.Packages[pkg][s].PackageVersion < va.Packages[pkg][t].PackageVersion
-			})
 		}
 
+		// Not to sort these lists to save some CPU cycles
 		exists = utils.NewSet()
 		for _, v := range vul.wls {
 			if !exists.Contains(v.ID) {
@@ -686,9 +684,6 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Workloads, func(s, t int) bool {
-			return va.Workloads[s].DisplayName < va.Workloads[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range vul.nodes {
@@ -697,9 +692,6 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Nodes, func(s, t int) bool {
-			return va.Nodes[s].DisplayName < va.Nodes[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range vul.images {
@@ -708,9 +700,6 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Images, func(s, t int) bool {
-			return va.Images[s].DisplayName < va.Images[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range vul.platforms {
@@ -719,9 +708,6 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Platforms, func(s, t int) bool {
-			return va.Platforms[s].DisplayName < va.Platforms[t].DisplayName
-		})
 
 		list = append(list, va)
 	}
