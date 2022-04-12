@@ -219,7 +219,7 @@ func TestAzureCniCmd(t *testing.T) {
 	global.RT = &dummyRTDriver{cmd: "runc"}
 	p := &Probe{bKubePlatform: true}
 	for k, v := range apps {
-		res := p.isProcessException(v, share.GroupNVProtect, "1234567890", true)
+		res := p.isProcessException(v, share.GroupNVProtect, "1234567890", true, false)
 		if k < 10 {
 			if !res {
 				t.Errorf("Error[%v]: positive: %v\n", k, v)

@@ -402,6 +402,10 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, m
 	}
 
 	path := filepath.Join(hostRootMountPoint, cPath)
+	if path == hostRootMountPoint {
+		log.WithFields(log.Fields{"id": id, "cPath": cPath}).Error("FSN: invaild cPath")
+		return false, nil
+	}
 
 	fsn.lockMux()
 	defer fsn.unlockMux()

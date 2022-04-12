@@ -335,7 +335,7 @@ func TestUpperDir_Overlay2(t *testing.T) {
 		tmpfs /sys/firmware tmpfs ro,relatime 0 0`
 
 	id := "00462ec62b1186a3962d7814fa02214011b7e99300cf30efa0a33bfe79555067"
-	res_rootfs := ""
+	res_rootfs := "/"
 	res_upper := "/var/lib/docker/overlay2/03a3f687e69707e7d9ed2864727a6b6f70a273980e7bed41ad5d98c5a7b29264/diff"
 
 	r := strings.NewReader(mounts)
@@ -1112,5 +1112,321 @@ tmpfs /sys/firmware tmpfs ro,relatime,inode64 0 0
 
 	if workingDir != res_workingDir {
 		t.Errorf("failed to obtain workingDir: %v\n", workingDir)
+	}
+}
+
+func TestUpperDir_Overlay_MutipleMounts2(t *testing.T) {
+	// Crio: 1.21
+	// Storage Driver: overlay
+	// oc pod: machine-config-daemon
+	mounts := `
+	/dev/sda4 / xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /etc xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	overlay /etc/NetworkManager/systemConnectionsMerged overlay rw,seclabel,relatime,lowerdir=/etc/NetworkManager/system-connections,upperdir=/run/nm-system-connections,workdir=/run/nm-system-connections-work 0 0
+	/dev/sda4 /usr xfs ro,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /sysroot xfs ro,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	sysfs /sys sysfs rw,seclabel,nosuid,nodev,noexec,relatime 0 0
+	securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
+	tmpfs /sys/fs/cgroup tmpfs ro,seclabel,nosuid,nodev,noexec,mode=755 0 0
+	cgroup /sys/fs/cgroup/systemd cgroup rw,seclabel,nosuid,nodev,noexec,relatime,xattr,release_agent=/usr/lib/systemd/systemd-cgroups-agent,name=systemd 0 0
+	cgroup /sys/fs/cgroup/memory cgroup rw,seclabel,nosuid,nodev,noexec,relatime,memory 0 0
+	cgroup /sys/fs/cgroup/pids cgroup rw,seclabel,nosuid,nodev,noexec,relatime,pids 0 0
+	cgroup /sys/fs/cgroup/cpu,cpuacct cgroup rw,seclabel,nosuid,nodev,noexec,relatime,cpu,cpuacct 0 0
+	cgroup /sys/fs/cgroup/net_cls,net_prio cgroup rw,seclabel,nosuid,nodev,noexec,relatime,net_cls,net_prio 0 0
+	cgroup /sys/fs/cgroup/blkio cgroup rw,seclabel,nosuid,nodev,noexec,relatime,blkio 0 0
+	cgroup /sys/fs/cgroup/freezer cgroup rw,seclabel,nosuid,nodev,noexec,relatime,freezer 0 0
+	cgroup /sys/fs/cgroup/perf_event cgroup rw,seclabel,nosuid,nodev,noexec,relatime,perf_event 0 0
+	cgroup /sys/fs/cgroup/rdma cgroup rw,seclabel,nosuid,nodev,noexec,relatime,rdma 0 0
+	cgroup /sys/fs/cgroup/cpuset cgroup rw,seclabel,nosuid,nodev,noexec,relatime,cpuset 0 0
+	cgroup /sys/fs/cgroup/hugetlb cgroup rw,seclabel,nosuid,nodev,noexec,relatime,hugetlb 0 0
+	cgroup /sys/fs/cgroup/devices cgroup rw,seclabel,nosuid,nodev,noexec,relatime,devices 0 0
+	pstore /sys/fs/pstore pstore rw,seclabel,nosuid,nodev,noexec,relatime 0 0
+	bpf /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime,mode=700 0 0
+	none /sys/kernel/tracing tracefs rw,seclabel,relatime 0 0
+	configfs /sys/kernel/config configfs rw,relatime 0 0
+	selinuxfs /sys/fs/selinux selinuxfs rw,relatime 0 0
+	debugfs /sys/kernel/debug debugfs rw,seclabel,relatime 0 0
+	fusectl /sys/fs/fuse/connections fusectl rw,relatime 0 0
+	devtmpfs /dev devtmpfs rw,seclabel,nosuid,size=8157216k,nr_inodes=2039304,mode=755 0 0
+	tmpfs /dev/shm tmpfs rw,seclabel,nosuid,nodev 0 0
+	devpts /dev/pts devpts rw,seclabel,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+	hugetlbfs /dev/hugepages hugetlbfs rw,seclabel,relatime,pagesize=2M 0 0
+	mqueue /dev/mqueue mqueue rw,seclabel,relatime 0 0
+	tmpfs /run tmpfs rw,seclabel,nosuid,nodev,mode=755 0 0
+	shm /run/containers/storage/overlay-containers/58688a516052081917948beb43d8d527f4ab87bdcc47469bd53ce3695505899a/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c366,c947",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/c3ede37946e111e8fc1167f221fd0e882f912e1b7d0a1c80a7e68fa9be8a514c/userdata/shm tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/861c598c-420c-4093-8983-7deae358511b nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/861c598c-420c-4093-8983-7deae358511b nsfs rw,seclabel 0 0
+	nsfs /run/netns/861c598c-420c-4093-8983-7deae358511b nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/a3dd9b7e063b219357076104baccc1680b35f83403d767ed509a1ccd6e3bcb91/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c14,c24",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/06c21eaf482d88eee2d0f4342ea8d7a097cca69c7c4b8f8293a5ab9f54c72179/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c541,c851",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/fdaca0243d8d0227aa8da70717790e0276ab6c30867feb733fcd8e96ebadf5cf/userdata/shm tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/6b1b4bc553727d910f8d338ca94c521b3ad49f7e27c1ed69b4bcdf6a47068588/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c4,c17",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/aeb84afe1f6a2bc719b79b56ce60a47b91cd4981718fd53f0eb7bfdd55dd1dd9/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/2df0c9d9be7c32d0cc497d8a783f0b730f878b76f8dbcbdef5bd30da2b952980/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/539b2690-c9f7-4fd6-87a6-ae19c459f6c4 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/539b2690-c9f7-4fd6-87a6-ae19c459f6c4 nsfs rw,seclabel 0 0
+	nsfs /run/netns/539b2690-c9f7-4fd6-87a6-ae19c459f6c4 nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/5243653e13484d15d94c867ada606fbd4afd469bac22067457a33a1d8a14496c/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/ebc74697603ded65e3362ad21ad40c196fd2e2d36302f5ffeab5e8a1a90c96e6/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c9,c22",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/4922166cef98257b393557d976dc4f2575af23c3eabb41a8151032da9688908b/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c9,c22",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/81f3b980-3ed2-497a-b275-ca6e12259f4b nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/81f3b980-3ed2-497a-b275-ca6e12259f4b nsfs rw,seclabel 0 0
+	nsfs /run/netns/81f3b980-3ed2-497a-b275-ca6e12259f4b nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/a7ea32d56d053b37911dad0b6e54c8c957e015e22362b920b7e1c80ff7b904be/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c4,c17",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/03272afb58a50492e0bd4d356ae9e79540ab92c89f7080fd3d512c3d840ea288/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/23986cbb6318cefe0ba57b1102fdeece2c680b98e22628e17d890d1805f9f152/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c25",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/c5f2fe8e841cc01be3b93ffabe86bc1b919aa1086d48a10a88b1b63537a7b925/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c102,c210",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/15da992408daa6f78df2351dd82815b014a3a082af3d3748cda007ef79933355/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c441,c714",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/71e7a93f-ba9e-4c60-914c-eb3c78201669 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/71e7a93f-ba9e-4c60-914c-eb3c78201669 nsfs rw,seclabel 0 0
+	nsfs /run/netns/71e7a93f-ba9e-4c60-914c-eb3c78201669 nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/c276b872fd9fe4bcc52c1b4a6b1932ac429f5403dd0ed08235297f1822c42b05/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/78809b99da6079b332d199a9f2d3ebb03d2af92e5c59b6c8444b251401b714c2/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/9b82da4b2c6f762c231b3e96a2119742dfeb0082ee60020756f359c3f7686370/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c12,c18",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/85a26e51-2bbf-424e-b616-6aed877f10eb nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/85a26e51-2bbf-424e-b616-6aed877f10eb nsfs rw,seclabel 0 0
+	nsfs /run/netns/85a26e51-2bbf-424e-b616-6aed877f10eb nsfs rw,seclabel 0 0
+	nsfs /run/utsns/08e1d80c-0db7-4f4e-b934-5f4ddd3666f1 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/08e1d80c-0db7-4f4e-b934-5f4ddd3666f1 nsfs rw,seclabel 0 0
+	nsfs /run/netns/08e1d80c-0db7-4f4e-b934-5f4ddd3666f1 nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/8975e24d8d319f75e242c89927c4448c1e3425d2c38068af8ed4f64931ef0bf4/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c19,c24",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/78a27ee9-4c9b-46c5-a6c8-56281e01cf1c nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/78a27ee9-4c9b-46c5-a6c8-56281e01cf1c nsfs rw,seclabel 0 0
+	nsfs /run/netns/78a27ee9-4c9b-46c5-a6c8-56281e01cf1c nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/9b2973c22c7094907ead4685b640fd8cbe389c97316eb90d8cb7b6830de1e665/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/63740e64cfef7a589f1a5e006406363beb0e827348d862438c211b2958b87e95/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c299,c751",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/77786189-e72b-4d3a-983b-d4f626acd3e1 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/77786189-e72b-4d3a-983b-d4f626acd3e1 nsfs rw,seclabel 0 0
+	nsfs /run/netns/77786189-e72b-4d3a-983b-d4f626acd3e1 nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/460d7d0cd0068fdb5762f104406cc42e0af827059d2e8db69e8631c171c505a8/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/6bc37d24e98d2ebb766d4c379d51cfb0338f82bce1e62176d79204af737192c5/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c43,c716",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/adb9833544d982350468a1741d52734d96446466c625544b82cc974657ebd669/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c4,c17",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/14b229ea6d25d458b61f939161cdd749f904ea0eb050b6f03f9882ad2a34adff/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/84138f017e19c942a372f3d501eb7926adaa2ff39aed8d8b926697f66141980d/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/36f28c83-fd4c-4935-be73-c86561a5a5c5 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/36f28c83-fd4c-4935-be73-c86561a5a5c5 nsfs rw,seclabel 0 0
+	nsfs /run/netns/36f28c83-fd4c-4935-be73-c86561a5a5c5 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/3d6a578c-1aff-46ba-a1ac-693b591492d4 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/3d6a578c-1aff-46ba-a1ac-693b591492d4 nsfs rw,seclabel 0 0
+	nsfs /run/netns/3d6a578c-1aff-46ba-a1ac-693b591492d4 nsfs rw,seclabel 0 0
+	shm /run/containers/storage/overlay-containers/16631fad07dfb384f4d944d25531a61791c8be832dc09992cd87273339b19dbb/userdata/shm tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/f7a2509907896b6fba343b63af68b51d2c9022a0e37522c533a9c4a2bf1e29d3/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c25",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	shm /run/containers/storage/overlay-containers/f16d43c77339407744808de7646f207bdeb7ed0504b5d6ff766a7871ca976432/userdata/shm tmpfs rw,context="system_u:object_r:container_file_t:s0:c0,c21",nosuid,nodev,noexec,relatime,size=65536k 0 0
+	nsfs /run/utsns/383592d5-331b-4042-b68c-b3d37cb93909 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/383592d5-331b-4042-b68c-b3d37cb93909 nsfs rw,seclabel 0 0
+	nsfs /run/netns/383592d5-331b-4042-b68c-b3d37cb93909 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/d68d98be-e9dd-4449-93f3-1f43c6843632 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/d68d98be-e9dd-4449-93f3-1f43c6843632 nsfs rw,seclabel 0 0
+	nsfs /run/netns/d68d98be-e9dd-4449-93f3-1f43c6843632 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/be78a4c4-77d5-46fd-ada7-ee9da3a0189b nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/be78a4c4-77d5-46fd-ada7-ee9da3a0189b nsfs rw,seclabel 0 0
+	nsfs /run/netns/be78a4c4-77d5-46fd-ada7-ee9da3a0189b nsfs rw,seclabel 0 0
+	nsfs /run/utsns/1ddae25a-d7c4-477f-8ee3-e64711fe5a7b nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/1ddae25a-d7c4-477f-8ee3-e64711fe5a7b nsfs rw,seclabel 0 0
+	nsfs /run/netns/1ddae25a-d7c4-477f-8ee3-e64711fe5a7b nsfs rw,seclabel 0 0
+	nsfs /run/utsns/a6958c39-624b-4422-bd9f-ad3c5f15ffc1 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/a6958c39-624b-4422-bd9f-ad3c5f15ffc1 nsfs rw,seclabel 0 0
+	nsfs /run/netns/a6958c39-624b-4422-bd9f-ad3c5f15ffc1 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/c25274d0-a526-49ff-b2a1-4a9938712d1a nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/c25274d0-a526-49ff-b2a1-4a9938712d1a nsfs rw,seclabel 0 0
+	nsfs /run/netns/c25274d0-a526-49ff-b2a1-4a9938712d1a nsfs rw,seclabel 0 0
+	nsfs /run/utsns/e83dfa33-b87f-4451-ba43-fe1fae138a13 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/e83dfa33-b87f-4451-ba43-fe1fae138a13 nsfs rw,seclabel 0 0
+	nsfs /run/netns/e83dfa33-b87f-4451-ba43-fe1fae138a13 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/590d19be-0e2f-4283-9867-eeb245e6c6d8 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/590d19be-0e2f-4283-9867-eeb245e6c6d8 nsfs rw,seclabel 0 0
+	nsfs /run/netns/590d19be-0e2f-4283-9867-eeb245e6c6d8 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/83f94f65-0353-4834-a526-fd2dc7e00d85 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/83f94f65-0353-4834-a526-fd2dc7e00d85 nsfs rw,seclabel 0 0
+	nsfs /run/netns/83f94f65-0353-4834-a526-fd2dc7e00d85 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/29536f3a-066c-4732-b2fb-fa54b5648707 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/29536f3a-066c-4732-b2fb-fa54b5648707 nsfs rw,seclabel 0 0
+	nsfs /run/netns/29536f3a-066c-4732-b2fb-fa54b5648707 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/6cbc847a-1d84-43dc-8953-a7604eeb54f3 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/6cbc847a-1d84-43dc-8953-a7604eeb54f3 nsfs rw,seclabel 0 0
+	nsfs /run/netns/6cbc847a-1d84-43dc-8953-a7604eeb54f3 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/5b2876be-9c76-4701-bd91-2c839c36c06b nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/5b2876be-9c76-4701-bd91-2c839c36c06b nsfs rw,seclabel 0 0
+	nsfs /run/netns/5b2876be-9c76-4701-bd91-2c839c36c06b nsfs rw,seclabel 0 0
+	nsfs /run/utsns/bbddb21d-e6f1-4c9b-9073-2d59df49b3e1 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/bbddb21d-e6f1-4c9b-9073-2d59df49b3e1 nsfs rw,seclabel 0 0
+	nsfs /run/netns/bbddb21d-e6f1-4c9b-9073-2d59df49b3e1 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/f381243e-c033-4005-8d82-6e10a34659b8 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/f381243e-c033-4005-8d82-6e10a34659b8 nsfs rw,seclabel 0 0
+	nsfs /run/netns/f381243e-c033-4005-8d82-6e10a34659b8 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/3a61e9f9-9ea3-4983-a10a-36f9309c121f nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/3a61e9f9-9ea3-4983-a10a-36f9309c121f nsfs rw,seclabel 0 0
+	nsfs /run/netns/3a61e9f9-9ea3-4983-a10a-36f9309c121f nsfs rw,seclabel 0 0
+	nsfs /run/utsns/12ecac15-f5d2-4926-89ff-714d13a05920 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/12ecac15-f5d2-4926-89ff-714d13a05920 nsfs rw,seclabel 0 0
+	nsfs /run/netns/12ecac15-f5d2-4926-89ff-714d13a05920 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/e057fcc7-13a6-4965-a229-ef42383889a5 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/e057fcc7-13a6-4965-a229-ef42383889a5 nsfs rw,seclabel 0 0
+	nsfs /run/netns/e057fcc7-13a6-4965-a229-ef42383889a5 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/23f18542-03e9-4da4-895b-efc37ed616dd nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/23f18542-03e9-4da4-895b-efc37ed616dd nsfs rw,seclabel 0 0
+	nsfs /run/netns/23f18542-03e9-4da4-895b-efc37ed616dd nsfs rw,seclabel 0 0
+	nsfs /run/utsns/497c6fc6-afa5-4861-b373-94c27a0b67b2 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/497c6fc6-afa5-4861-b373-94c27a0b67b2 nsfs rw,seclabel 0 0
+	nsfs /run/netns/497c6fc6-afa5-4861-b373-94c27a0b67b2 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/0d10d2e7-093e-476b-9d3b-12bcb6113c88 nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/0d10d2e7-093e-476b-9d3b-12bcb6113c88 nsfs rw,seclabel 0 0
+	nsfs /run/netns/0d10d2e7-093e-476b-9d3b-12bcb6113c88 nsfs rw,seclabel 0 0
+	nsfs /run/utsns/6a911b47-c76d-4538-972c-60a14f07206f nsfs rw,seclabel 0 0
+	nsfs /run/ipcns/6a911b47-c76d-4538-972c-60a14f07206f nsfs rw,seclabel 0 0
+	nsfs /run/netns/6a911b47-c76d-4538-972c-60a14f07206f nsfs rw,seclabel 0 0
+	proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+	systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=41,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=15032 0 0
+	tmpfs /tmp tmpfs rw,seclabel,nosuid,nodev 0 0
+	/dev/sda4 /var xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /var/lib/containers/storage/overlay xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	overlay /var/lib/containers/storage/overlay/0fc2eea34bc55c02a3e734c754444226bc9f13063d3e22716a84b3d2451fbd80/merged overlay rw,context="system_u:object_r:container_file_t:s0:c366,c947",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/0fc2eea34bc55c02a3e734c754444226bc9f13063d3e22716a84b3d2451fbd80/diff,workdir=/var/lib/containers/storage/overlay/0fc2eea34bc55c02a3e734c754444226bc9f13063d3e22716a84b3d2451fbd80/work 0 0
+	overlay /var/lib/containers/storage/overlay/e23820188334478ed88eb12907b1791031bf90ac11dcc98604f0f614fc8e4714/merged overlay rw,context="system_u:object_r:container_file_t:s0:c411,c459",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/e23820188334478ed88eb12907b1791031bf90ac11dcc98604f0f614fc8e4714/diff,workdir=/var/lib/containers/storage/overlay/e23820188334478ed88eb12907b1791031bf90ac11dcc98604f0f614fc8e4714/work 0 0
+	overlay /var/lib/containers/storage/overlay/d0e9c86c7570e5d054aba8851273d87f9cbe43fcedbc110ea3f3834cb429e47a/merged overlay rw,context="system_u:object_r:container_file_t:s0:c0,c683",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/d0e9c86c7570e5d054aba8851273d87f9cbe43fcedbc110ea3f3834cb429e47a/diff,workdir=/var/lib/containers/storage/overlay/d0e9c86c7570e5d054aba8851273d87f9cbe43fcedbc110ea3f3834cb429e47a/work 0 0
+	overlay /var/lib/containers/storage/overlay/540f83df881c52f7f65a08567c97af4bdcc6216cb3335701a48b6634bd556941/merged overlay rw,context="system_u:object_r:container_file_t:s0:c441,c714",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/540f83df881c52f7f65a08567c97af4bdcc6216cb3335701a48b6634bd556941/diff,workdir=/var/lib/containers/storage/overlay/540f83df881c52f7f65a08567c97af4bdcc6216cb3335701a48b6634bd556941/work 0 0
+	overlay /var/lib/containers/storage/overlay/48ca0ef70f4a2d2f25b6eb97333e36c573a209cea2542983f8ad63b47013f261/merged overlay rw,context="system_u:object_r:container_file_t:s0:c162,c405",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/48ca0ef70f4a2d2f25b6eb97333e36c573a209cea2542983f8ad63b47013f261/diff,workdir=/var/lib/containers/storage/overlay/48ca0ef70f4a2d2f25b6eb97333e36c573a209cea2542983f8ad63b47013f261/work 0 0
+	overlay /var/lib/containers/storage/overlay/da0f0b093db65716988753ead3e6ab07a407b6805ba90da5acc21efd214615bd/merged overlay rw,context="system_u:object_r:container_file_t:s0:c102,c210",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/da0f0b093db65716988753ead3e6ab07a407b6805ba90da5acc21efd214615bd/diff,workdir=/var/lib/containers/storage/overlay/da0f0b093db65716988753ead3e6ab07a407b6805ba90da5acc21efd214615bd/work 0 0
+	overlay /var/lib/containers/storage/overlay/732a8c35039144f16154551e73dd9ba4d4ed0e0d006eb804dcf7fe91ebdafb2b/merged overlay rw,context="system_u:object_r:container_file_t:s0:c569,c597",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/732a8c35039144f16154551e73dd9ba4d4ed0e0d006eb804dcf7fe91ebdafb2b/diff,workdir=/var/lib/containers/storage/overlay/732a8c35039144f16154551e73dd9ba4d4ed0e0d006eb804dcf7fe91ebdafb2b/work 0 0
+	overlay /var/lib/containers/storage/overlay/c0c4483a78974c99497cd7719d7e5ba7057d3f58b53a9b45ad51fee191ea9178/merged overlay rw,context="system_u:object_r:container_file_t:s0:c19,c24",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/c0c4483a78974c99497cd7719d7e5ba7057d3f58b53a9b45ad51fee191ea9178/diff,workdir=/var/lib/containers/storage/overlay/c0c4483a78974c99497cd7719d7e5ba7057d3f58b53a9b45ad51fee191ea9178/work 0 0
+	overlay /var/lib/containers/storage/overlay/85cad40c7d2ffd609cc41a350882e4deadd2be14ff1828788f45035cd51e8cd4/merged overlay rw,context="system_u:object_r:container_file_t:s0:c299,c751",relatime,lowerdir=/var/lib/containers/storage/overlay/l/ZOHQFFP6DNUZZII73VISP43FWT:/var/lib/containers/storage/overlay/l/QKE7WAAAABZLZDRCZ4R7246GPQ:/var/lib/containers/storage/overlay/l/IRD3CQIVJWKESQL4OBGFYGFMSR:/var/lib/containers/storage/overlay/l/ABFHB2YHGJQE3447IUXLWYI2M2:/var/lib/containers/storage/overlay/l/EFDMX3BHBG2L34QPVYSJFCLXQ6,upperdir=/var/lib/containers/storage/overlay/85cad40c7d2ffd609cc41a350882e4deadd2be14ff1828788f45035cd51e8cd4/diff,workdir=/var/lib/containers/storage/overlay/85cad40c7d2ffd609cc41a350882e4deadd2be14ff1828788f45035cd51e8cd4/work 0 0
+	overlay /var/lib/containers/storage/overlay/d07f6e0925432844c7d7c85698fb5794f7ad2ede4066225d785dec82a5d1b987/merged overlay rw,context="system_u:object_r:container_file_t:s0:c366,c947",relatime,lowerdir=/var/lib/containers/storage/overlay/l/VLFJVHO3GAX6ORSBCTX3RYZ6QQ:/var/lib/containers/storage/overlay/l/2ELF657Y5OLDK7FCHGH5D72H65:/var/lib/containers/storage/overlay/l/DXG73U4ANCX3BLNDFYUOZI3PWN:/var/lib/containers/storage/overlay/l/2MFE53W2KO5V3TLKQFB4E4SFTG:/var/lib/containers/storage/overlay/l/RCENOS2O7PSNINC7ZQZFU52NEY,upperdir=/var/lib/containers/storage/overlay/d07f6e0925432844c7d7c85698fb5794f7ad2ede4066225d785dec82a5d1b987/diff,workdir=/var/lib/containers/storage/overlay/d07f6e0925432844c7d7c85698fb5794f7ad2ede4066225d785dec82a5d1b987/work 0 0
+	overlay /var/lib/containers/storage/overlay/b17600ec08515f4b18ead9fc4aa62572a1372777132da4f1c5d8c5cdae4760ef/merged overlay rw,context="system_u:object_r:container_file_t:s0:c102,c210",relatime,lowerdir=/var/lib/containers/storage/overlay/l/5KFDTI7GO3E3PA3DKUL4DETGYN:/var/lib/containers/storage/overlay/l/2ELF657Y5OLDK7FCHGH5D72H65:/var/lib/containers/storage/overlay/l/DXG73U4ANCX3BLNDFYUOZI3PWN:/var/lib/containers/storage/overlay/l/2MFE53W2KO5V3TLKQFB4E4SFTG:/var/lib/containers/storage/overlay/l/RCENOS2O7PSNINC7ZQZFU52NEY,upperdir=/var/lib/containers/storage/overlay/b17600ec08515f4b18ead9fc4aa62572a1372777132da4f1c5d8c5cdae4760ef/diff,workdir=/var/lib/containers/storage/overlay/b17600ec08515f4b18ead9fc4aa62572a1372777132da4f1c5d8c5cdae4760ef/work 0 0
+	overlay /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged overlay rw,context="system_u:object_r:container_file_t:s0:c720,c843",relatime,lowerdir=/var/lib/containers/storage/overlay/l/YD3YYD6KP6B3WUB3PYBELGZPI6:/var/lib/containers/storage/overlay/l/2ELF657Y5OLDK7FCHGH5D72H65:/var/lib/containers/storage/overlay/l/DXG73U4ANCX3BLNDFYUOZI3PWN:/var/lib/containers/storage/overlay/l/2MFE53W2KO5V3TLKQFB4E4SFTG:/var/lib/containers/storage/overlay/l/RCENOS2O7PSNINC7ZQZFU52NEY,upperdir=/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/diff,workdir=/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/work 0 0
+	overlay /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged overlay rw,context="system_u:object_r:container_file_t:s0:c720,c843",relatime,lowerdir=/var/lib/containers/storage/overlay/l/YD3YYD6KP6B3WUB3PYBELGZPI6:/var/lib/containers/storage/overlay/l/2ELF657Y5OLDK7FCHGH5D72H65:/var/lib/containers/storage/overlay/l/DXG73U4ANCX3BLNDFYUOZI3PWN:/var/lib/containers/storage/overlay/l/2MFE53W2KO5V3TLKQFB4E4SFTG:/var/lib/containers/storage/overlay/l/RCENOS2O7PSNINC7ZQZFU52NEY,upperdir=/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/diff,workdir=/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/work 0 0
+	proc /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/proc proc rw,nosuid,nodev,noexec,relatime 0 0
+	tmpfs /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/dev tmpfs rw,seclabel,nosuid,size=65536k,mode=755 0 0
+	devpts /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/dev/pts devpts rw,seclabel,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=666 0 0
+	mqueue /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/dev/mqueue mqueue rw,seclabel,nosuid,nodev,noexec,relatime 0 0
+	shm /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/dev/shm tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=65536k 0 0
+	sysfs /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys sysfs rw,seclabel,nosuid,nodev,noexec,relatime 0 0
+	tmpfs /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,mode=755 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/systemd cgroup rw,seclabel,nosuid,nodev,noexec,relatime,xattr,release_agent=/usr/lib/systemd/systemd-cgroups-agent,name=systemd 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/memory cgroup rw,seclabel,nosuid,nodev,noexec,relatime,memory 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/pids cgroup rw,seclabel,nosuid,nodev,noexec,relatime,pids 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/cpu,cpuacct cgroup rw,seclabel,nosuid,nodev,noexec,relatime,cpu,cpuacct 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/net_cls,net_prio cgroup rw,seclabel,nosuid,nodev,noexec,relatime,net_cls,net_prio 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/blkio cgroup rw,seclabel,nosuid,nodev,noexec,relatime,blkio 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/freezer cgroup rw,seclabel,nosuid,nodev,noexec,relatime,freezer 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/perf_event cgroup rw,seclabel,nosuid,nodev,noexec,relatime,perf_event 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/rdma cgroup rw,seclabel,nosuid,nodev,noexec,relatime,rdma 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/cpuset cgroup rw,seclabel,nosuid,nodev,noexec,relatime,cpuset 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/hugetlb cgroup rw,seclabel,nosuid,nodev,noexec,relatime,hugetlb 0 0
+	cgroup /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/sys/fs/cgroup/devices cgroup rw,seclabel,nosuid,nodev,noexec,relatime,devices 0 0
+	tmpfs /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/etc/resolv.conf tmpfs rw,seclabel,nosuid,nodev,noexec,mode=755 0 0
+	tmpfs /var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged/etc/hostname tmpfs rw,seclabel,nosuid,nodev,mode=755 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-prometheus-k8s-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-prometheus-k8s-thanos-sidecar-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~secret/secret-alertmanager-main-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/c22e676f-7936-4443-ade1-b9c268c9023f/volumes/kubernetes.io~secret/sdn-metrics-certs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-prometheus-k8s-htpasswd tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-grpc-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/9afd7e74-54c8-48f2-aaac-5b6cc103ae11/volumes/kubernetes.io~secret/default-certificate tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-thanos-querier-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e4b8ef89-fabb-48a7-9ccb-7188ecbeea14/volumes/kubernetes.io~secret/secret-grafana-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e4b8ef89-fabb-48a7-9ccb-7188ecbeea14/volumes/kubernetes.io~secret/grafana-config tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/3e2959ae-df82-45c8-8de7-65f408a4103c/volumes/kubernetes.io~secret/telemeter-client-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/tls-assets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/be3e0125-4eaa-46f9-9b7d-1c7ea478bb0a/volumes/kubernetes.io~secret/tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/config tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/3e2959ae-df82-45c8-8de7-65f408a4103c/volumes/kubernetes.io~secret/secret-telemeter-client tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/40150fa2-ff0e-42a3-bfef-5c2fef149d60/volumes/kubernetes.io~secret/metrics-certs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/a7cdb713-99c6-4efd-91d3-55f314f4b5dc/volumes/kubernetes.io~projected/registry-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/9afd7e74-54c8-48f2-aaac-5b6cc103ae11/volumes/kubernetes.io~secret/metrics-certs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/a7cdb713-99c6-4efd-91d3-55f314f4b5dc/volumes/kubernetes.io~secret/installation-pull-secrets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-kube-etcd-client-certs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e4b8ef89-fabb-48a7-9ccb-7188ecbeea14/volumes/kubernetes.io~secret/grafana-datasources tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~secret/secret-prometheus-k8s-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e4b8ef89-fabb-48a7-9ccb-7188ecbeea14/volumes/kubernetes.io~secret/secret-grafana-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4bac76dc-eead-418c-b8af-96b3c3d4c6b0/volumes/kubernetes.io~secret/node-exporter-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-thanos-querier-kube-rbac-proxy-rules tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-thanos-querier-oauth-htpasswd tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~secret/tls-assets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~secret/secret-alertmanager-main-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~secret/secret-alertmanager-main-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/05a61a92-e860-41b1-ad1b-05352eda2912/volumes/kubernetes.io~secret/cookie-secret tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-grpc-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~secret/secret-alertmanager-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/6f82d33c-9897-46d1-a837-363454bb6717/volumes/kubernetes.io~projected/kube-api-access-kb2rh tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/9afd7e74-54c8-48f2-aaac-5b6cc103ae11/volumes/kubernetes.io~secret/stats-auth tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-thanos-querier-oauth-cookie tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~secret/secret-alertmanager-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~secret/secret-alertmanager-main-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~secret/secret-thanos-querier-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/05a61a92-e860-41b1-ad1b-05352eda2912/volumes/kubernetes.io~secret/proxy-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/21f81d1c-8b52-4f50-af0a-997884e284af/volumes/kubernetes.io~secret/metrics-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e0fb5b7d-d585-4b89-ad39-38eebdd48673/volumes/kubernetes.io~secret/kube-state-metrics-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~secret/config-volume tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~secret/tls-assets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~secret/config-volume tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~secret/secret-alertmanager-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/30d92a25-2a5d-4562-b888-2270f684b1eb/volumes/kubernetes.io~projected/kube-api-access-kgfbh tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~secret/secret-alertmanager-main-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/c22e676f-7936-4443-ade1-b9c268c9023f/volumes/kubernetes.io~projected/kube-api-access-qvzkm tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~secret/tls-assets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~secret/config-volume tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~secret/secret-alertmanager-main-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/32b3a7b1-b8c3-482d-8997-37505ecdd1bb/volumes/kubernetes.io~secret/openshift-state-metrics-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/62f251b9-0c8b-4168-83ca-e95bb94994de/volumes/kubernetes.io~projected/kube-api-access-q6xtn tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/d4bbaadd-4fbc-4a65-a198-65d43ac44883/volumes/kubernetes.io~projected/kube-api-access-jwq5t tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7cda2a27-d760-439d-a35a-cf48ad09f796/volumes/kubernetes.io~projected/kube-api-access-zbbld tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/af369854-92f6-4d95-b56f-37ade3c43000/volumes/kubernetes.io~projected/kube-api-access-r9mgf tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/77a724f7-48c8-468f-b6b0-50158f852b21/volumes/kubernetes.io~projected/kube-api-access-zl6ms tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/32b3a7b1-b8c3-482d-8997-37505ecdd1bb/volumes/kubernetes.io~projected/kube-api-access-5gkwf tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/0e6273fd-ae4f-4f55-b2ee-7a999b789c18/volumes/kubernetes.io~projected/kube-api-access-8fthd tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7c01a046-572f-42d9-9b4e-47c8eee4ac70/volumes/kubernetes.io~projected/kube-api-access-kt2xs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/be3e0125-4eaa-46f9-9b7d-1c7ea478bb0a/volumes/kubernetes.io~projected/kube-api-access-vmbch tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/21f81d1c-8b52-4f50-af0a-997884e284af/volumes/kubernetes.io~projected/kube-api-access-8g49j tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e0fb5b7d-d585-4b89-ad39-38eebdd48673/volumes/kubernetes.io~projected/kube-api-access-ccctg tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4bac76dc-eead-418c-b8af-96b3c3d4c6b0/volumes/kubernetes.io~projected/kube-api-access-6hgft tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/480072dd-1b4a-4d9d-a4af-944656ccc448/volumes/kubernetes.io~projected/kube-api-access-m6sk9 tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/a7cdb713-99c6-4efd-91d3-55f314f4b5dc/volumes/kubernetes.io~projected/kube-api-access-sgmnt tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/config tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-prometheus-k8s-htpasswd tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-prometheus-k8s-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-kube-rbac-proxy tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-grpc-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/tls-assets tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-prometheus-k8s-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-prometheus-k8s-thanos-sidecar-tls tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~secret/secret-kube-etcd-client-certs tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/9afd7e74-54c8-48f2-aaac-5b6cc103ae11/volumes/kubernetes.io~projected/kube-api-access-8rtsl tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/9d02c1b4-77bc-4336-bd6f-2dbaea5faf53/volumes/kubernetes.io~projected/kube-api-access-kqr7h tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/45885bf7-719f-4328-acc0-73bc8d92e538/volumes/kubernetes.io~projected/kube-api-access-4jg8k tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/e4b8ef89-fabb-48a7-9ccb-7188ecbeea14/volumes/kubernetes.io~projected/kube-api-access-8ldgp tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volumes/kubernetes.io~projected/kube-api-access-qt85n tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/ee83aade-fd9e-43dc-9e87-3bbb9b26d3df/volumes/kubernetes.io~projected/kube-api-access-p28jw tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/40150fa2-ff0e-42a3-bfef-5c2fef149d60/volumes/kubernetes.io~projected/kube-api-access-gm5gl tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/3e2959ae-df82-45c8-8de7-65f408a4103c/volumes/kubernetes.io~projected/kube-api-access-c47pn tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/b2c226d0-59a5-41c3-b591-77730ed475e6/volumes/kubernetes.io~projected/kube-api-access-f78cv tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/16c7ab89-a5cd-4781-adbe-15106fd41711/volumes/kubernetes.io~projected/kube-api-access-jkrf7 tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/4532be57-6b3a-48e1-8523-7662406558c8/volumes/kubernetes.io~projected/kube-api-access-jhx49 tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/a7cdb713-99c6-4efd-91d3-55f314f4b5dc/volumes/kubernetes.io~projected/bound-sa-token tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/721d242c-c339-4b8c-bec4-de0b3f2b75a9/volumes/kubernetes.io~projected/kube-api-access-8ff7m tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/05a61a92-e860-41b1-ad1b-05352eda2912/volumes/kubernetes.io~projected/kube-api-access-4hmbp tmpfs rw,seclabel,relatime 0 0
+	tmpfs /var/lib/kubelet/pods/7ff970d6-f92a-42bf-b73b-4ea9f7d8455d/volumes/kubernetes.io~projected/kube-api-access-f4scf tmpfs rw,seclabel,relatime 0 0
+	/dev/sda4 /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volume-subpaths/etc/tuned/1 xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volume-subpaths/etc/tuned/2 xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volume-subpaths/etc/tuned/3 xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volume-subpaths/etc/tuned/4 xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda4 /var/lib/kubelet/pods/5991b76b-73e4-4773-8244-a3f7ec543915/volume-subpaths/etc/tuned/5 xfs rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,prjquota 0 0
+	/dev/sda3 /boot ext4 ro,seclabel,nosuid,nodev,relatime 0 0
+	tmpfs /run/secrets tmpfs rw,seclabel,nosuid,nodev,mode=755 0 0
+	tmpfs /run/secrets/kubernetes.io/serviceaccount tmpfs ro,seclabel,relatime 0 0
+	`
+
+	id := "e00681fefce07e31233d07bca0730681a0a30591b57e5e255a04eb6a11cddc10"
+	res_rootfs := "/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/merged"
+	res_upper := "/var/lib/containers/storage/overlay/bd71ec861fd7bb0e1fec8ba016a2e02935d17941e9d3aa012b92428e268ddcf2/diff"
+
+	r := strings.NewReader(mounts)
+	upper, rootfs, _ := readUppperLayerPath(r, id)
+	if rootfs != res_rootfs {
+		t.Errorf("failed to obtain rootfs: %v\n", rootfs)
+	}
+
+	if upper != res_upper {
+		t.Errorf("failed to obtain upperDir: %v\n", upper)
 	}
 }

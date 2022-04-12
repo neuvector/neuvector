@@ -183,12 +183,18 @@ type Context struct {
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 }
 
+type k8sProbeCmd struct {
+	app  string
+	path string
+	cmds []string
+}
+
 type k8sPodEvent struct {
 	pod      resource.Pod
-	group    string     // group name, index
-	groupAlt string     // likely group name
-	cmds     [][]string // k8s probe commands
-	cleanAt  int64      // terminated time
+	group    string        // group name, index
+	groupAlt string        // likely group name
+	probes   []k8sProbeCmd // k8s probe commands
+	cleanAt  int64         // terminated time
 }
 
 var cctx *Context
@@ -1737,6 +1743,12 @@ func startWorkerThread() {
 					}
 					if n != nil {
 						if o == nil { // create
+							if !isNeuvectorContainerName(n.Name) {
+								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
+									addK8sPodEvent(*n)
+								}
+							}
+
 							queryK8sVer := false
 							if localDev.Host.Flavor == share.FlavorOpenShift {
 								if n.Domain == "openshift-apiserver" && strings.HasPrefix(n.Name, "apiserver-") {
@@ -1753,12 +1765,6 @@ func startWorkerThread() {
 							}
 							if queryK8sVer {
 								QueryK8sVersion()
-							}
-
-							if !isNeuvectorContainerName(n.Name) {
-								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
-									addK8sPodEvent(*n)
-								}
 							}
 						}
 						if n.SA != "" && n.ContainerID != "" {

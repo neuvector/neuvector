@@ -618,7 +618,7 @@ func (s *SystemTools) ContainerFilePath(pid int, path string) string {
 	return fmt.Sprintf("%s%d/root%s", s.procDir, pid, path)
 }
 
-func (s *SystemTools) IsContainerFile(pid int, path string) bool {
+func (s *SystemTools) IsNotContainerFile(pid int, path string) bool {
 	_, err := os.Stat(s.ContainerFilePath(pid, path))
 	return os.IsNotExist(err)
 }
@@ -768,4 +768,27 @@ func (s *SystemTools) NsGetFile(filePath string, pid int, binary bool, start, le
 		}
 	}
 	return out, nil
+}
+
+func (s *SystemTools) DefaultShellCmd(pid int, shellCmd string) (bool, string, string) {
+	if f, err := os.Open(s.ContainerFilePath(pid, "/etc/shells")); err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if shellCmd == filepath.Base(line) {
+				if fi, err := os.Lstat(s.ContainerFilePath(pid, line)); err == nil {
+					if fi.Mode()&os.ModeSymlink != 0 {
+						if originFile, err := os.Readlink(s.ContainerFilePath(pid, line)); err == nil {
+							path := filepath.Clean(filepath.Join(filepath.Dir(line), originFile))
+							//log.WithFields(log.Fields{"line": line, "path": path}).Debug()
+							return true, filepath.Base(originFile), path
+						}
+					}
+				}
+				break
+			}
+		}
+	}
+	return false, "", ""
 }
