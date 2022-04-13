@@ -244,12 +244,19 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	}
 
 	var wls []*api.RESTWorkload
-	var resp api.RESTWorkloadsData
-	resp.Workloads = make([]*api.RESTWorkload, 0)
+	var respV1 api.RESTWorkloadsData
+	var respV2 api.RESTWorkloadsDataV2
+	var resp interface{} = &respV2
+	if apiVer == "v2" {
+		respV2.Workloads = make([]*api.RESTWorkloadV2, 0)
+	} else {
+		respV1.Workloads = make([]*api.RESTWorkload, 0)
+		resp = &respV1
+	}
 
 	count, _, _ := cacher.GetWorkloadCount(acc)
 	if query.start > 0 && count <= query.start {
-		restRespSuccess(w, r, &resp, acc, login, nil, "Get container list")
+		restRespSuccess(w, r, resp, acc, login, nil, "Get container list")
 		return
 	}
 
@@ -278,7 +285,7 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 
 	// Filter
 	if len(wls) <= query.start {
-		restRespSuccess(w, r, &resp, acc, login, nil, "Get container list")
+		restRespSuccess(w, r, resp, acc, login, nil, "Get container list")
 		return
 	}
 
@@ -291,14 +298,14 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				continue
 			}
 
-			resp.Workloads = append(resp.Workloads, wl)
+			respV1.Workloads = append(respV1.Workloads, wl)
 
-			if query.limit > 0 && len(resp.Workloads) >= query.limit {
+			if query.limit > 0 && len(respV1.Workloads) >= query.limit {
 				break
 			}
 		}
 	} else if query.limit == 0 {
-		resp.Workloads = wls[query.start:]
+		respV1.Workloads = wls[query.start:]
 	} else {
 		var end int
 		if query.start+query.limit > len(wls) {
@@ -306,23 +313,20 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		} else {
 			end = query.start + query.limit
 		}
-		resp.Workloads = wls[query.start:end]
+		respV1.Workloads = wls[query.start:end]
 	}
 
-	log.WithFields(log.Fields{"entries": len(resp.Workloads)}).Debug("Response")
+	log.WithFields(log.Fields{"entries": len(respV1.Workloads)}).Debug("Response")
 
 	if apiVer == "v2" {
-		var respV2 api.RESTWorkloadsDataV2
-		respV2.Workloads = make([]*api.RESTWorkloadV2, 0, len(resp.Workloads))
-		for _, wlV1 := range resp.Workloads {
+		respV2.Workloads = make([]*api.RESTWorkloadV2, 0, len(respV1.Workloads))
+		for _, wlV1 := range respV1.Workloads {
 			if wlV2 := workloadV1ToV2(wlV1); wlV2 != nil {
 				respV2.Workloads = append(respV2.Workloads, wlV2)
 			}
 		}
-		restRespSuccess(w, r, &respV2, acc, login, nil, "Get container list")
-	} else {
-		restRespSuccess(w, r, &resp, acc, login, nil, "Get container list")
 	}
+	restRespSuccess(w, r, resp, acc, login, nil, "Get container list")
 }
 
 func handlerWorkloadList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -333,7 +337,81 @@ func handlerWorkloadListV2(w http.ResponseWriter, r *http.Request, ps httprouter
 	handlerWorkloadListBase("v2", w, r, ps)
 }
 
-func handlerWorkloadShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func workloadDetailsV1ToV2(wlV1 *api.RESTWorkloadDetail) *api.RESTWorkloadDetailV2 {
+	if wlV1 == nil {
+		return nil
+	}
+
+	wlV2 := &api.RESTWorkloadDetailV2{
+		RESTWorkloadV2: api.RESTWorkloadV2{
+			WlBrief: api.RESTWorkloadBriefV2{
+				ID:           wlV1.ID,
+				Name:         wlV1.Name,
+				DisplayName:  wlV1.DisplayName,
+				HostName:     wlV1.HostName,
+				HostID:       wlV1.HostID,
+				Image:        wlV1.Image,
+				ImageID:      wlV1.ImageID,
+				Domain:       wlV1.Domain,
+				State:        wlV1.State,
+				Service:      wlV1.Service,
+				Author:       wlV1.Author,
+				ServiceGroup: wlV1.ServiceGroup,
+			},
+			WlSecurity: api.RESTWorkloadSecurityV2{
+				CapSniff:           wlV1.CapSniff,
+				CapQuar:            wlV1.CapQuar,
+				CapChgMode:         wlV1.CapChgMode,
+				ServiceMesh:        wlV1.ServiceMesh,
+				ServiceMeshSidecar: wlV1.ServiceMeshSidecar,
+				PolicyMode:         wlV1.PolicyMode,
+				ProfileMode:        wlV1.ProfileMode,
+				BaselineProfile:    wlV1.BaselineProfile,
+				QuarReason:         wlV1.QuarReason,
+				ScanSummary:        wlV1.ScanSummary,
+			},
+			WlRtSttributes: api.RESTWorkloadRtAttribesV2{
+				PodName:        wlV1.PodName,
+				ShareNSWith:    wlV1.ShareNSWith,
+				Privileged:     wlV1.Privileged,
+				RunAsRoot:      wlV1.RunAsRoot,
+				Labels:         wlV1.Labels,
+				MemoryLimit:    wlV1.MemoryLimit,
+				CPUs:           wlV1.CPUs,
+				ServiceAccount: wlV1.ServiceAccount,
+				NetworkMode:    wlV1.NetworkMode,
+				Ifaces:         wlV1.Ifaces,
+				Ports:          wlV1.Ports,
+				Applications:   wlV1.Applications,
+			},
+			AgentID:      wlV1.AgentID,
+			AgentName:    wlV1.AgentName,
+			PlatformRole: wlV1.PlatformRole,
+			CreatedAt:    wlV1.CreatedAt,
+			StartedAt:    wlV1.StartedAt,
+			FinishedAt:   wlV1.FinishedAt,
+			Running:      wlV1.Running,
+			SecuredAt:    wlV1.SecuredAt,
+			ExitCode:     wlV1.ExitCode,
+		},
+		Misc: api.RESTWorkloadDetailMiscV2{
+			Groups:   wlV1.Groups,
+			AppPorts: wlV1.AppPorts,
+		},
+	}
+
+	wlChildrenV2 := make([]*api.RESTWorkloadDetailV2, 0, len(wlV1.Children))
+	for _, cV1 := range wlV1.Children {
+		if cV2 := workloadDetailsV1ToV2(cV1); cV2 != nil {
+			wlChildrenV2 = append(wlChildrenV2, cV2)
+		}
+	}
+	wlV2.Misc.Children = wlChildrenV2
+
+	return wlV2
+}
+
+func handlerWorkloadShowBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 
@@ -351,8 +429,6 @@ func handlerWorkloadShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		view = api.QueryValueViewPod
 	}
 
-	var resp api.RESTWorkloadDetailData
-
 	// Retrieve the workload
 	wl, err := cacher.GetWorkloadDetail(id, view, acc)
 	if wl == nil {
@@ -360,9 +436,24 @@ func handlerWorkloadShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	resp.Workload = wl
+	var respV1 api.RESTWorkloadDetailData
+	var respV2 api.RESTWorkloadDetailDataV2
+	var resp interface{} = &respV2
+	if apiVer == "v2" {
+		respV2.Workload = workloadDetailsV1ToV2(wl)
+	} else {
+		respV1.Workload = wl
+		resp = &respV1
+	}
+	restRespSuccess(w, r, resp, acc, login, nil, "Get container detail")
+}
 
-	restRespSuccess(w, r, &resp, acc, login, nil, "Get container detail")
+func handlerWorkloadShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerWorkloadShowBase("v1", w, r, ps)
+}
+
+func handlerWorkloadShowV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerWorkloadShowBase("v2", w, r, ps)
 }
 
 func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
