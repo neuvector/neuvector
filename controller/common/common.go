@@ -6,6 +6,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"syscall"
@@ -552,9 +553,9 @@ func MergeProcess(list []*share.CLUSProcessProfileEntry, p *share.CLUSProcessPro
 			}
 		}
 
-		if p.ProbeCmd != "" {
-			if pp.ProbeCmd != p.ProbeCmd {
-				pp.ProbeCmd = p.ProbeCmd // updated with the latest fetching result
+		if p.ProbeCmds != nil {
+			if !reflect.DeepEqual(pp.ProbeCmds, p.ProbeCmds) {
+				pp.ProbeCmds = p.ProbeCmds // updated with the latest fetching result
 				changed = true
 			}
 		}

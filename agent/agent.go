@@ -542,6 +542,7 @@ func main() {
 		DeferContStartRpt:    bPassiveContainerDetect,
 		EnableTrace:          *show_monitor_trace,
 		KubePlatform:         Host.Platform == share.PlatformKubernetes,
+		KubeFlavor:           Host.Flavor,
 		WalkHelper:           walkerTask,
 	}
 

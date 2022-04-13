@@ -39,6 +39,7 @@ type Probe struct {
 	reportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
 	disableNvProtect     bool
 	bKubePlatform        bool
+	kubeFlavor			 string
 	walkerTask           *workerlet.Tasker
 	nsProc               *netlink.NetlinkSocket
 	nsInet               *netlink.NetlinkSocket
@@ -462,6 +463,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		FaEndChan:            pc.FAEndChan,
 		deferCStartRpt:       pc.DeferContStartRpt,
 		bKubePlatform:        pc.KubePlatform,
+		kubeFlavor:           pc.KubeFlavor,
 		walkerTask:           pc.WalkHelper,
 		agentMntNsId:         global.SYS.GetMntNamespaceId(pc.Pid),
 
