@@ -1217,6 +1217,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/workload",
 			"v2/workload",
 			"v1/workload/*",
+			"v2/workload/*",
 			"v1/workload/*/stats",
 			"v1/workload/*/config",
 		},
