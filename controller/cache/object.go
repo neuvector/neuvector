@@ -292,6 +292,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 	return r
 }
 
+// cacheMutexRLock is already called by caller
 func workload2DetailREST(cache *workloadCache) *api.RESTWorkloadDetail {
 	wl := &api.RESTWorkloadDetail{
 		RESTWorkload: *workload2REST(cache),
@@ -308,13 +309,14 @@ func workload2DetailREST(cache *workloadCache) *api.RESTWorkloadDetail {
 	return wl
 }
 
+// cacheMutexRLock is already called by caller
 func workload2REST(cache *workloadCache) *api.RESTWorkload {
 	wl := cache.workload
 
 	r := &api.RESTWorkload{
 		RESTWorkloadBrief: *workload2BriefREST(cache),
 		AgentID:           wl.AgentID,
-		AgentName:         getAgentName(wl.AgentID),
+		AgentName:         getAgentNameNoLock(wl.AgentID),
 		NetworkMode:       wl.NetworkMode,
 		CreatedAt:         api.RESTTimeString(wl.CreatedAt),
 		StartedAt:         api.RESTTimeString(wl.StartedAt),

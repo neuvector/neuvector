@@ -501,6 +501,15 @@ func getAgentName(id string) string {
 	return ""
 }
 
+func getAgentNameNoLock(id string) string {
+	if id != "" {
+		if cache, _ := agentCacheMap[id]; cache != nil {
+			return cache.displayName
+		}
+	}
+	return ""
+}
+
 func getAgentCache(id string) *agentCache {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
