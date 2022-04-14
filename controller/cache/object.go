@@ -1236,7 +1236,7 @@ func addK8sPodEvent(pod resource.Pod) {
 	var bFound bool
 	for group, _ := range groupCacheMap {
 		if group == p.group || group == p.groupAlt {
-			log.WithFields(log.Fields{"group": group}).Debug("JW")
+			log.WithFields(log.Fields{"group": group}).Debug()
 			bFound = true
 			addK8sProbeApps(group, p.probes)
 			delete(cacher.k8sPodEvents, p.group)
@@ -1394,8 +1394,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			hostCacheMap[wl.HostID] = initHostCache(wl.HostID)
 			log.WithFields(log.Fields{"host": wl.HostID}).Debug("Create dummy host")
 		}
-		host := hostCacheMap[wl.HostID]
-		host.workloads.Add(wl.ID)
 
 		// Update group cache
 		if isLeader() {
