@@ -469,7 +469,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	// registry proxy
 	if rc.RegistryHttpProxy != nil {
 		if rc.RegistryHttpProxy.URL != "" {
-			if _, err = url.Parse(rc.RegistryHttpProxy.URL); err != nil {
+			if u, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
 				return errors.New("Invalid HTTP proxy setting")
 			}
@@ -480,7 +480,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	}
 	if rc.RegistryHttpsProxy != nil {
 		if rc.RegistryHttpsProxy.URL != "" {
-			if _, err = url.Parse(rc.RegistryHttpsProxy.URL); err != nil {
+			if u, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
 				return errors.New("Invalid HTTPS proxy setting")
 			}
