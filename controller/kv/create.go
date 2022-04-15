@@ -29,6 +29,9 @@ const (
 	commentSsnSensor     = "Sensor for SSN detection"
 	commentCcSensor      = "Sensor for Credit Card detection, Credit Card includes visa, master, discover, american express, diner and jcb"
 	commentDefaultSensor = "Hidden default sensor"
+	commentLog4shSensor  = "Log4Shell - 0Day RCE exploit found in Log4j"
+	commentSpr4shSensor  = "Spring4Shell - 0day RCE Vulnerability found in Java Spring Framework"
+	commentDefaultWafSensor = "Hidden default waf sensor"
 )
 
 func createDefaultAdminUser() {
@@ -713,6 +716,154 @@ func CreateDefDlpRules(withlock bool) {
 func createDefDlpRuleSensor() {
 	CreateDefDlpRules(false)
 	CreatePreDlpSensor(false)
+}
+
+var preWafRuleLog4sh = &share.CLUSWafRule{
+	Name: common.GetInternalWafRuleName(share.WafRuleNameLog4sh, share.CLUSWafLog4shSensor),
+	Patterns: []share.CLUSWafCriteriaEntry{
+		share.CLUSWafCriteriaEntry{
+			Key:   "pattern",
+			Op:    share.CriteriaOpRegex,
+			Context: share.DlpPatternContextHEAD,
+			Value: "\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*",
+		},
+	},
+	CfgType: share.UserCreated,
+}
+
+var Log4shWafSensor = &share.CLUSWafSensor{
+	Name: share.CLUSWafLog4shSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSWafRule),
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	RuleListNames: map[string]string{
+		preWafRuleLog4sh.Name: preWafRuleLog4sh.Name,
+	},
+	Comment:   commentLog4shSensor,
+	Predefine: false,
+	CfgType:   share.UserCreated,
+}
+
+var preWafRuleSpring4sh = &share.CLUSWafRule{
+	Name: common.GetInternalWafRuleName(share.WafRuleNameSpr4sh, share.CLUSWafSpr4shSensor),
+	Patterns: []share.CLUSWafCriteriaEntry{
+		share.CLUSWafCriteriaEntry{
+			Key:   "pattern",
+			Op:    share.CriteriaOpRegex,
+			Context: share.DlpPatternContextBODY,
+			Value: "if.*equals.*request\\.getParameter.*pwd.*getRuntime.*exec.*request\\.getParameter.*cmd.*getInputStream.*read.*print.*classLoader",
+		},
+	},
+	CfgType: share.UserCreated,
+}
+
+var Spring4shWafSensor = &share.CLUSWafSensor{
+	Name: share.CLUSWafSpr4shSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSWafRule),
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	RuleListNames: map[string]string{
+		preWafRuleSpring4sh.Name: preWafRuleSpring4sh.Name,
+	},
+	Comment:   commentSpr4shSensor,
+	Predefine: false,
+	CfgType:   share.UserCreated,
+}
+
+var PreWafSensors = []*share.CLUSWafSensor{
+	Log4shWafSensor,
+	Spring4shWafSensor,
+}
+
+func CreatePreWafSensor(withlock bool) {
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+	for _, cdr := range PreWafSensors {
+		wafsensor := clusHelper.GetWafSensor(cdr.Name)
+		if wafsensor == nil {
+			clusHelper.PutWafSensor(cdr, true)
+		}
+	}
+}
+
+var defaultSensorAllWafRule = &share.CLUSWafSensor{
+	Name:     share.CLUSWafDefaultSensor,
+	Groups:   make(map[string]string),
+	RuleList: map[string]*share.CLUSWafRule {
+		preWafRuleLog4sh.Name:      preWafRuleLog4sh,
+		preWafRuleSpring4sh.Name:   preWafRuleSpring4sh,
+	},
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	Comment:   commentDefaultWafSensor,
+	Predefine: true,
+	CfgType:   share.SystemDefined,
+}
+
+func CreateDefWafRules(withlock bool) {
+	for _, rule := range defaultSensorAllWafRule.RuleList {
+		if len(rule.Name) >= api.DlpRuleNameMaxLen {
+			log.WithFields(log.Fields{"name": rule.Name, "name_len": len(rule.Name)}).Debug("Invalid rule name")
+			return
+		}
+
+		if len(rule.Patterns) == 0 {
+			log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: waf rule must have pattern")
+			return
+		}
+		if len(rule.Patterns) > api.DlpRulePatternMaxNum {
+			log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: waf rule must have no more than 16 patterns")
+			return
+		}
+		for _, pt := range rule.Patterns {
+			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
+				if _, err := pcre.Compile(pt.Value, 0); err != nil {
+					log.WithFields(log.Fields{"error": err}).Debug("Failed to creat default waf rule: invalid regex in pattern criteria")
+					return
+				}
+			}
+		}
+	}
+
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+	wafsensor := clusHelper.GetWafSensor(defaultSensorAllWafRule.Name)
+	if wafsensor != nil {
+		for rname, cdr := range wafsensor.RuleList {
+			if _, ok := defaultSensorAllWafRule.RuleList[rname]; !ok {
+				defaultSensorAllWafRule.RuleList[rname] = cdr
+			}
+		}
+		for _, rule := range defaultSensorAllWafRule.RuleList {
+			if rule.ID == 0 {
+				rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
+			}
+		}
+		clusHelper.PutWafSensor(defaultSensorAllWafRule, false)
+	} else {
+		for _, rule := range defaultSensorAllWafRule.RuleList {
+			rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
+		}
+		clusHelper.PutWafSensor(defaultSensorAllWafRule, true)
+	}
+}
+
+func createDefWafRuleSensor() {
+	CreateDefWafRules(false)
+	CreatePreWafSensor(false)
 }
 
 func CreateDefaultFedGroups() {

@@ -320,80 +320,11 @@ func validateWafRuleConfig(list []api.RESTWafRule) error {
 	return nil
 }
 
-var maxWafRuleIDSeed int = 0
-
-// return 0 if a unique id cannot be found
-func getWafRuleID(wafsensor *share.CLUSWafSensor) uint32 {
-	var idx int = 0
-	var maxid int = 0
-	var rid int
-
-	if maxWafRuleIDSeed >= 0x7fffffff {
-		log.Error("Reach the max waf rule id seed")
-		return 0
-	}
-	log.WithFields(log.Fields{"maxWafRuleIDSeed": maxWafRuleIDSeed}).Debug("")
-
-	ids := make([]int, len(wafsensor.RuleList))
-	for _, cdr := range wafsensor.RuleList {
-		if cdr.ID < api.MinWafRuleID {
-			continue
-		}
-		ids[idx] = int(cdr.ID)
-		if ids[idx] > maxid {
-			maxid = ids[idx]
-		}
-		idx++
-	}
-
-	//each id use up one maxWafRuleIDSeed count
-	if maxWafRuleIDSeed == 0 && maxid >= api.MinWafRuleID {
-		maxWafRuleIDSeed = maxWafRuleIDSeed + (maxid - api.MinWafRuleID + 1)
-	}
-
-	rid = maxWafRuleIDSeed%(api.MaxWafRuleID-api.MinWafRuleID-1) + api.MinWafRuleID
-	maxWafRuleIDSeed++
-
-	if rid > maxid {
-		return uint32(rid)
-	}
-
-	sort.Ints(ids)
-	for _, id := range ids {
-		if id == 0 {
-			continue
-		}
-		if id != rid {
-			return uint32(rid)
-		} else {
-			rid = id + 1
-		}
-	}
-	if rid < api.MaxWafRuleID {
-		return uint32(rid)
-	} else {
-		return 0
-	}
-}
-
-const (
-	commentDefaultWafSensor = "Hidden default waf sensor"
-)
-
-var defaultSensorAllWafRule = &share.CLUSWafSensor{
-	Name:        share.CLUSWafDefaultSensor,
-	Groups:      make(map[string]string),
-	RuleList:    make(map[string]*share.CLUSWafRule),
-	PreRuleList: make(map[string][]*share.CLUSWafRule),
-	Comment:     commentDefaultWafSensor,
-	Predefine:   true,
-	CfgType:     share.SystemDefined,
-}
-
 //lock is alreay hold when call this function
 //clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 func createDefaultWafSensor() {
-	clusHelper.PutWafSensor(defaultSensorAllWafRule, true)
+	kv.CreateDefWafRules(true)
+	kv.CreatePreWafSensor(true)
 }
 
 func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgType share.TCfgType) error {
@@ -450,7 +381,7 @@ func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgTy
 				Context: rpt.Context,
 			})
 		}
-		cdr.ID = getWafRuleID(defsensor)
+		cdr.ID = common.GetWafRuleID(defsensor)
 		if cdr.ID == 0 {
 			e := "Waf rule id overflow!"
 			log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
@@ -671,7 +602,7 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 			if foundInLocal && foundInAll {
 				cdr.ID = tcdr.ID
 			} else {
-				cdr.ID = getWafRuleID(defsensor)
+				cdr.ID = common.GetWafRuleID(defsensor)
 				if cdr.ID == 0 {
 					e := "Waf rule id overflow!"
 					log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
@@ -757,7 +688,7 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 						delete(sensor.RuleListNames, origname)
 						delete(defsensor.RuleList, origname)
 					}
-					cdr.ID = getWafRuleID(defsensor)
+					cdr.ID = common.GetWafRuleID(defsensor)
 					if cdr.ID == 0 {
 						e := "Waf rule id overflow!"
 						log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)

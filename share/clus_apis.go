@@ -2096,6 +2096,8 @@ const (
 	CLUSDlpSsnSensor     = "sensor.ssn"
 	CLUSDlpCcSensor      = "sensor.creditcard"
 	CLUSWafDefaultSensor = "sensor.wafdfltnv"
+	CLUSWafLog4shSensor   = "sensor.log4shell"
+	CLUSWafSpr4shSensor  = "sensor.spring4shell"
 )
 
 const (
@@ -2108,6 +2110,8 @@ const (
 	DlpRuleNameCcDinerV2  string = "rule.diner2"
 	DlpRuleNameCcJcb      string = "rule.jcb"
 	DlpRuleNameSsn        string = "rule.ssn"
+	WafRuleNameLog4sh      string = "rule.log4shell"
+	WafRuleNameSpr4sh     string = "rule.spring4shell"
 )
 
 const (
