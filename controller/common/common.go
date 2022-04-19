@@ -11,7 +11,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"sort"
 
+	log "github.com/sirupsen/logrus"
 	syslog "github.com/RackSec/srslog"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -785,4 +787,60 @@ func MergeWafSensors(list []*share.CLUSWafSetting, p *share.CLUSWafSetting) ([]*
 	ret = append(ret, p)
 	ret = append(ret, list[insert:]...)
 	return ret, true
+}
+
+var maxWafRuleIDSeed int = 0
+
+// return 0 if a unique id cannot be found
+func GetWafRuleID(wafsensor *share.CLUSWafSensor) uint32 {
+	var idx int = 0
+	var maxid int = 0
+	var rid int
+
+	if maxWafRuleIDSeed >= 0x7fffffff {
+		log.Error("Reach the max waf rule id seed")
+		return 0
+	}
+	log.WithFields(log.Fields{"maxWafRuleIDSeed": maxWafRuleIDSeed}).Debug("")
+
+	ids := make([]int, len(wafsensor.RuleList))
+	for _, cdr := range wafsensor.RuleList {
+		if cdr.ID < api.MinWafRuleID {
+			continue
+		}
+		ids[idx] = int(cdr.ID)
+		if ids[idx] > maxid {
+			maxid = ids[idx]
+		}
+		idx++
+	}
+
+	//each id use up one maxWafRuleIDSeed count
+	if maxWafRuleIDSeed == 0 && maxid >= api.MinWafRuleID {
+		maxWafRuleIDSeed = maxWafRuleIDSeed + (maxid - api.MinWafRuleID + 1)
+	}
+
+	rid = maxWafRuleIDSeed%(api.MaxWafRuleID-api.MinWafRuleID-1) + api.MinWafRuleID
+	maxWafRuleIDSeed++
+
+	if rid > maxid {
+		return uint32(rid)
+	}
+
+	sort.Ints(ids)
+	for _, id := range ids {
+		if id == 0 {
+			continue
+		}
+		if id != rid {
+			return uint32(rid)
+		} else {
+			rid = id + 1
+		}
+	}
+	if rid < api.MaxWafRuleID {
+		return uint32(rid)
+	} else {
+		return 0
+	}
 }

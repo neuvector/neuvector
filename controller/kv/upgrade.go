@@ -752,7 +752,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"4C746652", resetDlpCfgType},
 
-	{"825C9419", nil},
+	{"825C9419", createDefWafRuleSensor},
+
+	{"7B3D205C", nil},
 }
 
 func latestKVVersion() string {
