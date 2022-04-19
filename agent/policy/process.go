@@ -123,6 +123,8 @@ func MatchProfileProcess(entry *share.CLUSProcessProfileEntry, proc *share.CLUSP
 			path := entry.Path[:len(entry.Path)-2]
 			//	log.WithFields(log.Fields{"path": path, "dir": dir}).Debug("PROC: ")
 			return strings.HasPrefix(dir, path)
+		} else if len(entry.ProbeCmds) > 0 { // probe shell commands
+			return bin == entry.Path
 		} else { // on a spefific file
 			return proc.Path == entry.Path
 		}
@@ -155,11 +157,19 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 	if ok {
 		var matchedEntry *share.CLUSProcessProfileEntry
 		for _, p := range profile.Process {
+			if len(p.ProbeCmds) > 0 && p.Name == "sh" && p.Path == "*" {
+				// replace
+				if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
+					p.Name = "*"
+					p.Path = app
+				}
+			}
+
 			if MatchProfileProcess(p, proc) {
 				matchedEntry = p
 				proc.Action = p.Action
 				proc.AllowFileUpdate = p.AllowFileUpdate
-				proc.ProbeCmd = p.ProbeCmd
+				proc.ProbeCmds = p.ProbeCmds
 				break
 			}
 		}

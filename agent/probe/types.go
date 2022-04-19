@@ -30,6 +30,7 @@ type ProbeConfig struct {
 	EnableTrace          bool
 	DeferContStartRpt    bool
 	KubePlatform         bool
+	KubeFlavor           string
 	WalkHelper           *workerlet.Tasker
 }
 

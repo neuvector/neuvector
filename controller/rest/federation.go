@@ -1135,7 +1135,7 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	body, _ := ioutil.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &reqData); err != nil || (reqData.Name != nil && *reqData.Name == "") ||
 		(reqData.RestInfo != nil && (reqData.RestInfo.Server == "" || reqData.RestInfo.Port == 0)) ||
-		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https" && *reqData.UseProxy != "http")) {
+		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -1252,8 +1252,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	var useProxy string
 	var msg string
 	body, _ := ioutil.ReadAll(r.Body)
-	if err = json.Unmarshal(body, &reqData); err != nil ||
-		(reqData.UseProxy != nil && *reqData.UseProxy != "" && *reqData.UseProxy != "https" && *reqData.UseProxy != "http") {
+	if err = json.Unmarshal(body, &reqData); err != nil || (reqData.UseProxy != nil && *reqData.UseProxy != "" && *reqData.UseProxy != "https") {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -1480,8 +1479,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var joinToken joinToken
 	var msgProxy string
 	body, _ := ioutil.ReadAll(r.Body)
-	if err := json.Unmarshal(body, &req); err != nil ||
-		(req.UseProxy != nil && *req.UseProxy != "" && *req.UseProxy != "https" && *req.UseProxy != "http") {
+	if err := json.Unmarshal(body, &req); err != nil || (req.UseProxy != nil && *req.UseProxy != "" && *req.UseProxy != "https") {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -1495,22 +1493,13 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 		}
 		if req.UseProxy != nil {
 			useProxy = *req.UseProxy
-			if useProxy == "http" {
-				proxyInfo = share.CLUSProxy{
-					Enable:   cfg.RegistryHttpProxyEnable,
-					URL:      cfg.RegistryHttpProxy.URL,
-					Username: cfg.RegistryHttpProxy.Username,
-					Password: cfg.RegistryHttpProxy.Password,
-				}
-			} else if useProxy == "https" {
+			if useProxy == "https" {
 				proxyInfo = share.CLUSProxy{
 					Enable:   cfg.RegistryHttpsProxyEnable,
 					URL:      cfg.RegistryHttpsProxy.URL,
 					Username: cfg.RegistryHttpsProxy.Username,
 					Password: cfg.RegistryHttpsProxy.Password,
 				}
-			} else {
-				useProxy = ""
 			}
 		} else {
 			useProxy = cacheUseProxy

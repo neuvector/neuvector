@@ -1228,7 +1228,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			// registry proxy
 			if rc.RegistryHttpProxy != nil {
 				if rc.RegistryHttpProxy.URL != "" {
-					if u, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil || u.Scheme != "http" {
+					if _, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
 						return
@@ -1240,7 +1240,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			}
 			if rc.RegistryHttpsProxy != nil {
 				if rc.RegistryHttpsProxy.URL != "" {
-					if u, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil && u.Scheme != "https" {
+					if _, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTPS proxy setting")
 						return

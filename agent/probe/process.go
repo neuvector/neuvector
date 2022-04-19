@@ -54,6 +54,7 @@ type procContainer struct {
 	portsMap         map[osutil.SocketInfo]*procApp
 	checkRemovedPort uint
 	fInfo            map[string]*fileInfo
+	bPrivHostmode 	 bool
 }
 
 type procInternal struct {
@@ -2110,7 +2111,7 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 	return false
 }
 
-func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc bool) bool {
+func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc, bZeroDrift bool) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
 	}
@@ -2120,6 +2121,14 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	if bRtProcP && proc.path == "/usr/bin/pod" && proc.name == "pod" {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 		return true
+	}
+
+	// oc specific
+	if p.kubeFlavor == share.FlavorOpenShift {
+		if bZeroDrift && bRtProcP && proc.path == "/usr/bin/coreutils" && proc.name == "coreutils" {
+			log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
+			return true
+		}
 	}
 
 	// both names are in the runtime list
@@ -2227,7 +2236,8 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 
 	//	proc.action = pp.Action
 	if (proc.reported & profileReported) == 0 {
-		if setting == share.ProfileZeroDrift {
+		bZeroDrift := setting == share.ProfileZeroDrift
+		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, proc, pp, true); pass {
 				if pp.Action != share.PolicyActionLearn {
 					pp.Action = share.PolicyActionAllow
@@ -2241,7 +2251,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				if c, ok := p.pidContainerMap[proc.ppid]; ok{
 					bParentHostProc = c.id == ""
 				}
-				if p.isProcessException(proc, pp.DerivedGroup, id, bParentHostProc) {
+				if p.isProcessException(proc, pp.DerivedGroup, id, bParentHostProc, bZeroDrift) {
 					pp.Action = share.PolicyActionAllow // can not be learned
 				}
 			}
@@ -2710,8 +2720,14 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 
 	bNotImageButNewlyAdded := false
 	bImageFile = true
-	if global.SYS.IsContainerFile(c.rootPid, ppe.Path) {
-		bImageFile = false
+	if global.SYS.IsNotContainerFile(c.rootPid, ppe.Path) {
+		log.WithFields(log.Fields{"c.bPrivHostmode": c.bPrivHostmode}).Debug("SHD:")
+		if c.bPrivHostmode {
+			log.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+		} else {
+			// this file is not existed
+			bImageFile = false
+		}
 	} else {
 		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec {
 			bImageFile = false
@@ -2729,14 +2745,24 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 		}
 	}
 
-	if bFromPmon && global.RT.IsRuntimeProcess(proc.pname, nil) {
-		// k8s probe app command: treat it as an insider process
-		if ppe.Action == share.PolicyActionAllow && ppe.ProbeCmd != "" {
-			// meet the qualification
-			if ppe.Name == proc.name && ppe.ProbeCmd == strings.TrimSuffix(strings.Join(proc.cmds, ","), ",") {
-				c.outsider.Remove(proc.pid)
-				c.children.Add(proc.pid)
-				mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug("SHD:")
+	if bFromPmon {
+		if ppe.Action == share.PolicyActionAllow && ppe.Name == proc.name && len(ppe.ProbeCmds) > 0 {
+			// meet the qualifications
+			var gpname string
+			if pproc, ok := p.pidProcMap[proc.ppid]; ok {
+				gpname = pproc.pname
+			}
+			if global.RT.IsRuntimeProcess(proc.pname, nil) || global.RT.IsRuntimeProcess(gpname, nil) {
+				norm := strings.TrimSuffix(strings.Join(proc.cmds, ","), ",")
+				for _, cmd := range ppe.ProbeCmds {
+					if strings.Contains(norm, cmd) {
+						// matched up to its grandparent process
+						c.outsider.Remove(proc.pid)
+						c.children.Add(proc.pid)
+						mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug()
+						break
+					}
+				}
 			}
 		}
 	}
@@ -2800,7 +2826,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 	return bPass
 }
 
-func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod bool) {
+func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivilegedHostmode bool) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
 
 	p.lockProcMux()
@@ -2828,6 +2854,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod boo
 	}
 
 	c.rootPid = rootPid
+	c.bPrivHostmode = bPrivilegedHostmode
 	allPids := c.outsider.Union(c.children)
 	allPids.Add(rootPid) // all collections: add rootPid as a pivot point
 	c.outsider.Clear()   // reset

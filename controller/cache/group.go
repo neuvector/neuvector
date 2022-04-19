@@ -1146,6 +1146,10 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	cacheMutexLock()
 
+	if host, ok := hostCacheMap[wl.HostID]; ok {
+		host.workloads.Add(wl.ID)
+	}
+
 	// TODO: multi-controller
 	// Normally, we are first notified with the new workload, create group then handle group
 	// creation; in multi-controller case, when the new controller joins the cluster, the

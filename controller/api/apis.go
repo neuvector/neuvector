@@ -954,12 +954,27 @@ type RESTWorkloadV2 struct {
 	//ChildrenBrief  []*RESTWorkloadBrief     `json:"children_brief"`
 }
 
+type RESTWorkloadDetailMiscV2 struct {
+	Groups   []string                `json:"groups"`
+	AppPorts map[string]string       `json:"app_ports"`
+	Children []*RESTWorkloadDetailV2 `json:"children"`
+}
+
+type RESTWorkloadDetailV2 struct {
+	RESTWorkloadV2
+	Misc RESTWorkloadDetailMiscV2 `json:"misc"`
+}
+
 type RESTWorkloadsDataV2 struct {
 	Workloads []*RESTWorkloadV2 `json:"workloads"` // for pagination, manager needs each layer in workload object to have <22 members
 }
 
 type RESTWorkloadDetailData struct {
 	Workload *RESTWorkloadDetail `json:"workload"`
+}
+
+type RESTWorkloadDetailDataV2 struct {
+	Workload *RESTWorkloadDetailV2 `json:"workload"`
 }
 
 type RESTWorkloadsBriefData struct {

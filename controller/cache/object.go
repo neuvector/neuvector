@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -291,6 +292,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 	return r
 }
 
+// cacheMutexRLock is already called by caller
 func workload2DetailREST(cache *workloadCache) *api.RESTWorkloadDetail {
 	wl := &api.RESTWorkloadDetail{
 		RESTWorkload: *workload2REST(cache),
@@ -307,13 +309,14 @@ func workload2DetailREST(cache *workloadCache) *api.RESTWorkloadDetail {
 	return wl
 }
 
+// cacheMutexRLock is already called by caller
 func workload2REST(cache *workloadCache) *api.RESTWorkload {
 	wl := cache.workload
 
 	r := &api.RESTWorkload{
 		RESTWorkloadBrief: *workload2BriefREST(cache),
 		AgentID:           wl.AgentID,
-		AgentName:         getAgentName(wl.AgentID),
+		AgentName:         getAgentNameNoLock(wl.AgentID),
 		NetworkMode:       wl.NetworkMode,
 		CreatedAt:         api.RESTTimeString(wl.CreatedAt),
 		StartedAt:         api.RESTTimeString(wl.StartedAt),
@@ -1150,21 +1153,72 @@ func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
 	}
 }
 
+func appendProbeCmds(cmds []string) *k8sProbeCmd {
+	if len(cmds) > 0 {
+		exe := filepath.Base(cmds[0])
+		path := filepath.Clean(cmds[0])
+		if exe == path {
+			// it does not have a complete path
+			path = "*"
+		}
+		cmd := strings.TrimSuffix(strings.Join(cmds, ","), ",")
+		return &k8sProbeCmd{app: exe, path: path, cmds: []string{cmd}}
+	}
+	return nil
+}
+
+func appendProbeSubCmds(cmds []string) []k8sProbeCmd {
+	var subcmds []k8sProbeCmd
+	if len(cmds) > 0 {
+		line := strings.Join(cmds, " ")
+		items := strings.Split(line, " exec ")
+		for i, item := range items {
+			if i == 0 {
+				continue
+			}
+			if index := strings.Index(item, ";"); index > 0 {
+				if pcmd := appendProbeCmds(strings.Split(item[0:index], " ")); pcmd != nil {
+					subcmds = append(subcmds, *pcmd)
+				}
+			}
+		}
+	}
+	return subcmds
+}
+
 func addK8sPodEvent(pod resource.Pod) {
-	var cmds [][]string
-	if len(pod.LivenessCmds) > 0 {
-		cmds = append(cmds, pod.LivenessCmds)
+	var probes []k8sProbeCmd
+	if pcmd := appendProbeCmds(pod.LivenessCmds); pcmd != nil {
+		probes = append(probes, *pcmd)
+		if pcmd.app == "sh" || pcmd.app == "bash" || pcmd.app == "ash" {
+			if pcmds := appendProbeSubCmds(pod.LivenessCmds); pcmds != nil {
+				probes = append(probes, pcmds...)
+			}
+		}
 	}
 
-	if len(pod.ReadinessCmds) > 0 {
-		cmds = append(cmds, pod.ReadinessCmds)
+	if pcmd := appendProbeCmds(pod.ReadinessCmds); pcmd != nil {
+		if len(probes) > 0 && probes[0].app == pcmd.app { // liveness exists
+			if probes[0].path != pcmd.path {
+				probes[0].path = "*" // mixed together
+			}
+			probes[0].cmds = append(probes[0].cmds, pcmd.cmds[0])
+		} else {
+			probes = append(probes, *pcmd)
+		}
+
+		if pcmd.app == "sh" || pcmd.app == "bash" || pcmd.app == "ash" {
+			if pcmds := appendProbeSubCmds(pod.ReadinessCmds); pcmds != nil {
+				probes = append(probes, pcmds...)
+			}
+		}
 	}
 
 	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
 	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Labels); svc != nil {
 		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
 	}
-	log.WithFields(log.Fields{"Name": pod.Name, "groupName": groupName}).Debug()
+	log.WithFields(log.Fields{"Name": pod.Name, "groupName": groupName, "probes": probes}).Debug()
 
 	var name_alt string
 	if pos := strings.LastIndex(pod.Name, "-"); pos != -1 {
@@ -1173,10 +1227,10 @@ func addK8sPodEvent(pod resource.Pod) {
 
 	p := &k8sPodEvent{
 		pod:      pod,
-		group:    groupName,                      // group name
-		groupAlt: name_alt,                       // a likely group name
-		cmds:     cmds,                           // probe commands
-		cleanAt:  time.Now().Unix() + 60*30,      // expired after 30 minutes
+		group:    groupName,                 // group name
+		groupAlt: name_alt,                  // a likely group name
+		probes:   probes,                    // probes
+		cleanAt:  time.Now().Unix() + 60*30, // expired after 30 minutes
 	}
 
 	cacheMutexLock()
@@ -1186,7 +1240,7 @@ func addK8sPodEvent(pod resource.Pod) {
 		if group == p.group || group == p.groupAlt {
 			log.WithFields(log.Fields{"group": group}).Debug()
 			bFound = true
-			addK8sProbeApps(group, p.cmds)
+			addK8sProbeApps(group, p.probes)
 			delete(cacher.k8sPodEvents, p.group)
 			break
 		}
@@ -1203,8 +1257,7 @@ func updateK8sPodEvent(group string) {
 	defer cacheMutexUnlock()
 	for name, p := range cacher.k8sPodEvents {
 		if group == p.group || group == p.groupAlt {
-			log.WithFields(log.Fields{"name": name, "group": group}).Debug()
-			addK8sProbeApps(group, p.cmds)
+			addK8sProbeApps(group, p.probes)
 			delete(cacher.k8sPodEvents, name)
 		} else {
 			if now > p.cleanAt {
@@ -1343,8 +1396,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			hostCacheMap[wl.HostID] = initHostCache(wl.HostID)
 			log.WithFields(log.Fields{"host": wl.HostID}).Debug("Create dummy host")
 		}
-		host := hostCacheMap[wl.HostID]
-		host.workloads.Add(wl.ID)
 
 		// Update group cache
 		if isLeader() {

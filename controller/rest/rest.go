@@ -1340,6 +1340,7 @@ func StartRESTServer() {
 	r.GET("/v1/workload", handlerWorkloadList)
 	r.GET("/v2/workload", handlerWorkloadListV2) // starting from 5.0, rest client should call this api.
 	r.GET("/v1/workload/:id", handlerWorkloadShow)
+	r.GET("/v2/workload/:id", handlerWorkloadShowV2) // starting from 5.0, rest client should call this api.
 	r.GET("/v1/workload/:id/stats", handlerWorkloadStats)
 	r.GET("/v1/workload/:id/config", handlerWorkloadGetConfig)
 	r.GET("/v1/workload/:id/process", handlerWorkloadProcess)

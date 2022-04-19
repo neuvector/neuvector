@@ -868,39 +868,46 @@ func (s *SystemTools) MonitorMemoryPressureEvents(threshold uint64, callback Mem
 	    "overlay /run/containerd/io.containerd.runtime.v2.task/k8s.io/5e14.../rootfs "
 */
 func readUppperLayerPath(file io.ReadSeeker, id string) (string, string, error) {
-	var rootfs string
+	var rootfs, upperdir string
+	var found bool
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		fstab := strings.Fields(line)
 		for i, field := range fstab {
-			// log.WithFields(log.Fields{"field": field, "i": i}).Debug()
 			if i == 0 && !strings.Contains(strings.ToLower(field), "overlay") { // fs_spec: overlay family only
 				break // skip
 			}
 
-			if i == 1 && field != "/" { // fs_file: "mount point"
-				if !strings.Contains(field, id) {
-					// log.WithFields(log.Fields{"rootfs": descs[1], "id": id}).Debug("not target")
-					break
-				}
+			if i == 1 { // fs_file: "mount point"
 				rootfs = field
-				continue
+				if strings.Contains(field, id) {
+					// log.WithFields(log.Fields{"rootfs": descs[1], "id": id}).Debug("not target")
+					found = true
+				}
 			}
 
-			if i == 3 { // fs_mntops: mount options
+			if i == 3 { // fs_mntops
 				options := strings.Split(field, ",")
 				for _, op := range options {
 					if strings.HasPrefix(op, "upperdir=") {
-						return op[len("upperdir="):], rootfs, nil
+						upperdir = op[len("upperdir="):]
+						if rootfs == "" { // common case
+							found = true
+						}
+						break
 					}
-				}
-				break // ignore below fields
+				}	// the last entry of the overlay could be a good target, too
+				break	// discard following fields
 			}
+		}
+
+		if found {	// skip scanning other entries
+			break
 		}
 	}
 
-	return "", rootfs, fmt.Errorf("not found")
+	return upperdir, rootfs, nil
 }
 
 // btrfs use two idential folders to store container files

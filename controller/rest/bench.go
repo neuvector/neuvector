@@ -930,6 +930,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 			Platforms:   make([]api.RESTIDName, 0),
 		}
 
+		// Not to sort these lists to save some CPU cycles
 		exists = utils.NewSet()
 		for _, v := range comp.wls {
 			if !exists.Contains(v.ID) {
@@ -937,9 +938,6 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Workloads, func(s, t int) bool {
-			return va.Workloads[s].DisplayName < va.Workloads[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range comp.nodes {
@@ -948,9 +946,6 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Nodes, func(s, t int) bool {
-			return va.Nodes[s].DisplayName < va.Nodes[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range comp.images {
@@ -959,9 +954,6 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Images, func(s, t int) bool {
-			return va.Images[s].DisplayName < va.Images[t].DisplayName
-		})
 
 		exists = utils.NewSet()
 		for _, v := range comp.platforms {
@@ -970,9 +962,6 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				exists.Add(v.ID)
 			}
 		}
-		sort.Slice(va.Platforms, func(s, t int) bool {
-			return va.Platforms[s].DisplayName < va.Platforms[t].DisplayName
-		})
 
 		list[i] = va
 		i++
