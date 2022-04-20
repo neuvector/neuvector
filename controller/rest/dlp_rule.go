@@ -274,7 +274,7 @@ var regPattern *regexp.Regexp = regexp.MustCompile(`^\.*\*$`)
 
 func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 	for _, rule := range list {
-		if !isObjectNameValid(rule.Name) || len(rule.Name) >= api.DlpRuleNameMaxLen {
+		if !isObjectNameValid(rule.Name) || len(rule.Name) > api.DlpRuleNameMaxLen {
 			log.WithFields(log.Fields{"name": rule.Name, "name_len": len(rule.Name)}).Error("Invalid rule name")
 			return fmt.Errorf("dlp rule %s: invalid name format", rule.Name)
 		}

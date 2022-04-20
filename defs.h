@@ -215,7 +215,8 @@ typedef struct {
 #define MSG_START    0x1
 #define MSG_END      0x2
 
-#define DP_DLP_RULE_NAME_MAX_LEN 256
+#define MAX_SIG_NAME_LEN 512 + 10
+#define DP_DLP_RULE_NAME_MAX_LEN MAX_SIG_NAME_LEN
 #define DP_DLP_RULE_PATTERN_MAX_LEN 512
 
 typedef struct {

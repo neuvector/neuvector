@@ -7,7 +7,6 @@
 #include "dpi/dpi_module.h"
 
 #define DPI_DLIMTS "<>()#\"'"
-#define MAX_SIG_NAME_LEN 512 + 10
 
 static dpi_sigopt_status_t dpi_sigopt_sig_id_parser (char *value, dpi_sig_t *sig)
 {
