@@ -980,6 +980,22 @@ func configPolicyMode(grp *share.CLUSGroup) error {
 	return nil
 }
 
+func isManagedByCRD(grpName string, acc *access.AccessControl) bool {
+	if cached, _ := cacher.GetGroup(grpName, "", false, acc); cached != nil {
+		if cached.CfgType == api.CfgTypeGround {
+			return true
+		} else {
+			for _, idx := range cached.PolicyRules {
+				if isSecurityPolicyID(idx) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -1042,7 +1058,8 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false // Used to respond BadRequest if no group can be configured.
+	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1052,6 +1069,11 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		grp, _, _ := clusHelper.GetGroup(name, acc)
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
+			continue
+		}
+
+		if isManagedByCRD(name, acc) {
+			managedByCRD = true
 			continue
 		}
 
@@ -1105,7 +1127,13 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	if !qualified {
-		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		var status int = http.StatusNotFound
+		var code int = api.RESTErrObjectNotFound
+		if managedByCRD {
+			status = http.StatusBadRequest
+			code = api.RESTErrOpNotAllowed
+		}
+		restRespError(w, status, code)
 	} else {
 		restRespSuccess(w, r, nil, acc, login, &rconf, "Configure services in batch")
 	}
@@ -1121,7 +1149,10 @@ func setServicePolicyModeAll(mode string, acc *access.AccessControl) error {
 	defer clusHelper.ReleaseLock(lock)
 
 	grps := clusHelper.GetAllGroups(share.ScopeLocal, acc)
-	for _, grp := range grps {
+	for name, grp := range grps {
+		if isManagedByCRD(name, acc) {
+			continue
+		}
 		if grp.PolicyMode == mode || !cacher.IsGroupPolicyModeChangeable(grp.Name) {
 			continue
 		}
@@ -1387,7 +1418,8 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false // Used to respond BadRequest if no group can be configured.
+	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1397,6 +1429,11 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		grp, _, _ := clusHelper.GetGroup(name, acc)
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
+			continue
+		}
+
+		if isManagedByCRD(name, acc) {
+			managedByCRD = true
 			continue
 		}
 
@@ -1424,7 +1461,13 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	}
 
 	if !qualified {
-		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		var status int = http.StatusNotFound
+		var code int = api.RESTErrObjectNotFound
+		if managedByCRD {
+			status = http.StatusBadRequest
+			code = api.RESTErrOpNotAllowed
+		}
+		restRespError(w, status, code)
 	} else {
 		restRespSuccess(w, r, nil, acc, login, &rconf, "Configure services in batch")
 	}
@@ -1478,7 +1521,8 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false // Used to respond BadRequest if no group can be configured.
+	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1488,6 +1532,11 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		grp, _, _ := clusHelper.GetGroup(name, acc)
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
+			continue
+		}
+
+		if isManagedByCRD(name, acc) {
+			managedByCRD = true
 			continue
 		}
 
@@ -1537,7 +1586,13 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	}
 
 	if !qualified {
-		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		var status int = http.StatusNotFound
+		var code int = api.RESTErrObjectNotFound
+		if managedByCRD {
+			status = http.StatusBadRequest
+			code = api.RESTErrOpNotAllowed
+		}
+		restRespError(w, status, code)
 	} else {
 		restRespSuccess(w, r, nil, acc, login, &rconf, "Configure services in batch")
 	}
