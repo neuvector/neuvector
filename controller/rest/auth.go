@@ -1941,7 +1941,7 @@ func isPasswordExpired(localAuthed bool, userName string, pwdResetTime time.Time
 }
 
 func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	var defaultPW bool
@@ -1965,7 +1965,8 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 					rancherUser, err = checkRancherUserRole(cfg, rsessToken, accReadAll)
 				} else {
 					code = api.RESTErrPlatformAuthDisabled
-					log.Error("platform auth disabled")
+					err = fmt.Errorf("platform auth disabled")
+					log.WithFields(log.Fields{"err": err}).Error()
 				}
 				if err != nil {
 					restRespError(w, http.StatusUnauthorized, code)
@@ -1991,6 +1992,13 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			msg := fmt.Sprintf("Failed to map to a valid role: %s(%s)", rancherUser.name, rancherUser.id)
 			restRespErrorMessage(w, http.StatusUnauthorized, api.RESTErrUnauthorized, msg)
 			return
+		}
+		if role == "admin" || role == "fedAdmin" {
+			if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll); u != nil {
+				if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
+					defaultPW = true
+				}
+			}
 		}
 		auth = api.RESTAuthData{
 			Password: &api.RESTAuthPassword{
