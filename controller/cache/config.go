@@ -262,7 +262,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		NetServiceStatus:          systemConfigCache.NetServiceStatus,
 		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
 		ModeAutoD2M:               systemConfigCache.ModeAutoD2M,
-		ModeAutoD2MDuration:  	   systemConfigCache.ModeAutoD2MDuration,
+		ModeAutoD2MDuration:       systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 	}
@@ -387,7 +387,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleIPPolicyCalculation(true)
 		} else if systemConfigCache.NetServiceStatus &&
 			cfg.NetServicePolicyMode != systemConfigCache.NetServicePolicyMode {
-				scheduleIPPolicyCalculation(true)
+			scheduleIPPolicyCalculation(true)
 		}
 		automodeConfigUpdate(cfg, systemConfigCache)
 	case cluster.ClusterNotifyDelete:
@@ -438,7 +438,7 @@ func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
-	if isLeader() && localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
+	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if cctx.RancherSSO {
 			systemConfigCache.AuthByPlatform = true
 		}
