@@ -2258,8 +2258,6 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		}
 
 		switch pp.Action {
-		case share.PolicyActionLearn:
-			p.reportLearnProc(svcGroup, pp)
 		case share.PolicyActionViolate:
 			proc.reported |= profileReported
 			proc.action = pp.Action
@@ -2280,6 +2278,11 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				}
 			}
 		}
+	}
+
+	// multiple learn process event are okay because they are merged at controllers.
+	if pp.Action == share.PolicyActionLearn {
+		p.reportLearnProc(svcGroup, pp)
 	}
 
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "action": pp.Action, "riskType": proc.riskType}).Debug("PROC:")
