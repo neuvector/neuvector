@@ -403,14 +403,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
 			}
-			//when getNetServiceStatus() is true, policymode
-			//is global so we use per group level profile mode
-			polmode, profmode := getWorkloadPolicyMode(cache)
-			if getNetServiceStatus() {
-				r.PolicyMode = profmode
-			} else {
-				r.PolicyMode = polmode
-			}
+			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			ins = append(ins, r)
 		}
 	}
@@ -432,14 +425,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
 			}
-			//when getNetServiceStatus() is true, policymode
-			//is global so we use per group level profile mode
-			polmode, profmode := getWorkloadPolicyMode(cache)
-			if getNetServiceStatus() {
-				r.PolicyMode = profmode
-			} else {
-				r.PolicyMode = polmode
-			}
+			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			outs = append(outs, r)
 		}
 	}

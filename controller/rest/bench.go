@@ -473,7 +473,7 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 
 	id := ps.ByName("id")
 
-	wl, err := cacher.GetWorkloadFilter(id, acc)
+	wl, err := cacher.GetWorkloadRisk(id, acc)
 	if wl == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -763,7 +763,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 	kubeVers := utils.NewSet()
 	dockerVers := utils.NewSet()
 
-	pods := cacher.GetAllWorkloadsFilter(acc)
+	pods := cacher.GetAllWorkloadsRisk(acc)
 	for _, pod := range pods {
 		// Skip pod in kubernetes; if no child, show the parent (native docker)
 		if len(pod.Children) == 0 {
@@ -780,7 +780,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -794,7 +794,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -808,7 +808,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -822,7 +822,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})

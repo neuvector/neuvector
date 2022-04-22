@@ -15,7 +15,7 @@ type CacheInterface interface {
 	GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTInternalSystemData
 
 	GetAllHosts(acc *access.AccessControl) []*api.RESTHost
-	GetAllHostsIDName(acc *access.AccessControl) []*api.RESTIDName
+	GetAllHostsRisk(acc *access.AccessControl) []*common.WorkloadRisk
 	GetHostCount(acc *access.AccessControl) int
 	GetHost(id string, acc *access.AccessControl) (*api.RESTHost, error)
 	CanAccessHost(id string, acc *access.AccessControl) error
@@ -50,8 +50,8 @@ type CacheInterface interface {
 	GetWorkloadBrief(id string, view string, acc *access.AccessControl) (*api.RESTWorkloadBrief, error)
 	GetWorkloadDetail(id string, view string, acc *access.AccessControl) (*api.RESTWorkloadDetail, error)
 	GetWorkloadConfig(id string, acc *access.AccessControl) (*api.RESTWorkloadConfig, error)
-	GetAllWorkloadsFilter(acc *access.AccessControl) []*common.WorkloadFilter
-	GetWorkloadFilter(id string, acc *access.AccessControl) (*common.WorkloadFilter, error)
+	GetAllWorkloadsRisk(acc *access.AccessControl) []*common.WorkloadRisk
+	GetWorkloadRisk(id string, acc *access.AccessControl) (*common.WorkloadRisk, error)
 	CanAccessWorkload(id string, acc *access.AccessControl) error
 
 	GetAllGroups(scope, view string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroup

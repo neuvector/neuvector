@@ -544,7 +544,7 @@ func getWlRules(cgdrs *share.CLUSWorkloadDlpRules, wl2rules map[string]map[strin
 			RuleType:      ruletype,
 		}
 		if wlcache, ok := wlCacheMap[wlid]; ok {
-			wlrule.PolicyMode, _ = getWorkloadPolicyMode(wlcache)
+			wlrule.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlcache)
 		} else {
 			wlrule.PolicyMode = ""
 		}

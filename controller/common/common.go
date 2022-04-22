@@ -19,6 +19,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -33,14 +34,15 @@ type LocalDevice struct {
 	Ctrler *share.CLUSController
 }
 
-type WorkloadFilter struct {
+type WorkloadRisk struct {
 	ID           string
-	PodName      string
+	Name         string
 	ImageID      string
 	PlatformRole string
 	Domain       string
 	PolicyMode   string
-	Children     []*WorkloadFilter
+	VulTraits    []*scanUtils.VulTrait
+	Children     []*WorkloadRisk
 }
 
 type RPCEndpoint struct {
@@ -79,12 +81,12 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 		SyslogCategories: defaultSyslogCategory,
 		SyslogInJSON:     false,
 	},
-	AuthOrder:       []string{},
-	ClusterName:     defaultClusterName,
-	Webhooks:        []share.CLUSWebhook{},
-	ControllerDebug: []string{},
-	TapProxymesh:    true,
-	XffEnabled:      true,
+	AuthOrder:            []string{},
+	ClusterName:          defaultClusterName,
+	Webhooks:             []share.CLUSWebhook{},
+	ControllerDebug:      []string{},
+	TapProxymesh:         true,
+	XffEnabled:           true,
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
 }

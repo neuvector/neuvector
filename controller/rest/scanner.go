@@ -9,10 +9,12 @@ import (
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -547,24 +549,14 @@ func setImagePolicyMode(i2m map[string]string, image, mode string) {
 	}
 }
 
-func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
-	defer r.Body.Close()
-
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	} else if !acc.HasRequiredPermissions() {
-		restRespAccessDenied(w, login)
-		return
-	}
-
+func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
+	sdb := scanUtils.GetScannerDB()
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 
 	img2mode := make(map[string]string)
 	all := make(map[string]*vulAsset)
 
-	pods := cacher.GetAllWorkloadsFilter(acc)
+	pods := cacher.GetAllWorkloadsRisk(acc)
 	for _, pod := range pods {
 		// Skip pod in kubernetes; if no child, show the parent (native docker)
 		if len(pod.Children) == 0 {
@@ -574,13 +566,13 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			vuls, _ := cacher.GetVulnerabilityReport(wl.ID, "")
+			vuls := scanUtils.FillVulDetails(sdb.CVEDB, wl.VulTraits, "")
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
 					va.wls = append(va.wls, api.RESTIDName{
 						ID:          wl.ID,
-						DisplayName: wl.PodName,
+						DisplayName: wl.Name,
 						PolicyMode:  wl.PolicyMode,
 						Domains:     []string{wl.Domain},
 					})
@@ -590,14 +582,36 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
-		nodes := cacher.GetAllHostsIDName(acc)
+		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
-			vuls, _ := cacher.GetVulnerabilityReport(n.ID, "")
+			vuls := scanUtils.FillVulDetails(sdb.CVEDB, n.VulTraits, "")
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
-					va.nodes = append(va.nodes, *n)
+					va.nodes = append(va.nodes, api.RESTIDName{
+						ID:          n.ID,
+						DisplayName: n.Name,
+						PolicyMode:  n.PolicyMode,
+					})
 				}
+			}
+		}
+	}
+
+	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
+		platform, _, _ := cacher.GetPlatform()
+		vuls, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		if vuls != nil {
+			for _, vul := range vuls {
+				va := addVulAsset(all, vul)
+
+				// TODO: for now, set platform policy to "discover" to indicate it's not protected
+				va.platforms = append(va.platforms, api.RESTIDName{
+					ID:          platform,
+					DisplayName: platform,
+					PolicyMode:  share.PolicyModeLearn,
+					Domains:     nil,
+				})
 			}
 		}
 	}
@@ -624,23 +638,22 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 
-	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
-		platform, _, _ := cacher.GetPlatform()
-		vuls, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
-		if vuls != nil {
-			for _, vul := range vuls {
-				va := addVulAsset(all, vul)
+	return all
+}
 
-				// TODO: for now, set platform policy to "discover" to indicate it's not protected
-				va.platforms = append(va.platforms, api.RESTIDName{
-					ID:          platform,
-					DisplayName: platform,
-					PolicyMode:  share.PolicyModeLearn,
-					Domains:     nil,
-				})
-			}
-		}
+func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
+		return
 	}
+
+	all := getAllVulnerabilities(acc)
 
 	var exists utils.Set
 	list := make([]*api.RESTVulnerabilityAsset, 0, len(all))

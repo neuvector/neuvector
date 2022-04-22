@@ -386,14 +386,27 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 	vmap := make(map[string][]*api.RESTVulnerability)
 	nmap := make(map[string][]api.RESTIDName)
 
-	for id, c := range rs.cache {
-		if sum, ok := rs.summary[id]; ok {
-			if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
+	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
+		// To avoid authorize for every image - run faster.
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
 				sdb := scanUtils.GetScannerDB()
-				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
 				nmap[id] = images2IDNames(rs, sum)
+			}
+		}
+	} else {
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
+				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
+					refreshScanCache(rs, id, sum, c, vpf)
+
+					sdb := scanUtils.GetScannerDB()
+					vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
+					nmap[id] = images2IDNames(rs, sum)
+				}
 			}
 		}
 	}
@@ -437,7 +450,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 		if vpf != nil {
 			if c, ok := rs.cache[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
-				rvuls = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				rvuls = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
 			} else {
 				rvuls = make([]*api.RESTVulnerability, len(report.Vuls))
 				for i, vul := range report.Vuls {
