@@ -721,6 +721,7 @@ bool dpi_waf_ep_policy_check (dpi_packet_t *p) {
 
     io_ep_t *ep = p->ep;
     dpi_detector_t *dlp_detector = (dpi_detector_t *)ep->dlp_detector;
+    dpi_policy_hdl_t *hdl = (dpi_policy_hdl_t *)ep->policy_hdl;
     bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
     io_dlp_ruleid_t key;
     dpi_session_t *sess = p->session;
@@ -750,6 +751,9 @@ bool dpi_waf_ep_policy_check (dpi_packet_t *p) {
         if (sess->policy_desc.id == 0 &&
             sess->policy_desc.action == DP_POLICY_ACTION_OPEN &&
             (sess->policy_desc.flags & POLICY_DESC_INTERNAL) ) {
+            if (hdl && hdl->def_action == DP_POLICY_ACTION_DENY) {
+                return true;
+            }
             if (dlp_detector->dlp_apply_dir & DP_POLICY_APPLY_EGRESS) {
                 if ((sess->policy_desc.flags & POLICY_DESC_TUNNEL) ||
                     (sess->policy_desc.flags & POLICY_DESC_HOSTIP)) {
@@ -780,6 +784,7 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
 
     io_ep_t *ep = p->ep;
     dpi_detector_t *dlp_detector = (dpi_detector_t *)ep->dlp_detector;
+    dpi_policy_hdl_t *hdl = (dpi_policy_hdl_t *)ep->policy_hdl;
     bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
     io_dlp_ruleid_t key;
     dpi_session_t *sess = p->session;
@@ -809,6 +814,9 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
         if (!isproxymesh && sess->policy_desc.id == 0 && 
             sess->policy_desc.action == DP_POLICY_ACTION_OPEN &&
             (sess->policy_desc.flags & POLICY_DESC_INTERNAL) ) {
+            if (hdl && hdl->def_action == DP_POLICY_ACTION_DENY) {
+                return true;
+            }
             if (dlp_detector->dlp_apply_dir & DP_POLICY_APPLY_EGRESS) {
                 if ((sess->policy_desc.flags & POLICY_DESC_TUNNEL) || 
                     (sess->policy_desc.flags & POLICY_DESC_HOSTIP)) {
