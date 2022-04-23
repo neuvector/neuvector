@@ -295,6 +295,7 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvMemoryPressureAgent:         {api.EventNameMemoryPressureAgent, api.EventCatAgent, api.LogLevelWARNING},
 	share.CLUSEvMemoryPressureController:    {api.EventNameMemoryPressureController, api.EventCatController, api.LogLevelWARNING},
 	share.CLUSEvK8sNvRBAC:                   {api.EventNameK8sNvRBAC, api.EventCatConfig, api.LogLevelWARNING},
+	share.CLUSEvGroupAutoPromote:            {api.EventNameGroupAutoPromote, api.EventCatGroup, api.LogLevelINFO},
 }
 
 type LogIncidentInfo struct {

@@ -1223,6 +1223,7 @@ const (
 	CLUSEvMemoryPressureAgent
 	CLUSEvMemoryPressureController
 	CLUSEvK8sNvRBAC
+	CLUSEvGroupAutoPromote
 )
 
 const (
