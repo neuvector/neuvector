@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
+	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,6 +31,7 @@ type procGrpRef struct {
 
 // allowed parent scripts
 var permitProcessGrp map[int]*procGrpRef = make(map[int]*procGrpRef)
+var k8sGrpProbe utils.Set = utils.NewSet()
 
 func (e *Engine) UpdateProcessPolicy(name string, profile *share.CLUSProcessProfile) (bool, *share.CLUSProcessProfile) {
 	e.Mutex.Lock()
@@ -38,6 +40,12 @@ func (e *Engine) UpdateProcessPolicy(name string, profile *share.CLUSProcessProf
 	exist, ok := e.ProcessPolicy[name]
 	if !ok || !reflect.DeepEqual(exist, profile) {
 		e.ProcessPolicy[name] = profile
+		for _, p := range profile.Process {
+			if len(p.ProbeCmds) > 0 {
+				k8sGrpProbe.Add(name) // set the flag
+				break
+			}
+		}
 		return true, exist
 	} else {
 		return false, exist
@@ -70,9 +78,16 @@ func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile
 	return nil, false
 }
 
+func (e *Engine) IsK8sGroupWithProbe(name string) bool {
+	e.Mutex.Lock()
+	defer e.Mutex.Unlock()
+	return k8sGrpProbe.Contains(name)
+}
+
 func (e *Engine) DeleteProcessPolicy(name string) {
 	e.Mutex.Lock()
 	delete(e.ProcessPolicy, name)
+	k8sGrpProbe.Remove(name)
 	log.WithFields(log.Fields{"name": name}).Debug("PROC: ")
 	e.Mutex.Unlock()
 }

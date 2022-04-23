@@ -18,6 +18,7 @@ type ProbeConfig struct {
 	NotifyFsTaskChan     chan *fsmon.MonitorMessage
 	PolicyLookupFunc     func(conn *dp.Connection) (uint32, uint8, bool)
 	ProcPolicyLookupFunc func(id, riskType, pname, ppath string, pid, pgid, shellCmd int, proc *share.CLUSProcessProfileEntry) (string, string, string, string, bool, error)
+	IsK8sGroupWithProbe  func(svcGroup string) bool
 	ReportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
 	ContainerInContainer bool
 	GetContainerPid      func(id string) int

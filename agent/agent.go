@@ -531,6 +531,7 @@ func main() {
 		NotifyFsTaskChan:     fsmonTaskChan,
 		PolicyLookupFunc:     hostPolicyLookup,
 		ProcPolicyLookupFunc: processPolicyLookup,
+		IsK8sGroupWithProbe:  pe.IsK8sGroupWithProbe,
 		ReportLearnProc:      addLearnedProcess,
 		ContainerInContainer: agentEnv.containerInContainer,
 		GetContainerPid:      cbGetContainerPid,

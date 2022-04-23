@@ -42,6 +42,7 @@ type rootFd struct {
 	pid            int
 	id             string
 	setting        string
+	group          string
 	whlst          map[string]int // not set: -1, deny: 0, allow: 1
 	dirMonitorList []string
 	allowProcList  []faProcGrpRef        // allowed process group
@@ -403,7 +404,7 @@ func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAll
 }
 
 /////
-func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting string, rootpid int, process []*share.CLUSProcessProfileEntry) bool {
+func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup string, rootpid int, process []*share.CLUSProcessProfileEntry) bool {
 	if !fa.bEnabled {
 		log.Debug("FA: not supported")
 		return false
@@ -429,6 +430,7 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting string, r
 		pid:            rootpid,
 		id:             id,
 		setting:        setting,
+		group:          svcGroup,
 		whlst:          execs,
 		dirMonitorList: dirs,
 		allowProcList:  make([]faProcGrpRef, 0),
@@ -619,13 +621,14 @@ func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, st
 	return allowed, name, path, pgid
 }
 
-func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, path string, pid, res int) (bool, *share.CLUSProcessProfileEntry) {
+func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, path, svcGroup string, pid, res int) (bool, *share.CLUSProcessProfileEntry) {
 	if fa.prober == nil {
 		return false, nil
 	}
 	name := filepath.Base(path) // open app
 	sid, pgid := osutil.GetSessionId(pid), osutil.GetProcessGroupId(pid)
-	proc := &procInternal{pid: pid, name: name, path: path, ppid: pid, sid: sid, pgid: pgid}
+	ppid, _, _, _, _ := osutil.GetProcessPIDs(pid)
+	proc := &procInternal{pid: pid, name: name, path: path, ppid: ppid, sid: sid, pgid: pgid}
 	group, _, _ := fa.prober.getServiceGroupName(id)
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, DerivedGroup: group}
 	switch res {
@@ -640,23 +643,24 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, path string, pid, res in
 		ppe.AllowFileUpdate = false
 	}
 
-	pass := fa.prober.IsAllowedShieldProcess(id, share.PolicyModeEnforce, proc, ppe, false)
+	pass := fa.prober.IsAllowedShieldProcess(id, share.PolicyModeEnforce, svcGroup, proc, ppe, false)
 	return pass, ppe // permitted ?
 }
 
-func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, int) {
+func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, string, int) {
+	var svcGroup string
 	res := rule_allowed // allowed all
 	profileSetting := share.ProfileBasic
 	// check if the /proc/xxx/cgroup exists
 	id, _, _, found := global.SYS.GetContainerIDByPID(pid)
 	if id == fa.prober.selfID {
 		// log.WithFields(log.Fields{"id": id}).Debug("FA: agent, pass")
-		return id, profileSetting, res // allow agent operations
+		return id, profileSetting, svcGroup, res // allow agent operations
 	}
 
 	// Pass any request to avoid the blocked file open
 	if !fa.bEnabled {
-		return id, profileSetting, res
+		return id, profileSetting, svcGroup, res
 	}
 
 	// log.WithFields(log.Fields{"id": id, "found": found, "path": path}).Debug("FA: ")
@@ -667,9 +671,10 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 		cRoot, ok := fa.roots[id] // enforcer is not in the list
 		if ok {
 			profileSetting = cRoot.setting
+			svcGroup = cRoot.group
 			if ok, pname, ppath, pgid := fa.isAllowedByParentApp(cRoot, pid); ok {
 				log.WithFields(log.Fields{"pname": pname, "ppath": ppath, "pid": pid, "pgid": pgid}).Debug("FA: allowed by parent")
-				return id, profileSetting, res
+				return id, profileSetting, svcGroup, res
 			}
 
 			if rres, ok := cRoot.whlst[path]; ok {
@@ -680,20 +685,20 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 						rres = rule_not_defined
 					}
 				}
-				return id, profileSetting, rres
+				return id, profileSetting, svcGroup, rres
 			} else {
 				//	log.Debug("FA: not in the whtlst")
 			}
 		}
 	}
-	return id, profileSetting, res
+	return id, profileSetting, svcGroup, res
 }
 
 func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 	if (ev.Mask & fsmon.FAN_OPEN_PERM) > 0 {
 		var ppe *share.CLUSProcessProfileEntry
 		var pass bool
-		var ppath, pname string
+		var ppath, pname, svcGroup string
 
 		res := -1 // undefined
 
@@ -729,10 +734,10 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 		if err == nil && !fa.isParentProcessException(pname, ppath, name, path) {
 			var id, profileSetting string
 			// cmds, _ := global.SYS.ReadCmdLine(pid)
-			id, profileSetting, res = fa.whiteListCheck(path, pid)
+			id, profileSetting, svcGroup, res = fa.whiteListCheck(path, pid)
 			// mLog.WithFields(log.Fields{"path": path, "pid": pid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
 			if res != rule_denied && res != rule_allowed && profileSetting == share.ProfileZeroDrift { // not match any rule
-				pass, ppe = fa.checkAllowedShieldProcess(id, path, pid, res)
+				pass, ppe = fa.checkAllowedShieldProcess(id, path, svcGroup, pid, res)
 				if pass {
 					res = rule_allowed_image // image file only
 					log.WithFields(log.Fields{"id": id, "ppe": ppe}).Debug("SHD: allowed")
