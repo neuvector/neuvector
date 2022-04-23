@@ -2238,7 +2238,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	if (proc.reported & profileReported) == 0 {
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
-			if pass := p.IsAllowedShieldProcess(id, mode, proc, pp, true); pass {
+			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
 				if pp.Action != share.PolicyActionLearn {
 					pp.Action = share.PolicyActionAllow
 				}
@@ -2569,7 +2569,7 @@ func (p *Probe) processProfileReeval(id string, pg *share.CLUSProcessProfile, bA
 func (p *Probe) applyProcessBlockingPolicy(id string, pid int, pg *share.CLUSProcessProfile, bBlocking bool) bool {
 	log.WithFields(log.Fields{"mode": pg.Mode, "baseline": pg.Baseline, "id": id}).Debug("PROC")
 	if bBlocking {
-		p.addProcessControl(id, pg.Baseline, pid, pg.Process) // serial operation, no go routine
+		p.addProcessControl(id, pg.Baseline, pg.Group, pid, pg.Process) // serial operation, no go routine
 	} else {
 		p.RemoveProcessControl(id) // serial operation, no go routine
 	}
@@ -2702,7 +2702,7 @@ func negativeResByMode(mode string) string {
 	return share.PolicyActionViolate
 }
 
-func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe *share.CLUSProcessProfileEntry, bFromPmon bool) bool {
+func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInternal, ppe *share.CLUSProcessProfileEntry, bFromPmon bool) bool {
 	var bPass, bImageFile, bModified bool
 
 	if id == "" { // nodes
@@ -2748,26 +2748,37 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 		}
 	}
 
-	if bFromPmon {
-		if ppe.Action == share.PolicyActionAllow && ppe.Name == proc.name && len(ppe.ProbeCmds) > 0 {
-			// meet the qualifications
-			var gpname string
-			if pproc, ok := p.pidProcMap[proc.ppid]; ok {
-				gpname = pproc.pname
-			}
-			if global.RT.IsRuntimeProcess(proc.pname, nil) || global.RT.IsRuntimeProcess(gpname, nil) {
-				norm := strings.TrimSuffix(strings.Join(proc.cmds, ","), ",")
-				for _, cmd := range ppe.ProbeCmds {
-					if strings.Contains(norm, cmd) {
-						// matched up to its grandparent process
-						c.outsider.Remove(proc.pid)
-						c.children.Add(proc.pid)
-						mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug()
-						break
-					}
-				}
-			}
+	bCanBeLearned := true
+	if ppe.Action != share.PolicyActionViolate && p.bK8sGroupWithProbe(svcGroup) {
+		// allowing "kubctl exec ..."
+		var gpname string
+		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
+			gpname = pproc.pname
 		}
+
+		bRuncChild := global.RT.IsRuntimeProcess(proc.pname, nil) || global.RT.IsRuntimeProcess(gpname, nil)
+		if bRuncChild {
+			bCanBeLearned = false
+			c.outsider.Remove(proc.pid)
+			c.children.Add(proc.pid)
+		}
+
+		//  TODO: meet the qualifications
+		// if ppe.Name == proc.name && len(ppe.ProbeCmds) > 0 {
+		//	if bRuncChild {
+			//	norm := strings.TrimSuffix(strings.Join(proc.cmds, ","), ",")
+			//	for _, cmd := range ppe.ProbeCmds {
+			//		if strings.Contains(norm, cmd) {
+			//			// matched up to its grandparent process
+			//          bCanBeLearned = false
+			//			c.outsider.Remove(proc.pid)
+			//			c.children.Add(proc.pid)
+			//			mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug()
+			//			break
+			//		}
+			//	}
+		//	}
+		//}
 	}
 
 	// mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
@@ -2786,6 +2797,10 @@ func (p *Probe) IsAllowedShieldProcess(id, mode string, proc *procInternal, ppe 
 				bPass = false
 				ppe.Action = negativeResByMode(mode)
 				ppe.Uuid = share.CLUSReservedUuidAnchorMode
+			} else if bCanBeLearned == false {
+				// allowed but will not be learned
+				ppe.Action = share.PolicyActionAllow
+				mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "svcGroup": svcGroup}).Debug()
 			}
 		case share.PolicyActionAllow, share.PolicyActionViolate:
 			if ppe.Action == share.PolicyActionViolate && ppe.Uuid != share.CLUSReservedUuidNotAlllowed {

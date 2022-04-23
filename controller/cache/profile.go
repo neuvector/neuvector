@@ -422,6 +422,10 @@ func addK8sProbeApps(group string, probeCmds []k8sProbeCmd) {
 
 	if len(procs) > 0 {
 		gproc[group] = procs
-		AddProcessReport(gproc)
+		if isLeader() {
+			handleProfileReport(gproc)
+		} else {
+			AddProcessReport(gproc)	// put into a queue
+		}
 	}
 }

@@ -1148,7 +1148,7 @@ func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
 	}
 }
 
-func appendProbeCmds(cmds []string) *k8sProbeCmd {
+func appendProbeCmds(cmds []string) (bool, string, string, string) {
 	if len(cmds) > 0 {
 		exe := filepath.Base(cmds[0])
 		path := filepath.Clean(cmds[0])
@@ -1157,13 +1157,13 @@ func appendProbeCmds(cmds []string) *k8sProbeCmd {
 			path = "*"
 		}
 		cmd := strings.TrimSuffix(strings.Join(cmds, ","), ",")
-		return &k8sProbeCmd{app: exe, path: path, cmds: []string{cmd}}
+		return true, exe, path, cmd
 	}
-	return nil
+	return false, "", "", ""
 }
 
-func appendProbeSubCmds(cmds []string) []k8sProbeCmd {
-	var subcmds []k8sProbeCmd
+func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
+	var subcmds []*k8sProbeCmd
 	if len(cmds) > 0 {
 		line := strings.Join(cmds, " ")
 		items := strings.Split(line, " exec ")
@@ -1172,8 +1172,9 @@ func appendProbeSubCmds(cmds []string) []k8sProbeCmd {
 				continue
 			}
 			if index := strings.Index(item, ";"); index > 0 {
-				if pcmd := appendProbeCmds(strings.Split(item[0:index], " ")); pcmd != nil {
-					subcmds = append(subcmds, *pcmd)
+				if ok, app, path, cmdline := appendProbeCmds(strings.Split(item[0:index], " ")); ok {
+					p := &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+					subcmds = append(subcmds, p)
 				}
 			}
 		}
@@ -1181,40 +1182,47 @@ func appendProbeSubCmds(cmds []string) []k8sProbeCmd {
 	return subcmds
 }
 
-func addK8sPodEvent(pod resource.Pod) {
+func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
+	pp := make(map[string]*k8sProbeCmd)
+	for _, cmd := range cmds {
+		if ok, app, path, cmdline  := appendProbeCmds(cmd); ok {
+			if p, ok := pp[app]; ok {
+				p.path = "*"
+				p.cmds = append(p.cmds, cmdline)
+			} else {
+				pp[app] = &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+			}
+
+			if app == "sh" || app == "bash" || app == "ash" {
+				if pcmds := appendProbeSubCmds(cmd); pcmds != nil {
+					for _, pcmd := range pcmds {
+						if p, ok := pp[pcmd.app]; ok {
+							p.path = "*"
+							p.cmds = append(p.cmds, pcmd.cmds...)
+						} else {
+							pp[pcmd.app] = pcmd
+						}
+					}
+				}
+			}
+		}
+	}
+
 	var probes []k8sProbeCmd
-	if pcmd := appendProbeCmds(pod.LivenessCmds); pcmd != nil {
-		probes = append(probes, *pcmd)
-		if pcmd.app == "sh" || pcmd.app == "bash" || pcmd.app == "ash" {
-			if pcmds := appendProbeSubCmds(pod.LivenessCmds); pcmds != nil {
-				probes = append(probes, pcmds...)
-			}
-		}
+	for _, p := range pp {
+		probes = append(probes, *p)
 	}
+	return probes
+}
 
-	if pcmd := appendProbeCmds(pod.ReadinessCmds); pcmd != nil {
-		if len(probes) > 0 && probes[0].app == pcmd.app { // liveness exists
-			if probes[0].path != pcmd.path {
-				probes[0].path = "*" // mixed together
-			}
-			probes[0].cmds = append(probes[0].cmds, pcmd.cmds[0])
-		} else {
-			probes = append(probes, *pcmd)
-		}
-
-		if pcmd.app == "sh" || pcmd.app == "bash" || pcmd.app == "ash" {
-			if pcmds := appendProbeSubCmds(pod.ReadinessCmds); pcmds != nil {
-				probes = append(probes, pcmds...)
-			}
-		}
-	}
-
+func addK8sPodEvent(pod resource.Pod) {
+	probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
 	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
 	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Labels); svc != nil {
 		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
 	}
-	log.WithFields(log.Fields{"Name": pod.Name, "groupName": groupName, "probes": probes}).Debug()
 
+	//log.WithFields(log.Fields{"Name": pod.Name, "groupName": groupName, "probes": probes}).Debug()
 	var name_alt string
 	if pos := strings.LastIndex(pod.Name, "-"); pos != -1 {
 		name_alt = fmt.Sprintf("nv.%s.%s", pod.Name[:pos], pod.Domain)
@@ -1236,7 +1244,7 @@ func addK8sPodEvent(pod resource.Pod) {
 			log.WithFields(log.Fields{"group": group}).Debug()
 			bFound = true
 			addK8sProbeApps(group, p.probes)
-			delete(cacher.k8sPodEvents, p.group)
+			// delete(cacher.k8sPodEvents, p.group)
 			break
 		}
 	}
@@ -1246,19 +1254,36 @@ func addK8sPodEvent(pod resource.Pod) {
 	}
 }
 
-func updateK8sPodEvent(group string) {
+// The cacheMutex is locked by callers
+func updateK8sPodEvent(group, podname, domain string) {
+	var bFound bool
 	now := time.Now().Unix()
-	cacheMutexLock()
-	defer cacheMutexUnlock()
 	for name, p := range cacher.k8sPodEvents {
 		if group == p.group || group == p.groupAlt {
 			addK8sProbeApps(group, p.probes)
+			// delete(cacher.k8sPodEvents, name)
+			bFound = true
+			break
+		}
+		if now > p.cleanAt {
+			log.WithFields(log.Fields{"name": name}).Debug("Clean-up")
 			delete(cacher.k8sPodEvents, name)
+		}
+	}
+
+	if !bFound {
+		if obj, err := global.ORCH.GetResource(resource.RscTypePod, domain, podname); err != nil {
+			log.WithFields(log.Fields{"error": err, "group": group, "pod": podname, "domain": domain}).Error("get ressource")
+			return
 		} else {
-			if now > p.cleanAt {
-				log.WithFields(log.Fields{"name": name}).Debug("Clean")
-				delete(cacher.k8sPodEvents, name)
+			pod := obj.(*resource.Pod)
+			probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
+			if len(probes) == 0 {
+				return
 			}
+
+			// log.WithFields(log.Fields{"probes": probes, "group": group, "pod": podname, "domain": domain}).Debug()
+			addK8sProbeApps(group, probes)
 		}
 	}
 }
