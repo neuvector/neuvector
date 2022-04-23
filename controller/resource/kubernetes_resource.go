@@ -683,12 +683,12 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 				if liveness != nil || readiness != nil {
 					if handler := liveness.GetHandler(); handler != nil {
 						if exec := handler.GetExec(); exec != nil {
-							r.LivenessCmds = exec.GetCommand()
+							r.LivenessCmds = append(r.LivenessCmds, exec.GetCommand())
 						}
 					}
 					if handler := readiness.GetHandler(); handler != nil {
 						if exec := handler.GetExec(); exec != nil {
-							r.ReadinessCmds = exec.GetCommand()
+							r.ReadinessCmds = append(r.ReadinessCmds, exec.GetCommand())
 						}
 					}
 				}
@@ -1332,6 +1332,15 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
 		RscTypeNode:
 		return d.getResource(rt, namespace, name)
+	case RscTypePod:
+		if r, err:= d.getResource(rt, namespace, name); err == nil {
+			if _, p := xlatePod(r.(k8s.Resource)); p != nil {
+				return p, nil
+			}
+			return nil, common.ErrObjectNotFound
+		} else {
+			return nil, err
+		}
 	}
 	return nil, ErrResourceNotSupported
 }

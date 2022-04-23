@@ -36,6 +36,7 @@ type Probe struct {
 	containerInContainer bool // container-in-container
 	policyLookupFunc     func(conn *dp.Connection) (uint32, uint8, bool)
 	procPolicyLookupFunc func(id, riskType, pname, ppath string, pid, pgid, shellCmd int, proc *share.CLUSProcessProfileEntry) (string, string, string, string, bool, error)
+	bK8sGroupWithProbe   func(svcGroup string) bool
 	reportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
 	disableNvProtect     bool
 	bKubePlatform        bool
@@ -453,6 +454,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		pidNetlink:           pc.PidMode == "host",
 		policyLookupFunc:     pc.PolicyLookupFunc,
 		procPolicyLookupFunc: pc.ProcPolicyLookupFunc,
+		bK8sGroupWithProbe:   pc.IsK8sGroupWithProbe,
 		reportLearnProc:      pc.ReportLearnProc,
 		containerInContainer: pc.ContainerInContainer,
 		getContainerPid:      pc.GetContainerPid,
@@ -669,7 +671,7 @@ func (p *Probe) ReportDockerCp(id, containerName string, toContainer bool) {
 }
 
 ///// by policy order
-func (p *Probe) addProcessControl(id, setting string, pid int, process []*share.CLUSProcessProfileEntry) {
+func (p *Probe) addProcessControl(id, setting, svcGroup string, pid int, process []*share.CLUSProcessProfileEntry) {
 	if p.fAccessCtl != nil {
 		for _, proc := range process {
 			mLog.WithFields(log.Fields{"name": proc.Name, "path": proc.Path, "action": proc.Action}).Debug("PROC:")
@@ -680,7 +682,7 @@ func (p *Probe) addProcessControl(id, setting string, pid int, process []*share.
 			return
 		}
 
-		if !p.fAccessCtl.AddContainerControlByPolicyOrder(id, setting, pid, process) {
+		if !p.fAccessCtl.AddContainerControlByPolicyOrder(id, setting, svcGroup, pid, process) {
 			log.WithFields(log.Fields{"id": id, "pid": pid}).Debug("PROC: failed")
 		}
 	} else {

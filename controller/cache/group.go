@@ -1160,6 +1160,9 @@ func groupWorkloadJoin(id string, param interface{}) {
 		if isLeader() {
 			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				if localDev.Host.Platform == share.PlatformKubernetes {
+					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+				}
 			}
 			// Members is calculated when group change is handled
 			// Service address is updated when group change is handled. It cannot be written
@@ -1203,7 +1206,13 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
-		updateK8sPodEvent(wlc.learnedGroupName)
+		if localDev.Host.Platform == share.PlatformKubernetes {
+			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") {	// ignore POD
+				cacheMutexLock()
+				updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+				cacheMutexUnlock()
+			}
+		}
 		dispatchHelper.WorkloadJoin(wlc.workload.HostID, wlc.learnedGroupName, id, dptCustomGrpAdds, isLeader())
 	}
 }
