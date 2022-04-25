@@ -473,7 +473,7 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 
 	id := ps.ByName("id")
 
-	wl, err := cacher.GetWorkloadFilter(id, acc)
+	wl, err := cacher.GetWorkloadRisk(id, acc)
 	if wl == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -690,6 +690,47 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	}
 }
 
+func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfileFilter) *api.RESTBenchReport {
+	var r share.CLUSBenchReport
+
+	if len(value) == 0 {
+		return nil
+	} else {
+		uzb := utils.GunzipBytes(value)
+		if uzb == nil {
+			log.Error("Failed to unzip benchmark report")
+			return nil
+		}
+		if err := json.Unmarshal(uzb, &r); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to unmarshal report")
+			return nil
+		}
+	}
+
+	if r.Status != share.BenchStatusIdle && r.Status != share.BenchStatusFinished {
+		return nil
+	}
+
+	rpt := api.RESTBenchReport{
+		RunAtTimeStamp: r.RunAt.Unix(),
+		RunAt:          api.RESTTimeString(r.RunAt),
+		Version:        r.Version,
+		Items:          make([]*api.RESTBenchItem, 0),
+	}
+
+	// Add check tags
+	for _, item := range r.Items {
+		if ritem := bench2REST(bench, item, cpf); ritem != nil {
+			rpt.Items = append(rpt.Items, ritem)
+		}
+	}
+
+	rpt.Items = filterComplianceChecks(rpt.Items, cpf)
+
+	return &rpt
+
+}
+
 type compAsset struct {
 	Name        string
 	Catalog     string
@@ -763,7 +804,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 	kubeVers := utils.NewSet()
 	dockerVers := utils.NewSet()
 
-	pods := cacher.GetAllWorkloadsFilter(acc)
+	pods := cacher.GetAllWorkloadsRisk(acc)
 	for _, pod := range pods {
 		// Skip pod in kubernetes; if no child, show the parent (native docker)
 		if len(pod.Children) == 0 {
@@ -780,7 +821,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -794,7 +835,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -808,7 +849,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})
@@ -822,7 +863,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 						va := addCompAsset(all, item)
 						va.wls = append(va.wls, api.RESTIDName{
 							ID:          wl.ID,
-							DisplayName: wl.PodName,
+							DisplayName: wl.Name,
 							PolicyMode:  wl.PolicyMode,
 							Domains:     []string{wl.Domain},
 						})

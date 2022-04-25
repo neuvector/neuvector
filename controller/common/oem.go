@@ -15,9 +15,6 @@ func OEMPlatformVersionURL() string {
 }
 
 func OEMIgnoreWorkload(wl *share.CLUSWorkload) bool {
-	if wl.Name == "curl" {
-		return true
-	}
 	return false
 }
 

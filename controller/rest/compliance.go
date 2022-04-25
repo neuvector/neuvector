@@ -46,7 +46,7 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 	var domain string
 	if cpf.object == nil {
 		domain = api.DomainNodes
-	} else if wl, ok := cpf.object.(*common.WorkloadFilter); ok {
+	} else if wl, ok := cpf.object.(*common.WorkloadRisk); ok {
 		if cpf.disableSystem && wl.PlatformRole == api.PlatformContainerCore {
 			return []*api.RESTBenchItem{}
 		}

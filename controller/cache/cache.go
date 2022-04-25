@@ -20,13 +20,14 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -48,16 +49,21 @@ type hostDigest struct {
 }
 
 type hostCache struct {
-	host       *share.CLUSHost
-	agents     utils.Set
-	workloads  utils.Set
-	portWLMap  map[string]*workloadDigest
-	ipWLMap    map[string]*workloadDigest
-	wlSubnets  utils.Set // host-scope subnet *net.IPNet, such as 172.17.0.0/16
-	scanBrief  *api.RESTScanBrief
-	state      string
-	timerTask  string
-	timerSched time.Time
+	host             *share.CLUSHost
+	agents           utils.Set
+	workloads        utils.Set
+	portWLMap        map[string]*workloadDigest
+	ipWLMap          map[string]*workloadDigest
+	wlSubnets        utils.Set             // host-scope subnet *net.IPNet, such as 172.17.0.0/16
+	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
+	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	customBenchValue []byte
+	dockerBenchValue []byte
+	masterBenchValue []byte
+	workerBenchValue []byte
+	state            string
+	timerTask        string
+	timerSched       time.Time
 }
 
 type agentCache struct {
@@ -93,7 +99,12 @@ type workloadCache struct {
 	displayName      string
 	podName          string
 	serviceAccount   string
-	scanBrief        *api.RESTScanBrief
+	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
+	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	customBenchValue []byte
+	dockerBenchValue []byte
+	secretBenchValue []byte
+	setidBenchValue  []byte
 	children         utils.Set
 }
 
@@ -309,13 +320,8 @@ func deriveWorkloadState(cache *workloadCache) string {
 	} else if cache.workload.Inline {
 		return api.WorkloadStateProtect
 	}
-	//when getNetServiceStatus() is true, policymode
-	//is global so we use per group level profile mode
-	mode, profmode := getWorkloadPolicyMode(cache)
-	if getNetServiceStatus() {
-		mode = profmode
-	}
 
+	mode, _ := getWorkloadPerGroupPolicyMode(cache)
 	switch mode {
 	case share.PolicyModeEvaluate:
 		return api.WorkloadStateMonitor
@@ -628,7 +634,7 @@ func (m CacheMethod) GetWorkloadBrief(id string, view string, acc *access.Access
 	return getWorkloadBrief(id, view, acc)
 }
 
-func (m CacheMethod) GetWorkloadFilter(id string, acc *access.AccessControl) (*common.WorkloadFilter, error) {
+func (m CacheMethod) GetWorkloadRisk(id string, acc *access.AccessControl) (*common.WorkloadRisk, error) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
@@ -637,10 +643,10 @@ func (m CacheMethod) GetWorkloadFilter(id string, acc *access.AccessControl) (*c
 			return nil, common.ErrObjectAccessDenied
 		}
 
-		wl := workload2Filter(cache)
+		wl := workload2Risk(cache)
 		for child := range cache.children.Iter() {
 			if childCache, ok := wlCacheMap[child.(string)]; ok {
-				wl.Children = append(wl.Children, workload2Filter(childCache))
+				wl.Children = append(wl.Children, workload2Risk(childCache))
 			}
 		}
 
@@ -1046,21 +1052,28 @@ func (m CacheMethod) GetAgentConfig(id string, acc *access.AccessControl) (*api.
 	return nil, common.ErrObjectNotFound
 }
 
-func (m CacheMethod) GetAllHostsIDName(acc *access.AccessControl) []*api.RESTIDName {
+func (m CacheMethod) GetAllHostsRisk(acc *access.AccessControl) []*common.WorkloadRisk {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
-	hosts := make([]*api.RESTIDName, 0, len(hostCacheMap))
+	hosts := make([]*common.WorkloadRisk, 0, len(hostCacheMap))
 	for _, cache := range hostCacheMap {
 		if !acc.Authorize(cache.host, nil) || isDummyHostCache(cache) {
 			continue
 		}
 
 		pm, _ := getHostPolicyMode(cache)
-		hosts = append(hosts, &api.RESTIDName{
-			ID:          cache.host.ID,
-			DisplayName: cache.host.Name,
-			PolicyMode:  pm,
+		hosts = append(hosts, &common.WorkloadRisk{
+			ID:         cache.host.ID,
+			Name:       cache.host.Name,
+			PolicyMode: pm,
+			// When vul. profile updates, it will refresh all scanMap and workload/host cache.
+			// No refresh in this path, which is different from GetVulnerabilityReport().
+			VulTraits:        cache.vulTraits,
+			CustomBenchValue: cache.customBenchValue,
+			DockerBenchValue: cache.dockerBenchValue,
+			MasterBenchValue: cache.masterBenchValue,
+			WorkerBenchValue: cache.workerBenchValue,
 		})
 	}
 	return hosts
@@ -1256,11 +1269,11 @@ func (m CacheMethod) GetAllWorkloadsBrief(view string, acc *access.AccessControl
 	return wls
 }
 
-func (m CacheMethod) GetAllWorkloadsFilter(acc *access.AccessControl) []*common.WorkloadFilter {
+func (m CacheMethod) GetAllWorkloadsRisk(acc *access.AccessControl) []*common.WorkloadRisk {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
-	wls := make([]*common.WorkloadFilter, 0, len(wlCacheMap))
+	wls := make([]*common.WorkloadRisk, 0, len(wlCacheMap))
 	for _, cache := range wlCacheMap {
 		if !acc.Authorize(cache.workload, nil) {
 			continue
@@ -1270,10 +1283,10 @@ func (m CacheMethod) GetAllWorkloadsFilter(acc *access.AccessControl) []*common.
 		}
 
 		if cache.workload.ShareNetNS == "" {
-			wl := workload2Filter(cache)
+			wl := workload2Risk(cache)
 			for child := range cache.children.Iter() {
 				if childCache, ok := wlCacheMap[child.(string)]; ok {
-					wl.Children = append(wl.Children, workload2Filter(childCache))
+					wl.Children = append(wl.Children, workload2Risk(childCache))
 				}
 			}
 			wls = append(wls, wl)

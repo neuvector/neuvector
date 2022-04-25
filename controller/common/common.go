@@ -7,18 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"sort"
 
-	log "github.com/sirupsen/logrus"
 	syslog "github.com/RackSec/srslog"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -33,14 +34,21 @@ type LocalDevice struct {
 	Ctrler *share.CLUSController
 }
 
-type WorkloadFilter struct {
-	ID           string
-	PodName      string
-	ImageID      string
-	PlatformRole string
-	Domain       string
-	PolicyMode   string
-	Children     []*WorkloadFilter
+type WorkloadRisk struct {
+	ID               string
+	Name             string
+	ImageID          string
+	PlatformRole     string
+	Domain           string
+	PolicyMode       string
+	VulTraits        []*scanUtils.VulTrait
+	Children         []*WorkloadRisk
+	CustomBenchValue []byte
+	DockerBenchValue []byte
+	MasterBenchValue []byte
+	WorkerBenchValue []byte
+	SecretBenchValue []byte
+	SetidBenchValue  []byte
 }
 
 type RPCEndpoint struct {
@@ -79,12 +87,12 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 		SyslogCategories: defaultSyslogCategory,
 		SyslogInJSON:     false,
 	},
-	AuthOrder:       []string{},
-	ClusterName:     defaultClusterName,
-	Webhooks:        []share.CLUSWebhook{},
-	ControllerDebug: []string{},
-	TapProxymesh:    true,
-	XffEnabled:      true,
+	AuthOrder:            []string{},
+	ClusterName:          defaultClusterName,
+	Webhooks:             []share.CLUSWebhook{},
+	ControllerDebug:      []string{},
+	TapProxymesh:         true,
+	XffEnabled:           true,
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
 }

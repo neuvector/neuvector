@@ -406,9 +406,17 @@ func getHostPolicyMode(cache *hostCache) (string, string) {
 	}
 }
 
-func getWorkloadPolicyMode(wlCache *workloadCache) (string, string) {
-	//if global net service status is enabled, use global net service
-	//policy mode, profile still use per group mode
+func getWorkloadPerGroupPolicyMode(wlCache *workloadCache) (string, string) {
+	if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
+		return cache.group.PolicyMode, cache.group.ProfileMode
+	} else {
+		return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+	}
+}
+
+// If global net service status is enabled, use global net service
+// policy mode, profile still use per group mode
+func getWorkloadEffectivePolicyMode(wlCache *workloadCache) (string, string) {
 	if getNetServiceStatus() {
 		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
 			return getNetServicePolicyMode(), cache.group.ProfileMode
@@ -435,7 +443,7 @@ func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 	wlAddr := share.CLUSWorkloadAddr{
 		WlID: wlCache.workload.ID,
 	}
-	wlAddr.PolicyMode, _ = getWorkloadPolicyMode(wlCache)
+	wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache)
 	for _, addrs := range wlCache.workload.Ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {

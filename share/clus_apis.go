@@ -2,11 +2,12 @@ package share
 
 import (
 	"fmt"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
 
 const CLUSObjectStore string = "object/"
@@ -337,6 +338,14 @@ func CLUSScanDataPlatformKey(id string) string {
 	return fmt.Sprintf("%sreport/platform/%s", CLUSScanDataStore, id)
 }
 
+func CLUSBenchStateHostKey(id string) string {
+	return fmt.Sprintf("%sbench/host/%s", CLUSScanStateStore, id)
+}
+
+func CLUSBenchStateWorkloadKey(id string) string {
+	return fmt.Sprintf("%sbench/workload/%s", CLUSScanStateStore, id)
+}
+
 func CLUSScanStateHostKey(id string) string {
 	return fmt.Sprintf("%sreport/host/%s", CLUSScanStateStore, id)
 }
@@ -349,12 +358,12 @@ func CLUSScanStatePlatformKey(id string) string {
 	return fmt.Sprintf("%sreport/platform/%s", CLUSScanStateStore, id)
 }
 
-func CLUSBenchKey(hostID string) string {
-	return fmt.Sprintf("%s%s", CLUSBenchStore, hostID)
+func CLUSBenchKey(id string) string {
+	return fmt.Sprintf("%s%s", CLUSBenchStore, id)
 }
 
-func CLUSBenchReportKey(hostID string, bench BenchType) string {
-	return fmt.Sprintf("%s/report/%s", CLUSBenchKey(hostID), bench)
+func CLUSBenchReportKey(id string, bench BenchType) string {
+	return fmt.Sprintf("%s/report/%s", CLUSBenchKey(id), bench)
 }
 
 func CLUSCustomCheckConfigKey(name string) string {
@@ -564,6 +573,14 @@ func CLUSScanStateKey2Type(key string) string {
 }
 
 func CLUSScanStateKey2ID(key string) string {
+	return CLUSKeyNthToken(key, 4)
+}
+
+func CLUSBenchStateKey2Type(key string) string {
+	return CLUSKeyNthToken(key, 3)
+}
+
+func CLUSBenchStateKey2ID(key string) string {
 	return CLUSKeyNthToken(key, 4)
 }
 
@@ -1395,6 +1412,10 @@ type CLUSBenchItem struct {
 	Group       string   `json:"group"`
 }
 
+type CLUSBenchState struct {
+	RunAt time.Time `json:"run_at"`
+}
+
 type CLUSBenchReport struct {
 	Status  BenchStatus      `json:"status"`
 	RunAt   time.Time        `json:"run_at"`
@@ -2097,7 +2118,7 @@ const (
 	CLUSDlpSsnSensor     = "sensor.ssn"
 	CLUSDlpCcSensor      = "sensor.creditcard"
 	CLUSWafDefaultSensor = "sensor.wafdfltnv"
-	CLUSWafLog4shSensor   = "sensor.log4shell"
+	CLUSWafLog4shSensor  = "sensor.log4shell"
 	CLUSWafSpr4shSensor  = "sensor.spring4shell"
 )
 
@@ -2111,7 +2132,7 @@ const (
 	DlpRuleNameCcDinerV2  string = "rule.diner2"
 	DlpRuleNameCcJcb      string = "rule.jcb"
 	DlpRuleNameSsn        string = "rule.ssn"
-	WafRuleNameLog4sh      string = "rule.log4shell"
+	WafRuleNameLog4sh     string = "rule.log4shell"
 	WafRuleNameSpr4sh     string = "rule.spring4shell"
 )
 

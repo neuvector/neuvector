@@ -221,23 +221,23 @@ func workload2EndpointREST(cache *workloadCache, withChildren bool) *api.RESTCon
 }
 
 // For internal use, only needed fields are assigned
-func workload2Filter(cache *workloadCache) *common.WorkloadFilter {
+func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
 	wl := cache.workload
-	r := &common.WorkloadFilter{
+	r := &common.WorkloadRisk{
 		ID:           wl.ID,
-		PodName:      cache.podName,
+		Name:         cache.podName,
 		PlatformRole: cache.platformRole,
 		ImageID:      wl.ImageID,
 		Domain:       wl.Domain,
+		// When vul. profile updates, it will refresh all scanMap and workload/host cache.
+		// No refresh in this path, which is different from GetVulnerabilityReport().
+		VulTraits:        cache.vulTraits,
+		CustomBenchValue: cache.customBenchValue,
+		DockerBenchValue: cache.dockerBenchValue,
+		SecretBenchValue: cache.secretBenchValue,
+		SetidBenchValue:  cache.setidBenchValue,
 	}
-	//when getNetServiceStatus() is true, policymode
-	//is global so we use per group level profile mode
-	polmode, profmode := getWorkloadPolicyMode(cache)
-	if getNetServiceStatus() {
-		r.PolicyMode = profmode
-	} else {
-		r.PolicyMode = polmode
-	}
+	r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 	return r
 }
 
@@ -271,12 +271,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		RunAsRoot:          wl.RunAsRoot,
 	}
 
-	//when getNetServiceStatus() is true, policymode
-	//is global so we use per group level profile mode
-	r.PolicyMode, r.ProfileMode = getWorkloadPolicyMode(cache)
-	if getNetServiceStatus() {
-		r.PolicyMode = r.ProfileMode
-	}
+	r.PolicyMode, r.ProfileMode = getWorkloadPerGroupPolicyMode(cache)
 	r.BaselineProfile = getWorkloadBaselineProfile(cache)
 
 	if cache.scanBrief == nil {

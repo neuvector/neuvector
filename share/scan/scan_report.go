@@ -90,33 +90,10 @@ func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) 
 		InBaseImage:    vul.InBase,
 	}
 
-	// Fill verbose vulnerability info, new scanner should return DBKey for each cve,
-	// so the guess work based on baseOS is only needed for short-term compatibility
-	var filled bool
+	// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
 	if vul.DBKey != "" {
 		if vr, ok := cvedb[vul.DBKey]; ok {
 			fillVulFields(vr, v)
-			filled = true
-		}
-	}
-
-	if !filled {
-		baseOS = normalizeBaseOS(baseOS)
-
-		key := fmt.Sprintf("%s:%s", baseOS, v.Name)
-		if vr, ok := cvedb[key]; ok {
-			fillVulFields(vr, v)
-		} else {
-			// lookup apps
-			key = fmt.Sprintf("apps:%s", v.Name)
-			if vr, ok := cvedb[key]; ok {
-				fillVulFields(vr, v)
-			} else {
-				// fix metadata
-				if vr, ok := cvedb[v.Name]; ok {
-					fillVulFields(vr, v)
-				}
-			}
 		}
 	}
 
@@ -358,26 +335,7 @@ func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {
 	}
 }
 
-// cvedb lookup now uses DBKey in each vulnerability entry.
-// This function is kept for short-term compatibility.
-// No need to update!!
-func normalizeBaseOS(baseOS string) string {
-	if a := strings.Index(baseOS, ":"); a > 0 {
-		baseOS = baseOS[:a]
-		if baseOS == "rhel" || baseOS == "server" {
-			baseOS = "centos"
-		} else if baseOS == "amzn" {
-			baseOS = "amazon"
-		} else if baseOS != "centos" && baseOS != "ubuntu" && baseOS != "debian" && baseOS != "alpine" {
-			baseOS = "upstream"
-		}
-	}
-	return baseOS
-}
-
-func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
-	baseOS = normalizeBaseOS(baseOS)
-
+func FillVulDetails(cvedb CVEDBType, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
 	vuls := make([]*api.RESTVulnerability, 0, len(vts))
 
 	for _, vt := range vts {
@@ -392,31 +350,9 @@ func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag str
 			FixedVersion:   vt.fixVer,
 		}
 
-		// Fill verbose vulnerability info, new scanner should return DBKey for each cve,
-		// so the guess work based on baseOS is only needed for short-term compatibility
-		var filled bool
-		if vt.dbKey != "" {
-			if vr, ok := cvedb[vt.dbKey]; ok {
-				fillVulFields(vr, vul)
-				filled = true
-			}
-		}
-
-		if !filled {
-			key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
-			if vr, ok := cvedb[key]; ok {
-				fillVulFields(vr, vul)
-			} else {
-				// lookup apps
-				key = fmt.Sprintf("apps:%s", vul.Name)
-				if vr, ok := cvedb[key]; ok {
-					fillVulFields(vr, vul)
-				} else {
-					if vr, ok := cvedb[vul.Name]; ok {
-						fillVulFields(vr, vul)
-					}
-				}
-			}
+		// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
+		if vr, ok := cvedb[vt.dbKey]; ok {
+			fillVulFields(vr, vul)
 		}
 
 		if vt.filtered {

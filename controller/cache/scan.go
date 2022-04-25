@@ -57,8 +57,8 @@ type scanInfo struct {
 	objType         share.ScanObjectType
 	version         string
 	cveDBCreateTime string
-	brief           *api.RESTScanBrief
-	vulTraits       []*scanUtils.VulTrait
+	brief           *api.RESTScanBrief    // Stats of filtered entries
+	vulTraits       []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
 	filteredTime    time.Time
 	idns            []api.RESTIDName
 }
@@ -371,10 +371,12 @@ func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
 	case share.ScanObjectType_CONTAINER:
 		if c := getWorkloadCache(id); c != nil {
 			c.scanBrief = brief
+			c.vulTraits = info.vulTraits
 		}
 	case share.ScanObjectType_HOST:
 		if c := getHostCache(id); c != nil {
 			c.scanBrief = brief
+			c.vulTraits = info.vulTraits
 		}
 	}
 }
@@ -467,10 +469,12 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		case share.ScanObjectType_CONTAINER:
 			if c := getWorkloadCache(id); c != nil {
 				c.scanBrief = brief
+				c.vulTraits = info.vulTraits
 			}
 		case share.ScanObjectType_HOST:
 			if c := getHostCache(id); c != nil {
 				c.scanBrief = brief
+				c.vulTraits = info.vulTraits
 			}
 		}
 	} else {
@@ -948,6 +952,8 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 func ScanUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	object := share.CLUSScanKey2Subject(key)
 	switch object {
+	case "bench":
+		benchStateHandler(nType, key, value)
 	case "report":
 		scanStateHandler(nType, key, value)
 	case "registry":
@@ -1129,7 +1135,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 
 		sdb := scanUtils.GetScannerDB()
-		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
+		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.vulTraits, showTag)
 		return vuls, nil
 	} else {
 		return nil, common.ErrObjectNotFound
