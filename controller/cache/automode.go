@@ -1,5 +1,6 @@
 package cache
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -40,27 +41,55 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 		}
 
 		var count int
-		var last *api.Incident
+		var incd_last *api.Incident
+		var vio_last *api.Violation
+		var thrt_last *api.Threat
 
 		// trace back to last probe duration - 10 seconds
 		traceback := time.Now().Unix() - probeDuration - 10
-		for i, incd := range incidentCache {
-			if i == curIncidentIndex {
-				break
-			}
 
+		// process incidents
+		for i := 0; i < curIncidentIndex; i++ {
+			incd := incidentCache[curIncidentIndex-i-1]
 			if incd == nil || incd.AggregationFrom < traceback {
 				continue
 			}
 
 			if incd.Group == group {
 				count++
-				last = incd
+				incd_last = incd
+			}
+		}
+
+		// suspicious threats
+		for i := 0; i < curThrtIndex; i++ {
+			thrt := thrtCache[curThrtIndex-i-1]
+			if thrt == nil || thrt.ReportedTimeStamp < traceback {
+				continue
+			}
+
+			if thrt.Group == group {
+				count++
+				thrt_last = thrt
+			}
+		}
+
+		// network violations
+		service := strings.TrimPrefix(group, "nv.")
+		for i := 0; i < curVioIndex; i++ {
+			vio := vioCache[curVioIndex-i-1]
+			if vio == nil || vio.ReportedTimeStamp < traceback {
+				continue
+			}
+
+			if vio.ServerService == service || vio.ClientService == service {
+				count++
+				vio_last = vio
 			}
 		}
 
 		if count > 0 {
-			log.WithFields(log.Fields{"incident": count, "group": group, "last": last}).Debug("ATMO:")
+			log.WithFields(log.Fields{"incident": count, "group": group, "incd_last": incd_last, "thrt_last": thrt_last, "vio_last": vio_last}).Debug("ATMO:")
 		}
 		return (count == 0), nil
 	}
@@ -75,6 +104,15 @@ func automode_test_func(mover int, group string, probeDuration time.Duration) (b
 		return automode_m2p_test_func(group, int64(probeDuration.Seconds()))
 	}
 	return false, common.ErrUnsupported
+}
+
+func automode_log_event(group, mode string) {
+	clog := share.CLUSEventLog{
+		Event:      share.CLUSEvGroupAutoPromote,
+		ReportedAt: time.Now().UTC(),
+	}
+	clog.Msg = fmt.Sprintf("Promote %s to %s.\n", group, mode)
+	cctx.EvQueue.Append(&clog)
 }
 
 func automode_promote_mode(group, mode string) error {
@@ -121,6 +159,8 @@ func automode_promote_mode(group, mode string) error {
 	}
 	log.WithFields(log.Fields{"group": group, "mode": mode}).Info("ATMO: upgraded")
 	clusHelper.PutGroup(grp, false)
+
+	automode_log_event(group, mode)
 	return nil
 }
 
