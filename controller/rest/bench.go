@@ -690,6 +690,47 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	}
 }
 
+func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfileFilter) *api.RESTBenchReport {
+	var r share.CLUSBenchReport
+
+	if len(value) == 0 {
+		return nil
+	} else {
+		uzb := utils.GunzipBytes(value)
+		if uzb == nil {
+			log.Error("Failed to unzip benchmark report")
+			return nil
+		}
+		if err := json.Unmarshal(uzb, &r); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to unmarshal report")
+			return nil
+		}
+	}
+
+	if r.Status != share.BenchStatusIdle && r.Status != share.BenchStatusFinished {
+		return nil
+	}
+
+	rpt := api.RESTBenchReport{
+		RunAtTimeStamp: r.RunAt.Unix(),
+		RunAt:          api.RESTTimeString(r.RunAt),
+		Version:        r.Version,
+		Items:          make([]*api.RESTBenchItem, 0),
+	}
+
+	// Add check tags
+	for _, item := range r.Items {
+		if ritem := bench2REST(bench, item, cpf); ritem != nil {
+			rpt.Items = append(rpt.Items, ritem)
+		}
+	}
+
+	rpt.Items = filterComplianceChecks(rpt.Items, cpf)
+
+	return &rpt
+
+}
+
 type compAsset struct {
 	Name        string
 	Catalog     string

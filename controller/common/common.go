@@ -7,14 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"sort"
 
-	log "github.com/sirupsen/logrus"
 	syslog "github.com/RackSec/srslog"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
@@ -35,14 +35,20 @@ type LocalDevice struct {
 }
 
 type WorkloadRisk struct {
-	ID           string
-	Name         string
-	ImageID      string
-	PlatformRole string
-	Domain       string
-	PolicyMode   string
-	VulTraits    []*scanUtils.VulTrait
-	Children     []*WorkloadRisk
+	ID               string
+	Name             string
+	ImageID          string
+	PlatformRole     string
+	Domain           string
+	PolicyMode       string
+	VulTraits        []*scanUtils.VulTrait
+	Children         []*WorkloadRisk
+	CustomBenchValue []byte
+	DockerBenchValue []byte
+	MasterBenchValue []byte
+	WorkerBenchValue []byte
+	SecretBenchValue []byte
+	SetidBenchValue  []byte
 }
 
 type RPCEndpoint struct {

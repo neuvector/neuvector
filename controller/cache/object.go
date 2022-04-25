@@ -231,7 +231,11 @@ func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
 		Domain:       wl.Domain,
 		// When vul. profile updates, it will refresh all scanMap and workload/host cache.
 		// No refresh in this path, which is different from GetVulnerabilityReport().
-		VulTraits: cache.vulTraits,
+		VulTraits:        cache.vulTraits,
+		CustomBenchValue: cache.customBenchValue,
+		DockerBenchValue: cache.dockerBenchValue,
+		SecretBenchValue: cache.secretBenchValue,
+		SetidBenchValue:  cache.setidBenchValue,
 	}
 	r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 	return r

@@ -1084,9 +1084,10 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 		}
 	}
 
+	now := time.Now().UTC()
 	report := share.CLUSBenchReport{
 		Status: status,
-		RunAt:  time.Now().UTC(),
+		RunAt:  now,
 		Items:  checks,
 	}
 
@@ -1105,6 +1106,18 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+
+	// Notify bench scan changed.
+	if len(checks) > 0 {
+		switch bench {
+		case share.BenchDockerHost, share.BenchCustomHost:
+			key = share.CLUSBenchStateHostKey(id)
+		default:
+			key = share.CLUSBenchStateWorkloadKey(id)
+		}
+		value, _ = json.Marshal(&share.CLUSBenchState{RunAt: now})
+		cluster.PutBinary(key, value)
 	}
 }
 

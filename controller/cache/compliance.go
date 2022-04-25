@@ -433,3 +433,57 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 
 	return &api.RESTInternalSystemData{Metrics: &s, Ingress: ins, Egress: outs}
 }
+
+// ---
+
+func readBenchFromCluster(id string, bench share.BenchType) []byte {
+	key := share.CLUSBenchReportKey(id, bench)
+	if value, err := cluster.Get(key); err != nil || len(value) == 0 {
+		// not all bench type exist, for example custom check, so use INFO level debug
+		log.WithFields(log.Fields{"error": err, "key": key}).Info("Benchmark report not found")
+		return nil
+	} else {
+		return value
+	}
+}
+
+func benchStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
+	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
+
+	if nType == cluster.ClusterNotifyDelete {
+		return
+	}
+
+	id := share.CLUSScanStateKey2ID(key)
+	if share.CLUSScanStateKey2Type(key) == "host" {
+		if c := getHostCache(id); c != nil {
+			if v := readBenchFromCluster(id, share.BenchCustomHost); v != nil {
+				c.customBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchDockerHost); v != nil {
+				c.dockerBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchKubeMaster); v != nil {
+				c.masterBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchKubeWorker); v != nil {
+				c.workerBenchValue = v
+			}
+		}
+	} else {
+		if c := getWorkloadCache(id); c != nil {
+			if v := readBenchFromCluster(id, share.BenchCustomContainer); v != nil {
+				c.customBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchContainer); v != nil {
+				c.dockerBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchContainerSecret); v != nil {
+				c.secretBenchValue = v
+			}
+			if v := readBenchFromCluster(id, share.BenchContainerSetID); v != nil {
+				c.setidBenchValue = v
+			}
+		}
+	}
+}

@@ -952,6 +952,8 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 func ScanUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	object := share.CLUSScanKey2Subject(key)
 	switch object {
+	case "bench":
+		benchStateHandler(nType, key, value)
 	case "report":
 		scanStateHandler(nType, key, value)
 	case "registry":
