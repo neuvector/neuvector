@@ -2750,13 +2750,31 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	bCanBeLearned := true
 	if ppe.Action != share.PolicyActionViolate && p.bK8sGroupWithProbe(svcGroup) {
-		// allowing "kubctl exec ..."
-		var gpname string
+		// allowing "kubctl exec ...", adpot the binary path to resolve the name
+		gpname := ""
+		pname := proc.pname
+		if _, ppid, err := global.SYS.GetProcessName(proc.pid); err == nil {
+			// ppid could be updated, read it again
+			proc.ppid = ppid
+			if path, err := global.SYS.GetFilePath(ppid); err == nil { // exe path
+				pname = filepath.Base(path)
+			}
+		}
+
 		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
 			gpname = pproc.pname
 		}
 
-		bRuncChild := global.RT.IsRuntimeProcess(proc.pname, nil) || global.RT.IsRuntimeProcess(gpname, nil)
+		if len(gpname) < 2 { //  "" or "."
+			if _, gpid, err := global.SYS.GetProcessName(proc.ppid); err == nil {
+				if path, err := global.SYS.GetFilePath(gpid); err == nil { // exe path
+					gpname = filepath.Base(path)
+				}
+			}
+		}
+
+		// mLog.WithFields(log.Fields{"gpname": gpname, "pname": pname}).Debug("SHD:")
+		bRuncChild := global.RT.IsRuntimeProcess(pname, nil) || global.RT.IsRuntimeProcess(gpname, nil)
 		if bRuncChild {
 			bCanBeLearned = false
 			c.outsider.Remove(proc.pid)
