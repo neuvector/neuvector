@@ -116,7 +116,7 @@ var ocReaderVerbs utils.Set = utils.NewSet(
 var nvReadVerbs utils.Set = utils.NewSet("get")
 var nvWriteVerbs utils.Set = utils.NewSet("*")
 var nvPermissionRscs utils.Set
-var nvRscsMap map[string]utils.Set
+var nvRscsMap map[string]utils.Set // key is apiGroup, value is (permission) resources
 
 //Rancher SSO : (phase-2) custom roles. Pseudo role has name "custom_:[pseudo name]"
 //var nvPermissionIndex map[string]int // For rancher only: permission -> index in the pseudo role's [pseudo name]
@@ -791,9 +791,7 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 	} else {
 		n = res.(*k8sRole)
 		ref := k8sObjectRef{name: n.name, domain: n.domain}
-		if n.nvRole != "" {
-			d.roleCache[ref] = n.nvRole
-		}
+		d.roleCache[ref] = n.nvRole
 		log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole}).Debug("Update role")
 
 		// in case the clusterrole neuvector-binding-customresourcedefinition is recreated/updated(after nv 5.0 deployment)
