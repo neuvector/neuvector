@@ -418,7 +418,9 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			c.labels = report.Labels
 			c.cmds = report.Cmds
 			c.modules = report.Modules
-			c.secrets = report.Secrets.Logs
+			if report.Secrets != nil {
+				c.secrets = report.Secrets.Logs
+			}
 			c.setIDPerm = report.SetIdPerms
 
 			c.layers = make([]string, len(report.Layers))
