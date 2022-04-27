@@ -71,6 +71,10 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 		if domain == "" {
 			domain = api.DomainImages
 		}
+	} else if idns, ok := cpf.object.([]api.RESTIDName); ok {
+		if len(idns) > 0 && len(idns[0].Domains) > 0 {
+			domain = idns[0].Domains[0]
+		}
 	} else {
 		domain = api.DomainNodes
 	}

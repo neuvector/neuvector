@@ -71,7 +71,7 @@ func GetScannerDB() *share.CLUSScannerDB {
 }
 
 // Functions can be used in both controllers and scanner
-func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) *api.RESTVulnerability {
+func ScanVul2REST(cvedb CVEDBType, vul *share.ScanVulnerability) *api.RESTVulnerability {
 	v := &api.RESTVulnerability{
 		Name:           vul.Name,
 		Score:          vul.Score,
@@ -152,6 +152,88 @@ func GetSecretBenchMessage(stype, loc, evidence string) string {
 	return fmt.Sprintf("File %s contains %s: %s", loc, stype, evidence)
 }
 
+func ImageBench2REST(cmds []string, secrets []*share.ScanSecretLog, setids []*share.ScanSetIdPermLog, tagMap map[string][]string) []*api.RESTBenchItem {
+	_, metaMap := GetComplianceMeta()
+	runAsRoot, hasADD, hasHEALTHCHECK := ParseImageCmds(cmds)
+
+	checks := make([]*api.RESTBenchItem, 0)
+	if runAsRoot {
+		if c, ok := metaMap["I.4.1"]; ok {
+			item := &api.RESTBenchItem{
+				RESTBenchCheck: c.RESTBenchCheck,
+				Level:          "WARN",
+				Message:        []string{},
+			}
+			checks = append(checks, item)
+		}
+	}
+	if hasADD {
+		if c, ok := metaMap["I.4.9"]; ok {
+			item := &api.RESTBenchItem{
+				RESTBenchCheck: c.RESTBenchCheck,
+				Level:          "WARN",
+				Message:        []string{},
+			}
+			checks = append(checks, item)
+		}
+	}
+	if !hasHEALTHCHECK {
+		if c, ok := metaMap["I.4.6"]; ok {
+			item := &api.RESTBenchItem{
+				RESTBenchCheck: c.RESTBenchCheck,
+				Level:          "WARN",
+				Message:        []string{},
+			}
+			checks = append(checks, item)
+		}
+	}
+	if len(secrets) > 0 {
+		if c, ok := metaMap["I.4.10"]; ok {
+			for _, s := range secrets {
+				item := &api.RESTBenchItem{
+					RESTBenchCheck: c.RESTBenchCheck,
+					Level:          "WARN",
+					Location:       s.File,
+					Evidence:       s.Text,
+					Message:        []string{GetSecretBenchMessage(s.Type, s.File, s.Text)},
+				}
+				item.Remediation = s.Suggestion
+				item.Description = fmt.Sprintf("%s - %s", item.Description, item.Message[0])
+				checks = append(checks, item)
+			}
+		}
+	}
+	if len(setids) > 0 {
+		if c, ok := metaMap["I.4.8"]; ok {
+			for _, s := range setids {
+				item := &api.RESTBenchItem{
+					RESTBenchCheck: c.RESTBenchCheck,
+					Level:          "WARN",
+					Location:       s.File,
+					Evidence:       s.Evidence,
+					Message:        []string{GetSetIDBenchMessage(s.Type, s.File, s.Evidence)},
+				}
+				item.Description = fmt.Sprintf("%s - %s", item.Description, item.Message[0])
+				checks = append(checks, item)
+			}
+		}
+	}
+
+	// add tags to every checks
+	for _, item := range checks {
+		if tagMap == nil {
+			item.Tags = make([]string, 0)
+		} else if tags, ok := tagMap[item.TestNum]; !ok {
+			item.Tags = make([]string, 0)
+		} else {
+			item.Tags = tags
+		}
+	}
+
+	return checks
+}
+
+/*
 func ImageBench2REST(cmds []string, secrets []*api.RESTScanSecret, setids []*api.RESTScanSetIdPerm, tagMap map[string][]string) []*api.RESTBenchItem {
 	_, metaMap := GetComplianceMeta()
 	runAsRoot, hasADD, hasHEALTHCHECK := ParseImageCmds(cmds)
@@ -232,13 +314,14 @@ func ImageBench2REST(cmds []string, secrets []*api.RESTScanSecret, setids []*api
 
 	return checks
 }
+*/
 
 func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *api.RESTScanRepoReport {
 	sdb := GetScannerDB()
 
 	rvuls := make([]*api.RESTVulnerability, len(result.Vuls))
 	for i, vul := range result.Vuls {
-		rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
+		rvuls[i] = ScanVul2REST(sdb.CVEDB, vul)
 	}
 	rmods := make([]*api.RESTScanModule, len(result.Modules))
 	for i, m := range result.Modules {
@@ -261,7 +344,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 	for j, layer := range result.Layers {
 		rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 		for i, vul := range layer.Vuls {
-			rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
+			rvuls[i] = ScanVul2REST(sdb.CVEDB, vul)
 		}
 		/*
 			var rsrts []*api.RESTScanSecret
@@ -277,7 +360,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		layers[j] = &api.RESTScanLayer{Digest: layer.Digest, Cmds: layer.Cmds, Vuls: rvuls, Size: layer.Size}
 	}
 
-	checks := ImageBench2REST(result.Cmds, rsecrets, ridperms, tagMap)
+	checks := ImageBench2REST(result.Cmds, result.Secrets.Logs, result.SetIdPerms, tagMap)
 
 	return &api.RESTScanRepoReport{
 		CVEDBVersion:    result.Version,
