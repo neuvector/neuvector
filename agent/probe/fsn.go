@@ -3,6 +3,7 @@ package probe
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -618,6 +619,16 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.S
 
 	/// image layer (init)
 	initPath := rootPath + "-init"
+	if _, err := os.Stat(filepath.Join("/proc/1/root", initPath)); os.IsNotExist(err) {
+		path := strings.TrimSuffix(rootPath, "/")	// remove appending "/" if it exists
+		subvol := filepath.Base(path)
+		path = filepath.Dir(path)
+		if imageLayer, err := fsn.lookupBtrfsLayerFile(path, subvol); err == nil {
+			initPath = filepath.Join(path, imageLayer)
+		}
+		// log.WithFields(log.Fields{"path": initPath, "subvol": subvol}).Debug("FSN:")
+	}
+
 	req = workerlet.WalkPathRequest{
 		Pid:  1,
 		Path: strings.TrimPrefix(initPath, hostRootMountPoint),
@@ -674,4 +685,31 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.S
 	}
 	log.WithFields(log.Fields{"path": rootPath, "fCount": len(files), "dCount": dirs.Cardinality(), "error": err}).Debug("FSN:")
 	return dirs, files
+}
+
+///////////////////////
+type BtrfsLayerData struct {
+	ID      string     `json:"id"`
+	Parent  string     `json:"parent"`
+	Names    []string  `json:"names"`
+	Created time.Time  `json:"created"`
+}
+
+func (fsn *FileNotificationCtr) lookupBtrfsLayerFile(rootPath, sublayer string) (string, error) {
+	// go up 2 layers, then find the "layers.json"
+	file := filepath.Join("/proc/1/root", filepath.Dir(filepath.Dir(rootPath)), "btrfs-layers", "layers.json")
+	value, err := ioutil.ReadFile(file)
+	if err == nil {
+		var layers []BtrfsLayerData
+		if err = json.Unmarshal(value, &layers); err == nil {
+			for _, layer := range layers {
+				// log.WithFields(log.Fields{"layer": layer}).Debug("FSN:")
+				if layer.ID  == sublayer {
+					return layer.Parent, nil
+				}
+			}
+		}
+	}
+	log.WithFields(log.Fields{"error": err, "file": file}).Error("FSN:")
+	return "", err
 }
