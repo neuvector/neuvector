@@ -27,7 +27,8 @@ type ScanInterface interface {
 	GetAllRegistrySummary(acc *access.AccessControl) []*api.RESTRegistrySummary
 	GetRegistryImageSummary(name string, vpf scanUtils.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary
 	GetRegistryVulnerabilities(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error)
-	GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error)
+	GetRegistryBenches(name string, tagMap map[string][]string, acc *access.AccessControl) (map[string][]*api.RESTBenchItem, map[string][]api.RESTIDName, error)
+	GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error)
 	GetRegistryLayersReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error)
 	GetRegistryDebugImages(source string) []*api.RESTRegistryDebugImage
 	StartRegistry(name string) error
@@ -386,13 +387,13 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 	vmap := make(map[string][]*api.RESTVulnerability)
 	nmap := make(map[string][]api.RESTIDName)
 
+	sdb := scanUtils.GetScannerDB()
 	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
 		// To avoid authorize for every image - run faster.
 		for id, c := range rs.cache {
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				sdb := scanUtils.GetScannerDB()
 				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
 				nmap[id] = images2IDNames(rs, sum)
 			}
@@ -403,7 +404,6 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					sdb := scanUtils.GetScannerDB()
 					vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
 					nmap[id] = images2IDNames(rs, sum)
 				}
@@ -414,7 +414,48 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 	return vmap, nmap, nil
 }
 
-func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanReport, error) {
+func (m *scanMethod) GetRegistryBenches(name string, tagMap map[string][]string, acc *access.AccessControl) (map[string][]*api.RESTBenchItem, map[string][]api.RESTIDName, error) {
+	var rs *Registry
+	var ok bool
+
+	if name == registryRepoScanName {
+		rs = repoScanRegistry
+	} else if rs, ok = regMapLookup(name); !ok {
+		return nil, nil, common.ErrObjectNotFound
+	}
+
+	rs.stateLock()
+	defer rs.stateUnlock()
+	if !acc.Authorize(rs.config, nil) {
+		return nil, nil, common.ErrObjectAccessDenied
+	}
+
+	cmap := make(map[string][]*api.RESTBenchItem)
+	nmap := make(map[string][]api.RESTIDName)
+
+	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
+		// To avoid authorize for every image - run faster.
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
+				cmap[id] = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
+				nmap[id] = images2IDNames(rs, sum)
+			}
+		}
+	} else {
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
+				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
+					cmap[id] = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
+					nmap[id] = images2IDNames(rs, sum)
+				}
+			}
+		}
+	}
+
+	return cmap, nmap, nil
+}
+
+func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
 	var rs *Registry
 	var ok bool
 
@@ -439,56 +480,41 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 		return nil, common.ErrObjectAccessDenied
 	}
 
-	key := share.CLUSRegistryImageDataKey(name, id)
-	if report := clusHelper.GetScanReport(key); report == nil {
-		return nil, common.ErrObjectNotFound
-	} else {
-		sdb := scanUtils.GetScannerDB()
-		idns := images2IDNames(rs, sum)
+	var rrpt api.RESTScanReport
 
-		var rvuls []*api.RESTVulnerability
-		if vpf != nil {
-			if c, ok := rs.cache[id]; ok {
-				refreshScanCache(rs, id, sum, c, vpf)
-				rvuls = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
-			} else {
-				rvuls = make([]*api.RESTVulnerability, len(report.Vuls))
-				for i, vul := range report.Vuls {
-					rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
+	if vpf != nil {
+		if c, ok := rs.cache[id]; ok {
+			sdb := scanUtils.GetScannerDB()
+
+			rrpt.Envs = c.envs
+			rrpt.Labels = c.labels
+			rrpt.Cmds = c.cmds
+
+			refreshScanCache(rs, id, sum, c, vpf)
+			rrpt.Vuls = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
+			// The checks are still to be filtered
+			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
+
+			rrpt.Secrets = make([]*api.RESTScanSecret, 0)
+			if !rs.config.DisableFiles && c.secrets != nil {
+				for _, s := range c.secrets {
+					rrpt.Secrets = append(rrpt.Secrets, scanUtils.ScanSecrets2REST(s))
 				}
-				rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
+			}
+
+			rrpt.SetIDs = make([]*api.RESTScanSetIdPerm, 0)
+			for _, p := range c.setIDPerm {
+				rrpt.SetIDs = append(rrpt.SetIDs, scanUtils.ScanSetIdPerm2REST(p))
+			}
+
+			rrpt.Modules = make([]*api.RESTScanModule, len(c.modules))
+			for i, m := range c.modules {
+				rrpt.Modules[i] = scanUtils.ScanModule2REST(m)
 			}
 		}
-
-		rmods := make([]*api.RESTScanModule, len(report.Modules))
-		for i, m := range report.Modules {
-			rmods[i] = scanUtils.ScanModule2REST(m)
-		}
-
-		var rsecrets []*api.RESTScanSecret
-		if !rs.config.DisableFiles && report.Secrets != nil {
-			rsecrets = make([]*api.RESTScanSecret, 0)
-			for _, s := range report.Secrets.Logs {
-				rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
-			}
-		}
-
-		ridperms := make([]*api.RESTScanSetIdPerm, len(report.SetIdPerms))
-		for i, p := range report.SetIdPerms {
-			ridperms[i] = scanUtils.ScanSetIdPerm2REST(p)
-		}
-
-		rrpt := &api.RESTScanReport{
-			Vuls:    rvuls,
-			Modules: rmods,
-			Secrets: rsecrets,
-			SetIDs:  ridperms,
-			Envs:    report.Envs,
-			Labels:  report.Labels,
-			Cmds:    report.Cmds,
-		}
-		return rrpt, nil
 	}
+
+	return &rrpt, nil
 }
 
 func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (*api.RESTScanLayersReport, error) {
@@ -528,7 +554,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			// Because cache doesn't save vul. trait of layers, we have to filtered them every time.
 			rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 			for i, vul := range layer.Vuls {
-				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
+				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, vul)
 			}
 			rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
 

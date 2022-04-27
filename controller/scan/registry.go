@@ -58,9 +58,11 @@ type imageInfoCache struct {
 	lowVulInfo      []share.CLUSScannedVulInfoSimple
 	layers          []string
 	envs            []string
+	cmds            []string
 	labels          map[string]string
-	secrets         []share.ScanSecretLog
-	setIDPerm       []share.ScanSetIdPermLog
+	modules         []*share.ScanModule
+	secrets         []*share.ScanSecretLog
+	setIDPerm       []*share.ScanSetIdPermLog
 	filteredTime    time.Time
 }
 
@@ -414,20 +416,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			c.medVuls = len(meds)
 			c.envs = report.Envs
 			c.labels = report.Labels
+			c.cmds = report.Cmds
+			c.modules = report.Modules
+			c.secrets = report.Secrets.Logs
+			c.setIDPerm = report.SetIdPerms
 
 			c.layers = make([]string, len(report.Layers))
 			for i, l := range report.Layers {
 				c.layers[i] = l.Digest
-			}
-			if report.Secrets != nil {
-				c.secrets = make([]share.ScanSecretLog, len(report.Secrets.Logs))
-				for i, s := range report.Secrets.Logs {
-					c.secrets[i] = *s
-				}
-			}
-			c.setIDPerm = make([]share.ScanSetIdPermLog, len(report.SetIdPerms))
-			for i, s := range report.SetIdPerms {
-				c.setIDPerm[i] = *s
 			}
 		}
 	}

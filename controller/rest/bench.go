@@ -815,7 +815,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
 			cpf.object = wl
-			if rpt, _, _ := getCISReportFromCluster(share.BenchCustomContainer, wl.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchCustomContainer, wl.CustomBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						va := addCompAsset(all, item)
@@ -829,7 +829,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				}
 			}
 
-			if rpt, _, _ := getCISReportFromCluster(share.BenchContainer, wl.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchContainer, wl.DockerBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						va := addCompAsset(all, item)
@@ -843,7 +843,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				}
 			}
 
-			if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSecret, wl.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchContainerSecret, wl.SecretBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						va := addCompAsset(all, item)
@@ -857,7 +857,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				}
 			}
 
-			if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSetID, wl.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchContainerSetID, wl.SetidBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						va := addCompAsset(all, item)
@@ -874,10 +874,10 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	if acc.HasGlobalPermissions(share.PERMS_COMPLIANCE, 0) {
-		nodes := cacher.GetAllHosts(acc)
+		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
 			cpf.object = n
-			if rpt, _, _ := getCISReportFromCluster(share.BenchCustomHost, n.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchCustomHost, n.CustomBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						ca := addCompAsset(all, item)
@@ -890,7 +890,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 					}
 				}
 			}
-			if rpt, _, _ := getCISReportFromCluster(share.BenchDockerHost, n.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchDockerHost, n.DockerBenchValue, cpf); rpt != nil {
 				dockerVers.Add(rpt.Version)
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
@@ -904,7 +904,21 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 					}
 				}
 			}
-			if rpt, _, _ := getKubeCISReportFromCluster(n.ID, cpf, acc); rpt != nil {
+			if rpt := decodeCISReport(share.BenchKubeMaster, n.MasterBenchValue, cpf); rpt != nil {
+				kubeVers.Add(rpt.Version)
+				for _, item := range rpt.Items {
+					if item.Level != "PASS" && item.Level != "NOTE" {
+						ca := addCompAsset(all, item)
+						ca.nodes = append(ca.nodes, api.RESTIDName{
+							ID:          n.ID,
+							DisplayName: n.Name,
+							PolicyMode:  n.PolicyMode,
+							Domains:     nil,
+						})
+					}
+				}
+			}
+			if rpt := decodeCISReport(share.BenchKubeWorker, n.WorkerBenchValue, cpf); rpt != nil {
 				kubeVers.Add(rpt.Version)
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
@@ -923,26 +937,24 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 
 	registries := scanner.GetAllRegistrySummary(acc)
 	for _, reg := range registries {
-		images := scanner.GetRegistryImageSummary(reg.Name, nil, acc)
-		for _, image := range images {
-			rpt, _ := scanner.GetRegistryImageReport(reg.Name, image.ImageID, nil, "", acc)
-			if rpt != nil {
-				cpf.object = image
-				checks := scanUtils.ImageBench2REST(rpt.Cmds, rpt.Secrets, rpt.SetIDs, cpf.filter)
-				checks = filterComplianceChecks(checks, cpf)
-				for _, item := range checks {
-					if item.Level != "PASS" && item.Level != "NOTE" {
-						ca := addCompAsset(all, item)
+		if cmap, nmap, err := scanner.GetRegistryBenches(reg.Name, cpf.filter, acc); err == nil {
+			for id, checks := range cmap {
+				if idns, ok := nmap[id]; ok {
+					cpf.object = idns
+					checks = filterComplianceChecks(checks, cpf)
+					for _, item := range checks {
+						if item.Level != "PASS" && item.Level != "NOTE" {
+							ca := addCompAsset(all, item)
 
-						// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
-						// Policy mode is empty if the image is not used.
-						pm, _ := img2mode[image.ImageID]
-						ca.images = append(ca.images, api.RESTIDName{
-							ID:          image.ImageID,
-							DisplayName: fmt.Sprintf("%s:%s", image.Repository, image.Tag),
-							PolicyMode:  pm,
-							Domains:     nil,
-						})
+							// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
+							// Policy mode is empty if the image is not used.
+							pm, _ := img2mode[id]
+							for i := 0; i < len(idns); i++ {
+								idns[i].PolicyMode = pm
+							}
+
+							ca.images = append(ca.images, idns...)
+						}
 					}
 				}
 			}

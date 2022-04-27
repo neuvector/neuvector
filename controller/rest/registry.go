@@ -857,12 +857,6 @@ func handlerRegistryImageReport(w http.ResponseWriter, r *http.Request, ps httpr
 
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 
-	rept, err := scanner.GetRegistryImageReport(name, id, vpf, showTag, acc)
-	if rept == nil {
-		restRespNotFoundLogAccessDenied(w, login, err)
-		return
-	}
-
 	// build image compliance list and filter the list
 	cpf := &complianceProfileFilter{filter: make(map[string][]string)}
 	if cp, filter, err := cacher.GetComplianceProfile(share.DefaultComplianceProfileName, access.NewReaderAccessControl()); err != nil {
@@ -873,8 +867,13 @@ func handlerRegistryImageReport(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 	}
 
-	checks := scanUtils.ImageBench2REST(rept.Cmds, rept.Secrets, rept.SetIDs, cpf.filter)
-	rept.Checks = filterComplianceChecks(checks, cpf)
+	rept, err := scanner.GetRegistryImageReport(name, id, vpf, showTag, cpf.filter, acc)
+	if rept == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	rept.Checks = filterComplianceChecks(rept.Checks, cpf)
 
 	resp := api.RESTScanReportData{Report: rept}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get registry image scan report")
