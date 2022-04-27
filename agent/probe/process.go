@@ -2732,7 +2732,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			bImageFile = false
 		}
 	} else {
-		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec {
+		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
 			bImageFile = false
 			if fi, ok := c.fInfo[ppe.Path]; ok {
 				bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
@@ -2751,30 +2751,46 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	bCanBeLearned := true
 	if ppe.Action != share.PolicyActionViolate && p.bK8sGroupWithProbe(svcGroup) {
 		// allowing "kubctl exec ...", adpot the binary path to resolve the name
-		gpname := ""
-		pname := proc.pname
-		if _, ppid, err := global.SYS.GetProcessName(proc.pid); err == nil {
-			// ppid could be updated, read it again
-			proc.ppid = ppid
-			if path, err := global.SYS.GetFilePath(ppid); err == nil { // exe path
-				pname = filepath.Base(path)
-			}
-		}
+		var bRuncChild bool
+		bRuncChild = global.RT.IsRuntimeProcess(proc.pname, nil)
+		if !bRuncChild {
+			pid := proc.pid
+			for i := 0; i < 4; i++ {	// upto 4 ancestors
+				// ppid could be updated, read it again
+				if _, ppid, err := global.SYS.GetProcessName(pid); err != nil || ppid <= 1 {
+					if i== 0 && err != nil {	// process left, pstree failed, trace back 8 entries, could be more restrictive
+						for j := 1; j <= 8; j++ {
+							ppid = proc.ppid - j
+							if pp, ok := p.pidProcMap[ppid]; ok && len(pp.name) > 1 {	// "" or "."
+								if c, ok := p.pidContainerMap[ppid]; ok && c.id == "" { // only node process
+									bRuncChild = global.RT.IsRuntimeProcess(pp.name, nil)
+									if bRuncChild {
+										mLog.WithFields(log.Fields{"pid": ppid, "name": pp.name}).Debug("SHD:")
+										break
+									}
+								}
+							}
+						}
+					}
+					break
+				} else {
+					var name string
+					if p, ok := p.pidProcMap[ppid]; ok && len(p.name) > 1 {	// "" or "."
+						name = p.name
+					} else if path, err := global.SYS.GetFilePath(ppid); err == nil { // exe path
+						name = filepath.Base(path)
+					}
 
-		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
-			gpname = pproc.pname
-		}
-
-		if len(gpname) < 2 { //  "" or "."
-			if _, gpid, err := global.SYS.GetProcessName(proc.ppid); err == nil {
-				if path, err := global.SYS.GetFilePath(gpid); err == nil { // exe path
-					gpname = filepath.Base(path)
+					bRuncChild = global.RT.IsRuntimeProcess(name, nil)
+					if bRuncChild {
+						mLog.WithFields(log.Fields{"ppid": ppid, "pname": name}).Debug("SHD:")
+						break
+					}
+					pid = ppid	// next ancestor
 				}
 			}
 		}
 
-		// mLog.WithFields(log.Fields{"gpname": gpname, "pname": pname}).Debug("SHD:")
-		bRuncChild := global.RT.IsRuntimeProcess(pname, nil) || global.RT.IsRuntimeProcess(gpname, nil)
 		if bRuncChild {
 			bCanBeLearned = false
 			c.outsider.Remove(proc.pid)
