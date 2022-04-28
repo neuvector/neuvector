@@ -964,6 +964,7 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 func groupRemoveEvent(ev share.TLogEvent, group string) {
 	clog := share.CLUSEventLog{
 		Event:      ev,
+		GroupName:  group,
 		ReportedAt: time.Now().UTC(),
 	}
 	clog.Msg = fmt.Sprintf("Auto remove unused group: %s and related network/response rules.\n", group)
@@ -1207,7 +1208,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
 		if localDev.Host.Platform == share.PlatformKubernetes {
-			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") {	// ignore POD
+			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") { // ignore POD
 				cacheMutexLock()
 				updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
 				cacheMutexUnlock()
