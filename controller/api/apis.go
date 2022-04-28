@@ -940,7 +940,7 @@ type RESTWorkloadRtAttribesV2 struct {
 type RESTWorkloadV2 struct {
 	WlBrief        RESTWorkloadBriefV2      `json:"brief"`
 	WlSecurity     RESTWorkloadSecurityV2   `json:"security"`
-	WlRtSttributes RESTWorkloadRtAttribesV2 `json:"rt_attributes"`
+	WlRtAttributes RESTWorkloadRtAttribesV2 `json:"rt_attributes"`
 	Children       []*RESTWorkloadV2        `json:"children"`
 	AgentID        string                   `json:"enforcer_id"`
 	AgentName      string                   `json:"enforcer_name"`

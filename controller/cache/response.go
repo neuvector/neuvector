@@ -17,17 +17,18 @@ import (
 )
 
 type eventDesc struct {
-	id       string
-	event    string
-	name     string
-	level    string
-	proc     string
-	cve_high int
-	cve_med  int
-	items    []string
-	vuls     utils.Set
-	arg      interface{}
-	noQuar   bool
+	id        string
+	event     string
+	name      string
+	groupName string
+	level     string
+	proc      string
+	cve_high  int
+	cve_med   int
+	items     []string
+	vuls      utils.Set
+	arg       interface{}
+	noQuar    bool
 }
 
 type actionDesc struct {
@@ -287,8 +288,14 @@ func lookup(desc *eventDesc) []actionDesc {
 					log.WithFields(log.Fields{"id": head.ID, "group": rule.Group}).Error("cannot find group")
 					continue
 				}
-				if !group.members.Contains(desc.id) { //-> TO CHECK ?
-					continue
+				if desc.name == api.EventNameGroupAutoRemove || desc.name == api.EventNameGroupAutoPromote { // they for groups, not for workloads
+					if desc.groupName != rule.Group {
+						continue
+					}
+				} else {
+					if !group.members.Contains(desc.id) { //-> TO CHECK ?
+						continue
+					}
 				}
 				//DLP threat, rule.Group belong to dlp group that triggers DLP threat?
 				if strings.HasPrefix(desc.name, common.DlpPrefix) && !checkGrpThreatDlpGrp(rule.Group, desc.arg) {
