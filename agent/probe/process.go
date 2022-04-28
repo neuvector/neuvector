@@ -2721,6 +2721,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		return true
 	}
 
+	if proc.pid == c.rootPid {
+		log.WithFields(log.Fields{"id": id, "rootPid": proc.pid}).Debug("SHD: rootPid")
+		return true
+	}
+
 	bNotImageButNewlyAdded := false
 	bImageFile = true
 	if global.SYS.IsNotContainerFile(c.rootPid, ppe.Path) {
@@ -2997,10 +3002,13 @@ func (p *Probe) UpdateFromAllowRule(id, path string) {
 	}
 	p.unlockProcMux()
 
+	path = strings.TrimPrefix(path, "/")
 	if finfo, ok := p.fsnCtr.IsNotExistingImageFile(id, path); ok {
+		// it is normal for file_not_exist because our process rules are pod-based
+		// this rule could apply to any containers in this pod.
 		// the file is not in the image file
 		if finfo.fileType == file_not_exist {
-			mLog.WithFields(log.Fields{"id": id, "path": path, "finfo": finfo}).Debug("FSN: not image file")
+			// mLog.WithFields(log.Fields{"id": id, "path": path, "finfo": finfo}).Debug("FSN: not image file")
 			p.lockProcMux()
 			if c, ok := p.containerMap[id]; ok {
 				c.fInfo[path] = finfo
