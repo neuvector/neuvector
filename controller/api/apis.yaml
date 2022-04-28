@@ -9,7 +9,6 @@ info:
   title: NeuVector API
   contact:
     email: support@neuvector.com
-basePath: /v1
 schemes:
   - https
 externalDocs:
@@ -70,14 +69,14 @@ tags:
     description: Operations about Vulnerability management
   - name: WAF Rule
     description: Operations about waf Rule
-  - name: Workload
-    description: Operations about Workload
+  - name: Container
+    description: Operations about Container
 
 ################################################################################
 #                                  Paths                                       #
 ################################################################################
 paths:
-  /admission/options:
+  /v1/admission/options:
     get:
       tags:
         - Admission
@@ -94,7 +93,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAdmissionConfigData'
-  /admission/rule/{id}:
+  /v1/admission/rule/{id}:
     get:
       tags:
         - Admission
@@ -133,7 +132,7 @@ paths:
       responses:
         '200':
           description: Success
-  /admission/rule:
+  /v1/admission/rule:
     post:
       tags:
         - Admission
@@ -176,7 +175,7 @@ paths:
       responses:
         '200':
           description: Success
-  /admission/rule/promote:
+  /v1/admission/rule/promote:
     post:
       tags:
         - Admission
@@ -197,7 +196,7 @@ paths:
       responses:
         '200':
           description: Success
-  /admission/rules:
+  /v1/admission/rules:
     get:
       tags:
         - Admission
@@ -242,7 +241,7 @@ paths:
       responses:
         '200':
           description: Success
-  /admission/state:
+  /v1/admission/state:
     get:
       tags:
         - Admission
@@ -287,7 +286,7 @@ paths:
           description: Operation not allowed
           schema:
             $ref: '#/definitions/RESTError'
-  /admission/stats:
+  /v1/admission/stats:
     get:
       tags:
         - Admission
@@ -304,7 +303,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAdmissionStatsData'
-  /assess/admission/rule:
+  /v1/assess/admission/rule:
     post:
       tags:
         - Admission
@@ -327,7 +326,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAdmCtrlRulesTestResults'
-  /auth:
+  /v1/auth:
     post:
       tags:
         - Authentication
@@ -380,7 +379,7 @@ paths:
           description: Authentication failed
           schema:
             $ref: '#/definitions/RESTError'
-  /auth/{server}:
+  /v1/auth/{server}:
     post:
       tags:
         - Authentication
@@ -406,7 +405,7 @@ paths:
       responses:
         '200':
           description: Success
-  /bench/host/{id}/docker:
+  /v1/bench/host/{id}/docker:
     get:
       tags:
         - Compliance
@@ -445,7 +444,7 @@ paths:
       responses:
         '200':
           description: Success
-  /bench/host/{id}/kubernetes:
+  /v1/bench/host/{id}/kubernetes:
     get:
       tags:
         - Compliance
@@ -484,7 +483,7 @@ paths:
       responses:
         '200':
           description: Success
-  /compliance/profile:
+  /v1/compliance/profile:
     get:
       tags:
         - Compliance
@@ -501,7 +500,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTComplianceProfilesData'
-  /compliance/profile/{name}:
+  /v1/compliance/profile/{name}:
     get:
       tags:
         - Compliance
@@ -548,7 +547,7 @@ paths:
       responses:
         '200':
           description: Success
-  /compliance/profile/{name}/entry/{check}:
+  /v1/compliance/profile/{name}/entry/{check}:
     patch:
       tags:
         - Compliance
@@ -601,7 +600,7 @@ paths:
       responses:
         '200':
           description: Success
-  /controller:
+  /v1/controller:
     get:
       tags:
         - Controller
@@ -618,7 +617,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTController'
-  /controller/{id}:
+  /v1/controller/{id}:
     get:
       tags:
         - Controller
@@ -665,7 +664,7 @@ paths:
       responses:
         '200':
           description: Success
-  /controller/{id}/stats:
+  /v1/controller/{id}/stats:
     get:
       tags:
         - Controller
@@ -687,7 +686,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadStatsData'
-  /controller/{id}/config:
+  /v1/controller/{id}/config:
     get:
       tags:
         - Controller
@@ -709,7 +708,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTControllerConfigData'
-  /custom_check:
+  /v1/custom_check:
     get:
       tags:
         - Compliance
@@ -726,7 +725,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTCustomCheckListData'
-  /custom_check/{group}:
+  /v1/custom_check/{group}:
     get:
       tags:
         - Compliance
@@ -773,7 +772,7 @@ paths:
       responses:
         '200':
           description: Success
-  /dlp/sensor:
+  /v1/dlp/sensor:
     get:
       tags:
         - DLP
@@ -810,7 +809,7 @@ paths:
       responses:
         '200':
           description: Success
-  /dlp/sensor/{name}:
+  /v1/dlp/sensor/{name}:
     get:
       tags:
         - DLP
@@ -874,7 +873,7 @@ paths:
       responses:
         '200':
           description: Success
-  /dlp/group:
+  /v1/dlp/group:
     get:
       tags:
         - DLP
@@ -891,7 +890,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTDlpGroupsData'
-  /dlp/group/{name}:
+  /v1/dlp/group/{name}:
     get:
       tags:
         - DLP
@@ -938,7 +937,7 @@ paths:
       responses:
         '200':
           description: Success
-  /dlp/rule:
+  /v1/dlp/rule:
     get:
       tags:
         - DLP
@@ -955,7 +954,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTDlpRulesData'
-  /dlp/rule/{name}:
+  /v1/dlp/rule/{name}:
     get:
       tags:
         - DLP
@@ -977,7 +976,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTDlpRuleData'
-  /domain:
+  /v1/domain:
     get:
       tags:
         - Namespace
@@ -1014,7 +1013,7 @@ paths:
       responses:
         '200':
           description: Success
-  /domain/{name}:
+  /v1/domain/{name}:
     patch:
       tags:
         - Namespace
@@ -1040,7 +1039,7 @@ paths:
       responses:
         '200':
           description: Success
-  /enforcer:
+  /v1/enforcer:
     get:
       tags:
         - Enforcer
@@ -1057,7 +1056,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAgentsData'
-  /enforcer/{id}:
+  /v1/enforcer/{id}:
     get:
       tags:
         - Enforcer
@@ -1104,7 +1103,7 @@ paths:
       responses:
         '200':
           description: Success
-  /enforcer/{id}/stats:
+  /v1/enforcer/{id}/stats:
     get:
       tags:
         - Enforcer
@@ -1126,7 +1125,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAgentStatsData'
-  /enforcer/{id}/config:
+  /v1/enforcer/{id}/config:
     get:
       tags:
         - Enforcer
@@ -1148,7 +1147,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAgentConfigData'
-  /eula:
+  /v1/eula:
     get:
       tags:
         - EULA
@@ -1185,7 +1184,7 @@ paths:
       responses:
         '200':
           description: Success
-  /file/admission:
+  /v1/file/admission:
     post:
       tags:
         - File
@@ -1213,7 +1212,7 @@ paths:
       responses:
         '200':
           description: Success. Get a yaml file.
-  /file/admission/config:
+  /v1/file/admission/config:
     post:
       tags:
         - File
@@ -1240,7 +1239,7 @@ paths:
       responses:
         '200':
           description: Success
-  /file/config:
+  /v1/file/config:
     get:
       tags:
         - File
@@ -1277,7 +1276,7 @@ paths:
       responses:
         '200':
           description: Success. Upload a configure file.
-  /file/dlp:
+  /v1/file/dlp:
     post:
       tags:
         - File
@@ -1305,7 +1304,7 @@ paths:
       responses:
         '200':
           description: Success. Get a yaml file.
-  /file/dlp/config:
+  /v1/file/dlp/config:
     post:
       tags:
         - File
@@ -1332,7 +1331,7 @@ paths:
       responses:
         '200':
           description: Success
-  /file/waf:
+  /v1/file/waf:
     post:
       tags:
         - File
@@ -1360,7 +1359,7 @@ paths:
       responses:
         '200':
           description: Success. Get a yaml file.
-  /file/waf/config:
+  /v1/file/waf/config:
     post:
       tags:
         - File
@@ -1387,7 +1386,7 @@ paths:
       responses:
         '200':
           description: Success
-  /file/group:
+  /v1/file/group:
     get:
       tags:
         - File
@@ -1428,7 +1427,7 @@ paths:
       responses:
         '200':
           description: Success. Get a yaml file.
-  /file/group/config:
+  /v1/file/group/config:
     get:
       tags:
         - File
@@ -1478,7 +1477,7 @@ paths:
       responses:
         '200':
           description: Success
-  /file_monitor:
+  /v1/file_monitor:
     get:
       tags:
         - File Monitor
@@ -1503,7 +1502,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTFileMonitorFileData'
-  /file_monitor/{name}:
+  /v1/file_monitor/{name}:
     get:
       tags:
         - File Monitor
@@ -1550,7 +1549,7 @@ paths:
       responses:
         '200':
           description: Success
-  /group:
+  /v1/group:
     get:
       tags:
         - Group
@@ -1599,7 +1598,7 @@ paths:
           description: Error
           schema:
             $ref: '#/definitions/RESTError'
-  /group/{name}:
+  /v1/group/{name}:
     get:
       tags:
         - Group
@@ -1663,7 +1662,7 @@ paths:
       responses:
         '200':
           description: Success
-  /host:
+  /v1/host:
     get:
       tags:
         - Host
@@ -1680,7 +1679,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTHostsData'
-  /host/{id}:
+  /v1/host/{id}:
     get:
       tags:
         - Host
@@ -1702,7 +1701,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTHostData'
-  /host/{id}/compliance:
+  /v1/host/{id}/compliance:
     get:
       tags:
         - Host
@@ -1724,7 +1723,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTComplianceData'
-  /log/activity:
+  /v1/log/activity:
     get:
       tags:
         - Log
@@ -1741,7 +1740,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTEventsData'
-  /log/audit:
+  /v1/log/audit:
     get:
       tags:
         - Log
@@ -1758,7 +1757,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTAuditsData'
-  /log/event:
+  /v1/log/event:
     get:
       tags:
         - Log
@@ -1775,7 +1774,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTEventsData'
-  /log/incident:
+  /v1/log/incident:
     get:
       tags:
         - Log
@@ -1792,7 +1791,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTIncidentsData'
-  /log/threat:
+  /v1/log/threat:
     get:
       tags:
         - Log
@@ -1809,7 +1808,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTThreatsData'
-  /log/threat/{id}:
+  /v1/log/threat/{id}:
     get:
       tags:
         - Log
@@ -1831,7 +1830,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTThreatData'
-  /log/violation:
+  /v1/log/violation:
     get:
       tags:
         - Log
@@ -1848,7 +1847,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTPolicyViolationsData'
-  /log/violation/workload:
+  /v1/log/violation/workload:
     get:
       tags:
         - Log
@@ -1865,7 +1864,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTPolicyViolationsWLData'
-  /log/security:
+  /v1/log/security:
     get:
       tags:
         - Log
@@ -1882,7 +1881,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTSecurityData'
-  /password_profile:
+  /v1/password_profile:
     get:
       tags:
         - User
@@ -1899,7 +1898,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTPwdProfilesData'
-  /password_profile/{name}:
+  /v1/password_profile/{name}:
     get:
       tags:
         - User
@@ -1946,7 +1945,7 @@ paths:
       responses:
         '200':
           description: Success
-  /policy/rule:
+  /v1/policy/rule:
     get:
       tags:
         - Policy
@@ -2019,7 +2018,7 @@ paths:
       responses:
         '200':
           description: Success
-  /policy/rule/{id}:
+  /v1/policy/rule/{id}:
     get:
       tags:
         - Policy
@@ -2094,7 +2093,7 @@ paths:
       responses:
         '200':
           description: Success
-  /policy/rules/promote:
+  /v1/policy/rules/promote:
     post:
       tags:
         - Policy
@@ -2115,7 +2114,7 @@ paths:
       responses:
         '200':
           description: Success
-  /process_profile:
+  /v1/process_profile:
     get:
       tags:
         - Process
@@ -2140,7 +2139,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTProcessProfilesData'
-  /process_profile/{name}:
+  /v1/process_profile/{name}:
     get:
       tags:
         - Process
@@ -2187,7 +2186,7 @@ paths:
       responses:
         '200':
           description: Success
-  /process_rules/{uuid}:
+  /v1/process_rules/{uuid}:
     get:
       tags:
         - Process
@@ -2209,7 +2208,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTProcessRulesResp'
-  /response/rule:
+  /v1/response/rule:
     get:
       tags:
         - Response Rule
@@ -2274,7 +2273,7 @@ paths:
       responses:
         '200':
           description: Success
-  /response/rule/{id}:
+  /v1/response/rule/{id}:
     get:
       tags:
         - Response Rule
@@ -2338,7 +2337,7 @@ paths:
       responses:
         '200':
           description: Success
-  /response/workload_rules/{id}:
+  /v1/response/workload_rules/{id}:
     get:
       tags:
         - Response Rule
@@ -2360,7 +2359,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTResponseRulesData'
-  /scan/scanner:
+  /v1/scan/scanner:
     get:
       tags:
         - Scan
@@ -2377,7 +2376,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScannerData'
-  /scan/config:
+  /v1/scan/config:
     get:
       tags:
         - Scan
@@ -2414,7 +2413,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/host/{id}:
+  /v1/scan/host/{id}:
     get:
       tags:
         - Scan
@@ -2455,7 +2454,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/image:
+  /v1/scan/image:
     get:
       tags:
         - Scan
@@ -2472,7 +2471,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanImageSummaryData'
-  /scan/image/{id}:
+  /v1/scan/image/{id}:
     get:
       tags:
         - Scan
@@ -2494,7 +2493,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanReportData'
-  /scan/platform:
+  /v1/scan/platform:
     get:
       tags:
         - Scan
@@ -2511,7 +2510,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanPlatformSummaryData'
-  /scan/platform/platform:
+  /v1/scan/platform/platform:
     get:
       tags:
         - Scan
@@ -2540,7 +2539,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/registry:
+  /v1/scan/registry:
     get:
       tags:
         - Scan
@@ -2577,7 +2576,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/registry/{name}:
+  /v1/scan/registry/{name}:
     get:
       tags:
         - Scan
@@ -2641,7 +2640,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/registry/{name}/images:
+  /v1/scan/registry/{name}/images:
     get:
       tags:
         - Scan
@@ -2663,7 +2662,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTRegistryImageSummaryData'
-  /scan/registry/{name}/image/{id}:
+  /v1/scan/registry/{name}/image/{id}:
     get:
       tags:
         - Scan
@@ -2690,7 +2689,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanReportData'
-  /scan/registry/{name}/layers/{id}:
+  /v1/scan/registry/{name}/layers/{id}:
     get:
       tags:
         - Scan
@@ -2717,7 +2716,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanLayersReportData'
-  /scan/registry/{name}/scan:
+  /v1/scan/registry/{name}/scan:
     post:
       tags:
         - Scan
@@ -2752,7 +2751,7 @@ paths:
       responses:
         '200':
           description: Success
-  /scan/repository:
+  /v1/scan/repository:
     post:
       tags:
         - Scan
@@ -2777,7 +2776,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanRepoReportData'
-  /scan/status:
+  /v1/scan/status:
     get:
       tags:
         - Scan
@@ -2794,7 +2793,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanStatusData'
-  /scan/workload/{id}:
+  /v1/scan/workload/{id}:
     get:
       tags:
         - Scan
@@ -2835,7 +2834,7 @@ paths:
       responses:
         '200':
           description: Success
-  /server:
+  /v1/server:
     get:
       tags:
         - Server
@@ -2872,7 +2871,7 @@ paths:
       responses:
         '200':
           description: Success
-  /server/{name}:
+  /v1/server/{name}:
     get:
       tags:
         - Server
@@ -2936,7 +2935,7 @@ paths:
       responses:
         '200':
           description: Success
-  /server/{name}/role/{role}:
+  /v1/server/{name}/role/{role}:
     patch:
       tags:
         - Server
@@ -2967,7 +2966,7 @@ paths:
       responses:
         '200':
           description: Success
-  /server/{name}/user:
+  /v1/server/{name}/user:
     get:
       tags:
         - Server
@@ -2989,7 +2988,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTUsersData'
-  /service:
+  /v1/service:
     get:
       tags:
         - Service
@@ -3026,7 +3025,7 @@ paths:
       responses:
         '200':
           description: Success
-  /service/{name}:
+  /v1/service/{name}:
     get:
       tags:
         - Service
@@ -3048,7 +3047,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTServiceData'
-  /service/config:
+  /v1/service/config:
     patch:
       tags:
         - Service
@@ -3069,7 +3068,7 @@ paths:
       responses:
         '200':
           description: Success
-  /service/config/network:
+  /v1/service/config/network:
     patch:
       tags:
         - Service
@@ -3090,7 +3089,7 @@ paths:
       responses:
         '200':
           description: Success
-  /service/config/profile:
+  /v1/service/config/profile:
     patch:
       tags:
         - Service
@@ -3111,7 +3110,7 @@ paths:
       responses:
         '200':
           description: Success
-  /sniffer:
+  /v1/sniffer:
     get:
       tags:
         - Sniffer
@@ -3158,7 +3157,7 @@ paths:
       responses:
         '200':
           description: Success
-  /sniffer/{id}:
+  /v1/sniffer/{id}:
     get:
       tags:
         - Sniffer
@@ -3197,7 +3196,7 @@ paths:
       responses:
         '200':
           description: Success
-  /sniffer/stop/{id}:
+  /v1/sniffer/stop/{id}:
     patch:
       tags:
         - Sniffer
@@ -3215,7 +3214,7 @@ paths:
       responses:
         '200':
           description: Success
-  /sniffer/{id}/pcap:
+  /v1/sniffer/{id}/pcap:
     get:
       tags:
         - Sniffer
@@ -3233,7 +3232,7 @@ paths:
       responses:
         '200':
           description: Success. Get pcap file.
-  /system/summary:
+  /v1/system/summary:
     get:
       tags:
         - System
@@ -3250,7 +3249,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTSystemSummaryData'
-  /system/config:
+  /v1/system/config:
     get:
       tags:
         - System
@@ -3295,7 +3294,32 @@ paths:
       responses:
         '200':
           description: Success
-  /system/config/webhook:
+  /v2/system/config:
+    get:
+      tags:
+        - System
+      summary: Get system configuration (starting from 5.0, rest client should call this api.)
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - fed
+            - local
+          description: "When set the scope to be fed, it will return the fed system configures. When set the scope to be local, it will return the local system configures. If there is no query string 'scope', it will return all system configures."
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTSystemConfigDataV2'
+  /v1/system/config/webhook:
     post:
       tags:
         - System
@@ -3316,7 +3340,7 @@ paths:
       responses:
         '200':
           description: Success
-  /system/config/webhook/{name}:
+  /v1/system/config/webhook/{name}:
     patch:
       tags:
         - System
@@ -3375,7 +3399,7 @@ paths:
       responses:
         '200':
           description: Success
-  /system/rbac:
+  /v1/system/rbac:
     get:
       tags:
         - System
@@ -3392,7 +3416,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTK8sNvRbacStatus'
-  /system/request:
+  /v1/system/request:
     post:
       tags:
         - System
@@ -3413,7 +3437,7 @@ paths:
       responses:
         '200':
           description: Success
-  /system/license:
+  /v1/system/license:
     get:
       tags:
         - System
@@ -3442,7 +3466,7 @@ paths:
       responses:
         '200':
           description: Success
-  /system/license/update:
+  /v1/system/license/update:
     post:
       tags:
         - System
@@ -3463,7 +3487,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user:
+  /v1/user:
     get:
       tags:
         - User
@@ -3500,7 +3524,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user/{fullname}:
+  /v1/user/{fullname}:
     get:
       tags:
         - User
@@ -3568,7 +3592,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user/{fullname}/password:
+  /v1/user/{fullname}/password:
     post:
       tags:
         - User
@@ -3594,7 +3618,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user/{fullname}/role/{role}:
+  /v1/user/{fullname}/role/{role}:
     patch:
       tags:
         - User
@@ -3625,7 +3649,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user_role:
+  /v1/user_role:
     get:
       tags:
         - User
@@ -3662,7 +3686,7 @@ paths:
       responses:
         '200':
           description: Success
-  /user_role/{name}:
+  /v1/user_role/{name}:
     get:
       tags:
         - User
@@ -3726,7 +3750,7 @@ paths:
       responses:
         '200':
           description: Success
-  /vulnerability/profile:
+  /v1/vulnerability/profile:
     get:
       tags:
         - Vulnerability
@@ -3743,7 +3767,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTVulnerabilityProfilesData'
-  /vulnerability/profile/{name}:
+  /v1/vulnerability/profile/{name}:
     get:
       tags:
         - Vulnerability
@@ -3790,7 +3814,7 @@ paths:
       responses:
         '200':
           description: Success
-  /vulnerability/profile/{name}/entry:
+  /v1/vulnerability/profile/{name}/entry:
     post:
       tags:
         - Vulnerability
@@ -3814,7 +3838,7 @@ paths:
       responses:
         '200':
           description: Success
-  /vulnerability/profile/{name}/entry/{id}:
+  /v1/vulnerability/profile/{name}/entry/{id}:
     patch:
       tags:
         - Vulnerability
@@ -3869,7 +3893,7 @@ paths:
       responses:
         '200':
           description: Success
-  /waf/sensor:
+  /v1/waf/sensor:
     get:
       tags:
         - WAF Rule
@@ -3913,7 +3937,7 @@ paths:
       responses:
         '200':
           description: Success
-  /waf/sersor/{name}:
+  /v1/waf/sersor/{name}:
     get:
       tags:
         - WAF Rule
@@ -3977,7 +4001,7 @@ paths:
       responses:
         '200':
           description: Success
-  /waf/group:
+  /v1/waf/group:
     get:
       tags:
         - WAF Rule
@@ -4001,7 +4025,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWafGroupsData'
-  /waf/group/{name}:
+  /v1/waf/group/{name}:
     get:
       tags:
         - WAF Rule
@@ -4048,7 +4072,7 @@ paths:
       responses:
         '200':
           description: Success
-  /waf/rule:
+  /v1/waf/rule:
     get:
       tags:
         - WAF Rule
@@ -4065,7 +4089,7 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWafRulesData'
-  /waf/rule/{name}:
+  /v1/waf/rule/{name}:
     get:
       tags:
         - WAF Rule
@@ -4087,11 +4111,11 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWafRuleData'
-  /workload:
+  /v1/workload:
     get:
       tags:
-        - Workload
-      summary: Get a list of workload
+        - Container
+      summary: Get container list
       produces:
         - application/json
       parameters:
@@ -4104,11 +4128,28 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadsData'
-  /workload/{id}:
+  /v2/workload:
     get:
       tags:
-        - Workload
-      summary: Show workload
+        - Container
+      summary: Get container list (starting from 5.0, rest client should call this api.)
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWorkloadsDataV2'
+  /v1/workload/{id}:
+    get:
+      tags:
+        - Container
+      summary: Get container detail
       produces:
         - application/json
       parameters:
@@ -4128,8 +4169,8 @@ paths:
             $ref: '#/definitions/RESTWorkloadDetailData'
     patch:
       tags:
-        - Workload
-      summary: Update workload
+        - Container
+      summary: Update Container
       consumes:
         - application/json
       parameters:
@@ -4139,23 +4180,23 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: Container ID
           required: true
           type: string
         - in: body
           name: body
-          description: Workload update data
+          description: Container update data
           required: true
           schema:
             $ref: '#/definitions/RESTWorkloadConfigData'
       responses:
         '200':
           description: Success
-  /workload/{id}/stats:
+  /v2/workload/{id}:
     get:
       tags:
-        - Workload
-      summary: Workload stats
+        - Container
+      summary: Get container detail (starting from 5.0, rest client should call this api.)
       produces:
         - application/json
       parameters:
@@ -4166,6 +4207,28 @@ paths:
         - in: path
           name: id
           description: Workload ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWorkloadDetailDataV2'
+  /v1/workload/{id}/stats:
+    get:
+      tags:
+        - Container
+      summary: get container stats
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: id
+          description: Container ID
           required: true
           type: string
       responses:
@@ -4173,11 +4236,11 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadStatsData'
-  /workload/{id}/config:
+  /v1/workload/{id}/config:
     get:
       tags:
-        - Workload
-      summary: Get a workload configure
+        - Container
+      summary: Get a container configure
       produces:
         - application/json
       parameters:
@@ -4187,7 +4250,7 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: container ID
           required: true
           type: string
       responses:
@@ -4195,11 +4258,11 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadConfigData'
-  /workload/{id}/process:
+  /v1/workload/{id}/process:
     get:
       tags:
-        - Workload
-      summary: Get a workload process
+        - Container
+      summary: Get a container process
       produces:
         - application/json
       parameters:
@@ -4209,7 +4272,7 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: Container ID
           required: true
           type: string
       responses:
@@ -4221,11 +4284,11 @@ paths:
           description: Container not running
           schema:
             $ref: '#/definitions/RESTError'
-  /workload/{id}/process_history:
+  /v1/workload/{id}/process_history:
     get:
       tags:
-        - Workload
-      summary: Get a workload process history
+        - Container
+      summary: Get a container process history
       produces:
         - application/json
       parameters:
@@ -4235,7 +4298,7 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: Container ID
           required: true
           type: string
       responses:
@@ -4243,11 +4306,11 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTProcessProfileEntry'
-  /workload/{id}/compliance:
+  /v1/workload/{id}/compliance:
     get:
       tags:
-        - Workload
-      summary: Get a workload compliance report
+        - Container
+      summary: Get a container compliance report
       produces:
         - application/json
       parameters:
@@ -4257,7 +4320,7 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: Container ID
           required: true
           type: string
       responses:
@@ -4265,11 +4328,11 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTComplianceData'
-  /workload/request/{id}:
+  /v1/workload/request/{id}:
     post:
       tags:
-        - Workload
-      summary: Workload request
+        - Container
+      summary: Container request
       consumes:
         - application/json
       parameters:
@@ -4279,12 +4342,12 @@ paths:
           type: string
         - in: path
           name: id
-          description: Workload ID
+          description: Container ID
           required: true
           type: string
         - in: body
           name: body
-          description: Workload request data
+          description: Container request data
           required: true
           schema:
             $ref: '#/definitions/RESTWorkloadRequestData'
@@ -9633,6 +9696,28 @@ definitions:
         $ref: '#/definitions/RESTMetry'
       span_60:
         $ref: '#/definitions/RESTMetry'
+  RESTSysAtmoConfigConfig:
+    type: object
+    required:
+      - mode_auto_d2m
+      - mode_auto_d2m_duration
+      - mode_auto_m2p
+      - mode_auto_m2p_duration
+    properties:
+      mode_auto_d2m:
+        type: boolean
+        example: false
+      mode_auto_d2m_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+      mode_auto_m2p:
+        type: boolean
+        example: false
+      mode_auto_m2p_duration:
+        type: integer
+        format: int64
+        example: 1505755716
   RESTSysNetConfigConfig:
     type: object
     properties:
@@ -9674,6 +9759,10 @@ definitions:
       - xff_enabled
       - net_service_status
       - net_service_policy_mode
+      - mode_auto_d2m
+      - mode_auto_d2m_duration
+      - mode_auto_m2p
+      - mode_auto_m2p_duration
     properties:
       new_service_policy_mode:
         type: string
@@ -9776,6 +9865,228 @@ definitions:
       net_service_policy_mode:
         type: string
         example: "Monitor"
+      mode_auto_d2m:
+        type: boolean
+        example: false
+      mode_auto_d2m_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+      mode_auto_m2p:
+        type: boolean
+        example: false
+      mode_auto_m2p_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+  RESTSystemConfigAuthV2:
+    type: object
+    required:
+      - auth_order
+      - auth_by_platform
+      - rancher_ep
+    properties:
+      auth_order:
+        type: array
+        items:
+          type: string
+          example: ["local", "ldap"]
+      auth_by_platform:
+        type: boolean
+        example: true
+      rancher_ep:
+        type: string
+        example: ""
+  RESTSystemConfigIBMSAV2:
+    type: object
+    required:
+      - ibmsa_ep_enabled
+      - ibmsa_ep_start
+      - ibmsa_ep_dashboard_url
+      - ibmsa_ep_connected_at
+    properties:
+      ibmsa_ep_enabled:
+        type: boolean
+        example: false
+      ibmsa_ep_start:
+        type: integer
+        format: uint32
+        example: 1
+      ibmsa_ep_dashboard_url:
+        type: string
+        example: ""
+      ibmsa_ep_connected_at:
+        type: string
+        example: ""
+  RESTSystemConfigMiscV2:
+    type: object
+    required:
+      - unused_group_aging
+      - cluster_name
+      - controller_debug
+      - monitor_service_mesh
+      - xff_enabled
+    properties:
+      configured_internal_subnets:
+        type: array
+        items:
+          type: string
+          example: ["69.89.0.0/16", "172.217.5.0/23"]
+      unused_group_aging:
+        type: integer
+        format: uint8
+        example: 123
+      cluster_name:
+        type: string
+        example: cluster1
+      controller_debug:
+        type: array
+        items:
+          type: string
+          example: "all"
+      monitor_service_mesh:
+        type: boolean
+        example: true
+      xff_enabled:
+        type: boolean
+        example: false
+  RESTSystemConfigModeAutoV2:
+    type: object
+    required:
+      - mode_auto_d2m
+      - mode_auto_d2m_duration
+      - mode_auto_m2p
+      - mode_auto_m2p_duration
+    properties:
+      mode_auto_d2m:
+        type: boolean
+        example: false
+      mode_auto_d2m_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+      mode_auto_m2p:
+        type: boolean
+        example: false
+      mode_auto_m2p_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+  RESTSystemConfigNetSvcV2:
+    type: object
+    required:
+      - net_service_status
+      - new_service_profile_baseline
+    properties:
+      net_service_status:
+        type: boolean
+        example: true
+      new_service_profile_baseline:
+        type: string
+        example: "zero-drift"
+  RESTSystemConfigNewSvcV2:
+    type: object
+    required:
+      - new_service_policy_mode
+      - new_service_profile_baseline
+    properties:
+      new_service_policy_mode:
+        type: string
+        example: "Discover"
+      new_service_profile_baseline:
+        type: string
+        example: "zero-drift"
+  RESTSystemConfigProxyV2:
+    type: object
+    required:
+      - registry_http_proxy_status
+      - registry_https_proxy_status
+      - registry_http_proxy
+      - registry_https_proxy
+    properties:
+      registry_http_proxy_status:
+        type: boolean
+        example: true
+      registry_https_proxy_status:
+        type: boolean
+        example: false
+      registry_http_proxy:
+        $ref: '#/definitions/RESTProxy'
+      registry_https_proxy:
+        $ref: '#/definitions/RESTProxy'
+  RESTSystemConfigSyslogV2:
+    type: object
+    required:
+      - syslog_ip
+      - syslog_ip_proto
+      - syslog_port
+      - syslog_level
+      - syslog_status
+      - syslog_categories
+      - syslog_in_json
+      - single_cve_per_syslog
+    properties:
+      syslog_ip:
+        type: string
+        example: 10.1.0.14
+      syslog_ip_proto:
+        type: integer
+        format: uint8
+        example: 6
+      syslog_port:
+        type: integer
+        format: uint16
+        example: 514
+      syslog_level:
+        type: string
+        example: INFO
+      syslog_status:
+        type: boolean
+        example: false
+      syslog_categories:
+        type: array
+        items:
+          type: string
+          example: ["event", "violation", "threat", "incident"]
+      syslog_in_json:
+        type: boolean
+        example: true
+      single_cve_per_syslog:
+        type: boolean
+        example: false
+  RESTSystemConfigV2:
+    type: object
+    required:
+      - new_svc
+      - syslog
+      - auth
+      - misc
+      - webhooks
+      - proxy
+      - ibmsa
+      - net_svc
+      - mode_auto
+    properties:
+      new_svc:
+        $ref: '#/definitions/RESTSystemConfigNewSvcV2'
+      syslog:
+        $ref: '#/definitions/RESTSystemConfigSyslogV2'
+      auth:
+        $ref: '#/definitions/RESTSystemConfigAuthV2'
+      misc:
+        $ref: '#/definitions/RESTSystemConfigMiscV2'
+      webhooks:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWebhook'
+      proxy:
+        $ref: '#/definitions/RESTSystemConfigProxyV2'
+      ibmsa:
+        $ref: '#/definitions/RESTSystemConfigIBMSAV2'
+      net_svc:
+        $ref: '#/definitions/RESTSystemConfigNetSvcV2'
+      mode_auto:
+        $ref: '#/definitions/RESTSystemConfigModeAutoV2'
   RESTSystemConfigData:
     type: object
     required:
@@ -9784,6 +10095,16 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfig'
+      fed_config:
+        $ref: '#/definitions/RESTFedSystemConfig'
+  RESTSystemConfigDataV2:
+    type: object
+    required:
+      - config
+      - fed_config
+    properties:
+      config:
+        $ref: '#/definitions/RESTSystemConfigV2'
       fed_config:
         $ref: '#/definitions/RESTFedSystemConfig'
   RESTSystemConfigConfig:
@@ -9881,6 +10202,10 @@ definitions:
     type: object
     required:
       - single_cve_per_syslog
+      - mode_auto_d2m
+      - mode_auto_d2m_duration
+      - mode_auto_m2p
+      - mode_auto_m2p_duration
       - always_reload
     properties:
       new_service_policy_mode:
@@ -9975,6 +10300,20 @@ definitions:
       net_service_policy_mode:
         type: string
         example: ""
+      mode_auto_d2m:
+        type: boolean
+        example: false
+      mode_auto_d2m_duration:
+        type: integer
+        format: int64
+        example: 1505755716
+      mode_auto_m2p:
+        type: boolean
+        example: false
+      mode_auto_m2p_duration:
+        type: integer
+        format: int64
+        example: 1505755716
       always_reload:
         type: boolean
         example: false
@@ -9984,6 +10323,7 @@ definitions:
       - config
       - fed_config
       - net_config
+      - atmo_config
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
@@ -9991,6 +10331,8 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigConfig'
       net_config:
         $ref: '#/definitions/RESTSysNetConfigConfig'
+      atmo_config:
+        $ref: '#/definitions/RESTSysAtmoConfigConfig'
   RESTSystemSummary:
     type: object
     required:
@@ -10574,7 +10916,6 @@ definitions:
       - vectors_v3
       - published_timestamp
       - last_modified_timestamp
-      - package_versions
       - workloads
       - nodes
       - images
@@ -10627,26 +10968,26 @@ definitions:
         type: integer
         format: int64
         example: 1516561253
-      package_versions:
-        type: array
-        items:
-          $ref: '#/definitions/RESTVulnPackageVersion'
       workloads:
         type: array
         items:
-          $ref: '#/definitions/RESTIDName'
+          type: string
+          example: ""
       nodes:
         type: array
         items:
-          $ref: '#/definitions/RESTIDName'
+          type: string
+          example: ""
       images:
         type: array
         items:
-          $ref: '#/definitions/RESTIDName'
+          type: string
+          example: ""
       platforms:
         type: array
         items:
-          $ref: '#/definitions/RESTIDName'
+          type: string
+          example: ""
   RESTVulnerabilityProfile:
     type: object
     required:
@@ -11056,7 +11397,6 @@ definitions:
       - cap_quarantine
       - cap_change_mode
       - scan_summary
-      - children
       - service_mesh
       - service_mesh_sidecar
       - privileged
@@ -11064,6 +11404,7 @@ definitions:
       - host_name
       - host_id
       - enforcer_id
+      - enforcer_name
       - network_mode
       - created_at
       - started_at
@@ -11077,7 +11418,8 @@ definitions:
       - applications
       - memory_limit
       - cpus
-    #      - children
+      - children
+      - service_account
     properties:
       id:
         type: string
@@ -11132,10 +11474,6 @@ definitions:
         example: Discover
       scan_summary:
         $ref: '#/definitions/RESTScanBrief'
-      children:
-        type: array
-        items:
-          $ref: '#/definitions/RESTWorkloadBrief'
       quarantine_reason:
         type: string
         example: ""
@@ -11160,6 +11498,9 @@ definitions:
       enforcer_id:
         type: string
         example: 002a4f71d9dbdb40db81c31484ac25564fe80574dfbe
+      enforcer_name:
+        type: string
+        example: allinone
       network_mode:
         type: string
         example: host
@@ -11216,10 +11557,67 @@ definitions:
       cpus:
         type: string
         example: ""
-  #      children:
-  #        type: array
-  #        items:
-  #          $ref: '#/definitions/RESTWorkload'
+      service_account:
+        type: string
+        example: ""
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkload'
+  RESTWorkloadV2:
+    type: object
+    required:
+      - brief
+      - security
+      - rt_attributes
+      - children
+      - enforcer_id
+      - enforcer_name
+      - platform_role
+      - created_at
+      - started_at
+      - finished_at
+      - running
+      - secured_at
+      - exit_code
+    properties:
+      brief:
+        $ref: '#/definitions/RESTWorkloadBriefV2'
+      security:
+        $ref: '#/definitions/RESTWorkloadSecurityV2'
+      rt_attributes:
+        $ref: '#/definitions/RESTWorkloadRtAttribesV2'
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadV2'
+      enforcer_id:
+        type: string
+        example: 002a4f71d9dbdb40db81c31484ac25564fe80574dfbe
+      enforcer_name:
+        type: string
+        example: allinone
+      platform_role:
+        type: string
+        example: core
+      created_at:
+        type: string
+        example: "2018-01-18T00:44:02Z"
+      started_at:
+        type: string
+        example: "2018-01-18T00:44:02Z"
+      finished_at:
+        type: string
+        example: "2018-01-18T01:20:02Z"
+      running:
+        type: boolean
+        example: false
+      secured_at:
+        type: string
+        example: "2018-01-18T01:20:02Z"
+      exit_code:
+        type: integer
+        example: 0
   RESTWorkloadsData:
     type: object
     required:
@@ -11229,6 +11627,125 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTWorkload'
+  RESTWorkloadsDataV2:
+    type: object
+    required:
+      - workloads
+    properties:
+      workloads:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadV2'
+  RESTWorkloadRtAttribesV2:
+    type: object
+    required:
+      - pod_name
+      - privileged
+      - run_as_root
+      - labels
+      - memory_limit
+      - cpus
+      - service_account
+      - network_mode
+      - interfaces
+      - ports
+      - applications
+    properties:
+      pod_name:
+        type: string
+        example: "istio-policy-5cdbc47674-t67p4"
+      share_ns_with:
+        type: string
+        example: cc0709d522749203042e89dba28bf6924a4b0d360648
+      privileged:
+        type: boolean
+        example: false
+      run_as_root:
+        type: boolean
+        example: false
+      labels:
+        type: object
+        properties:
+          key:
+            type: string
+            example: io.kubernetes.pod.name
+          value:
+            type: string
+            example: calico-node-mzhtk
+      memory_limit:
+        type: integer
+        format: int64
+        example: 0
+      cpus:
+        type: string
+        example: ""
+      service_account:
+        type: string
+        example: ""
+      network_mode:
+        type: string
+        example: host
+      interfaces:
+        type: object
+        properties:
+          key:
+            type: string
+            example: eth0
+          value:
+            type: array
+            items:
+              $ref: '#/definitions/RESTIPAddr'
+      ports:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadPorts'
+      applications:
+        type: array
+        items:
+          type: string
+          example: TCP/9999
+  RESTWorkloadSecurityV2:
+    type: object
+    required:
+      - cap_sniff
+      - cap_quarantine
+      - cap_change_mode
+      - service_mesh
+      - service_mesh_sidecar
+      - policy_mode
+      - profile_mode
+      - baseline_profile
+      - scan_summary
+    properties:
+      cap_sniff:
+        type: boolean
+        example: true
+      cap_quarantine:
+        type: boolean
+        example: true
+      cap_change_mode:
+        type: boolean
+        example: true
+      service_mesh:
+        type: boolean
+        example: true
+      service_mesh_sidecar:
+        type: boolean
+        example: true
+      policy_mode:
+        type: string
+        example: Discover
+      profile_mode:
+        type: string
+        example: Discover
+      baseline_profile:
+        type: string
+        example: ""
+      quarantine_reason:
+        type: string
+        example: violation
+      scan_summary:
+        $ref: '#/definitions/RESTScanBrief'
   RESTWorkloadBrief:
     type: object
     required:
@@ -11335,6 +11852,58 @@ definitions:
       baseline_profile:
         type: string
         example: ""
+  RESTWorkloadBriefV2:
+    type: object
+    required:
+      - id
+      - name
+      - display_name
+      - host_name
+      - host_id
+      - image
+      - image_id
+      - domain
+      - state
+      - service
+      - author
+      - service_group
+    properties:
+      id:
+        type: string
+        example: 7304e72fd093155c4cbcd65d07375329b2db82cc679
+      name:
+        type: string
+        example: k8s_POD.d86c_calico-node-mzhtk_kube-system_0050565a_365c13d
+      display_name:
+        type: string
+        example: calico-node-mzhtk
+      host_name:
+        type: string
+        example: ubuntu1604-k8worker1-calico
+      host_id:
+        type: string
+        example: GRSW:3RCY:YL6O:TIGT:666B:OW22:XYQF:YHGI:JB3L
+      image:
+        type: string
+        example: calico
+      image_id:
+        type: string
+        example: "d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f"
+      domain:
+        type: string
+        example: ""
+      state:
+        type: string
+        example: exit
+      service:
+        type: string
+        example: kafkazookeeper
+      author:
+        type: string
+        example: ""
+      service_group:
+        type: string
+        example: nv.calico
   RESTWorkloadConfig:
     type: object
     required:
@@ -11514,6 +12083,63 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTWorkloadDetail'
+  RESTWorkloadDetailV2:
+    type: object
+    required:
+      - brief
+      - security
+      - rt_attributes
+      - children
+      - enforcer_id
+      - enforcer_name
+      - platform_role
+      - created_at
+      - started_at
+      - finished_at
+      - running
+      - secured_at
+      - exit_code
+      - misc
+    properties:
+      brief:
+        $ref: '#/definitions/RESTWorkloadBriefV2'
+      security:
+        $ref: '#/definitions/RESTWorkloadSecurityV2'
+      rt_attributes:
+        $ref: '#/definitions/RESTWorkloadRtAttribesV2'
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadV2'
+      enforcer_id:
+        type: string
+        example: 002a4f71d9dbdb40db81c31484ac25564fe80574dfbe
+      enforcer_name:
+        type: string
+        example: allinone
+      platform_role:
+        type: string
+        example: core
+      created_at:
+        type: string
+        example: "2018-01-18T00:44:02Z"
+      started_at:
+        type: string
+        example: "2018-01-18T00:44:02Z"
+      finished_at:
+        type: string
+        example: "2018-01-18T01:20:02Z"
+      running:
+        type: boolean
+        example: false
+      secured_at:
+        type: string
+        example: "2018-01-18T01:20:02Z"
+      exit_code:
+        type: integer
+        example: 0
+      misc:
+        $ref: '#/definitions/RESTWorkloadDetailMiscV2'
   RESTWorkloadDetailData:
     type: object
     required:
@@ -11521,6 +12147,38 @@ definitions:
     properties:
       workload:
         $ref: '#/definitions/RESTWorkloadDetail'
+  RESTWorkloadDetailDataV2:
+    type: object
+    required:
+      - workload
+    properties:
+      workload:
+        $ref: '#/definitions/RESTWorkloadDetailV2'
+  RESTWorkloadDetailMiscV2:
+    type: object
+    required:
+      - groups
+      - app_ports
+      - children
+    properties:
+      groups:
+        type: array
+        items:
+          type: string
+          example: ["nv.iperfclient-pod", "nv.pod"]
+      app_ports:
+        type: object
+        properties:
+          key:
+            type: string
+            example: TCP
+          value:
+            type: string
+            example: "9999"
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadDetailV2'
   RESTWorkloadPorts:
     type: object
     required:
