@@ -187,7 +187,7 @@ func workloadV1ToV2(wlV1 *api.RESTWorkload) *api.RESTWorkloadV2 {
 			QuarReason:         wlV1.QuarReason,
 			ScanSummary:        wlV1.ScanSummary,
 		},
-		WlRtSttributes: api.RESTWorkloadRtAttribesV2{
+		WlRtAttributes: api.RESTWorkloadRtAttribesV2{
 			PodName:        wlV1.PodName,
 			ShareNSWith:    wlV1.ShareNSWith,
 			Privileged:     wlV1.Privileged,
@@ -370,7 +370,7 @@ func workloadDetailsV1ToV2(wlV1 *api.RESTWorkloadDetail) *api.RESTWorkloadDetail
 				QuarReason:         wlV1.QuarReason,
 				ScanSummary:        wlV1.ScanSummary,
 			},
-			WlRtSttributes: api.RESTWorkloadRtAttribesV2{
+			WlRtAttributes: api.RESTWorkloadRtAttribesV2{
 				PodName:        wlV1.PodName,
 				ShareNSWith:    wlV1.ShareNSWith,
 				Privileged:     wlV1.Privileged,
