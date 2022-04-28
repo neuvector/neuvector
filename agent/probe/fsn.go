@@ -561,7 +561,7 @@ func (fsn *FileNotificationCtr) IsNotExistingImageFile(id, file string) (*fileIn
 			// Stat: returns a FileInfo describing the named "target" file.
 			// Lstat: If the file is a symbolic link, the returned FileInfodescribes the symbolic link. Lstat makes no attempt to follow the link
 			if _, err := os.Stat(filepath.Join(procPath, file)); os.IsNotExist(err) {
-				mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: not the in image")
+				// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: not the in image")
 				finfo.fileType = file_not_exist
 				finfo.bExec = true
 				return finfo, true // not existed in image layers

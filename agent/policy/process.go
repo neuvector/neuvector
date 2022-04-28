@@ -413,6 +413,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"nc", "/bin/busybox"},
 		{"tee", "/usr/bin/tee"},
 		{"stat", "/usr/bin/stat"}, // bench scripts
+		{"stty", "/bin/busybox"},  // python3.9
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -653,6 +654,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"cat", "*"},                     // k8s readiness and openshift operations
 		{"configure.sh", "/bin/busybox"}, // monitor tool
 		{"teardown.sh", "/bin/busybox"},  // monitor tool
+		{"stty", "/bin/busybox"},         // python3.9
 
 		// below entries for debug purpose : docker exec -ti allinone sh
 		{"sh", "/bin/dash"},
