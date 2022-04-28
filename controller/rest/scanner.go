@@ -488,50 +488,40 @@ func handlerScanPlatformSummary(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 type vulAsset struct {
-	Name        string
-	Severity    string
-	Description string
-	Link        string
-	Score       float32
-	Vectors     string
-	ScoreV3     float32
-	VectorsV3   string
-	PublishedTS int64
-	LastModTS   int64
-	Packages    map[string]utils.Set
-	wls         []api.RESTIDName
-	nodes       []api.RESTIDName
-	images      []api.RESTIDName
-	platforms   []api.RESTIDName
+	asset                         *api.RESTVulnerabilityAsset
+	packages                      map[string]utils.Set
+	wls, nodes, images, platforms utils.Set
 }
 
 func addVulAsset(all map[string]*vulAsset, vul *api.RESTVulnerability) *vulAsset {
 	va, ok := all[vul.Name]
 	if !ok {
 		va = &vulAsset{
-			Name:        vul.Name,
-			Severity:    vul.Severity,
-			Description: vul.Description,
-			Packages:    make(map[string]utils.Set),
-			Link:        vul.Link,
-			Score:       vul.Score,
-			Vectors:     vul.Vectors,
-			ScoreV3:     vul.ScoreV3,
-			VectorsV3:   vul.VectorsV3,
-			PublishedTS: vul.PublishedTS,
-			LastModTS:   vul.LastModTS,
-			wls:         make([]api.RESTIDName, 0),
-			nodes:       make([]api.RESTIDName, 0),
-			images:      make([]api.RESTIDName, 0),
-			platforms:   make([]api.RESTIDName, 0),
+			asset: &api.RESTVulnerabilityAsset{
+				Name:        vul.Name,
+				Severity:    vul.Severity,
+				Description: vul.Description,
+				Link:        vul.Link,
+				Score:       vul.Score,
+				Vectors:     vul.Vectors,
+				ScoreV3:     vul.ScoreV3,
+				VectorsV3:   vul.VectorsV3,
+				PublishedTS: vul.PublishedTS,
+				LastModTS:   vul.LastModTS,
+			},
+			packages:  make(map[string]utils.Set),
+			wls:       utils.NewSet(),
+			nodes:     utils.NewSet(),
+			images:    utils.NewSet(),
+			platforms: utils.NewSet(),
 		}
 		all[vul.Name] = va
 	}
-	_, ok = va.Packages[vul.PackageName]
+	_, ok = va.packages[vul.PackageName]
 	if !ok {
-		va.Packages[vul.PackageName] = utils.NewSet()
+		va.packages[vul.PackageName] = utils.NewSet()
 	}
-	va.Packages[vul.PackageName].Add(api.RESTVulnPackageVersion{
+	va.packages[vul.PackageName].Add(api.RESTVulnPackageVersion{
 		PackageVersion: vul.PackageVersion,
 		FixedVersion:   vul.FixedVersion,
 	})
@@ -549,12 +539,35 @@ func setImagePolicyMode(i2m map[string]string, image, mode string) {
 	}
 }
 
-func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
+func nodeRisk2IDName(n *common.WorkloadRisk) api.RESTIDName {
+	return api.RESTIDName{
+		ID:          n.ID,
+		DisplayName: n.Name,
+		PolicyMode:  n.PolicyMode,
+	}
+}
+
+func workloadRisk2IDName(wl *common.WorkloadRisk) api.RESTIDName {
+	return api.RESTIDName{
+		ID:          wl.ID,
+		DisplayName: wl.Name,
+		PolicyMode:  wl.PolicyMode,
+		Domains:     []string{wl.Domain},
+	}
+}
+
+func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *api.RESTVulnerabilityAssetData) {
 	sdb := scanUtils.GetScannerDB()
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 
-	img2mode := make(map[string]string)
+	resp := api.RESTVulnerabilityAssetData{
+		Workloads: make(map[string][]api.RESTIDName),
+		Nodes:     make(map[string][]api.RESTIDName),
+		Images:    make(map[string][]api.RESTIDName),
+		Platforms: make(map[string][]api.RESTIDName),
+	}
 	all := make(map[string]*vulAsset)
+	img2mode := make(map[string]string)
 
 	pods := cacher.GetAllWorkloadsRisk(acc)
 	for _, pod := range pods {
@@ -570,13 +583,9 @@ func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
-					va.wls = append(va.wls, api.RESTIDName{
-						ID:          wl.ID,
-						DisplayName: wl.Name,
-						PolicyMode:  wl.PolicyMode,
-						Domains:     []string{wl.Domain},
-					})
+					va.wls.Add(wl.ID)
 				}
+				resp.Workloads[wl.ID] = []api.RESTIDName{workloadRisk2IDName(wl)}
 			}
 		}
 	}
@@ -588,12 +597,9 @@ func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
-					va.nodes = append(va.nodes, api.RESTIDName{
-						ID:          n.ID,
-						DisplayName: n.Name,
-						PolicyMode:  n.PolicyMode,
-					})
+					va.nodes.Add(n.ID)
 				}
+				resp.Nodes[n.ID] = []api.RESTIDName{nodeRisk2IDName(n)}
 			}
 		}
 	}
@@ -604,14 +610,16 @@ func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
 		if vuls != nil {
 			for _, vul := range vuls {
 				va := addVulAsset(all, vul)
+				va.platforms.Add(platform)
+			}
 
-				// TODO: for now, set platform policy to "discover" to indicate it's not protected
-				va.platforms = append(va.platforms, api.RESTIDName{
+			// TODO: for now, set platform policy to "discover" to indicate it's not protected
+			resp.Platforms[platform] = []api.RESTIDName{
+				api.RESTIDName{
 					ID:          platform,
 					DisplayName: platform,
 					PolicyMode:  share.PolicyModeLearn,
-					Domains:     nil,
-				})
+				},
 			}
 		}
 	}
@@ -623,22 +631,26 @@ func getAllVulnerabilities(acc *access.AccessControl) map[string]*vulAsset {
 				if idns, ok := nmap[id]; ok {
 					for _, vul := range vuls {
 						va := addVulAsset(all, vul)
+						va.images.Add(id)
+					}
 
-						// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
-						// Policy mode is empty if the image is not used.
-						pm, _ := img2mode[id]
-						for i := 0; i < len(idns); i++ {
-							idns[i].PolicyMode = pm
-						}
-
-						va.images = append(va.images, idns...)
+					// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
+					// Policy mode is empty if the image is not used.
+					pm, _ := img2mode[id]
+					for i := 0; i < len(idns); i++ {
+						idns[i].PolicyMode = pm
+					}
+					if exist, ok := resp.Images[id]; ok {
+						resp.Images[id] = append(exist, idns...)
+					} else {
+						resp.Images[id] = idns
 					}
 				}
 			}
 		}
 	}
 
-	return all
+	return all, &resp
 }
 
 func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -653,76 +665,30 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	all := getAllVulnerabilities(acc)
+	all, resp := getAllVulnerabilities(acc)
 
-	var exists utils.Set
 	list := make([]*api.RESTVulnerabilityAsset, 0, len(all))
 	for _, vul := range all {
-		if vul.ScoreV3 == 0 && vul.Score == 0 {
+		if vul.asset.ScoreV3 == 0 && vul.asset.Score == 0 {
 			continue
 		}
 
-		va := &api.RESTVulnerabilityAsset{
-			Name:        vul.Name,
-			Severity:    vul.Severity,
-			Description: vul.Description,
-			Packages:    make(map[string][]api.RESTVulnPackageVersion),
-			Link:        vul.Link,
-			Score:       vul.Score,
-			Vectors:     vul.Vectors,
-			ScoreV3:     vul.ScoreV3,
-			VectorsV3:   vul.VectorsV3,
-			PublishedTS: vul.PublishedTS,
-			LastModTS:   vul.LastModTS,
-			Workloads:   make([]api.RESTIDName, 0),
-			Nodes:       make([]api.RESTIDName, 0),
-			Images:      make([]api.RESTIDName, 0),
-			Platforms:   make([]api.RESTIDName, 0),
-		}
+		vul.asset.Packages = make(map[string][]api.RESTVulnPackageVersion)
+		vul.asset.Workloads = vul.wls.ToStringSlice() // Not to sort these lists to save some CPU cycles
+		vul.asset.Nodes = vul.nodes.ToStringSlice()
+		vul.asset.Images = vul.images.ToStringSlice()
+		vul.asset.Platforms = vul.platforms.ToStringSlice()
 
-		for pkg, vers := range vul.Packages {
-			va.Packages[pkg] = make([]api.RESTVulnPackageVersion, vers.Cardinality())
+		for pkg, vers := range vul.packages {
+			vul.asset.Packages[pkg] = make([]api.RESTVulnPackageVersion, vers.Cardinality())
 			j := 0
 			for v := range vers.Iter() {
-				va.Packages[pkg][j] = v.(api.RESTVulnPackageVersion)
+				vul.asset.Packages[pkg][j] = v.(api.RESTVulnPackageVersion)
 				j++
 			}
 		}
 
-		// Not to sort these lists to save some CPU cycles
-		exists = utils.NewSet()
-		for _, v := range vul.wls {
-			if !exists.Contains(v.ID) {
-				va.Workloads = append(va.Workloads, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range vul.nodes {
-			if !exists.Contains(v.ID) {
-				va.Nodes = append(va.Nodes, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range vul.images {
-			if !exists.Contains(v.ID) {
-				va.Images = append(va.Images, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range vul.platforms {
-			if !exists.Contains(v.ID) {
-				va.Platforms = append(va.Platforms, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		list = append(list, va)
+		list = append(list, vul.asset)
 	}
 
 	sort.Slice(list, func(s, t int) bool {
@@ -735,7 +701,24 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	})
 
-	resp := &api.RESTVulnerabilityAssetData{Vuls: list}
+	resp.Vuls = list
+
+	// remove id from RESTIDName to reduce data size.
+	for _, wls := range resp.Workloads {
+		for i, _ := range wls {
+			wls[i].ID = ""
+		}
+	}
+	for _, nodes := range resp.Nodes {
+		for i, _ := range nodes {
+			nodes[i].ID = ""
+		}
+	}
+	for _, images := range resp.Images {
+		for i, _ := range images {
+			images[i].ID = ""
+		}
+	}
 
 	log.WithFields(log.Fields{"entries": len(resp.Vuls)}).Debug("Response")
 	restRespSuccess(w, r, resp, acc, login, nil, "Get vulnerabiility asset report")

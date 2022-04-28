@@ -1989,27 +1989,29 @@ type RESTVulnPackageVersion struct {
 }
 
 type RESTVulnerabilityAsset struct {
-	Name            string                              `json:"name"`
-	Severity        string                              `json:"severity"`
-	Description     string                              `json:"description"`
-	Packages        map[string][]RESTVulnPackageVersion `json:"packages`
-	PackageName     string                              `json:"package_name"` // deprecated in 4.3.3
-	Link            string                              `json:"link"`
-	Score           float32                             `json:"score"`
-	Vectors         string                              `json:"vectors"`
-	ScoreV3         float32                             `json:"score_v3"`
-	VectorsV3       string                              `json:"vectors_v3"`
-	PublishedTS     int64                               `json:"published_timestamp"`
-	LastModTS       int64                               `json:"last_modified_timestamp"`
-	PackageVersions []RESTVulnPackageVersion            `json:"package_versions"` // deprecated in 4.3.3
-	Workloads       []RESTIDName                        `json:"workloads"`
-	Nodes           []RESTIDName                        `json:"nodes"`
-	Images          []RESTIDName                        `json:"images"`
-	Platforms       []RESTIDName                        `json:"platforms"`
+	Name        string                              `json:"name"`
+	Severity    string                              `json:"severity"`
+	Description string                              `json:"description"`
+	Packages    map[string][]RESTVulnPackageVersion `json:"packages`
+	Link        string                              `json:"link"`
+	Score       float32                             `json:"score"`
+	Vectors     string                              `json:"vectors"`
+	ScoreV3     float32                             `json:"score_v3"`
+	VectorsV3   string                              `json:"vectors_v3"`
+	PublishedTS int64                               `json:"published_timestamp"`
+	LastModTS   int64                               `json:"last_modified_timestamp"`
+	Workloads   []string                            `json:"workloads"`
+	Nodes       []string                            `json:"nodes"`
+	Images      []string                            `json:"images"`
+	Platforms   []string                            `json:"platforms"`
 }
 
 type RESTVulnerabilityAssetData struct {
-	Vuls []*RESTVulnerabilityAsset `json:"vulnerabilities"`
+	Vuls      []*RESTVulnerabilityAsset `json:"vulnerabilities"`
+	Workloads map[string][]RESTIDName   `json:"workloads"`
+	Nodes     map[string][]RESTIDName   `json:"nodes"`
+	Images    map[string][]RESTIDName   `json:"images"`
+	Platforms map[string][]RESTIDName   `json:"platforms"`
 }
 
 type RESTScanReportData struct {
@@ -2284,28 +2286,32 @@ type RESTComplianceData struct {
 }
 
 type RESTComplianceAsset struct {
-	Name        string       `json:"name"`
-	Catalog     string       `json:"catalog"`
-	Type        string       `json:"type"`
-	Level       string       `json:"level"`
-	Profile     string       `json:"profile"`
-	Scored      bool         `json:"scored"`
-	Description string       `json:"description"`
-	Message     []string     `json:"message"`
-	Remediation string       `json:"remediation"`
-	Group       string       `json:"group"`
-	Tags        []string     `json:"tags"`
-	Workloads   []RESTIDName `json:"workloads"`
-	Nodes       []RESTIDName `json:"nodes"`
-	Images      []RESTIDName `json:"images"`
-	Platforms   []RESTIDName `json:"platforms"`
+	Name        string   `json:"name"`
+	Catalog     string   `json:"catalog"`
+	Type        string   `json:"type"`
+	Level       string   `json:"level"`
+	Profile     string   `json:"profile"`
+	Scored      bool     `json:"scored"`
+	Description string   `json:"description"`
+	Message     []string `json:"message"`
+	Remediation string   `json:"remediation"`
+	Group       string   `json:"group"`
+	Tags        []string `json:"tags"`
+	Workloads   []string `json:"workloads"`
+	Nodes       []string `json:"nodes"`
+	Images      []string `json:"images"`
+	Platforms   []string `json:"platforms"`
 }
 
 type RESTComplianceAssetData struct {
-	Compliances   []*RESTComplianceAsset `json:"compliances"`
-	KubeCategory  string                 `json:"kubernetes_cis_category"`
-	KubeVersion   string                 `json:"kubernetes_cis_version"`
-	DockerVersion string                 `json:"docker_cis_version"`
+	Compliances   []*RESTComplianceAsset  `json:"compliances"`
+	Workloads     map[string][]RESTIDName `json:"workloads"`
+	Nodes         map[string][]RESTIDName `json:"nodes"`
+	Images        map[string][]RESTIDName `json:"images"`
+	Platforms     map[string][]RESTIDName `json:"platforms"`
+	KubeCategory  string                  `json:"kubernetes_cis_category"`
+	KubeVersion   string                  `json:"kubernetes_cis_version"`
+	DockerVersion string                  `json:"docker_cis_version"`
 }
 
 const (

@@ -728,52 +728,40 @@ func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfile
 	rpt.Items = filterComplianceChecks(rpt.Items, cpf)
 
 	return &rpt
-
 }
 
 type compAsset struct {
-	Name        string
-	Catalog     string
-	Type        string
-	Level       string
-	Scored      bool
-	Profile     string
-	Description string
-	Message     []string
-	Remediation string
-	Group       string
-	Tags        []string
-	wls         []api.RESTIDName
-	nodes       []api.RESTIDName
-	images      []api.RESTIDName
-	platforms   []api.RESTIDName
+	asset                         *api.RESTComplianceAsset
+	wls, nodes, images, platforms utils.Set
 }
 
 func addCompAsset(all map[string]*compAsset, comp *api.RESTBenchItem) *compAsset {
 	ca, ok := all[comp.TestNum]
 	if !ok {
 		ca = &compAsset{
-			Name:        comp.TestNum,
-			Catalog:     comp.Catalog,
-			Type:        comp.Type,
-			Level:       comp.Level,
-			Scored:      comp.Scored,
-			Profile:     comp.Profile,
-			Description: comp.Description,
-			Message:     comp.Message,
-			Remediation: comp.Remediation,
-			Group:       comp.Group,
-			Tags:        comp.Tags,
-			wls:         make([]api.RESTIDName, 0),
-			nodes:       make([]api.RESTIDName, 0),
-			images:      make([]api.RESTIDName, 0),
-			platforms:   make([]api.RESTIDName, 0),
+			asset: &api.RESTComplianceAsset{
+				Name:        comp.TestNum,
+				Catalog:     comp.Catalog,
+				Type:        comp.Type,
+				Level:       comp.Level,
+				Scored:      comp.Scored,
+				Profile:     comp.Profile,
+				Description: comp.Description,
+				Message:     comp.Message,
+				Remediation: comp.Remediation,
+				Group:       comp.Group,
+				Tags:        comp.Tags,
+			},
+			wls:       utils.NewSet(),
+			nodes:     utils.NewSet(),
+			images:    utils.NewSet(),
+			platforms: utils.NewSet(),
 		}
 		all[comp.TestNum] = ca
 	} else {
 		// Replace "custom check failed" message
-		if strings.HasPrefix(ca.Description, share.CustomScriptFailedPrefix) {
-			ca.Description = comp.Description
+		if strings.HasPrefix(ca.asset.Description, share.CustomScriptFailedPrefix) {
+			ca.asset.Description = comp.Description
 		}
 	}
 	return ca
@@ -799,8 +787,14 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 		cpf = &complianceProfileFilter{disableSystem: cp.DisableSystem, filter: filter}
 	}
 
-	img2mode := make(map[string]string)
+	resp := api.RESTComplianceAssetData{
+		Workloads: make(map[string][]api.RESTIDName),
+		Nodes:     make(map[string][]api.RESTIDName),
+		Images:    make(map[string][]api.RESTIDName),
+		Platforms: make(map[string][]api.RESTIDName),
+	}
 	all := make(map[string]*compAsset)
+	img2mode := make(map[string]string)
 	kubeVers := utils.NewSet()
 	dockerVers := utils.NewSet()
 
@@ -818,56 +812,48 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 			if rpt := decodeCISReport(share.BenchCustomContainer, wl.CustomBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
-						va := addCompAsset(all, item)
-						va.wls = append(va.wls, api.RESTIDName{
-							ID:          wl.ID,
-							DisplayName: wl.Name,
-							PolicyMode:  wl.PolicyMode,
-							Domains:     []string{wl.Domain},
-						})
+						ca := addCompAsset(all, item)
+						ca.wls.Add(wl.ID)
 					}
+				}
+				if _, ok := resp.Workloads[wl.ID]; !ok {
+					resp.Workloads[wl.ID] = []api.RESTIDName{workloadRisk2IDName(wl)}
 				}
 			}
 
 			if rpt := decodeCISReport(share.BenchContainer, wl.DockerBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
-						va := addCompAsset(all, item)
-						va.wls = append(va.wls, api.RESTIDName{
-							ID:          wl.ID,
-							DisplayName: wl.Name,
-							PolicyMode:  wl.PolicyMode,
-							Domains:     []string{wl.Domain},
-						})
+						ca := addCompAsset(all, item)
+						ca.wls.Add(wl.ID)
 					}
+				}
+				if _, ok := resp.Workloads[wl.ID]; !ok {
+					resp.Workloads[wl.ID] = []api.RESTIDName{workloadRisk2IDName(wl)}
 				}
 			}
 
 			if rpt := decodeCISReport(share.BenchContainerSecret, wl.SecretBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
-						va := addCompAsset(all, item)
-						va.wls = append(va.wls, api.RESTIDName{
-							ID:          wl.ID,
-							DisplayName: wl.Name,
-							PolicyMode:  wl.PolicyMode,
-							Domains:     []string{wl.Domain},
-						})
+						ca := addCompAsset(all, item)
+						ca.wls.Add(wl.ID)
 					}
+				}
+				if _, ok := resp.Workloads[wl.ID]; !ok {
+					resp.Workloads[wl.ID] = []api.RESTIDName{workloadRisk2IDName(wl)}
 				}
 			}
 
 			if rpt := decodeCISReport(share.BenchContainerSetID, wl.SetidBenchValue, cpf); rpt != nil {
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
-						va := addCompAsset(all, item)
-						va.wls = append(va.wls, api.RESTIDName{
-							ID:          wl.ID,
-							DisplayName: wl.Name,
-							PolicyMode:  wl.PolicyMode,
-							Domains:     []string{wl.Domain},
-						})
+						ca := addCompAsset(all, item)
+						ca.wls.Add(wl.ID)
 					}
+				}
+				if _, ok := resp.Workloads[wl.ID]; !ok {
+					resp.Workloads[wl.ID] = []api.RESTIDName{workloadRisk2IDName(wl)}
 				}
 			}
 		}
@@ -881,13 +867,11 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						ca := addCompAsset(all, item)
-						ca.nodes = append(ca.nodes, api.RESTIDName{
-							ID:          n.ID,
-							DisplayName: n.Name,
-							PolicyMode:  n.PolicyMode,
-							Domains:     nil,
-						})
+						ca.nodes.Add(n.ID)
 					}
+				}
+				if _, ok := resp.Nodes[n.ID]; !ok {
+					resp.Nodes[n.ID] = []api.RESTIDName{nodeRisk2IDName(n)}
 				}
 			}
 			if rpt := decodeCISReport(share.BenchDockerHost, n.DockerBenchValue, cpf); rpt != nil {
@@ -895,13 +879,11 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						ca := addCompAsset(all, item)
-						ca.nodes = append(ca.nodes, api.RESTIDName{
-							ID:          n.ID,
-							DisplayName: n.Name,
-							PolicyMode:  n.PolicyMode,
-							Domains:     nil,
-						})
+						ca.nodes.Add(n.ID)
 					}
+				}
+				if _, ok := resp.Nodes[n.ID]; !ok {
+					resp.Nodes[n.ID] = []api.RESTIDName{nodeRisk2IDName(n)}
 				}
 			}
 			if rpt := decodeCISReport(share.BenchKubeMaster, n.MasterBenchValue, cpf); rpt != nil {
@@ -909,13 +891,11 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						ca := addCompAsset(all, item)
-						ca.nodes = append(ca.nodes, api.RESTIDName{
-							ID:          n.ID,
-							DisplayName: n.Name,
-							PolicyMode:  n.PolicyMode,
-							Domains:     nil,
-						})
+						ca.nodes.Add(n.ID)
 					}
+				}
+				if _, ok := resp.Nodes[n.ID]; !ok {
+					resp.Nodes[n.ID] = []api.RESTIDName{nodeRisk2IDName(n)}
 				}
 			}
 			if rpt := decodeCISReport(share.BenchKubeWorker, n.WorkerBenchValue, cpf); rpt != nil {
@@ -923,13 +903,11 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 				for _, item := range rpt.Items {
 					if item.Level != "PASS" && item.Level != "NOTE" {
 						ca := addCompAsset(all, item)
-						ca.nodes = append(ca.nodes, api.RESTIDName{
-							ID:          n.ID,
-							DisplayName: n.Name,
-							PolicyMode:  n.PolicyMode,
-							Domains:     nil,
-						})
+						ca.nodes.Add(n.ID)
 					}
+				}
+				if _, ok := resp.Nodes[n.ID]; !ok {
+					resp.Nodes[n.ID] = []api.RESTIDName{nodeRisk2IDName(n)}
 				}
 			}
 		}
@@ -945,16 +923,20 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 					for _, item := range checks {
 						if item.Level != "PASS" && item.Level != "NOTE" {
 							ca := addCompAsset(all, item)
-
-							// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
-							// Policy mode is empty if the image is not used.
-							pm, _ := img2mode[id]
-							for i := 0; i < len(idns); i++ {
-								idns[i].PolicyMode = pm
-							}
-
-							ca.images = append(ca.images, idns...)
+							ca.images.Add(id)
 						}
+					}
+
+					// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
+					// Policy mode is empty if the image is not used.
+					pm, _ := img2mode[id]
+					for i := 0; i < len(idns); i++ {
+						idns[i].PolicyMode = pm
+					}
+					if exist, ok := resp.Images[id]; ok {
+						resp.Images[id] = append(exist, idns...)
+					} else {
+						resp.Images[id] = idns
 					}
 				}
 			}
@@ -962,61 +944,14 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var i int
-	var exists utils.Set
 	list := make([]*api.RESTComplianceAsset, len(all))
-	for _, comp := range all {
-		va := &api.RESTComplianceAsset{
-			Name:        comp.Name,
-			Catalog:     comp.Catalog,
-			Type:        comp.Type,
-			Level:       comp.Level,
-			Scored:      comp.Scored,
-			Profile:     comp.Profile,
-			Description: comp.Description,
-			Message:     comp.Message,
-			Remediation: comp.Remediation,
-			Group:       comp.Group,
-			Tags:        comp.Tags,
-			Workloads:   make([]api.RESTIDName, 0),
-			Nodes:       make([]api.RESTIDName, 0),
-			Images:      make([]api.RESTIDName, 0),
-			Platforms:   make([]api.RESTIDName, 0),
-		}
+	for _, c := range all {
+		c.asset.Workloads = c.wls.ToStringSlice() // Not to sort these lists to save some CPU cycles
+		c.asset.Nodes = c.nodes.ToStringSlice()
+		c.asset.Images = c.images.ToStringSlice()
+		c.asset.Platforms = c.platforms.ToStringSlice()
 
-		// Not to sort these lists to save some CPU cycles
-		exists = utils.NewSet()
-		for _, v := range comp.wls {
-			if !exists.Contains(v.ID) {
-				va.Workloads = append(va.Workloads, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range comp.nodes {
-			if !exists.Contains(v.ID) {
-				va.Nodes = append(va.Nodes, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range comp.images {
-			if !exists.Contains(v.ID) {
-				va.Images = append(va.Images, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		exists = utils.NewSet()
-		for _, v := range comp.platforms {
-			if !exists.Contains(v.ID) {
-				va.Platforms = append(va.Platforms, v)
-				exists.Add(v.ID)
-			}
-		}
-
-		list[i] = va
+		list[i] = c.asset
 		i++
 	}
 
@@ -1031,10 +966,25 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 		return list[s].Catalog == api.BenchCatalogCustom
 	})
 
-	resp := &api.RESTComplianceAssetData{
-		Compliances:   list,
-		KubeVersion:   getNewestVersion(kubeVers),
-		DockerVersion: getNewestVersion(dockerVers),
+	resp.Compliances = list
+	resp.KubeVersion = getNewestVersion(kubeVers)
+	resp.DockerVersion = getNewestVersion(dockerVers)
+
+	// remove id from RESTIDName to reduce data size.
+	for _, wls := range resp.Workloads {
+		for i, _ := range wls {
+			wls[i].ID = ""
+		}
+	}
+	for _, nodes := range resp.Nodes {
+		for i, _ := range nodes {
+			nodes[i].ID = ""
+		}
+	}
+	for _, images := range resp.Images {
+		for i, _ := range images {
+			images[i].ID = ""
+		}
 	}
 
 	log.WithFields(log.Fields{"entries": len(resp.Compliances)}).Debug("Response")

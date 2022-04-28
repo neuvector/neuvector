@@ -665,6 +665,8 @@ func scanWorkloadAdd(id string, param interface{}) {
 	if !common.OEMIgnoreWorkload(workload) {
 		idns := []api.RESTIDName{api.RESTIDName{Domains: []string{workload.Domain}}}
 		scanMapAdd(id, workload.AgentID, idns, share.ScanObjectType_CONTAINER)
+		// Read bench checks into cache in case its notification came earlier
+		benchStateHandler(cluster.ClusterNotifyAdd, share.CLUSBenchStateWorkloadKey(id), nil)
 	}
 }
 
@@ -687,6 +689,8 @@ func scanAgentAdd(id string, param interface{}) {
 	// the host has been scanned.
 	agent := param.(*agentCache).agent
 	scanMapAdd(agent.HostID, id, nil, share.ScanObjectType_HOST)
+	// Read bench checks into cache in case its notification came earlier
+	benchStateHandler(cluster.ClusterNotifyAdd, share.CLUSBenchStateHostKey(agent.HostID), nil)
 }
 
 func scanHostDelete(id string, param interface{}) {

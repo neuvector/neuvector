@@ -447,6 +447,7 @@ func readBenchFromCluster(id string, bench share.BenchType) []byte {
 	}
 }
 
+// value could be nil if it's coming from host/workload object notification
 func benchStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
 	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
