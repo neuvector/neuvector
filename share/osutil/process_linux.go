@@ -419,6 +419,8 @@ func GetProcessUIDs(pid int) (name string, ppid, ruid, euid int) {
 					}
 				}
 			}
+
+			name = filepath.Base(name)
 			if i := strings.IndexAny(name, "/: ;,"); i > 0 {
 				name = name[:i]
 			}
