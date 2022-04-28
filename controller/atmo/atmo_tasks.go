@@ -50,7 +50,10 @@ func (t *task) Expire() {
 		t.runs++
 		// log.WithFields(log.Fields{"group": t.id, "runs": t.runs}).Debug("ATMO:")
 	} else {
-		//log.WithFields(log.Fields{"group": t.id}).Debug("ATMO: invalid")
+		//log.WithFields(log.Fields{"group": t.id}).Debug("ATMO:")
+		if t.mover == Monitor2Protect {
+			t.runs = 0		// reset counters
+		}
 	}
 
 	if t.runs >= t.lifeFunc(t.mover) {
