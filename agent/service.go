@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -694,8 +693,10 @@ func (rs *RPCService) cbAgentCounter(buf []byte, param interface{}) bool {
 		return true
 	}
 
-	pid := os.Getpid()
-	lsof, _ := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
+	// Disable lsof because of NVSHAS-6356, hangs on centos
+	// pid := os.Getpid()
+	// lsof, _ := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
+	lsof := []byte("lsof disabled")
 	ps, _ := sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Agent.Pid)).Output()
 
 	offset := int(unsafe.Sizeof(*hdr))
