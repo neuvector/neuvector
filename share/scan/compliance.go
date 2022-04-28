@@ -519,7 +519,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Remediation: "Follow the current Dockerdocumentation on how to install the Docker daemon as a non-root user.",
 	},
 	"D.2.2": api.RESTBenchCheck{
-		TestNum:     "D.2.1",
+		TestNum:     "D.2.2",
 		Type:        "host",
 		Catalog:     "docker",
 		Scored:      true,

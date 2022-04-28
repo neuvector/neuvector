@@ -402,7 +402,7 @@ func getHostPolicyMode(cache *hostCache) (string, string) {
 	if cache, ok := groupCacheMap[api.AllHostGroup]; ok {
 		return cache.group.PolicyMode, cache.group.ProfileMode
 	} else {
-		return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+		return share.PolicyModeLearn, share.PolicyModeLearn
 	}
 }
 
@@ -410,7 +410,7 @@ func getWorkloadPerGroupPolicyMode(wlCache *workloadCache) (string, string) {
 	if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
 		return cache.group.PolicyMode, cache.group.ProfileMode
 	} else {
-		return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+		return share.PolicyModeLearn, share.PolicyModeLearn
 	}
 }
 
@@ -421,7 +421,7 @@ func getWorkloadEffectivePolicyMode(wlCache *workloadCache) (string, string) {
 		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
 			return getNetServicePolicyMode(), cache.group.ProfileMode
 		} else {
-			return getNetServicePolicyMode(), api.WorkloadStateDiscover
+			return getNetServicePolicyMode(), share.PolicyModeLearn
 		}
 	} else {
 		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
