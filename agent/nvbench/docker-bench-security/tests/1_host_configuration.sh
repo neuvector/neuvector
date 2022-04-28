@@ -110,7 +110,7 @@ check_1_1_3() {
 
 check_1_1_4() {
   local id="1.1.4"
-  local desc="Ensure auditing is configured for Docker files and directories -/run/containerd (Automated)"
+  local desc="Ensure auditing is configured for Docker files and directories - /run/containerd (Automated)"
   local remediation="Install auditd. Add -a exit,always -F path=/run/containerd -F perm=war -k docker to the /etc/audit/rules.d/audit.rules file. Then restart the audit daemon using command service auditd restart."
   local remediationImpact="Audit can generate large log files. So you need to make sure that they are rotated and archived periodically. Create a separate partition for audit logs to avoid filling up other critical partitions."
   local check="$id - $desc"
@@ -378,7 +378,7 @@ check_1_1_11() {
 
 check_1_1_12() {
   local id="1.1.12"
-  local desc="1.1.12 Ensure auditing is configured for Dockerfiles and directories - /etc/containerd/config.toml (Automated)"
+  local desc="Ensure auditing is configured for Dockerfiles and directories - /etc/containerd/config.toml (Automated)"
   local remediation="Install auditd. Add -w /etc/containerd/config.toml -k docker to the /etc/audit/rules.d/audit.rules file. Then restart the audit daemon using command service auditd restart."
   local remediationImpact="Audit can generate large log files. So you need to make sure that they are rotated and archived periodically. Create a separate partition for audit logs to avoid filling up other critical partitions."
   local check="$id - $desc"

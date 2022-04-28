@@ -113,9 +113,10 @@ check_5_3() {
   fail=0
   caps_containers=""
   for c in $containers; do
-    container_caps=$(docker inspect --format 'CapAdd={{ .HostConfig.CapAdd}}' "$c")
+    container_caps=$(docker inspect --format 'CapAdd={{ .HostConfig.CapAdd }}' "$c")
     caps=$(echo "$container_caps" | tr "[:lower:]" "[:upper:]" | \
       sed 's/CAPADD/CapAdd/' | \
+      sed -r "s/CAP_AUDIT_WRITE|CAP_CHOWN|CAP_DAC_OVERRIDE|CAP_FOWNER|CAP_FSETID|CAP_KILL|CAP_MKNOD|CAP_NET_BIND_SERVICE|CAP_NET_RAW|CAP_SETFCAP|CAP_SETGID|CAP_SETPCAP|CAP_SETUID|CAP_SYS_CHROOT|\s//g" | \
       sed -r "s/AUDIT_WRITE|CHOWN|DAC_OVERRIDE|FOWNER|FSETID|KILL|MKNOD|NET_BIND_SERVICE|NET_RAW|SETFCAP|SETGID|SETPCAP|SETUID|SYS_CHROOT|\s//g")
 
     if [ "$caps" != 'CapAdd=' ] && [ "$caps" != 'CapAdd=[]' ] && [ "$caps" != 'CapAdd=<no value>' ] && [ "$caps" != 'CapAdd=<nil>' ]; then
@@ -969,23 +970,32 @@ check_5_25() {
   starttestjson "$id" "$desc"
 
   fail=0
+  no_priv_config=0
   addprivs_containers=""
-  for c in $containers; do
-    if ! docker inspect --format 'SecurityOpt={{.HostConfig.SecurityOpt }}' "$c" | grep 'no-new-privileges' 2>/dev/null 1>&2; then
-      # If it's the first container, fail the test
-      if [ $fail -eq 0 ]; then
-        warn -s "$check"
+
+  if get_docker_effective_command_line_args '--no-new-privileges' | grep "no-new-privileges" >/dev/null 2>&1; then
+    no_priv_config=1
+  elif get_docker_configuration_file_args 'no-new-privileges' | grep true >/dev/null 2>&1; then
+    no_priv_config=1
+  else
+    for c in $containers; do
+      if ! docker inspect --format 'SecurityOpt={{.HostConfig.SecurityOpt }}' "$c" | grep 'no-new-privileges' 2>/dev/null 1>&2; then
+        # If it's the first container, fail the test
+        if [ $fail -eq 0 ]; then
+          warn -s "$check"
+          warn "      * Privileges not restricted: $c"
+          addprivs_containers="$addprivs_containers $c"
+          fail=1
+          continue
+        fi
         warn "      * Privileges not restricted: $c"
         addprivs_containers="$addprivs_containers $c"
-        fail=1
-        continue
       fi
-      warn "      * Privileges not restricted: $c"
-      addprivs_containers="$addprivs_containers $c"
-    fi
-  done
+    done
+  fi
+
   # We went through all the containers and found none with capability to acquire additional privileges
-  if [ $fail -eq 0 ]; then
+  if [ $fail -eq 0 ] || [ $no_priv_config -eq 1 ]; then
     pass -s "$check"
     logcheckresult "PASS"
     return
