@@ -69,11 +69,7 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		MinVersion:               tls.VersionTLS11,
 		PreferServerCipherSuites: true,
 		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
-		// FIXME: This is required for full mTLS, but in order to support
-		// previous version, especially for the connection from old
-		// controller to the new external scanner, we have to disable
-		// this now! Will enable it when most users are upgrded to 4.x
-		// ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:               tls.RequireAndVerifyClientCert,
 	}
 	creds := credentials.NewTLS(config)
 
