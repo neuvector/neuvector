@@ -271,7 +271,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		if depth < jarMaxDepth && isJava(f.Name) {
+		if depth+1 < jarMaxDepth && isJava(f.Name) {
 			// Parse jar file recursively
 			if jarFile, err := f.Open(); err == nil {
 				// Unzip the jar file to disk then walk through. Can we unzip on the fly?
