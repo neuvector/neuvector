@@ -2686,6 +2686,12 @@ static void dp_ctrl_update_connects(void)
 
 static void dp_ctrl_update_fqdn_ip(void)
 {
+    //this function is called in ctrl thread, but g_fqdn_hdl is initialized
+    //in data thread, no guarantee g_fqdn_hdl is already initialized when ctrl
+    //thread reach here during dp start, so we check null value here
+    if (g_fqdn_hdl == NULL) {
+        return;
+    }
     struct cds_lfht_node *name_node;
 
     // Iterate through fqdn map
