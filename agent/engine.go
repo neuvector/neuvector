@@ -1521,7 +1521,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 
 	// entry to apply group policies
 	workloadJoinGroup(c)
-	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, hostMode && info.Privileged)
+	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, info.Privileged)
 	prober.HandleAnchorModeChange(true, c.id, c.upperDir, c.pid)
 
 	if parent == nil {
