@@ -1074,15 +1074,15 @@ func updateContainerFamilyTrees(name string) {
 	grpCacheLock.Unlock()
 
 	for _, cid := range cids {
-		bPrivHostmode := false
+		bPrivileged := false
 		gInfoRLock()
 		c, ok := gInfo.activeContainers[cid]
 		if ok && c.info != nil {
-			bPrivHostmode = c.hostMode && c.info.Privileged
+			bPrivileged = c.info.Privileged
 		}
 		gInfoRUnlock()
 		if ok {
-			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivHostmode)
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivileged)
 		}
 	}
 }
