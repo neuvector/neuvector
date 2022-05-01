@@ -8,14 +8,17 @@ type tagsResponse struct {
 	Tags []string `json:"tags"`
 }
 
-func (registry *Registry) Tags(repository string) ([]string, error) {
-	var err error
-	url := registry.url("/v2/%s/tags/list", repository)
+func (r *Registry) Tags(repository string) ([]string, error) {
+	url := r.url("/v2/%s/tags/list", repository)
 	tags := make([]string, 0)
+
 	var response tagsResponse
+	var err error
+
+	r.Client.SetTimeout(longTimeout)
 	for {
 		log.WithFields(log.Fields{"url": url, "repository": repository}).Debug()
-		url, err = registry.getPaginatedJson(url, &response)
+		url, err = r.getPaginatedJson(url, &response)
 		switch err {
 		case ErrNoMorePages:
 			tags = append(tags, response.Tags...)

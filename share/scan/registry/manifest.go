@@ -16,8 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const nonDataTimeout = 20 * time.Second
-
 type ManifestInfo struct {
 	SignedManifest *manifestV1.SignedManifest
 	Digest         string

@@ -14,18 +14,21 @@ type repositoriesResponse struct {
 	Repositories []string `json:"repositories"`
 }
 
-func (registry *Registry) Repositories() ([]string, error) {
-	url := registry.url("/v2/_catalog")
+func (r *Registry) Repositories() ([]string, error) {
+	url := r.url("/v2/_catalog")
 	repos := make([]string, 0)
-	var err error
-	var response repositoriesResponse
 
+	var response repositoriesResponse
+	var err error
+
+	r.Client.SetTimeout(longTimeout)
 	for {
 		log.WithFields(log.Fields{"url": url}).Debug()
-		if !strings.HasPrefix(url, registry.URL) {
-			url = registry.URL + url
+		if !strings.HasPrefix(url, r.URL) {
+			url = r.URL + url
 		}
-		url, err = registry.getPaginatedJson(url, &response)
+
+		url, err = r.getPaginatedJson(url, &response)
 		switch err {
 		case ErrNoMorePages:
 			repos = append(repos, response.Repositories...)
@@ -40,9 +43,9 @@ func (registry *Registry) Repositories() ([]string, error) {
 	}
 }
 
-func (registry *Registry) Search(term string, limit int) ([]string, error) {
-	u := registry.url("/v1/search?q=" + url.QueryEscape(term) + "&n=" + url.QueryEscape(fmt.Sprintf("%d", limit)))
-	resp, err := registry.Client.Get(u)
+func (r *Registry) Search(term string, limit int) ([]string, error) {
+	u := r.url("/v1/search?q=" + url.QueryEscape(term) + "&n=" + url.QueryEscape(fmt.Sprintf("%d", limit)))
+	resp, err := r.Client.Get(u)
 	if err != nil {
 		return nil, err
 	}
