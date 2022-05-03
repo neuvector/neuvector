@@ -39,14 +39,17 @@ const (
 	tomcatName         = "Tomcat"
 	jarMaxDepth        = 2
 
-	javaPOMproperty   = "/pom.properties"
-	javaPOMgroupId    = "groupId="
-	javaPOMartifactId = "artifactId="
-	javaPOMversion    = "version="
-	javaManifest      = "MANIFEST.MF"
-	javaMnfstVendorId = "Implementation-Vendor-Id:"
-	javaMnfstVersion  = "Implementation-Version:"
-	javaMnfstTitle    = "Implementation-Title:"
+	javaPOMproperty         = "/pom.properties"
+	javaPOMgroupId          = "groupId="
+	javaPOMartifactId       = "artifactId="
+	javaPOMversion          = "version="
+	javaManifest            = "MANIFEST.MF"
+	javaMnfstVendorId       = "Implementation-Vendor-Id:"
+	javaMnfstVersion        = "Implementation-Version:"
+	javaMnfstTitle          = "Implementation-Title:"
+	javaMnfstBundleVendorId = "Bundle-Vendor:"
+	javaMnfstBundleVersion  = "Bundle-Version:"
+	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -349,6 +352,10 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					break
 				}
 			}
+			if groupId == "" || version == "" || artifactId == "" {
+				log.WithFields(log.Fields{"path": path}).Info("Missing artifactId, groupId, or version")
+				continue
+			}
 
 			pkg := AppPackage{
 				AppName:    jar,
@@ -377,6 +384,12 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
 				case strings.HasPrefix(line, javaMnfstTitle):
 					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
+				case strings.HasPrefix(line, javaMnfstBundleVendorId):
+					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
+				case strings.HasPrefix(line, javaMnfstBundleVersion):
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+				case strings.HasPrefix(line, javaMnfstBundleTitle):
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
 				}
 
 				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
@@ -385,7 +398,8 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			}
 
 			//Suppress incomplete entries as we can't use them later.
-			if title != "" || version != "" {
+			if title == "" || version == "" || vendorId == "" {
+				log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
 				continue
 			}
 
