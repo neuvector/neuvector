@@ -1129,6 +1129,11 @@ func connectHostAdd(id string, param interface{}) {
 
 	graphMutexLock()
 	defer graphMutexUnlock()
+
+	_connectHostAdd(host)
+}
+
+func _connectHostAdd(host *share.CLUSHost) {
 	for _, addrs := range host.Ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {

@@ -423,8 +423,19 @@ func syncLeftNVObjectsToCluster() {
 	for _, cache := range hostCacheMap {
 		if cache.state == api.StateLeft {
 			deleteHostFromCluster(cache.host.ID)
-		} else {
-			evhdls.Trigger(EV_HOST_ADD, cache.host.ID, cache)
+		}
+	}
+}
+
+func cleanHostUnmanagedWorkload() {
+	graphMutexLock()
+	defer graphMutexUnlock()
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	for _, cache := range hostCacheMap {
+		if cache.state != api.StateLeft {
+			_connectHostAdd(cache.host)
 		}
 	}
 }

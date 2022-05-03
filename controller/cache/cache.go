@@ -274,6 +274,10 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 
 	// When lead change, synchonize states in case operation was missed
 	syncLeftNVObjectsToCluster()
+	//NVSHAS-5914, During rolling upgrade remove the unmanaged workload
+	//drawn on network activity canvas related to host/tunnel ip.
+	cleanHostUnmanagedWorkload()
+
 	// When recovering from a lead loss because controllers left ungracefully, the new lead
 	// could be a fresh new controller. Should not sync the policy to the cluster.
 	// syncLearnedPolicyToClusterWrapper()
