@@ -2567,9 +2567,9 @@ func (p *Probe) evaluateLiveApps(id string) {
 func (p *Probe) processProfileReeval(id string, pg *share.CLUSProcessProfile, bAddContainer bool) {
 	if bAddContainer {
 		go p.PutBeginningProcEventsBackToWork(id)
-	} else {
-		go p.evaluateLiveApps(id)
 	}
+
+	go p.evaluateLiveApps(id)
 
 	// update riskApp by current policy
 	p.updateCurrentRiskyAppRule(id, pg)
