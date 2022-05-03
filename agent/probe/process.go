@@ -2808,7 +2808,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		}
 
 		if bRuncChild {
-			bCanBeLearned = false
+		//	bCanBeLearned = false
 			c.outsider.Remove(proc.pid)
 			c.children.Add(proc.pid)
 		}
