@@ -397,14 +397,14 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				}
 			}
 
-			//Suppress incomplete entries as we can't use them later.
-			if title == "" || version == "" || vendorId == "" {
-				log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-				continue
-			}
-
 			if len(vendorId) == 0 {
 				vendorId = "jar"
+			}
+
+			//Suppress incomplete entries as we can't use them later.
+			if title == "" || version == "" {
+				log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
+				continue
 			}
 
 			pkg := AppPackage{
