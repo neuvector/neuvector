@@ -2111,6 +2111,11 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 	return false
 }
 
+// a runc building-command during "docker run" (not from root process but exists parallelly)
+func (p *Probe) isAllowRuncInitCommand(path string, cmds[]string) bool {
+	return filepath.Base(path) == "runc" && len(cmds) >= 2 && cmds[0] == "runc" &&  cmds[1] == "init"
+}
+
 func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc, bZeroDrift bool) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
@@ -2150,6 +2155,10 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			return true
 		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
+		default:
+			if p.isAllowRuncInitCommand(proc.path, proc.cmds) {
+				return true
+			}
 		}
 
 		// NV4856
@@ -2737,6 +2746,13 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			// this file is not existed
 			bImageFile = false
 			log.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+		}
+
+		// from docker run, v20.10.7
+		bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+		if bRtProcP && p.isAllowRuncInitCommand(proc.path, proc.cmds) {
+			// mlog.WithFields(log.Fields{"id": id}).Debug("SHD: runc init")
+			return true
 		}
 	} else {
 		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
