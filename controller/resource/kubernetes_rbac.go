@@ -791,7 +791,11 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 	} else {
 		n = res.(*k8sRole)
 		ref := k8sObjectRef{name: n.name, domain: n.domain}
-		d.roleCache[ref] = n.nvRole
+		if n.nvRole != "" {
+			d.roleCache[ref] = n.nvRole
+		} else {
+			delete(d.roleCache, ref)
+		}
 		log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole}).Debug("Update role")
 
 		// in case the clusterrole neuvector-binding-customresourcedefinition is recreated/updated(after nv 5.0 deployment)
@@ -1103,6 +1107,8 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 			return
 		} else if len(rbac) > 0 {
 			d.rbacCache[subj] = rbac
+		} else {
+			delete(d.rbacCache, subj)
 		}
 
 		d.lock.Lock()
