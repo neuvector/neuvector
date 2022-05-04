@@ -1887,17 +1887,20 @@ func startWorkerThread() {
 
 				*/
 				case resource.RscTypeValidatingWebhookConfiguration:
-					if skip := atomic.LoadUint32(&nvDeployDeleted); skip > 0 || !isLeader() {
+					if skip := atomic.LoadUint32(&nvDeployDeleted); skip > 0 {
+						log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Info("being deleted")
 						return
 					}
-					var n, o *resource.AdmissionWebhookConfiguration
-					if ev.ResourceNew != nil {
-						n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
+					if isLeader() {
+						var n, o *resource.AdmissionWebhookConfiguration
+						if ev.ResourceNew != nil {
+							n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
+						}
+						if ev.ResourceOld != nil {
+							o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
+						}
+						refreshK8sAdminWebhookStateCache(o, n)
 					}
-					if ev.ResourceOld != nil {
-						o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
-					}
-					refreshK8sAdminWebhookStateCache(o, n)
 				}
 			}
 		}

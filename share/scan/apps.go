@@ -39,14 +39,17 @@ const (
 	tomcatName         = "Tomcat"
 	jarMaxDepth        = 2
 
-	javaPOMproperty    = "/pom.properties"
-	javaPOMgroupId     = "groupId="
-	javaPOMartifactId  = "artifactId="
-	javaPOMversion     = "version="
-	javaManifest       = "MANIFEST.MF"
-	javaMnfstVendorId  = "Implementation-Vendor-Id:"
-	javaMnfstVersion   = "Implementation-Version:"
-	javaMnfstTitle     = "Implementation-Title:"
+	javaPOMproperty         = "/pom.properties"
+	javaPOMgroupId          = "groupId="
+	javaPOMartifactId       = "artifactId="
+	javaPOMversion          = "version="
+	javaManifest            = "MANIFEST.MF"
+	javaMnfstVendorId       = "Implementation-Vendor-Id:"
+	javaMnfstVersion        = "Implementation-Version:"
+	javaMnfstTitle          = "Implementation-Title:"
+	javaMnfstBundleVendorId = "Bundle-Vendor:"
+	javaMnfstBundleVersion  = "Bundle-Version:"
+	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -271,7 +274,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 		if f.FileInfo().IsDir() {
 			continue
 		}
-
 		if depth+1 < jarMaxDepth && isJava(f.Name) {
 			// Parse jar file recursively
 			if jarFile, err := f.Open(); err == nil {
@@ -288,7 +290,10 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 						dstFile.Close()
 						log.WithFields(log.Fields{"dst": dstPath, "filename": filename, "err": err}).Error("unable to copy jar file")
 					}
-					os.Remove(dstPath)
+					err := os.Remove(dstPath)
+					if err != nil {
+						log.WithFields(log.Fields{"dst": dstPath, "filename": filename, "err": err}).Error("unable to remove dst path")
+					}
 				} else {
 					log.WithFields(log.Fields{"dst": dstPath, "err": err}).Error("unable to create dst file")
 				}
@@ -343,9 +348,13 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					artifactId = strings.TrimSpace(strings.TrimPrefix(line, javaPOMartifactId))
 				}
 
-				if len(groupId) > 0  && len(version) > 0 && len(artifactId) > 0 {
+				if len(groupId) > 0 && len(version) > 0 && len(artifactId) > 0 {
 					break
 				}
+			}
+			if groupId == "" || version == "" || artifactId == "" {
+				log.WithFields(log.Fields{"path": path}).Info("Missing artifactId, groupId, or version")
+				continue
 			}
 
 			pkg := AppPackage{
@@ -355,7 +364,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				Version:    version,
 			}
 			pkgs[path] = []AppPackage{pkg}
-			break	// higher priority
+			continue //higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
 			var vendorId, version, title string
 			rc, err := f.Open()
@@ -375,15 +384,27 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
 				case strings.HasPrefix(line, javaMnfstTitle):
 					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
+				case strings.HasPrefix(line, javaMnfstBundleVendorId):
+					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
+				case strings.HasPrefix(line, javaMnfstBundleVersion):
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+				case strings.HasPrefix(line, javaMnfstBundleTitle):
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
 				}
 
-				if len(vendorId) > 0  && len(title) > 0 && len(version) > 0 {
+				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
 					break
 				}
 			}
 
 			if len(vendorId) == 0 {
 				vendorId = "jar"
+			}
+
+			//Suppress incomplete entries as we can't use them later.
+			if title == "" || version == "" {
+				log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
+				continue
 			}
 
 			pkg := AppPackage{

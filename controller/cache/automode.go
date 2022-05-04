@@ -1,4 +1,5 @@
 package cache
+
 import (
 	"fmt"
 	"math/rand"
@@ -37,7 +38,7 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 	defer cacheMutexRUnlock()
 	if cache, ok := groupCacheMap[group]; ok {
 		if cache.members.Cardinality() == 0 {
-			return false, nil	// TBD
+			return false, nil // TBD
 		}
 
 		var count int
@@ -109,9 +110,10 @@ func automode_test_func(mover int, group string, probeDuration time.Duration) (b
 func automode_log_event(group, mode string) {
 	clog := share.CLUSEventLog{
 		Event:      share.CLUSEvGroupAutoPromote,
+		GroupName:  group,
 		ReportedAt: time.Now().UTC(),
 	}
-	clog.Msg = fmt.Sprintf("Promote %s to %s.\n", group, mode)
+	clog.Msg = fmt.Sprintf("Promote the policy mode of group %s to %s.\n", group, mode)
 	cctx.EvQueue.Append(&clog)
 }
 
@@ -185,9 +187,9 @@ func automode_decision_func(mover int, group string, err error) error {
 	} else {
 		go func() {
 			r1 := rand.New(rand.NewSource(time.Now().UnixNano()))
-			wait_sec := 3 * 60 + r1.Intn(100)	// separating controller actions. no promoting when it has been already promoted
+			wait_sec := 3*60 + r1.Intn(100) // separating controller actions. no promoting when it has been already promoted
 			time.Sleep(time.Second * time.Duration(wait_sec))
-			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, time.Duration(time.Second * 60))
+			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, time.Duration(time.Second*60))
 			if err != nil {
 				log.WithFields(log.Fields{"group": group, "mode": targetMode}).Error("failed: delay changed")
 				return
@@ -231,7 +233,7 @@ func automode_init_trigger(mover int) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 	for name, cache := range groupCacheMap {
-		if !utils.DoesGroupHavePolicyMode(name) || name == api.AllHostGroup || cache.group == nil{
+		if !utils.DoesGroupHavePolicyMode(name) || name == api.AllHostGroup || cache.group == nil {
 			continue
 		}
 
@@ -259,6 +261,7 @@ func automode_trigger_m2p() {
 }
 
 var firstUpdated bool
+
 func automodeConfigUpdate(cfg, cache share.CLUSSystemConfig) {
 	// log.WithFields(log.Fields{"cfg": cfg, "cache": cache}).Debug("ATMO:")
 	if firstUpdated {
@@ -307,7 +310,7 @@ func automodeGroupAdd(name string, param interface{}) {
 
 		// log.WithFields(log.Fields{"name": name, "cache": cache, "group": cache.group}).Debug("ATMO:")
 		now := time.Now().Unix()
-		switch(cache.group.ProfileMode) {
+		switch cache.group.ProfileMode {
 		case share.PolicyModeLearn:
 			mover = atmo.Discover2Monitor
 			if cache.atmo_d2m > 0 {
@@ -327,7 +330,7 @@ func automodeGroupAdd(name string, param interface{}) {
 		}
 		atmoHelper.AddGroup(mover, name)
 	} else {
-		cache.atmo_m2p = 0	// reset all
+		cache.atmo_m2p = 0 // reset all
 		cache.atmo_d2m = 0
 	}
 }

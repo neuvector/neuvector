@@ -1275,6 +1275,7 @@ type CLUSEventLog struct {
 	RESTBody       string            `json:"rest_body,omitempty"`
 	EnforcerLimit  int               `json:"enforcer_limit,omitempty"`
 	LicenseExpire  time.Time         `json:"license_expire,omitempty"`
+	GroupName      string            `json:"group_name"`
 	Msg            string            `json:"message"`
 }
 

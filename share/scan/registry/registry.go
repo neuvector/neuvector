@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -24,6 +25,9 @@ type Registry struct {
 	URL    string
 	Client *httptrace.TraceClient
 }
+
+const nonDataTimeout = 20 * time.Second
+const longTimeout = 300 * time.Second
 
 func NewSecure(registryUrl, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
 	transport := &http.Transport{

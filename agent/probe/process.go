@@ -54,7 +54,7 @@ type procContainer struct {
 	portsMap         map[osutil.SocketInfo]*procApp
 	checkRemovedPort uint
 	fInfo            map[string]*fileInfo
-	bPrivHostmode 	 bool
+	bPrivileged 	 bool
 }
 
 type procInternal struct {
@@ -2111,6 +2111,25 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 	return false
 }
 
+// a runc building-command during "docker run" (not from root process but exists parallelly)
+func (p *Probe) isAllowRuncInitCommand(path string, cmds[]string) bool {
+	if filepath.Base(path) == "runc" {
+		for i, cmd := range cmds {
+			if i == 0 && filepath.Base(cmds[0]) != "runc" {
+				break
+			}
+
+			if i > 0 {
+				switch cmd {
+				case "init", "create":
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc, bZeroDrift bool) bool {
 	if proc.riskyChild && proc.riskType != "" {
 		return false
@@ -2150,6 +2169,10 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			return true
 		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
+		default:
+			if p.isAllowRuncInitCommand(proc.path, proc.cmds) {
+				return true
+			}
 		}
 
 		// NV4856
@@ -2294,9 +2317,9 @@ func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup 
 
 	switch uuid {
 	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
-		s = p.makeProcessReport(id, proc, "Process profile violation, this file has been modified", nil, false, group, uuid)
+		s = p.makeProcessReport(id, proc, "Process profile violation, not from an image file", nil, false, group, uuid)
 	case share.CLUSReservedUuidShieldMode:	// zero-drift incident
-		s = p.makeProcessReport(id, proc, "Process profile violation, not from root process", nil, false, group, uuid)
+		s = p.makeProcessReport(id, proc, "Process profile violation, not from its root process", nil, false, group, uuid)
 	default: // rules-based incident
 		s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, uuid)
 	}
@@ -2409,24 +2432,24 @@ func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 		elements := histProc.DumpExt()
 		for i := 0; i < len(elements); i++ {
 			proc := elements[i].(*procInternal)
+
 			// filter the docker run events since the path is not in the containers
-			if p.isDockerDaemonProcess(proc, id) {
-				// filter it out
-			} else {
-				// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC:")
-				//  Skip the inherted actions from parents.
-				//  These processes has not been justified by policy, all the actions and riskinfo are default values
-				//  assume no ousiders during the initial stage, only justify insider processes
-				if p.isInsiderProcess(id, proc.pid) {
-					p.evaluateApplication(proc, id, true)
-					// update its results
-					if p, ok := p.pidProcMap[proc.pid]; ok {
-						p.reported = proc.reported
-						p.action = proc.action
-					}
-					cnt++
-				}
+			if global.RT.IsRuntimeProcess(proc.name, nil) {
+				// skip: runtime processes,  filter it out
+				continue
 			}
+
+			// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC:")
+			//  Skip the inherted actions from parents.
+			//  These processes has not been justified by policy, all the actions and riskinfo are default values
+			//  assume no ousiders during the initial stage, only justify insider processes
+			p.evaluateApplication(proc, id, true)
+			// update its results
+			if p, ok := p.pidProcMap[proc.pid]; ok {
+				p.reported = proc.reported
+				p.action = proc.action
+			}
+			cnt++
 		}
 	}
 
@@ -2558,9 +2581,9 @@ func (p *Probe) evaluateLiveApps(id string) {
 func (p *Probe) processProfileReeval(id string, pg *share.CLUSProcessProfile, bAddContainer bool) {
 	if bAddContainer {
 		go p.PutBeginningProcEventsBackToWork(id)
-	} else {
-		go p.evaluateLiveApps(id)
 	}
+
+	go p.evaluateLiveApps(id)
 
 	// update riskApp by current policy
 	p.updateCurrentRiskyAppRule(id, pg)
@@ -2729,12 +2752,21 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	bNotImageButNewlyAdded := false
 	bImageFile = true
 	if global.SYS.IsNotContainerFile(c.rootPid, ppe.Path) {
-		log.WithFields(log.Fields{"c.bPrivHostmode": c.bPrivHostmode}).Debug("SHD:")
-		if c.bPrivHostmode {
+		// We will not monitor files under the mounted folder
+		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
+		if c.bPrivileged {
 			log.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 		} else {
 			// this file is not existed
 			bImageFile = false
+			log.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+		}
+
+		// from docker run, v20.10.7
+		bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+		if bRtProcP && p.isAllowRuncInitCommand(proc.path, proc.cmds) {
+			// mlog.WithFields(log.Fields{"id": id}).Debug("SHD: runc init")
+			return true
 		}
 	} else {
 		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
@@ -2766,6 +2798,10 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					if i== 0 && err != nil {	// process left, pstree failed, trace back 8 entries, could be more restrictive
 						for j := 1; j <= 8; j++ {
 							ppid = proc.ppid - j
+							if ppid == c.rootPid {
+								mLog.WithFields(log.Fields{"pid": ppid}).Debug("SHD: rootPid")
+								break
+							}
 							if pp, ok := p.pidProcMap[ppid]; ok && len(pp.name) > 1 {	// "" or "."
 								if c, ok := p.pidContainerMap[ppid]; ok && c.id == "" { // only node process
 									bRuncChild = global.RT.IsRuntimeProcess(pp.name, nil)
@@ -2780,6 +2816,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					break
 				} else {
 					var name string
+					if ppid == c.rootPid {
+						mLog.WithFields(log.Fields{"ppid": ppid}).Debug("SHD: rootPid")
+						break
+					}
+
 					if p, ok := p.pidProcMap[ppid]; ok && len(p.name) > 1 {	// "" or "."
 						name = p.name
 					} else if path, err := global.SYS.GetFilePath(ppid); err == nil { // exe path
@@ -2797,7 +2838,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		}
 
 		if bRuncChild {
-			bCanBeLearned = false
+		//	bCanBeLearned = false
 			c.outsider.Remove(proc.pid)
 			c.children.Add(proc.pid)
 		}
@@ -2883,7 +2924,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	return bPass
 }
 
-func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivilegedHostmode bool) {
+func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
 
 	p.lockProcMux()
@@ -2911,7 +2952,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	}
 
 	c.rootPid = rootPid
-	c.bPrivHostmode = bPrivilegedHostmode
+	c.bPrivileged = bPrivileged
 	allPids := c.outsider.Union(c.children)
 	allPids.Add(rootPid) // all collections: add rootPid as a pivot point
 	c.outsider.Clear()   // reset
@@ -2977,18 +3018,6 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 		}
 		p.unlockProcMux()
 	}
-}
-
-// already locked
-func (p *Probe) isInsiderProcess(id string, pid int) bool {
-	if id == "" {
-		return true // always
-	}
-
-	if c, ok := p.containerMap[id]; ok {
-		return c.children.Contains(pid)
-	}
-	return false
 }
 
 func (p *Probe) UpdateFromAllowRule(id, path string) {

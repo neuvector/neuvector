@@ -615,7 +615,7 @@ func eventLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, m
 						name: rlog.Name, level: rlog.Level, arg: rlog}
 				} else {
 					desc = eventDesc{id: rlog.WorkloadID, event: share.EventEvent,
-						name: rlog.Name, level: rlog.Level, arg: rlog}
+						name: rlog.Name, groupName: ev.GroupName, level: rlog.Level, arg: rlog}
 				}
 				responseRuleLookup(&desc)
 			}

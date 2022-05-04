@@ -918,7 +918,7 @@ func xlateValidatingWebhookConfiguration(obj k8s.Resource) (string, interface{})
 	} else if o, ok := obj.(*apiv1beta1.ValidatingWebhookConfiguration); ok {
 		meta = o.Metadata
 	}
-	if meta != nil {
+	if meta != nil && meta.GetName() == NvAdmValidatingName {
 		r := &AdmissionWebhookConfiguration{
 			AdmType: nvAdmValidateType,
 			Name:    meta.GetName(),

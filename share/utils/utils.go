@@ -969,6 +969,20 @@ func IsMountPoint(path string) bool {
 	return stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev
 }
 
+func IsContainerMountFile(pid int, path string) bool {
+	rootPath := fmt.Sprintf("/proc/%d/root/.", pid)
+	stat, err := os.Stat(filepath.Join(rootPath, path))
+	if err != nil {
+		return false
+	}
+	rootStat, err := os.Lstat(rootPath)
+	if err != nil {
+		return false
+	}
+	// If the directory has the same device as parent, then it's not a mountpoint.
+	return stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev
+}
+
 // IsExecutableLinkableFile: explore ELF header
 func IsExecutableLinkableFile(path string) bool {
 	// checking ELF header
