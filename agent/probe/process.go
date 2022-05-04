@@ -2113,7 +2113,21 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 
 // a runc building-command during "docker run" (not from root process but exists parallelly)
 func (p *Probe) isAllowRuncInitCommand(path string, cmds[]string) bool {
-	return filepath.Base(path) == "runc" && len(cmds) >= 2 && cmds[0] == "runc" &&  cmds[1] == "init"
+	if filepath.Base(path) == "runc" {
+		for i, cmd := range cmds {
+			if i == 0 && filepath.Base(cmds[0]) != "runc" {
+				break
+			}
+
+			if i > 0 {
+				switch cmd {
+				case "init", "create":
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (p *Probe) isProcessException(proc *procInternal, group, id string, bParentHostProc, bZeroDrift bool) bool {
