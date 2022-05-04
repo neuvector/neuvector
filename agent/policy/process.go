@@ -172,12 +172,14 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 	if ok {
 		var matchedEntry *share.CLUSProcessProfileEntry
 		for _, p := range profile.Process {
-			if len(p.ProbeCmds) > 0 && p.Name == "sh" && p.Path == "*" {
-				// replace
-				if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
-					p.Name = "*"
-					p.Path = app
-				}
+			if len(p.ProbeCmds) > 0 {
+			//	if p.Name == "sh" && p.Path == "*" {		// replace
+			//		if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
+			//			p.Name = "*"
+			//			p.Path = app
+			//		}
+			//	}
+				continue  // trigger a learning event
 			}
 
 			if MatchProfileProcess(p, proc) {
