@@ -1695,9 +1695,11 @@ func startWorkerThread() {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Node)
 					}
-					if o == nil {
+					if n != nil {
+						//as long as new is not nil, no matter old is nil or not
 						addrOrchHostAdd(n.IPNets)
-					} else if n == nil {
+					} else if o != nil {
+						//new is nil and old is not nil
 						addrOrchHostDelete(o.IPNets)
 						connectOrchHostDelete(o.IPNets)
 					}
