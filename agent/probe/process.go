@@ -2227,6 +2227,15 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 }
 
 func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) (string, bool) {
+	if filepath.Base(proc.path) != proc.name {
+		// update name
+		if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
+			proc.name = name
+		} else {
+			proc.name = filepath.Base(proc.path)
+		}
+	}
+
 	pp := &share.CLUSProcessProfileEntry{
 		Name:   proc.name,
 		User:   proc.user,
@@ -2740,12 +2749,12 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		log.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
+		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
 		return true
 	}
 
 	if proc.pid == c.rootPid {
-		log.WithFields(log.Fields{"id": id, "rootPid": proc.pid}).Debug("SHD: rootPid")
+		mLog.WithFields(log.Fields{"id": id, "rootPid": proc.pid}).Debug("SHD: rootPid")
 		return true
 	}
 
@@ -2755,11 +2764,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		// We will not monitor files under the mounted folder
 		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
 		if c.bPrivileged {
-			log.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 		} else {
 			// this file is not existed
 			bImageFile = false
-			log.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+			mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
 		}
 
 		// from docker run, v20.10.7
