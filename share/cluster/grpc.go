@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/peer"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
@@ -28,13 +27,15 @@ var subjectCN string
 
 func middlefunc(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	// get client tls info
-	if p, ok := peer.FromContext(ctx); ok {
-		if mtls, ok := p.AuthInfo.(credentials.TLSInfo); ok {
-			for _, item := range mtls.State.PeerCertificates {
-				log.WithFields(log.Fields{"subject": item.Subject}).Info("grpc cert")
+	/*
+		if p, ok := peer.FromContext(ctx); ok {
+			if mtls, ok := p.AuthInfo.(credentials.TLSInfo); ok {
+				for _, item := range mtls.State.PeerCertificates {
+					log.WithFields(log.Fields{"subject": item.Subject}).Info("grpc cert")
+				}
 			}
 		}
-	}
+	*/
 	return handler(ctx, req)
 }
 
