@@ -2271,7 +2271,9 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
-				if pp.Action != share.PolicyActionLearn {
+				switch pp.Action {
+				case share.PolicyActionLearn, share.PolicyActionCheckApp:	// exclude these two actions
+				default:
 					pp.Action = share.PolicyActionAllow
 				}
 			}
@@ -2452,11 +2454,10 @@ func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 			//  Skip the inherted actions from parents.
 			//  These processes has not been justified by policy, all the actions and riskinfo are default values
 			//  assume no ousiders during the initial stage, only justify insider processes
-			p.evaluateApplication(proc, id, true)
-			// update its results
-			if p, ok := p.pidProcMap[proc.pid]; ok {
-				p.reported = proc.reported
-				p.action = proc.action
+			if pp, ok := p.pidProcMap[proc.pid]; ok {
+				p.evaluateApplication(pp, id, true)
+			} else {	// process was gone
+				p.evaluateApplication(proc, id, true)
 			}
 			cnt++
 		}
@@ -2547,7 +2548,7 @@ func (p *Probe) updateCurrentRiskyAppRule(id string, pg *share.CLUSProcessProfil
 
 // under parent's lock
 func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
-	if proc := p.pidProcMap[pid]; proc != nil {
+	if proc, ok := p.pidProcMap[pid]; ok {
 		if osutil.IsPidValid(proc.pid) {
 			proc.name, proc.ppid, _, _ = osutil.GetProcessUIDs(proc.pid)
 			if !global.RT.IsRuntimeProcess(proc.name, nil) {
