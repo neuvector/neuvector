@@ -521,12 +521,14 @@ func (fsn *FileNotificationCtr) GetUpperFileInfo(id, file string) (*fileInfo, bo
 				return finfo, true
 			}
 
-			if fi, err := os.Stat(filepath.Join(root.cLayer, file)); err == nil {
-				finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, file)
-				finfo.fileType = file_added
-				root.files[file] = finfo
-				// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
-				return finfo, true // patch missing event
+			if fsn.storageDrv != drv_btrfs {
+				if fi, err := os.Stat(filepath.Join(root.cLayer, file)); err == nil {
+					finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, file)
+					finfo.fileType = file_added
+					root.files[file] = finfo
+					// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
+					return finfo, true // patch missing event
+				}
 			}
 
 			// possible image file
