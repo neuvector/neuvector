@@ -394,7 +394,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
+				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -404,7 +404,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
+					vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 					nmap[id] = images2IDNames(rs, sum)
 				}
 			}
@@ -491,7 +491,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			rrpt.Cmds = c.cmds
 
 			refreshScanCache(rs, id, sum, c, vpf)
-			rrpt.Vuls = scanUtils.FillVulDetails(sdb.CVEDB, c.vulTraits, showTag)
+			rrpt.Vuls = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 			// The checks are still to be filtered
 			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
 
@@ -554,7 +554,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			// Because cache doesn't save vul. trait of layers, we have to filtered them every time.
 			rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 			for i, vul := range layer.Vuls {
-				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, vul)
+				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
 			}
 			rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
 

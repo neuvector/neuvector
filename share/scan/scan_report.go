@@ -71,7 +71,7 @@ func GetScannerDB() *share.CLUSScannerDB {
 }
 
 // Functions can be used in both controllers and scanner
-func ScanVul2REST(cvedb CVEDBType, vul *share.ScanVulnerability) *api.RESTVulnerability {
+func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) *api.RESTVulnerability {
 	v := &api.RESTVulnerability{
 		Name:           vul.Name,
 		Score:          vul.Score,
@@ -91,9 +91,28 @@ func ScanVul2REST(cvedb CVEDBType, vul *share.ScanVulnerability) *api.RESTVulner
 	}
 
 	// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
+	// The guess work based on baseOS is only needed for upgrade from pre-5.0 cases.
 	if vul.DBKey != "" {
 		if vr, ok := cvedb[vul.DBKey]; ok {
 			fillVulFields(vr, v)
+		}
+	} else {
+		baseOS = normalizeBaseOS(baseOS)
+
+		key := fmt.Sprintf("%s:%s", baseOS, v.Name)
+		if vr, ok := cvedb[key]; ok {
+			fillVulFields(vr, v)
+		} else {
+			// lookup apps
+			key = fmt.Sprintf("apps:%s", v.Name)
+			if vr, ok := cvedb[key]; ok {
+				fillVulFields(vr, v)
+			} else {
+				// fix metadata
+				if vr, ok := cvedb[v.Name]; ok {
+					fillVulFields(vr, v)
+				}
+			}
 		}
 	}
 
@@ -321,7 +340,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 
 	rvuls := make([]*api.RESTVulnerability, len(result.Vuls))
 	for i, vul := range result.Vuls {
-		rvuls[i] = ScanVul2REST(sdb.CVEDB, vul)
+		rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
 	}
 	rmods := make([]*api.RESTScanModule, len(result.Modules))
 	for i, m := range result.Modules {
@@ -344,7 +363,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 	for j, layer := range result.Layers {
 		rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 		for i, vul := range layer.Vuls {
-			rvuls[i] = ScanVul2REST(sdb.CVEDB, vul)
+			rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
 		}
 		/*
 			var rsrts []*api.RESTScanSecret
@@ -418,7 +437,29 @@ func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {
 	}
 }
 
-func FillVulDetails(cvedb CVEDBType, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
+// cvedb lookup now uses DBKey in each vulnerability entry.
+// This function is kept for upgrade from pre-5.0 cases.
+func normalizeBaseOS(baseOS string) string {
+	if a := strings.Index(baseOS, ":"); a > 0 {
+		baseOS = baseOS[:a]
+		if baseOS == "rhel" || baseOS == "server" || baseOS == "centos" {
+			baseOS = "centos"
+		} else if baseOS == "rhcos" {
+			baseOS = ""
+		} else if baseOS == "ol" {
+			baseOS = "oracle"
+		} else if baseOS == "amzn" {
+			baseOS = "amazon"
+		} else if baseOS == "sles" {
+			baseOS = "suse"
+		}
+	}
+	return baseOS
+}
+
+func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
+	baseOS = normalizeBaseOS(baseOS)
+
 	vuls := make([]*api.RESTVulnerability, 0, len(vts))
 
 	for _, vt := range vts {
@@ -434,8 +475,26 @@ func FillVulDetails(cvedb CVEDBType, vts []*VulTrait, showTag string) []*api.RES
 		}
 
 		// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
-		if vr, ok := cvedb[vt.dbKey]; ok {
-			fillVulFields(vr, vul)
+		// The guess work based on baseOS is only needed for upgrade from pre-5.0 cases.
+		if vt.dbKey != "" {
+			if vr, ok := cvedb[vt.dbKey]; ok {
+				fillVulFields(vr, vul)
+			}
+		} else {
+			key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
+			if vr, ok := cvedb[key]; ok {
+				fillVulFields(vr, vul)
+			} else {
+				// lookup apps
+				key = fmt.Sprintf("apps:%s", vul.Name)
+				if vr, ok := cvedb[key]; ok {
+					fillVulFields(vr, vul)
+				} else {
+					if vr, ok := cvedb[vul.Name]; ok {
+						fillVulFields(vr, vul)
+					}
+				}
+			}
 		}
 
 		if vt.filtered {
