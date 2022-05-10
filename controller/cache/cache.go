@@ -1066,10 +1066,15 @@ func (m CacheMethod) GetAllHostsRisk(acc *access.AccessControl) []*common.Worklo
 			continue
 		}
 
+		var baseOS string
+		if cache.scanBrief != nil {
+			baseOS = cache.scanBrief.BaseOS
+		}
 		pm, _ := getHostPolicyMode(cache)
 		hosts = append(hosts, &common.WorkloadRisk{
 			ID:         cache.host.ID,
 			Name:       cache.host.Name,
+			BaseOS:     baseOS,
 			PolicyMode: pm,
 			// When vul. profile updates, it will refresh all scanMap and workload/host cache.
 			// No refresh in this path, which is different from GetVulnerabilityReport().

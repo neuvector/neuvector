@@ -40,6 +40,7 @@ type WorkloadRisk struct {
 	ImageID          string
 	PlatformRole     string
 	Domain           string
+	BaseOS           string
 	PolicyMode       string
 	VulTraits        []*scanUtils.VulTrait
 	Children         []*WorkloadRisk

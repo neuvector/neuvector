@@ -1139,7 +1139,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 
 		sdb := scanUtils.GetScannerDB()
-		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.vulTraits, showTag)
+		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
 		return vuls, nil
 	} else {
 		return nil, common.ErrObjectNotFound

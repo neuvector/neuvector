@@ -237,6 +237,9 @@ func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
 		SecretBenchValue: cache.secretBenchValue,
 		SetidBenchValue:  cache.setidBenchValue,
 	}
+	if cache.scanBrief != nil {
+		r.BaseOS = cache.scanBrief.BaseOS
+	}
 	r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 	return r
 }
@@ -1173,7 +1176,7 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 			}
 			if index := strings.Index(item, ";"); index > 0 {
 				if ok, app, path, cmdline := appendProbeCmds(strings.Split(item[0:index], " ")); ok {
-					p := &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+					p := &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline}}
 					subcmds = append(subcmds, p)
 				}
 			}
@@ -1185,12 +1188,12 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 	pp := make(map[string]*k8sProbeCmd)
 	for _, cmd := range cmds {
-		if ok, app, path, cmdline  := appendProbeCmds(cmd); ok {
+		if ok, app, path, cmdline := appendProbeCmds(cmd); ok {
 			if p, ok := pp[app]; ok {
 				p.path = "*"
 				p.cmds = append(p.cmds, cmdline)
 			} else {
-				pp[app] = &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+				pp[app] = &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline}}
 			}
 
 			if app == "sh" || app == "bash" || app == "ash" {
