@@ -475,7 +475,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
 		// /usr/local/bin
-		{"consul", "/usr/local/bin/consul"},
+		{"consul", "*"},				// monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
@@ -538,7 +538,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		/////////////////////////////////
 		// /usr/local/bin
 		{"agent", "/usr/local/bin/agent"},
-		{"consul", "/usr/local/bin/consul"},
+		{"consul", "*"},			// monitor also calls it through a shell command
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
@@ -618,7 +618,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// /usr/local/bin
 		//  {"*", "/usr/local/bin/*"}, // wildcard for below commented execs
 		{"agent", "/usr/local/bin/agent"},
-		{"consul", "/usr/local/bin/consul"},
+		{"consul", "*"},			// monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
