@@ -1,8 +1,10 @@
 package global
 
 import (
+	"errors"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
@@ -24,18 +26,25 @@ var ORCH *orchHub
 
 func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, string, string, []*container.ContainerMeta, error) {
 	var err error
+	var containers []*container.ContainerMeta
 
 	SYS = system.NewSystemTools()
 
 	RT, err = container.Connect(rtSocket, SYS)
-	if err != nil {
+ 	if err != nil {
 		return "", "", "", nil, err
 	}
 
-	// List only running containers
-	containers, err := RT.ListContainers(true)
-	if err != nil {
-		return "", "", "", nil, err
+	// List only at least one running containers: 3 tries
+	for i := 0; i < 3; i++ {
+		if containers, err = RT.ListContainers(true); err == nil && len(containers) > 0 {
+			break
+		}
+		time.Sleep(time.Millisecond * 50)
+	}
+
+	if len(containers) == 0 {
+		return "", "", "", nil, errors.New("Container list is empty")
 	}
 
 	platform, flavor, network := getPlatform(containers)
