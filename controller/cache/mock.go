@@ -29,9 +29,8 @@ func MockCacheInit() {
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
-		StartFedRestServerFunc:   dummyStartFedRestServer,
-		StopFedRestServerFunc:    dummyStopFedRestServer,
 		StartStopFedPingPollFunc: dummyStartStopFedPingPoll,
+		RestConfigFunc:           dummyRestConfig,
 	}
 }
 
@@ -42,6 +41,5 @@ func MockUserRoleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 	userRoleConfigUpdate(nType, key, value)
 }
 
-func dummyStartFedRestServer(fedPingInterval uint32)                           {}
-func dummyStopFedRestServer()                                                  {}
-func dummyStartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error { return nil }
+func dummyStartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error           { return nil }
+func dummyRestConfig(cmd, interval uint32, param1 interface{}, param2 interface{}) error { return nil }

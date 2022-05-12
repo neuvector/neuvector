@@ -2,7 +2,6 @@ package rest
 
 import (
 	"crypto/rsa"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,7 @@ import (
 	"math"
 	mathRand "math/rand"
 	"net/http"
-	"net/http/cookiejar"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -422,46 +421,25 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	var statusCode int
 	var proxyUsed bool
 	var useProxy string
-	var proxyInfo share.CLUSProxy
 	var rancherUser tRancherUser = tRancherUser{domainRoles: make(map[string]string)}
 
-	// Rancher SSO: how to enable controller to go thru proxy for communications with Rancher?
-	if useProxy == "http" {
-		proxyInfo = share.CLUSProxy{
-			Enable:   cfg.RegistryHttpProxyEnable,
-			URL:      cfg.RegistryHttpProxy.URL,
-			Username: cfg.RegistryHttpProxy.Username,
-			Password: cfg.RegistryHttpProxy.Password,
-		}
-	} else if useProxy == "https" {
-		proxyInfo = share.CLUSProxy{
-			Enable:   cfg.RegistryHttpsProxyEnable,
-			URL:      cfg.RegistryHttpsProxy.URL,
-			Username: cfg.RegistryHttpsProxy.Username,
-			Password: cfg.RegistryHttpsProxy.Password,
-		}
+	// Rancher SSO: will try proxy if proxy is configured & enabled
+	urlRancher, err := url.Parse(cfg.RancherEP)
+	if err != nil {
+		return rancherUser, err
+	}
+	if urlRancher.Scheme == "https" && cfg.RegistryHttpsProxyEnable {
+		useProxy = "https"
+	} else if urlRancher.Scheme == "http" && cfg.RegistryHttpProxyEnable {
+		useProxy = "http"
 	}
 
 	cookie := &http.Cookie{
 		Name:  "R_SESS",
 		Value: rsessToken,
 	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error("creating cookie jar")
-		return rancherUser, err
-	}
-	httpClient := &http.Client{
-		Jar: jar,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: clusterAuthTimeout,
-	}
-	url := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
-	data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+	urlStr := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
+	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", cookie, []byte{}, true, &useProxy, acc)
 	if err == nil {
 		var domainRoles map[string]string
 		var rancherUsers api.UserCollection
@@ -481,8 +459,8 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 				rancherUser.id = rancherUsers.Data[idx].ID
 				rancherUser.name = rancherUsers.Data[idx].Username
 				rancherUser.token = rsessToken
-				url = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
-				data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+				urlStr = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
+				data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", cookie, []byte{}, true, &useProxy, acc)
 				//-> if user-id changes, reset mapped roles
 				//-> if mapped role changes, reset mapped roles in token
 				if err == nil {
@@ -541,12 +519,12 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"data": string(data), "url": url, "err": err}).Error()
+		log.WithFields(log.Fields{"data": string(data), "url": urlStr, "err": err}).Error()
 	}
 
 	if !rancherUser.valid || len(rancherUser.domainRoles) == 0 {
 		err = fmt.Errorf("cannot find a mapped role")
-		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "useProxy": useProxy, "proxyEnable": proxyInfo.Enable, "proxyUsed": proxyUsed}).Error()
+		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "proxyUsed": proxyUsed}).Error()
 	}
 
 	return rancherUser, err
@@ -1110,9 +1088,13 @@ func jwtReadKeys() error {
 }
 
 func resetFedJointKeys() {
-	fedClientPoolMutex.Lock()
-	_fedHttpClients = make(map[string]*tFedHttpClient)
-	fedClientPoolMutex.Unlock()
+	_httpClientMutex.Lock()
+	v, ok := _proxyOptionHistory["rancher"]
+	_proxyOptionHistory = make(map[string]int8)
+	if ok {
+		_proxyOptionHistory["rancher"] = v
+	}
+	_httpClientMutex.Unlock()
 
 	fedAuthMutex.Lock()
 	jointPublicKey = nil
@@ -2203,7 +2185,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 }
 
 func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	accReadAll := access.NewReaderAccessControl()
@@ -2284,7 +2266,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 }
 
 func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	// Read body
@@ -2326,7 +2308,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		username := data.Password.Username
 		var blockedForFailedLogin, blockedForExpiredPwd, userFound bool
 
-		log.WithFields(log.Fields{"server": server}).Debug("")
+		log.WithFields(log.Fields{"server": server}).Debug()
 		if server == api.AuthServerLocal {
 			user, blockedForFailedLogin, blockedForExpiredPwd, userFound, _, err = localPasswordAuth(data.Password, accReadAll)
 			if user != nil && err == nil {
@@ -2487,7 +2469,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 func handlerAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -2524,7 +2506,7 @@ func handlerAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 }
 
 func handlerFedAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleJoint, _adminRequired, w, r)
@@ -2647,7 +2629,7 @@ type RESTAuthTestData struct {
 }
 
 func handlerDumpAuthData(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed("*", _readerRequired, w, r)

@@ -585,7 +585,7 @@ func addrDeviceDeleteByID(id string) bool {
 }
 
 func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -594,6 +594,9 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		var host share.CLUSHost
 		json.Unmarshal(value, &host)
 
+		if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher && host.Flavor == "" {
+			host.Flavor = share.FlavorRancher
+		}
 		log.WithFields(log.Fields{"host": host}).Info("Add or update host")
 
 		cacheMutexLock()
@@ -1188,7 +1191,7 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 	pp := make(map[string]*k8sProbeCmd)
 	for _, cmd := range cmds {
-		if ok, app, path, cmdline := appendProbeCmds(cmd); ok {
+		if ok, app, path, cmdline  := appendProbeCmds(cmd); ok {
 			if p, ok := pp[app]; ok {
 				p.path = "*"
 				p.cmds = append(p.cmds, cmdline)
