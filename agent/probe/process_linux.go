@@ -347,7 +347,7 @@ func (p *Probe) netlinkProcWorker() {
 				break
 			}
 
-			if !unixIsEAGAIN(err) {
+			if !errors.Is(err, syscall.EAGAIN) {
 				timeSkipped := time.Since(lastReceiveTime)
 				if timeSkipped > time.Duration(time.Millisecond*100) {
 					p.resetProcTbl = true
