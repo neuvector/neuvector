@@ -2148,6 +2148,18 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 			return true
 		}
+
+		if filepath.Base(proc.ppath) == "pod" && proc.pname == "pod" { // pod services
+			return true
+		}
+	}
+
+	if filepath.Base(proc.ppath) == "kubelet" && proc.pname == "kubelet" { // kubelet services
+		return true
+	}
+
+	if filepath.Base(proc.ppath) == "hyperkube" && proc.pname == "hyperkube" { // hyperkube services
+		return true
 	}
 
 	// both names are in the runtime list
