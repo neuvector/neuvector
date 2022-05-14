@@ -758,6 +758,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_FED: []string{
 				"v1/fed/join_token",
 				"v1/fed/cluster/*/**",
+				"v1/fed/view/*",
 			},
 			CONST_API_VULNERABILITY: []string{
 				"v1/vulnerability/profile",

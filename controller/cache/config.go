@@ -407,10 +407,12 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 	systemConfigCache = cfg
 
-	fedCacheMutexLock()
-	fedHttpsProxyCache = systemConfigCache.RegistryHttpsProxy
-	fedHttpProxyCache = systemConfigCache.RegistryHttpProxy
-	fedCacheMutexUnlock()
+	httpsProxy := cfg.RegistryHttpsProxy
+	httpProxy := cfg.RegistryHttpProxy
+	var param1 interface{} = &httpsProxy
+	var param2 interface{} = &httpProxy
+	cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
+
 	//cacheMutexUnlock() //-> TO CHECK
 
 	putInternalIPNetToCluseter(true)

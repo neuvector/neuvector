@@ -1232,6 +1232,8 @@ func InitContext(ctx *Context) {
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
 		_pwdValidUnit = time.Duration(ctx.PwdValidUnit)
 	}
+
+	initHttpClients()
 }
 
 func StartRESTServer() {
@@ -1443,6 +1445,7 @@ func StartRESTServer() {
 	r.POST("/v1/fed/joint_test_internal", handlerTestJointInternal)          // Skip API document, called from master cluster to joint cluster
 	r.POST("/v1/fed/remove_internal", handlerJointKickedInternal)            // Skip API document, called from master cluster to joint cluster
 	r.POST("/v1/fed/command_internal", handlerFedCommandInternal)            // Skip API document, called from master cluster to joint cluster
+	r.GET("/v1/fed/view/:id", handlerGetJointClusterView)                    // Skip API document, called by manager of master cluster
 	r.GET("/v1/fed/cluster/:id/*request", handlerFedClusterForwardGet)       // Skip API document, called by manager of master cluster
 	r.POST("/v1/fed/cluster/:id/*request", handlerFedClusterForwardPost)     // Skip API document, called by manager of master cluster
 	r.PATCH("/v1/fed/cluster/:id/*request", handlerFedClusterForwardPatch)   // Skip API document, called by manager of master cluster
@@ -1572,6 +1575,8 @@ func StartRESTServer() {
 		Addr:         addr,
 		Handler:      restLogger{r},
 		TLSConfig:    config,
+		// ReadTimeout:  time.Duration(5) * time.Second,
+		// WriteTimeout: time.Duration(35) * time.Second,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0), // disable http/2
 	}
 	for {
@@ -1584,7 +1589,7 @@ func StartRESTServer() {
 	}
 }
 
-func StartFedRestServer(fedPingInterval uint32) {
+func startFedRestServer(fedPingInterval uint32) {
 	if m := clusHelper.GetFedMembership(); m == nil || m.FedRole != api.FedRoleMaster {
 		return
 	} else {
@@ -1608,7 +1613,13 @@ func StartFedRestServer(fedPingInterval uint32) {
 	r.POST("/v1/fed/leave_internal", handlerLeaveFedInternal)    // Skip API document, called from joint cluster to master cluster
 
 	config := &tls.Config{MinVersion: tls.VersionTLS11}
-	server := &http.Server{Addr: addr, Handler: restLogger{r}, TLSConfig: config}
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      restLogger{r},
+		TLSConfig:    config,
+		// ReadTimeout:  time.Duration(5) * time.Second,
+		// WriteTimeout: time.Duration(35) * time.Second,
+	}
 
 	atomic.StoreUint64(&fedRestServerState, _fedRestServerRunning_)
 
@@ -1663,7 +1674,7 @@ Loop:
 	}
 }
 
-func StopFedRestServer() {
+func stopFedRestServer() {
 	_fedPingTimer.Stop()
 	fedRestServerMutex.Lock()
 	defer fedRestServerMutex.Unlock()
@@ -1678,13 +1689,6 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	var err error
 	leader := atomic.LoadUint32(&_isLeader)
 	switch cmd {
-	case share.StartPingFedJoints:
-		if leader == 1 {
-			// for share.StartPingFedJoints cmd, param `interval` is actually for the waiting seconds before the 1st ping
-			_fedPingTimer.Reset(time.Second * time.Duration(interval))
-		}
-	case share.StopPingFedJoints:
-		_fedPingTimer.Stop()
 	case share.StartPollFedMaster:
 		if interval > 0 {
 			atomic.StoreUint32(&_fedPollInterval, interval)
@@ -1693,8 +1697,6 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 			pollFedRules(true, 3)
 			_fedPollingTimer.Reset(time.Minute * time.Duration(atomic.LoadUint32(&_fedPollInterval)))
 		}
-	case share.StopPollFedMaster:
-		_fedPollingTimer.Stop()
 	case share.InstantPollFedMaster:
 		if leader == 1 {
 			if interval > 0 {
@@ -1716,9 +1718,6 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 				callerFedRole = api.FedRoleMaster
 			}
 			if cluster, ok := param1.(*share.CLUSFedJointClusterInfo); ok && cluster != nil {
-				if cmd == share.MasterLoadJointKeys {
-					updateHttpClientPool(cluster.ID, true)
-				}
 				if err = setJointKeysInCache(callerFedRole, cluster); err != nil {
 					log.WithFields(log.Fields{"id": cluster.ID, "err": err}).Error("invalid joint keys")
 				}
@@ -1732,7 +1731,9 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 		if param1 != nil {
 			if clusterID, ok := param1.(*string); ok && clusterID != nil {
 				_setFedJointPrivateKey(*clusterID, nil)
-				updateHttpClientPool(*clusterID, false)
+				_httpClientMutex.Lock()
+				delete(_proxyOptionHistory, *clusterID)
+				_httpClientMutex.Unlock()
 			} else {
 				err = fmt.Errorf("wrong type")
 			}
@@ -1781,6 +1782,12 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 				err = fmt.Errorf("wrong type")
 			}
 		}
+	case share.StartFedRestServer:
+		_fedPollingTimer.Stop()
+		startFedRestServer(interval)
+	case share.StopFedRestServer:
+		_fedPollingTimer.Stop()
+        stopFedRestServer()
 	}
 
 	return err
