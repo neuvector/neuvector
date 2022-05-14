@@ -119,12 +119,10 @@ func (d *dockerDriver) ListContainerIDs() (utils.Set, utils.Set) {
 }
 
 func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
-	var containers []dockerclient.Container
-
-	if runningOnly {
-		containers, _ = d.client.ListContainers(false, false, "")
-	} else {
-		containers, _ = d.client.ListContainers(true, false, "")
+	containers, err := d.client.ListContainers( !runningOnly, false, "")
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "runningOnly": runningOnly}).Error("Fail to list containers")
+		return nil, err
 	}
 
 	metas := make([]*ContainerMeta, len(containers))
