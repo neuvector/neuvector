@@ -42,13 +42,18 @@ With Azure advanced networking plugin:
  5: azure0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP qlen 1000
 */
 
-func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (map[string][]share.CLUSIPAddr, utils.Set, bool) {
+func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (map[string][]share.CLUSIPAddr, utils.Set, bool, bool) {
 	devs := make(map[string][]share.CLUSIPAddr)
 	ips := utils.NewSet()
 	maxMTU := 0
+	ciliumCNI := false
 
 	for name, iface := range ifaces {
 		log.WithFields(log.Fields{"link": name, "type": iface.Type, "mtu": iface.Mtu,"flags":iface.Flags,}).Info("link")
+
+		if strings.HasPrefix(name, "cilium") {
+			ciliumCNI = true
+		}
 
 		if iface.Mtu <= share.NV_VBR_PORT_MTU_JUMBO && maxMTU < iface.Mtu {
 			maxMTU = iface.Mtu
@@ -83,10 +88,10 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 			}
 		}
 	}
-	log.WithFields(log.Fields{"maxMTU": maxMTU}).Info("")
+	log.WithFields(log.Fields{"maxMTU": maxMTU, "ciliumCNI":ciliumCNI}).Info("")
 	if maxMTU > share.NV_VBR_PORT_MTU {//jumbo frame mtu
-		return devs, ips, true
+		return devs, ips, true, ciliumCNI
 	} else {
-		return devs, ips, false
+		return devs, ips, false, ciliumCNI
 	}
 }

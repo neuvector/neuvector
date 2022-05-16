@@ -62,7 +62,7 @@ int dp_open_socket(dp_context_t *ctx, const char *iface, bool tap, bool tc, uint
 void dp_close_socket(dp_context_t *ctx);
 int dp_rx(dp_context_t *ctx, uint32_t tick);
 void dp_get_stats(dp_context_t *ctx);
-int dp_open_nfq_handle(dp_context_t *ctx, bool jumboframe, uint blocks, uint batch);
+int dp_open_nfq_handle(dp_context_t *ctx, int qnum, bool jumboframe, uint blocks, uint batch);
 
 dp_context_t *dp_inline_context()
 {
@@ -146,7 +146,7 @@ static dp_context_t *dp_alloc_context(const char *iface, int thr_id, bool tap, b
     return ctx;
 }
 
-static dp_context_t *dp_alloc_nfq_context(const char *iface, int thr_id, bool tap, bool jumboframe, uint blocks, uint batch)
+static dp_context_t *dp_alloc_nfq_context(const char *iface, int qnum, int thr_id, bool tap, bool jumboframe, uint blocks, uint batch)
 {
     int fd;
     dp_context_t *ctx;
@@ -156,7 +156,7 @@ static dp_context_t *dp_alloc_nfq_context(const char *iface, int thr_id, bool ta
         return NULL;
     }
 
-    fd = dp_open_nfq_handle(ctx, jumboframe, blocks, batch);
+    fd = dp_open_nfq_handle(ctx, qnum, jumboframe, blocks, batch);
     if (fd < 0) {
         DEBUG_ERROR(DBG_CTRL, "fail to open dp nfq handle, iface=%s\n", iface);
         if (ctx && ctx->nfq_ctx.nfq_q_hdl) {
@@ -377,7 +377,7 @@ static const char *get_nfq_name(char *name, const char *netns, const char *iface
     return name;
 }
 
-int dp_data_add_nfq(const char *netns, const char *iface, const char *ep_mac, bool jumboframe, int thr_id)
+int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *ep_mac, bool jumboframe, int thr_id)
 {
     int ret = 0;
     dp_context_t *ctx;
@@ -408,7 +408,7 @@ int dp_data_add_nfq(const char *netns, const char *iface, const char *ep_mac, bo
             break;
         }
 
-        ctx = dp_alloc_nfq_context(iface, thr_id, false, jumboframe, NFQ_BLOCK, NFQ_BATCH);
+        ctx = dp_alloc_nfq_context(iface, qnum, thr_id, false, jumboframe, NFQ_BLOCK, NFQ_BATCH);
         if (ctx == NULL) {
             ret = -1;
             break;

@@ -34,6 +34,7 @@ type DPDelTapPortReq struct {
 type DPNfqPort struct {
 	NetNS 		string `json:"netns"`
 	Iface 		string `json:"iface"`
+	Qnum		int    `json:"qnum"`
 	EPMAC 		string `json:"epmac"`
 	JumboFrame	*bool  `json:"jumboframe,omitempty"`
 }
