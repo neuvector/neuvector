@@ -2227,6 +2227,15 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 }
 
 func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) (string, bool) {
+	if filepath.Base(proc.path) != proc.name {
+		// update name
+		if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
+			proc.name = name
+		} else {
+			proc.name = filepath.Base(proc.path)
+		}
+	}
+
 	pp := &share.CLUSProcessProfileEntry{
 		Name:   proc.name,
 		User:   proc.user,
@@ -2262,7 +2271,9 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
-				if pp.Action != share.PolicyActionLearn {
+				switch pp.Action {
+				case share.PolicyActionLearn, share.PolicyActionCheckApp:	// exclude these two actions
+				default:
 					pp.Action = share.PolicyActionAllow
 				}
 			}
@@ -2443,11 +2454,10 @@ func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 			//  Skip the inherted actions from parents.
 			//  These processes has not been justified by policy, all the actions and riskinfo are default values
 			//  assume no ousiders during the initial stage, only justify insider processes
-			p.evaluateApplication(proc, id, true)
-			// update its results
-			if p, ok := p.pidProcMap[proc.pid]; ok {
-				p.reported = proc.reported
-				p.action = proc.action
+			if pp, ok := p.pidProcMap[proc.pid]; ok {
+				p.evaluateApplication(pp, id, true)
+			} else {	// process was gone
+				p.evaluateApplication(proc, id, true)
 			}
 			cnt++
 		}
@@ -2538,7 +2548,7 @@ func (p *Probe) updateCurrentRiskyAppRule(id string, pg *share.CLUSProcessProfil
 
 // under parent's lock
 func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
-	if proc := p.pidProcMap[pid]; proc != nil {
+	if proc, ok := p.pidProcMap[pid]; ok {
 		if osutil.IsPidValid(proc.pid) {
 			proc.name, proc.ppid, _, _ = osutil.GetProcessUIDs(proc.pid)
 			if !global.RT.IsRuntimeProcess(proc.name, nil) {
@@ -2740,12 +2750,12 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		log.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
+		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
 		return true
 	}
 
 	if proc.pid == c.rootPid {
-		log.WithFields(log.Fields{"id": id, "rootPid": proc.pid}).Debug("SHD: rootPid")
+		mLog.WithFields(log.Fields{"id": id, "rootPid": proc.pid}).Debug("SHD: rootPid")
 		return true
 	}
 
@@ -2755,11 +2765,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		// We will not monitor files under the mounted folder
 		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
 		if c.bPrivileged {
-			log.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 		} else {
 			// this file is not existed
 			bImageFile = false
-			log.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+			mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
 		}
 
 		// from docker run, v20.10.7

@@ -237,6 +237,9 @@ func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
 		SecretBenchValue: cache.secretBenchValue,
 		SetidBenchValue:  cache.setidBenchValue,
 	}
+	if cache.scanBrief != nil {
+		r.BaseOS = cache.scanBrief.BaseOS
+	}
 	r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 	return r
 }
@@ -582,7 +585,7 @@ func addrDeviceDeleteByID(id string) bool {
 }
 
 func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -591,6 +594,9 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		var host share.CLUSHost
 		json.Unmarshal(value, &host)
 
+		if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher && host.Flavor == "" {
+			host.Flavor = share.FlavorRancher
+		}
 		log.WithFields(log.Fields{"host": host}).Info("Add or update host")
 
 		cacheMutexLock()
@@ -1173,7 +1179,7 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 			}
 			if index := strings.Index(item, ";"); index > 0 {
 				if ok, app, path, cmdline := appendProbeCmds(strings.Split(item[0:index], " ")); ok {
-					p := &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+					p := &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline}}
 					subcmds = append(subcmds, p)
 				}
 			}
@@ -1190,7 +1196,7 @@ func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 				p.path = "*"
 				p.cmds = append(p.cmds, cmdline)
 			} else {
-				pp[app] = &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline,}}
+				pp[app] = &k8sProbeCmd{app: app, path: path, cmds: []string{cmdline}}
 			}
 
 			if app == "sh" || app == "bash" || app == "ash" {

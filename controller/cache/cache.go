@@ -49,21 +49,21 @@ type hostDigest struct {
 }
 
 type hostCache struct {
-	host             *share.CLUSHost
-	agents           utils.Set
-	workloads        utils.Set
-	portWLMap        map[string]*workloadDigest
-	ipWLMap          map[string]*workloadDigest
-	wlSubnets        utils.Set             // host-scope subnet *net.IPNet, such as 172.17.0.0/16
+	host       *share.CLUSHost
+	agents     utils.Set
+	workloads  utils.Set
+	portWLMap  map[string]*workloadDigest
+	ipWLMap    map[string]*workloadDigest
+	wlSubnets  utils.Set // host-scope subnet *net.IPNet, such as 172.17.0.0/16
 	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
 	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
 	customBenchValue []byte
 	dockerBenchValue []byte
 	masterBenchValue []byte
 	workerBenchValue []byte
-	state            string
-	timerTask        string
-	timerSched       time.Time
+	state      string
+	timerTask  string
+	timerSched time.Time
 }
 
 type agentCache struct {
@@ -189,9 +189,8 @@ type Context struct {
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
-	StartFedRestServerFunc   func(fedPingInterval uint32)
-	StopFedRestServerFunc    func()
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
+	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
 }
 
 type k8sProbeCmd struct {
@@ -1066,10 +1065,15 @@ func (m CacheMethod) GetAllHostsRisk(acc *access.AccessControl) []*common.Worklo
 			continue
 		}
 
+		var baseOS string
+		if cache.scanBrief != nil {
+			baseOS = cache.scanBrief.BaseOS
+		}
 		pm, _ := getHostPolicyMode(cache)
 		hosts = append(hosts, &common.WorkloadRisk{
 			ID:         cache.host.ID,
 			Name:       cache.host.Name,
+			BaseOS:     baseOS,
 			PolicyMode: pm,
 			// When vul. profile updates, it will refresh all scanMap and workload/host cache.
 			// No refresh in this path, which is different from GetVulnerabilityReport().

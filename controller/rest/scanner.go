@@ -579,7 +579,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			vuls := scanUtils.FillVulDetails(sdb.CVEDB, wl.VulTraits, "")
+			vuls := scanUtils.FillVulDetails(sdb.CVEDB, wl.BaseOS, wl.VulTraits, "")
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -593,7 +593,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
-			vuls := scanUtils.FillVulDetails(sdb.CVEDB, n.VulTraits, "")
+			vuls := scanUtils.FillVulDetails(sdb.CVEDB, n.BaseOS, n.VulTraits, "")
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)

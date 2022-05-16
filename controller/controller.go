@@ -543,9 +543,8 @@ func main() {
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
-		StartFedRestServerFunc:   rest.StartFedRestServer,
-		StopFedRestServerFunc:    rest.StopFedRestServer,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
+		RestConfigFunc:           rest.RestConfig,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead)
 	cache.ScannerChangeNotify(Ctrler.Leader)
