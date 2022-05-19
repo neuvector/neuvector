@@ -365,8 +365,6 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 	var cfg share.CLUSSystemConfig
 
-	// cacheMutexLock() //-> TO CHECK
-
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		json.Unmarshal(value, &cfg)
@@ -405,7 +403,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		scan.UpdateProxy(&cfg.RegistryHttpProxy, &cfg.RegistryHttpsProxy)
 	}
 
+	cacheMutexLock()
 	systemConfigCache = cfg
+	putInternalIPNetToCluseter(true)
+	cacheMutexUnlock()
 
 	httpsProxy := cfg.RegistryHttpsProxy
 	httpProxy := cfg.RegistryHttpProxy
@@ -413,9 +414,6 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	var param2 interface{} = &httpProxy
 	cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
 
-	//cacheMutexUnlock() //-> TO CHECK
-
-	putInternalIPNetToCluseter(true)
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
