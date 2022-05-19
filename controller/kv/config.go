@@ -691,8 +691,6 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					clusHelper.PutPolicyRuleListZip(key, array)
 				} else {
 					clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
-					//for CLUSConfigSystemKey only
-					clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
 					txn.Put(key, array)
 					if txn.Size() >= 64 || (ep.name == share.CFGEndpointAdmissionControl && key == "object/config/admission_control/default/state") {
 						applyTransaction(txn, importTask, true, processedLines)
