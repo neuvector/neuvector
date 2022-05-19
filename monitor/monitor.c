@@ -30,6 +30,7 @@
 #define ENV_CTRL_SERVER_PORT   "CTRL_SERVER_PORT"
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
+#define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
 #define ENV_TAP_INTERFACE      "TAP_INTERFACE"
 #define ENV_TAP_ALL_CONTAINERS "TAP_ALL_CONTAINERS"
 #define ENV_DOCKER_URL         "DOCKER_URL"
@@ -194,7 +195,7 @@ static pid_t fork_exec(int i)
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit, *rancher_ep;
+    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level;
     int a;
 
     switch (i) {
@@ -415,6 +416,10 @@ static pid_t fork_exec(int i)
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-d";
             }
+        }
+        if ((debug_level = getenv(ENV_DEBUG_LEVEL)) != NULL) {
+            args[a ++] = "-v";
+            args[a ++] = debug_level;
         }
         if ((cnet_type = getenv(ENV_CNET_TYPE)) != NULL) {
             args[a ++] = "-n";

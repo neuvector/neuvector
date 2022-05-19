@@ -264,6 +264,7 @@ func main() {
 
 	withCtlr := flag.Bool("c", false, "Coexist controller and ranger")
 	debug := flag.Bool("d", false, "Enable control path debug")
+	debug_level := flag.String("v", "", "debug level")
 	join := flag.String("j", "", "Cluster join address")
 	adv := flag.String("a", "", "Cluster advertise address")
 	bind := flag.String("b", "", "Cluster bind address")
@@ -281,6 +282,14 @@ func main() {
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 		gInfo.agentConfig.Debug = []string{"ctrl"}
+	}
+
+	if *debug_level != "" {
+		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, strings.Split(*debug_level, " ")...))
+		if !*debug && levels.Contains("ctrl") {
+			levels.Remove("ctrl")
+		}
+		gInfo.agentConfig.Debug = levels.ToStringSlice()
 	}
 
 	agentEnv.kvCongestCtrl = true
