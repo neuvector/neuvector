@@ -413,10 +413,7 @@ func GetProcessUIDs(pid int) (name string, ppid, ruid, euid int) {
 			//if it is exe, it's a symlink, not a real one.
 			if name == "exe" || len(name) == maxStatCmdLen {
 				if cmds, err := global.SYS.ReadCmdLine(pid); err == nil && len(cmds) > 0 && cmds[0] != "" {
-					name = cmds[0]
-					if i := strings.LastIndex(name, "/"); i > 0 {
-						name = name[i+1:]
-					}
+					name = filepath.Base(cmds[0])
 				}
 			}
 
@@ -522,14 +519,7 @@ func GetContainerDaemonArgs() ([]string, error) {
 				continue
 			}
 			if cmds, err := global.SYS.ReadCmdLine(pid); err == nil && len(cmds) > 0 {
-				var procName string
-				i := strings.LastIndex(cmds[0], "/")
-				if i != -1 {
-					procName = cmds[0][i+1:]
-				} else {
-					procName = cmds[0]
-				}
-				if global.RT.IsDaemonProcess(procName, cmds) {
+				if global.RT.IsDaemonProcess(filepath.Base(cmds[0]), cmds) {
 					return cmds[1:], nil
 				}
 			}
@@ -542,9 +532,7 @@ func GetContainerDaemonArgs() ([]string, error) {
 func GetProcessName(pid int) string {
 	var name string
 	if path, err := GetExePathFromLink(pid); err == nil {
-		if a := strings.LastIndex(path, "/"); a > 0 {
-			name = path[a+1:]
-		}
+		name = filepath.Base(path)
 	} else {
 		name, _, _, _ = GetProcessUIDs(pid)
 	}

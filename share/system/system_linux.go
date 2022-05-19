@@ -569,10 +569,7 @@ func (s *SystemTools) GetProcessName(pid int) (string, int, error) {
 			//if it is exe, it's a symlink, not a real one.
 			if name == "exe" || len(name) == maxStatCmdLen {
 				if cmds, err := s.ReadCmdLine(pid); err == nil && len(cmds) > 0 && cmds[0] != "" {
-					name = cmds[0]
-					if i := strings.LastIndex(name, "/"); i > 0 {
-						name = name[i+1:]
-					}
+					name = filepath.Base(cmds[0])
 				}
 			}
 		} else if strings.HasPrefix(line, "PPid:\t") {
@@ -695,14 +692,7 @@ func (s *SystemTools) IsOpenshift() (bool, error) {
 
 			// openshift 3.x
 			if cmds, err := s.ReadCmdLine(pid); err == nil && len(cmds) > 3 {
-				var procName string
-				i := strings.LastIndex(cmds[0], "/")
-				if i != -1 {
-					procName = cmds[0][i+1:]
-				} else {
-					procName = cmds[0]
-				}
-				if procName == "openshift" && cmds[1] == "start" {
+				if filepath.Base(cmds[0]) == "openshift" && cmds[1] == "start" {
 					return true, nil
 				}
 			}
