@@ -25,6 +25,13 @@ import (
 ////
 var mLog *log.Logger = log.New()
 
+const delayExitThreshold = time.Duration(time.Second * 1)
+type procDelayExit struct {
+	pid  int
+	id   string
+	last time.Time
+}
+
 type Probe struct {
 	agentPid             int
 	agentMntNsId         uint64
@@ -93,6 +100,7 @@ type Probe struct {
 	pMsgAggregates      map[string]*probeMsgAggregate
 	msgAggregatesMux    sync.Mutex
 	fsnCtr              *FileNotificationCtr // anchor profile helper
+	exitProcSlices      []*procDelayExit
 }
 
 func (p *Probe) cbOpenNetlinkSockets(param interface{}) {
@@ -406,6 +414,7 @@ func (p *Probe) loop() {
 	for {
 		select {
 		case <-scanTicker:
+			p.removeDelayExitProc()
 			if p.monitorConnection { // for network==host mode containers
 				conns := p.getNewConnections()
 				if len(conns) > 0 {
@@ -425,6 +434,7 @@ func (p *Probe) loop() {
 				}
 				scan = !scan
 			}
+
 		case <-purgeHistoryTicker:
 			p.purgeProcHistory()
 
