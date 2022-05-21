@@ -495,7 +495,8 @@ func processPolicyLookup(id, riskType, pname, ppath string, pid, pgid, shellCmd 
 		case share.PolicyActionDeny: // a real policy
 			///// a signature for upper layers to recognize the incidents
 			if bNeuvector {
-				group = share.GroupNVProtect
+				group = share.GroupNVProtect // updated
+				svcGroup = group
 				log.WithFields(log.Fields{"id": id, "name": proc.Name, "path": proc.Path}).Info("GRP: NV Protect")
 			} else if pe.IsAllowedByParentApp(svcGroup, id, proc.Name, pname, ppath, pgid) {
 				proc.Action = share.PolicyActionAllow

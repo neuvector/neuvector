@@ -2297,7 +2297,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				if c, ok := p.pidContainerMap[proc.ppid]; ok{
 					bParentHostProc = c.id == ""
 				}
-				if p.isProcessException(proc, pp.DerivedGroup, id, bParentHostProc, bZeroDrift) {
+				if p.isProcessException(proc, svcGroup, id, bParentHostProc, bZeroDrift) {
 					pp.Action = share.PolicyActionAllow // can not be learned
 				}
 			}
