@@ -820,7 +820,10 @@ func isSudoCommand(cmds []string) bool {
 	case length > 1: // it could be "su -c /bin/ps neuvector"
 		for i, cmd := range cmds {
 			if i == 0 {
-				if cmd != "su" {
+				name := filepath.Base(cmd)
+				if name == "su" || name == "sudo" {
+					continue
+				} else {
 					break
 				}
 			} else if cmd[:1] == "-" { // option
