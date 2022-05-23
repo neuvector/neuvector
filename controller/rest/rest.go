@@ -74,6 +74,9 @@ var _licSigKeyEnv int
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
 
+const defFedSSLCertFile = "/etc/neuvector/certs/fed-ssl-cert.pem"
+const defFedSSLKeyFile = "/etc/neuvector/certs/fed-ssl-cert.key"
+
 const restErrMessageDefault string = "Unknown error"
 
 const crdEventProcPeriod = time.Duration(time.Second * 10)
@@ -1572,9 +1575,9 @@ func StartRESTServer() {
 		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
 	}
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      restLogger{r},
-		TLSConfig:    config,
+		Addr:      addr,
+		Handler:   restLogger{r},
+		TLSConfig: config,
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0), // disable http/2
@@ -1614,9 +1617,9 @@ func startFedRestServer(fedPingInterval uint32) {
 
 	config := &tls.Config{MinVersion: tls.VersionTLS11}
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      restLogger{r},
-		TLSConfig:    config,
+		Addr:      addr,
+		Handler:   restLogger{r},
+		TLSConfig: config,
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
 	}
@@ -1625,8 +1628,16 @@ func startFedRestServer(fedPingInterval uint32) {
 
 	log.WithFields(log.Fields{"port": _fedPort}).Info("Start fed REST server")
 	go func() {
+		keyFileName := defFedSSLKeyFile
+		certFileName := defFedSSLCertFile
+		_, err1 := os.Stat(keyFileName)
+		_, err2 := os.Stat(certFileName)
+		if os.IsNotExist(err1) || os.IsNotExist(err2) {
+			keyFileName = defaultSSLKeyFile
+			certFileName = defaultSSLCertFile
+		}
 		for i := 0; i < 5; i++ {
-			if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 				if err == http.ErrServerClosed {
 					break
 				}
@@ -1787,7 +1798,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 		startFedRestServer(interval)
 	case share.StopFedRestServer:
 		_fedPollingTimer.Stop()
-        stopFedRestServer()
+		stopFedRestServer()
 	}
 
 	return err
