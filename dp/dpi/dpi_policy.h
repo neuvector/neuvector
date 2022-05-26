@@ -34,6 +34,32 @@ typedef struct dpi_policy_desc_ {
     uint32_t order;
 } dpi_policy_desc_t;
 
+typedef struct dpi_rule_ {
+    struct cds_lfht_node node;
+    dpi_policy_desc_t desc;
+    dpi_rule_key_t key;
+} dpi_rule_t;
+
+typedef struct dpi_range_rule_key_ {
+    uint32_t ip;
+    uint16_t proto;
+    uint16_t flag;  // ingress or egress
+#define DP_RANGE_RULE_INGRESS    1
+#define DP_RANGE_RULE_EGRESS     2
+} dpi_range_rule_key_t;
+
+typedef struct dpi_range_rule_item_ {
+    struct dpi_range_rule_item_ *next;
+    dpi_policy_desc_t desc;
+    dpi_rule_key_t key_l;
+    dpi_rule_key_t key_h;
+} dpi_range_rule_item_t;
+
+typedef struct dpi_range_rule_ {
+    struct cds_lfht_node node;
+    dpi_range_rule_key_t key;
+    dpi_range_rule_item_t *range_rule_list;
+} dpi_range_rule_t;
 
 typedef struct dpi_policy_hdl_ {
     uint16_t ref_cnt;

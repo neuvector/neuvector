@@ -1191,7 +1191,7 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 	pp := make(map[string]*k8sProbeCmd)
 	for _, cmd := range cmds {
-		if ok, app, path, cmdline  := appendProbeCmds(cmd); ok {
+		if ok, app, path, cmdline := appendProbeCmds(cmd); ok {
 			if p, ok := pp[app]; ok {
 				p.path = "*"
 				p.cmds = append(p.cmds, cmdline)
@@ -1541,10 +1541,6 @@ func attrWorkloadAdd(id string, param interface{}) {
 	}
 }
 
-func benchHostDelete(id string, param interface{}) {
-	cluster.Delete(share.CLUSBenchKey(id))
-}
-
 func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	object := share.CLUSObjectKey2Object(key)
 	switch object {
@@ -1700,6 +1696,7 @@ func registerEventHandlers() {
 	evhdls.Register(EV_AGENT_ADD, []eventHandlerFunc{
 		connectAgentAdd,
 		scanAgentAdd,
+		benchAgentOnline,
 	})
 	evhdls.Register(EV_AGENT_DELETE, []eventHandlerFunc{
 		uniconfAgentDelete,

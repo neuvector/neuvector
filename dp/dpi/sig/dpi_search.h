@@ -82,6 +82,7 @@ void dpi_dlp_release_detector (dpi_detector_t *detector);
 void dpi_dlp_detector_destroy(dpi_detector_t *detector);
 void dpi_dlp_release_dlprulelist (dpi_detector_t *detector);
 void dpi_print_siglist(dpi_detector_t *detector);
+void dpi_print_siglist_fp(dpi_detector_t *detector, FILE *logfp);
 void dpi_hs_free_global_context(dpi_detector_t *detector);
 extern dpi_detector_t *g_release_detector;
 extern dpi_detector_t *g_build_detector;

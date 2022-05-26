@@ -1111,7 +1111,7 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 	// Notify bench scan changed.
 	if len(checks) > 0 {
 		switch bench {
-		case share.BenchDockerHost, share.BenchCustomHost:
+		case share.BenchDockerHost, share.BenchCustomHost, share.BenchKubeMaster, share.BenchKubeWorker:
 			key = share.CLUSBenchStateHostKey(id)
 		default:
 			key = share.CLUSBenchStateWorkloadKey(id)
