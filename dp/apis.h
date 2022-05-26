@@ -28,6 +28,7 @@ enum {
     CTRL_REQ_CLEAR_SESSION,
     CTRL_REQ_LIST_METER,
     CTRL_REQ_DEL_MAC,
+    CTRL_REQ_DUMP_POLICY,
 };
 
 enum {
