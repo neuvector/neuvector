@@ -808,8 +808,14 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 			}
 
 			if !user.RoleOverride {
-				user.Role = role
-				user.RoleDomains = roleDomains
+				if server == share.FlavorRancher && username != common.DefaultAdminUser &&
+					user.Role == api.UserRoleFedAdmin && role == api.UserRoleAdmin {
+					// in Rancher SSO, a Rancher cluster admin who promotes the nv cluster to fed master is prmoted to fedAdmin role in nv kv.
+					// however, Rancher cluster admin is mapped to nv admon role(as the role parameter) by k8s rbac
+				} else {
+					user.Role = role
+					user.RoleDomains = roleDomains
+				}
 			}
 
 			newUser = user
