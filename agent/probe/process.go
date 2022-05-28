@@ -811,28 +811,22 @@ func (p *Probe) checkUserGroup_uidChange(escalProc *procInternal, c *procContain
 
 /////
 func isSudoCommand(cmds []string) bool {
-	length := len(cmds)
-	switch {
-	case length == 1:
-		if cmds[0] == "sudo" || cmds[0] == "su" {
-			return true
-		}
-	case length > 1: // it could be "su -c /bin/ps neuvector"
-		for i, cmd := range cmds {
-			if i == 0 {
-				name := filepath.Base(cmd)
-				if name == "su" || name == "sudo" {
-					continue
-				} else {
-					break
-				}
-			} else if cmd[:1] == "-" { // option
+	for i, cmd := range cmds {
+		if i == 0 {
+			switch(filepath.Base(cmd)) {
+			case "sudo":
+				return true
+			case "su":	// check following su cmds
+			default:
+				return false
+			}
+		} else {
+			if cmd[:1] == "-" { // skip option
 				continue
-			} else {
+			} else {	// it could be "su -c /bin/ps neuvector"
 				if cmd == "root" {
 					return true
 				}
-				return false
 			}
 		}
 	}
