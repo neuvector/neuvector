@@ -1348,8 +1348,8 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed)
 		return
 	}
-	// do not promote current user to fedAdmin if it's not local user
-	if login.fullname != common.DefaultAdminUser && login.server == "" {
+	// any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
+	if login.fullname != common.DefaultAdminUser {
 		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
 	}
 
