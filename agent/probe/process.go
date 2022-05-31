@@ -821,7 +821,7 @@ func isSudoCommand(cmds []string) bool {
 				return false
 			}
 		} else {
-			if cmd[:1] == "-" { // skip option
+			if strings.HasPrefix(cmd, "-") { // skip option
 				continue
 			} else {	// it could be "su -c /bin/ps neuvector"
 				if cmd == "root" {
