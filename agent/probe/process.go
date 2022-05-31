@@ -2309,16 +2309,24 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			proc.reported |= profileReported
 			go p.sendProcessIncident(true, id, pp.Uuid, svcGroup, derivedGroup, proc)
 			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
+				pid := proc.pid
+				if c, ok := p.pidContainerMap[proc.pid]; ok{
+					pid = c.rootPid  // in case that it was gone
+				}
+
+				switch proc.name {
+				case "nc", "ncat", "netcat", "cat":
+					// possible health check application, avoid to block them at its access layer
+				default:
+					if !global.SYS.IsNotContainerFile(pid, proc.path) {
+						//// add the entry to black list
+						go p.addContainerFAccessBlackList(id, []string{proc.path})
+					}
+				}
+
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
-				if proc.name == "nc" || proc.name == "ncat" || proc.name == "netcat" {
-					// possible health check application, avoid to block them at its access layer
-				} else {
-					//// add the entry to black list
-					go p.addContainerFAccessBlackList(id, []string{proc.path})
-				}
 			}
 		}
 	}
@@ -3068,8 +3076,8 @@ func (p *Probe) UpdateFromAllowRule(id, path string) {
 
 func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
 	p.lockProcMux()
-	defer p.unlockProcMux()
 	proc, ok := p.pidProcMap[pid]
-	mLog.WithFields(log.Fields{"proc": proc}).Debug("PROC:")
+	p.unlockProcMux()
+	mLog.WithFields(log.Fields{"proc": proc, "pid": pid}).Debug("FA:")
 	return proc, ok
 }
