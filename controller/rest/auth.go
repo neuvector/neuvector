@@ -515,6 +515,13 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 										}
 									}
 								}
+								if rancherUser.name == common.DefaultAdminUser {
+									if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+										if role, ok := domainRoles[access.AccessDomainGlobal]; ok && role == api.UserRoleAdmin {
+											domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
+										}
+									}
+								}
 							} else {
 								log.WithFields(log.Fields{"id": pid, "subType": subType}).Debug("no deduced role")
 							}
