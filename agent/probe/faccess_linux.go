@@ -154,8 +154,8 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 
 	// docker cp (file changes) might change the polling behaviors,
 	// remove the non-block io to controller the polling timeouts
-	flags := fsmon.FAN_CLOEXEC | fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS
-	fn, err := fsmon.Initialize(flags, os.O_RDONLY|syscall.O_LARGEFILE)
+	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE
+	fn, err := fsmon.Initialize(flags, unix.O_RDONLY | unix.O_LARGEFILE)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FA: Initialize")
 		return nil, false
@@ -637,6 +637,9 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, path, svcGroup string, c
 	name := filepath.Base(path) // open app
 	sid, pgid := osutil.GetSessionId(pid), osutil.GetProcessGroupId(pid)
 	ppid, _, _, _, _ := osutil.GetProcessPIDs(pid)
+	if len(cmds) == 0 {
+		cmds, _ = global.SYS.ReadCmdLine(pid)
+	}
 	proc := &procInternal{pid: pid, name: name, path: path, cmds: cmds, ppid: ppid, sid: sid, pgid: pgid}
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, Action: share.PolicyActionAllow, DerivedGroup: svcGroup}
 
@@ -669,8 +672,6 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	}
 
 	// log.WithFields(log.Fields{"id": id, "found": found, "path": path}).Debug("FA: ")
-	fa.lockMux()
-	defer fa.unlockMux()
 	if cRoot, ok := fa.roots[id]; ok {
 		profileSetting = cRoot.setting
 		svcGroup = cRoot.group
@@ -689,7 +690,8 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	return id, profileSetting, svcGroup, res
 }
 
-func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
+func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
+	bPass := true
 	if (ev.Mask & fa.cflag) > 0 {
 		var ppath, pname, name, path string
 		var cmds []string
@@ -702,15 +704,14 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 		if fa.prober != nil {
 			// obtains parent process information
 			if proc, ok := fa.prober.GetProcessInfo(ppid); ok {
-				pname = proc.name
-				ppath = proc.path
-				cmds = proc.cmds
-				if pname == "" {
+				if ppath == "" && pname == "" {
 					pname = proc.pname
-				}
-				if ppath == "" {
 					ppath = proc.ppath
+				} else {
+					pname = proc.name
+					ppath = proc.path
 				}
+				cmds = proc.cmds
 			}
 		}
 
@@ -719,12 +720,9 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 		}
 
 		if ppath == "" {
-			ppath, _ = global.SYS.GetFilePath(ppid)
-		}
-
-		if len(cmds) == 0 {	// a reference for zero-drift
-			if pcmds, err := global.SYS.ReadCmdLine(ppid); err == nil {
-				cmds = pcmds
+			if ppath, _ = global.SYS.GetFilePath(ppid); ppath == "" {
+				// empty when executing a file created with memfd_create() via fexecve() or execveat(AT_EMPTY_PATH).
+				ppath = pname
 			}
 		}
 
@@ -791,34 +789,35 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) {
 					}
 				}
 			}
-
 		}
 
-		pass := res > rule_denied
-		if err = fa.fanfd.Response(ev, pass); err != nil {
-			log.WithFields(log.Fields{"err": err}).Error("FA: response fail")
-		}
-
-		///////
-		if !pass {
+		bPass = res > rule_denied
+		if !bPass {
 			log.WithFields(log.Fields{"path": path, "ppid": ppid, "pname": pname}).Debug("FA: denied")
+		} else {
+			log.WithFields(log.Fields{"ppid": ppid}).Debug("FA: allowed")
 		}
 	}
+	return bPass
 }
 
 func (fa *FileAccessCtrl) handleEvents() {
 	for {
-		ev, err := fa.fanfd.GetEvent()
-		if err != nil {
-			// if !strings.HasSuffix(err, "resource temporarily unavailable") {
-			if !errors.Is(err, syscall.EAGAIN) {
-				log.WithFields(log.Fields{"err": err}).Error("FA:")
+		if ev, err := fa.fanfd.GetEvent(); err != nil {
+			if errors.Is(err, syscall.EAGAIN) {
+				continue  // try later
 			}
-			return
+			break
+		} else {
+			bPass := true
+			if ev.Version == fsmon.FANOTIFY_METADATA_VERSION {
+				bPass = fa.processEvent(ev)
+			} else {
+				log.Error("FA: wrong metadata version")
+			}
+			fa.fanfd.Response(ev, bPass)
+			ev.File.Close()
 		}
-
-		fa.processEvent(ev)
-		ev.File.Close()
 	}
 }
 
@@ -846,7 +845,9 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
+			fa.lockMux()
 			fa.handleEvents()
+			fa.unlockMux()
 			waitCnt = 0
 		}
 	}
@@ -883,7 +884,7 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 // For example, the "ps" commands (opening "/bin/busybox") for runtime services:
 //     crio uses "docker-runc-current", but docker-native uses "docker"
 func (fa *FileAccessCtrl) isParentProcessException(pname, ppath, name, path string) bool {
-	// mLog.WithFields(log.Fields{"pname": pname, "path": ppath, "name": name, "path": path}).Debug("FA:")
+	// mlog.WithFields(log.Fields{"pname": pname, "ppath": ppath, "name": name, "path": path}).Debug("FA:")
 	if name == "ps" {
 		return true // common service call
 	}
