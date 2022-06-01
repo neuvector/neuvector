@@ -436,6 +436,17 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 
 // ---
 
+func benchHostDelete(id string, param interface{}) {
+	cluster.DeleteTree(share.CLUSBenchKey(id))
+	cluster.Delete(share.CLUSBenchStateHostKey(id))
+}
+
+func benchAgentOnline(id string, param interface{}) {
+	// Read bench checks into cache in case its notification came earlier
+	agent := param.(*agentCache).agent
+	benchStateHandler(cluster.ClusterNotifyAdd, share.CLUSBenchStateHostKey(agent.HostID), nil)
+}
+
 func readBenchFromCluster(id string, bench share.BenchType) []byte {
 	key := share.CLUSBenchReportKey(id, bench)
 	if value, err := cluster.Get(key); err != nil || len(value) == 0 {
@@ -455,8 +466,8 @@ func benchStateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 		return
 	}
 
-	id := share.CLUSScanStateKey2ID(key)
-	if share.CLUSScanStateKey2Type(key) == "host" {
+	id := share.CLUSBenchStateKey2ID(key)
+	if share.CLUSBenchStateKey2Type(key) == "host" {
 		if c := getHostCache(id); c != nil {
 			if v := readBenchFromCluster(id, share.BenchCustomHost); v != nil {
 				c.customBenchValue = v
