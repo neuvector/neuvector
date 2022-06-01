@@ -1538,10 +1538,6 @@ func attrWorkloadAdd(id string, param interface{}) {
 	}
 }
 
-func benchHostDelete(id string, param interface{}) {
-	cluster.Delete(share.CLUSBenchKey(id))
-}
-
 func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	object := share.CLUSObjectKey2Object(key)
 	switch object {
@@ -1697,6 +1693,7 @@ func registerEventHandlers() {
 	evhdls.Register(EV_AGENT_ADD, []eventHandlerFunc{
 		connectAgentAdd,
 		scanAgentAdd,
+		benchAgentOnline,
 	})
 	evhdls.Register(EV_AGENT_DELETE, []eventHandlerFunc{
 		uniconfAgentDelete,

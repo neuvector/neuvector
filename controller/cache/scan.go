@@ -691,8 +691,6 @@ func scanAgentAdd(id string, param interface{}) {
 	// the host has been scanned.
 	agent := param.(*agentCache).agent
 	scanMapAdd(agent.HostID, id, nil, share.ScanObjectType_HOST)
-	// Read bench checks into cache in case its notification came earlier
-	benchStateHandler(cluster.ClusterNotifyAdd, share.CLUSBenchStateHostKey(agent.HostID), nil)
 }
 
 func scanHostDelete(id string, param interface{}) {
@@ -1148,7 +1146,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 		return vuls, modules, nil
 	} else {
-		return nil, nil,common.ErrObjectNotFound
+		return nil, nil, common.ErrObjectNotFound
 	}
 }
 
