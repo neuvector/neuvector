@@ -523,6 +523,7 @@ func addrOrchHostDelete(ipnets []net.IPNet) {
 
 // With cachMutex held
 func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
+	var addcnt int = 0
 	for _, addrs := range ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {
@@ -531,6 +532,7 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 				if _, ok := ipDevMap[key]; !ok {
 					log.WithFields(log.Fields{"ip": key, "id": id}).Info("add ip-device map")
 					ipDevMap[key] = &workloadEphemeral{wl: id}
+					addcnt++
 				} else {
 					log.WithFields(log.Fields{"ip": key, "id": id}).Info("renew ip-device map")
 					ipDevMap[key] = &workloadEphemeral{wl: id}
@@ -543,7 +545,9 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 	//than agent get updated which cause neuvector device temprary to be unmanaged
 	//workload, reset unManagedWlTimer to update unmanaged workload ip to prevent
 	//neuvector device being treated as unmanaged wl
-	scheduleUnmanagedWlProc(false)
+	if addcnt > 0 {
+		scheduleUnmanagedWlProc(false)
+	}
 
 	// cleanup ephemeral entries
 	for key, dev := range ipDevMap {
@@ -1023,7 +1027,8 @@ func addrWorkloadAdd(id string, param interface{}) {
 					wlp.ipnet = addr.IPNet
 					wlp.alive = true
 					wlp.managed = true
-					if wlp.node == "" {
+					//workload's hostname from agent is more accurate
+					if wlp.node != wl.HostName {
 						wlp.node = wl.HostName
 					}
 				} else {
