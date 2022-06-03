@@ -92,16 +92,18 @@ var svcLabelKeys = make(map[string]*WebhookSvcLabelKey) // key is service name
 
 var admCtrlTypes []string
 
+var defAllowedNamespaces utils.Set  // namespaces in critical(default) allow rules only
 var allowedNamespaces utils.Set     // all effectively allowed namespaces that do no contain wildcard character
 var allowedNamespacesWild utils.Set // all effectively allowed namespaces that contain wildcard character
 var nsSelectorValue string
 
 var allSetOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan}
 
-func InitK8sNsSelectorInfo(allowedNS, allowedNsWild utils.Set, selectorValue string, admCtrlEnabled bool) {
+func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, selectorValue string, admCtrlEnabled bool) {
 	nsSelectorValue = selectorValue
 	allowedNamespaces = allowedNS
 	allowedNamespacesWild = allowedNsWild
+	defAllowedNamespaces = defAllowedNS
 	if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
 		for _, obj := range objs {
 			if nsObj := obj.(*resource.Namespace); nsObj != nil {
@@ -133,56 +135,50 @@ func UpdateAllowedK8sNs(isLead, admCtrlEnabled bool, newAllowedNS, newAllowedNsW
 }
 
 func VerifyK8sNs(admCtrlEnabled bool, nsName string, nsLabels map[string]string) {
-	keys := map[string]bool{ // map key is label key, map value is the label key should exist in k8s resource metadata or not
-		resource.NsSelectorKeySkipNV:   false,
-		resource.NsSelectorKeyStatusNV: false,
+	if nsLabels == nil {
+		nsLabels = make(map[string]string)
 	}
-	addLabelSkip := false
-	addLabelStatus := false
+
+	var shouldExist bool = true
+	var shouldNotExist bool = false
+
+	labelKeys := map[string]*bool{ // map key is label key, map value means the label key should exist in k8s ns resource object's metadata or not
+		resource.NsSelectorKeySkipNV:   &shouldNotExist,
+		resource.NsSelectorKeyStatusNV: &shouldNotExist,
+	}
 	if admCtrlEnabled {
+		if resource.CtrlPlaneOpInWhExpr == resource.NsSelectorOpNotExist {
+			labelKeys[resource.NsSelectorKeyCtrlPlane] = &shouldNotExist
+			if defAllowedNamespaces.Contains(nsName) {
+				labelKeys[resource.NsSelectorKeyCtrlPlane] = nil // could exist or not
+			}
+		}
+
 		if allowedNamespaces.Contains(nsName) {
-			keys[resource.NsSelectorKeySkipNV] = true
-			addLabelSkip = true
+			labelKeys[resource.NsSelectorKeySkipNV] = &shouldExist
 		} else {
 			for allowedNsWild := range allowedNamespacesWild.Iter() {
 				if share.EqualMatch(allowedNsWild.(string), nsName) {
-					keys[resource.NsSelectorKeySkipNV] = true
-					addLabelSkip = true
+					labelKeys[resource.NsSelectorKeySkipNV] = &shouldExist
 					break
 				}
 			}
 		}
+
 		if resource.NvAdmSvcNamespace == nsName {
 			// as long as admission control is enabled, even 'namespace=neuvector' critical allow rule is disabled, label 'statusNeuvector' still exists in neuvector namespace
-			keys[resource.NsSelectorKeyStatusNV] = true
-			addLabelStatus = true
+			labelKeys[resource.NsSelectorKeyStatusNV] = &shouldExist
 		}
 	}
-	needUpdate := false
-	for key, labelShouldExist := range keys {
-		if labelShouldExist {
-			if nsLabels != nil {
-				if _, exists := nsLabels[key]; exists {
-					continue
-				} else {
-					needUpdate = true
-					break
-				}
-			} else {
-				needUpdate = true
+
+	for labelKey, shouldExist := range labelKeys {
+		if shouldExist != nil {
+			_, exists := nsLabels[labelKey]
+			if (*shouldExist && !exists) || (!*shouldExist && exists) {
+				workSingleK8sNsLabels(nsName, labelKeys)
 				break
 			}
-		} else {
-			if nsLabels != nil {
-				if _, exists := nsLabels[key]; exists {
-					needUpdate = true
-					break
-				}
-			}
 		}
-	}
-	if needUpdate {
-		workSingleK8sNsLabels(addLabelSkip, addLabelStatus, nsName)
 	}
 }
 
@@ -782,46 +778,31 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 	return TestFailed, nil
 }
 
-func workSingleK8sNsLabels(addLabelSkip, addLabelStatus bool, nsName string) error {
+func workSingleK8sNsLabels(nsName string, labelKeys map[string]*bool) error {
 	obj, err := global.ORCH.GetResource(resource.RscTypeNamespace, "", nsName)
 	if err != nil {
-		log.WithFields(log.Fields{"addLabelSkip": addLabelSkip, "addLabelStatus": addLabelStatus, "namespace": nsName, "err": err}).Error("resource no found")
+		log.WithFields(log.Fields{"labelKeys": labelKeys, "namespace": nsName, "err": err}).Error("resource no found")
 		return err
 	} else {
-		keys := map[string]bool{ // map key is label key, map value is the label key should exist in k8s resource metadata or not
-			resource.NsSelectorKeySkipNV:   false,
-			resource.NsSelectorKeyStatusNV: false,
-		}
-		if addLabelSkip {
-			keys[resource.NsSelectorKeySkipNV] = true
-		}
-		if addLabelStatus && resource.NvAdmSvcNamespace == nsName {
-			// as long as admission control is enabled, even 'namespace=neuvector' critical allow rule is disabled, label 'statusNeuvector' still exists in neuvector namespace
-			keys[resource.NsSelectorKeyStatusNV] = true
-		}
 		nsObj := obj.(*corev1.Namespace)
 		if nsObj != nil && nsObj.Metadata != nil {
-			updated := false
-			for key, labelShouldExist := range keys {
-				if labelShouldExist {
-					if nsObj.Metadata.Labels == nil {
-						nsObj.Metadata.Labels = make(map[string]string)
-					}
-					if _, exists := nsObj.Metadata.Labels[key]; exists {
-						continue
-					}
-					nsObj.Metadata.Labels[key] = nsSelectorValue
-					updated = true
-				} else {
-					if nsObj.Metadata.Labels != nil {
-						if _, exists := nsObj.Metadata.Labels[key]; exists {
-							delete(nsObj.Metadata.Labels, key)
-							updated = true
-						}
+			if nsObj.Metadata.Labels == nil {
+				nsObj.Metadata.Labels = make(map[string]string)
+			}
+			needUpdate := false
+			for labelKey, shouldExist := range labelKeys {
+				if shouldExist != nil {
+					_, exists := nsObj.Metadata.Labels[labelKey]
+					if *shouldExist && !exists {
+						nsObj.Metadata.Labels[labelKey] = nsSelectorValue
+						needUpdate = true
+					} else if !*shouldExist && exists {
+						delete(nsObj.Metadata.Labels, labelKey)
+						needUpdate = true
 					}
 				}
 			}
-			if updated {
+			if needUpdate {
 				err = global.ORCH.UpdateResource(resource.RscTypeNamespace, nsObj)
 				if err != nil {
 					log.WithFields(log.Fields{"nsName": nsName, "err": err}).Error("update resource failed")

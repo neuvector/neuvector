@@ -18,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	nvcrd "github.com/neuvector/neuvector/controller/nvk8sapi/neuvectorcrd"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
@@ -196,7 +197,7 @@ func lookupK8sContainerID(id, role string, containers []*container.ContainerMeta
 	for _, c := range containers {
 		if strings.HasPrefix(c.Name, "k8s_POD") {
 			// parent: POD
-			if c.ID == id  {
+			if c.ID == id {
 				podname, _ = c.Labels[container.KubeKeyPodName]
 				break
 			}
@@ -372,7 +373,7 @@ func main() {
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion)
+		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs)
 	}
 
 	// Assign controller interface/IP scope

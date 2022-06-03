@@ -1894,16 +1894,14 @@ func startWorkerThread() {
 						log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Info("being deleted")
 						return
 					}
-					if isLeader() {
-						var n, o *resource.AdmissionWebhookConfiguration
-						if ev.ResourceNew != nil {
-							n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
-						}
-						if ev.ResourceOld != nil {
-							o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
-						}
-						refreshK8sAdminWebhookStateCache(o, n)
+					var n, o *resource.AdmissionWebhookConfiguration
+					if ev.ResourceNew != nil {
+						n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
 					}
+					if ev.ResourceOld != nil {
+						o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
+					}
+					refreshK8sAdminWebhookStateCache(o, n)
 				}
 			}
 		}
@@ -1968,7 +1966,11 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 		},
 	}
 
-	if isLeader() && (!enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo))) {
+	isValidSetting := false
+	if !enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo)) {
+		isValidSetting = true
+	}
+	if isLeader() && isValidSetting {
 		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name)
 		if skip && err == nil {
 			// meaning nv resource in k8s sync with nv's cluster status. do nothing
