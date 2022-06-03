@@ -96,8 +96,9 @@ const (
 )
 
 const (
-	NsSelectorKeyStatusNV = "statusNeuvector" // written to only neuvector namespace's label
-	NsSelectorKeySkipNV   = "skipNeuvectorAdmissionControl"
+	NsSelectorKeyStatusNV  = "statusNeuvector" // written to only neuvector namespace's label
+	NsSelectorKeySkipNV    = "skipNeuvectorAdmissionControl"
+	NsSelectorKeyCtrlPlane = "control-plane" // AKS writes this label to kube-system ns & our validation webhook
 
 	NsSelectorOpNotExist = "DoesNotExist"
 	NsSelectorOpExists   = "Exists"
@@ -192,6 +193,8 @@ type NvCrdInitFunc func(leader bool)
 
 type NvQueryK8sVerFunc func()
 
+type NvVerifyK8sNsFunc func(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
+
 //----------------------------------------------------------
 
 var NvAdmSvcName = "neuvector-svc-admission-webhook"
@@ -256,7 +259,9 @@ var cacheEventFunc common.CacheEventFunc
 
 var nvCrdInitFunc NvCrdInitFunc
 var nvQueryK8sVerFunc NvQueryK8sVerFunc
+var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
 var isLeader bool
+var CtrlPlaneOpInWhExpr string
 
 var watchFailedFlag int32
 
@@ -1333,7 +1338,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 		RscTypeNode:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod:
-		if r, err:= d.getResource(rt, namespace, name); err == nil {
+		if r, err := d.getResource(rt, namespace, name); err == nil {
 			if _, p := xlatePod(r.(k8s.Resource)); p != nil {
 				return p, nil
 			}
@@ -1494,17 +1499,15 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool) bool {
 	var nvOpResources []NvAdmRegRuleSetting // is for what nv expects
-	var nsSelectorKey, nsSelectorOp string
-
+	// key/operator in webhook NamespaceSelector's MatchExpressions.
+	selKeyOps := map[string]string{NsSelectorKeyCtrlPlane: NsSelectorOpNotExist}
 	switch whName {
 	case NvAdmValidatingWebhookName:
 		nvOpResources = AdmResForOpsSettings
-		nsSelectorKey = NsSelectorKeySkipNV
-		nsSelectorOp = NsSelectorOpNotExist
+		selKeyOps[NsSelectorKeySkipNV] = NsSelectorOpNotExist
 	case NvStatusValidatingWebhookName:
 		nvOpResources = StatusResForOpsSettings
-		nsSelectorKey = NsSelectorKeyStatusNV
-		nsSelectorOp = NsSelectorOpExists
+		selKeyOps[NsSelectorKeyStatusNV] = NsSelectorOpExists
 	case NvCrdValidatingWebhookName:
 		nvOpResources = CrdResForOpsSettings
 		checkNsSelector = false
@@ -1549,10 +1552,38 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 		return false
 	}
 	if checkNsSelector {
+		var ctrlPlaneOpInWhExpr string
 		for _, expr := range wh.NamespaceSelector.MatchExpressions {
-			if expr == nil || *expr.Key != nsSelectorKey || *expr.Operator != nsSelectorOp {
+			key := expr.GetKey()
+			value := expr.GetOperator()
+			if op, ok := selKeyOps[key]; !ok || op != value {
+				// an unexpected label(key/value) is found in webhook NamespaceSelector's MatchExpressions
+				log.WithFields(log.Fields{"key": key, "value": value}).Info("unexpected label")
 				return false
 			}
+			if key == NsSelectorKeyCtrlPlane { // "control-plane" key is also in MatchExpressions on AKS
+				ctrlPlaneOpInWhExpr = value
+			}
+			delete(selKeyOps, key)
+		}
+		if whName == NvAdmValidatingWebhookName && CtrlPlaneOpInWhExpr != ctrlPlaneOpInWhExpr {
+			CtrlPlaneOpInWhExpr = ctrlPlaneOpInWhExpr
+			log.WithFields(log.Fields{"ctrlPlaneOp": CtrlPlaneOpInWhExpr}).Info()
+			if isLeader && nvVerifyK8sNsFunc != nil {
+				if objs, err := global.ORCH.ListResource(RscTypeNamespace); len(objs) > 0 {
+					for _, obj := range objs {
+						if nsObj := obj.(*Namespace); nsObj != nil {
+							nvVerifyK8sNsFunc(true, nsObj.Name, nsObj.Labels)
+						}
+					}
+				} else {
+					log.WithFields(log.Fields{"err": err}).Error()
+				}
+			}
+		}
+		delete(selKeyOps, NsSelectorKeyCtrlPlane)
+		if len(selKeyOps) > 0 {
+			return false
 		}
 	}
 
@@ -1580,9 +1611,10 @@ func AdjustAdmResForOC() {
 	nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
 }
 
-func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc) {
+func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc) {
 	nvCrdInitFunc = f1
 	nvQueryK8sVerFunc = f2
+	nvVerifyK8sNsFunc = f3
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
 	NvCrdValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvCrdValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-crd-webhook.neuvector.svc
