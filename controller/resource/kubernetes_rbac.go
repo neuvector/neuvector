@@ -1397,7 +1397,7 @@ func VerifyNvK8sRBAC(flavor string, existOnly bool) ([]string, []string, []strin
 	var k8sRbac403 bool
 	k8sClusterRoleBindings := []string{NvRbacRoleBinding, NvAppRoleBinding, NvAdmCtrlRoleBinding,
 		NvCrdRoleBinding, NvCrdSecRoleBinding, NvCrdAdmCtrlRoleBinding, NvCrdDlpRoleBinding, NvCrdWafRoleBinding}
-	if flavor == share.FlavorOpenShift {
+	if flavor == share.FlavorOpenShift && ocVersionMajor > 3 {
 		k8sClusterRoleBindings = append(k8sClusterRoleBindings, NvOperatorsRoleBinding)
 	}
 	clusterRoleErrors, k8sRbac403 = VerifyNvClusterRoles(k8sClusterRoleBindings, existOnly)
