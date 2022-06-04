@@ -149,6 +149,30 @@ void dpi_ep_set_server_ver(dpi_packet_t *p, char *ver, int len)
     DEBUG_LOG(DBG_SESSION, p, "port=%u version=%s\n", s->server.port, app->version);
 }
 
+void dpi_print_ip4_internal_fp(FILE *logfp)
+{
+    int i;
+    fprintf(logfp, "INTERNAL SUBNET\n");
+    for (i = 0; i < th_internal_subnet4->count; i++) {
+        fprintf(logfp, "    internal ip/mask="DBG_IPV4_FORMAT"/"DBG_IPV4_FORMAT"\n",
+                    DBG_IPV4_TUPLE(th_internal_subnet4->list[i].ip),
+                    DBG_IPV4_TUPLE(th_internal_subnet4->list[i].mask));
+    }
+    fprintf(logfp, "SPECIAL IP\n");
+    for (i = 0; i < th_specialip_subnet4->count; i++) {
+        fprintf(logfp, "    special ip/mask="DBG_IPV4_FORMAT"/"DBG_IPV4_FORMAT" iptype:%d\n",
+                    DBG_IPV4_TUPLE(th_specialip_subnet4->list[i].ip),
+                    DBG_IPV4_TUPLE(th_specialip_subnet4->list[i].mask),
+                    th_specialip_subnet4->list[i].iptype);
+    }
+    fprintf(logfp, "POLICY ADDRESS MAP\n");
+    for (i = 0; i < th_policy_addr->count; i++) {
+        fprintf(logfp, "    policy ip/mask="DBG_IPV4_FORMAT"/"DBG_IPV4_FORMAT"\n",
+                    DBG_IPV4_TUPLE(th_policy_addr->list[i].ip),
+                    DBG_IPV4_TUPLE(th_policy_addr->list[i].mask));
+    }
+}
+
 bool dpi_is_ip4_internal(uint32_t ip)
 {
     int i;

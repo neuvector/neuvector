@@ -239,5 +239,6 @@ int dpi_ipv6_defrag(dpi_packet_t *p);
 bool dpi_is_ip4_internal(uint32_t ip);
 uint8_t dpi_ip4_iptype(uint32_t ip);
 bool dpi_is_policy_addr(uint32_t ip);
+void dpi_print_ip4_internal_fp(FILE *logfp);
 
 #endif
