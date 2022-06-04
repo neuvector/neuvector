@@ -49,20 +49,20 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 
 		switch bench {
 		case share.BenchDockerHost, share.BenchDockerContainer, share.BenchContainer:
-			r.Catalog = api.BenchCatalogDocker
+			r.Category = api.BenchCategoryDocker
 		case share.BenchKubeMaster, share.BenchKubeWorker:
-			r.Catalog = api.BenchCatalogKube
+			r.Category = api.BenchCategoryKube
 		}
 	}
 
 	switch bench {
 	case share.BenchCustomHost:
 		r.Profile = "Level 1"
-		r.Catalog = api.BenchCatalogCustom
+		r.Category = api.BenchCategoryCustom
 		r.Type = api.BenchTypeHost
 	case share.BenchCustomContainer:
 		r.Profile = "Level 1"
-		r.Catalog = api.BenchCatalogCustom
+		r.Category = api.BenchCategoryCustom
 		r.Type = api.BenchTypeContainer
 	case share.BenchContainerSecret:
 		if len(item.Message) >= 3 { // type, evidence, location
@@ -99,14 +99,14 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 
 func sortBenchItems(items []*api.RESTBenchItem) []*api.RESTBenchItem {
 	sort.Slice(items, func(s, t int) bool {
-		if items[s].Catalog != api.BenchCatalogCustom && items[t].Catalog != api.BenchCatalogCustom {
+		if items[s].Category != api.BenchCategoryCustom && items[t].Category != api.BenchCategoryCustom {
 			return items[s].TestNum < items[t].TestNum
 		}
-		if items[s].Catalog == api.BenchCatalogCustom && items[t].Catalog == api.BenchCatalogCustom {
+		if items[s].Category == api.BenchCategoryCustom && items[t].Category == api.BenchCategoryCustom {
 			return items[s].TestNum < items[t].TestNum
 		}
 		// custom check on the top
-		return items[s].Catalog == api.BenchCatalogCustom
+		return items[s].Category == api.BenchCategoryCustom
 	})
 	return items
 }
@@ -741,7 +741,7 @@ func addCompAsset(all map[string]*compAsset, comp *api.RESTBenchItem) *compAsset
 		ca = &compAsset{
 			asset: &api.RESTComplianceAsset{
 				Name:        comp.TestNum,
-				Catalog:     comp.Catalog,
+				Category:    comp.Category,
 				Type:        comp.Type,
 				Level:       comp.Level,
 				Scored:      comp.Scored,
@@ -956,14 +956,14 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	sort.Slice(list, func(s, t int) bool {
-		if list[s].Catalog != api.BenchCatalogCustom && list[t].Catalog != api.BenchCatalogCustom {
+		if list[s].Category != api.BenchCategoryCustom && list[t].Category != api.BenchCategoryCustom {
 			return list[s].Name < list[t].Name
 		}
-		if list[s].Catalog == api.BenchCatalogCustom && list[t].Catalog == api.BenchCatalogCustom {
+		if list[s].Category == api.BenchCategoryCustom && list[t].Category == api.BenchCategoryCustom {
 			return list[s].Name < list[t].Name
 		}
 		// custom check on the top
-		return list[s].Catalog == api.BenchCatalogCustom
+		return list[s].Category == api.BenchCategoryCustom
 	})
 
 	resp.Compliances = list

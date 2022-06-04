@@ -263,7 +263,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.1": api.RESTBenchCheck{
 		TestNum:     "I.4.1",
 		Type:        "image",
-		Catalog:     "image",
+		Category:    "image",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -272,7 +272,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.6": api.RESTBenchCheck{
 		TestNum:     "I.4.6",
 		Type:        "image",
-		Catalog:     "image",
+		Category:    "image",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -281,7 +281,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.8": api.RESTBenchCheck{
 		TestNum:     "I.4.8",
 		Type:        "image",
-		Catalog:     "image",
+		Category:    "image",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -290,7 +290,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.9": api.RESTBenchCheck{
 		TestNum:     "I.4.9",
 		Type:        "image",
-		Catalog:     "image",
+		Category:    "image",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -299,7 +299,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.10": api.RESTBenchCheck{
 		TestNum:     "I.4.10",
 		Type:        "secret",
-		Catalog:     "image",
+		Category:    "image",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -311,7 +311,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.1": api.RESTBenchCheck{
 		TestNum:     "D.1.1.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -321,7 +321,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.2": api.RESTBenchCheck{
 		TestNum:     "D.1.1.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -331,7 +331,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.3": api.RESTBenchCheck{
 		TestNum:     "D.1.1.3",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -341,7 +341,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.4": api.RESTBenchCheck{
 		TestNum:     "D.1.1.4",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -351,7 +351,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.5": api.RESTBenchCheck{
 		TestNum:     "D.1.1.5",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -361,7 +361,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.6": api.RESTBenchCheck{
 		TestNum:     "D.1.1.6",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -371,7 +371,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.7": api.RESTBenchCheck{
 		TestNum:     "D.1.1.7",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -381,7 +381,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.8": api.RESTBenchCheck{
 		TestNum:     "D.1.1.8",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -391,7 +391,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.9": api.RESTBenchCheck{
 		TestNum:     "D.1.1.9",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -401,7 +401,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.10": api.RESTBenchCheck{
 		TestNum:     "D.1.1.10",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -411,7 +411,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.11": api.RESTBenchCheck{
 		TestNum:     "D.1.1.11",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -421,7 +421,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.12": api.RESTBenchCheck{
 		TestNum:     "D.1.1.12",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -431,7 +431,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.13": api.RESTBenchCheck{
 		TestNum:     "D.1.1.13",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -441,7 +441,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.14": api.RESTBenchCheck{
 		TestNum:     "D.1.1.14",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -451,7 +451,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.15": api.RESTBenchCheck{
 		TestNum:     "D.1.1.15",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -461,7 +461,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.16": api.RESTBenchCheck{
 		TestNum:     "D.1.1.16",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -471,7 +471,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.17": api.RESTBenchCheck{
 		TestNum:     "D.1.1.17",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -481,7 +481,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.18": api.RESTBenchCheck{
 		TestNum:     "D.1.1.18",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -491,7 +491,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.2.1": api.RESTBenchCheck{
 		TestNum:     "D.1.2.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -501,7 +501,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.1.2.2": api.RESTBenchCheck{
 		TestNum:     "D.1.2.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -511,7 +511,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.1": api.RESTBenchCheck{
 		TestNum:     "D.2.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -521,7 +521,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.2": api.RESTBenchCheck{
 		TestNum:     "D.2.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -531,7 +531,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.3": api.RESTBenchCheck{
 		TestNum:     "D.2.3",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -541,7 +541,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.4": api.RESTBenchCheck{
 		TestNum:     "D.2.4",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -551,7 +551,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.5": api.RESTBenchCheck{
 		TestNum:     "D.2.5",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -561,7 +561,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.6": api.RESTBenchCheck{
 		TestNum:     "D.2.6",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -571,7 +571,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.7": api.RESTBenchCheck{
 		TestNum:     "D.2.7",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -581,7 +581,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.8": api.RESTBenchCheck{
 		TestNum:     "D.2.8",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -591,7 +591,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.9": api.RESTBenchCheck{
 		TestNum:     "D.2.9",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -601,7 +601,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.10": api.RESTBenchCheck{
 		TestNum:     "D.2.10",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -611,7 +611,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.11": api.RESTBenchCheck{
 		TestNum:     "D.2.11",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -621,7 +621,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.12": api.RESTBenchCheck{
 		TestNum:     "D.2.12",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -631,7 +631,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.13": api.RESTBenchCheck{
 		TestNum:     "D.2.13",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -641,7 +641,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.14": api.RESTBenchCheck{
 		TestNum:     "D.2.14",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -651,7 +651,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.15": api.RESTBenchCheck{
 		TestNum:     "D.2.15",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -661,7 +661,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.16": api.RESTBenchCheck{
 		TestNum:     "D.2.16",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -671,7 +671,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.17": api.RESTBenchCheck{
 		TestNum:     "D.2.17",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -681,7 +681,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.2.18": api.RESTBenchCheck{
 		TestNum:     "D.2.18",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -691,7 +691,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.1": api.RESTBenchCheck{
 		TestNum:     "D.3.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -701,7 +701,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.2": api.RESTBenchCheck{
 		TestNum:     "D.3.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -711,7 +711,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.3": api.RESTBenchCheck{
 		TestNum:     "D.3.3",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -721,7 +721,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.4": api.RESTBenchCheck{
 		TestNum:     "D.3.4",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -731,7 +731,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.5": api.RESTBenchCheck{
 		TestNum:     "D.3.5",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -741,7 +741,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.6": api.RESTBenchCheck{
 		TestNum:     "D.3.6",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -751,7 +751,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.7": api.RESTBenchCheck{
 		TestNum:     "D.3.7",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -761,7 +761,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.8": api.RESTBenchCheck{
 		TestNum:     "D.3.8",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -771,7 +771,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.9": api.RESTBenchCheck{
 		TestNum:     "D.3.9",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -781,7 +781,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.10": api.RESTBenchCheck{
 		TestNum:     "D.3.10",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -791,7 +791,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.11": api.RESTBenchCheck{
 		TestNum:     "D.3.11",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -801,7 +801,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.12": api.RESTBenchCheck{
 		TestNum:     "D.3.12",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -811,7 +811,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.13": api.RESTBenchCheck{
 		TestNum:     "D.3.13",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -821,7 +821,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.14": api.RESTBenchCheck{
 		TestNum:     "D.3.14",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -831,7 +831,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.15": api.RESTBenchCheck{
 		TestNum:     "D.3.15",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -841,7 +841,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.16": api.RESTBenchCheck{
 		TestNum:     "D.3.16",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -851,7 +851,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.17": api.RESTBenchCheck{
 		TestNum:     "D.3.17",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -861,7 +861,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.18": api.RESTBenchCheck{
 		TestNum:     "D.3.18",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -871,7 +871,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.19": api.RESTBenchCheck{
 		TestNum:     "D.3.19",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -881,7 +881,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.20": api.RESTBenchCheck{
 		TestNum:     "D.3.20",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -891,7 +891,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.21": api.RESTBenchCheck{
 		TestNum:     "D.3.21",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -901,7 +901,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.3.22": api.RESTBenchCheck{
 		TestNum:     "D.3.22",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -911,7 +911,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.1": api.RESTBenchCheck{
 		TestNum:     "D.4.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -921,7 +921,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.2": api.RESTBenchCheck{
 		TestNum:     "D.4.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -931,7 +931,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.3": api.RESTBenchCheck{
 		TestNum:     "D.4.3",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -941,7 +941,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.4": api.RESTBenchCheck{
 		TestNum:     "D.4.4",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -951,7 +951,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.5": api.RESTBenchCheck{
 		TestNum:     "D.4.5",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -961,7 +961,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.6": api.RESTBenchCheck{
 		TestNum:     "D.4.6",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -971,7 +971,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.7": api.RESTBenchCheck{
 		TestNum:     "D.4.7",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -981,7 +981,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.8": api.RESTBenchCheck{
 		TestNum:     "D.4.8",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -991,7 +991,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.9": api.RESTBenchCheck{
 		TestNum:     "D.4.9",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1001,7 +1001,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.10": api.RESTBenchCheck{
 		TestNum:     "D.4.10",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1011,7 +1011,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.11": api.RESTBenchCheck{
 		TestNum:     "D.4.11",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1021,7 +1021,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.4.12": api.RESTBenchCheck{
 		TestNum:     "D.4.12",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1031,7 +1031,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.6.1": api.RESTBenchCheck{
 		TestNum:     "D.6.1",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1041,7 +1041,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.6.2": api.RESTBenchCheck{
 		TestNum:     "D.6.2",
 		Type:        "host",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1051,7 +1051,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.1": api.RESTBenchCheck{
 		TestNum:     "D.5.1",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1061,7 +1061,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.2": api.RESTBenchCheck{
 		TestNum:     "D.5.2",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1071,7 +1071,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.3": api.RESTBenchCheck{
 		TestNum:     "D.5.3",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1081,7 +1081,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.4": api.RESTBenchCheck{
 		TestNum:     "D.5.4",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1091,7 +1091,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.5": api.RESTBenchCheck{
 		TestNum:     "D.5.5",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1101,7 +1101,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.6": api.RESTBenchCheck{
 		TestNum:     "D.5.6",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1111,7 +1111,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.7": api.RESTBenchCheck{
 		TestNum:     "D.5.7",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1121,7 +1121,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.8": api.RESTBenchCheck{
 		TestNum:     "D.5.8",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1131,7 +1131,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.9": api.RESTBenchCheck{
 		TestNum:     "D.5.9",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1141,7 +1141,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.10": api.RESTBenchCheck{
 		TestNum:     "D.5.10",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1151,7 +1151,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.11": api.RESTBenchCheck{
 		TestNum:     "D.5.11",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1161,7 +1161,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.12": api.RESTBenchCheck{
 		TestNum:     "D.5.12",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1171,7 +1171,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.13": api.RESTBenchCheck{
 		TestNum:     "D.5.13",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1181,7 +1181,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.14": api.RESTBenchCheck{
 		TestNum:     "D.5.14",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1191,7 +1191,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.15": api.RESTBenchCheck{
 		TestNum:     "D.5.15",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1201,7 +1201,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.16": api.RESTBenchCheck{
 		TestNum:     "D.5.16",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1211,7 +1211,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.17": api.RESTBenchCheck{
 		TestNum:     "D.5.17",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1221,7 +1221,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.18": api.RESTBenchCheck{
 		TestNum:     "D.5.18",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1231,7 +1231,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.19": api.RESTBenchCheck{
 		TestNum:     "D.5.19",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1241,7 +1241,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.20": api.RESTBenchCheck{
 		TestNum:     "D.5.20",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1251,7 +1251,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.21": api.RESTBenchCheck{
 		TestNum:     "D.5.21",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1261,7 +1261,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.22": api.RESTBenchCheck{
 		TestNum:     "D.5.22",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1271,7 +1271,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.23": api.RESTBenchCheck{
 		TestNum:     "D.5.23",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1281,7 +1281,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.24": api.RESTBenchCheck{
 		TestNum:     "D.5.24",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1291,7 +1291,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.25": api.RESTBenchCheck{
 		TestNum:     "D.5.25",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1301,7 +1301,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.26": api.RESTBenchCheck{
 		TestNum:     "D.5.26",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1311,7 +1311,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.27": api.RESTBenchCheck{
 		TestNum:     "D.5.27",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1321,7 +1321,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.28": api.RESTBenchCheck{
 		TestNum:     "D.5.28",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1331,7 +1331,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.29": api.RESTBenchCheck{
 		TestNum:     "D.5.29",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1341,7 +1341,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.30": api.RESTBenchCheck{
 		TestNum:     "D.5.30",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1351,7 +1351,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"D.5.31": api.RESTBenchCheck{
 		TestNum:     "D.5.31",
 		Type:        "container",
-		Catalog:     "docker",
+		Category:    "docker",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1361,7 +1361,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.1": api.RESTBenchCheck{
 		TestNum:     "K.1.1.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1371,7 +1371,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.2": api.RESTBenchCheck{
 		TestNum:     "K.1.1.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1381,7 +1381,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.3": api.RESTBenchCheck{
 		TestNum:     "K.1.1.3",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1391,7 +1391,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.4": api.RESTBenchCheck{
 		TestNum:     "K.1.1.4",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1401,7 +1401,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.5": api.RESTBenchCheck{
 		TestNum:     "K.1.1.5",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1411,7 +1411,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.6": api.RESTBenchCheck{
 		TestNum:     "K.1.1.6",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1421,7 +1421,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.7": api.RESTBenchCheck{
 		TestNum:     "K.1.1.7",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1431,7 +1431,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.8": api.RESTBenchCheck{
 		TestNum:     "K.1.1.8",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1441,7 +1441,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.9": api.RESTBenchCheck{
 		TestNum:     "K.1.1.9",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1451,7 +1451,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.10": api.RESTBenchCheck{
 		TestNum:     "K.1.1.10",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1461,7 +1461,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.11": api.RESTBenchCheck{
 		TestNum:     "K.1.1.11",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1471,7 +1471,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.12": api.RESTBenchCheck{
 		TestNum:     "K.1.1.12",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1481,7 +1481,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.13": api.RESTBenchCheck{
 		TestNum:     "K.1.1.13",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1491,7 +1491,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.14": api.RESTBenchCheck{
 		TestNum:     "K.1.1.14",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1501,7 +1501,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.15": api.RESTBenchCheck{
 		TestNum:     "K.1.1.15",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1511,7 +1511,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.16": api.RESTBenchCheck{
 		TestNum:     "K.1.1.16",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1521,7 +1521,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.17": api.RESTBenchCheck{
 		TestNum:     "K.1.1.17",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1531,7 +1531,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.18": api.RESTBenchCheck{
 		TestNum:     "K.1.1.18",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1541,7 +1541,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.19": api.RESTBenchCheck{
 		TestNum:     "K.1.1.19",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1551,7 +1551,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.20": api.RESTBenchCheck{
 		TestNum:     "K.1.1.20",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1561,7 +1561,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.1.21": api.RESTBenchCheck{
 		TestNum:     "K.1.1.21",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1571,7 +1571,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.1": api.RESTBenchCheck{
 		TestNum:     "K.1.2.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1581,7 +1581,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.2": api.RESTBenchCheck{
 		TestNum:     "K.1.2.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1591,7 +1591,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.3": api.RESTBenchCheck{
 		TestNum:     "K.1.2.3",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1601,7 +1601,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.4": api.RESTBenchCheck{
 		TestNum:     "K.1.2.4",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1611,7 +1611,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.5": api.RESTBenchCheck{
 		TestNum:     "K.1.2.5",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1621,7 +1621,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.6": api.RESTBenchCheck{
 		TestNum:     "K.1.2.6",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1631,7 +1631,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.7": api.RESTBenchCheck{
 		TestNum:     "K.1.2.7",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1641,7 +1641,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.8": api.RESTBenchCheck{
 		TestNum:     "K.1.2.8",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1651,7 +1651,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.9": api.RESTBenchCheck{
 		TestNum:     "K.1.2.9",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1661,7 +1661,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.10": api.RESTBenchCheck{
 		TestNum:     "K.1.2.10",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1671,7 +1671,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.11": api.RESTBenchCheck{
 		TestNum:     "K.1.2.11",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1681,7 +1681,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.12": api.RESTBenchCheck{
 		TestNum:     "K.1.2.12",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1691,7 +1691,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.13": api.RESTBenchCheck{
 		TestNum:     "K.1.2.13",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1701,7 +1701,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.14": api.RESTBenchCheck{
 		TestNum:     "K.1.2.14",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1711,7 +1711,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.15": api.RESTBenchCheck{
 		TestNum:     "K.1.2.15",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1721,7 +1721,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.16": api.RESTBenchCheck{
 		TestNum:     "K.1.2.16",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1731,7 +1731,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.17": api.RESTBenchCheck{
 		TestNum:     "K.1.2.17",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1741,7 +1741,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.18": api.RESTBenchCheck{
 		TestNum:     "K.1.2.18",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1751,7 +1751,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.19": api.RESTBenchCheck{
 		TestNum:     "K.1.2.19",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1761,7 +1761,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.20": api.RESTBenchCheck{
 		TestNum:     "K.1.2.20",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1771,7 +1771,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.21": api.RESTBenchCheck{
 		TestNum:     "K.1.2.21",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1781,7 +1781,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.22": api.RESTBenchCheck{
 		TestNum:     "K.1.2.22",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1791,7 +1791,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.23": api.RESTBenchCheck{
 		TestNum:     "K.1.2.23",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1801,7 +1801,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.24": api.RESTBenchCheck{
 		TestNum:     "K.1.2.24",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1811,7 +1811,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.25": api.RESTBenchCheck{
 		TestNum:     "K.1.2.25",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1821,7 +1821,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.26": api.RESTBenchCheck{
 		TestNum:     "K.1.2.26",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1831,7 +1831,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.27": api.RESTBenchCheck{
 		TestNum:     "K.1.2.27",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1841,7 +1841,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.28": api.RESTBenchCheck{
 		TestNum:     "K.1.2.28",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1851,7 +1851,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.29": api.RESTBenchCheck{
 		TestNum:     "K.1.2.29",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1861,7 +1861,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.30": api.RESTBenchCheck{
 		TestNum:     "K.1.2.30",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1871,7 +1871,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.31": api.RESTBenchCheck{
 		TestNum:     "K.1.2.31",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1881,7 +1881,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.32": api.RESTBenchCheck{
 		TestNum:     "K.1.2.32",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1891,7 +1891,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.33": api.RESTBenchCheck{
 		TestNum:     "K.1.2.33",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1901,7 +1901,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.34": api.RESTBenchCheck{
 		TestNum:     "K.1.2.34",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1911,7 +1911,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.2.35": api.RESTBenchCheck{
 		TestNum:     "K.1.2.35",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1921,7 +1921,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.1": api.RESTBenchCheck{
 		TestNum:     "K.1.3.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1931,7 +1931,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.2": api.RESTBenchCheck{
 		TestNum:     "K.1.3.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1941,7 +1941,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.3": api.RESTBenchCheck{
 		TestNum:     "K.1.3.3",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1951,7 +1951,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.4": api.RESTBenchCheck{
 		TestNum:     "K.1.3.4",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1961,7 +1961,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.5": api.RESTBenchCheck{
 		TestNum:     "K.1.3.5",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1971,7 +1971,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.6": api.RESTBenchCheck{
 		TestNum:     "K.1.3.6",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -1981,7 +1981,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.3.7": api.RESTBenchCheck{
 		TestNum:     "K.1.3.7",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -1991,7 +1991,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.4.1": api.RESTBenchCheck{
 		TestNum:     "K.1.4.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2001,7 +2001,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.1.4.2": api.RESTBenchCheck{
 		TestNum:     "K.1.4.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2011,7 +2011,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.1": api.RESTBenchCheck{
 		TestNum:     "K.2.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2021,7 +2021,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.2": api.RESTBenchCheck{
 		TestNum:     "K.2.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2031,7 +2031,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.3": api.RESTBenchCheck{
 		TestNum:     "K.2.3",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2041,7 +2041,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.4": api.RESTBenchCheck{
 		TestNum:     "K.2.4",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2051,7 +2051,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.5": api.RESTBenchCheck{
 		TestNum:     "K.2.5",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2061,7 +2061,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.6": api.RESTBenchCheck{
 		TestNum:     "K.2.6",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2071,7 +2071,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.2.7": api.RESTBenchCheck{
 		TestNum:     "K.2.7",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -2081,7 +2081,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.3.1.1": api.RESTBenchCheck{
 		TestNum:     "K.3.1.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -2091,7 +2091,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.3.2.1": api.RESTBenchCheck{
 		TestNum:     "K.3.2.1",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2101,7 +2101,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.3.2.2": api.RESTBenchCheck{
 		TestNum:     "K.3.2.2",
 		Type:        "master",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
@@ -2111,7 +2111,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.1": api.RESTBenchCheck{
 		TestNum:     "K.4.1.1",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2121,7 +2121,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.2": api.RESTBenchCheck{
 		TestNum:     "K.4.1.2",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2131,7 +2131,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.3": api.RESTBenchCheck{
 		TestNum:     "K.4.1.3",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2141,7 +2141,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.4": api.RESTBenchCheck{
 		TestNum:     "K.4.1.4",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2151,7 +2151,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.5": api.RESTBenchCheck{
 		TestNum:     "K.4.1.5",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2161,7 +2161,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.6": api.RESTBenchCheck{
 		TestNum:     "K.4.1.6",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2171,7 +2171,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.7": api.RESTBenchCheck{
 		TestNum:     "K.4.1.7",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2181,7 +2181,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.8": api.RESTBenchCheck{
 		TestNum:     "K.4.1.8",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2191,7 +2191,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.9": api.RESTBenchCheck{
 		TestNum:     "K.4.1.9",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2201,7 +2201,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.1.10": api.RESTBenchCheck{
 		TestNum:     "K.4.1.10",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2211,7 +2211,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.1": api.RESTBenchCheck{
 		TestNum:     "K.4.2.1",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2221,7 +2221,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.2": api.RESTBenchCheck{
 		TestNum:     "K.4.2.2",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2231,7 +2231,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.3": api.RESTBenchCheck{
 		TestNum:     "K.4.2.3",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2241,7 +2241,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.4": api.RESTBenchCheck{
 		TestNum:     "K.4.2.4",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2251,7 +2251,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.5": api.RESTBenchCheck{
 		TestNum:     "K.4.2.5",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2261,7 +2261,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.6": api.RESTBenchCheck{
 		TestNum:     "K.4.2.6",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2271,7 +2271,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.7": api.RESTBenchCheck{
 		TestNum:     "K.4.2.7",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2281,7 +2281,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.8": api.RESTBenchCheck{
 		TestNum:     "K.4.2.8",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2291,7 +2291,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.9": api.RESTBenchCheck{
 		TestNum:     "K.4.2.9",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   true,
@@ -2301,7 +2301,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.10": api.RESTBenchCheck{
 		TestNum:     "K.4.2.10",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
@@ -2311,7 +2311,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.11": api.RESTBenchCheck{
 		TestNum:     "K.4.2.11",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2321,7 +2321,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.12": api.RESTBenchCheck{
 		TestNum:     "K.4.2.12",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
@@ -2331,7 +2331,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 	"K.4.2.13": api.RESTBenchCheck{
 		TestNum:     "K.4.2.13",
 		Type:        "worker",
-		Catalog:     "kubernetes",
+		Category:    "kubernetes",
 		Scored:      false,
 		Profile:     "Level 1",
 		Automated:   false,
