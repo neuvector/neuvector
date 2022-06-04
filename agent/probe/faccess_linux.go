@@ -2,13 +2,11 @@ package probe
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -154,7 +152,7 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 
 	// docker cp (file changes) might change the polling behaviors,
 	// remove the non-block io to controller the polling timeouts
-	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE
+	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE | fsmon.FAN_NONBLOCK
 	fn, err := fsmon.Initialize(flags, unix.O_RDONLY | unix.O_LARGEFILE)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FA: Initialize")
@@ -252,7 +250,6 @@ func (fa *FileAccessCtrl) Close() {
 
 	fa.lockMux()
 	defer fa.unlockMux()
-
 	for _, cRoot := range fa.roots {
 		fa.removeDirMarks(cRoot.pid, cRoot.dirMonitorList)
 		cRoot.dirMonitorList = nil
@@ -795,29 +792,27 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 		if !bPass {
 			log.WithFields(log.Fields{"path": path, "ppid": ppid, "pname": pname}).Debug("FA: denied")
 		} else {
-			log.WithFields(log.Fields{"ppid": ppid}).Debug("FA: allowed")
+			log.WithFields(log.Fields{"ppid": ppid, "pname": pname, "path": path}).Debug("FA: allowed")
 		}
 	}
 	return bPass
 }
 
 func (fa *FileAccessCtrl) handleEvents() {
-	for {
-		if ev, err := fa.fanfd.GetEvent(); err != nil {
-			if errors.Is(err, syscall.EAGAIN) {
-				continue  // try later
-			}
-			break
-		} else {
-			bPass := true
-			if ev.Version == fsmon.FANOTIFY_METADATA_VERSION {
-				bPass = fa.processEvent(ev)
-			} else {
-				log.Error("FA: wrong metadata version")
-			}
-			fa.fanfd.Response(ev, bPass)
-			ev.File.Close()
+	for fa.bEnabled {
+		ev, err := fa.fanfd.GetEvent()
+		if err != nil {
+			return
 		}
+
+		if ev.Version == fsmon.FANOTIFY_METADATA_VERSION {
+			fa.lockMux()
+			fa.fanfd.Response(ev, fa.processEvent(ev))
+			fa.unlockMux()
+		} else {
+			log.WithFields(log.Fields{"ev": ev}).Error("FA: wrong metadata version")
+		}
+		ev.File.Close()
 	}
 }
 
@@ -834,6 +829,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 			log.WithFields(log.Fields{"err": err}).Error("FA: poll returns error")
 			break
 		}
+
 		if n <= 0 {
 			if n == 0 && !fa.bEnabled { // timeout at exit stage
 				waitCnt += 1
@@ -845,9 +841,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			fa.lockMux()
 			fa.handleEvents()
-			fa.unlockMux()
 			waitCnt = 0
 		}
 	}
