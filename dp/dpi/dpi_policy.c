@@ -100,33 +100,6 @@ static void update_unknown_ip_cache(dpi_unknown_ip_cache_t *cache)
  * --- Policy rule definition --------------------------
  * -----------------------------------------------------
  */
-typedef struct dpi_rule_ {
-    struct cds_lfht_node node;
-    dpi_policy_desc_t desc;
-    dpi_rule_key_t key;
-} dpi_rule_t;
-
-typedef struct dpi_range_rule_key_ {
-    uint32_t ip;
-    uint16_t proto;
-    uint16_t flag;  // ingress or egress
-#define DP_RANGE_RULE_INGRESS    1
-#define DP_RANGE_RULE_EGRESS     2
-} dpi_range_rule_key_t;
-
-typedef struct dpi_range_rule_item_ {
-    struct dpi_range_rule_item_ *next;
-    dpi_policy_desc_t desc;
-    dpi_rule_key_t key_l;
-    dpi_rule_key_t key_h;
-} dpi_range_rule_item_t;
-
-typedef struct dpi_range_rule_ {
-    struct cds_lfht_node node;
-    dpi_range_rule_key_t key;
-    dpi_range_rule_item_t *range_rule_list;
-} dpi_range_rule_t;
-
 static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                              uint16_t dport, uint16_t proto, uint32_t app,
                              int is_ingress, dpi_policy_desc_t *desc);

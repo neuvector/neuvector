@@ -193,6 +193,28 @@ void dpi_print_siglist(dpi_detector_t *detector)
     }
 }
 
+void dpi_print_siglist_fp(dpi_detector_t *detector, FILE *logfp)
+{
+    dpi_sig_macro_sig_t *macro, *macro_next;
+    dpi_sig_t *sig, *sig_next;
+    cds_list_for_each_entry_safe(macro, macro_next, &detector->dlpSigList, node) {
+        cds_list_for_each_entry_safe(sig, sig_next, &(macro->sigs), node) {
+            fprintf(logfp, "sig: name(%s),"
+                        " text: (%s), "
+                        "id: (%d) "
+                        "flags: (0x%x)"
+                        "severity: (%d)"
+                        "action: (%d)\n",
+                        macro->conf.name,
+                        macro->conf.text,
+                        macro->conf.id,
+                        macro->conf.flags,
+                        macro->conf.severity,
+                        macro->conf.action);
+        }
+    }
+}
+
 void dpi_dlp_release_dlprulelist (dpi_detector_t *detector)
 {
     DEBUG_LOG_FUNC_ENTRY(DBG_DETECT,NULL);

@@ -53,6 +53,14 @@ pthread_mutex_t g_debug_lock;
 io_callback_t g_callback;
 io_config_t g_config;
 
+static void dp_signal_dump_policy(int num)
+{
+    int thr_id;
+    for (thr_id = 0; thr_id < g_dp_threads; thr_id ++) {
+        dp_data_wait_ctrl_req_thr(CTRL_REQ_DUMP_POLICY, thr_id);
+    }
+}
+
 static void dp_signal_exit(int num)
 {
     g_running = false;
@@ -158,6 +166,7 @@ static int net_run(const char *in_iface)
     signal(SIGTERM, dp_signal_exit);
     signal(SIGINT, dp_signal_exit);
     signal(SIGQUIT, dp_signal_exit);
+    signal(SIGUSR1, dp_signal_dump_policy);
 
     // Calculate number of dp threads
     if (g_dp_threads == 0) {

@@ -254,6 +254,7 @@ var StatusResForOpsSettings = []NvAdmRegRuleSetting{
 
 var k8sVersionMajor int
 var k8sVersionMinor int
+var ocVersionMajor int
 
 var cacheEventFunc common.CacheEventFunc
 
@@ -1601,14 +1602,16 @@ func AdjustAdmResForOC() {
 		}
 		roleInfo.rules = append(roleInfo.rules, rule)
 	}
-	nvClusterRoles[NvOperatorsRole] = &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
-		&k8sClusterRoleRuleInfo{
-			apiGroup:  "config.openshift.io",
-			resources: utils.NewSet(clusterOperators),
-			verbs:     utils.NewSet("get", "list"),
-		},
-	}}
-	nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
+	if ocVersionMajor > 3 {
+		nvClusterRoles[NvOperatorsRole] = &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
+			&k8sClusterRoleRuleInfo{
+				apiGroup:  "config.openshift.io",
+				resources: utils.NewSet(clusterOperators),
+				verbs:     utils.NewSet("get", "list"),
+			},
+		}}
+		nvClusterRoleBindings[NvOperatorsRoleBinding] = NvOperatorsRole
+	}
 }
 
 func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc) {
@@ -1624,8 +1627,13 @@ func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8s
 
 func GetK8sVersion() (int, int) {
 	if k8sVersionMajor == 0 && k8sVersionMinor == 0 {
-		k8sVer, _ := global.ORCH.GetVersion(false, false)
+		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 		SetK8sVersion(k8sVer)
+		if ocVersionMajor == 0 {
+			if ss := strings.Split(ocVer, "."); len(ss) > 0 {
+				ocVersionMajor, _ = strconv.Atoi(ss[0])
+			}
+		}
 	}
 
 	return k8sVersionMajor, k8sVersionMinor
