@@ -1253,9 +1253,13 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 				case api.FedRoleMaster:
 					cluster := cacher.GetFedMasterCluster(acc)
 					if cluster.RestInfo.Server != reqData.RestInfo.Server || cluster.RestInfo.Port != reqData.RestInfo.Port {
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
-							"Exposed REST server info is read-only when the cluster is the primary cluster")
-						return
+						if joined := cacher.GetFedJoinedClusterCount(); joined > 0 {
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
+								"Exposed REST server info is read-only when there is other cluster in the federation")
+							return
+						}
+						m.LocalRestInfo = *reqData.RestInfo
+						m.MasterCluster.RestInfo = *reqData.RestInfo
 					}
 					if reqData.PingInterval != nil && *reqData.PingInterval > 0 {
 						m.PingInterval = *reqData.PingInterval
