@@ -24,6 +24,7 @@ type IFile struct {
 	protect bool // access control
 	learnt  bool // discover mode
 	userAdd bool
+	lastChg int64	// unix time
 }
 
 type fNotify struct {

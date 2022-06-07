@@ -34,7 +34,8 @@ const inodeChangeMask = syscall.IN_CLOSE_WRITE |
 var packageFile utils.Set = utils.NewSet(
 	"/var/lib/dpkg/status",
 	"/var/lib/rpm/Packages",
-	"/lib/apk/db/installed")
+	"/var/lib/rpm/Packages.db",
+	"/lib/apk/db/installed",)
 
 type SendAggregateReportCallback func(fsmsg *MonitorMessage) bool
 
@@ -42,6 +43,7 @@ var ImportantFiles []share.CLUSFileMonitorFilter = []share.CLUSFileMonitorFilter
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/dpkg/status", Regex: ""},
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages", Regex: ""},
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib/apk/db/installed", Regex: ""},
+	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages.db", Regex: ""},
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/hosts", Regex: ""},
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/passwd", Regex: ""},
 	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/shadow", Regex: ""},
