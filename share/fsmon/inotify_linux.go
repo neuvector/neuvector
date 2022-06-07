@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	log "github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ const (
 		syscall.IN_MOVE |
 		syscall.IN_MOVE_SELF
 	imonitorDirMask = imonitorFileMask | syscall.IN_MOVED_TO | syscall.IN_CREATE
+	imonitorRemoveMask = syscall.IN_DELETE | syscall.IN_DELETE_SELF | syscall.IN_MOVE | syscall.IN_MOVE_SELF
 )
 
 type Inotify struct {
@@ -251,11 +253,19 @@ func (n *Inotify) MonitorFileEvents() {
 							cbFile = file
 						}
 					} else {
-						log.WithFields(log.Fields{"path": file.path}).Debug("notify")
-						cbFile = file
-						syscall.InotifyRmWatch(n.fd, uint32(event.Wd))
-						delete(n.wds, int(event.Wd))
-						delete(n.paths, file.path)
+						if (event.Mask & imonitorRemoveMask) > 0 {
+							log.WithFields(log.Fields{"path": file.path}).Debug("notify: remove")
+							syscall.InotifyRmWatch(n.fd, uint32(event.Wd))
+							cbFile = file
+							delete(n.wds, int(event.Wd))
+							delete(n.paths, file.path)
+						} else {
+							if (time.Now().Unix() - file.lastChg) > 180 { // reduce report cases
+								log.WithFields(log.Fields{"path": file.path}).Debug("notify: change")
+								file.lastChg = time.Now().Unix()
+								cbFile = file
+							}
+						}
 					}
 				}
 			}

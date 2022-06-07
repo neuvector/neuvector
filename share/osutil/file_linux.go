@@ -25,6 +25,7 @@ const (
 var packageFiles utils.Set = utils.NewSet(
 	"/var/lib/dpkg/status",
 	"/var/lib/rpm/Packages",
+	"/var/lib/rpm/Packages.db",
 	"/lib/apk/db/installed",
 )
 

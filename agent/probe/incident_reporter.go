@@ -152,8 +152,8 @@ func (p *Probe) SendAggregateProbeReport(pmsg *ProbeMessage, bExtOp bool) bool {
 }
 
 /////
-// dpkg[ubuntu, debian], yum[centos,fedora] , dnf[centos, coreos,fedora], rpm[redhat], apk[busybox]
-var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk")
+// dpkg[ubuntu, debian], yum[centos,fedora] , dnf[centos, coreos,fedora], rpm[redhat], apk[busybox], zypper[bci]
+var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk", "zypper")
 const (
 	fsPackageUpdate = "Software packages were updated."
 	fsComboAction   = "Files were modified or deleted."
