@@ -281,6 +281,7 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		resp.PwdDaysUntilExpire = -1
 		resp.PwdHoursUntilExpire = 0
 	}
+	resp.GlobalPermits, resp.DomainPermits, _ = access.GetDomainPermissions(user.Role, user.RoleDomains)
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
 }

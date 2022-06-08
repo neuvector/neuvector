@@ -549,9 +549,11 @@ type RESTUserData struct {
 }
 
 type RESTSelfUserData struct {
-	User                *RESTUser `json:"user"`
-	PwdDaysUntilExpire  int       `json:"password_days_until_expire"`  // negative means password never expires
-	PwdHoursUntilExpire int       `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
+	User                *RESTUser                        `json:"user"`
+	PwdDaysUntilExpire  int                              `json:"password_days_until_expire"`  // negative means password never expires
+	PwdHoursUntilExpire int                              `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
+	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }
 
 type RESTUserConfigData struct {
