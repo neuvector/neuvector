@@ -693,6 +693,7 @@ type RESTHost struct {
 	Memory            int64                    `json:"memory"`
 	CGroupVersion     int                      `json:"cgroup_version"`
 	Containers        int                      `json:"containers"`
+	Pods              int                      `json:"pods"`
 	Ifaces            map[string][]*RESTIPAddr `json:"interfaces"`
 	State             string                   `json:"state"`
 	CapDockerBench    bool                     `json:"cap_docker_bench"`

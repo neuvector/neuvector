@@ -64,6 +64,8 @@ type hostCache struct {
 	state            string
 	timerTask        string
 	timerSched       time.Time
+	runningPods      utils.Set
+	runningCntrs     utils.Set
 }
 
 type agentCache struct {
@@ -346,6 +348,8 @@ func initHostCache(id string) *hostCache {
 		wlSubnets: utils.NewSet(),
 		portWLMap: make(map[string]*workloadDigest), // host port to workload ID and port
 		ipWLMap:   make(map[string]*workloadDigest), // ip of host-scope to workload ID
+		runningPods:  utils.NewSet(),
+		runningCntrs: utils.NewSet(),
 	}
 }
 

@@ -53,7 +53,8 @@ func host2REST(cache *hostCache, k8sCache *k8sHostCache) *api.RESTHost {
 		CGroupVersion:  host.CgroupVersion,
 		Ifaces:         make(map[string][]*api.RESTIPAddr),
 		State:          cache.state,
-		Containers:     cache.workloads.Cardinality(),
+		Containers:     cache.runningCntrs.Cardinality(),
+		Pods:           cache.runningPods.Cardinality(),
 		Platform:       getHostPlatform(host.Platform, host.Flavor),
 		CapDockerBench: host.CapDockerBench,
 		CapKubeBench:   host.CapKubeBench,
@@ -1466,8 +1467,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 
 	case cluster.ClusterNotifyDelete:
-		var agentID, hostID string
-
 		id := share.CLUSWorkloadKey2ID(key)
 
 		// Check if it's NeuVector containers first
@@ -1485,27 +1484,12 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		cacheMutexLock()
 
 		if wlCache, ok = wlCacheMap[id]; ok {
-			agentID = wlCache.workload.AgentID
 			delete(wlCacheMap, id)
 
 			// Update parent's children list.
 			if wlCache.workload.ShareNetNS != "" {
 				if parent, ok := wlCacheMap[wlCache.workload.ShareNetNS]; ok {
 					parent.children.Remove(id)
-				}
-			}
-		}
-
-		if agentID != "" {
-			// Update agent cache
-			if cache, ok := agentCacheMap[agentID]; ok {
-				hostID = cache.agent.HostID
-			}
-
-			// Update host cache
-			if hostID != "" {
-				if cache, ok := hostCacheMap[hostID]; ok {
-					cache.workloads.Remove(id)
 				}
 			}
 		}
@@ -1659,16 +1643,19 @@ func registerEventHandlers() {
 		attrWorkloadAdd,
 	})
 	evhdls.Register(EV_WORKLOAD_DELETE, []eventHandlerFunc{
+		hostWorkloadDelete,
 		addrWorkloadStop,
 		uniconfWorkloadDelete,
 		connectWorkloadDelete,
 		groupWorkloadLeave,
 	})
 	evhdls.Register(EV_WORKLOAD_START, []eventHandlerFunc{
+		hostWorkloadStart,
 		groupWorkloadJoin,
 		scanWorkloadAdd,
 	})
 	evhdls.Register(EV_WORKLOAD_STOP, []eventHandlerFunc{
+		hostWorkloadStop,
 		addrWorkloadStop,
 		connectWorkloadDelete,
 		groupWorkloadLeave,
