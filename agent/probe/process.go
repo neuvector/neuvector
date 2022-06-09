@@ -588,7 +588,11 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 }
 
 func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
-	// children of nstools
+	// children of nstools, bench script: nstools -> sh -> executables
+	if pproc, ok := p.pidProcMap[proc.ppid]; ok && pproc.ppath == "/usr/local/bin/nstools" {
+		return true
+	}
+	// bench script: work into a different mount namespace
 	return proc.ppath == "/usr/local/bin/nstools" || p.agentMntNsId != global.SYS.GetMntNamespaceId(proc.pid)
 }
 
