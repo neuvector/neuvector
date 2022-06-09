@@ -1602,7 +1602,8 @@ func AdjustAdmResForOC() {
 		}
 		roleInfo.rules = append(roleInfo.rules, rule)
 	}
-	if ocVersionMajor > 3 {
+	// ocVersionMajor == 0 : if k8s RBAC neuvector-binding-co is missing, we cannot get oc version. In this case treat it as oc 4.x
+	if ocVersionMajor == 0 || ocVersionMajor > 3 {
 		nvClusterRoles[NvOperatorsRole] = &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
 			&k8sClusterRoleRuleInfo{
 				apiGroup:  "config.openshift.io",
