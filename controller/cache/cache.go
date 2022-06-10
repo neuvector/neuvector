@@ -49,21 +49,23 @@ type hostDigest struct {
 }
 
 type hostCache struct {
-	host       *share.CLUSHost
-	agents     utils.Set
-	workloads  utils.Set
-	portWLMap  map[string]*workloadDigest
-	ipWLMap    map[string]*workloadDigest
-	wlSubnets  utils.Set // host-scope subnet *net.IPNet, such as 172.17.0.0/16
+	host             *share.CLUSHost
+	agents           utils.Set
+	workloads        utils.Set
+	portWLMap        map[string]*workloadDigest
+	ipWLMap          map[string]*workloadDigest
+	wlSubnets        utils.Set             // host-scope subnet *net.IPNet, such as 172.17.0.0/16
 	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
 	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
 	customBenchValue []byte
 	dockerBenchValue []byte
 	masterBenchValue []byte
 	workerBenchValue []byte
-	state      string
-	timerTask  string
-	timerSched time.Time
+	state            string
+	timerTask        string
+	timerSched       time.Time
+	runningPods      utils.Set
+	runningCntrs     utils.Set
 }
 
 type agentCache struct {
@@ -345,6 +347,8 @@ func initHostCache(id string) *hostCache {
 		wlSubnets: utils.NewSet(),
 		portWLMap: make(map[string]*workloadDigest), // host port to workload ID and port
 		ipWLMap:   make(map[string]*workloadDigest), // ip of host-scope to workload ID
+		runningPods:  utils.NewSet(),
+		runningCntrs: utils.NewSet(),
 	}
 }
 
@@ -1706,8 +1710,8 @@ func startWorkerThread() {
 							if ((o.IPNets == nil || len(o.IPNets) == 0) &&
 								(n.IPNets != nil && len(n.IPNets) > 0)) ||
 								(o.IPNets != nil && len(o.IPNets) > 0 &&
-								n.IPNets != nil && len(n.IPNets) > 0 &&
-								!reflect.DeepEqual(o.IPNets, n.IPNets)) {
+									n.IPNets != nil && len(n.IPNets) > 0 &&
+									!reflect.DeepEqual(o.IPNets, n.IPNets)) {
 								addrOrchHostAdd(n.IPNets)
 							}
 						}
@@ -1904,16 +1908,14 @@ func startWorkerThread() {
 						log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Info("being deleted")
 						return
 					}
-					if isLeader() {
-						var n, o *resource.AdmissionWebhookConfiguration
-						if ev.ResourceNew != nil {
-							n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
-						}
-						if ev.ResourceOld != nil {
-							o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
-						}
-						refreshK8sAdminWebhookStateCache(o, n)
+					var n, o *resource.AdmissionWebhookConfiguration
+					if ev.ResourceNew != nil {
+						n = ev.ResourceNew.(*resource.AdmissionWebhookConfiguration)
 					}
+					if ev.ResourceOld != nil {
+						o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
+					}
+					refreshK8sAdminWebhookStateCache(o, n)
 				}
 			}
 		}
@@ -1978,7 +1980,11 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 		},
 	}
 
-	if isLeader() && (!enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo))) {
+	isValidSetting := false
+	if !enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo)) {
+		isValidSetting = true
+	}
+	if isLeader() && isValidSetting {
 		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name)
 		if skip && err == nil {
 			// meaning nv resource in k8s sync with nv's cluster status. do nothing

@@ -214,14 +214,14 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var resp *api.RESTScanReportData
 
-	vuls, _ := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, modules, _ := cacher.GetVulnerabilityReport(id, showTag)
 	if vuls == nil {
 		// Return an empty list if workload has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
-			Vuls: make([]*api.RESTVulnerability, 0),
+			Vuls: make([]*api.RESTVulnerability, 0), Modules: modules,
 		}}
 	} else {
-		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls}}
+		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls, Modules: modules}}
 	}
 
 	restRespSuccess(w, r, resp, acc, login, nil, "Get container scan report")
@@ -258,7 +258,7 @@ func handlerScanImageReport(w http.ResponseWriter, r *http.Request, ps httproute
 	if brief == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 	} else {
-		vuls, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
+		vuls, _, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
 		if vuls == nil {
 			restRespNotFoundLogAccessDenied(w, login, err)
 			return
@@ -423,7 +423,7 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	var resp *api.RESTScanReportData
 
-	vuls, err := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, _, err := cacher.GetVulnerabilityReport(id, showTag)
 	if vuls == nil {
 		// Return an empty list if node has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
@@ -455,7 +455,7 @@ func handlerScanPlatformReport(w http.ResponseWriter, r *http.Request, ps httpro
 		showTag = api.QueryValueShowAccepted
 	}
 
-	vuls, err := cacher.GetVulnerabilityReport(common.ScanPlatformID, showTag)
+	vuls, _, err := cacher.GetVulnerabilityReport(common.ScanPlatformID, showTag)
 	if vuls == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -606,7 +606,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		platform, _, _ := cacher.GetPlatform()
-		vuls, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		vuls, _, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
 		if vuls != nil {
 			for _, vul := range vuls {
 				va := addVulAsset(all, vul)

@@ -239,9 +239,14 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 			if len(elements) > 2 {
 				// log.WithFields(log.Fields{"path": elements[2]}).Debug()
 				tokens := strings.Split(elements[2], "/")
-				for _, token := range tokens {
-					token = strings.TrimPrefix(token, "docker-") // TODO: other runtimes
-					token = strings.TrimPrefix(token, "crio-")
+				for i := len(tokens) - 1; i > 0; i-- {	// the last item is most possible target
+					token := tokens[i]
+					//token = strings.TrimPrefix(token, "docker-") // TODO: other runtimes
+					//token = strings.TrimPrefix(token, "crio-")
+					//token = strings.TrimPrefix(token, "cri-containerd-")
+					if index := strings.LastIndex(token, "-");  index != -1 {
+						token = token[index+1:]
+					}
 					token = strings.TrimSuffix(token, ".scope")
 					if isContainerID(token) {
 						return token, false, true
@@ -254,9 +259,11 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 				if len(fstab) > 3 {
 					// log.WithFields(log.Fields{"fstab": fstab[3]}).Debug()
 					tokens := strings.Split(fstab[3], "/")
-					for _, token := range tokens {
-						token = strings.TrimPrefix(token, "docker-") // TODO: other runtimes
-						token = strings.TrimPrefix(token, "crio-")
+					for i := len(tokens) - 1; i > 0; i-- {
+						token := tokens[i]
+						if index := strings.LastIndex(token, "-");  index != -1 {
+							token = token[index+1:]
+						}
 						token = strings.TrimSuffix(token, ".scope")
 						if isContainerID(token) {
 							return token, false, true

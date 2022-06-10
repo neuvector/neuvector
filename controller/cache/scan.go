@@ -61,6 +61,7 @@ type scanInfo struct {
 	vulTraits       []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
 	filteredTime    time.Time
 	idns            []api.RESTIDName
+	modules         []*share.ScanModule
 }
 
 type scanTaskInfo struct {
@@ -455,6 +456,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.baseOS = report.Namespace
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
+		info.modules = report.Modules
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
@@ -689,8 +691,6 @@ func scanAgentAdd(id string, param interface{}) {
 	// the host has been scanned.
 	agent := param.(*agentCache).agent
 	scanMapAdd(agent.HostID, id, nil, share.ScanObjectType_HOST)
-	// Read bench checks into cache in case its notification came earlier
-	benchStateHandler(cluster.ClusterNotifyAdd, share.CLUSBenchStateHostKey(agent.HostID), nil)
 }
 
 func scanHostDelete(id string, param interface{}) {
@@ -1128,7 +1128,7 @@ func scanBrief2REST(info *scanInfo) *api.RESTScanBrief {
 	return &r
 }
 
-func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVulnerability, error) {
+func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVulnerability, []*api.RESTScanModule, error) {
 	scanMutexRLock()
 	defer scanMutexRUnlock()
 
@@ -1140,9 +1140,13 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 
 		sdb := scanUtils.GetScannerDB()
 		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
-		return vuls, nil
+		modules := make([]*api.RESTScanModule, len(info.modules))
+		for i, m := range info.modules {
+			modules[i] = scanUtils.ScanModule2REST(m)
+		}
+		return vuls, modules, nil
 	} else {
-		return nil, common.ErrObjectNotFound
+		return nil, nil, common.ErrObjectNotFound
 	}
 }
 

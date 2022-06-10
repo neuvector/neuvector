@@ -514,9 +514,24 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 	}
 }
 
-func (p *Probe) removeProcessInContainer(pid int) {
+func (p *Probe) cleanupProcessInContainer(id string) {
+	// clean up
+	if c, ok := p.containerMap[id]; ok {
+		for ps := range c.outsider.Union(c.children).Iter() {
+			pid := ps.(int)
+			if !osutil.IsPidValid(pid) {
+				c.children.Remove(pid)
+				c.outsider.Remove(pid)
+				delete(p.pidProcMap, pid) // bottom-line
+				delete(p.pidContainerMap, pid)
+			}
+		}
+	}
+}
+
+func (p *Probe) removeProcessInContainer(pid int, id string) {
 	containerRemoved := false
-	if c, ok := p.pidContainerMap[pid]; ok {
+	if c, ok := p.containerMap[id]; ok {
 		if c.id == "" {
 			c.children.Remove(pid)
 			return
@@ -557,6 +572,10 @@ func (p *Probe) removeProcessInContainer(pid int) {
 			p.containerStops.Add(c.id)
 			delete(p.containerMap, c.id)
 			log.WithFields(log.Fields{"pid": pid, "id": c.id, "cnt": len(p.containerMap) - 2}).Debug("PROC: Container remove")
+		} else {
+			if (c.children.Cardinality() + c.outsider.Cardinality()) > 32 {
+				p.cleanupProcessInContainer(id)
+			}
 		}
 
 		// TODO: what if the container was removed, does it need to remove all netwroking references?
@@ -569,7 +588,11 @@ func (p *Probe) removeProcessInContainer(pid int) {
 }
 
 func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
-	// children of nstools
+	// children of nstools, bench script: nstools -> sh -> executables
+	if pproc, ok := p.pidProcMap[proc.ppid]; ok && pproc.ppath == "/usr/local/bin/nstools" {
+		return true
+	}
+	// bench script: work into a different mount namespace
 	return proc.ppath == "/usr/local/bin/nstools" || p.agentMntNsId != global.SYS.GetMntNamespaceId(proc.pid)
 }
 
@@ -811,25 +834,22 @@ func (p *Probe) checkUserGroup_uidChange(escalProc *procInternal, c *procContain
 
 /////
 func isSudoCommand(cmds []string) bool {
-	length := len(cmds)
-	switch {
-	case length == 1:
-		if cmds[0] == "sudo" || cmds[0] == "su" {
-			return true
-		}
-	case length > 1: // it could be "su -c /bin/ps neuvector"
-		for i, cmd := range cmds {
-			if i == 0 {
-				if cmd != "su" {
-					break
-				}
-			} else if cmd[:1] == "-" { // option
+	for i, cmd := range cmds {
+		if i == 0 {
+			switch(filepath.Base(cmd)) {
+			case "sudo":
+				return true
+			case "su":	// check following su cmds
+			default:
+				return false
+			}
+		} else {
+			if strings.HasPrefix(cmd, "-") { // skip option
 				continue
-			} else {
+			} else {	// it could be "su -c /bin/ps neuvector"
 				if cmd == "root" {
 					return true
 				}
-				return false
 			}
 		}
 	}
@@ -1194,38 +1214,47 @@ func (p *Probe) handleProcExec(pid int, bInit bool) (bKubeProc bool) {
 	return false
 }
 
-func (p *Probe) handleProcExit(pid int) *procInternal {
-	var proc *procInternal
-	var c *procContainer
-	var ok, bDelayExit bool
-
-	// log.Debug("PROC: exit: ", pid)
-	if proc, ok = p.pidProcMap[pid]; !ok {
-		return nil
+func (p *Probe) removeDelayExitProc() {
+	p.lockProcMux()
+	defer p.unlockProcMux()
+	index := -1
+	count := 0
+	for i, dep := range p.exitProcSlices {
+		if time.Since(dep.last) < delayExitThreshold {
+			index = i
+			break
+		}
+		count++
+		delete(p.pidProcMap, dep.pid)
+		p.removeProcessInContainer(dep.pid, dep.id)
+		delete(p.pidContainerMap, dep.pid)
 	}
 
-	if c, ok = p.pidContainerMap[pid]; ok {
-		bDelayExit = (c.id != "") // exclude host processes
-	}
-
-	////
-	if bDelayExit {
-		go func() {
-			time.Sleep(time.Millisecond * 1000) // 1 sec
-			p.lockProcMux()
-			defer p.unlockProcMux()
-			// log.WithFields(log.Fields{"pid": pid}).Error("PROC: delayed")
-			delete(p.pidProcMap, pid)
-			p.removeProcessInContainer(pid)
-			delete(p.pidContainerMap, pid)
-		}()
+	if index == -1 {
+		if count > 0 {
+			p.exitProcSlices = nil
+		}
 	} else {
-		delete(p.pidProcMap, pid)
-		p.removeProcessInContainer(pid)
-		delete(p.pidContainerMap, pid)
+		p.exitProcSlices = p.exitProcSlices[index:]
 	}
+}
 
-	return proc
+func (p *Probe) handleProcExit(pid int) *procInternal {
+	// log.Debug("PROC: exit: ", pid)
+	if proc, ok := p.pidProcMap[pid]; ok {
+		if c, ok := p.pidContainerMap[pid]; !ok {
+			delete(p.pidProcMap, pid)
+			delete(p.pidContainerMap, pid)
+		} else if c.id == "" {	// exclude host processes
+			delete(p.pidProcMap, pid)
+			p.removeProcessInContainer(pid, c.id)
+			delete(p.pidContainerMap, pid)
+		} else {
+			p.exitProcSlices = append(p.exitProcSlices, &procDelayExit{ pid: pid, id: c.id, last: time.Now() })
+		}
+		return proc
+	}
+	return nil
 }
 
 // after FORK event but before EXEC
@@ -2148,6 +2177,18 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
 			return true
 		}
+
+		if filepath.Base(proc.ppath) == "pod" && proc.pname == "pod" { // pod services
+			return true
+		}
+	}
+
+	if filepath.Base(proc.ppath) == "kubelet" && proc.pname == "kubelet" { // kubelet services
+		return true
+	}
+
+	if filepath.Base(proc.ppath) == "hyperkube" && proc.pname == "hyperkube" { // hyperkube services
+		return true
 	}
 
 	// both names are in the runtime list
@@ -2285,7 +2326,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				if c, ok := p.pidContainerMap[proc.ppid]; ok{
 					bParentHostProc = c.id == ""
 				}
-				if p.isProcessException(proc, pp.DerivedGroup, id, bParentHostProc, bZeroDrift) {
+				if p.isProcessException(proc, svcGroup, id, bParentHostProc, bZeroDrift) {
 					pp.Action = share.PolicyActionAllow // can not be learned
 				}
 			}
@@ -2302,14 +2343,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
-				if proc.name == "nc" || proc.name == "ncat" || proc.name == "netcat" {
-					// possible health check application, avoid to block them at its access layer
-				} else {
-					//// add the entry to black list
-					go p.addContainerFAccessBlackList(id, []string{proc.path})
-				}
 			}
 		}
 	}
@@ -2463,6 +2497,7 @@ func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 		}
 	}
 
+	p.cleanupProcessInContainer(id)	// remove dead processes
 	return cnt
 }
 
@@ -2796,9 +2831,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	}
 
 	bCanBeLearned := true
+	bRuncChild := false
 	if ppe.Action != share.PolicyActionViolate && p.bK8sGroupWithProbe(svcGroup) {
 		// allowing "kubctl exec ...", adpot the binary path to resolve the name
-		var bRuncChild bool
 		bRuncChild = global.RT.IsRuntimeProcess(proc.pname, nil)
 		if !bRuncChild {
 			pid := proc.pid
@@ -2847,11 +2882,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			}
 		}
 
-		if bRuncChild {
+		//if bRuncChild {
 		//	bCanBeLearned = false
-			c.outsider.Remove(proc.pid)
-			c.children.Add(proc.pid)
-		}
+		//}
 
 		//  TODO: meet the qualifications
 		// if ppe.Name == proc.name && len(ppe.ProbeCmds) > 0 {
@@ -2873,7 +2906,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	// mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
 	// ZeroDrift: allow a family member of the root process
-	if isFamilyProcess(c.children, proc) {
+	if isFamilyProcess(c.children, proc) || bRuncChild {
 		// a family member
 		if bFromPmon {
 			c.outsider.Remove(proc.pid)
@@ -2960,6 +2993,8 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 			return
 		}
 	}
+
+	p.cleanupProcessInContainer(id)	// remove dead processes
 
 	c.rootPid = rootPid
 	c.bPrivileged = bPrivileged
@@ -3059,8 +3094,8 @@ func (p *Probe) UpdateFromAllowRule(id, path string) {
 
 func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
 	p.lockProcMux()
-	defer p.unlockProcMux()
 	proc, ok := p.pidProcMap[pid]
-	mLog.WithFields(log.Fields{"proc": proc}).Debug("PROC:")
+	p.unlockProcMux()
+	mLog.WithFields(log.Fields{"proc": proc, "pid": pid}).Debug("FA:")
 	return proc, ok
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -17,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	nvcrd "github.com/neuvector/neuvector/controller/nvk8sapi/neuvectorcrd"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
@@ -188,21 +190,39 @@ func getConfigKvData(key string) ([]byte, bool) {
 	return cacher.GetConfigKvData(key)
 }
 
-// TODO: sidecar implementation might have two app pods
-func adjustContainerPod(selfID string, containers []*container.ContainerMeta) string {
+func lookupK8sContainerID(id, role string, containers []*container.ContainerMeta) (string, error) {
+	var podname string
+
+	// (1) identify it is a POD or container
 	for _, c := range containers {
-		if v, ok := c.Labels["io.kubernetes.sandbox.id"]; ok {
-			if v == selfID {
-				log.WithFields(log.Fields{"Pod": selfID, "ID": c.ID}).Debug("Update")
-				return c.ID
+		if strings.HasPrefix(c.Name, "k8s_POD") {
+			// parent: POD
+			if c.ID == id {
+				podname, _ = c.Labels[container.KubeKeyPodName]
+				break
+			}
+		} else {
+			// found: it is a child, container
+			if c.ID == id {
+				return c.ID, nil
 			}
 		}
-		if c.Sandbox != "" && c.Sandbox == selfID {
-			log.WithFields(log.Fields{"Pod": selfID, "ID": c.ID}).Debug("Update")
-			return c.ID
+	}
+
+	// (2) search its child pod
+	for _, c := range containers {
+		if !strings.HasPrefix(c.Name, "k8s_POD") {
+			if name, ok := c.Labels[container.KubeKeyPodName]; ok && (name == podname) {
+				if v, ok := c.Labels[share.NeuVectorLabelRole]; ok {
+					if strings.Contains(v, role) {
+						// neuvector image role: it might have more than one children
+						return c.ID, nil
+					}
+				}
+			}
 		}
 	}
-	return selfID
+	return id, fmt.Errorf("failed to find container")
 }
 
 func main() {
@@ -316,7 +336,9 @@ func main() {
 	}
 
 	if platform == share.PlatformKubernetes {
-		selfID = adjustContainerPod(selfID, containers)
+		if selfID, err = lookupK8sContainerID(selfID, share.NeuVectorRoleEnforcer, containers); err != nil {
+			log.WithFields(log.Fields{"selfID": selfID, "error": err}).Error("lookup")
+		}
 	}
 
 	// Container port can be injected after container is up. Wait for at least one.
@@ -351,7 +373,7 @@ func main() {
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion)
+		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs)
 	}
 
 	// Assign controller interface/IP scope

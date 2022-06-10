@@ -167,9 +167,9 @@ const (
 )
 
 const (
-	BenchCatalogDocker = "docker"
-	BenchCatalogKube   = "kubernetes"
-	BenchCatalogCustom = "custom"
+	BenchCategoryDocker = "docker"
+	BenchCategoryKube   = "kubernetes"
+	BenchCategoryCustom = "custom"
 
 	BenchTypeMaster    = "master"
 	BenchTypeWorker    = "worker"
@@ -549,9 +549,11 @@ type RESTUserData struct {
 }
 
 type RESTSelfUserData struct {
-	User                *RESTUser `json:"user"`
-	PwdDaysUntilExpire  int       `json:"password_days_until_expire"`  // negative means password never expires
-	PwdHoursUntilExpire int       `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
+	User                *RESTUser                        `json:"user"`
+	PwdDaysUntilExpire  int                              `json:"password_days_until_expire"`  // negative means password never expires
+	PwdHoursUntilExpire int                              `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
+	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }
 
 type RESTUserConfigData struct {
@@ -691,6 +693,7 @@ type RESTHost struct {
 	Memory            int64                    `json:"memory"`
 	CGroupVersion     int                      `json:"cgroup_version"`
 	Containers        int                      `json:"containers"`
+	Pods              int                      `json:"pods"`
 	Ifaces            map[string][]*RESTIPAddr `json:"interfaces"`
 	State             string                   `json:"state"`
 	CapDockerBench    bool                     `json:"cap_docker_bench"`
@@ -2246,7 +2249,7 @@ type RESTWorkloadInterceptData struct {
 
 type RESTBenchCheck struct {
 	TestNum     string   `json:"test_number"`
-	Catalog     string   `json:"catalog"`
+	Category    string   `json:"category"`
 	Type        string   `json:"type"`
 	Profile     string   `json:"profile"`
 	Scored      bool     `json:"scored"`
@@ -2279,7 +2282,6 @@ type RESTBenchReport struct {
 type RESTComplianceData struct {
 	RunAtTimeStamp int64            `json:"run_timestamp"`
 	RunAt          string           `json:"run_at"`
-	KubeCategory   string           `json:"kubernetes_cis_category"`
 	KubeVersion    string           `json:"kubernetes_cis_version"`
 	DockerVersion  string           `json:"docker_cis_version"`
 	Items          []*RESTBenchItem `json:"items"`
@@ -2287,7 +2289,7 @@ type RESTComplianceData struct {
 
 type RESTComplianceAsset struct {
 	Name        string   `json:"name"`
-	Catalog     string   `json:"catalog"`
+	Category    string   `json:"category"`
 	Type        string   `json:"type"`
 	Level       string   `json:"level"`
 	Profile     string   `json:"profile"`
@@ -2309,7 +2311,6 @@ type RESTComplianceAssetData struct {
 	Nodes         map[string][]RESTIDName `json:"nodes"`
 	Images        map[string][]RESTIDName `json:"images"`
 	Platforms     map[string][]RESTIDName `json:"platforms"`
-	KubeCategory  string                  `json:"kubernetes_cis_category"`
 	KubeVersion   string                  `json:"kubernetes_cis_version"`
 	DockerVersion string                  `json:"docker_cis_version"`
 }

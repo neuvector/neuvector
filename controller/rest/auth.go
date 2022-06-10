@@ -493,6 +493,13 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 										}
 									}
 								}
+								if rancherUser.name == common.DefaultAdminUser {
+									if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+										if role, ok := domainRoles[access.AccessDomainGlobal]; ok && role == api.UserRoleAdmin {
+											domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
+										}
+									}
+								}
 							} else {
 								log.WithFields(log.Fields{"id": pid, "subType": subType}).Debug("no deduced role")
 							}
@@ -786,8 +793,14 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 			}
 
 			if !user.RoleOverride {
-				user.Role = role
-				user.RoleDomains = roleDomains
+				if server == share.FlavorRancher && username != common.DefaultAdminUser &&
+					user.Role == api.UserRoleFedAdmin && role == api.UserRoleAdmin {
+					// in Rancher SSO, a Rancher cluster admin who promotes the nv cluster to fed master is prmoted to fedAdmin role in nv kv.
+					// however, Rancher cluster admin is mapped to nv admon role(as the role parameter) by k8s rbac
+				} else {
+					user.Role = role
+					user.RoleDomains = roleDomains
+				}
 			}
 
 			newUser = user

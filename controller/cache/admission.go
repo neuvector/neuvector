@@ -125,6 +125,7 @@ func initCache() {
 	cacheMutexLock()
 	defer cacheMutexUnlock()
 
+	defAllowedNS := utils.NewSet()     // namespaces in critical(default) allow rules, enabled or not
 	allAllowedNS := utils.NewSet()     // all effectively allowed namespaces that do no contain wildcard character
 	allAllowedNsWild := utils.NewSet() // all effectively allowed namespaces that contain wildcard character
 	ruleTypes := [4]string{api.ValidatingExceptRuleType, api.ValidatingDenyRuleType, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType}
@@ -151,7 +152,7 @@ func initCache() {
 				ruleCaches[idx].RuleMap[arh.ID] = r
 				ruleCaches[idx].RuleHeads = append(ruleCaches[idx].RuleHeads, rh)
 
-				if !r.Disable && r.RuleType == api.ValidatingExceptRuleType {
+				if r.RuleType == api.ValidatingExceptRuleType {
 					if qualifiedRule := (r.Critical || r.CfgType == share.FederalCfg); qualifiedRule {
 						for _, crt := range r.Criteria {
 							if crt.Name != share.CriteriaKeyNamespace || crt.Op != share.CriteriaOpContainsAny {
@@ -163,10 +164,15 @@ func initCache() {
 							// reaching here means this critical/fed allow rule contains {namespace is in <namespaces>}-only criteria
 							for _, crt := range r.Criteria {
 								for _, ns := range strings.Split(crt.Value, setDelim) {
-									if strings.Contains(ns, "*") {
-										allAllowedNsWild.Add(ns)
-									} else {
-										allAllowedNS.Add(ns)
+									if !r.Disable {
+										if strings.Contains(ns, "*") {
+											allAllowedNsWild.Add(ns)
+										} else {
+											allAllowedNS.Add(ns)
+										}
+									}
+									if r.Critical {
+										defAllowedNS.Add(ns)
 									}
 								}
 							}
@@ -179,7 +185,7 @@ func initCache() {
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		if admission.IsNsSelectorSupported() {
 			installID, _ := clusHelper.GetInstallationID()
-			admission.InitK8sNsSelectorInfo(allAllowedNS, allAllowedNsWild, installID, admStateCache.Enable)
+			admission.InitK8sNsSelectorInfo(allAllowedNS, allAllowedNsWild, defAllowedNS, installID, admStateCache.Enable)
 		}
 
 		var svcAvailable bool

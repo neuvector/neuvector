@@ -53,7 +53,8 @@ func host2REST(cache *hostCache, k8sCache *k8sHostCache) *api.RESTHost {
 		CGroupVersion:  host.CgroupVersion,
 		Ifaces:         make(map[string][]*api.RESTIPAddr),
 		State:          cache.state,
-		Containers:     cache.workloads.Cardinality(),
+		Containers:     cache.runningCntrs.Cardinality(),
+		Pods:           cache.runningPods.Cardinality(),
 		Platform:       getHostPlatform(host.Platform, host.Flavor),
 		CapDockerBench: host.CapDockerBench,
 		CapKubeBench:   host.CapKubeBench,
@@ -523,6 +524,7 @@ func addrOrchHostDelete(ipnets []net.IPNet) {
 
 // With cachMutex held
 func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
+	var addcnt int = 0
 	for _, addrs := range ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {
@@ -531,6 +533,7 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 				if _, ok := ipDevMap[key]; !ok {
 					log.WithFields(log.Fields{"ip": key, "id": id}).Info("add ip-device map")
 					ipDevMap[key] = &workloadEphemeral{wl: id}
+					addcnt++
 				} else {
 					log.WithFields(log.Fields{"ip": key, "id": id}).Info("renew ip-device map")
 					ipDevMap[key] = &workloadEphemeral{wl: id}
@@ -543,7 +546,9 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 	//than agent get updated which cause neuvector device temprary to be unmanaged
 	//workload, reset unManagedWlTimer to update unmanaged workload ip to prevent
 	//neuvector device being treated as unmanaged wl
-	scheduleUnmanagedWlProc(false)
+	if addcnt > 0 {
+		scheduleUnmanagedWlProc(false)
+	}
 
 	// cleanup ephemeral entries
 	for key, dev := range ipDevMap {
@@ -1023,7 +1028,8 @@ func addrWorkloadAdd(id string, param interface{}) {
 					wlp.ipnet = addr.IPNet
 					wlp.alive = true
 					wlp.managed = true
-					if wlp.node == "" {
+					//workload's hostname from agent is more accurate
+					if wlp.node != wl.HostName {
 						wlp.node = wl.HostName
 					}
 				} else {
@@ -1191,7 +1197,7 @@ func appendProbeSubCmds(cmds []string) []*k8sProbeCmd {
 func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 	pp := make(map[string]*k8sProbeCmd)
 	for _, cmd := range cmds {
-		if ok, app, path, cmdline  := appendProbeCmds(cmd); ok {
+		if ok, app, path, cmdline := appendProbeCmds(cmd); ok {
 			if p, ok := pp[app]; ok {
 				p.path = "*"
 				p.cmds = append(p.cmds, cmdline)
@@ -1464,8 +1470,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 
 	case cluster.ClusterNotifyDelete:
-		var agentID, hostID string
-
 		id := share.CLUSWorkloadKey2ID(key)
 
 		// Check if it's NeuVector containers first
@@ -1483,27 +1487,12 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		cacheMutexLock()
 
 		if wlCache, ok = wlCacheMap[id]; ok {
-			agentID = wlCache.workload.AgentID
 			delete(wlCacheMap, id)
 
 			// Update parent's children list.
 			if wlCache.workload.ShareNetNS != "" {
 				if parent, ok := wlCacheMap[wlCache.workload.ShareNetNS]; ok {
 					parent.children.Remove(id)
-				}
-			}
-		}
-
-		if agentID != "" {
-			// Update agent cache
-			if cache, ok := agentCacheMap[agentID]; ok {
-				hostID = cache.agent.HostID
-			}
-
-			// Update host cache
-			if hostID != "" {
-				if cache, ok := hostCacheMap[hostID]; ok {
-					cache.workloads.Remove(id)
 				}
 			}
 		}
@@ -1539,10 +1528,6 @@ func attrWorkloadAdd(id string, param interface{}) {
 	if wl.PlatformRole != "" {
 		wlc.platformRole = api.PlatformContainerCore
 	}
-}
-
-func benchHostDelete(id string, param interface{}) {
-	cluster.Delete(share.CLUSBenchKey(id))
 }
 
 func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
@@ -1661,16 +1646,19 @@ func registerEventHandlers() {
 		attrWorkloadAdd,
 	})
 	evhdls.Register(EV_WORKLOAD_DELETE, []eventHandlerFunc{
+		hostWorkloadDelete,
 		addrWorkloadStop,
 		uniconfWorkloadDelete,
 		connectWorkloadDelete,
 		groupWorkloadLeave,
 	})
 	evhdls.Register(EV_WORKLOAD_START, []eventHandlerFunc{
+		hostWorkloadStart,
 		groupWorkloadJoin,
 		scanWorkloadAdd,
 	})
 	evhdls.Register(EV_WORKLOAD_STOP, []eventHandlerFunc{
+		hostWorkloadStop,
 		addrWorkloadStop,
 		connectWorkloadDelete,
 		groupWorkloadLeave,
@@ -1700,6 +1688,7 @@ func registerEventHandlers() {
 	evhdls.Register(EV_AGENT_ADD, []eventHandlerFunc{
 		connectAgentAdd,
 		scanAgentAdd,
+		benchAgentOnline,
 	})
 	evhdls.Register(EV_AGENT_DELETE, []eventHandlerFunc{
 		uniconfAgentDelete,

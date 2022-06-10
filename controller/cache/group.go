@@ -1137,6 +1137,53 @@ func groupWorkloadLeave(id string, param interface{}) {
 	}
 }
 
+func hostWorkloadStart(id string, param interface{}) {
+	wlc := param.(*workloadCache)
+	wl := wlc.workload
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+
+	if host, ok := hostCacheMap[wl.HostID]; ok {
+		if localDev.Host.Platform == share.PlatformKubernetes {
+			if wlc.workload.ShareNetNS == "" {
+				host.runningPods.Add(wl.ID)
+			}
+		} else {
+			host.runningPods.Add(wl.ID)
+		}
+		host.runningCntrs.Add(wl.ID)
+		host.workloads.Add(wl.ID)
+	}
+}
+
+func hostWorkloadStop(id string, param interface{}) {
+	wlc := param.(*workloadCache)
+	wl := wlc.workload
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+
+	if host, ok := hostCacheMap[wl.HostID]; ok {
+		host.runningPods.Remove(wl.ID)
+		host.runningCntrs.Remove(wl.ID)
+	}
+}
+
+func hostWorkloadDelete(id string, param interface{}) {
+	wlc := param.(*workloadCache)
+	wl := wlc.workload
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+
+	if host, ok := hostCacheMap[wl.HostID]; ok {
+		host.runningPods.Remove(wl.ID)
+		host.runningCntrs.Remove(wl.ID)
+		host.workloads.Remove(wl.ID)
+	}
+}
+
 func groupWorkloadJoin(id string, param interface{}) {
 	wlc := param.(*workloadCache)
 	wl := wlc.workload
@@ -1146,10 +1193,6 @@ func groupWorkloadJoin(id string, param interface{}) {
 	dptCustomGrpAdds := utils.NewSet()
 
 	cacheMutexLock()
-
-	if host, ok := hostCacheMap[wl.HostID]; ok {
-		host.workloads.Add(wl.ID)
-	}
 
 	// TODO: multi-controller
 	// Normally, we are first notified with the new workload, create group then handle group

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 #include <linux/if_ether.h>
 #include <netinet/in.h>
 
@@ -10,6 +11,9 @@
 
 #include "dpi/dpi_module.h"
 #include "dpi/sig/dpi_search.h"
+
+#define DUMP_POLICY_FILE "/var/log/dp.pol"
+extern dpi_fqdn_hdl_t *g_fqdn_hdl;
 
 static void dpi_ctrl_req_done(void)
 {
@@ -306,6 +310,107 @@ static void dpi_session_delete_by_mac(struct ether_addr *mac_addr)
     }
 }
 
+bool iter_print_one_rule(struct cds_lfht_node *ht_node, void *args)
+{
+    FILE *logfp = (FILE *)args;
+    dpi_rule_t *r = (dpi_rule_t *)ht_node;
+    fprintf(logfp, "    REGULAR rule\n");
+    fprintf(logfp, "        src:"DBG_IPV4_FORMAT" dst:"DBG_IPV4_FORMAT":dport %u proto:%u app:%u\n        "DP_POLICY_DESC_STR"\n\n", 
+                DBG_IPV4_TUPLE(r->key.sip), DBG_IPV4_TUPLE(r->key.dip), r->key.dport, r->key.proto, r->key.app,
+                DP_POLICY_DESC((&(r->desc))));
+    return 0;
+}
+
+bool iter_print_one_range_rule(struct cds_lfht_node *ht_node, void *args)
+{
+    FILE *logfp = (FILE *)args;
+    dpi_range_rule_t *r = (dpi_range_rule_t *)ht_node;
+    dpi_range_rule_item_t  *p, *prev;
+    fprintf(logfp, "    RANGE rule key ip:"DBG_IPV4_FORMAT" proto:%u ingress:%x\n",
+                DBG_IPV4_TUPLE(r->key.ip), r->key.proto, r->key.flag);
+    p = r->range_rule_list;
+    if (p) {
+        fprintf(logfp, "    RANGE rule list\n");
+    }
+    while (p) {
+        prev = p;
+        p = p->next;
+        fprintf(logfp, "        low:src:"DBG_IPV4_FORMAT" dst:"DBG_IPV4_FORMAT":dport %u proto:%u app:%u\n"
+            "        high:src:"DBG_IPV4_FORMAT" dst:"DBG_IPV4_FORMAT":dport %u proto:%u app:%u\n        "
+            DP_POLICY_DESC_STR"\n\n", 
+            DBG_IPV4_TUPLE(prev->key_l.sip), DBG_IPV4_TUPLE(prev->key_l.dip), prev->key_l.dport, prev->key_l.proto, prev->key_l.app,
+            DBG_IPV4_TUPLE(prev->key_h.sip), DBG_IPV4_TUPLE(prev->key_h.dip), prev->key_h.dport, prev->key_h.proto, prev->key_h.app,
+            DP_POLICY_DESC((&(prev->desc))));
+    }
+    return 0;
+}
+
+static void dpi_dump_policy()
+{
+    FILE *logfp = NULL;
+
+    if (logfp == NULL) {
+        logfp = fopen(DUMP_POLICY_FILE, "w");
+        if (logfp != NULL) {
+            int flags;
+
+            if ((flags = fcntl(fileno(logfp), F_GETFL, 0)) == -1) {
+                flags = 0;
+            }
+            fcntl(fileno(logfp), F_SETFL, flags | O_NONBLOCK);
+        }
+    }
+    struct cds_lfht_node *node;
+    dpi_detector_t *dlp_detector = NULL;
+
+    // Iterate through all MAC
+    RCU_MAP_FOR_EACH(&g_ep_map, node) {
+        io_mac_t *mac = STRUCT_OF(node, io_mac_t, node);
+        if (mac == NULL) continue;
+        io_ep_t *ep = mac->ep;
+        if (ep == NULL) continue;
+        if (ep->dlp_detector != NULL)
+        {
+            dlp_detector = (dpi_detector_t *)ep->dlp_detector;
+        }
+        dpi_policy_hdl_t *hdl = (dpi_policy_hdl_t *)ep->policy_hdl;
+
+        fprintf(logfp, "mac="DBG_MAC_FORMAT, DBG_MAC_TUPLE(mac->mac));
+        if (hdl) {
+            fprintf(logfp, " hdl_ver:%u default_action:%d fqdn:%d\n", hdl->ver, hdl->def_action, DPI_POLICY_HAS_FQDN(hdl));
+            rcu_map_for_each(&hdl->policy_map, iter_print_one_rule, logfp);
+            rcu_map_for_each(&hdl->range_policy_map, iter_print_one_range_rule, logfp);
+        } else {
+            fprintf(logfp, "\n");
+        }
+        fflush(logfp);
+    }
+
+    if (g_fqdn_hdl != NULL) {
+        struct cds_lfht_node *name_node;
+        // Iterate through fqdn map
+        RCU_MAP_FOR_EACH(&g_fqdn_hdl->fqdn_name_map, name_node) {
+            fqdn_name_entry_t *name_entry = STRUCT_OF(name_node, fqdn_name_entry_t, node);
+            fprintf(logfp, "FQDN name:%s code:%x\n", name_entry->r->name, ntohl(name_entry->r->code));
+
+            // Iterate through all ips
+            fqdn_ipv4_item_t *ipv4_itr, *ipv4_next;
+            cds_list_for_each_entry_safe(ipv4_itr, ipv4_next, &(name_entry->r->iplist), node) {
+                fprintf(logfp, "    FQDN match ip:"DBG_IPV4_FORMAT"\n", DBG_IPV4_TUPLE(ipv4_itr->ip));
+            }
+            fflush(logfp);
+        }
+    }
+
+    if (dlp_detector != NULL)
+    {
+        dpi_print_siglist_fp(dlp_detector, logfp);
+        fflush(logfp);
+    }
+    dpi_print_ip4_internal_fp(logfp);
+    fflush(logfp);
+}
+
 // --
 
 #define METERS_PER_MSG ((DP_MSG_SIZE - sizeof(DPMsgHdr) - sizeof(DPMsgMeterHdr)) / sizeof(DPMsgMeter))
@@ -402,6 +507,9 @@ void dpi_handle_ctrl_req(int req, io_ctx_t *ctx)
         if (g_mac_addr_to_del) {
             dpi_session_delete_by_mac(g_mac_addr_to_del);
         }
+        break;
+    case CTRL_REQ_DUMP_POLICY:
+        dpi_dump_policy();
         break;
     }
 
