@@ -302,6 +302,7 @@ type DPWorkloadDlpRule struct {
 	PolicyRuleIds []uint32          `json:"policy_rule_ids"`
 	PolWafRuleIds []uint32          `json:"polwaf_rule_ids"`
 	RuleType      string            `json:"ruletype"`
+	WafRuleType   string            `json:"wafruletype"`
 }
 
 type DPDlpRuleEntry struct {
@@ -318,6 +319,7 @@ type DPDlpCfg struct {
 	RuleIds      []uint32            `json:"rule_ids"`
 	WafRuleIds   []uint32            `json:"waf_rule_ids"`
 	RuleType     string              `json:"ruletype"`
+	WafRuleType  string              `json:"wafruletype"`
 }
 
 type DPDlpCfgReq struct {
