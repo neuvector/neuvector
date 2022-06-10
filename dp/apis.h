@@ -144,6 +144,7 @@ typedef struct io_ep_ {
     void *dlp_detector;
     uint16_t dlp_detect_ver;
     bool dlp_inside;
+    bool waf_inside;
 } io_ep_t;
 
 typedef struct io_mac_ {
