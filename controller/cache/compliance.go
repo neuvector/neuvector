@@ -451,7 +451,7 @@ func readBenchFromCluster(id string, bench share.BenchType) []byte {
 	key := share.CLUSBenchReportKey(id, bench)
 	if value, err := cluster.Get(key); err != nil || len(value) == 0 {
 		// not all bench type exist, for example custom check, so use INFO level debug
-		log.WithFields(log.Fields{"error": err, "key": key}).Info("Benchmark report not found")
+		// log.WithFields(log.Fields{"error": err, "key": key}).Info("Benchmark report not found")
 		return nil
 	} else {
 		return value
