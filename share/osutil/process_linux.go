@@ -14,10 +14,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"golang.org/x/sys/unix"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
+	"golang.org/x/sys/unix"
 )
 
 const maxStatCmdLen = 15
@@ -201,12 +201,13 @@ func getListenPortsByFile(listens utils.Set, fileName string, inodes utils.Set, 
 	}
 }
 
-func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, tcp bool)  {
+func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, tcp bool) {
 	fileName := filepath.Join("/proc", strconv.Itoa(rootPid), "root/proc/1/net", file)
 	// log.WithFields(log.Fields{"filename": fileName}).Debug()
 	f, err := os.Open(fileName)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("open net/tcp,udp")
+		// Suppresss the log message
+		// log.WithFields(log.Fields{"error": err, "filename": filename}).Error()
 		return
 	}
 	defer f.Close()
@@ -239,9 +240,9 @@ func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, t
 			ip_port := strings.Split(tokens[1], ":")
 			port, _ := strconv.ParseUint(ip_port[1], 16, 16)
 			if tcp {
-				tbl[inode] = SocketInfo{ Port: uint16(port), IPProto: syscall.IPPROTO_TCP, INode: inode,}
+				tbl[inode] = SocketInfo{Port: uint16(port), IPProto: syscall.IPPROTO_TCP, INode: inode}
 			} else {
-				tbl[inode] = SocketInfo{ Port: uint16(port), IPProto: syscall.IPPROTO_UDP, INode: inode,}
+				tbl[inode] = SocketInfo{Port: uint16(port), IPProto: syscall.IPPROTO_UDP, INode: inode}
 			}
 		}
 	}
@@ -256,10 +257,10 @@ func GetContainerSocketTable(rootPid int) map[uint32]SocketInfo {
 	getCGroupSocketTable(rootPid, tbl, "udp", false)
 	getCGroupSocketTable(rootPid, tbl, "udp6", false)
 
-//	log.WithFields(log.Fields{"rootPid": rootPid, "tbl": len(tbl)}).Debug()
-//	for inode, pport := range tbl {
-//		log.WithFields(log.Fields{"inode": inode, "pport": pport}).Debug()
-//	}
+	//	log.WithFields(log.Fields{"rootPid": rootPid, "tbl": len(tbl)}).Debug()
+	//	for inode, pport := range tbl {
+	//		log.WithFields(log.Fields{"inode": inode, "pport": pport}).Debug()
+	//	}
 	return tbl
 }
 
