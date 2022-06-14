@@ -476,7 +476,7 @@ func (s *ScanUtil) GetLocalImageMeta(ctx context.Context, repository, tag, rtSoc
 	return meta, share.ScanErrorCode_ScanErrNone
 }
 
-func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, imgPath string) (*ImageInfo, map[string]*LayerFiles, share.ScanErrorCode) {
+func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, imgPath string) (*ImageInfo, map[string]*LayerFiles, []string, share.ScanErrorCode) {
 	sock, repo := parseSocketFromRepo(repository)
 	if sock == "" {
 		sock = rtSock
@@ -485,7 +485,7 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 	rt, err := container.ConnectDocker(sock, s.sys)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Connect docker server fail")
-		return nil, nil, share.ScanErrorCode_ScanErrContainerAPI
+		return nil, nil, nil, share.ScanErrorCode_ScanErrContainerAPI
 	}
 
 	imageName := fmt.Sprintf("%s:%s", repo, tag)
@@ -494,29 +494,29 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to get local image")
 		if err == dockerclient.ErrImageNotFound {
-			return nil, nil, share.ScanErrorCode_ScanErrImageNotFound
+			return nil, nil, nil, share.ScanErrorCode_ScanErrImageNotFound
 		}
-		return nil, nil, share.ScanErrorCode_ScanErrContainerAPI
+		return nil, nil, nil, share.ScanErrorCode_ScanErrContainerAPI
 	}
 
 	histories, err := rt.GetImageHistory(imageName)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to get local image history")
 		if err == dockerclient.ErrImageNotFound {
-			return nil, nil, share.ScanErrorCode_ScanErrImageNotFound
+			return nil, nil, nil, share.ScanErrorCode_ScanErrImageNotFound
 		}
-		return nil, nil, share.ScanErrorCode_ScanErrContainerAPI
+		return nil, nil, nil, share.ScanErrorCode_ScanErrContainerAPI
 	}
 
 	file, err := rt.GetImageFile(meta.ID)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to get image")
 		if err == dockerclient.ErrImageNotFound {
-			return nil, nil, share.ScanErrorCode_ScanErrImageNotFound
+			return nil, nil, nil, share.ScanErrorCode_ScanErrImageNotFound
 		} else if err == container.ErrMethodNotSupported {
-			return nil, nil, share.ScanErrorCode_ScanErrDriverAPINotSupport
+			return nil, nil, nil, share.ScanErrorCode_ScanErrDriverAPINotSupport
 		}
-		return nil, nil, share.ScanErrorCode_ScanErrContainerAPI
+		return nil, nil, nil, share.ScanErrorCode_ScanErrContainerAPI
 	}
 
 	// create an image file and image layered folders
@@ -534,14 +534,14 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 	file.Close()
 	if err != nil {
 		log.Errorf("could not write to image: %s", err)
-		return nil, nil, share.ScanErrorCode_ScanErrFileSystem
+		return nil, nil, nil, share.ScanErrorCode_ScanErrFileSystem
 	}
 
 	// obtain layer information, then extract the layers into tar files
 	layers, _, _, _, err := getImageLayers(repoFolder, imageFile)
 	if err != nil {
 		log.Errorf("could not extract image layers: %s", err)
-		return nil, nil, share.ScanErrorCode_ScanErrPackage
+		return nil, nil, nil, share.ScanErrorCode_ScanErrPackage
 	}
 
 	layerFiles, errCode := getImageLayerIterate(ctx, layers, nil, false, imgPath,
@@ -561,8 +561,12 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 			return file, bytes, nil
 		})
 
-	// GetImage and getImageLayers return different set of layer ID, make them consistent.
+	// GetImage(sha256:xxxx) and getImageLayers (yyyy) return different sets of layer ID, make them consistent.
+	// In the "inspect image" CLI command, users can only read the "sha256:xxxx" list.
+	// however, "yyyy" is the real data storage and referrable.
+	var tarLayers []string
 	for i, l2 := range layers {
+		tarLayers = append(tarLayers, l2)
 		l1 := meta.Layers[i]
 		if files, ok := layerFiles[l2]; ok {
 			layerFiles[l1] = files
@@ -611,7 +615,7 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 		RepoTags: meta.RepoTags,
 	}
 
-	return repoInfo, layerFiles, errCode
+	return repoInfo, layerFiles, tarLayers, errCode
 }
 
 type LayerMetadata struct {
