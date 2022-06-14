@@ -1324,7 +1324,7 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 					if k8sDefaultRole {
 						fmtStr = `Kubernetes rolebinding "%s" is required to bind %s "%s" to service account %s:%s.`
 					} else {
-						fmtStr = `Kubernetes rolebinding "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.[1]`
+						fmtStr = `Kubernetes rolebinding "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.`
 					}
 					err = fmt.Errorf(fmtStr, bindingName, strings.ToLower(bindingInfo.roleKind), bindingInfo.roleName, NvAdmSvcNamespace, nvSA)
 				}
@@ -1335,7 +1335,7 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 		if err != nil {
 			log.WithFields(log.Fields{"rolebinding": bindingName, "error": err}).Error()
 			if strings.Contains(err.Error(), " 403 ") {
-				err = fmt.Errorf(`Kubernetes rolebinding "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,
+				err = fmt.Errorf(`Kubernetes clusterrolebinding "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,
 					NvRbacRoleBinding, NvRbacRole, NvAdmSvcNamespace, nvSA)
 				log.WithFields(log.Fields{"error": err}).Error()
 			}
