@@ -291,25 +291,30 @@ func TestIsMapCriterionMet(t *testing.T) {
 			Op:    share.CriteriaOpContainsOtherThan,
 			Value: "label1,label2=value2,label3=value3",
 		},
+		&share.CLUSAdmRuleCriterion{
+			Name:  share.CriteriaKeyLabels,
+			Op:    share.CriteriaOpContainsAny,
+			Value: "label1=value1,label1=value2",
+		},
 	}
-	expected1 := []bool{true, false, true, true, true, true}
+	expected1 := []bool{true, false, true, true, true, true, true}
 	ctnerLabels1 := map[string]string{
 		"token":  "100",
 		"label1": "value1",
 	}
-	expected2 := []bool{true, false, false, false, true, false}
+	expected2 := []bool{true, false, false, false, true, false, false}
 	ctnerLabels2 := map[string]string{
 		"label1": "",
 		"label2": "value2",
 	}
-	expected3 := []bool{true, false, false, false, true, false}
+	expected3 := []bool{true, false, false, false, true, false, false}
 	ctnerLabels3 := map[string]string{
 		"label2": "value2",
 	}
-	expected4 := []bool{false, false, true, false, false, false}
+	expected4 := []bool{false, false, true, false, false, false, false}
 	ctnerLabels4 := map[string]string{}
 
-	expected5 := []bool{false, false, true, true, true, true}
+	expected5 := []bool{false, false, true, true, true, true, false}
 	ctnerLabels5 := map[string]string{
 		"token": "100",
 	}
