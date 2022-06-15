@@ -548,53 +548,38 @@ func (fn *FaNotify) MonitorFileEvents() {
 
 //////
 func (fn *FaNotify) handleEvents() error {
-	for {
-		ev, err := fn.fa.GetEvent()
-		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Debug("FMON:")
-			if fn.bEnabled {
-				log.WithFields(log.Fields{"err": err}).Debug("FMON: Read Error")
-			}
-			return nil
-		}
+	if events, err := fn.fa.GetEvents(); err == nil {
+		for _, ev := range events {
+			// log.WithFields(log.Fields{"pid": pid, "fmask": fmt.Sprintf("0x%08x", fmask), "fd": fd}).Debug("FMON:")
+			pid := int(ev.Pid)
+			fd := int(ev.File.Fd())
+			fmask := uint64(ev.Mask)
+			perm := (fmask & (FAN_OPEN_PERM | FAN_ACCESS_PERM)) > 0
 
-		//////
-		pid := int(ev.Pid)
-		fd := int(ev.File.Fd())
-		fmask := uint64(ev.Mask)
-		perm := (fmask & (FAN_OPEN_PERM | FAN_ACCESS_PERM)) > 0
-		// log.WithFields(log.Fields{"pid": pid, "fmask": fmt.Sprintf("0x%08x", fmask), "fd": fd}).Debug("FMON:")
-		if ev.Version != FANOTIFY_METADATA_VERSION {
+			resp, mask, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
 			if perm {
-				fn.fa.Response(ev, true)
+				fn.fa.Response(ev, resp)
 			}
 			ev.File.Close()
-			return fmt.Errorf("FMON: version not match")
-		}
 
-		resp, mask, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
-		if perm {
-			fn.fa.Response(ev, resp)
-		}
-		ev.File.Close()
+			if ifile == nil {
+				continue // nothing to justify
+			}
 
-		if ifile == nil {
-			continue // nothing to justify
-		}
+			change := (fmask & FAN_CLOSE_WRITE) > 0
+			// log.WithFields(log.Fields{"ifile": ifile, "pInfo": pInfo, "Resp": resp, "Change": change, "Perm": perm}).Debug("FMON:")
 
-		change := (fmask & FAN_CLOSE_WRITE) > 0
-		// log.WithFields(log.Fields{"ifile": ifile, "pInfo": pInfo, "Resp": resp, "Change": change, "Perm": perm}).Debug("FMON:")
+			var bReporting bool
+			if ifile.learnt { // discover mode
+				bReporting = ifile.userAdd // learn app for customer-added entry
+			} else { // monitor or protect mode
+				allowRead := resp && !change
+				bReporting = (allowRead == false) // allowed app by block_access
+			}
 
-		var bReporting bool
-		if ifile.learnt { // discover mode
-			bReporting = ifile.userAdd // learn app for customer-added entry
-		} else { // monitor or protect mode
-			allowRead := resp && !change
-			bReporting = (allowRead == false) // allowed app by block_access
-		}
-
-		if bReporting || change { // report changed file
-			ifile.cb(ifile.path, mask, ifile.params, pInfo)
+			if bReporting || change { // report changed file
+				ifile.cb(ifile.path, mask, ifile.params, pInfo)
+			}
 		}
 	}
 	return nil
