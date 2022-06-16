@@ -18,6 +18,8 @@ type orchHub struct {
 	orchAPI.ResourceDriver
 }
 
+var ErrEmptyContainerList = errors.New("Container list is empty")
+
 type RegisterDriverFunc func(platform, flavor, network string) orchAPI.ResourceDriver
 
 var SYS *system.SystemTools
@@ -44,7 +46,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	}
 
 	if len(containers) == 0 {
-		return "", "", "", nil, errors.New("Container list is empty")
+		return "", "", "", nil, ErrEmptyContainerList
 	}
 
 	platform, flavor, network := getPlatform(containers)

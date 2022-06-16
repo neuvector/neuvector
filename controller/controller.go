@@ -304,6 +304,11 @@ func main() {
 	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
+		if err == global.ErrEmptyContainerList {
+			// Temporary get container list error
+			// => exit the process but the container doesn't need to be restarted
+			os.Exit(-1)
+		}
 		os.Exit(-2)
 	}
 
