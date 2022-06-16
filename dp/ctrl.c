@@ -1757,18 +1757,21 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
     int cnt3 = 0;
     int flag;
     const char *ruletype = json_string_value(json_object_get(msg, "ruletype"));
+    const char *wafruletype = json_string_value(json_object_get(msg, "wafruletype"));
     bool inside_rule = false;
+    bool wafinside_rule = false;
 
     if ( strcmp(ruletype, DLP_RULETYPE_INSIDE) == 0 ) {
         inside_rule = true;
     } else if ( strcmp(ruletype, DLP_RULETYPE_OUTSIDE) == 0 ) {
         inside_rule = false;
-    } else if ( strcmp(ruletype, WAF_RULETYPE_INSIDE) == 0 ) {
-        inside_rule = true;
-    } else if ( strcmp(ruletype, WAF_RULETYPE_OUTSIDE) == 0 ) {
-        inside_rule = false;
+    }
+    if ( strcmp(wafruletype, WAF_RULETYPE_INSIDE) == 0 ) {
+        wafinside_rule = true;
+    } else if ( strcmp(wafruletype, WAF_RULETYPE_OUTSIDE) == 0 ) {
+        wafinside_rule = false;
     } 
-    DEBUG_CTRL("ruletype %s, inside_rule %d\n", ruletype, inside_rule);
+    DEBUG_CTRL("ruletype %s, wafruletype %s, inside_rule %d, wafinside_rule %d\n", ruletype, wafruletype, inside_rule, wafinside_rule);
 
     obj = json_object_get(msg, "mac");
     flag = json_integer_value(json_object_get(msg, "flag"));
@@ -1796,6 +1799,7 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
 
         io_ep_t *ep = mac->ep;
         ep->dlp_inside = inside_rule;
+        ep->waf_inside = wafinside_rule;
         // policy ids/connection to be exempt of dlp check
         if ((flag & MSG_START) && rule_ids_obj != NULL) {
             int k;

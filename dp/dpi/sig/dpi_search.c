@@ -750,27 +750,26 @@ bool dpi_waf_ep_policy_check (dpi_packet_t *p) {
     key.rid = sess->policy_desc.id;
     uint32_t app = 0;
 
-    //traffic between sidecar and service is considered within dlp group.
-    if (isproxymesh) {
-        return false;
-    }
     app = sess->app?sess->app:(sess->base_app?sess->base_app:DP_POLICY_APP_UNKNOWN);
     if (app == DPI_APP_SSL || app == DPI_APP_SSH) {
         //DEBUG_DLP("No waf inspection for SSL/SSH protocol, app(%u)!\n", app);
         return false;
     }
 
-    if (!ep->dlp_inside) {
+    if (!ep->waf_inside) {
         io_dlp_ruleid_t *waf_rid = rcu_map_lookup(&ep->waf_rid_map, &key);
         //only detect traffic that match network policy id for outside wl
-        if (waf_rid != NULL) {
+        //and always detect traffic between sidecar and service
+        if (waf_rid != NULL || isproxymesh) {
             //DEBUG_DLP("OUTSIDE find rid:(%d) in waf_rid_map continue!\n", waf_rid->rid);
             return true;
         }
         return false;
     } else {
-        //for internal east-west traffic with no policy, no dlp detect
-        if (sess->policy_desc.id == 0 &&
+        //for internal east-west traffic with no policy, no waf detect
+        //always go through waf detection for proxymesh traffic
+        //such as istio/linkerd
+        if (!isproxymesh && sess->policy_desc.id == 0 &&
             sess->policy_desc.action == DP_POLICY_ACTION_OPEN &&
             (sess->policy_desc.flags & POLICY_DESC_INTERNAL) ) {
             if (hdl && hdl->def_action == DP_POLICY_ACTION_DENY) {
@@ -813,10 +812,6 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
     key.rid = sess->policy_desc.id;
     uint32_t app = 0;
 
-    //traffic between sidecar and service is considered within dlp group.
-    if (isproxymesh) {
-        return false;
-    }
     app = sess->app?sess->app:(sess->base_app?sess->base_app:DP_POLICY_APP_UNKNOWN);
     if (app == DPI_APP_SSL || app == DPI_APP_SSH) {
         //DEBUG_DLP("No dlp inspection for SSL/SSH protocol, app(%u)!\n", app);
@@ -826,7 +821,8 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
     if (!ep->dlp_inside) {
         io_dlp_ruleid_t *dlp_rid = rcu_map_lookup(&ep->dlp_rid_map, &key);
         //only detect traffic that match network policy id for outside wl
-        if (dlp_rid != NULL) {
+        //and always detect traffic between sidecar and service
+        if (dlp_rid != NULL || isproxymesh) {
             //DEBUG_DLP("OUTSIDE find rid:(%d) in dlp_rid_map continue!\n", dlp_rid->rid);
             return true;
         } 
@@ -856,7 +852,8 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
 
         io_dlp_ruleid_t *dlp_rid = rcu_map_lookup(&ep->dlp_rid_map, &key);
         //not to continue because traffic is within dlp group
-        if (dlp_rid != NULL) {
+        //traffic between sidecar and service is considered within dlp group.
+        if (dlp_rid != NULL || isproxymesh) {
             //DEBUG_DLP("INSIDE find rid:(%d) in dlp_rid_map not continue!\n", dlp_rid->rid);
             return false;
         } 
