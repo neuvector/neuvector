@@ -1717,7 +1717,7 @@ func startWorkerThread() {
 							hostName = n.IBMCloudWorkerID // is like "kube-c40msj4d0tb4oeriggqg-atibmcluste-default-000001f1"
 						}
 						k8sCache, ok := k8sHostInfoMap[hostName]
-						if !ok || k8sCache == nil {
+						if !ok {
 							k8sCache = &k8sHostCache{}
 						}
 						k8sCache.labels = n.Labels
