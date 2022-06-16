@@ -1335,13 +1335,21 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
-		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeNode:
+		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
 			if _, p := xlatePod(r.(k8s.Resource)); p != nil {
 				return p, nil
+			}
+			return nil, common.ErrObjectNotFound
+		} else {
+			return nil, err
+		}
+	case RscTypeNode:
+		if r, err:= d.getResource(rt, namespace, name); err == nil {
+			if _, n := xlateNode(r.(k8s.Resource)); n != nil {
+				return n, nil
 			}
 			return nil, common.ErrObjectNotFound
 		} else {
