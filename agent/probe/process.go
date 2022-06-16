@@ -2166,29 +2166,25 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
-	if bRtProcP && proc.path == "/usr/bin/pod" && proc.name == "pod" {
-		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
-		return true
-	}
 
-	// oc specific
-	if p.kubeFlavor == share.FlavorOpenShift {
-		if bZeroDrift && bRtProcP && proc.path == "/usr/bin/coreutils" && proc.name == "coreutils" {
-			log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
+	// parent: matching only from binary
+	pname := filepath.Base(proc.ppath)
+	if p.bKubePlatform {
+		switch pname {
+		case "pod", "kubelet":
 			return true
 		}
 
-		if filepath.Base(proc.ppath) == "pod" && proc.pname == "pod" { // pod services
-			return true
+		// oc specific
+		if p.kubeFlavor == share.FlavorOpenShift {
+			switch pname  {
+			case "hyperkube", "coreutils":
+				return true
+			case "openshift-sdn-node":
+				name := filepath.Base(proc.path)
+				return  name == "sh" || name == "bash"
+			}
 		}
-	}
-
-	if filepath.Base(proc.ppath) == "kubelet" && proc.pname == "kubelet" { // kubelet services
-		return true
-	}
-
-	if filepath.Base(proc.ppath) == "hyperkube" && proc.pname == "hyperkube" { // hyperkube services
-		return true
 	}
 
 	// both names are in the runtime list
@@ -2206,7 +2202,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	// CNI commands from node
 	if bRtProcP || (bParentHostProc && p.isAllowCniCommand(proc.ppath)) {
 		switch proc.name {
-		case "portmap", "containerd", "sleep", "uptime": // NV4856
+		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
 		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
@@ -3094,8 +3090,11 @@ func (p *Probe) UpdateFromAllowRule(id, path string) {
 
 func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
 	p.lockProcMux()
-	proc, ok := p.pidProcMap[pid]
-	p.unlockProcMux()
-	mLog.WithFields(log.Fields{"proc": proc, "pid": pid}).Debug("FA:")
-	return proc, ok
+	defer p.unlockProcMux()
+	if proc, ok := p.pidProcMap[pid]; ok {
+		mLog.WithFields(log.Fields{"name": proc.name, "pname": proc.pname, "pid": pid}).Debug("FA:")
+		return proc, true
+	}
+	mLog.WithFields(log.Fields{"pid": pid}).Debug("FA:")
+	return nil, false
 }
