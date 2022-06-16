@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/neuvector/k8s"
-	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -611,9 +610,11 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			cache.host = &host
 			if localDev.Host.Platform == share.PlatformKubernetes {
 				k8sCache, ok := k8sHostInfoMap[host.Name]
-				if !ok || k8sCache == nil {
+				if !ok {
 					k8sCache = &k8sHostCache{id: host.ID}
-				} else if k8sCache.id != host.ID {
+				}
+
+				if k8sCache.id != host.ID {
 					if k8sCache.id != "" {
 						k8sCache.labels = nil
 						k8sCache.annotations = nil
@@ -622,9 +623,8 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 				}
 				if len(k8sCache.labels) == 0 && len(k8sCache.annotations) == 0 {
 					if obj, err := global.ORCH.GetResource(resource.RscTypeNode, k8s.AllNamespaces, host.Name); err == nil {
-						if o, ok := obj.(*corev1.Node); ok && o != nil && o.Metadata != nil {
-							k8sCache.labels, k8sCache.annotations = o.Metadata.Labels, o.Metadata.Annotations
-						}
+						node := obj.(*resource.Node)
+						k8sCache.labels, k8sCache.annotations = node.Labels, node.Annotations
 					} else {
 						k8sNames := make([]string, 0, 4)
 						// [2021/07/29] special handling for IBM Cloud:
@@ -645,17 +645,17 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 						}
 						log.WithFields(log.Fields{"host": host.Name, "error": err, "k8sNames": k8sNames}).Debug()
 						for _, k8sName := range k8sNames {
-							if obj, err2 := global.ORCH.GetResource(resource.RscTypeNode, k8s.AllNamespaces, k8sName); err2 == nil {
-								if o, ok := obj.(*corev1.Node); ok && o != nil && o.Metadata != nil {
-									if o.Metadata.Name != nil && *o.Metadata.Name == k8sName {
-										k8sCache.labels, k8sCache.annotations = o.Metadata.Labels, o.Metadata.Annotations
-										break
-									}
+							if obj, err := global.ORCH.GetResource(resource.RscTypeNode, k8s.AllNamespaces, k8sName); err == nil {
+								node := obj.(*resource.Node)
+								if node.Name == k8sName {
+									k8sCache.labels, k8sCache.annotations = node.Labels, node.Annotations
+									break
 								}
 							}
 						}
 					}
 				}
+				k8sHostInfoMap[host.Name] = k8sCache
 			}
 
 			hostCacheMap[host.ID] = cache
