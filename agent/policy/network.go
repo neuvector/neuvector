@@ -879,6 +879,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 			if pInfo.HostMode {
 				hostPolicyChangeSet.Add(id)
 			} else if dpConnected {
+				//simulateAddLargeNumIPRules(&pInfo.Policy, pInfo.Policy.ApplyDir)
 				dp.DPCtrlConfigPolicy(&pInfo.Policy, C.CFG_ADD)
 			}
 		} else if pInfo.Configured != old.Configured ||
@@ -886,6 +887,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 			if pInfo.HostMode {
 				hostPolicyChangeSet.Add(id)
 			} else if dpConnected {
+				//simulateAddLargeNumIPRules(&pInfo.Policy, pInfo.Policy.ApplyDir)
 				dp.DPCtrlConfigPolicy(&pInfo.Policy, C.CFG_MODIFY)
 			}
 		}
