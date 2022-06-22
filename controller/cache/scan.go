@@ -697,6 +697,20 @@ func scanHostDelete(id string, param interface{}) {
 	scanMapDelete(id)
 }
 
+func scanAgentDelete(id string, param interface{}) {
+	// purge incomplete scanning jobs but keep completed scans
+	scanMutexLock()
+	defer scanMutexUnlock()
+	for task, info := range scanMap {
+		if info.agentId == id {
+			if info.cveDBCreateTime ==  "" {	// incompleted, not done yet
+				log.WithFields(log.Fields{"task": task, "info": info}).Info()
+				delete(scanMap, task)
+			}
+		}
+	}
+}
+
 func scanConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:

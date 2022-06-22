@@ -1689,6 +1689,7 @@ func registerEventHandlers() {
 	})
 	evhdls.Register(EV_AGENT_DELETE, []eventHandlerFunc{
 		uniconfAgentDelete,
+		scanAgentDelete,
 	})
 	evhdls.Register(EV_AGENT_ONLINE, []eventHandlerFunc{
 		rpcAgentOnline,
