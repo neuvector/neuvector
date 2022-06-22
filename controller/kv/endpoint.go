@@ -487,6 +487,8 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 				clusHelper.PutPolicyRuleListZip(key, array)
 			} else {
 				clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+				//for CLUSConfigSystemKey only
+				clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
 				txn.Put(key, array)
 				if txn.Size() >= 64 {
 					applyTransaction(txn, nil, false, 0)
