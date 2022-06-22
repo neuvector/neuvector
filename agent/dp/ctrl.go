@@ -142,13 +142,14 @@ func DPCtrlDelTapPort(netns, iface string) {
 	dpSendMsg(msg)
 }
 
-func DPCtrlAddNfqPort(netns, iface string, epmac net.HardwareAddr, jumboframe *bool) {
+func DPCtrlAddNfqPort(netns, iface string, qno int, epmac net.HardwareAddr, jumboframe *bool) {
 	log.WithFields(log.Fields{"netns": netns, "iface": iface}).Debug("")
 
 	data := DPAddNfqPortReq{
 		AddNfqPort: &DPNfqPort{
 			NetNS: netns,
 			Iface: iface,
+			Qnum:  qno,
 			EPMAC: epmac.String(),
 		},
 	}

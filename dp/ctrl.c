@@ -24,7 +24,7 @@ extern int dp_data_add_port(const char *iface, bool jumboframe, int thr_id);
 extern int dp_data_del_port(const char *iface, int thr_id);
 extern int dp_data_add_tap(const char *netns, const char *iface, const char *ep_mac, int thr_id);
 extern int dp_data_del_tap(const char *netns, const char *iface, int thr_id);
-extern int dp_data_add_nfq(const char *netns, const char *iface, const char *ep_mac, bool jumboframe, int thr_id);
+extern int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *ep_mac, bool jumboframe, int thr_id);
 extern int dp_data_del_nfq(const char *netns, const char *iface, int thr_id);
 extern int dp_read_ring_stats(dp_stats_t *s, int thr_id);
 extern int dp_read_conn_stats(conn_stats_t *s, int thr_id);
@@ -181,6 +181,7 @@ static int dp_ctrl_add_nfq_port(json_t *msg)
     const char *netns, *iface, *ep_mac;
     json_t *jumboframe_obj;
     bool jumboframe = false;
+    int qnum = 0;
 
     jumboframe_obj = json_object_get(msg, "jumboframe");
     if (jumboframe_obj != NULL) {
@@ -189,10 +190,12 @@ static int dp_ctrl_add_nfq_port(json_t *msg)
 
     netns = json_string_value(json_object_get(msg, "netns"));
     iface = json_string_value(json_object_get(msg, "iface"));
+    qnum = json_integer_value(json_object_get(msg, "qnum"));
+
     ep_mac = json_string_value(json_object_get(msg, "epmac"));
     DEBUG_CTRL("add nfq netns=%s iface=%s, jumboframe=%d\n", netns, iface, jumboframe);
 
-    return dp_data_add_nfq(netns, iface, ep_mac, jumboframe, 0);
+    return dp_data_add_nfq(netns, iface, qnum, ep_mac, jumboframe, 0);
 }
 
 static int dp_ctrl_del_nfq_port(json_t *msg)
