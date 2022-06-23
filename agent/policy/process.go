@@ -385,12 +385,8 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"*", "/usr/lib/jvm/*"}, // JVM
 		//	{"java", "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"}
 
-		//
-		{"pgrep", "/usr/bin/pgrep"}, // new procps package
-
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"grep", "/bin/busybox"},
 		{"lsof", "/bin/busybox"}, // replaced
 		{"netstat", "/bin/busybox"},
 		{"ps", "/bin/busybox"}, // replaced
@@ -410,7 +406,6 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ls", "/bin/busybox"},
 		{"kill", "/bin/busybox"},  // replaced
 		{"top", "/bin/busybox"},   // replaced
-		{"pgrep", "/bin/busybox"}, // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"tee", "/usr/bin/tee"},
@@ -421,6 +416,9 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"}, 			 // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -438,7 +436,6 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"grep", "/bin/busybox"},
 		{"netstat", "/bin/busybox"},
 		{"sh", "/bin/busybox"},
 		{"uname", "/bin/busybox"},
@@ -453,7 +450,6 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"kill", "/bin/kill"}, // new procps package
 		{"ls", "/bin/busybox"},
 		{"lsof", "/usr/bin/lsof"},   // new lsof package
-		{"pgrep", "/usr/bin/pgrep"}, // new procps package
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -464,6 +460,9 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"}, 			 // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -492,11 +491,9 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
 		{"lsof", "/usr/bin/lsof"},        // new lsof package
-		{"pgrep", "/usr/bin/pgrep"},      // new procps package
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"grep", "/bin/busybox"},
 		{"mv", "/bin/busybox"},
 		{"lsof", "/bin/busybox"}, // replaced
 		{"netstat", "/bin/busybox"},
@@ -515,7 +512,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ls", "/bin/busybox"},
 		{"kill", "/bin/busybox"},  // replaced
 		{"top", "/bin/busybox"},   // replaced
-		{"pgrep", "/bin/busybox"}, // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -526,6 +522,9 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"}, 			 // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -555,14 +554,12 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
 		{"lsof", "/usr/bin/lsof"},        // new lsof package
-		{"pgrep", "/usr/bin/pgrep"},      // new procps package
 		{"curl", "/usr/bin/curl"},        // cis benchmark
 		{"jq", "/usr/bin/jq"},            // cis benchmark
 		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"grep", "/bin/busybox"},
 		{"mv", "/bin/busybox"},
 		{"lsof", "/bin/busybox"}, // replaced
 		{"netstat", "/bin/busybox"},
@@ -584,7 +581,6 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ls", "/bin/busybox"},
 		{"kill", "/bin/busybox"},  // replaced
 		{"top", "/bin/busybox"},   // replaced
-		{"pgrep", "/bin/busybox"}, // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -595,6 +591,9 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"}, 			 // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -637,14 +636,12 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
 		{"lsof", "/usr/bin/lsof"},        // new lsof package
-		{"pgrep", "/usr/bin/pgrep"},      // new procps package
 		{"curl", "/usr/bin/curl"},        // cis benchmark
 		{"jq", "/usr/bin/jq"},            // cis benchmark
 		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"grep", "/bin/busybox"},
 		{"mv", "/bin/busybox"},
 		{"lsof", "/bin/busybox"}, // replaced
 		{"netstat", "/bin/busybox"},
@@ -669,7 +666,6 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ls", "/bin/busybox"},
 		{"kill", "/bin/busybox"},  // replaced
 		{"top", "/bin/busybox"},   // replaced
-		{"pgrep", "/bin/busybox"}, // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -679,6 +675,9 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"}, 			 // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
