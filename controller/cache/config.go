@@ -233,8 +233,8 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		return nil
 	}
 
-	//cacheMutexRLock() //-> TO CHECK
-	//defer cacheMutexRUnlock()
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
 
 	rconf := api.RESTSystemConfig{
 		NewServicePolicyMode:      systemConfigCache.NewServicePolicyMode,
@@ -295,6 +295,13 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		Password: proxy.Password,
 	}
 
+	autoscale := systemConfigCache.ScannerAutoscale
+	rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{
+		Strategy: autoscale.Strategy,
+		MinPods:  autoscale.MinPods,
+		MaxPods:  autoscale.MaxPods,
+	}
+
 	return &rconf
 }
 
@@ -321,8 +328,8 @@ func (m CacheMethod) GetIBMSAConfig(acc *access.AccessControl) (*api.RESTIBMSACo
 		return nil, common.ErrObjectAccessDenied
 	}
 
-	//cacheMutexRLock() //-> TO CHECK
-	//defer cacheMutexRUnlock()
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
 
 	rconf := &api.RESTIBMSAConfig{
 		AccountID:         systemConfigCache.IBMSAConfig.AccountID,
@@ -343,8 +350,8 @@ func (m CacheMethod) GetIBMSAConfigNV(acc *access.AccessControl) (share.CLUSIBMS
 		return share.CLUSIBMSAConfigNV{}, common.ErrObjectAccessDenied
 	}
 
-	//cacheMutexRLock() //-> TO CHECK
-	//defer cacheMutexRUnlock()
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
 
 	return systemConfigCache.IBMSAConfigNV, nil
 }
@@ -413,7 +420,6 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	var param1 interface{} = &httpsProxy
 	var param2 interface{} = &httpProxy
 	cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
-
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {

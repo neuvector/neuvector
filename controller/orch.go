@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/neuvector/k8s"
 	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
 	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
 	"github.com/neuvector/neuvector/controller/resource"
@@ -139,7 +140,7 @@ func (c *orchConn) Start() {
 	}
 
 	r = resource.RscTypeNode
-	if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
+	if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, c.cbWatcherState); err != nil {
 		log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
 
 		if err != resource.ErrMethodNotSupported {
@@ -148,7 +149,7 @@ func (c *orchConn) Start() {
 	}
 
 	r = resource.RscTypeNamespace
-	if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
+	if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, c.cbWatcherState); err != nil {
 		log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
 
 		if err != resource.ErrMethodNotSupported {
@@ -156,15 +157,15 @@ func (c *orchConn) Start() {
 		}
 	}
 
-	rscTypes := make([]string, 0, 5)
-	rscTypes = append(rscTypes, resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC)
-	if Host.Platform == share.PlatformKubernetes {
-		rscTypes = append(rscTypes, resource.RscTypeValidatingWebhookConfiguration)
-	}
+	rscTypes := []string{resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC,
+		resource.RscTypeValidatingWebhookConfiguration}
 	for _, r := range rscTypes {
-		if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, nil); err != nil {
+		if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil); err != nil {
 			log.WithFields(log.Fields{"watch": r, "error": err}).Error()
 		}
+	}
+	if err := global.ORCH.StartWatchResource(resource.RscTypeDeployment, Ctrler.Domain, c.cbResourceWatcher, nil); err != nil {
+		log.WithFields(log.Fields{"watch": resource.RscTypeDeployment, "error": err}).Error()
 	}
 
 	rscTypes = []string{
@@ -182,7 +183,7 @@ func (c *orchConn) Start() {
 
 	if regImage {
 		r = resource.RscTypeImage
-		if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
+		if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, c.cbWatcherState); err != nil {
 			log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
 		}
 	}

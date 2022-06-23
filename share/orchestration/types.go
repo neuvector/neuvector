@@ -57,7 +57,7 @@ type ResourceDriver interface {
 	ListUsers() []UserRBAC
 	RegisterResource(rt string) error
 	ListResource(rt string) ([]interface{}, error)
-	StartWatchResource(rt string, wcb WatchCallback, scb StateCallback) error
+	StartWatchResource(rt, ns string, wcb WatchCallback, scb StateCallback) error
 	StopWatchResource(rt string) error
 	StopWatchAllResources() error
 	GetResource(rt, namespace, name string) (interface{}, error)

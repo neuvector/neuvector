@@ -38,11 +38,13 @@ const (
 	RscTypeRbacClusterRoles               = "clusterroles"
 	RscTypeRbacRolebindings               = "rolebindings"
 	RscTypeRbacClusterRolebindings        = "clusterrolebindings"
+	RscTypeDeployment                     = "deployment"
 )
 
 const (
 	RscNamespaces                          = "namespaces"
 	RscServices                            = "services"
+	RscDeployments                         = "deployments"
 	RscNameMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"   // case sensitive!
 	RscNameValidatingWebhookConfigurations = "validatingwebhookconfigurations" // case sensitive!
 	RscNameCustomResourceDefinitions       = "customresourcedefinitions"       // case sensitive!
@@ -114,6 +116,13 @@ type Pod struct {
 	SA            string // service account of this pod
 	ContainerID   string // workload id
 	Labels        map[string]string
+}
+
+type Deployment struct {
+	UID      string
+	Name     string
+	Domain   string
+	Replicas int32
 }
 
 type ImageTag struct {
