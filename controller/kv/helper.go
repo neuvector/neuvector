@@ -1538,6 +1538,9 @@ func (m clusterHelper) PutFileMonitorProfile(name string, conf *share.CLUSFileMo
 	key := share.CLUSFileMonitorKey(name)
 	value, _ := json.Marshal(conf)
 	m.DuplicateNetworkKey(key, value)
+	if rev == 0 {
+		return cluster.Put(key, value)
+	}
 	return cluster.PutRev(key, value, rev)
 }
 

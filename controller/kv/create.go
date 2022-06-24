@@ -1017,3 +1017,38 @@ func addAdmCtrlStateStatusUri() {
 	}
 	log.Error("failed to update AdmCtrl state")
 }
+
+func addPredefinedFileRule(behavior, path, regexStr string) {
+	tm := time.Now().UTC()
+	fmps := clusHelper.GetAllFileMonitorProfile()
+	for group, fmp := range fmps {
+		if !utils.DoesGroupHavePolicyMode(group) {
+			continue
+		}
+
+		found := false
+		for _, rule := range fmp.Filters {
+			if rule.Path == path {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// file monitor rule
+			flt := share.CLUSFileMonitorFilter{Behavior: behavior, Path: path, Regex: regexStr}
+			flt.Filter = common.FsmonFilterToRest(flt.Path, flt.Regex)
+			fmp.Filters = append(fmp.Filters, flt)
+			clusHelper.PutFileMonitorProfile(group, fmp, 0)
+
+			// file access rule
+			rconf := &share.CLUSFileAccessRule{
+				Filters:    make(map[string]*share.CLUSFileAccessFilterRule),
+				FiltersCRD: make(map[string]*share.CLUSFileAccessFilterRule),
+			}
+			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
+			rconf.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps:make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior,}
+			clusHelper.PutFileAccessRuleIfNotExist(group, rconf)
+		}
+	}
+}
