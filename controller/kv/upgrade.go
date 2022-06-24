@@ -754,7 +754,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"825C9419", createDefWafRuleSensor},
 
-	{"7B3D205C", nil},
+	{"7B3D205C", addFmonRpmPackageDB},
+
+	{"168EE3FA", nil},
 }
 
 func latestKVVersion() string {
@@ -1569,4 +1571,9 @@ func upgradeDlpSensor(cfg *share.CLUSDlpSensor) (bool, bool) {
 func resetDlpCfgType() {
 	clusHelper.GetAllDlpSensors()
 	clusHelper.GetAllGroups(share.ScopeLocal, access.NewReaderAccessControl())
+}
+
+func addFmonRpmPackageDB(){
+	// additional file monitor entry
+	addPredefinedFileRule(share.FileAccessBehaviorMonitor, "/var/lib/rpm/Packages.db", "")
 }
