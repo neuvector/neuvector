@@ -532,7 +532,10 @@ func delProxyMeshMac(c *containerData, withlock bool) {
 	}
 }
 
-func getProxyMeshAppMap(c *containerData) map[share.CLUSProtoPort]*share.CLUSApp {
+func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPort]*share.CLUSApp {
+	if listenAll {
+		return nil
+	}
 	proxyMeshApp := make(map[share.CLUSProtoPort]*share.CLUSApp)
 	for port, app := range c.appMap {
 		proxyMeshApp[port] = app
@@ -586,22 +589,22 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 		//traffic between sidecar proxy and app container cannot be enforced
 		//as regular veth pair, we need to set up iptable rules with NFQUEUE
 		//in container's namespace, and dp need to create nfq handle(nfq_open)
-		proxyMeshApp := getProxyMeshAppMap(c)
+		proxyMeshApp := getProxyMeshAppMap(c, true)
 		if c.nfq == false {
-			err := pipe.CreateNfqRules(c.pid, true, proxyMeshApp)
+			err := pipe.CreateNfqRules(c.pid, 0, true, true, "lo", proxyMeshApp)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create nfq iptable rules")
 			} else {
 				c.nfq = true
 				jumboFrame := gInfo.jumboFrameMTU
 				//create dp nfq handle
-				dp.DPCtrlAddNfqPort(netns, "lo", lo_mac, &jumboFrame)
+				dp.DPCtrlAddNfqPort(netns, "lo", 0, lo_mac, &jumboFrame)
 			}
 		} else {
-			pipe.CreateNfqRules(c.pid, false, proxyMeshApp)
+			pipe.CreateNfqRules(c.pid, 0, false, true, "lo", proxyMeshApp)
 			jumboFrame := gInfo.jumboFrameMTU
 			//create dp nfq handle
-			dp.DPCtrlAddNfqPort(netns, "lo", lo_mac, &jumboFrame)
+			dp.DPCtrlAddNfqPort(netns, "lo", 0, lo_mac, &jumboFrame)
 		}
 	} else {
 		if restore {
@@ -1720,6 +1723,7 @@ func taskStopContainer(id string, pid int) {
 	bench.RemoveContainer(id)
 	prober.HandleAnchorModeChange(false, id, c.upperDir, 0)
 
+	netns := global.SYS.GetNetNamespacePath(c.pid)
 	if !c.hostMode && c.hasDatapath {
 		// Stop monitor interface change before we reconnect the ports
 		prober.StopMonitorInterface(id)
@@ -1733,15 +1737,14 @@ func taskStopContainer(id string, pid int) {
 				}
 			}
 		} else {
-			netns := global.SYS.GetNetNamespacePath(c.pid)
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
-			//POD with proxy injection
-			if gInfo.tapProxymesh {
-				programDelProxyMeshDP(c, netns)
-			}
+		}
+		//POD with proxy injection
+		if gInfo.tapProxymesh {
+			programDelProxyMeshDP(c, netns)
 		}
 	}
 
@@ -1951,6 +1954,7 @@ func containerTaskExit() {
 	}
 	// The following operations are optional
 	for _, c := range gInfo.activeContainers {
+		netns := global.SYS.GetNetNamespacePath(c.pid)
 		if c.inline || c.quar {
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
@@ -1959,16 +1963,14 @@ func containerTaskExit() {
 				}
 			}
 		} else {
-			netns := global.SYS.GetNetNamespacePath(c.pid)
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
-			//POD with proxy injection
-			if gInfo.tapProxymesh {
-				programDelProxyMeshDP(c, netns)
-			}
-
+		}
+		//POD with proxy injection
+		if gInfo.tapProxymesh {
+			programDelProxyMeshDP(c, netns)
 		}
 	}
 }

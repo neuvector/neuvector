@@ -786,6 +786,9 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
             dps->XffApp = sess->xff_app;
             dps->XffPort = sess->xff_port;
         }
+        if (sess->policy_desc.flags & POLICY_DESC_MESH_TO_SVR) {
+            dps->Flags |= DPSESS_FLAG_MESH_TO_SVR;
+        }
     } else {
         dps->EtherType = ETH_P_IPV6;
         memcpy(dps->ClientIP, &c->ip.ip6, 16);
@@ -879,6 +882,9 @@ static void dpi_session_log_from_pkt(dpi_packet_t *p, int to_server, dpi_policy_
         }
         if (desc->flags & POLICY_DESC_SVC_EXTIP) {
             dps->Flags |= DPSESS_FLAG_SVC_EXTIP;
+        }
+        if (desc->flags & POLICY_DESC_MESH_TO_SVR) {
+            dps->Flags |= DPSESS_FLAG_MESH_TO_SVR;
         }
     } else {
         struct ip6_hdr *ip6h = (struct ip6_hdr *)(p->pkt + p->l3);

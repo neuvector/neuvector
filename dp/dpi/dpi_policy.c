@@ -854,6 +854,8 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
     } else {
         int is_internal = dpi_is_ip4_internal(key.dip);
         uint8_t iptype = dpi_ip4_iptype(key.dip);
+        fqdn_ipv4_entry_t *ipv4_ent = NULL;
+        ipv4_ent = rcu_map_lookup(&g_fqdn_hdl->fqdn_ipv4_map, &(key.dip));
 
         //client inside cluster connect to server service
         //with type externalIP has MITM (man in the middle)
@@ -873,7 +875,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         //on k8s platform, we want to learn policy if
         //egress traffic is to host ip
         if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS) &&
-            iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP) {
+            !ipv4_ent && iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP) {
             // east-west egress traffic is always allowed
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;
@@ -954,6 +956,43 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
             policy_eval = 1;
         }
     }
+
+    //this is for istio, return packet from svr shows correct svr ip
+    //instead of 127.0.0.1, so we do a meaningful policy match
+    if(unlikely(FLAGS_TEST(s->flags, DPI_SESS_FLAG_MESH_TO_SVR))) {
+        struct iphdr *iph = (struct iphdr *)(p->pkt + p->l3);
+        if ((iph->saddr == iph->daddr) ||
+            iph->daddr == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(iph->daddr)) ||
+            iph->saddr == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(iph->saddr))) {
+        } else {
+            io_ep_t *pep;
+            dpi_policy_hdl_t *phdl;
+            void *pbuf;
+            uint32_t app = s->app?s->app:(s->base_app?s->base_app:DP_POLICY_APP_UNKNOWN);
+            bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
+            if (isproxymesh) {
+                if (p->ep && !mac_zero(p->ep->pmac.ether_addr_octet)) {
+                    pbuf = rcu_map_lookup(&g_ep_map, &p->ep->pmac);
+                    if (pbuf) {
+                        pep = GET_EP_FROM_MAC_MAP(pbuf);
+                        phdl = (dpi_policy_hdl_t *)pep->policy_hdl;
+                        if (phdl) {
+                            DEBUG_POLICY("MESH_TO_SVR switch policy hdl(%p) to proxymesh orig hdl(%p)\n",hdl, phdl);
+                            hdl = phdl;
+                            dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
+                            if (unlikely((s->policy_desc.action == DP_POLICY_ACTION_CHECK_APP))) {
+                                dpi_policy_lookup(p, hdl, app, to_server, xff, &s->policy_desc, 0);
+                            }
+                            s->policy_desc.flags &= ~(POLICY_DESC_CHECK_VER);
+                            s->policy_desc.flags |= POLICY_DESC_MESH_TO_SVR;
+                            policy_eval = 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     //use original client ip saved in X-Forwarded-For header to match policy
     //this is used to detect traffic from router/ingress via loadbalancer
     if(unlikely(th_xff_enabled && FLAGS_TEST(s->flags, DPI_SESS_FLAG_INGRESS) &&
@@ -974,7 +1013,7 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
                     pep = GET_EP_FROM_MAC_MAP(pbuf);
                     phdl = (dpi_policy_hdl_t *)pep->policy_hdl;
                     if (phdl) {
-                        DEBUG_POLICY("switch policy hdl(%p) to proxymesh orig hdl(%p)\n",hdl, phdl);
+                        DEBUG_POLICY("XFF switch policy hdl(%p) to proxymesh orig hdl(%p)\n",hdl, phdl);
                         hdl = phdl;
                         //check whether dst ip is 127.0.0.x
                         iph = (struct iphdr *)(p->pkt + p->l3);

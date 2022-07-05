@@ -1223,64 +1223,126 @@ func resetIptablesNvRules() {
 	shellCombined(cmd)
 }
 
-func insertIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
+func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
+	var cmd string
 	if appMap == nil || len(appMap) <= 0 {
+		cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
+		shellCombined(cmd)
+		cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
+		shellCombined(cmd)
 		return
 	}
 
-	var cmd string
 	for p, _ := range appMap {
 		if p.IPProto == syscall.IPPROTO_TCP {//tcp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
-			cmd = fmt.Sprintf("iptables -I %v -t filter -p tcp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			}
 			shellCombined(cmd)
-			cmd = fmt.Sprintf("iptables -I %v -t filter -p tcp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			}
 			shellCombined(cmd)
 		} else if p.IPProto == syscall.IPPROTO_UDP {//udp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
-			cmd = fmt.Sprintf("iptables -I %v -t filter -p udp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			}
 			shellCombined(cmd)
-			cmd = fmt.Sprintf("iptables -I %v -t filter -p udp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			}
 			shellCombined(cmd)
 		}
 	}
 }
 
-func checkInsertIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
+func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
+	var cmd string
 	if appMap == nil || len(appMap) <= 0 {
+		cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
+		if _, err := shellCombined(cmd); err != nil {
+			cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
+			shellCombined(cmd)
+		}
+		cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
+		if _, err := shellCombined(cmd); err != nil {
+			cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
+			shellCombined(cmd)
+		}
 		return
 	}
 
-	var cmd string
 	for p, _ := range appMap {
 		if p.IPProto == syscall.IPPROTO_TCP {//tcp
 			//check existence of rule before insert it
-			cmd = fmt.Sprintf("iptables -C %v -t filter -p tcp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			}
 			if _, err := shellCombined(cmd); err != nil {
 				//insert to top of rule list in filter table INPUT and OUTPUT chain
-				cmd = fmt.Sprintf("iptables -I %v -t filter -p tcp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+				if isloopback {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+				} else {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+				}
 				shellCombined(cmd)
 			}
 			//check existence of rule before insert it
-			cmd = fmt.Sprintf("iptables -C %v -t filter -p tcp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			}
 			if _, err := shellCombined(cmd); err != nil {
 				//insert to top of rule list in filter table INPUT and OUTPUT chain
-				cmd = fmt.Sprintf("iptables -I %v -t filter -p tcp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+				if isloopback {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+				} else {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+				}
 				shellCombined(cmd)
 			}
 		} else if p.IPProto == syscall.IPPROTO_UDP {//udp
 			//check existence of rule before insert it
-			cmd = fmt.Sprintf("iptables -C %v -t filter -p udp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+			}
 			if _, err := shellCombined(cmd); err != nil {
 				//insert to top of rule list in filter table INPUT and OUTPUT chain
-				cmd = fmt.Sprintf("iptables -I %v -t filter -p udp --sport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvInputChain, p.Port)
+				if isloopback {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+				} else {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
+				}
 				shellCombined(cmd)
 			}
 			//check existence of rule before insert it
-			cmd = fmt.Sprintf("iptables -C %v -t filter -p udp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+			if isloopback {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			} else {
+				cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+			}
 			if _, err := shellCombined(cmd); err != nil {
 				//insert to top of rule list in filter table INPUT and OUTPUT chain
-				cmd = fmt.Sprintf("iptables -I %v -t filter -p udp --dport %d -j NFQUEUE --queue-num 0 --queue-bypass", nvOutputChain, p.Port)
+				if isloopback {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+				} else {
+					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
+				}
 				shellCombined(cmd)
 			}
 		}
@@ -1301,7 +1363,7 @@ func checkInsertIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
  * iptables -I OUTPUT -j NV_OUTPUT
  * iptables -I INPUT -j NV_INPUT
  */
-func createIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
+func createIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	var cmd string
 	//create custom chains
 	cmd = fmt.Sprintf("iptables -N %v", nvInputChain)
@@ -1314,7 +1376,7 @@ func createIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	cmd = fmt.Sprintf("iptables -A %v -j RETURN", nvOutputChain)
 	shellCombined(cmd)
 
-	insertIptablesNvRules(appMap)
+	insertIptablesNvRules(intf, isloopback, qno, appMap)
 
 	//associate NV_OUTPUT/NV_INPUT with OUTPUT/INPUT chain
 	cmd = fmt.Sprintf("iptables -I INPUT -j %v", nvInputChain)
@@ -1324,7 +1386,7 @@ func createIptablesNvRules(appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 }
 
 //setup iptable rules with NFQUEUE target
-func CreateNfqRules(pid int, create bool, appMap map[share.CLUSProtoPort]*share.CLUSApp) error {
+func CreateNfqRules(pid, qno int, create, isloopback bool, intf string, appMap map[share.CLUSProtoPort]*share.CLUSApp) error {
 	log.WithFields(log.Fields{"pid": pid}).Debug("")
 
 	// Lock the OS Thread so we don't accidentally switch namespaces
@@ -1355,9 +1417,9 @@ func CreateNfqRules(pid int, create bool, appMap map[share.CLUSProtoPort]*share.
 	if create {
 		//create iptable rules
 		resetIptablesNvRules()
-		createIptablesNvRules(appMap)
+		createIptablesNvRules(intf, isloopback, qno, appMap)
 	} else {
-		checkInsertIptablesNvRules(appMap)
+		checkInsertIptablesNvRules(intf, isloopback, qno, appMap)
 	}
 
 	// Switch back to original NS
