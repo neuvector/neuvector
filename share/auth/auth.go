@@ -235,3 +235,5 @@ func (a *remoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAu
 
 	return claims, nil
 }
+
+//TEST
