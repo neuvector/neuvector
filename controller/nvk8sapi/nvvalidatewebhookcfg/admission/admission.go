@@ -55,6 +55,7 @@ type ScannedImageSummary struct {
 	LowVulInfo      []share.CLUSScannedVulInfoSimple    // only care about score
 	SetIDPermCnt    int                                 // setuid and set gid from image scan
 	SecretsCnt      int                                 // secrets from image scan
+	Modules         []*share.ScanModule
 }
 
 type AdmContainerInfo struct {
@@ -380,6 +381,11 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 					},
 				},
 			},
+			share.CriteriaKeyModules: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyModules,
+				Ops:      allSetOps,
+				MatchSrc: api.MatchSrcImage,
+			},
 		}
 	}
 	return admK8sDenyRuleOptions
@@ -493,6 +499,11 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
+			},
+			share.CriteriaKeyModules: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyModules,
+				Ops:      allSetOps,
+				MatchSrc: api.MatchSrcImage,
 			},
 		}
 	}

@@ -798,7 +798,7 @@ func isMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string]strin
 				value = strings.TrimSpace(crtValue[i+1:])
 				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
 				kvMap[key] = append(kvMap[key], "")
 			}
 		}
@@ -873,7 +873,7 @@ func doesComplexMapContain(key, value string, propMap map[string][]string) bool 
 
 func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string][]string) (bool, bool) {
 	if len(propMap) > 0 {
-		kvMap := make(map[string][]string, len(crt.ValueSlice)) // the key=value configured in criteria
+		kvMap := make(map[string][]string) // the key=value configured in criteria
 		for _, crtValue := range crt.ValueSlice {
 			var key, value string
 			if i := strings.Index(crtValue, "="); i >= 0 {
@@ -881,7 +881,7 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 				value = strings.TrimSpace(crtValue[i+1:])
 				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
 				kvMap[key] = append(kvMap[key], "")
 			}
 		}
@@ -1136,6 +1136,15 @@ func isImageCriterionMet(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmC
 	return false, true
 }
 
+func isModulesCriterionMet(crt *share.CLUSAdmRuleCriterion, modules []*share.ScanModule) (bool, bool) {
+	var nameVersionMap map[string][]string = make(map[string][]string)
+	for _, module := range modules {
+		nameVersionMap[module.Name] = append(nameVersionMap[module.Name], module.Version)
+	}
+
+	return isComplexMapCriterionMet(crt, nameVersionMap)
+}
+
 func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]string) map[string][]string {
 	size := len(propFromYaml)
 	if len(propFromImage) > size {
@@ -1279,6 +1288,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			}
 		case share.CriteriaKeyRequestLimit:
 			met, positive = isResourceLimitCriterionMet(crt, c)
+		case share.CriteriaKeyModules:
+			met, positive = isModulesCriterionMet(crt, scannedImage.Modules)
 		default:
 			met, positive = false, true
 		}
