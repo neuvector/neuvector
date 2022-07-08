@@ -798,7 +798,7 @@ func isMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string]strin
 				value = strings.TrimSpace(crtValue[i+1:])
 				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
 				kvMap[key] = append(kvMap[key], "")
 			}
 		}
@@ -881,7 +881,7 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 				value = strings.TrimSpace(crtValue[i+1:])
 				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
 				kvMap[key] = append(kvMap[key], "")
 			}
 		}
