@@ -1042,13 +1042,17 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 			clusHelper.PutFileMonitorProfile(group, fmp, 0)
 
 			// file access rule
-			rconf := &share.CLUSFileAccessRule{
-				Filters:    make(map[string]*share.CLUSFileAccessFilterRule),
-				FiltersCRD: make(map[string]*share.CLUSFileAccessFilterRule),
+			far, rev := clusHelper.GetFileAccessRule(group) // associated with "mon"
+			if far == nil {
+				far = &share.CLUSFileAccessRule{
+					Filters:    make(map[string]*share.CLUSFileAccessFilterRule),
+					FiltersCRD: make(map[string]*share.CLUSFileAccessFilterRule),
+				}
 			}
+
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
-			rconf.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps:make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior,}
-			clusHelper.PutFileAccessRuleIfNotExist(group, rconf)
+			far.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps:make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior,}
+			clusHelper.PutFileAccessRule(group, far, rev)
 		}
 	}
 }
