@@ -152,13 +152,13 @@ static int dp_ring_nfq(int fd, struct nfq_handle *nfq_hdl, struct nfq_q_handle *
     return 0;
 }
 
-int dp_open_nfq_handle(dp_context_t *ctx, bool jumboframe, uint blocks, uint batch)
+int dp_open_nfq_handle(dp_context_t *ctx, int qnum, bool jumboframe, uint blocks, uint batch)
 {
     struct nfq_handle *nfq_hdl;
 	struct nfq_q_handle *nfq_q_hdl;
 	int fd;
     int err;
-	uint32_t nfq_queue_num = 0;
+	uint32_t nfq_queue_num = (uint32_t)qnum;
 
     DEBUG_CTRL("opening nfq handle\n");
 	nfq_hdl = nfq_open();

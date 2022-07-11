@@ -327,6 +327,12 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			sa.external = false
 			sa.workload = true
 			sa.managed = true
+			if conn.MeshToSvr {
+				if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+					conn.ServerWL = ep
+					sa.addrgrp = true
+				}
+			}
 			return &ca, &sa, &stip, true
 		} else if isDeviceIP(net.IP(conn.ServerIP)) {
 			cctx.ConnLog.WithFields(log.Fields{
@@ -341,6 +347,11 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			if svc := getSvcAddrGroup(net.IP(conn.ServerIP), uint16(conn.ServerPort)); svc != nil {
 				conn.ServerWL = svc.group.Name
 				sa.ipsvcgrp = true
+				if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+					conn.ServerWL = ep
+					sa.addrgrp = true
+					return &ca, &sa, &stip, true
+				}
 				// Ignore egress connection to service group that is hidden
 				if isIPSvcGrpHidden(svc) {
 					cctx.ConnLog.WithFields(log.Fields{

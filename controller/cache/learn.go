@@ -178,7 +178,7 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 	// dumpLink(conn.ClientWL, policyLink, conn.ServerWL)
 
 	//no policy match for service mesh with sidecar
-	if !strings.Contains(conn.Network, share.NetworkProxyMesh) || conn.Xff {
+	if !strings.Contains(conn.Network, share.NetworkProxyMesh) || conn.Xff || conn.MeshToSvr {
 		switch conn.PolicyAction {
 		case C.DP_POLICY_ACTION_LEARN:
 			// This is used to create policy.

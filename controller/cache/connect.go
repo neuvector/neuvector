@@ -509,12 +509,13 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"xff":            conn.Xff,
 			"extIP":          conn.SvcExtIP,
 			"toSidecar":      conn.ToSidecar,
+			"meshToSvr":      conn.MeshToSvr,
 		}).Debug()
 
 		addConnectToGraph(conn, ca, sa, stip)
 
 		//add additional conversation link between sidecar and app
-		if strings.Contains(conn.Network, share.NetworkProxyMesh) && !conn.Xff {
+		if strings.Contains(conn.Network, share.NetworkProxyMesh) && !conn.Xff && !conn.MeshToSvr {
 			if conn.Ingress {
 				conn.ClientWL = scwl
 			} else {

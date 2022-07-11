@@ -65,6 +65,7 @@ typedef struct dpi_wing_ {
 #define DPI_SESS_FLAG_IGNOR_PATTERN      0x1000
 #define DPI_SESS_FLAG_XFF                0x2000
 #define DPI_SESS_FLAG_PROXYMESH          0x4000
+#define DPI_SESS_FLAG_MESH_TO_SVR        0x8000
 
 #define DPI_SESS_FLAG_ONLY_PARSER (DPI_SESS_FLAG_FINAL_PARSER | DPI_SESS_FLAG_LAST_PARSER)
 // Either app is ID-ed, or no app can be ID-ed.

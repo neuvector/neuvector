@@ -188,6 +188,11 @@ func dpMsgConnection(msg []byte) {
 			// connection has client->svcExtIP violation
 			cc.SvcExtIP = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_MESH_TO_SVR) != 0 {
+			// appcontainer to sidecar connection has
+			//client to remote svr detection
+			cc.MeshToSvr = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),

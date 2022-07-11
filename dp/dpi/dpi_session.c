@@ -46,6 +46,9 @@ static int session4_proxymesh_match(struct cds_lfht_node *ht_node, const void *k
             s->client.ip.ip4 != htonl(INADDR_LOOPBACK)) {
             s->server.ip.ip4 = k->server.ip.ip4;
             s->server.port = k->server.port;
+            //return packet from svr shows correct svr ip
+            //instead of 127.0.0.1, this is for istio
+            FLAGS_SET(s->flags, DPI_SESS_FLAG_MESH_TO_SVR);
 
             s->policy_desc.flags &= ~(POLICY_DESC_INTERNAL|POLICY_DESC_EXTERNAL);
             if (FLAGS_TEST(s->flags, DPI_SESS_FLAG_INGRESS)) {
