@@ -217,6 +217,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 		} else {
 			sort.Slice(rconf.Webhooks, func(i, j int) bool { return rconf.Webhooks[i].Name < rconf.Webhooks[j].Name })
 		}
+		if !k8sPlatform && scope == share.ScopeLocal {
+			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
+			rconf.ScannerAutoscale.Strategy = api.AutoScaleNA
+		}
 	}
 
 	resp := &api.RESTSystemConfigData{}
@@ -279,6 +283,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						ModeAutoM2P:         rconf.ModeAutoM2P,
 						ModeAutoM2PDuration: rconf.ModeAutoM2PDuration,
 					},
+					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
@@ -1283,6 +1288,55 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					}
 				} else {
 					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
+				}
+			}
+
+			// scanner autoscale
+			if k8sPlatform && rc.ScannerAutoscale != nil {
+				autoscale := rc.ScannerAutoscale
+				if autoscale.Strategy != nil || autoscale.MinPods != nil || autoscale.MaxPods != nil {
+					invalidValue := false
+					strategy := cconf.ScannerAutoscale.Strategy
+					min := cconf.ScannerAutoscale.MinPods
+					max := cconf.ScannerAutoscale.MaxPods
+					if autoscale.MinPods != nil {
+						min = *autoscale.MinPods
+					}
+					if autoscale.MaxPods != nil {
+						max = *autoscale.MaxPods
+					}
+					if max > 128 || max < min || min == 0 {
+						invalidValue = true
+					}
+					if !invalidValue && autoscale.Strategy != nil {
+						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
+							// someone tries to enable autoscaling
+							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, false); err != nil {
+								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
+								return
+							}
+							if min == 0 {
+								min = 3
+							}
+							if max == 0 {
+								max = 3
+							}
+						}
+						strategy = *autoscale.Strategy
+						allowed := utils.NewSet(api.AutoScaleNone, api.AutoScaleImmediate, api.AutoScaleDelayed)
+						if !allowed.Contains(strategy) {
+							invalidValue = true
+						}
+					}
+					if invalidValue {
+						e := "Invalid autoscale value"
+						log.Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return
+					}
+					cconf.ScannerAutoscale.Strategy = strategy
+					cconf.ScannerAutoscale.MinPods = min
+					cconf.ScannerAutoscale.MaxPods = max
 				}
 			}
 		} else if scope == share.ScopeFed && rconf.FedConfig != nil {

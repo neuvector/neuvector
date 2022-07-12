@@ -715,30 +715,40 @@ type CLUSSystemConfig struct {
 	NewServiceProfileBaseline string `json:"new_service_profile_baseline"`
 	UnusedGroupAging          uint8  `json:"unused_group_aging"`
 	CLUSSyslogConfig
-	SingleCVEPerSyslog   bool                 `json:"single_cve_per_syslog"`
-	AuthOrder            []string             `json:"auth_order"`
-	AuthByPlatform       bool                 `json:"auth_by_platform"`
-	RancherEP            string               `json:"rancher_ep"`
-	InternalSubnets      []string             `json:"configured_internal_subnets,omitempty"`
-	WebhookEnable_UNUSED bool                 `json:"webhook_enable"`
-	WebhookUrl_UNUSED    string               `json:"webhook_url"`
-	Webhooks             []CLUSWebhook        `json:"webhooks"`
-	ClusterName          string               `json:"cluster_name"`
-	ControllerDebug      []string             `json:"controller_debug"`
-	TapProxymesh         bool                 `json:"tap_proxymesh"`
-	RegistryHttpProxy    CLUSProxy            `json:"registry_http_proxy"`
-	RegistryHttpsProxy   CLUSProxy            `json:"registry_https_proxy"`
-	IBMSAConfigNV        CLUSIBMSAConfigNV    `json:"ibmsa_config_nv"`
-	IBMSAConfig          CLUSIBMSAConfig      `json:"ibmsa_config"`
-	IBMSAOnboardData     CLUSIBMSAOnboardData `json:"ibmsa_onboard_data"`
-	XffEnabled           bool                 `json:"xff_enabled"`
-	CfgType              TCfgType             `json:"cfg_type"`
-	NetServiceStatus     bool                 `json:"net_service_status"`
-	NetServicePolicyMode string               `json:"net_service_policy_mode"`
-	ModeAutoD2M          bool                 `json:"mode_auto_d2m"`
-	ModeAutoD2MDuration  int64                `json:"mode_auto_d2m_duration"`
-	ModeAutoM2P          bool                 `json:"mode_auto_m2p"`
-	ModeAutoM2PDuration  int64                `json:"mode_auto_m2p_duration"`
+	SingleCVEPerSyslog   bool                      `json:"single_cve_per_syslog"`
+	AuthOrder            []string                  `json:"auth_order"`
+	AuthByPlatform       bool                      `json:"auth_by_platform"`
+	RancherEP            string                    `json:"rancher_ep"`
+	InternalSubnets      []string                  `json:"configured_internal_subnets,omitempty"`
+	WebhookEnable_UNUSED bool                      `json:"webhook_enable"`
+	WebhookUrl_UNUSED    string                    `json:"webhook_url"`
+	Webhooks             []CLUSWebhook             `json:"webhooks"`
+	ClusterName          string                    `json:"cluster_name"`
+	ControllerDebug      []string                  `json:"controller_debug"`
+	TapProxymesh         bool                      `json:"tap_proxymesh"`
+	RegistryHttpProxy    CLUSProxy                 `json:"registry_http_proxy"`
+	RegistryHttpsProxy   CLUSProxy                 `json:"registry_https_proxy"`
+	IBMSAConfigNV        CLUSIBMSAConfigNV         `json:"ibmsa_config_nv"`
+	IBMSAConfig          CLUSIBMSAConfig           `json:"ibmsa_config"`
+	IBMSAOnboardData     CLUSIBMSAOnboardData      `json:"ibmsa_onboard_data"`
+	XffEnabled           bool                      `json:"xff_enabled"`
+	CfgType              TCfgType                  `json:"cfg_type"`
+	NetServiceStatus     bool                      `json:"net_service_status"`
+	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
+	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
+	AutoScaleStrategy    string                    `json:"scanner_autoscale_strategy"`
+	AutoScaleMinScanners uint8                     `json:"min_scanners"`
+	AutoScaleMaxScanners uint8                     `json:"max_scanners"`
+	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
+}
+
+type CLUSSystemConfigAutoscale struct {
+	Strategy string `json:"strategy"`
+	MinPods  uint32 `json:"min_pods"`
+	MaxPods  uint32 `json:"max_pods"`
 }
 
 type CLUSEULA struct {

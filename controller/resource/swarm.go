@@ -74,7 +74,7 @@ func (d *swarm) cpEventCallback(rtev container.Event, id string, pid int) {
 	}
 }
 
-func (d *swarm) StartWatchResource(rt string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
+func (d *swarm) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
 	log.WithFields(log.Fields{"resource": rt}).Debug()
 
 	if rt != RscTypeService {

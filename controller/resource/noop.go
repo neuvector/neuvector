@@ -111,7 +111,7 @@ func (d *noop) ListResource(rt string) ([]interface{}, error) {
 	return nil, ErrMethodNotSupported
 }
 
-func (d *noop) StartWatchResource(rt string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
+func (d *noop) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
 	return ErrMethodNotSupported
 }
 

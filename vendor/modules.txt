@@ -273,6 +273,7 @@ github.com/neuvector/k8s/apis/admissionregistration/v1
 github.com/neuvector/k8s/apis/admissionregistration/v1beta1
 github.com/neuvector/k8s/apis/apiextensions/v1
 github.com/neuvector/k8s/apis/apiextensions/v1beta1
+github.com/neuvector/k8s/apis/apps/v1
 github.com/neuvector/k8s/apis/core/v1
 github.com/neuvector/k8s/apis/meta/v1
 github.com/neuvector/k8s/apis/rbac/v1
