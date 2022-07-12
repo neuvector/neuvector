@@ -253,6 +253,7 @@ type ClusterHelper interface {
 	DuplicateNetworkKey(key string, value []byte) error
 	DuplicateNetworkKeyTxn(txn *cluster.ClusterTransact, key string, value []byte) error
 	RestoreNetworkKeys()
+	DuplicateNetworkSystemKeyTxn(txn *cluster.ClusterTransact, key string, value []byte) error
 
 	// password profile
 	GetAllPwdProfiles(acc *access.AccessControl) map[string]*share.CLUSPwdProfile
@@ -1537,6 +1538,9 @@ func (m clusterHelper) PutFileMonitorProfile(name string, conf *share.CLUSFileMo
 	key := share.CLUSFileMonitorKey(name)
 	value, _ := json.Marshal(conf)
 	m.DuplicateNetworkKey(key, value)
+	if rev == 0 {
+		return cluster.Put(key, value)
+	}
 	return cluster.PutRev(key, value, rev)
 }
 
@@ -2526,6 +2530,19 @@ func (m clusterHelper) RestoreNetworkKeys() {
 			}
 		}
 	}
+}
+
+func (m clusterHelper) DuplicateNetworkSystemKeyTxn(txn *cluster.ClusterTransact, key string, value []byte) error {
+	//restore/import need to duplicate network/system key/value
+	//so that xff status is correctly pushed to dp
+	if (key == share.CLUSConfigSystemKey) {
+		if txn != nil {
+			txn.PutQuiet(share.NetworkSystemKey, value)
+		} else {
+			return cluster.PutQuiet(share.NetworkSystemKey, value)
+		}
+	}
+	return nil
 }
 
 // password profile

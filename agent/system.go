@@ -21,6 +21,7 @@ import (
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/share/container"
 )
 
 var policyApplyDir int
@@ -656,18 +657,22 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 					PolicyRuleIds: nil,
 					PolWafRuleIds: nil,
 					ApplyDir:      policyApplyDir,
-					RuleType:      dre.RuleType,
+				}
+				if dre.RuleType == share.WafWlRuleIn || dre.RuleType == share.WafWlRuleOut {
+					dlpWlRule.WafRuleType = dre.RuleType
+				} else {
+					dlpWlRule.RuleType = dre.RuleType
 				}
 				for _, pair := range c.intcpPairs {
 					dlpWlRule.WorkloadMac = append(dlpWlRule.WorkloadMac, pair.MAC.String())
 					wlmacs.Add(pair.MAC.String())
 				}
-				//traffic between sidecar and service is always considered intra dlpgroup
-				/*if gInfo.tapProxymesh && c.info.ProxyMesh {
+				//we need to detect traffic between sidecar and service container
+				if gInfo.tapProxymesh && c.info.ProxyMesh {
 					lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 					dlpWlRule.WorkloadMac = append(dlpWlRule.WorkloadMac, lomac_str)
 					wlmacs.Add(lomac_str)
-				}*/
+				}
 				if dlpWlRule.WorkloadMac == nil || len(dlpWlRule.WorkloadMac) == 0 {
 					continue
 				}
@@ -716,6 +721,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 					//dlp rule in array is always before waf rule
 					edlpWlRule.WafRuleNames = append(edlpWlRule.WafRuleNames, dlpWlRule.WafRuleNames...)
 					edlpWlRule.PolWafRuleIds = append(edlpWlRule.PolWafRuleIds, dlpWlRule.PolWafRuleIds...)
+					edlpWlRule.WafRuleType = dlpWlRule.WafRuleType
 				}
 			}
 		}

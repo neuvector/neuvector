@@ -279,6 +279,7 @@ func main() {
 
 	withCtlr := flag.Bool("c", false, "Coexist controller and ranger")
 	debug := flag.Bool("d", false, "Enable control path debug")
+	debug_level := flag.String("v", "", "debug level")
 	join := flag.String("j", "", "Cluster join address")
 	adv := flag.String("a", "", "Cluster advertise address")
 	bind := flag.String("b", "", "Cluster bind address")
@@ -296,6 +297,14 @@ func main() {
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 		gInfo.agentConfig.Debug = []string{"ctrl"}
+	}
+
+	if *debug_level != "" {
+		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, strings.Split(*debug_level, " ")...))
+		if !*debug && levels.Contains("ctrl") {
+			levels.Remove("ctrl")
+		}
+		gInfo.agentConfig.Debug = levels.ToStringSlice()
 	}
 
 	agentEnv.kvCongestCtrl = true
@@ -340,6 +349,11 @@ func main() {
 	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, nil)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
+		if err == global.ErrEmptyContainerList {
+			// Temporary get container list error
+			// => exit the process but the container doesn't need to be restarted
+			os.Exit(-1)
+		}
 		os.Exit(-2)
 	}
 

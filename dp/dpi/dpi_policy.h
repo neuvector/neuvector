@@ -30,6 +30,7 @@ typedef struct dpi_policy_desc_ {
 #define POLICY_DESC_UNKNOWN_IP     0x10
 #define POLICY_DESC_SVC_EXTIP      0x20
 #define POLICY_DESC_HOSTIP         0x40
+#define POLICY_DESC_MESH_TO_SVR    0x80
     uint16_t hdl_ver;
     uint32_t order;
 } dpi_policy_desc_t;

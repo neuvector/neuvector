@@ -182,9 +182,11 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	crt := criRT.NewRuntimeServiceClient(cri)
 	req := &criRT.VersionRequest{}
-	ver, err := crt.Version(context.Background(), req)
+	ver, err := crt.Version(ctx, req)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to get crio version")
 		return nil, err
@@ -381,15 +383,17 @@ func (d *crioDriver) isPrivileged(pod *criRT.PodSandboxStatus, cs *criRT.Contain
 // the crio API with specific container ID, we can retrieve the pod container info. The
 // later is usually triggered by process monitoring
 func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
-	crt := criRT.NewRuntimeServiceClient(d.criClient)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	resp_container, err := crt.ListContainers(context.Background(), &criRT.ListContainersRequest{})
+	crt := criRT.NewRuntimeServiceClient(d.criClient)
+	resp_container, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return nil, err
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(context.Background(), &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return nil, err
@@ -436,9 +440,10 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	}
 
 	//////
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	pod, err := crt.PodSandboxStatus(
-		context.Background(), &criRT.PodSandboxStatusRequest{PodSandboxId: sandboxID, Verbose: true})
+	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: sandboxID, Verbose: true})
 	if err != nil || pod.Status == nil {
 		log.WithFields(log.Fields{"container": id, "podID": sandboxID, "error": err}).Error("Fail to get sandbox status")
 		return nil, err
@@ -453,7 +458,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		}
 	}
 
-	cs, err := crt.ContainerStatus(context.Background(), &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
+	cs, err := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
 	if err != nil {
 		// This most likely be a pod
 	} else if cs.Status == nil {
@@ -557,11 +562,13 @@ func (d *crioDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 }
 
 func (d *crioDriver) GetImage(name string) (*ImageMeta, error) {
-	cimg := criRT.NewImageServiceClient(d.criClient)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	cimg := criRT.NewImageServiceClient(d.criClient)
 	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}}
 	// Extra check for resp and resp.Image because of NVSHAS-4778
-	if resp, err := cimg.ImageStatus(context.Background(), req); err == nil && resp != nil && resp.Image != nil {
+	if resp, err := cimg.ImageStatus(ctx, req); err == nil && resp != nil && resp.Image != nil {
 		meta := &ImageMeta{
 			ID:     resp.Image.Id,
 			Size:   int64(resp.Image.Size_),
@@ -584,15 +591,17 @@ func (d *crioDriver) GetImageFile(id string) (io.ReadCloser, error) {
 func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ids := utils.NewSet()
 	stops := utils.NewSet()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	crt := criRT.NewRuntimeServiceClient(d.criClient)
-	resp_containers, err := crt.ListContainers(context.Background(), &criRT.ListContainersRequest{})
+	resp_containers, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return ids, nil
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(context.Background(), &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return ids, nil
@@ -644,7 +653,7 @@ func (d *crioDriver) IsDaemonProcess(proc string, cmds []string) bool {
 }
 
 func (d *crioDriver) IsRuntimeProcess(proc string, cmds []string) bool {
-	return proc == "runc" || proc == "conmon" // an OCI container runtime monitor
+	return proc == "runc" || proc == "crio" || proc == "conmon" // an OCI container runtime monitor
 }
 
 func (d *crioDriver) GetParent(info *ContainerMetaExtra, pidMap map[int]string) (bool, string) {
@@ -677,8 +686,11 @@ func (d *crioDriver) GetStorageDriver() string {
 
 func (d *crioDriver) setPodImageInfo() error {
 	// log.WithFields(log.Fields{"repoDigest": d.podImgRepoDigest}).Debug("CRIO")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cimg := criRT.NewImageServiceClient(d.criClient)
-	if list, err := cimg.ListImages(context.Background(), &criRT.ListImagesRequest{}); err == nil {
+	if list, err := cimg.ListImages(ctx, &criRT.ListImagesRequest{}); err == nil {
 		for _, img := range list.Images {
 			// log.WithFields(log.Fields{"image": img}).Debug("CRIO")
 			for _, repoDig := range img.RepoDigests {

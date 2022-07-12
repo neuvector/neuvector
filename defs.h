@@ -185,12 +185,13 @@ typedef struct {
     uint32_t CurIPSess;
 } DPMsgSessionCount;
 
-#define DPSESS_FLAG_INGRESS   0x01
-#define DPSESS_FLAG_TAP       0x02
-#define DPSESS_FLAG_MID       0x04
-#define DPSESS_FLAG_EXTERNAL  0x08 // remote peer is not local
-#define DPSESS_FLAG_XFF       0x10 // virtual xff connection 
-#define DPSESS_FLAG_SVC_EXTIP 0x20 // service externalIP 
+#define DPSESS_FLAG_INGRESS       0x01
+#define DPSESS_FLAG_TAP           0x02
+#define DPSESS_FLAG_MID           0x04
+#define DPSESS_FLAG_EXTERNAL      0x08 // remote peer is not local
+#define DPSESS_FLAG_XFF           0x10 // virtual xff connection
+#define DPSESS_FLAG_SVC_EXTIP     0x20 // service externalIP
+#define DPSESS_FLAG_MESH_TO_SVR   0x40 // mesh traffic to svr
 
 #define DP_POLICY_APPLY_EGRESS  0x1
 #define DP_POLICY_APPLY_INGRESS 0x2
@@ -393,10 +394,11 @@ typedef struct {
     uint32_t DlpNameHash;
 } DPMsgThreatLog;
 
-#define DPCONN_FLAG_INGRESS   0x01
-#define DPCONN_FLAG_EXTERNAL  0x02
-#define DPCONN_FLAG_XFF       0x04
-#define DPCONN_FLAG_SVC_EXTIP 0x08
+#define DPCONN_FLAG_INGRESS       0x01
+#define DPCONN_FLAG_EXTERNAL      0x02
+#define DPCONN_FLAG_XFF           0x04
+#define DPCONN_FLAG_SVC_EXTIP     0x08
+#define DPCONN_FLAG_MESH_TO_SVR   0x10
 
 typedef struct {
     uint8_t  EPMAC[6];

@@ -534,7 +534,10 @@ func delProxyMeshMac(c *containerData, withlock bool) {
 	}
 }
 
-func getProxyMeshAppMap(c *containerData) map[share.CLUSProtoPort]*share.CLUSApp {
+func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPort]*share.CLUSApp {
+	if listenAll {
+		return nil
+	}
 	proxyMeshApp := make(map[share.CLUSProtoPort]*share.CLUSApp)
 	for port, app := range c.appMap {
 		proxyMeshApp[port] = app
@@ -588,7 +591,7 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 		//traffic between sidecar proxy and app container cannot be enforced
 		//as regular veth pair, we need to set up iptable rules with NFQUEUE
 		//in container's namespace, and dp need to create nfq handle(nfq_open)
-		proxyMeshApp := getProxyMeshAppMap(c)
+		proxyMeshApp := getProxyMeshAppMap(c, true)
 		if c.nfq == false {
 			err := pipe.CreateNfqRules(c.pid, 0, true, true, "lo", proxyMeshApp)
 			if err != nil {
