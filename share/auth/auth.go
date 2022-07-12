@@ -73,7 +73,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 		client.UserFilter = fmt.Sprintf(ldapUserFilter, cldap.UserNameAttr, username)
 	}
 
-	log.WithFields(log.Fields{"filter": client.GroupFilter}).Debug("user query")
+	log.WithFields(log.Fields{"filter": client.UserFilter}).Debug("user query")
 	dn, attrs, err := client.Authenticate(username, password)
 	if err != nil {
 		return nil, nil, err
@@ -83,13 +83,24 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	}
 
 	if cldap.Type == api.ServerLDAPTypeMSAD {
-		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, ldap.EscapeFilter(dn))
+		client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(dn))
 	} else {
 		client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(username))
 	}
 
-	log.WithFields(log.Fields{"filter": client.GroupFilter}).Debug("group member query")
 	groups, _ := client.GetGroupsOfUser()
+	log.WithFields(log.Fields{"filter": client.GroupFilter, "groups": groups}).Debug("group member query")
+
+	// add nested group query for MSAD
+	if cldap.Type == api.ServerLDAPTypeMSAD {
+		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, ldap.EscapeFilter(dn))
+
+		groups2, _ := client.GetGroupsOfUser()
+		log.WithFields(log.Fields{"filter": client.GroupFilter, "groups": groups2}).Debug("nested group member query")
+
+		groups = append(groups, groups2...)
+		groups = removeDuplicateValues(groups)
+	}
 
 	// There is a case (Ticket 1137), where group members are stored with their dn, so if groups are not found,
 	// we try the other way again.
@@ -236,5 +247,15 @@ func (a *remoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAu
 	return claims, nil
 }
 
-//TEST
-//TEST2
+func removeDuplicateValues(strSlice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	for _, entry := range strSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
