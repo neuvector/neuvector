@@ -14,6 +14,10 @@ func (d *kubernetes) isTunnelInterface(name, kind string) bool {
 	if strings.HasPrefix(name, "flannel") && kind == "vxlan" {
 		return true
 	}
+	// cilium_vxlan
+	if strings.HasPrefix(name, "cilium") && kind == "vxlan" {
+		return true
+	}
 	//vxlan.calico i/f is transparent to user so we won't see
 	//workload:ingress as source although it is still act as
 	//a tunnel i/f

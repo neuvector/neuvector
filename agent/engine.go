@@ -109,6 +109,7 @@ type localSystemInfo struct {
 	tapProxymesh    bool
 	jumboFrameMTU   bool
 	xffEnabled      bool
+	ciliumCNI       bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -137,6 +138,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	tapProxymesh:     defaultTapProxymesh,
 	jumboFrameMTU:    false,
 	xffEnabled:       defaultXffEnabled,
+	ciliumCNI:        false,
 }
 
 func gInfoLock() {
@@ -1158,7 +1160,36 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 	}
 }
 
+func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
+	if c.hostMode {
+		return nil, errHostModeUnsupported
+	}
+	// we check parentNS
+	if c.parentNS != "" {
+		return nil, errChildUnsupported
+	}
+
+	log.WithFields(log.Fields{"container": c.id}).Debug("")
+
+	netns := global.SYS.GetNetNamespacePath(c.pid)
+	if !c.quar && !c.inline && restore {
+		for _, pair := range c.intcpPairs {
+			//delete dp nfq handle
+			dp.DPCtrlDelNfqPort(netns, pair.Port)
+		}
+	}
+	//for ciliumCNI we do not pull container ports, only read ports
+	newPairs, err := pipe.InspectContainerPorts(c.pid, c.intcpPairs)
+	if err != nil {
+		log.WithFields(log.Fields{"container": c.id, "error": err}).Error("NFQ Failed to inspect port")
+	}
+	return newPairs, err
+}
+
 func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
+	if driver == pipe.PIPE_CLM {
+		return programNfqPorts(c, restore)
+	}
 	// Platform containers' interfaces should be inspected, so instead of check against hasDatapath,
 	// we check parentNS
 	if c.hostMode {
@@ -1211,7 +1242,83 @@ func programBridge(c *containerData) {
 	}
 }
 
+func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
+	if c.hostMode || !c.hasDatapath {
+	   return
+	}
+
+	log.WithFields(log.Fields{"container": c.id}).Debug("")
+
+	netns := global.SYS.GetNetNamespacePath(c.pid)
+
+	macs := make([]string, len(c.intcpPairs))
+	for i, pair := range c.intcpPairs {
+	   macs[i] = pair.MAC.String()
+	}
+
+	var oldMAC, pMAC net.HardwareAddr
+	tap := false
+	//pass containers IP to ep so that ingress/egress
+	//direction can be decided by comparing src/dst ip
+	//with container IP, nfq packet does not have l2 mac
+	pAddrs := make([]net.IP, 0)
+	for _, pair := range c.intcpPairs {
+		for _, addr := range pair.Addrs {
+			pAddrs = append(pAddrs, addr.IPNet.IP)
+		}
+	}
+	if c.quar || c.inline {
+		proxyMeshApp := getProxyMeshAppMap(c, true)
+		jumboFrame := gInfo.jumboFrameMTU
+		for idx, pair := range c.intcpPairs {
+			if macChangePairs != nil {
+				if oldPair, ok := macChangePairs[pair.Port]; ok {
+					oldMAC = oldPair.MAC
+				}
+			}
+			dp.DPCtrlDelTapPort(netns, pair.Port)
+			dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, pAddrs)
+			idx++
+			if c.nfq == false {
+				err := pipe.CreateNfqRules(c.pid, idx, true, false, pair.Port, proxyMeshApp)
+				if err != nil {
+					log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create nfq iptable rules")
+				} else {
+					c.nfq = true
+					//create dp nfq handle
+					dp.DPCtrlAddNfqPort(netns, pair.Port, idx, pair.MAC, &jumboFrame)
+				}
+			} else {
+				pipe.CreateNfqRules(c.pid, idx, false, false, pair.Port, proxyMeshApp)
+				//create dp nfq handle
+				dp.DPCtrlAddNfqPort(netns, pair.Port, idx, pair.MAC, &jumboFrame)
+			}
+		}
+	} else {
+	   for _, pair := range c.intcpPairs {
+		  if macChangePairs != nil {
+			 if oldPair, ok := macChangePairs[pair.Port]; ok {
+				oldMAC = oldPair.MAC
+			 }
+		  }
+		  dp.DPCtrlAddTapPort(netns, pair.Port, pair.MAC)
+		  dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, nil)
+	   }
+	   tap = true
+	}
+	if cfgApp {
+	   dp.DPCtrlConfigMAC(macs, &tap, c.appMap)
+	} else {
+	   dp.DPCtrlConfigMAC(macs, &tap, nil)
+	}
+ }
+
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
+	if driver == pipe.PIPE_CLM {
+		programNfqDP(c, cfgApp, macChangePairs)
+		return
+	}
+
 	if c.hostMode || !c.hasDatapath {
 		return
 	}
@@ -1684,6 +1791,19 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	}
 }
 
+func delProgramNfqDP(c *containerData, ns string) {
+	log.WithFields(log.Fields{"pid": c.pid}).Debug("")
+
+	for _, pair := range c.intcpPairs {
+		//delete dp nfq handle
+		dp.DPCtrlDelNfqPort(ns, pair.Port)
+	}
+
+	//delete dp nfq handle if any then reset iptable rules
+	pipe.DeleteNfqRules(c.pid)
+	c.nfq = false
+}
+
 func taskStopContainer(id string, pid int) {
 	if c, ok := gInfo.neuContainers[id]; ok {
 		stopNeuVectorMonitor(c)
@@ -1729,7 +1849,9 @@ func taskStopContainer(id string, pid int) {
 		prober.StopMonitorInterface(id)
 
 		if c.inline || c.quar {
-			pipe.CleanupContainer(c.pid, c.intcpPairs)
+			if driver != pipe.PIPE_CLM {
+				pipe.CleanupContainer(c.pid, c.intcpPairs)
+			}
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 				if driver == pipe.PIPE_NOTC {
@@ -1741,6 +1863,9 @@ func taskStopContainer(id string, pid int) {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
+		}
+		if driver == pipe.PIPE_CLM {
+			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
 		if gInfo.tapProxymesh {
@@ -1814,7 +1939,7 @@ func taskDPConnect() {
 	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 	dp.DPCtrlConfigSpecialIPSubnet(specialSubnets)
 
-	if driver != pipe.PIPE_NOTC {
+	if driver != pipe.PIPE_NOTC && driver != pipe.PIPE_CLM {
 		jumboFrame := gInfo.jumboFrameMTU
 		dp.DPCtrlAddSrvcPort(nvSvcPort, &jumboFrame)
 	}
@@ -1948,8 +2073,10 @@ func containerTaskExit() {
 
 		prober.StopMonitorInterface(c.id)
 		if c.inline || c.quar {
-			log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
-			pipe.RestoreContainer(c.pid, c.intcpPairs)
+			if driver != pipe.PIPE_CLM {
+				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
+				pipe.RestoreContainer(c.pid, c.intcpPairs)
+			}
 		}
 	}
 	// The following operations are optional
@@ -1967,6 +2094,9 @@ func containerTaskExit() {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
+		}
+		if driver == pipe.PIPE_CLM {
+			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
 		if gInfo.tapProxymesh {

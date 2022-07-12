@@ -73,7 +73,7 @@ func isAgentContainer(id string) bool {
 
 func getHostIPs() {
 	addrs := getHostAddrs()
-	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU = parseHostAddrs(addrs, Host.Platform, Host.Network)
+	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
 		Host.TunnelIP = tun
 	}
@@ -476,9 +476,13 @@ func main() {
 		driver = pipe.PIPE_NOTC
 	} else {
 		driver = pipe.PIPE_TC
+		if gInfo.ciliumCNI {
+			driver = pipe.PIPE_CLM
+		} else {
+			driver = pipe.PIPE_TC
+		}
 	}
-	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU}).Info("")
-
+	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU, "ciliumCNI": gInfo.ciliumCNI}).Info("")
 	if nvSvcPort, nvSvcBrPort, err = pipe.Open(driver, cnet_type, Agent.Pid, gInfo.jumboFrameMTU); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to open pipe driver")
 		os.Exit(-2)
@@ -670,7 +674,7 @@ func main() {
 
 	waitContainerTaskExit()
 
-	if driver != pipe.PIPE_NOTC {
+	if driver != pipe.PIPE_NOTC  && driver != pipe.PIPE_CLM {
 		dp.DPCtrlDelSrvcPort(nvSvcPort)
 	}
 

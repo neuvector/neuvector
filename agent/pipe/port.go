@@ -46,6 +46,7 @@ const (
 	PIPE_TC   = "tc"
 	PIPE_OVS  = "ovs"
 	PIPE_NOTC = "no_tc"
+	PIPE_CLM  = "clm"
 )
 
 var ErrNoDefaultRoute = errors.New("No default route")
@@ -1524,6 +1525,8 @@ func Open(driver string, cnet_type *string, pid int, jumboframe bool) (string, s
 		piper = &tcPipe
 	case PIPE_NOTC:
 		piper = &notcPipe
+	case PIPE_CLM:
+		piper = &clmPipe
 	default:
 		piper = &tcPipe
 	}
