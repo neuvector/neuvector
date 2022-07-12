@@ -1268,7 +1268,7 @@ func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe
 		}
 	}
 	if c.quar || c.inline {
-		proxyMeshApp := getProxyMeshAppMap(c)
+		proxyMeshApp := getProxyMeshAppMap(c, true)
 		jumboFrame := gInfo.jumboFrameMTU
 		for idx, pair := range c.intcpPairs {
 			if macChangePairs != nil {
