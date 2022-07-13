@@ -35,6 +35,10 @@ func (d *kubernetes) isTunnelInterface(name, kind string) bool {
 	if name == "cbr0" && kind == "bridge" {
 		return true
 	}
+	//kube-router CNI
+	if name == "kube-bridge" && kind == "bridge" {
+		return true
+	}
 	//NVSHAS-5338, ubuntu with containerd in gke set up
 	//has veth interface work as ingress, need to add
 	//veth's ip as tunnel ip
