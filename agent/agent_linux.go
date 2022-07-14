@@ -73,6 +73,10 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 			if platform == share.PlatformKubernetes && strings.HasPrefix(name, "cni") {
 				continue
 			}
+			//kube-router CNI
+			if platform == share.PlatformKubernetes && name == "kube-bridge" {
+				continue
+			}
 
 			for _, addr := range iface.Addrs {
 				if utils.IsIPv4(addr.IPNet.IP) {
