@@ -14,6 +14,8 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
@@ -46,7 +48,7 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	// This lock is shared between goroutines handle this queue only, so it is ok to wait long
 	lock, err := clusHelper.AcquireLock(share.CLUSLockCrdQueueKey, time.Minute*5)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Crd dequeue Acquire crd lock error")
+		log.WithFields(log.Fields{"error": err}).Error("Crd enqueue Acquire crd lock error")
 		return err
 	}
 	defer clusHelper.ReleaseLock(lock)
@@ -54,26 +56,19 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	var crdQueue share.CLUSCrdRecord
 	crdQueue.CrdRecord = ar
 	if err := clusHelper.PutCrdRecord(&crdQueue, name); err != nil {
-		log.WithFields(log.Fields{"Enqueu crd put error": err}).Error("")
+		log.WithFields(log.Fields{"Enqueu crd put error": err}).Error()
 		return err
 	}
 
 	// second save the unique name of the crd event in the queue for orderly process
 	crdEventQueue := clusHelper.GetCrdEventQueue()
-
 	if crdEventQueue == nil {
-		var crdEventQueue share.CLUSCrdEventRecord
-		crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
-		if err := clusHelper.PutCrdEventQueue(&crdEventQueue); err != nil {
-			log.WithFields(log.Fields{"Enqueu crd event put error": err}).Error("")
-			return err
-		}
-	} else {
-		crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
-		if err := clusHelper.PutCrdEventQueue(crdEventQueue); err != nil {
-			log.WithFields(log.Fields{"Enqueu crd event put error": err}).Error("")
-			return err
-		}
+		crdEventQueue = new(share.CLUSCrdEventRecord)
+	}
+	crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
+	if err := clusHelper.PutCrdEventQueue(crdEventQueue); err != nil {
+		log.WithFields(log.Fields{"Enqueu crd event put error": err}).Error()
+		return err
 	}
 	return nil
 }
@@ -86,9 +81,9 @@ func CrdQueueProc() {
 	for {
 		select {
 		case <-crdEventProcTicker.C:
-			// after weak up the thread will gry to drain crd event queue
+			// after wake-up the thread will try to drain crd event queue
 		NEXT_CRD:
-			// add peak at beginning to avoid lock everytime.
+			// add peek at beginning to avoid lock everytime.
 			crdEventQueue := clusHelper.GetCrdEventQueue()
 			if crdEventQueue == nil || len(crdEventQueue.CrdEventRecord) == 0 {
 				continue
@@ -114,14 +109,14 @@ func CrdQueueProc() {
 				crdEventQueue.CrdEventRecord = nil
 			}
 			if err := clusHelper.PutCrdEventQueue(crdEventQueue); err != nil {
-				log.WithFields(log.Fields{"Dequeu crd event put error": err}).Error("")
+				log.WithFields(log.Fields{"Dequeu crd event put error": err}).Error()
 				clusHelper.ReleaseLock(lock)
 				continue
 			}
 			// Second use the name go get the content of the crd
 			crdProcRecord := clusHelper.GetCrdRecord(name)
 			if crdProcRecord == nil {
-				log.WithFields(log.Fields{"Dequeu  crd can't find record": name}).Error("")
+				log.WithFields(log.Fields{"Dequeu  crd can't find record": name}).Error()
 				clusHelper.ReleaseLock(lock)
 				continue
 			}
@@ -168,7 +163,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 	} else {
 		if whsvr.dumpRequestObj && ar.Request.Operation != admissionv1beta1.Delete {
 			if b, err := json.Marshal(ar); err == nil {
-				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug("")
+				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug()
 			}
 		}
 		if (ar.Request == nil || len(ar.Request.Object.Raw) == 0) && (ar.Request.Operation != admissionv1beta1.Delete) {
@@ -177,13 +172,37 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 
-		var dryRun bool
+		var sizeErrMsg string
+		if len(body) > cluster.KVValueSizeMax {
+			crdRecord := share.CLUSCrdRecord{CrdRecord: &ar}
+			value, _ := json.Marshal(crdRecord)
+			if len(value) >= cluster.KVValueSizeMax {
+				zb := utils.GzipBytes(value)
+				if len(zb) >= cluster.KVValueSizeMax {
+					var name string
+					if ar.Request != nil {
+						name = ar.Request.Name
+					}
+					sizeErrMsg = fmt.Sprintf("CRD resource size(%d) is too big", len(body))
+					log.WithFields(log.Fields{"name": name, "size": len(value), "compressed": len(zb)}).Error(sizeErrMsg)
+				}
+			}
+		}
+
+		var skip bool
+		var allowed bool
 		var resultMsg string
-		if ar.Request.DryRun != nil && *ar.Request.DryRun {
-			dryRun = true
-			resultMsg = fmt.Sprintf(" %s denied in dry-run", ar.Request.Operation)
+		if len(sizeErrMsg) > 0 {
+			skip = true
+			resultMsg = fmt.Sprintf(" %s denied: %s", ar.Request.Operation, sizeErrMsg)
 		} else {
-			resultMsg = fmt.Sprintf(" %s done", ar.Request.Operation)
+			if ar.Request.DryRun != nil && *ar.Request.DryRun {
+				skip = true
+				resultMsg = fmt.Sprintf(" %s denied in dry-run", ar.Request.Operation)
+			} else {
+				allowed = true
+				resultMsg = fmt.Sprintf(" %s done", ar.Request.Operation)
+			}
 		}
 
 		admissionReview := admissionv1beta1.AdmissionReview{
@@ -192,7 +211,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				APIVersion: resource.AdmissionK8sIoV1Beta1, // [2021/09/21] currently our webhook server only support k8s.io/api/admission/v1beta1
 			},
 			Response: &admissionv1beta1.AdmissionResponse{
-				Allowed: !dryRun,
+				Allowed: allowed,
 				Result:  &metav1.Status{Message: resultMsg},
 				UID:     ar.Request.UID,
 			},
@@ -208,7 +227,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 
-		if !dryRun {
+		if !skip {
 			// Return the rest call early to prevent webhookvalidating timeout
 			// use gorutines to do the enqueue as it need wait in lock write to kv to mantaine order
 			go crdProcEnqueue(&ar)
