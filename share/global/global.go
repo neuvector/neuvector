@@ -19,6 +19,7 @@ type orchHub struct {
 }
 
 var ErrEmptyContainerList = errors.New("Container list is empty")
+var ErrContainerNotFound = errors.New("Failed to find container")
 
 type RegisterDriverFunc func(platform, flavor, network string) orchAPI.ResourceDriver
 
@@ -177,4 +178,38 @@ func getPlatform(containers []*container.ContainerMeta) (string, string, string)
 	}
 
 	return platform, flavor, network
+}
+
+func IdentifyK8sContainerID(id string) (string, error) {
+	var podname string
+	for i := 0; i < 4; i++ {
+		if containers, err := RT.ListContainers(true); err == nil {
+			// (1) identify it is a POD or container
+			for _, c := range containers {
+				if strings.HasPrefix(c.Name, "k8s_POD") {
+					// parent: POD
+					if c.ID == id {
+						podname, _ = c.Labels[container.KubeKeyPodName]
+						break
+					}
+				} else {
+					// found: it is a child, container
+					if c.ID == id {
+						return c.ID, nil
+					}
+				}
+			}
+
+			// (2) search its child pod
+			for _, c := range containers {
+				if !strings.HasPrefix(c.Name, "k8s_POD") {
+					if name, ok := c.Labels[container.KubeKeyPodName]; ok && (name == podname) {
+						return c.ID, nil
+					}
+				}
+			}
+		}
+		time.Sleep(time.Millisecond * 250)
+	}
+	return id, ErrContainerNotFound
 }
