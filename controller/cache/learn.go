@@ -1175,7 +1175,7 @@ func SyncLearnedPolicyFromCluster() {
 func cbDeleteNode(node string) {
 	// Only delete learned policies if endpoint is unmanaged, host:x.x.x.x or workload:x.x.x.x,
 	// user created rule will not be deleted.
-	if isHostOrUnmanagedWorkload(node) ||
+	if (isHostOrUnmanagedWorkload(node) && !strings.Contains(node, api.EndpointIngress)) ||
 		strings.HasPrefix(node, api.LearnedSvcGroupPrefix) {
 		unlearnAll(node)
 	}
