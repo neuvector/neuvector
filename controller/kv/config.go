@@ -407,6 +407,7 @@ func getFedRole() (string, *share.CLUSFedRulesRevision) {
 	return fedRole, data
 }
 
+// the written-to-file exported values are always in text format
 func (c *configHelper) Export(w *bufio.Writer, sections utils.Set) error {
 	log.WithFields(log.Fields{"sections": sections}).Debug()
 
@@ -500,6 +501,7 @@ func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, local
 	return nil
 }
 
+// value of each key in the file is always in text format (i.e. non-gzip format). Compress it if it's >= 512k before importing to kv
 func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, importTask *share.CLUSImportTask,
 	revertFedRoles RevertFedRolesFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, watcherPaused *bool, ignoreFed bool) error {
 	log.Debug()
@@ -692,8 +694,13 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				} else {
 					clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
 					//for CLUSConfigSystemKey only
-					clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)					
-					txn.Put(key, array)
+					clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+					if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
+						zb := utils.GzipBytes(array)
+						txn.PutBinary(key, zb)
+					} else {
+						txn.Put(key, array)
+					}
 					if txn.Size() >= 64 || (ep.name == share.CFGEndpointAdmissionControl && key == "object/config/admission_control/default/state") {
 						applyTransaction(txn, importTask, true, processedLines)
 						if ep.name == share.CFGEndpointAdmissionControl && key == "object/config/admission_control/default/state" {

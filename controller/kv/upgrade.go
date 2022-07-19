@@ -565,37 +565,38 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	}
 	var v interface{}
 	var wrt bool
-	var unzipped bool = false
-	var uzb []byte
+	var policyListKey bool
+	var crdKey bool
 
 	if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
-		//do unzip first for rulelist
-		uzb = utils.GunzipBytes(value)
-		if uzb == nil {
-			log.Error("Failed to unzip data")
-			return value, nil, false
-		} else {
-			v, wrt = doUpgrade(key, uzb)
-			unzipped = true
-		}
-	} else {
-		v, wrt = doUpgrade(key, value)
+		policyListKey = true
 	}
+	if strings.HasPrefix(key, share.CLUSCrdProcStore) || strings.HasPrefix(key, share.CLUSConfigCrdStore) {
+		crdKey = true
+	}
+	// [31, 139] is the first 2 bytes of gzip-format data
+	if policyListKey || (crdKey && len(value) >= 2 && value[0] == 31 && value[1] == 139) {
+		if value = utils.GunzipBytes(value); value == nil {
+			log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
+			return value, nil, false
+		}
+	}
+	v, wrt = doUpgrade(key, value)
 
 	if v != nil && wrt {
-		if !unzipped {
-			// Write back to the cluster if needed.
-			newv, _ := json.Marshal(v)
-			if err := cluster.Put(key, newv); err != nil {
-				wrt = false
-			}
+		var err error
+		newv, _ := json.Marshal(v)
+		// currently we only zip nw policy rulelist & longer-than-512k-crd-keys
+		if policyListKey || (crdKey && len(newv) >= cluster.KVValueSizeMax) { // 512 * 1024
+			new_zb := utils.GzipBytes(newv)
+			err = cluster.PutBinary(key, new_zb)
 		} else {
-			//need to zip rulelist before put to cluster
-			tmpv, _ := json.Marshal(v)
-			new_zb := utils.GzipBytes(tmpv)
-			if err := cluster.PutBinary(key, new_zb); err != nil {
-				wrt = false
-			}
+			// Write back to the cluster if needed.
+			err = cluster.Put(key, newv)
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"key": key}).Error(err)
+			wrt = false
 		}
 	} else {
 		wrt = false
@@ -654,12 +655,7 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	}
 
 	if v == nil {
-		if !unzipped {
-			return value, nil, wrt
-		} else {
-			//return unzipped rulelist
-			return uzb, nil, wrt
-		}
+		return value, nil, wrt
 	} else {
 		value, err := json.Marshal(v)
 		return value, err, wrt
@@ -1573,7 +1569,7 @@ func resetDlpCfgType() {
 	clusHelper.GetAllGroups(share.ScopeLocal, access.NewReaderAccessControl())
 }
 
-func addFmonRpmPackageDB(){
+func addFmonRpmPackageDB() {
 	// additional file monitor entry
 	addPredefinedFileRule(share.FileAccessBehaviorMonitor, "/var/lib/rpm/Packages.db", "")
 }

@@ -381,8 +381,30 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 		var wrt bool
 		if value, err, wrt = UpgradeAndConvert(key, value); wrt {
 			value, rev, err = cluster.GetRev(key)
+			// [31, 139] is the first 2 bytes of gzip-format data
+			if len(value) >= 2 && value[0] == 31 && value[1] == 139 &&
+				(strings.HasPrefix(key, share.CLUSCrdProcStore) || strings.HasPrefix(key, share.CLUSConfigCrdStore)) {
+				value = utils.GunzipBytes(value)
+				if value == nil {
+					err = fmt.Errorf("Failed to unzip data")
+				}
+			}
 		}
 		return value, rev, err
+	}
+}
+
+func (m clusterHelper) putSizeAware(key string, value []byte) error {
+	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
+		zb := utils.GzipBytes(value)
+		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
+			err := fmt.Errorf("zip data(%d) too big", len(zb))
+			log.WithFields(log.Fields{"key": key}).Error(err)
+			return err
+		}
+		return cluster.PutBinary(key, zb)
+	} else {
+		return cluster.Put(key, value)
 	}
 }
 
@@ -1821,7 +1843,7 @@ func (m clusterHelper) DeleteAdmissionRule(admType, ruleType string, id uint32) 
 func (m clusterHelper) GetAdmissionStatsRev() (*share.CLUSAdmissionStats, uint64) {
 	stats := share.CLUSAdmissionStats{}
 	key := share.CLUSAdmissionStatsKey(share.DefaultPolicyName)
-	if value, rev, _ := cluster.GetRev(key); value != nil {
+	if value, rev, _ := m.get(key); value != nil {
 		json.Unmarshal(value, &stats)
 		return &stats, rev
 	}
@@ -1873,7 +1895,7 @@ func (m clusterHelper) GetCrdSecurityRuleRecord(crdKind, crdName string) *share.
 func (m clusterHelper) PutCrdSecurityRuleRecord(crdKind, crdName string, rules *share.CLUSCrdSecurityRule) error {
 	key := share.CLUSCrdKey(crdKind, crdName)
 	value, _ := json.Marshal(rules)
-	return cluster.Put(key, value)
+	return m.putSizeAware(key, value)
 }
 
 func (m clusterHelper) DeleteCrdSecurityRuleRecord(crdKind, crdName string) error {
@@ -1882,7 +1904,6 @@ func (m clusterHelper) DeleteCrdSecurityRuleRecord(crdKind, crdName string) erro
 }
 
 func (m clusterHelper) GetCrdSecurityRuleRecordList(crdKind string) map[string]*share.CLUSCrdSecurityRule {
-	//	key := share.CLUSCrdKey(crdKind, crdName)
 	records := make(map[string]*share.CLUSCrdSecurityRule, 0)
 	store := share.CLUSConfigCrdStore
 	keys, _ := cluster.GetStoreKeys(store)
@@ -1901,7 +1922,7 @@ func (m clusterHelper) GetCrdSecurityRuleRecordList(crdKind string) map[string]*
 
 // Mult-clusters (Federation)
 func (m clusterHelper) GetFedMembership() *share.CLUSFedMembership {
-	if value, _ := cluster.Get(share.CLUSFedMembershipKey); value != nil {
+	if value, _, _ := m.get(share.CLUSFedMembershipKey); value != nil {
 		s := share.CLUSFedMembership{}
 		dec.Unmarshal(value, &s)
 		return &s
@@ -1920,7 +1941,7 @@ func (m clusterHelper) PutFedMembership(s *share.CLUSFedMembership) error {
 }
 
 func (m clusterHelper) GetFedJointClusterList() *share.CLUSFedJoinedClusterList {
-	if value, _ := cluster.Get(share.CLUSFedClustersListKey); value != nil {
+	if value, _, _ := m.get(share.CLUSFedClustersListKey); value != nil {
 		clusters := share.CLUSFedJoinedClusterList{}
 		json.Unmarshal(value, &clusters)
 		return &clusters
@@ -1958,7 +1979,7 @@ func (m clusterHelper) DeleteFedJointClusterStatus(id string) error {
 
 func (m clusterHelper) GetFedJointCluster(id string) *share.CLUSFedJointClusterInfo {
 	key := share.CLUSFedJointClusterKey(id)
-	if value, _ := cluster.Get(key); value != nil {
+	if value, _, _ := m.get(key); value != nil {
 		cluster := share.CLUSFedJointClusterInfo{}
 		dec.Unmarshal(value, &cluster)
 		return &cluster
@@ -1985,7 +2006,7 @@ func (m clusterHelper) DeleteFedJointCluster(id string) error {
 }
 
 func (m clusterHelper) GetFedRulesRevisionRev() (*share.CLUSFedRulesRevision, uint64) {
-	if value, rev, _ := cluster.GetRev(share.CLUSFedRulesRevisionKey); value != nil {
+	if value, rev, _ := m.get(share.CLUSFedRulesRevisionKey); value != nil {
 		revisions := share.CLUSFedRulesRevision{}
 		json.Unmarshal(value, &revisions)
 		return &revisions, rev
@@ -2321,7 +2342,7 @@ func (m clusterHelper) GetCrdRecord(name string) *share.CLUSCrdRecord {
 func (m clusterHelper) PutCrdRecord(record *share.CLUSCrdRecord, name string) error {
 	key := share.CLUSCrdQueueKey(name)
 	value, _ := json.Marshal(record)
-	return cluster.Put(key, value)
+	return m.putSizeAware(key, value)
 }
 
 func (m clusterHelper) DeleteCrdRecord(name string) error {
@@ -2342,7 +2363,7 @@ func (m clusterHelper) GetCrdEventQueue() *share.CLUSCrdEventRecord {
 func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error {
 	key := share.CLUSCrdProcStore
 	value, _ := json.Marshal(record)
-	return cluster.Put(key, value)
+	return m.putSizeAware(key, value)
 }
 
 func (m clusterHelper) DeleteAwsProjectCfg(projectName string) error {
@@ -2535,7 +2556,7 @@ func (m clusterHelper) RestoreNetworkKeys() {
 func (m clusterHelper) DuplicateNetworkSystemKeyTxn(txn *cluster.ClusterTransact, key string, value []byte) error {
 	//restore/import need to duplicate network/system key/value
 	//so that xff status is correctly pushed to dp
-	if (key == share.CLUSConfigSystemKey) {
+	if key == share.CLUSConfigSystemKey {
 		if txn != nil {
 			txn.PutQuiet(share.NetworkSystemKey, value)
 		} else {
@@ -2595,7 +2616,7 @@ func (m clusterHelper) DeletePwdProfile(name string) error {
 }
 
 func (m clusterHelper) GetActivePwdProfileName() string {
-	if value, _ := cluster.Get(share.CLUSConfigPwdProfileStore); value != nil {
+	if value, _, _ := m.get(share.CLUSConfigPwdProfileStore); value != nil {
 		var cfg share.CLUSActivePwdProfileConfig
 		json.Unmarshal(value, &cfg)
 		return cfg.Name
