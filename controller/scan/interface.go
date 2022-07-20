@@ -188,6 +188,7 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			Labels:          make(map[string]string, len(s.cache.labels)),
 			SecretsCnt:      len(s.cache.secrets),
 			SetIDPermCnt:    len(s.cache.setIDPerm),
+			Modules:		 s.cache.modules,
 		}
 		for _, v := range s.cache.vulTraits {
 			if !v.IsFiltered() {
