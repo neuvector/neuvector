@@ -143,6 +143,9 @@ type RESTRiskScoreMetrics struct {
 	DiscoverGroups   int    `json:"discover_groups"`
 	MonitorGroups    int    `json:"monitor_groups"`
 	ProtectGroups    int    `json:"protect_groups"`
+	DiscoverGroupsZD int    `json:"discover_groups_zero_drift"`
+	MonitorGroupsZD  int    `json:"monitor_groups_zero_drift"`
+	ProtectGroupsZD  int    `json:"protect_groups_zero_drift"`
 	Groups           int    `json:"groups"`
 	RunningPods      int    `json:"running_pods"`
 	PrivilegedWLs    int    `json:"privileged_wls"`

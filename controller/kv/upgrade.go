@@ -16,7 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/share"
@@ -59,7 +59,7 @@ func upgradeSystemConfig(cfg *share.CLUSSystemConfig) (bool, bool) {
 		upd = true
 	} else {
 		blValue := strings.ToLower(cfg.NewServiceProfileBaseline)
-		if blValue == share.ProfileDefault || blValue == share.ProfileShield {
+		if blValue == share.ProfileDefault_UNUSED || blValue == share.ProfileShield_UNUSED {
 			blValue = share.ProfileZeroDrift
 		}
 		if blValue != cfg.NewServiceProfileBaseline {
@@ -295,7 +295,7 @@ func upgradeProcessProfile(cfg *share.CLUSProcessProfile) (bool, bool) {
 			upd = true
 		} else {
 			blValue := strings.ToLower(cfg.Baseline)
-			if blValue == share.ProfileDefault || blValue == share.ProfileShield {
+			if blValue == share.ProfileDefault_UNUSED || blValue == share.ProfileShield_UNUSED {
 				blValue = share.ProfileZeroDrift
 			}
 			if blValue != cfg.Baseline {

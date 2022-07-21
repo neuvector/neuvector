@@ -4,6 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/url"
+	"os"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/ghodss/yaml"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -13,13 +21,6 @@ import (
 	"github.com/neuvector/neuvector/share/auth"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
-	"net"
-	"net/url"
-	"os"
-	"strings"
-	"syscall"
-	"time"
 )
 
 const ldapconfigmap string = "/etc/config/ldapinitcfg.yaml"
@@ -287,7 +288,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		switch blValue {
 		case share.ProfileBasic:
 			cconf.NewServiceProfileBaseline = share.ProfileBasic
-		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+		case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
 			cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
 		default:
 			e := "Invalid new service profile baseline"

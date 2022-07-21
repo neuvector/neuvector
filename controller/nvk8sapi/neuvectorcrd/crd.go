@@ -8,9 +8,10 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"encoding/json"
+
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/share"
@@ -37,7 +38,7 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.AdmClientModeSvc, share.AdmClientModeUrl,
 		share.AdmCtrlActionAllow, share.AdmCtrlActionDeny,
 		share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce, share.PolicyModeUnavailable,
-		share.ProfileBasic, share.ProfileZeroDrift, share.ProfileDefault, share.ProfileShield,
+		share.ProfileBasic, share.ProfileZeroDrift, share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED,
 		share.FileAccessBehaviorMonitor, share.FileAccessBehaviorBlock,
 		share.DlpPatternContextURI, share.DlpPatternContextHEAD, share.DlpPatternContextBODY, share.DlpPatternContextPACKET,
 		share.CriteriaOpRegex, share.CriteriaOpNotRegex, share.DlpRuleKeyPattern,
@@ -351,8 +352,8 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 								Enum: []*apiextv1.JSON{
 									&apiextv1.JSON{Raw: b.enumMap[share.ProfileBasic]},
 									&apiextv1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileDefault]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileShield]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
+									&apiextv1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
 						},
@@ -453,8 +454,8 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 								Enum: []*apiextv1b1.JSON{
 									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileBasic]},
 									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
+									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
 						},
