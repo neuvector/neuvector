@@ -1042,7 +1042,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		switch blValue {
 		case share.ProfileBasic:
 			*rc.BaselineProfile = share.ProfileBasic
-		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+		case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
 			*rc.BaselineProfile = share.ProfileZeroDrift
 		default:
 			log.WithFields(log.Fields{"baseline": *rc.BaselineProfile}).Error("Invalid profile baseline")

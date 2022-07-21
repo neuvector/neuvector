@@ -38,10 +38,10 @@ const (
 )
 
 const (
-	ProfileDefault   string = "default" // (obsolete) it's equal to "zero-drift"
-	ProfileShield    string = "shield"  // (obsolete) it's equal to "zero-drift"
-	ProfileBasic     string = "basic"
-	ProfileZeroDrift string = "zero-drift"
+	ProfileDefault_UNUSED string = "default" // (obsolete) it's equal to "zero-drift"
+	ProfileShield_UNUSED  string = "shield"  // (obsolete) it's equal to "zero-drift"
+	ProfileBasic          string = "basic"
+	ProfileZeroDrift      string = "zero-drift"
 )
 
 const (

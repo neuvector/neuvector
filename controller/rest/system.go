@@ -1023,7 +1023,7 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 				switch blValue {
 				case share.ProfileBasic:
 					cconf.NewServiceProfileBaseline = share.ProfileBasic
-				case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+				case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
 					cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
 				default:
 					e := "Invalid new service profile baseline"

@@ -221,10 +221,19 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		switch g.PolicyMode {
 		case share.PolicyModeLearn:
 			s.DiscoverGroups++
+			if g.BaselineProfile == share.ProfileZeroDrift {
+				s.DiscoverGroupsZD++
+			}
 		case share.PolicyModeEvaluate:
 			s.MonitorGroups++
+			if g.BaselineProfile == share.ProfileZeroDrift {
+				s.MonitorGroupsZD++
+			}
 		case share.PolicyModeEnforce:
 			s.ProtectGroups++
+			if g.BaselineProfile == share.ProfileZeroDrift {
+				s.ProtectGroupsZD++
+			}
 		}
 		s.Groups++
 	}
