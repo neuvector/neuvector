@@ -305,7 +305,7 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		switch blValue {
 		case share.ProfileBasic:
 			profile.Baseline = share.ProfileBasic
-		case share.ProfileDefault, share.ProfileShield, share.ProfileZeroDrift:
+		case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
 			profile.Baseline = share.ProfileZeroDrift
 		default:
 			log.WithFields(log.Fields{"group": group, "baseline": *conf.Baseline}).Error("Invalid profile baseline")

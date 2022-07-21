@@ -5,9 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"sort"
+
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
+
 	//	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	"io/ioutil"
+	"net/http"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
@@ -15,8 +24,8 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/share"
@@ -25,13 +34,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/spaolacci/murmur3"
-	"io/ioutil"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"net/http"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
 )
 
 type nvCrdHandler struct {
@@ -1923,7 +1926,7 @@ targetpass:
 				blValue := *gfwrule.Spec.ProcessProfile.Baseline
 				if blValue == share.ProfileBasic {
 					baseline = share.ProfileBasic
-				} else if blValue != share.ProfileDefault && blValue != share.ProfileShield && blValue != share.ProfileZeroDrift {
+				} else if blValue != share.ProfileDefault_UNUSED && blValue != share.ProfileShield_UNUSED && blValue != share.ProfileZeroDrift {
 					errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, blValue)
 					buffer.WriteString(errMsg)
 					errCount += errNo
