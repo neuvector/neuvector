@@ -862,7 +862,7 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 	parent, ok := p.pidProcMap[proc.ppid]
 	if !ok { // parent has not been caught
 		if !osutil.IsPidValid(proc.ppid) {
-			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Info("PROC: parent exited")
+			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Debug("PROC: parent exited")
 			p.unlockProcMux() // minimum section lock
 			return
 		}
@@ -3003,6 +3003,12 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 		return
 	}
 
+	if proc, ok := p.pidProcMap[rootPid]; ok {
+		if proc.ppid > 0 {	// exclude its runtime init process
+			allPids.Remove(proc.ppid)
+		}
+	}
+
 	// (1) make a sorting slice of the outsiders
 	pids := allPids.ToInt32Slice()
 	sort.Slice(pids, func(i, j int) bool { return pids[i] < pids[j] }) //sorting in increasing order
@@ -3019,6 +3025,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	// (3) rebuild two sets
 	c.children.Add(rootPid) // from the beginning
 	for _, pid := range pids {
+
 		if proc, ok := p.pidProcMap[int(pid)]; ok {
 			if isFamilyProcess(c.children, proc) {
 				c.children.Add(int(pid))
