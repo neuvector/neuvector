@@ -61,13 +61,12 @@ func NewTimerWheelWithTick(tick time.Duration) *TimerWheel {
 }
 
 func (t *TimerWheel) Start() {
-	t.lock.Lock()
 	t.tick = time.NewTicker(t.tickDuration)
-	defer t.lock.Unlock()
 	go func() {
 		for {
 			select {
 			case <-t.tick.C:
+				t.lock.Lock()
 				t.wheelCursor++
 				if t.wheelCursor == t.wheelCount {
 					t.wheelCursor = 0
@@ -75,6 +74,8 @@ func (t *TimerWheel) Start() {
 
 				iterator := t.wheel[t.wheelCursor]
 				tasks := t.fetchExpiredTimeouts(iterator)
+				t.lock.Unlock()
+
 				t.notifyExpiredTimeOut(tasks)
 			}
 		}
@@ -127,29 +128,21 @@ func (t *TimerWheel) RemoveTask(taskId string) error {
 
 func (t *TimerWheel) scheduleTimeOut(timeOut *WheelTimeOut) (string, error) {
 	if timeOut.delay < t.tickDuration {
-		timeOut.delay = t.tickDuration
+		timeOut.delay = t.tickDuration // smallest unit delay
 	}
-	lastRoundDelay := timeOut.delay % t.roundDuration
-	lastTickDelay := timeOut.delay % t.tickDuration
+	lastRoundDelay := timeOut.delay % t.roundDuration  // position within a boundary (3600 seconds)
+	relativeIndex := lastRoundDelay / t.tickDuration   // relative slot index (after the current slot index)
+	remainingRounds := timeOut.delay / t.roundDuration // repeating counter; if tm < 3600s, it is 0
 
-	relativeIndex := lastRoundDelay / t.tickDuration
-	if lastTickDelay != 0 {
-		relativeIndex = relativeIndex + 1
-	}
-
-	remainingRounds := timeOut.delay / t.roundDuration
-	if lastRoundDelay == 0 {
-		remainingRounds = remainingRounds - 1
-	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	stopIndex := t.wheelCursor + int(relativeIndex)
-	if stopIndex >= t.wheelCount {
+	stopIndex := t.wheelCursor + int(relativeIndex)	// real slot index from current slot index
+	if stopIndex >= t.wheelCount {					// wrap around
 		stopIndex = stopIndex - t.wheelCount
-		timeOut.rounds = int(remainingRounds) + 1
-	} else {
-		timeOut.rounds = int(remainingRounds)
 	}
+
+	// task's slot assignment
+	timeOut.rounds = int(remainingRounds)
 	timeOut.index = stopIndex
 	item := t.wheel[stopIndex]
 	if item == nil {
@@ -176,9 +169,6 @@ func (t *TimerWheel) scheduleTimeOut(timeOut *WheelTimeOut) (string, error) {
 }
 
 func (t *TimerWheel) fetchExpiredTimeouts(iterator *Iterator) []*WheelTimeOut {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	task := []*WheelTimeOut{}
 
 	for k, v := range iterator.items {
