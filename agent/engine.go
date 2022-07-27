@@ -244,7 +244,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 
 	// 2nd screening: handle the exited child container at the last part
 	if rootPid == 0 {
-		log.Debug("invalid root pid")
+		// log.Debug("invalid root pid")
 		return true // skipped the test
 	}
 
@@ -1446,6 +1446,14 @@ func isNeuvectorContainerById(id string) bool {
 	return ok
 }
 
+// oc49 and above: pod process is none on the cri-o
+func isEmptyProcessPod(info *container.ContainerMetaExtra) bool {
+	if global.RT.String() == container.RuntimeCriO {
+		return (info.Pid == 0) && info.ID == info.Sandbox
+	}
+	return false
+}
+
 //////
 func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra) {
 	log.WithFields(log.Fields{"id": id, "name": info.Name, "role": role, "pid": info.Pid}).Info()
@@ -1597,14 +1605,16 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	}
 
 	// fill RunAsRoot flag
-	if _, ppid, ruid, _ := osutil.GetProcessUIDs(info.Pid); ppid >= 0 {
-		info.RunAsRoot = ruid == 0
-	} else {
-		if !osutil.IsPidValid(info.Pid) {
-			log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("rootPid exited")
-			return // container already exited
+	if !isEmptyProcessPod(info) {
+		if _, ppid, ruid, _ := osutil.GetProcessUIDs(info.Pid); ppid >= 0 {
+			info.RunAsRoot = ruid == 0
+		} else {
+			if !osutil.IsPidValid(info.Pid) {
+				log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("rootPid exited")
+				return // container already exited
+			}
+			log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("Failed to obtain UID")
 		}
-		log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("Failed to obtain UID")
 	}
 	c.info = info      // update
 	c.pid = c.info.Pid // update
@@ -1698,21 +1708,25 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		}
 	}
 
-	if !osutil.IsPidValid(info.Pid) {
-		// however, the rootPid was left, an exited container
-		// it could be a late event from the slow statsLoop()'s trigger
-		log.WithFields(log.Fields{"id": id, "pid": info.Pid}).Debug("container left")
-		info.Running = false // update it and put a cluster record for the exited container
-	} else {
-		// patch undetected container pid
-		go prober.PatchContainerProcess(info.Pid, false)
+	if !isEmptyProcessPod(info) {
+		if !osutil.IsPidValid(info.Pid) {
+			// however, the rootPid was left, an exited container
+			// it could be a late event from the slow statsLoop()'s trigger
+			log.WithFields(log.Fields{"id": id, "pid": info.Pid}).Debug("container left")
+			info.Running = false // update it and put a cluster record for the exited container
+		} else {
+			// patch undetected container pid
+			go prober.PatchContainerProcess(info.Pid, false)
+		}
 	}
 
 	if role, ok := isNeuVectorContainer(info); ok {
 		if info.Running {
 			startNeuVectorMonitors(id, role, info)
 		} else {
-			log.WithFields(log.Fields{"id": id, "role": role, "pid": info.Pid}).Debug("PROC: exited NeuVector")
+			if info.Pid != 0 {
+				log.WithFields(log.Fields{"id": id, "role": role, "pid": info.Pid}).Debug("PROC: exited NeuVector")
+			}
 			// Sending notification to controller for NeuVector containers is to report
 			// the interface list. No need if the container is not running
 		}
