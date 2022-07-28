@@ -522,8 +522,9 @@ func (fsn *FileNotificationCtr) GetUpperFileInfo(id, file string) (*fileInfo, bo
 			}
 
 			if fsn.storageDrv != drv_btrfs {
-				if fi, err := os.Stat(filepath.Join(root.cLayer, file)); err == nil {
-					finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, file)
+				fpath := filepath.Join(root.cLayer, file)
+				if fi, err := os.Stat(fpath); err == nil {
+					finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, fpath)
 					finfo.fileType = file_added
 					root.files[file] = finfo
 					// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
