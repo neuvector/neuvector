@@ -191,7 +191,7 @@ func checkAntiAffinity(containers []*container.ContainerMeta, skips ...string) e
 
 func cbRerunKube(cmd, cmdRemap string) {
 	if Host.CapKubeBench {
-		bench.RerunKube(cmd, cmdRemap)
+		bench.RerunKube(cmd, cmdRemap, false)
 	}
 }
 
@@ -257,6 +257,7 @@ func main() {
 	show_monitor_trace := flag.Bool("m", false, "Show process/file monitor traces")
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
+	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
 	flag.Parse()
 
 	if *debug {
@@ -282,6 +283,12 @@ func main() {
 	if *disable_scan_secrets {
 		log.Info("Scanning secrets on containers is disabled")
 		agentEnv.scanSecrets = false
+	}
+
+	agentEnv.autoBenchmark = true
+	if *disable_auto_benchmark {
+		log.Info("Auto benchmark is disabled")
+		agentEnv.autoBenchmark = false
 	}
 
 	if *join != "" {
@@ -506,7 +513,7 @@ func main() {
 	go bench.BenchLoop()
 
 	if Host.CapDockerBench {
-		bench.RerunDocker()
+		bench.RerunDocker(false)
 	} else {
 		// If the older version write status into the cluster, clear it.
 		bench.ResetDockerStatus()

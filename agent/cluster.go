@@ -680,10 +680,10 @@ func leadChangeHandler(newLead, oldLead string) {
 			clusterFailed = false
 			uploadCurrentInfo()
 			if Host.CapDockerBench {
-				bench.RerunDocker()
+				bench.RerunDocker(false)
 			}
 			if Host.CapKubeBench {
-				bench.RerunKube("", "")
+				bench.RerunKube("", "", false)
 			}
 			cluster.ResumeAllWatchers()
 		}
