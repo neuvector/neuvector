@@ -393,7 +393,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
-			log.WithFields(log.Fields{"id":id, "info": pod.Info, "status": pod.Status}).Error("Fail to get pod")
+			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
 			return nil, err
 		}
 
@@ -428,7 +428,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		// an APP container
 		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
 		if err2 != nil || cs.Status == nil || cs.Info == nil {
-			log.WithFields(log.Fields{"id": id, "error": err2, "info": cs.Info, "status": cs.Status}).Error("Fail to get container")
+			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
 			return nil, err
 		}
 
