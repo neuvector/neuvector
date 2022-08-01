@@ -151,6 +151,7 @@ static inline bool is_mac_m_b_cast(uint8_t* mac)
 int8_t c2hex(uint8_t c);
 
 #define IS_IN_LOOPBACK(i)		(((u_int32_t)(i) & 0xff000000) == 0x7f000000)
+#define IS_IN_LINKLOCAL(i)      (((u_int32_t)(i) & 0xffff0000) == (u_int32_t)0xA9FE0000 /* 169.254.0.0 */)
 
 #endif
 

@@ -494,7 +494,8 @@ func (d *kubernetes) GetHostTunnelIP(links map[string]sk.NetIface) []net.IPNet {
 			//veth's ip as tunnel ip
 			if link.Type == "veth" {
 				ones, bits := addr.IPNet.Mask.Size()
-				if ones == bits && ones == 32 && addr.Scope == syscall.RT_SCOPE_UNIVERSE {
+				//cilium_host i/f scope is RT_SCOPE_LINK
+				if ones == bits && ones == 32 && (addr.Scope == syscall.RT_SCOPE_UNIVERSE || addr.Scope == syscall.RT_SCOPE_LINK){
 					//log.WithFields(log.Fields{"ones": ones, "bits":bits, "scope":addr.Scope}).Debug("")
 					ret = append(ret, addr.IPNet)
 				}

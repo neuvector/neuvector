@@ -798,6 +798,15 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         }
         goto exit;
     }
+    if (IS_IN_LINKLOCAL(sip) || IS_IN_LINKLOCAL(dip) ) {
+        // cilium use link_local ip as service loopback
+        desc->id = 0;
+        desc->action = DP_POLICY_ACTION_OPEN;
+        desc->flags = POLICY_DESC_CHECK_VER;
+        desc->flags |= POLICY_DESC_INTERNAL;
+        desc->flags |= POLICY_DESC_LINK_LOCAL;
+        goto exit;
+    }
     memset(&key, 0, sizeof(key));
     key.sip = sip;
     key.dip = dip;

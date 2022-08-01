@@ -22,15 +22,16 @@ typedef struct dpi_rule_key_ {
 typedef struct dpi_policy_desc_ {
     uint32_t id;
     uint8_t action;
-    uint8_t flags;
-#define POLICY_DESC_CHECK_VER      0x01
-#define POLICY_DESC_INTERNAL       0x02
-#define POLICY_DESC_EXTERNAL       0x04
-#define POLICY_DESC_TUNNEL         0x08
-#define POLICY_DESC_UNKNOWN_IP     0x10
-#define POLICY_DESC_SVC_EXTIP      0x20
-#define POLICY_DESC_HOSTIP         0x40
-#define POLICY_DESC_MESH_TO_SVR    0x80
+    uint16_t flags;
+#define POLICY_DESC_CHECK_VER      0x0001
+#define POLICY_DESC_INTERNAL       0x0002
+#define POLICY_DESC_EXTERNAL       0x0004
+#define POLICY_DESC_TUNNEL         0x0008
+#define POLICY_DESC_UNKNOWN_IP     0x0010
+#define POLICY_DESC_SVC_EXTIP      0x0020
+#define POLICY_DESC_HOSTIP         0x0040
+#define POLICY_DESC_MESH_TO_SVR    0x0080
+#define POLICY_DESC_LINK_LOCAL     0x0100
     uint16_t hdl_ver;
     uint32_t order;
 } dpi_policy_desc_t;

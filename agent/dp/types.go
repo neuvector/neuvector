@@ -46,6 +46,7 @@ type Connection struct {
 	SvcExtIP     bool
 	ToSidecar    bool
 	MeshToSvr    bool
+	LinkLocal    bool
 }
 
 type ConnectionData struct {

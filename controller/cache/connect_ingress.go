@@ -287,6 +287,15 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			case "":
 				// If the enforcer say it's not from external, respect that.
 				if !conn.ExternalPeer {
+					if conn.LinkLocal {
+						// link local 169.254.0.0 is special svc loopback
+						// used by cilium CNI
+						conn.ClientWL = conn.ServerWL
+						ca.external = false
+						ca.workload = true
+						ca.managed = true
+						return &ca, &sa, &stip, true
+					}
 					cctx.ConnLog.WithFields(log.Fields{
 						"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 					}).Debug("Ignore ingress connection from unknown subnet")
@@ -388,6 +397,15 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 				case "":
 					// If the enforcer say it's not to external, respect that.
 					if !conn.ExternalPeer {
+						if conn.LinkLocal {
+							// link local 169.254.0.0 is special svc loopback
+							// used by cilium CNI
+							conn.ServerWL = conn.ClientWL
+							sa.external = false
+							sa.workload = true
+							sa.managed = true
+							return &ca, &sa, &stip, true
+						}
 						// Consider it as unknown global workload
 						if !connectPAIToGlobal(conn, &sa, &stip) {
 							return &ca, &sa, &stip, false
