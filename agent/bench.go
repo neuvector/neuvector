@@ -399,7 +399,12 @@ func (b *Bench) triggerHostCustomCheck(script *share.CLUSCustomCheckGroup) {
 	b.customHostTimer.Reset(scriptTimerStart)
 }
 
-func (b *Bench) RerunDocker() {
+func (b *Bench) RerunDocker(forced bool) {
+	if agentEnv.autoBenchmark == false && forced == false {
+		log.Info("ignored")
+		return
+	}
+
 	log.Info("")
 
 	if err := b.dockerCheckPrerequisites(); err != nil {
@@ -413,7 +418,12 @@ func (b *Bench) RerunDocker() {
 	}
 }
 
-func (b *Bench) RerunKube(cmd, cmdRemap string) {
+func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
+	if agentEnv.autoBenchmark == false && forced == false {
+		log.Info("ignored")
+		return
+	}
+
 	log.Info("")
 
 	if cmd != "" && cmdRemap != "" {

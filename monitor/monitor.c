@@ -42,6 +42,7 @@
 #define ENV_SHOW_MONITOR_TRACE "ENF_MONITOR_TRACE"
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
+#define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
@@ -436,6 +437,9 @@ static pid_t fork_exec(int i)
         }
         if (getenv(ENV_NO_SCAN_SECRETS)) {
             args[a ++] = "-no_scrt";
+        }
+        if (getenv(ENV_NO_AUTO_BENCHMARK)) {
+            args[a ++] = "-no_auto_benchmark";
         }
         args[a] = NULL;
         break;

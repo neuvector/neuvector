@@ -903,14 +903,14 @@ func (rs *RPCService) GetContainerLogs(f *share.CLUSContainerLogReq, stream shar
 
 func (rs *RPCService) RunDockerBench(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
 	if Host.CapDockerBench {
-		bench.RerunDocker()
+		bench.RerunDocker(true)
 	}
 	return &share.RPCVoid{}, nil
 }
 
 func (rs *RPCService) RunKubernetesBench(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
 	if Host.CapKubeBench {
-		bench.RerunKube("", "")
+		bench.RerunKube("", "", true)
 	}
 	return &share.RPCVoid{}, nil
 }
