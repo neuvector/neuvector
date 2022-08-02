@@ -753,8 +753,10 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		}
 
 		if proc.name != "" {
-			if _, ok := p.isSuspiciousProcess(proc, c.id); !ok {
-				proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
+			if proc.action != share.PolicyActionCheckApp { // preserve the suspicious process name
+				if _, ok := p.isSuspiciousProcess(proc, c.id); !ok {
+					proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
+				}
 			}
 		} else {
 			proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -2265,11 +2267,13 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) (string, bool) {
 	if filepath.Base(proc.path) != proc.name {
-		// update name
-		if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
-			proc.name = name
-		} else {
-			proc.name = filepath.Base(proc.path)
+		if proc.action != share.PolicyActionCheckApp { // preserve the suspicious process name
+			// update name
+			if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
+				proc.name = name
+			} else {
+				proc.name = filepath.Base(proc.path)
+			}
 		}
 	}
 
