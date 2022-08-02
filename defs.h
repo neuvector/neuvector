@@ -192,6 +192,7 @@ typedef struct {
 #define DPSESS_FLAG_XFF           0x10 // virtual xff connection
 #define DPSESS_FLAG_SVC_EXTIP     0x20 // service externalIP
 #define DPSESS_FLAG_MESH_TO_SVR   0x40 // mesh traffic to svr
+#define DPSESS_FLAG_LINK_LOCAL    0x80 // link local(169.254.0.0)
 
 #define DP_POLICY_APPLY_EGRESS  0x1
 #define DP_POLICY_APPLY_INGRESS 0x2
@@ -399,6 +400,7 @@ typedef struct {
 #define DPCONN_FLAG_XFF           0x04
 #define DPCONN_FLAG_SVC_EXTIP     0x08
 #define DPCONN_FLAG_MESH_TO_SVR   0x10
+#define DPCONN_FLAG_LINK_LOCAL    0x20
 
 typedef struct {
     uint8_t  EPMAC[6];

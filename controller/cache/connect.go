@@ -510,6 +510,7 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"extIP":          conn.SvcExtIP,
 			"toSidecar":      conn.ToSidecar,
 			"meshToSvr":      conn.MeshToSvr,
+			"linkLocal":      conn.LinkLocal,
 		}).Debug()
 
 		addConnectToGraph(conn, ca, sa, stip)
