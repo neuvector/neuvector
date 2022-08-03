@@ -265,6 +265,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		ModeAutoD2MDuration:       systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
+		NoTelemetryReport:         systemConfigCache.NoTelemetryReport,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()

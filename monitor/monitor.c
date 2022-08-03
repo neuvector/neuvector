@@ -46,6 +46,10 @@
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
+#define ENV_TELE_NEUVECTOR_EP  "TELEMETRY_NEUVECTOR_EP"
+#define ENV_TELE_SCANNER_EP    "TELEMETRY_SCANNER_EP"
+#define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
+#define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -197,6 +201,7 @@ static pid_t fork_exec(int i)
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level;
+    char *telemetry_neuvector_ep, *telemetry_scanner_ep, *telemetry_current_ver, *telemetry_freq;
     int a;
 
     switch (i) {
@@ -368,6 +373,22 @@ static pid_t fork_exec(int i)
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-rancher_sso";
             }
+        }
+        if ((telemetry_neuvector_ep = getenv(ENV_TELE_NEUVECTOR_EP)) != NULL) {
+            args[a++] = "-telemetry_neuvector_ep";
+            args[a++] = telemetry_neuvector_ep;
+        }
+        if ((telemetry_scanner_ep = getenv(ENV_TELE_SCANNER_EP)) != NULL) {
+            args[a++] = "-telemetry_scanner_ep";
+            args[a++] = telemetry_scanner_ep;
+        }
+        if ((telemetry_current_ver = getenv(ENV_TELE_CURRENT_VER)) != NULL) {
+            args[a++] = "-telemetry_current_ver";
+            args[a++] = telemetry_current_ver;
+        }
+        if ((telemetry_freq = getenv(ENV_TELEMETRY_FREQ)) != NULL) {
+            args[a++] = "-telemetry_freq";
+            args[a++] = telemetry_freq;
         }
         args[a] = NULL;
         break;

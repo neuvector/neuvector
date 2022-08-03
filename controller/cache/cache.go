@@ -182,6 +182,7 @@ type Context struct {
 	ocVersion                string
 	RancherEP                string // from yaml/helm chart
 	RancherSSO               bool   // from yaml/helm chart
+	TelemetryFreq            uint   // from yaml
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -1620,11 +1621,20 @@ const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 var unManagedWlTimer *time.Timer
 var uwlUpdated bool
 
-func startWorkerThread() {
+func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+
+	noTelemetry := false
+	telemetryFreq := ctx.TelemetryFreq
+	if telemetryFreq == 0 {
+		noTelemetry = true
+		telemetryFreq = 60
+	}
+	teleReportTicker := time.NewTicker(time.Duration(telemetryFreq) * time.Minute)
+
 	unManagedWlTimer.Stop()
 
 	if isLeader() {
@@ -1637,6 +1647,13 @@ func startWorkerThread() {
 			case <-usageReportTicker.C:
 				if isLeader() {
 					writeUsageReport()
+				}
+			case <-teleReportTicker.C:
+				if isLeader() && !noTelemetry {
+					if sendTelemetry, teleData := getTelemetryData(); sendTelemetry {
+						var param interface{} = &teleData
+						cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+					}
 				}
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
@@ -2054,7 +2071,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	// we know whether we need to modify namesapce for admCtrl's namespaceSelector feature before orch watcher starts
 	admissionRuleInit()
 
-	startWorkerThread() // timer and orch channel
+	startWorkerThread(ctx) // timer and orch channel
 	startPolicyThread()
 
 	configInit()

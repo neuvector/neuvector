@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"net"
 	"os"
@@ -232,6 +233,10 @@ func main() {
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
+	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "") // for testing only
+	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")     // for testing only
+	teleCurrentVer := flag.String("telemetry_current_ver", "", "")   // in the format {major}.{minor}.{patch}[-s{#}], for testing only
+	telemetryFreq := flag.Uint("telemetry_freq", 60, "")             // in minutes, for testing only
 	flag.Parse()
 
 	if *debug {
@@ -519,11 +524,29 @@ func main() {
 	orchObjChan := make(chan *resource.Event, 32)
 	orchScanChan := make(chan *resource.Event, 16)
 
+	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+		var ver share.CLUSCtrlVersion
+		json.Unmarshal(value, &ver)
+		if !strings.HasPrefix(ver.CtrlVersion, "interim/") {
+			// it's official release image
+			if *teleNeuvectorEP == "" {
+				*teleNeuvectorEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
+			}
+			if *teleScannerEP == "" {
+				*teleScannerEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
+			}
+		}
+	}
+	if *teleNeuvectorEP == "" && *teleScannerEP == "" {
+		*telemetryFreq = 0
+	}
+
 	// Initialize cache
 	// - Start policy learning thread and build learnedPolicyRuleWrapper from KV
 	cctx := cache.Context{
 		RancherEP:                *rancherEP,
 		RancherSSO:               *rancherSSO,
+		TelemetryFreq:            *telemetryFreq,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
 		AuditQueue:               auditQueue,
@@ -573,15 +596,18 @@ func main() {
 
 	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
-		LocalDev:     dev,
-		EvQueue:      evqueue,
-		AuditQueue:   auditQueue,
-		Messenger:    messenger,
-		Cacher:       cacher,
-		Scanner:      scanner,
-		RESTPort:     *restPort,
-		FedPort:      *fedPort,
-		PwdValidUnit: *pwdValidUnit,
+		LocalDev:         dev,
+		EvQueue:          evqueue,
+		AuditQueue:       auditQueue,
+		Messenger:        messenger,
+		Cacher:           cacher,
+		Scanner:          scanner,
+		RESTPort:         *restPort,
+		FedPort:          *fedPort,
+		PwdValidUnit:     *pwdValidUnit,
+		TeleNeuvectorURL: *teleNeuvectorEP,
+		TeleScannerURL:   *teleScannerEP,
+		TeleCurrentVer:   *teleCurrentVer,
 	}
 	rest.InitContext(&rctx)
 

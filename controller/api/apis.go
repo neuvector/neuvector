@@ -1629,6 +1629,7 @@ type RESTSystemConfigConfig struct {
 	IBMSAEpDashboardURL       *string                          `json:"ibmsa_ep_dashboard_url,omitempty"`
 	XffEnabled                *bool                            `json:"xff_enabled,omitempty"`
 	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
+	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
@@ -1709,6 +1710,7 @@ type RESTSystemConfig struct {
 	ModeAutoM2P               bool                      `json:"mode_auto_m2p"`
 	ModeAutoM2PDuration       int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
+	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
 }
 
 type RESTSystemConfigData struct {
@@ -1745,6 +1747,7 @@ type RESTSystemConfigMiscV2 struct {
 	ControllerDebug    []string `json:"controller_debug"`
 	MonitorServiceMesh bool     `json:"monitor_service_mesh"`
 	XffEnabled         bool     `json:"xff_enabled"`
+	NoTelemetryReport  bool     `json:"no_telemetry_report"`
 }
 
 // for scanner autoscaling
@@ -2018,7 +2021,7 @@ type RESTVulnerabilityAsset struct {
 	Name        string                              `json:"name"`
 	Severity    string                              `json:"severity"`
 	Description string                              `json:"description"`
-	Packages    map[string][]RESTVulnPackageVersion `json:"packages`
+	Packages    map[string][]RESTVulnPackageVersion `json:"packages"`
 	Link        string                              `json:"link"`
 	Score       float32                             `json:"score"`
 	Vectors     string                              `json:"vectors"`
@@ -3279,10 +3282,4 @@ type RESTPolicyPromoteRequestData struct {
 
 type RESTAdmCtrlPromoteRequestData struct {
 	Request *RESTAdmCtrlPromoteRequest `json:"request"`
-}
-
-type RESTK8sNvRbacStatus struct {
-	ClusterRoleErrors        []string `json:"clusterrole_errors"`
-	ClusterRoleBindingErrors []string `json:"clusterrolebinding_errors"`
-	RoleBindingErrors        []string `json:"rolebinding_errors"`
 }
