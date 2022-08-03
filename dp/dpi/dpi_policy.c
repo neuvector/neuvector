@@ -798,7 +798,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         }
         goto exit;
     }
-    if (IS_IN_LINKLOCAL(sip) || IS_IN_LINKLOCAL(dip) ) {
+    if (IS_IN_LINKLOCAL(ntohl(sip)) || IS_IN_LINKLOCAL(ntohl(dip))) {
         // cilium use link_local ip as service loopback
         desc->id = 0;
         desc->action = DP_POLICY_ACTION_OPEN;
