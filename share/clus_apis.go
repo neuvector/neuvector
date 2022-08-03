@@ -741,9 +741,6 @@ type CLUSSystemConfig struct {
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
 	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
-	AutoScaleStrategy    string                    `json:"scanner_autoscale_strategy"`
-	AutoScaleMinScanners uint8                     `json:"min_scanners"`
-	AutoScaleMaxScanners uint8                     `json:"max_scanners"`
 	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
 }
