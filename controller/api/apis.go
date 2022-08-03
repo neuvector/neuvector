@@ -1653,10 +1653,70 @@ type RESTSystemConfigConfigCfgMap struct {
 }
 
 type RESTSystemConfigConfigData struct {
-	Config     *RESTSystemConfigConfig  `json:"config"`
-	FedConfig  *RESTSystemConfigConfig  `json:"fed_config"`
-	NetConfig  *RESTSysNetConfigConfig  `json:"net_config"`
-	AtmoConfig *RESTSysAtmoConfigConfig `json:"atmo_config"`
+	Config     *RESTSystemConfigConfig   `json:"config,omitempty"`
+	ConfigV2   *RESTSystemConfigConfigV2 `json:"config_v2,omitempty"`
+	FedConfig  *RESTSystemConfigConfig   `json:"fed_config,omitempty"`
+	NetConfig  *RESTSysNetConfigConfig   `json:"net_config,omitempty"`
+	AtmoConfig *RESTSysAtmoConfigConfig  `json:"atmo_config,omitempty"`
+}
+
+type RESTSystemConfigSvcCfgV2 struct {
+	NewServicePolicyMode      *string `json:"new_service_policy_mode,omitempty"`
+	NewServiceProfileBaseline *string `json:"new_service_profile_baseline,omitempty"`
+}
+
+type RESTSystemConfigSyslogCfgV2 struct {
+	SyslogServer       *string   `json:"syslog_ip,omitempty"`
+	SyslogIPProto      *uint8    `json:"syslog_ip_proto,omitempty"`
+	SyslogPort         *uint16   `json:"syslog_port,omitempty"`
+	SyslogLevel        *string   `json:"syslog_level,omitempty"`
+	SyslogEnable       *bool     `json:"syslog_status,omitempty"`
+	SyslogCategories   *[]string `json:"syslog_categories,omitempty"`
+	SyslogInJSON       *bool     `json:"syslog_in_json,omitempty"`
+	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
+}
+
+type RESTSystemConfigAuthCfgV2 struct {
+	AuthOrder      *[]string `json:"auth_order,omitempty"`
+	AuthByPlatform *bool     `json:"auth_by_platform,omitempty"`
+	RancherEP      *string   `json:"rancher_ep,omitempty"`
+}
+
+type RESTSystemConfigProxyCfgV2 struct {
+	RegistryHttpProxyEnable  *bool      `json:"registry_http_proxy_status,omitempty"`
+	RegistryHttpsProxyEnable *bool      `json:"registry_https_proxy_status,omitempty"`
+	RegistryHttpProxy        *RESTProxy `json:"registry_http_proxy,omitempty"`
+	RegistryHttpsProxy       *RESTProxy `json:"registry_https_proxy,omitempty"`
+}
+
+type RESTSystemConfigWebhookCfgV2 struct {
+	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
+}
+
+type RESTSystemConfigMiscCfgV2 struct {
+	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
+	UnusedGroupAging   *uint8    `json:"unused_group_aging,omitempty"`
+	ClusterName        *string   `json:"cluster_name,omitempty"`
+	ControllerDebug    *[]string `json:"controller_debug,omitempty"`
+	MonitorServiceMesh *bool     `json:"monitor_service_mesh,omitempty"`
+	XffEnabled         *bool     `json:"xff_enabled,omitempty"`
+	NoTelemetryReport  *bool     `json:"no_telemetry_report,omitempty"`
+}
+
+type RESTSystemConfigIBMSAVCfg2 struct {
+	IBMSAEpEnabled      *bool   `json:"ibmsa_ep_enabled,omitempty"`
+	IBMSAEpDashboardURL *string `json:"ibmsa_ep_dashboard_url,omitempty"`
+}
+
+type RESTSystemConfigConfigV2 struct {
+	SvcCfg           *RESTSystemConfigSvcCfgV2        `json:"svc_cfg,omitempty"`
+	SyslogCfg        *RESTSystemConfigSyslogCfgV2     `json:"svslog_cfg,omitempty"`
+	AuthCfg          *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
+	ProxyCfg         *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
+	Webhooks         *[]*RESTWebhook                  `json:"webhooks,omitempty"`
+	IbmsaCfg         *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
+	ScannerAutoscale *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
+	MiscCfg          *RESTSystemConfigMiscCfgV2       `json:"misc_cfg,omitempty"`
 }
 
 type RESTUnquarReq struct {

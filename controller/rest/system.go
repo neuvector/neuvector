@@ -874,7 +874,7 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete system webhook")
 }
 
-func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
@@ -888,6 +888,56 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	var rconf api.RESTSystemConfigConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
+	if err == nil && apiVer == "v2" {
+		if rconf.ConfigV2 != nil {
+			config := &api.RESTSystemConfigConfig{}
+			configV2 := rconf.ConfigV2
+			if configV2.SvcCfg != nil {
+				config.NewServicePolicyMode = configV2.SvcCfg.NewServicePolicyMode
+				config.NewServiceProfileBaseline = configV2.SvcCfg.NewServiceProfileBaseline
+			}
+			if configV2.SyslogCfg != nil {
+				config.SyslogServer = configV2.SyslogCfg.SyslogServer
+				config.SyslogIPProto = configV2.SyslogCfg.SyslogIPProto
+				config.SyslogPort = configV2.SyslogCfg.SyslogPort
+				config.SyslogLevel = configV2.SyslogCfg.SyslogLevel
+				config.SyslogEnable = configV2.SyslogCfg.SyslogEnable
+				config.SyslogCategories = configV2.SyslogCfg.SyslogCategories
+				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
+				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
+			}
+			if configV2.AuthCfg != nil {
+				config.AuthOrder = configV2.AuthCfg.AuthOrder
+				config.AuthByPlatform = configV2.AuthCfg.AuthByPlatform
+				config.RancherEP = configV2.AuthCfg.RancherEP
+			}
+			if configV2.ProxyCfg != nil {
+				config.RegistryHttpProxyEnable = configV2.ProxyCfg.RegistryHttpProxyEnable
+				config.RegistryHttpsProxyEnable = configV2.ProxyCfg.RegistryHttpsProxyEnable
+				config.RegistryHttpProxy = configV2.ProxyCfg.RegistryHttpProxy
+				config.RegistryHttpsProxy = configV2.ProxyCfg.RegistryHttpsProxy
+			}
+			if configV2.Webhooks != nil {
+				config.Webhooks = configV2.Webhooks
+			}
+			if configV2.IbmsaCfg != nil {
+				config.IBMSAEpEnabled = configV2.IbmsaCfg.IBMSAEpEnabled
+				config.IBMSAEpDashboardURL = configV2.IbmsaCfg.IBMSAEpDashboardURL
+			}
+			if configV2.MiscCfg != nil {
+				config.UnusedGroupAging = configV2.MiscCfg.UnusedGroupAging
+				config.ClusterName = configV2.MiscCfg.ClusterName
+				config.ControllerDebug = configV2.MiscCfg.ControllerDebug
+				config.MonitorServiceMesh = configV2.MiscCfg.MonitorServiceMesh
+				config.XffEnabled = configV2.MiscCfg.XffEnabled
+				config.NoTelemetryReport = configV2.MiscCfg.NoTelemetryReport
+			}
+			config.ScannerAutoscale = configV2.ScannerAutoscale
+			rconf.Config = config
+		} else {
+			rconf.Config = nil
+		}
+	}
 	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil && rconf.AtmoConfig == nil) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1393,6 +1443,14 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure system settings")
+}
+
+func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemConfigBase("v1", w, r, ps)
+}
+
+func handlerSystemConfigV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemConfigBase("v2", w, r, ps)
 }
 
 func session2REST(s *share.CLUSSession) *api.RESTSession {
