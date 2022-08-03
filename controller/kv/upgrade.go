@@ -909,14 +909,14 @@ const (
 // 2. if not, it means they shouldn't handle requests from each other
 //	  2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
 //	  2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
-func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int) {
+func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 	ver := getControlVersion()
 	if ver.KVVersion != latestKVVersion() {
 		// kv version is not the same as the last phase in the running controller because this controller is not upgraded yet in multi-controllers env
-		return false, _fedClusterUpgradeOngoing
+		return false, _fedClusterUpgradeOngoing, fmt.Errorf("kv_version: %s, latest: %s", ver.KVVersion, latestKVVersion())
 	}
 	if GetFedKvVer() == reqFedKvVer {
-		return true, _fedSuccess
+		return true, _fedSuccess, nil
 	} else {
 		var retCode int = -1
 		for i := 0; i < len(phases); i++ {
@@ -938,7 +938,7 @@ func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int) {
 			}
 		}
 		log.WithFields(log.Fields{"req": reqFedKvVer, "verifier": verifier, "handler": GetFedKvVer()}).Warn("version not qualified")
-		return false, retCode
+		return false, retCode, fmt.Errorf("fed_version: %s, req: %s", GetFedKvVer(), reqFedKvVer)
 	}
 }
 

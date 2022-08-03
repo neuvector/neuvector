@@ -59,6 +59,17 @@ type RPCEndpoint struct {
 	RPCServerPort uint16
 }
 
+type TelemetryData struct {
+	Hosts          int // nodes
+	Groups         int
+	PolicyRules    int
+	Clusters       int
+	AdmCtrlEnabled bool
+	InFederate     bool
+	PrimaryCluster bool
+	UseProxy       int // for http client, not for telemetry
+}
+
 type CacheEventFunc func(ev share.TLogEvent, msg string) error
 
 var ErrObjectNotFound error = errors.New("Object not found")

@@ -116,6 +116,7 @@ const CLUSCloudStore string = CLUSObjectStore + "cloud/"
 const CLUSCrdProcStore string = "crdcontent/"
 const CLUSCertStore string = CLUSObjectStore + "cert/"
 const CLUSLicenseStore string = CLUSObjectStore + "license/"
+const CLUSTelemetryStore string = CLUSObjectStore + "telemetry/"
 
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
@@ -155,6 +156,7 @@ const CLUSCtrlUsageReportStore string = CLUSStateStore + "usage_report/"
 const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
+const CLUSUpgradeInfoStore string = CLUSStateStore + "upgrade_info/"
 
 func CLUSExpiredTokenKey(token string) string {
 	return fmt.Sprintf("%s%s", CLUSExpiredTokenStore, token)
@@ -743,6 +745,7 @@ type CLUSSystemConfig struct {
 	AutoScaleMinScanners uint8                     `json:"min_scanners"`
 	AutoScaleMaxScanners uint8                     `json:"max_scanners"`
 	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
+	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
 }
 
 type CLUSSystemConfigAutoscale struct {
@@ -1959,6 +1962,7 @@ const (
 	StartFedRestServer
 	StopFedRestServer
 	UpdateProxyInfo
+	ReportTelemetryData
 )
 
 const (
@@ -2603,3 +2607,15 @@ const (
 	ReviewTypeDisplayDLP       = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF       = "WAF Configurations"               // interactive import
 )
+
+// Telemetry (upgrade responder)
+type CLUSCheckUpgradeVersion struct {
+	Version     string
+	ReleaseDate string
+	Tag         string
+}
+
+type CLUSCheckUpgradeInfo struct {
+	MinUpgradeVersion CLUSCheckUpgradeVersion
+	MaxUpgradeVersion CLUSCheckUpgradeVersion
+}
