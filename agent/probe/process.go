@@ -2144,9 +2144,10 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 
 // a runc building-command during "docker run" (not from root process but exists parallelly)
 func (p *Probe) isAllowRuncInitCommand(path string, cmds[]string) bool {
-	if filepath.Base(path) == "runc" {
+	// in-memory execution: cmd=[docker-runc init ] name=5 parent=docker-runc path=/memfd:runc_cloned:/proc/self/ex ppath=/run/torcx/unpack/docker/bin/runc
+	if filepath.Base(path) == "runc" || strings.HasPrefix(path, "/memfd:runc_cloned") {
 		for i, cmd := range cmds {
-			if i == 0 && filepath.Base(cmds[0]) != "runc" {
+			if i == 0 && !global.RT.IsRuntimeProcess(filepath.Base(cmds[0]), nil) {
 				break
 			}
 
