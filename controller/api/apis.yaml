@@ -3399,23 +3399,6 @@ paths:
       responses:
         '200':
           description: Success
-  /v1/system/rbac:
-    get:
-      tags:
-        - System
-      summary: Get missing Kubernetes RBAC
-      produces:
-        - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
-      responses:
-        '200':
-          description: Success
-          schema:
-            $ref: '#/definitions/RESTK8sNvRbacStatus'
   /v1/system/request:
     post:
       tags:
@@ -6954,28 +6937,6 @@ definitions:
       password:
         type: string
         example: "password"
-  RESTK8sNvRbacStatus:
-    type: object
-    required:
-      - clusterrole_errors
-      - clusterrolebinding_errors
-      - rolebinding_errors
-    properties:
-      clusterrole_errors:
-        type: array
-        items:
-          type: string
-          example: "Kubernetes clusterrole \"neuvector-binding-customresourcedefinition\" is required to grant create,get,update,watch permission(s) on customresourcedefinitions resource(s)."
-      clusterrolebinding_errors:
-        type: array
-        items:
-          type: string
-          example: "Cannot find Kubernetes clusterrolebinding \"neuvector-binding-nvwafsecurityrules\"(kubernetes api: Failure 404 clusterrolebindings.rbac.authorization.k8s.io \"neuvector-binding-nvwafsecurityrules\" not found)."
-      rolebinding_errors:
-        type: array
-        items:
-          type: string
-          example: ""
   RESTLicenseInfo:
     type: object
     required:
