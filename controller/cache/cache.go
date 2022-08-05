@@ -183,6 +183,7 @@ type Context struct {
 	RancherEP                string // from yaml/helm chart
 	RancherSSO               bool   // from yaml/helm chart
 	TelemetryFreq            uint   // from yaml
+	CheckDefAdminFreq        uint   // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -1649,10 +1650,15 @@ func startWorkerThread(ctx *Context) {
 					writeUsageReport()
 				}
 			case <-teleReportTicker.C:
-				if isLeader() && !noTelemetry {
-					if sendTelemetry, teleData := getTelemetryData(); sendTelemetry {
-						var param interface{} = &teleData
-						cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+				if isLeader() {
+					if !noTelemetry {
+						if sendTelemetry, teleData := getTelemetryData(); sendTelemetry {
+							var param interface{} = &teleData
+							cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+						}
+					}
+					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
+						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
 				}
 			case <-unManagedWlTimer.C:

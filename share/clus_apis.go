@@ -117,6 +117,7 @@ const CLUSCrdProcStore string = "crdcontent/"
 const CLUSCertStore string = CLUSObjectStore + "cert/"
 const CLUSLicenseStore string = CLUSObjectStore + "license/"
 const CLUSTelemetryStore string = CLUSObjectStore + "telemetry/"
+const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
@@ -1234,6 +1235,7 @@ const (
 	CLUSEvMemoryPressureController
 	CLUSEvK8sNvRBAC
 	CLUSEvGroupAutoPromote
+	CLUSEvAuthDefAdminPwdUnchanged // default admin's password is not changed yet. reported every 24 hours
 )
 
 const (
@@ -2615,4 +2617,9 @@ type CLUSCheckUpgradeVersion struct {
 type CLUSCheckUpgradeInfo struct {
 	MinUpgradeVersion CLUSCheckUpgradeVersion
 	MaxUpgradeVersion CLUSCheckUpgradeVersion
+}
+
+// throttled events/logs
+type CLUSThrottledEvents struct {
+	LastReportTime map[TLogEvent]int64 `json:"last_report_at"` // key is event id, value is time.Unix()
 }

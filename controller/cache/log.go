@@ -1887,3 +1887,39 @@ func auditSuppressSetIdRpts(rlog *api.Audit) {
 
 	rlog.Items = items
 }
+
+func checkDefAdminPwd(throttleMinutes uint) {
+	acc := access.NewReaderAccessControl()
+	if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, acc); u != nil {
+		if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
+			var evtsTime share.CLUSThrottledEvents
+			id := share.CLUSEvAuthDefAdminPwdUnchanged
+			key := share.CLUSThrottledEventStore + "events"
+			value, rev, _ := cluster.GetRev(key)
+			if value != nil {
+				json.Unmarshal(value, &evtsTime)
+			}
+			if evtsTime.LastReportTime == nil {
+				evtsTime.LastReportTime = make(map[share.TLogEvent]int64)
+			}
+			update := true
+			now := time.Now().UTC()
+			if lastTimestamp, ok := evtsTime.LastReportTime[id]; ok {
+				lastTime := time.Unix(lastTimestamp, 0).UTC()
+				if diff := now.Sub(lastTime); diff.Minutes() < float64(throttleMinutes) {
+					update = false
+				}
+			}
+			if update {
+				CacheEvent(id, "Default admin user's default password is not changed yet.")
+				evtsTime.LastReportTime[id] = now.Unix()
+				value, _ := json.Marshal(&evtsTime)
+				if rev == 0 {
+					cluster.Put(key, value)
+				} else {
+					cluster.PutRev(key, value, rev)
+				}
+			}
+		}
+	}
+}

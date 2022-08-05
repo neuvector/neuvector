@@ -233,10 +233,11 @@ func main() {
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
-	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "") // for testing only
-	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")     // for testing only
-	teleCurrentVer := flag.String("telemetry_current_ver", "", "")   // in the format {major}.{minor}.{patch}[-s{#}], for testing only
-	telemetryFreq := flag.Uint("telemetry_freq", 60, "")             // in minutes, for testing only
+	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
+	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")                       // for testing only
+	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
+	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
+	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
 	flag.Parse()
 
 	if *debug {
@@ -446,7 +447,7 @@ func main() {
 
 	isNewCluster := likelyNewCluster()
 
-	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster}).Info()
+	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster, "noDefAdmin": *noDefAdmin}).Info()
 
 	purgeFedRulesOnJoint := false
 	if Ctrler.Leader {
@@ -508,12 +509,20 @@ func main() {
 
 	if Ctrler.Leader {
 		kv.ValidateWebhookCert()
+		if isNewCluster && *noDefAdmin {
+			kv.GetClusterHelper().DeleteUser(common.DefaultAdminUser)
+		}
 		setConfigLoaded()
 	} else {
 		// The lead can take some time to restore the PV. Synchronize here so when non-lead
 		// read from the KV, such as policy list, it knows the data is complete.
 		waitConfigLoaded(isNewCluster)
 		kv.ValidateWebhookCert()
+	}
+
+	checkDefAdminFreq := *pwdValidUnit // check default admin's password every 24 hours by default
+	if isNewCluster && *noDefAdmin {
+		checkDefAdminFreq = 0 // do not check default admin's password if it's disabled
 	}
 
 	// pre-build compliance map
@@ -547,6 +556,7 @@ func main() {
 		RancherEP:                *rancherEP,
 		RancherSSO:               *rancherSSO,
 		TelemetryFreq:            *telemetryFreq,
+		CheckDefAdminFreq:        checkDefAdminFreq,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
 		AuditQueue:               auditQueue,

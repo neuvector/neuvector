@@ -780,9 +780,26 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 			continue
 		}
+
+		// Check role
+		if ruser.Fullname == common.DefaultAdminUser {
+			fedRole := cacher.GetFedMembershipRoleNoAuth()
+			roleForDefaultAdmin := api.UserRoleAdmin
+			if fedRole == api.FedRoleMaster {
+				roleForDefaultAdmin = api.UserRoleFedAdmin // default admin is always federate administrator on master cluster
+			}
+			if ruser.Role == "" || ruser.Role == api.UserRoleAdmin || ruser.Role == api.UserRoleFedAdmin {
+				ruser.Role = roleForDefaultAdmin
+			} else if ruser.Role != roleForDefaultAdmin {
+				e := "Default admin user's role cannot be changed"
+				log.WithFields(log.Fields{"user": ruser.Fullname, "fedRole": fedRole, "role": ruser.Role}).Error(e)
+				continue
+			}
+		}
 		if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, false); e != nil {
 			continue
 		}
+
 		var newuser bool
 		username := ruser.Fullname
 		user, rev, _ := clusHelper.GetUserRev(username, accAdmin)
@@ -833,17 +850,6 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			continue
 		}
 		user.Timeout = ruser.Timeout
-
-		// Check role
-		roleForDefaultAdmin := api.UserRoleAdmin
-		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			roleForDefaultAdmin = api.UserRoleFedAdmin // default admin is always federate administrator on master cluster
-		}
-		if ruser.Fullname == common.DefaultAdminUser && ruser.Role != "" && ruser.Role != roleForDefaultAdmin {
-			e := "Default admin user's role cannot be changed"
-			log.WithFields(log.Fields{"user": ruser.Fullname, "role": ruser.Role}).Error(e)
-			continue
-		}
 
 		user.Role = ruser.Role
 
