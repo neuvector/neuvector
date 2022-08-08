@@ -50,6 +50,7 @@
 #define ENV_TELE_SCANNER_EP    "TELEMETRY_SCANNER_EP"
 #define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
 #define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
+#define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -389,6 +390,11 @@ static pid_t fork_exec(int i)
         if ((telemetry_freq = getenv(ENV_TELEMETRY_FREQ)) != NULL) {
             args[a++] = "-telemetry_freq";
             args[a++] = telemetry_freq;
+        }
+        if ((enable = getenv(ENV_NO_DEFAULT_ADMIN)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-no_def_admin";
+            }
         }
         args[a] = NULL;
         break;

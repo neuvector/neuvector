@@ -152,6 +152,7 @@ const (
 	EventNameMemoryPressureController    = "Controller.Memory.Pressure"
 	EventNameK8sNvRBAC                   = "Kubenetes.NeuVector.RBAC"
 	EventNameGroupAutoPromote            = "Group.Auto.Promote"
+	EventNameAuthDefAdminPwdUnchanged    = "User.Password.Alert"
 )
 
 // TODO: these are not events but incidents
