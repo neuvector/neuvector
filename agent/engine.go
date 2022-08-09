@@ -252,6 +252,10 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 			if strings.HasPrefix(cmd, entryPtSig) { // matched at least two criteria
 				return true
 			}
+
+			if strings.HasPrefix(cmd, "/usr/local/bin/monitor") { // last matching
+				return true
+			}
 		}
 	}
 	return false
