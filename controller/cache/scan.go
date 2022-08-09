@@ -965,7 +965,7 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 		if id == share.CLUSScannerDBVersionID {
 			log.WithFields(log.Fields{"scanner": id}).Error("Cannot delete dummy db version scanner")
 		} else {
-			log.WithFields(log.Fields{"scanner": id}).Info("Delete scaner")
+			log.WithFields(log.Fields{"scanner": id}).Info("Delete scanner")
 
 			cacheMutexLock()
 			delete(scannerCacheMap, id)
