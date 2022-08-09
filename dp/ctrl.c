@@ -24,7 +24,7 @@ extern int dp_data_add_port(const char *iface, bool jumboframe, int thr_id);
 extern int dp_data_del_port(const char *iface, int thr_id);
 extern int dp_data_add_tap(const char *netns, const char *iface, const char *ep_mac, int thr_id);
 extern int dp_data_del_tap(const char *netns, const char *iface, int thr_id);
-extern int dp_data_add_nfq(const char *netns, const char *iface, const char *ep_mac, bool jumboframe, int thr_id);
+extern int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *ep_mac, bool jumboframe, int thr_id);
 extern int dp_data_del_nfq(const char *netns, const char *iface, int thr_id);
 extern int dp_read_ring_stats(dp_stats_t *s, int thr_id);
 extern int dp_read_conn_stats(conn_stats_t *s, int thr_id);
@@ -181,6 +181,7 @@ static int dp_ctrl_add_nfq_port(json_t *msg)
     const char *netns, *iface, *ep_mac;
     json_t *jumboframe_obj;
     bool jumboframe = false;
+    int qnum = 0;
 
     jumboframe_obj = json_object_get(msg, "jumboframe");
     if (jumboframe_obj != NULL) {
@@ -189,10 +190,12 @@ static int dp_ctrl_add_nfq_port(json_t *msg)
 
     netns = json_string_value(json_object_get(msg, "netns"));
     iface = json_string_value(json_object_get(msg, "iface"));
+    qnum = json_integer_value(json_object_get(msg, "qnum"));
+
     ep_mac = json_string_value(json_object_get(msg, "epmac"));
     DEBUG_CTRL("add nfq netns=%s iface=%s, jumboframe=%d\n", netns, iface, jumboframe);
 
-    return dp_data_add_nfq(netns, iface, ep_mac, jumboframe, 0);
+    return dp_data_add_nfq(netns, iface, qnum, ep_mac, jumboframe, 0);
 }
 
 static int dp_ctrl_del_nfq_port(json_t *msg)
@@ -1757,18 +1760,21 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
     int cnt3 = 0;
     int flag;
     const char *ruletype = json_string_value(json_object_get(msg, "ruletype"));
+    const char *wafruletype = json_string_value(json_object_get(msg, "wafruletype"));
     bool inside_rule = false;
+    bool wafinside_rule = false;
 
     if ( strcmp(ruletype, DLP_RULETYPE_INSIDE) == 0 ) {
         inside_rule = true;
     } else if ( strcmp(ruletype, DLP_RULETYPE_OUTSIDE) == 0 ) {
         inside_rule = false;
-    } else if ( strcmp(ruletype, WAF_RULETYPE_INSIDE) == 0 ) {
-        inside_rule = true;
-    } else if ( strcmp(ruletype, WAF_RULETYPE_OUTSIDE) == 0 ) {
-        inside_rule = false;
+    }
+    if ( strcmp(wafruletype, WAF_RULETYPE_INSIDE) == 0 ) {
+        wafinside_rule = true;
+    } else if ( strcmp(wafruletype, WAF_RULETYPE_OUTSIDE) == 0 ) {
+        wafinside_rule = false;
     } 
-    DEBUG_CTRL("ruletype %s, inside_rule %d\n", ruletype, inside_rule);
+    DEBUG_CTRL("ruletype %s, wafruletype %s, inside_rule %d, wafinside_rule %d\n", ruletype, wafruletype, inside_rule, wafinside_rule);
 
     obj = json_object_get(msg, "mac");
     flag = json_integer_value(json_object_get(msg, "flag"));
@@ -1796,6 +1802,7 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
 
         io_ep_t *ep = mac->ep;
         ep->dlp_inside = inside_rule;
+        ep->waf_inside = wafinside_rule;
         // policy ids/connection to be exempt of dlp check
         if ((flag & MSG_START) && rule_ids_obj != NULL) {
             int k;
@@ -2573,6 +2580,12 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             }
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_SVC_EXTIP)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_SVC_EXTIP);
+            }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_MESH_TO_SVR)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_MESH_TO_SVR);
+            }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_LINK_LOCAL)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_LINK_LOCAL);
             }
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;

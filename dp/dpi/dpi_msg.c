@@ -395,6 +395,11 @@ static void dpi_dump_policy()
 
             // Iterate through all ips
             fqdn_ipv4_item_t *ipv4_itr, *ipv4_next;
+            //for wildcard fqdn, it is possible that name<->iplist mapping is not established
+            //at the time of info print, so we need to initialize iplist to avoid crash
+            if(name_entry->r->iplist.prev==NULL && name_entry->r->iplist.next==NULL) {
+                CDS_INIT_LIST_HEAD(&(name_entry->r->iplist));
+            }
             cds_list_for_each_entry_safe(ipv4_itr, ipv4_next, &(name_entry->r->iplist), node) {
                 fprintf(logfp, "    FQDN match ip:"DBG_IPV4_FORMAT"\n", DBG_IPV4_TUPLE(ipv4_itr->ip));
             }

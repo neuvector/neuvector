@@ -24,6 +24,7 @@ import (
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/ruleid"
+	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
@@ -64,6 +65,8 @@ type hostCache struct {
 	state            string
 	timerTask        string
 	timerSched       time.Time
+	runningPods      utils.Set
+	runningCntrs     utils.Set
 }
 
 type agentCache struct {
@@ -179,6 +182,8 @@ type Context struct {
 	ocVersion                string
 	RancherEP                string // from yaml/helm chart
 	RancherSSO               bool   // from yaml/helm chart
+	TelemetryFreq            uint   // from yaml
+	CheckDefAdminFreq        uint   // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -339,12 +344,14 @@ func deriveWorkloadState(cache *workloadCache) string {
 
 func initHostCache(id string) *hostCache {
 	return &hostCache{
-		host:      &share.CLUSHost{ID: id},
-		agents:    utils.NewSet(),
-		workloads: utils.NewSet(),
-		wlSubnets: utils.NewSet(),
-		portWLMap: make(map[string]*workloadDigest), // host port to workload ID and port
-		ipWLMap:   make(map[string]*workloadDigest), // ip of host-scope to workload ID
+		host:         &share.CLUSHost{ID: id},
+		agents:       utils.NewSet(),
+		workloads:    utils.NewSet(),
+		wlSubnets:    utils.NewSet(),
+		portWLMap:    make(map[string]*workloadDigest), // host port to workload ID and port
+		ipWLMap:      make(map[string]*workloadDigest), // ip of host-scope to workload ID
+		runningPods:  utils.NewSet(),
+		runningCntrs: utils.NewSet(),
 	}
 }
 
@@ -1615,11 +1622,20 @@ const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 var unManagedWlTimer *time.Timer
 var uwlUpdated bool
 
-func startWorkerThread() {
+func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+
+	noTelemetry := false
+	telemetryFreq := ctx.TelemetryFreq
+	if telemetryFreq == 0 {
+		noTelemetry = true
+		telemetryFreq = 60
+	}
+	teleReportTicker := time.NewTicker(time.Duration(telemetryFreq) * time.Minute)
+
 	unManagedWlTimer.Stop()
 
 	if isLeader() {
@@ -1632,6 +1648,18 @@ func startWorkerThread() {
 			case <-usageReportTicker.C:
 				if isLeader() {
 					writeUsageReport()
+				}
+			case <-teleReportTicker.C:
+				if isLeader() {
+					if !noTelemetry {
+						if sendTelemetry, teleData := getTelemetryData(); sendTelemetry {
+							var param interface{} = &teleData
+							cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+						}
+					}
+					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
+						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
+					}
 				}
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
@@ -1650,7 +1678,7 @@ func startWorkerThread() {
 					// Remove stalled scanner
 					cacheMutexRLock()
 					for sid, cache := range scannerCacheMap {
-						// For built-in scanner, remove if controller does not exists.
+						// For built-in scanner, remove if controller does not exists. (20220621: no build-in scanner any more)
 						if cache.scanner.BuiltIn {
 							// Sometimes, NVSHAS-4116, controller notifications are received very late, after
 							// we already remove the scanners. Here is a work-around to wait at least the self
@@ -1680,7 +1708,24 @@ func startWorkerThread() {
 							}
 						}
 					}
+					autoscaleCfg := systemConfigCache.ScannerAutoscale
 					cacheMutexRUnlock()
+
+					taskCount := scan.RegTaskCount()
+					taskCount = taskCount + scanScher.TaskCount()
+					replicas := atomic.LoadUint32(&scannerReplicas)
+					if (autoscaleCfg.Strategy != api.AutoScaleImmediate && autoscaleCfg.Strategy != api.AutoScaleDelayed) ||
+						(autoscaleCfg.MinPods == autoscaleCfg.MaxPods) || (replicas == 0) ||
+						(replicas <= autoscaleCfg.MinPods && taskCount == 0) ||
+						(replicas >= autoscaleCfg.MaxPods && taskCount > 0) {
+						// no need to autoscale when:
+						// 1. autoscale is not enabled
+						// 2. the minimum scanner value is the same as the maximum scanner value
+						// 3. there is no task in the queue & the scanner count is the minimum configured value
+						// 4. there is task in the queue & the scanner count is the maximum configured value
+					} else {
+						rescaleScanner(autoscaleCfg, replicas, taskCount)
+					}
 				}
 			case ev := <-cctx.OrchChan:
 				log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Event received")
@@ -1723,7 +1768,7 @@ func startWorkerThread() {
 							hostName = n.IBMCloudWorkerID // is like "kube-c40msj4d0tb4oeriggqg-atibmcluste-default-000001f1"
 						}
 						k8sCache, ok := k8sHostInfoMap[hostName]
-						if !ok || k8sCache == nil {
+						if !ok {
 							k8sCache = &k8sHostCache{}
 						}
 						k8sCache.labels = n.Labels
@@ -1877,6 +1922,13 @@ func startWorkerThread() {
 							createServiceIPGroup(n)
 						}
 					}
+				case resource.RscTypeDeployment:
+					var replicas uint32
+					if ev.ResourceNew != nil {
+						n := ev.ResourceNew.(*resource.Deployment)
+						replicas = uint32(n.Replicas)
+					}
+					atomic.StoreUint32(&scannerReplicas, replicas)
 				/*
 						case resource.RscTypeMutatingWebhookConfiguration:
 							var n, o *resource.AdmissionWebhookConfiguration
@@ -2025,7 +2077,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	// we know whether we need to modify namesapce for admCtrl's namespaceSelector feature before orch watcher starts
 	admissionRuleInit()
 
-	startWorkerThread() // timer and orch channel
+	startWorkerThread(ctx) // timer and orch channel
 	startPolicyThread()
 
 	configInit()

@@ -35,7 +35,6 @@ type crioDriver struct {
 	sysInfo      *sysinfo.SysInfo
 	nodeHostname string
 	criClient    *grpc.ClientConn
-	crioClient   crioAPI.CrioClient
 	version      *criRT.VersionResponse
 	daemonInfo   types.CrioInfo
 
@@ -182,9 +181,11 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	crt := criRT.NewRuntimeServiceClient(cri)
 	req := &criRT.VersionRequest{}
-	ver, err := crt.Version(context.Background(), req)
+	ver, err := crt.Version(ctx, req)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to get crio version")
 		return nil, err
@@ -193,7 +194,7 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("crio connected")
 
 	driver := crioDriver{
-		sys: sys, version: ver, criClient: cri, crioClient: crio,
+		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod",
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon,
 	}
@@ -252,127 +253,82 @@ func (d *crioDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtr
 	return getDevice(id, d, d.sys)
 }
 
-func (d *crioDriver) getPodMeta(id string, pod *criRT.PodSandboxStatus, cinfo *types.ContainerInfo) *ContainerMeta {
-	name := "k8s_POD_" + pod.Labels["io.kubernetes.pod.name"] + "_" +
-		pod.Labels["io.kubernetes.pod.namespace"] + "_" +
-		pod.Labels["io.kubernetes.pod.uid"] + "_" +
-		fmt.Sprintf("%d", pod.Metadata.Attempt) // cinfo.Name
-	image := cinfo.Image
+///////
+type criContainerInfo struct {
+	Info struct {
+		SandboxID  string `json:"sandboxID"`
+		Pid        int    `json:"pid"`
+		Image      string `json:"image"`
+		Privileged bool   `json:"privileged"`
+	} `json:"info"`
+}
+
+func (d *crioDriver) getContainerInfo(infoMap map[string]string) (*criContainerInfo, error) {
+	// Info is extra information of the Runtime. The key could be arbitrary string, and
+	// value should be in json format.
+	var info criContainerInfo
+
+	jsonInfo := buildJsonFromMap(infoMap) // from map[string]string
+	if err := json.Unmarshal([]byte(jsonInfo), &info); err != nil {
+		// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
+		return nil, err
+	}
+	// log.WithFields(log.Fields{"info": info}).Debug()
+	return &info, nil
+}
+
+func (d *crioDriver) getPodMeta(id string, pod *criRT.PodSandboxStatusResponse, info *criContainerInfo) *ContainerMeta {
+	name := "k8s_POD_" + pod.Status.Labels["io.kubernetes.pod.name"] + "_" +
+		pod.Status.Labels["io.kubernetes.pod.namespace"] + "_" +
+		pod.Status.Labels["io.kubernetes.pod.uid"] + "_" +
+		fmt.Sprintf("%d", pod.Status.Metadata.Attempt) // cinfo.Name
 	meta := &ContainerMeta{
 		ID:       id,
 		Name:     name,
-		Image:    image,
-		Labels:   pod.Labels, // cinfo.Labels,
+		Pid:      info.Info.Pid,
+		Image:    info.Info.Image,
+		Labels:   pod.Status.Labels,
 		Hostname: "",
 		Envs:     make([]string, 0),
-		Pid:      cinfo.Pid,
-		Sandbox:  cinfo.Sandbox,
-		isChild:  cinfo.Sandbox != id,
+		Sandbox:  id,
+		isChild:  false,
 	}
-
-	if !meta.isChild && meta.Image == "" {
-		meta.Image = d.podImgRepoDigest
-		if meta.Image == "" {
-			meta.Image = "pod" // last resort
-		}
-	}
-
-	if pod.Linux == nil || pod.Linux.Namespaces == nil ||
-		pod.Linux.Namespaces.Options == nil {
-		log.Error("Fail to get sandbox linux namespaces")
-	} else {
-		opts := pod.Linux.Namespaces.Options
-		switch opts.Network {
-		case criRT.NamespaceMode_NODE:
-			meta.NetMode = "host"
-			meta.isChild = true
-		case criRT.NamespaceMode_CONTAINER:
-			meta.NetMode = "default"
-		case criRT.NamespaceMode_POD:
-			meta.NetMode = "default"
-			meta.isChild = true
-		}
-		switch opts.Pid {
-		case criRT.NamespaceMode_NODE:
-			meta.PidMode = "host"
-		case criRT.NamespaceMode_CONTAINER:
-		case criRT.NamespaceMode_POD:
-		}
-	}
-
 	return meta
 }
 
-func (d *crioDriver) getContainerMeta(id string, pod *criRT.PodSandboxStatus, cs *criRT.ContainerStatus, cinfo *types.ContainerInfo) *ContainerMeta {
-	name := "k8s_" + cs.Labels["io.kubernetes.container.name"] + "_" +
-		cs.Labels["io.kubernetes.pod.name"] + "_" +
-		cs.Labels["io.kubernetes.pod.namespace"] + "_" +
-		cs.Labels["io.kubernetes.pod.uid"] + "_" +
-		fmt.Sprintf("%d", cs.Metadata.Attempt) // cinfo.Name
-	image := cs.Image.Image // cinfo.Image
+func (d *crioDriver) getContainerMeta(id string, cs *criRT.ContainerStatusResponse, pod *criRT.PodSandboxStatusResponse, info *criContainerInfo) *ContainerMeta {
+	name := "k8s_" + cs.Status.Labels["io.kubernetes.container.name"] + "_" +
+		cs.Status.Labels["io.kubernetes.pod.name"] + "_" +
+		cs.Status.Labels["io.kubernetes.pod.namespace"] + "_" +
+		cs.Status.Labels["io.kubernetes.pod.uid"] + "_" +
+		fmt.Sprintf("%d", cs.Status.Metadata.Attempt)
+
 	meta := &ContainerMeta{
-		ID:       id,
-		Name:     name,
-		Image:    image,
-		Labels:   cs.Labels, // cinfo.Labels,
-		Hostname: "",
-		Envs:     make([]string, 0),
-		Pid:      cinfo.Pid,
-		Sandbox:  cinfo.Sandbox,
-		isChild:  cinfo.Sandbox != id,
+		ID:         id,
+		Name:       name,
+		Pid:        info.Info.Pid,
+		Sandbox:    info.Info.SandboxID,
+		Labels:     cs.Status.Labels,
+		Hostname:   "",
+		Envs:       make([]string, 0),
+		isChild:    true,
 	}
 
-	if pod.Linux == nil || pod.Linux.Namespaces == nil ||
-		pod.Linux.Namespaces.Options == nil {
-		log.Error("Fail to get sandbox linux namespaces")
+	if cs.Status.Image != nil {
+		meta.Image = cs.Status.Image.Image
 	} else {
-		opts := pod.Linux.Namespaces.Options
-		switch opts.Network {
-		case criRT.NamespaceMode_NODE:
-			meta.NetMode = "host"
-			meta.isChild = true
-		case criRT.NamespaceMode_CONTAINER:
-			meta.NetMode = "default"
-		case criRT.NamespaceMode_POD:
-			meta.NetMode = "default"
-			meta.isChild = true
-		}
-		switch opts.Pid {
-		case criRT.NamespaceMode_NODE:
-			meta.PidMode = "host"
-		case criRT.NamespaceMode_CONTAINER:
-		case criRT.NamespaceMode_POD:
-		}
+		meta.Image = cs.Status.ImageRef
 	}
-
 	return meta
 }
 
-type criContainerStatusExtension struct {
-	SandboxID  string `json:"sandboxID"`
-	Privileged bool   `json:"privileged"`
-}
-
-func (d *crioDriver) isPrivileged(pod *criRT.PodSandboxStatus, cs *criRT.ContainerStatusResponse) bool {
-	if scc, ok := pod.Annotations["openshift.io/scc"]; ok && scc == "privileged" {
-		return true
+func (d *crioDriver) isPrivileged(pod *criRT.PodSandboxStatus, cinfo *criContainerInfo) bool {
+	if scc, ok := pod.Annotations["openshift.io/scc"]; ok {
+		return scc == "privileged"
 	}
 
-	if cs != nil {
-		// Info is extra information of the Runtime. The key could be arbitrary string, and
-		// value should be in json format.
-		var ext criContainerStatusExtension
-		for _, v := range cs.Info { //
-			if err := json.Unmarshal([]byte(v), &ext); err != nil {
-				// log.WithFields(log.Fields{"err": err, "key": k, "value": v}).Debug()
-				continue
-			}
-
-			if ext.Privileged {
-				// log.WithFields(log.Fields{"Ext": ext}).Debug()
-				return true
-			}
-		}
+	if cinfo != nil {
+		return cinfo.Info.Privileged
 	}
 	return false
 }
@@ -381,15 +337,17 @@ func (d *crioDriver) isPrivileged(pod *criRT.PodSandboxStatus, cs *criRT.Contain
 // the crio API with specific container ID, we can retrieve the pod container info. The
 // later is usually triggered by process monitoring
 func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
-	crt := criRT.NewRuntimeServiceClient(d.criClient)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	resp_container, err := crt.ListContainers(context.Background(), &criRT.ListContainersRequest{})
+	crt := criRT.NewRuntimeServiceClient(d.criClient)
+	resp_container, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return nil, err
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(context.Background(), &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return nil, err
@@ -427,106 +385,87 @@ func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) 
 }
 
 func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
-	sandboxID := id                              // assumption
-	cinfo, err := d.crioClient.ContainerInfo(id) // http
-	if err != nil {
-		log.WithFields(log.Fields{"container": id, "error": err}).Error("Fail to get container info")
-	} else {
-		sandboxID = cinfo.Sandbox // update the correct sandboxID
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	//////
 	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	pod, err := crt.PodSandboxStatus(
-		context.Background(), &criRT.PodSandboxStatusRequest{PodSandboxId: sandboxID, Verbose: true})
-	if err != nil || pod.Status == nil {
-		log.WithFields(log.Fields{"container": id, "podID": sandboxID, "error": err}).Error("Fail to get sandbox status")
-		return nil, err
-	}
-
-	// fault-tolerent on the failure of http channel
-	if cinfo == nil {
-		// build an info structure
-		cinfo = &types.ContainerInfo{
-			Pid:     0, //
-			Sandbox: pod.Status.Id,
-		}
-	}
-
-	cs, err := crt.ContainerStatus(context.Background(), &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
-	if err != nil {
-		// This most likely be a pod
-	} else if cs.Status == nil {
-		log.WithFields(log.Fields{"container": id, "info": cinfo}).Error("Fail to get container status")
-		return nil, err
-	}
-
-	//	if cs == nil {
-	//		log.WithFields(log.Fields{"container": id, "info": cinfo, "pod": pod}).Info()
-	//	} else {
-	//		log.WithFields(log.Fields{"container": id, "info": cinfo, "pod": pod, "cs": cs}).Info()
-	//	}
-
 	var meta *ContainerMetaExtra
-	if cs == nil { // POD as sandbox
-		// POD
+	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
+	if err == nil && pod != nil {
+		if pod.Status == nil || pod.Info == nil {
+			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
+			return nil, err
+		}
+
+		podInfo, err2 := d.getContainerInfo(pod.Info)
+		if err2 != nil {
+			log.WithFields(log.Fields{"id":id, "info": pod.Info}).Error("Fail to get pod info")
+			return nil, err
+		}
+
+		// a POD
 		meta = &ContainerMetaExtra{
-			ContainerMeta: *d.getPodMeta(id, pod.Status, cinfo),
-			ImageDigest:   imageRef2Digest(cinfo.ImageRef),
-			Privileged:    d.isPrivileged(pod.Status, cs),
+			ContainerMeta: *d.getPodMeta(id, pod, podInfo),
+			Privileged:    d.isPrivileged(pod.Status, nil),
 			CreatedAt:     time.Unix(0, pod.Status.CreatedAt),
-			StartedAt:     time.Unix(0, pod.Status.CreatedAt),
-			Running:       (cinfo.Pid != 0) || (pod.Status.State == criRT.PodSandboxState_SANDBOX_READY),
+			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
 			Networks:      utils.NewSet(),
 		}
 
-		if cinfo.Image != "" {
-			if image, _ := d.GetImage(cinfo.Image); image != nil {
-				meta.ImageID = image.ID
-			}
-		}
-
-		if meta.ImageID != "" && meta.ImageDigest != "" {
-			if image, _ := d.GetImage(cinfo.ImageRef); image != nil {
-				meta.ImageID = image.ID
-			}
-		}
-
-		if meta.ImageID == "" {
-			// log.WithFields(log.Fields{"cinfo": cinfo}).Debug("fail to obtain pod id")
-			meta.ImageID = d.podImgID // from host's crio information
+		// image ID
+		if meta.Image == "" {
+			// from host's crio information
+			meta.Image = d.podImgRepoDigest
+			meta.ImageID = d.podImgID
 			meta.ImageDigest = d.podImgDigest
+		} else {
+			meta.ImageDigest = imageRef2Digest(meta.Image)
+			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
+				meta.ImageID = imageMeta.ID
+			}
 		}
 	} else {
-		// application Container
+		// an APP container
+		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
+		if err2 != nil || cs.Status == nil || cs.Info == nil {
+			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
+			return nil, err
+		}
+
+		csInfo, err2 := d.getContainerInfo(cs.Info)
+		if err2 != nil {
+			log.WithFields(log.Fields{"id": id, "info": cs.Info}).Error("Fail to get cs info")
+			return nil, err
+		}
+
+		pod, err = crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: csInfo.Info.SandboxID, Verbose: true})
+		if err2 != nil {
+			log.WithFields(log.Fields{"id": id, "csInfo": csInfo, "error": err}).Error("Fail to get its pod")
+			return nil, err
+		}
+
 		meta = &ContainerMetaExtra{
-			ContainerMeta: *d.getContainerMeta(id, pod.Status, cs.Status, cinfo),
+			ContainerMeta: *d.getContainerMeta(id, cs, pod, csInfo),
 			ImageDigest:   imageRef2Digest(cs.Status.ImageRef),
-			Privileged:    d.isPrivileged(pod.Status, cs),
+			Privileged:    d.isPrivileged(pod.Status, csInfo),
 			CreatedAt:     time.Unix(0, cs.Status.CreatedAt),
 			StartedAt:     time.Unix(0, cs.Status.StartedAt),
+			FinishedAt:    time.Unix(0, cs.Status.FinishedAt),
 			ExitCode:      int(cs.Status.ExitCode),
-			Running:       (cinfo.Pid != 0) || (cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING),
+			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 			Networks:      utils.NewSet(),
 			LogPath:       cs.Status.LogPath,
 		}
 
-		// otherwise, it is shown as "" in workload record
-		if cs.Status.FinishedAt != 0 {
-			meta.FinishedAt = time.Unix(0, cs.Status.FinishedAt)
-		}
-
-		// first try
-		if cs.Status.Image != nil && len(cs.Status.Image.Image) > 0 {
-			if image, _ := d.GetImage(cs.Status.Image.Image); image != nil {
-				meta.ImageID = image.ID
-			}
-		}
-
-		// 2nd chance
-		if meta.ImageID == "" && meta.ImageDigest != "" {
-			if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
-				meta.ImageID = image.ID
+		// image ID
+		if image, _ := d.GetImage(meta.Image); image != nil {
+			meta.ImageID = image.ID
+		} else {
+			// 2nd chance
+			if meta.ImageID == "" && meta.ImageDigest != "" {
+				if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
+					meta.ImageID = image.ID
+				}
 			}
 		}
 
@@ -535,19 +474,35 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		}
 	}
 
-	// avoid false-positive event which is different from the process monitor
-	if d.pidHost {
-		if cinfo.Pid > 0 {
-			if _, err := os.Stat(fmt.Sprintf("/proc/%d", cinfo.Pid)); err != nil {
-				log.WithFields(log.Fields{"id": id, "info": cinfo}).Debug("dead rootPid")
-				meta.Running = false
-			}
+	// retrive its network/pid namespace from the POD
+	if pod.Status.Linux == nil || pod.Status.Linux.Namespaces == nil || pod.Status.Linux.Namespaces.Options == nil {
+		log.Error("Fail to get sandbox linux namespaces")
+	} else {
+		opts := pod.Status.Linux.Namespaces.Options
+		switch opts.Network {
+		case criRT.NamespaceMode_NODE:
+			meta.NetMode = "host"
+		case criRT.NamespaceMode_CONTAINER:
+			meta.NetMode = "default"
+		case criRT.NamespaceMode_POD:
+			meta.NetMode = "default"
+		}
+		switch opts.Pid {
+		case criRT.NamespaceMode_NODE:
+			meta.PidMode = "host"
+		case criRT.NamespaceMode_CONTAINER:
+		case criRT.NamespaceMode_POD:
 		}
 	}
 
-	// patch POD finsihed time
-	if cs == nil && !meta.Running {
-		meta.FinishedAt = time.Now()
+	// avoid false-positive event which is different from the process monitor
+	if d.pidHost {
+		if meta.Pid > 0 {
+			if _, err := os.Stat(fmt.Sprintf("/proc/%d", meta.Pid)); err != nil {
+				log.WithFields(log.Fields{"id": id, "pid": meta.Pid}).Debug("dead rootPid")
+				meta.Running = false
+			}
+		}
 	}
 	return meta, nil
 }
@@ -557,11 +512,13 @@ func (d *crioDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 }
 
 func (d *crioDriver) GetImage(name string) (*ImageMeta, error) {
-	cimg := criRT.NewImageServiceClient(d.criClient)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	cimg := criRT.NewImageServiceClient(d.criClient)
 	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}}
 	// Extra check for resp and resp.Image because of NVSHAS-4778
-	if resp, err := cimg.ImageStatus(context.Background(), req); err == nil && resp != nil && resp.Image != nil {
+	if resp, err := cimg.ImageStatus(ctx, req); err == nil && resp != nil && resp.Image != nil {
 		meta := &ImageMeta{
 			ID:     resp.Image.Id,
 			Size:   int64(resp.Image.Size_),
@@ -584,15 +541,17 @@ func (d *crioDriver) GetImageFile(id string) (io.ReadCloser, error) {
 func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ids := utils.NewSet()
 	stops := utils.NewSet()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	crt := criRT.NewRuntimeServiceClient(d.criClient)
-	resp_containers, err := crt.ListContainers(context.Background(), &criRT.ListContainersRequest{})
+	resp_containers, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return ids, nil
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(context.Background(), &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return ids, nil
@@ -644,7 +603,7 @@ func (d *crioDriver) IsDaemonProcess(proc string, cmds []string) bool {
 }
 
 func (d *crioDriver) IsRuntimeProcess(proc string, cmds []string) bool {
-	return proc == "runc" || proc == "conmon" // an OCI container runtime monitor
+	return proc == "runc" || proc == "crio" || proc == "conmon" // an OCI container runtime monitor
 }
 
 func (d *crioDriver) GetParent(info *ContainerMetaExtra, pidMap map[int]string) (bool, string) {
@@ -677,8 +636,11 @@ func (d *crioDriver) GetStorageDriver() string {
 
 func (d *crioDriver) setPodImageInfo() error {
 	// log.WithFields(log.Fields{"repoDigest": d.podImgRepoDigest}).Debug("CRIO")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cimg := criRT.NewImageServiceClient(d.criClient)
-	if list, err := cimg.ListImages(context.Background(), &criRT.ListImagesRequest{}); err == nil {
+	if list, err := cimg.ListImages(ctx, &criRT.ListImagesRequest{}); err == nil {
 		for _, img := range list.Images {
 			// log.WithFields(log.Fields{"image": img}).Debug("CRIO")
 			for _, repoDig := range img.RepoDigests {

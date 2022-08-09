@@ -927,6 +927,7 @@ func CompileUriPermitsMapping() {
 			},
 			CONST_API_SYSTEM_CONFIG: []string{
 				"v1/system/config",
+				"v2/system/config",
 				"v1/system/config/webhook/*",
 			},
 			CONST_API_FED: []string{

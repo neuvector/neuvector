@@ -34,6 +34,7 @@ type DPDelTapPortReq struct {
 type DPNfqPort struct {
 	NetNS 		string `json:"netns"`
 	Iface 		string `json:"iface"`
+	Qnum		int    `json:"qnum"`
 	EPMAC 		string `json:"epmac"`
 	JumboFrame	*bool  `json:"jumboframe,omitempty"`
 }
@@ -302,6 +303,7 @@ type DPWorkloadDlpRule struct {
 	PolicyRuleIds []uint32          `json:"policy_rule_ids"`
 	PolWafRuleIds []uint32          `json:"polwaf_rule_ids"`
 	RuleType      string            `json:"ruletype"`
+	WafRuleType   string            `json:"wafruletype"`
 }
 
 type DPDlpRuleEntry struct {
@@ -318,6 +320,7 @@ type DPDlpCfg struct {
 	RuleIds      []uint32            `json:"rule_ids"`
 	WafRuleIds   []uint32            `json:"waf_rule_ids"`
 	RuleType     string              `json:"ruletype"`
+	WafRuleType  string              `json:"wafruletype"`
 }
 
 type DPDlpCfgReq struct {

@@ -22,6 +22,7 @@ import (
 	apiv1beta1 "github.com/neuvector/k8s/apis/admissionregistration/v1beta1"
 	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
 	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
+	appsv1 "github.com/neuvector/k8s/apis/apps/v1"
 	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
@@ -315,6 +316,17 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(corev1.Pod) },
 				func() k8s.ResourceList { return new(corev1.PodList) },
 				xlatePod,
+			},
+		},
+	},
+	RscTypeDeployment: k8sResource{
+		apiGroup: "apps",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(appsv1.Deployment) },
+				func() k8s.ResourceList { return new(appsv1.DeploymentList) },
+				xlateDeployment,
 			},
 		},
 	},
@@ -736,6 +748,27 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
+func xlateDeployment(obj k8s.Resource) (string, interface{}) {
+	if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
+		meta := o.Metadata
+		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-scanner-pod" {
+			return "", nil
+		}
+		r := &Deployment{
+			UID:      meta.GetUid(),
+			Name:     meta.GetName(),
+			Domain:   meta.GetNamespace(),
+			Replicas: 1,
+		}
+		if o.Spec.Replicas != nil && *o.Spec.Replicas > 0 {
+			r.Replicas = *o.Spec.Replicas
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
 func xlateImageRemoveURL(repo string) string {
 	if !strings.Contains(repo, share.DefaultOpenShiftRegistryURL) && !strings.Contains(repo, ":") {
 		return repo
@@ -1107,22 +1140,22 @@ func (d *kubernetes) listResource(rt string) ([]interface{}, error) {
 	return list, nil
 }
 
-func (d *kubernetes) StartWatchResource(rt string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
+func (d *kubernetes) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
 	if rt == RscTypeRBAC {
 		var err error
-		if err = d.startWatchResource(k8sRscTypeRole, d.cbResourceRole, scb); err != nil {
+		if err = d.startWatchResource(k8sRscTypeRole, ns, d.cbResourceRole, scb); err != nil {
 			d.StopWatchResource(rt)
 			return err
 		}
-		if err = d.startWatchResource(K8sRscTypeClusRole, d.cbResourceRole, scb); err != nil {
+		if err = d.startWatchResource(K8sRscTypeClusRole, ns, d.cbResourceRole, scb); err != nil {
 			d.StopWatchResource(rt)
 			return err
 		}
-		if err = d.startWatchResource(k8sRscTypeRoleBinding, d.cbResourceRoleBinding, scb); err != nil {
+		if err = d.startWatchResource(k8sRscTypeRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
 			d.StopWatchResource(rt)
 			return err
 		}
-		if err = d.startWatchResource(K8sRscTypeClusRoleBinding, d.cbResourceRoleBinding, scb); err != nil {
+		if err = d.startWatchResource(K8sRscTypeClusRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
 			d.StopWatchResource(rt)
 			return err
 		}
@@ -1131,11 +1164,11 @@ func (d *kubernetes) StartWatchResource(rt string, wcb orchAPI.WatchCallback, sc
 		d.lock.Unlock()
 		return nil
 	} else {
-		return d.startWatchResource(rt, wcb, scb)
+		return d.startWatchResource(rt, ns, wcb, scb)
 	}
 }
 
-func (d *kubernetes) startWatchResource(rt string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
+func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
 	log.WithFields(log.Fields{"resource": rt}).Debug()
 
 	maker, err := d.discoverResource(rt)
@@ -1157,7 +1190,7 @@ func (d *kubernetes) startWatchResource(rt string, wcb orchAPI.WatchCallback, sc
 		for {
 			ctx, cancel := context.WithCancel(context.Background())
 			d.lock.Lock()
-			watcher, err := d.client.Watch(ctx, k8s.AllNamespaces, maker.newObject())
+			watcher, err := d.client.Watch(ctx, ns, maker.newObject())
 			d.lock.Unlock()
 			if err != nil {
 				errCh <- err
@@ -1336,12 +1369,21 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeNode:
+		RscTypeDeployment:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
 			if _, p := xlatePod(r.(k8s.Resource)); p != nil {
 				return p, nil
+			}
+			return nil, common.ErrObjectNotFound
+		} else {
+			return nil, err
+		}
+	case RscTypeNode:
+		if r, err := d.getResource(rt, namespace, name); err == nil {
+			if _, n := xlateNode(r.(k8s.Resource)); n != nil {
+				return n, nil
 			}
 			return nil, common.ErrObjectNotFound
 		} else {
@@ -1418,6 +1460,11 @@ func (d *kubernetes) UpdateResource(rt string, res interface{}) error {
 	case RscTypeNamespace:
 		ns := res.(*corev1.Namespace)
 		if ns != nil && ns.Metadata != nil {
+			return d.updateResource(rt, res)
+		}
+	case RscTypeDeployment:
+		deploy := res.(*appsv1.Deployment)
+		if deploy != nil && deploy.Metadata != nil && deploy.Metadata.GetNamespace() == NvAdmSvcNamespace {
 			return d.updateResource(rt, res)
 		}
 	//case RscTypeMutatingWebhookConfiguration:
@@ -1602,7 +1649,8 @@ func AdjustAdmResForOC() {
 		}
 		roleInfo.rules = append(roleInfo.rules, rule)
 	}
-	if ocVersionMajor > 3 {
+	// ocVersionMajor == 0 : if k8s RBAC neuvector-binding-co is missing, we cannot get oc version. In this case treat it as oc 4.x
+	if ocVersionMajor == 0 || ocVersionMajor > 3 {
 		nvClusterRoles[NvOperatorsRole] = &k8sClusterRoleInfo{rules: []*k8sClusterRoleRuleInfo{
 			&k8sClusterRoleRuleInfo{
 				apiGroup:  "config.openshift.io",
@@ -1656,7 +1704,7 @@ func SetK8sVersion(k8sVer string) {
 func IsRancherFlavor() bool {
 	nsName := "cattle-system"
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
-		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Error("resource no found")
+		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 	} else {
 		svcnames := []string{"cattle-cluster-agent", "rancher"}
 		for _, svcname := range svcnames {
@@ -1688,4 +1736,24 @@ func IsRancherFlavor() bool {
 
 func SetLeader(lead bool) {
 	isLeader = lead
+}
+
+func UpdateDeploymentReplicates(name string, replicas int32) error {
+	obj, err := global.ORCH.GetResource(RscTypeDeployment, NvAdmSvcNamespace, name)
+	if err != nil {
+		log.WithFields(log.Fields{"name": name, "err": err}).Error("resource no found")
+		return err
+	} else {
+		deployObj := obj.(*appsv1.Deployment)
+		if deployObj != nil && deployObj.Spec != nil && deployObj.Spec.GetReplicas() != replicas {
+			deployObj.Spec.Replicas = &replicas
+			err = global.ORCH.UpdateResource(RscTypeDeployment, deployObj)
+			if err != nil {
+				log.WithFields(log.Fields{"name": name, "err": err}).Error("update resource failed")
+				return err
+			}
+		}
+	}
+
+	return nil
 }

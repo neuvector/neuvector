@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	consulapi "github.com/neuvector/neuvector/share/cluster/api"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const internalCertDir = "/etc/neuvector/certs/internal/"
@@ -29,6 +29,7 @@ const DefaultScannerGRPCPort = 18402
 const DefaultDataCenter string = "neuvector"
 
 var errPutCAS error = errors.New("CAS put error")
+var errSizeTooBig error = errors.New("size too big")
 
 const putRetryTimes int = 2
 const putRetryInterval time.Duration = time.Millisecond * 500
@@ -508,55 +509,107 @@ func putRev(key string, value []byte, rev uint64) error {
 }
 
 func PutQuiet(key string, value []byte) error {
-	return putBinary(key, value)
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		err = putBinary(key, value)
+	}
+	return err
 }
 
 func PutBinary(key string, value []byte) error {
-	log.WithFields(log.Fields{"key": key}).Debug("")
-	return putBinary(key, value)
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// we assume binary data is already in gzip format so do not try to gzip it again
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		log.WithFields(log.Fields{"key": key}).Debug()
+		err = putBinary(key, value)
+	}
+	return err
 }
 
 func PutQuietRev(key string, value []byte, rev uint64) error {
-	return putRev(key, value, rev)
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		err = putRev(key, value, rev)
+	}
+	return err
 }
 
 func Put(key string, value []byte) error {
-	log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("")
-	return putBinary(key, value)
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug()
+		err = putBinary(key, value)
+	}
+	return err
 }
 
 func PutRev(key string, value []byte, rev uint64) error {
-	log.WithFields(log.Fields{"key": key, "value": string(value), "rev": rev}).Debug("")
-	return putRev(key, value, rev)
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		log.WithFields(log.Fields{"key": key, "value": string(value), "rev": rev}).Debug()
+		err = putRev(key, value, rev)
+	}
+	return err
 }
 
 // The difference between putRev(k, v, 0) and PutIfNotExist(k, v) is the later return nil error
 // when the key exists
 func PutIfNotExist(key string, value []byte, logKeyOnly bool) error {
-	if logKeyOnly {
-		log.WithFields(log.Fields{"key": key}).Debug("")
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
 	} else {
-		log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("")
-	}
+		if logKeyOnly {
+			log.WithFields(log.Fields{"key": key}).Debug("")
+		} else {
+			log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("")
+		}
 
-	err := driver.PutIfNotExist(key, value)
-	if err != nil && err != errPutCAS {
-		for i := 0; i < putRetryTimes; i++ {
-			time.Sleep(putRetryInterval)
-			log.WithFields(log.Fields{"retry": i}).Debug(err)
-			err = driver.PutIfNotExist(key, value)
-			if err == nil || err == errPutCAS {
-				break
+		err = driver.PutIfNotExist(key, value)
+		if err != nil && err != errPutCAS {
+			for i := 0; i < putRetryTimes; i++ {
+				time.Sleep(putRetryInterval)
+				log.WithFields(log.Fields{"retry": i}).Debug(err)
+				err = driver.PutIfNotExist(key, value)
+				if err == nil || err == errPutCAS {
+					break
+				}
 			}
 		}
-	}
-	if err == errPutCAS {
-		// no error but key is already existed, ignore the update.
-		// Suppress log.
-		// log.WithFields(log.Fields{"key": key}).Debug("Put key CAS error")
-		err = nil
-	} else if err != nil {
-		log.WithFields(log.Fields{"key": key, "error": err}).Error("Failed to put key")
+		if err == errPutCAS {
+			// no error but key is already existed, ignore the update.
+			// Suppress log.
+			// log.WithFields(log.Fields{"key": key}).Debug("Put key CAS error")
+			err = nil
+		} else if err != nil {
+			log.WithFields(log.Fields{"key": key, "error": err}).Error("Failed to put key")
+		}
 	}
 	return err
 }
@@ -642,27 +695,50 @@ func min(a, b int) int {
 }
 
 func (t *ClusterTransact) PutBinary(key string, value []byte) {
-	t.entries = append(t.entries, transactEntry{
-		verb: clusterTransactPut, key: key, value: value,
-	})
+	if len(value) >= KVValueSizeMax {
+		// we assume binary data is already in gzip format so do not try to gzip it again
+		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
+	} else {
+		t.entries = append(t.entries, transactEntry{
+			verb: clusterTransactPut, key: key, value: value,
+		})
+	}
 }
 
 func (t *ClusterTransact) Put(key string, value []byte) {
-	log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("Transact")
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
+	} else {
+		log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("Transact")
 
-	t.PutBinary(key, value)
+		t.PutBinary(key, value)
+	}
 }
 
 func (t *ClusterTransact) PutQuiet(key string, value []byte) {
-	t.PutBinary(key, value)
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
+	} else {
+		t.PutBinary(key, value)
+	}
 }
 
 func (t *ClusterTransact) PutRev(key string, value []byte, rev uint64) {
-	log.WithFields(log.Fields{"key": key, "value": string(value), "rev": rev}).Debug("Transact")
+	if len(value) >= KVValueSizeMax {
+		// [20220712] for consul limitation
+		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
+		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
+	} else {
+		log.WithFields(log.Fields{"key": key, "value": string(value), "rev": rev}).Debug("Transact")
 
-	t.entries = append(t.entries, transactEntry{
-		verb: clusterTransactPutRev, key: key, value: value, rev: rev,
-	})
+		t.entries = append(t.entries, transactEntry{
+			verb: clusterTransactPutRev, key: key, value: value, rev: rev,
+		})
+	}
 }
 
 func (t *ClusterTransact) Delete(key string) {

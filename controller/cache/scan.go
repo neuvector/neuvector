@@ -14,6 +14,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/controller/scheduler"
@@ -74,6 +75,16 @@ const maxRetry = 5
 var scanCfg share.CLUSScanConfig
 var scanScher scheduler.Schd
 var scanMap map[string]*scanInfo = make(map[string]*scanInfo)
+
+const (
+	task_Q_Unknown = iota
+	task_Q_Empty
+	task_Q_NonEmpty
+)
+
+var scannerReplicas uint32
+var lastTaskQState int = task_Q_Unknown
+var contTaskQStateTime time.Time // start time of the time window for scaling up/down calculation
 
 // Within scanMutex, cacheMutex can be used; but not the other way around.
 var scanMutex sync.RWMutex
@@ -697,6 +708,20 @@ func scanHostDelete(id string, param interface{}) {
 	scanMapDelete(id)
 }
 
+func scanAgentDelete(id string, param interface{}) {
+	// purge incomplete scanning jobs but keep completed scans
+	scanMutexLock()
+	defer scanMutexUnlock()
+	for task, info := range scanMap {
+		if info.agentId == id {
+			if info.cveDBCreateTime ==  "" {	// incompleted, not done yet
+				log.WithFields(log.Fields{"task": task, "info": info}).Info()
+				delete(scanMap, task)
+			}
+		}
+	}
+}
+
 func scanConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -1009,6 +1034,57 @@ func scanBecomeScanner() {
 		}
 	}
 	scanMutexUnlock()
+}
+
+func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners uint32, taskCount int) {
+	var setTimeWindow bool
+	var newReplicas uint32 = totalScanners
+
+	if taskCount == 0 {
+		// there is no scanning task waiting in the queue now
+		if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_NonEmpty {
+			// init/had scanning task -> no scanning task now
+			lastTaskQState = task_Q_Empty
+			setTimeWindow = true
+		} else {
+			// had no scanning task -> still has no scanning task now
+			if time.Since(contTaskQStateTime) > time.Duration(180)*time.Second {
+				// it has been continuously long enough time that no scanning task is waiting in the queue. reduce scanner count by 1
+				newReplicas = newReplicas - 1
+				lastTaskQState = task_Q_Unknown // reset calculation time window
+				contTaskQStateTime = time.Time{}
+			}
+		}
+	} else {
+		// there is scanning task waiting in the queue now
+		if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_Empty {
+			// init/had no scanning task -> has scanning task now
+			lastTaskQState = task_Q_NonEmpty
+			setTimeWindow = true
+		} else {
+			// had scanning task -> still has scanning task now
+			if autoscaleCfg.Strategy == api.AutoScaleImmediate || time.Since(contTaskQStateTime) > time.Duration(90)*time.Second {
+				// it has been continuously long enough time that at lease one scanning task is waiting in the queue. increase scanner count by 1
+				newReplicas = newReplicas + 1
+				lastTaskQState = task_Q_Unknown // reset calculation time window
+				contTaskQStateTime = time.Time{}
+			}
+		}
+	}
+
+	if newReplicas < autoscaleCfg.MinPods {
+		newReplicas = autoscaleCfg.MinPods
+	} else if newReplicas > autoscaleCfg.MaxPods {
+		newReplicas = autoscaleCfg.MaxPods
+	}
+	if newReplicas != totalScanners {
+		if err := resource.UpdateDeploymentReplicates("neuvector-scanner-pod", int32(newReplicas)); err == nil {
+			log.WithFields(log.Fields{"from": totalScanners, "to": newReplicas}).Info("autoscale")
+		}
+	}
+	if setTimeWindow {
+		contTaskQStateTime = time.Now().UTC()
+	}
 }
 
 func scanInit() {

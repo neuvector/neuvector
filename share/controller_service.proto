@@ -106,6 +106,8 @@ message CLUSConnection {
 	bool Xff = 26;
 	bool SvcExtIP = 27;
 	bool ToSidecar = 28;
+	bool MeshToSvr = 29;
+	bool LinkLocal = 30;
 }
 
 message CLUSConnectionArray {

@@ -1459,7 +1459,7 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 	for _, g := range *curGroups {
 		if !isNvIpGroup && (g.OriginalName == groupCfg.Name) {
 			e := "Group already added"
-			log.WithFields(log.Fields{"name": groupCfg.Name}).Error(e)
+			log.WithFields(log.Fields{"name": groupCfg.Name}).Info(e)
 			dst := append([]api.RESTCriteriaEntry(nil), *groupCfg.Criteria...)
 			if !compareCLUSCriteria(*g.Criteria, dst, false) {
 				retMsg = fmt.Sprintf("%s Rule format error:   Group %s Group added with different Criteria", reviewTypeDisplay, groupCfg.Name)

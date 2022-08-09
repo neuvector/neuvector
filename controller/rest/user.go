@@ -177,6 +177,19 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
 		return
 	}
+	if username == common.DefaultAdminUser {
+		fedRole := cacher.GetFedMembershipRoleNoAuth()
+		roleForDefaultAdmin := api.UserRoleAdmin
+		if fedRole == api.FedRoleMaster {
+			roleForDefaultAdmin = api.UserRoleFedAdmin
+		}
+		if user.Role != roleForDefaultAdmin {
+			e := fmt.Sprintf("User \"admin\" must be %s role", roleForDefaultAdmin)
+			log.WithFields(log.Fields{"fedRole": fedRole, "error": err}).Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return
+		}
+	}
 	if err := clusHelper.CreateUser(&user); err != nil {
 		e := "Failed to write to the cluster"
 		log.WithFields(log.Fields{"error": err}).Error(e)
@@ -281,6 +294,7 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		resp.PwdDaysUntilExpire = -1
 		resp.PwdHoursUntilExpire = 0
 	}
+	resp.GlobalPermits, resp.DomainPermits, _ = access.GetDomainPermissions(user.Role, user.RoleDomains)
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
 }

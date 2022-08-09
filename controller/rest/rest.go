@@ -71,6 +71,9 @@ var _fedServerChan chan bool
 
 var _licSigKeyEnv int
 
+var _teleNeuvectorURL string
+var _teleScannerURL string
+
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
 
@@ -1203,15 +1206,18 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev     *common.LocalDevice
-	EvQueue      cluster.ObjectQueueInterface
-	AuditQueue   cluster.ObjectQueueInterface
-	Messenger    cluster.MessengerInterface
-	Cacher       cache.CacheInterface
-	Scanner      scan.ScanInterface
-	FedPort      uint
-	RESTPort     uint
-	PwdValidUnit uint
+	LocalDev         *common.LocalDevice
+	EvQueue          cluster.ObjectQueueInterface
+	AuditQueue       cluster.ObjectQueueInterface
+	Messenger        cluster.MessengerInterface
+	Cacher           cache.CacheInterface
+	Scanner          scan.ScanInterface
+	FedPort          uint
+	RESTPort         uint
+	PwdValidUnit     uint
+	TeleNeuvectorURL string
+	TeleScannerURL   string
+	TeleCurrentVer   string
 }
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
@@ -1234,6 +1240,30 @@ func InitContext(ctx *Context) {
 
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
 		_pwdValidUnit = time.Duration(ctx.PwdValidUnit)
+	}
+
+	_teleNeuvectorURL = ctx.TeleNeuvectorURL
+	_teleScannerURL = ctx.TeleScannerURL
+	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+		// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
+		// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
+		// nvSemanticVersion : in the format v{major}.{minor}.{patch}
+		var ver share.CLUSCtrlVersion
+		json.Unmarshal(value, &ver)
+		if strings.HasPrefix(ver.CtrlVersion, "interim/") {
+			// it's daily dev build image
+			if ctx.TeleCurrentVer == "" {
+				nvAppFullVersion = "5.1.0"
+			} else {
+				nvAppFullVersion = ctx.TeleCurrentVer
+			}
+		} else {
+			// it's official release image
+			nvAppFullVersion = ver.CtrlVersion[1:]
+		}
+		if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
+			nvSemanticVersion = "v" + ss[0]
+		}
 	}
 
 	initHttpClients()
@@ -1309,6 +1339,7 @@ func StartRESTServer() {
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
 	r.GET("/v1/system/rbac", handlerSystemGetRBAC)
 	r.PATCH("/v1/system/config", handlerSystemConfig)
+	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
 	r.PATCH("/v1/system/config/webhook/:name", handlerSystemWebhookConfig)  // supported 'scope' query parameter values: "fed"/"local"(default).
 	r.DELETE("/v1/system/config/webhook/:name", handlerSystemWebhookDelete) // supported 'scope' query parameter values: "fed"/"local"(default).
@@ -1799,6 +1830,14 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	case share.StopFedRestServer:
 		_fedPollingTimer.Stop()
 		stopFedRestServer()
+	case share.ReportTelemetryData:
+		if param1 != nil && _teleNeuvectorURL != "" {
+			if teleData, ok := param1.(*common.TelemetryData); ok && teleData != nil {
+				go reportTelemetryData(*teleData)
+			} else {
+				err = fmt.Errorf("wrong type")
+			}
+		}
 	}
 
 	return err

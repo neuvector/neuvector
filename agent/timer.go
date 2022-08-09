@@ -548,6 +548,8 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		Xff:          c.Xff,
 		SvcExtIP:     c.SvcExtIP,
 		ToSidecar:    c.ToSidecar,
+		MeshToSvr:    c.MeshToSvr,
+		LinkLocal:    c.LinkLocal,
 	}
 }
 

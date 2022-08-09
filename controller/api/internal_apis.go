@@ -183,3 +183,23 @@ type RESTInternalSystemData struct {
 	Ingress []*RESTExposedEndpoint `json:"ingress"`
 	Egress  []*RESTExposedEndpoint `json:"egress"`
 }
+
+type RESTK8sNvRbacStatus struct {
+	ClusterRoleErrors        []string              `json:"clusterrole_errors"`
+	ClusterRoleBindingErrors []string              `json:"clusterrolebinding_errors"`
+	RoleBindingErrors        []string              `json:"rolebinding_errors"`
+	NvUpgradeInfo            *RESTCheckUpgradeInfo `json:"neuvector_upgrade_info"`
+	ScannerUpgradeInfo       *RESTCheckUpgradeInfo `json:"scanner_upgrade_info"`
+}
+
+// telemetry
+type RESTUpgradeInfo struct {
+	Version     string // must be in semantic versioning, like v5.0.0
+	ReleaseDate string
+	Tag         string
+}
+
+type RESTCheckUpgradeInfo struct {
+	MinUpgradeVersion *RESTUpgradeInfo `json:"min_upgrade_version"`
+	MaxUpgradeVersion *RESTUpgradeInfo `json:"max_upgrade_version"`
+}

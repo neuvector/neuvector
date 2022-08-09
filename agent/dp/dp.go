@@ -188,6 +188,16 @@ func dpMsgConnection(msg []byte) {
 			// connection has client->svcExtIP violation
 			cc.SvcExtIP = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_MESH_TO_SVR) != 0 {
+			// appcontainer to sidecar connection has
+			// client to remote svr detection
+			cc.MeshToSvr = true
+		}
+		if (conn.Flags & C.DPCONN_FLAG_LINK_LOCAL) != 0 {
+			// link local 169.254.0.0 is special svc loopback
+			// used by cilium CNI
+			cc.LinkLocal = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),

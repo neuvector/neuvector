@@ -773,55 +773,60 @@ func doesMapContain(key, value string, propMap map[string]string) bool {
 	return false
 }
 
-// does propKey=propValue matches kvMap(criteria)
-func doesPropMatchCrt(propKey, propValue string, kvMap map[string]string) bool {
-	if value, exist := kvMap[propKey]; exist {
+
+func doesCrtContainProp(propKey, propValue string, kvMap map[string][]string) bool {
+	if crtValues, exist := kvMap[propKey]; exist {
 		// kvMap contains propKey
-		if value != "" {
-			// does kvMap contain propKey=propValue?
-			return share.EqualMatch(value, propValue)
+		for _, crtValue := range crtValues {
+			// crtValue of "" means user only cares whether propKey exists in criteria
+			// otherwise check that propValue equals crtValue
+			if crtValue == "" || share.EqualMatch(crtValue, propValue) {
+				return true
+			}
 		}
-		return true
 	}
 	return false
 }
 
 func isMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string]string) (bool, bool) {
 	if len(propMap) > 0 {
-		kvMap := make(map[string]string, len(crt.ValueSlice)) // the key=value configured in criteria
+		kvMap := make(map[string][]string) // the key=value configured in criteria
 		for _, crtValue := range crt.ValueSlice {
 			var key, value string
 			if i := strings.Index(crtValue, "="); i >= 0 {
 				key = strings.TrimSpace(crtValue[:i])
 				value = strings.TrimSpace(crtValue[i+1:])
+				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
+				kvMap[key] = append(kvMap[key], "")
 			}
-			kvMap[key] = value
 		}
 		switch crt.Op {
 		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny:
-			for key, value := range kvMap {
-				switch crt.Op {
-				case share.CriteriaOpContainsAll:
-					if !doesMapContain(key, value, propMap) {
-						return false, true
+			for key, values := range kvMap {
+				for _, value := range values {
+					switch crt.Op {
+					case share.CriteriaOpContainsAll:
+						if !doesMapContain(key, value, propMap) {
+							return false, true
+						}
+					case share.CriteriaOpContainsAny:
+						if doesMapContain(key, value, propMap) {
+							return true, true
+						}
+					case share.CriteriaOpNotContainsAny:
+						if doesMapContain(key, value, propMap) {
+							return false, false
+						}
+					default:
+						log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
 					}
-				case share.CriteriaOpContainsAny:
-					if doesMapContain(key, value, propMap) {
-						return true, true
-					}
-				case share.CriteriaOpNotContainsAny:
-					if doesMapContain(key, value, propMap) {
-						return false, false
-					}
-				default:
-					log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
 				}
 			}
 		case share.CriteriaOpContainsOtherThan:
 			for propKey, propValue := range propMap {
-				if !doesPropMatchCrt(propKey, propValue, kvMap) {
+				if !doesCrtContainProp(propKey, propValue, kvMap) {
 					// in propMap there is an entry that doesn't match crtValue
 					return true, true
 				}
@@ -868,41 +873,44 @@ func doesComplexMapContain(key, value string, propMap map[string][]string) bool 
 
 func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string][]string) (bool, bool) {
 	if len(propMap) > 0 {
-		kvMap := make(map[string]string, len(crt.ValueSlice)) // the key=value configured in criteria
+		kvMap := make(map[string][]string) // the key=value configured in criteria
 		for _, crtValue := range crt.ValueSlice {
 			var key, value string
 			if i := strings.Index(crtValue, "="); i >= 0 {
 				key = strings.TrimSpace(crtValue[:i])
 				value = strings.TrimSpace(crtValue[i+1:])
+				kvMap[key] = append(kvMap[key], value)
 			} else {
-				key = crtValue
+				key = strings.TrimSpace(crtValue)
+				kvMap[key] = append(kvMap[key], "")
 			}
-			kvMap[key] = value
 		}
 		switch crt.Op {
 		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny:
-			for key, value := range kvMap {
-				switch crt.Op {
-				case share.CriteriaOpContainsAll:
-					if !doesComplexMapContain(key, value, propMap) {
-						return false, true
+			for key, values := range kvMap {
+				for _, value := range values {
+					switch crt.Op {
+					case share.CriteriaOpContainsAll:
+						if !doesComplexMapContain(key, value, propMap) {
+							return false, true
+						}
+					case share.CriteriaOpContainsAny:
+						if doesComplexMapContain(key, value, propMap) {
+							return true, true
+						}
+					case share.CriteriaOpNotContainsAny:
+						if doesComplexMapContain(key, value, propMap) {
+							return false, false
+						}
+					default:
+						log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
 					}
-				case share.CriteriaOpContainsAny:
-					if doesComplexMapContain(key, value, propMap) {
-						return true, true
-					}
-				case share.CriteriaOpNotContainsAny:
-					if doesComplexMapContain(key, value, propMap) {
-						return false, false
-					}
-				default:
-					log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
 				}
 			}
 		case share.CriteriaOpContainsOtherThan:
 			for propKey, propValues := range propMap {
 				for _, propValue := range propValues {
-					if !doesPropMatchCrt(propKey, propValue, kvMap) {
+					if !doesCrtContainProp(propKey, propValue, kvMap) {
 						// in propMap there is an entry that doesn't match crtValue
 						return true, true
 					}
@@ -1128,6 +1136,15 @@ func isImageCriterionMet(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmC
 	return false, true
 }
 
+func isModulesCriterionMet(crt *share.CLUSAdmRuleCriterion, modules []*share.ScanModule) (bool, bool) {
+	var nameVersionMap map[string][]string = make(map[string][]string)
+	for _, module := range modules {
+		nameVersionMap[module.Name] = append(nameVersionMap[module.Name], module.Version)
+	}
+
+	return isComplexMapCriterionMet(crt, nameVersionMap)
+}
+
 func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]string) map[string][]string {
 	size := len(propFromYaml)
 	if len(propFromImage) > size {
@@ -1271,6 +1288,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			}
 		case share.CriteriaKeyRequestLimit:
 			met, positive = isResourceLimitCriterionMet(crt, c)
+		case share.CriteriaKeyModules:
+			met, positive = isModulesCriterionMet(crt, scannedImage.Modules)
 		default:
 			met, positive = false, true
 		}

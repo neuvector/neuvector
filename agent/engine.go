@@ -109,6 +109,7 @@ type localSystemInfo struct {
 	tapProxymesh    bool
 	jumboFrameMTU   bool
 	xffEnabled      bool
+	ciliumCNI       bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -137,6 +138,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	tapProxymesh:     defaultTapProxymesh,
 	jumboFrameMTU:    false,
 	xffEnabled:       defaultXffEnabled,
+	ciliumCNI:        false,
 }
 
 func gInfoLock() {
@@ -242,7 +244,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 
 	// 2nd screening: handle the exited child container at the last part
 	if rootPid == 0 {
-		log.Debug("invalid root pid")
+		// log.Debug("invalid root pid")
 		return true // skipped the test
 	}
 
@@ -532,7 +534,10 @@ func delProxyMeshMac(c *containerData, withlock bool) {
 	}
 }
 
-func getProxyMeshAppMap(c *containerData) map[share.CLUSProtoPort]*share.CLUSApp {
+func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPort]*share.CLUSApp {
+	if listenAll {
+		return nil
+	}
 	proxyMeshApp := make(map[share.CLUSProtoPort]*share.CLUSApp)
 	for port, app := range c.appMap {
 		proxyMeshApp[port] = app
@@ -586,22 +591,22 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 		//traffic between sidecar proxy and app container cannot be enforced
 		//as regular veth pair, we need to set up iptable rules with NFQUEUE
 		//in container's namespace, and dp need to create nfq handle(nfq_open)
-		proxyMeshApp := getProxyMeshAppMap(c)
+		proxyMeshApp := getProxyMeshAppMap(c, true)
 		if c.nfq == false {
-			err := pipe.CreateNfqRules(c.pid, true, proxyMeshApp)
+			err := pipe.CreateNfqRules(c.pid, 0, true, true, "lo", proxyMeshApp)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create nfq iptable rules")
 			} else {
 				c.nfq = true
 				jumboFrame := gInfo.jumboFrameMTU
 				//create dp nfq handle
-				dp.DPCtrlAddNfqPort(netns, "lo", lo_mac, &jumboFrame)
+				dp.DPCtrlAddNfqPort(netns, "lo", 0, lo_mac, &jumboFrame)
 			}
 		} else {
-			pipe.CreateNfqRules(c.pid, false, proxyMeshApp)
+			pipe.CreateNfqRules(c.pid, 0, false, true, "lo", proxyMeshApp)
 			jumboFrame := gInfo.jumboFrameMTU
 			//create dp nfq handle
-			dp.DPCtrlAddNfqPort(netns, "lo", lo_mac, &jumboFrame)
+			dp.DPCtrlAddNfqPort(netns, "lo", 0, lo_mac, &jumboFrame)
 		}
 	} else {
 		if restore {
@@ -1155,7 +1160,36 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 	}
 }
 
+func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
+	if c.hostMode {
+		return nil, errHostModeUnsupported
+	}
+	// we check parentNS
+	if c.parentNS != "" {
+		return nil, errChildUnsupported
+	}
+
+	log.WithFields(log.Fields{"container": c.id}).Debug("")
+
+	netns := global.SYS.GetNetNamespacePath(c.pid)
+	if !c.quar && !c.inline && restore {
+		for _, pair := range c.intcpPairs {
+			//delete dp nfq handle
+			dp.DPCtrlDelNfqPort(netns, pair.Port)
+		}
+	}
+	//for ciliumCNI we do not pull container ports, only read ports
+	newPairs, err := pipe.InspectContainerPorts(c.pid, c.intcpPairs)
+	if err != nil {
+		log.WithFields(log.Fields{"container": c.id, "error": err}).Error("NFQ Failed to inspect port")
+	}
+	return newPairs, err
+}
+
 func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
+	if driver == pipe.PIPE_CLM {
+		return programNfqPorts(c, restore)
+	}
 	// Platform containers' interfaces should be inspected, so instead of check against hasDatapath,
 	// we check parentNS
 	if c.hostMode {
@@ -1208,7 +1242,83 @@ func programBridge(c *containerData) {
 	}
 }
 
+func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
+	if c.hostMode || !c.hasDatapath {
+	   return
+	}
+
+	log.WithFields(log.Fields{"container": c.id}).Debug("")
+
+	netns := global.SYS.GetNetNamespacePath(c.pid)
+
+	macs := make([]string, len(c.intcpPairs))
+	for i, pair := range c.intcpPairs {
+	   macs[i] = pair.MAC.String()
+	}
+
+	var oldMAC, pMAC net.HardwareAddr
+	tap := false
+	//pass containers IP to ep so that ingress/egress
+	//direction can be decided by comparing src/dst ip
+	//with container IP, nfq packet does not have l2 mac
+	pAddrs := make([]net.IP, 0)
+	for _, pair := range c.intcpPairs {
+		for _, addr := range pair.Addrs {
+			pAddrs = append(pAddrs, addr.IPNet.IP)
+		}
+	}
+	if c.quar || c.inline {
+		proxyMeshApp := getProxyMeshAppMap(c, true)
+		jumboFrame := gInfo.jumboFrameMTU
+		for idx, pair := range c.intcpPairs {
+			if macChangePairs != nil {
+				if oldPair, ok := macChangePairs[pair.Port]; ok {
+					oldMAC = oldPair.MAC
+				}
+			}
+			dp.DPCtrlDelTapPort(netns, pair.Port)
+			dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, pAddrs)
+			idx++
+			if c.nfq == false {
+				err := pipe.CreateNfqRules(c.pid, idx, true, false, pair.Port, proxyMeshApp)
+				if err != nil {
+					log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create nfq iptable rules")
+				} else {
+					c.nfq = true
+					//create dp nfq handle
+					dp.DPCtrlAddNfqPort(netns, pair.Port, idx, pair.MAC, &jumboFrame)
+				}
+			} else {
+				pipe.CreateNfqRules(c.pid, idx, false, false, pair.Port, proxyMeshApp)
+				//create dp nfq handle
+				dp.DPCtrlAddNfqPort(netns, pair.Port, idx, pair.MAC, &jumboFrame)
+			}
+		}
+	} else {
+	   for _, pair := range c.intcpPairs {
+		  if macChangePairs != nil {
+			 if oldPair, ok := macChangePairs[pair.Port]; ok {
+				oldMAC = oldPair.MAC
+			 }
+		  }
+		  dp.DPCtrlAddTapPort(netns, pair.Port, pair.MAC)
+		  dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, nil)
+	   }
+	   tap = true
+	}
+	if cfgApp {
+	   dp.DPCtrlConfigMAC(macs, &tap, c.appMap)
+	} else {
+	   dp.DPCtrlConfigMAC(macs, &tap, nil)
+	}
+ }
+
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
+	if driver == pipe.PIPE_CLM {
+		programNfqDP(c, cfgApp, macChangePairs)
+		return
+	}
+
 	if c.hostMode || !c.hasDatapath {
 		return
 	}
@@ -1334,6 +1444,14 @@ func isNeuvectorContainerById(id string) bool {
 	defer gInfoRUnlock()
 	_, ok := gInfo.neuContainers[id]
 	return ok
+}
+
+// oc49 and above: pod process is none on the cri-o
+func isEmptyProcessPod(info *container.ContainerMetaExtra) bool {
+	if global.RT.String() == container.RuntimeCriO {
+		return (info.Pid == 0) && info.ID == info.Sandbox
+	}
+	return false
 }
 
 //////
@@ -1487,14 +1605,16 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	}
 
 	// fill RunAsRoot flag
-	if _, ppid, ruid, _ := osutil.GetProcessUIDs(info.Pid); ppid >= 0 {
-		info.RunAsRoot = ruid == 0
-	} else {
-		if !osutil.IsPidValid(info.Pid) {
-			log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("rootPid exited")
-			return // container already exited
+	if !isEmptyProcessPod(info) {
+		if _, ppid, ruid, _ := osutil.GetProcessUIDs(info.Pid); ppid >= 0 {
+			info.RunAsRoot = ruid == 0
+		} else {
+			if !osutil.IsPidValid(info.Pid) {
+				log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("rootPid exited")
+				return // container already exited
+			}
+			log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("Failed to obtain UID")
 		}
-		log.WithFields(log.Fields{"pid": info.Pid, "id": id}).Error("Failed to obtain UID")
 	}
 	c.info = info      // update
 	c.pid = c.info.Pid // update
@@ -1588,21 +1708,25 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		}
 	}
 
-	if !osutil.IsPidValid(info.Pid) {
-		// however, the rootPid was left, an exited container
-		// it could be a late event from the slow statsLoop()'s trigger
-		log.WithFields(log.Fields{"id": id, "pid": info.Pid}).Debug("container left")
-		info.Running = false // update it and put a cluster record for the exited container
-	} else {
-		// patch undetected container pid
-		go prober.PatchContainerProcess(info.Pid, false)
+	if !isEmptyProcessPod(info) {
+		if !osutil.IsPidValid(info.Pid) {
+			// however, the rootPid was left, an exited container
+			// it could be a late event from the slow statsLoop()'s trigger
+			log.WithFields(log.Fields{"id": id, "pid": info.Pid}).Debug("container left")
+			info.Running = false // update it and put a cluster record for the exited container
+		} else {
+			// patch undetected container pid
+			go prober.PatchContainerProcess(info.Pid, false)
+		}
 	}
 
 	if role, ok := isNeuVectorContainer(info); ok {
 		if info.Running {
 			startNeuVectorMonitors(id, role, info)
 		} else {
-			log.WithFields(log.Fields{"id": id, "role": role, "pid": info.Pid}).Debug("PROC: exited NeuVector")
+			if info.Pid != 0 {
+				log.WithFields(log.Fields{"id": id, "role": role, "pid": info.Pid}).Debug("PROC: exited NeuVector")
+			}
 			// Sending notification to controller for NeuVector containers is to report
 			// the interface list. No need if the container is not running
 		}
@@ -1681,6 +1805,19 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	}
 }
 
+func delProgramNfqDP(c *containerData, ns string) {
+	log.WithFields(log.Fields{"pid": c.pid}).Debug("")
+
+	for _, pair := range c.intcpPairs {
+		//delete dp nfq handle
+		dp.DPCtrlDelNfqPort(ns, pair.Port)
+	}
+
+	//delete dp nfq handle if any then reset iptable rules
+	pipe.DeleteNfqRules(c.pid)
+	c.nfq = false
+}
+
 func taskStopContainer(id string, pid int) {
 	if c, ok := gInfo.neuContainers[id]; ok {
 		stopNeuVectorMonitor(c)
@@ -1720,12 +1857,15 @@ func taskStopContainer(id string, pid int) {
 	bench.RemoveContainer(id)
 	prober.HandleAnchorModeChange(false, id, c.upperDir, 0)
 
+	netns := global.SYS.GetNetNamespacePath(c.pid)
 	if !c.hostMode && c.hasDatapath {
 		// Stop monitor interface change before we reconnect the ports
 		prober.StopMonitorInterface(id)
 
 		if c.inline || c.quar {
-			pipe.CleanupContainer(c.pid, c.intcpPairs)
+			if driver != pipe.PIPE_CLM {
+				pipe.CleanupContainer(c.pid, c.intcpPairs)
+			}
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 				if driver == pipe.PIPE_NOTC {
@@ -1733,15 +1873,17 @@ func taskStopContainer(id string, pid int) {
 				}
 			}
 		} else {
-			netns := global.SYS.GetNetNamespacePath(c.pid)
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
-			//POD with proxy injection
-			if gInfo.tapProxymesh {
-				programDelProxyMeshDP(c, netns)
-			}
+		}
+		if driver == pipe.PIPE_CLM {
+			delProgramNfqDP(c, netns)
+		}
+		//POD with proxy injection
+		if gInfo.tapProxymesh {
+			programDelProxyMeshDP(c, netns)
 		}
 	}
 
@@ -1811,7 +1953,7 @@ func taskDPConnect() {
 	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
 	dp.DPCtrlConfigSpecialIPSubnet(specialSubnets)
 
-	if driver != pipe.PIPE_NOTC {
+	if driver != pipe.PIPE_NOTC && driver != pipe.PIPE_CLM {
 		jumboFrame := gInfo.jumboFrameMTU
 		dp.DPCtrlAddSrvcPort(nvSvcPort, &jumboFrame)
 	}
@@ -1945,12 +2087,15 @@ func containerTaskExit() {
 
 		prober.StopMonitorInterface(c.id)
 		if c.inline || c.quar {
-			log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
-			pipe.RestoreContainer(c.pid, c.intcpPairs)
+			if driver != pipe.PIPE_CLM {
+				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
+				pipe.RestoreContainer(c.pid, c.intcpPairs)
+			}
 		}
 	}
 	// The following operations are optional
 	for _, c := range gInfo.activeContainers {
+		netns := global.SYS.GetNetNamespacePath(c.pid)
 		if c.inline || c.quar {
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
@@ -1959,16 +2104,17 @@ func containerTaskExit() {
 				}
 			}
 		} else {
-			netns := global.SYS.GetNetNamespacePath(c.pid)
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
-			//POD with proxy injection
-			if gInfo.tapProxymesh {
-				programDelProxyMeshDP(c, netns)
-			}
-
+		}
+		if driver == pipe.PIPE_CLM {
+			delProgramNfqDP(c, netns)
+		}
+		//POD with proxy injection
+		if gInfo.tapProxymesh {
+			programDelProxyMeshDP(c, netns)
 		}
 	}
 }

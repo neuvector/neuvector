@@ -257,6 +257,204 @@ func TestIsImageCriterionMet(t *testing.T) {
 	postTest()
 }
 
+func TestIsModulesCriterionMet(t *testing.T) {
+	preTest()
+
+	moduleSets := [][]*share.ScanModule{
+		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "vim",
+				Version: "8.2.4081-1.cm1",
+			},
+		},
+		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "vim",
+				Version: "8.2.4081-1.cm1",
+			},
+			&share.ScanModule{
+				Name: "curl",
+				Version: "9.9.9999-9.cm1",
+			},
+		},
+		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "vim",
+				Version: "8.2.4081-1.cm1",
+			},
+			&share.ScanModule{
+				Name: "curl",
+				Version: "9.9.9999-9.cm1",
+			},
+			&share.ScanModule{
+				Name: "random-package",
+				Version: "1.0.0000-0.cm1",
+			},
+		},
+		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "random-package",
+				Version: "1.0.0000-0.cm1",
+			},
+		},
+		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "vim",
+				Version: "8.2.4081-1.cm1",
+			},
+			&share.ScanModule{
+				Name: "random-package",
+				Version: "1.0.0000-0.cm1",
+			},
+		},
+		/********************************************/
+	}
+
+	type criteriaTestCase struct {
+		Value string
+		Expected [][]bool // expected isModulesCriterionMet result for above moduleSets
+	}
+
+	cases := []criteriaTestCase{
+		criteriaTestCase{
+			Value: "vim",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true}, // first array is for CriteriaOpContainsAny
+				[]bool {true, true, true, false, true}, // second array is for CriteriaOpContainsAll
+				[]bool {false, true, true, true, true}, // third array is for CriteriaOpContainsOtherThan
+			},
+		},
+		criteriaTestCase{
+			Value: "vim, curl",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, true, true, false, false},
+				[]bool {false, false, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "curl",
+			Expected: [][]bool {
+				[]bool {false, true, true, false, false},
+				[]bool {false, true, true, false, false},
+				[]bool {true, true, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {true, true, true, false, true},
+				[]bool {false, true, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, false, false, false, false},
+				[]bool {false, true, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=9.9.9999-9.cm1",
+			Expected: [][]bool {
+				[]bool {false, false, false, false, false},
+				[]bool {false, false, false, false, false},
+				[]bool {true, true, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1, curl",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, true, true, false, false},
+				[]bool {false, false, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1, curl",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, false, false, false, false},
+				[]bool {false, false, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=9.9.9999-9.cm1, curl",
+			Expected: [][]bool {
+				[]bool {false, true, true, false, false},
+				[]bool {false, false, false, false, false},
+				[]bool {true, true, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1, curl=9.9.9999-9.cm1",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, true, true, false, false},
+				[]bool {false, false, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1, curl=9.9.9999-9.cm1",
+			Expected: [][]bool {
+				[]bool {true, true, true, false, true},
+				[]bool {false, false, false, false, false},
+				[]bool {false, false, true, true, true},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim=9.9.9999-9.cm1, curl=9.9.9999-9.cm1",
+			Expected: [][]bool {
+				[]bool {false, true, true, false, false},
+				[]bool {false, false, false, false, false},
+				[]bool {true, true, true, true, true},
+			},
+		},
+	}
+
+	criteriaOps := []string{
+		share.CriteriaOpContainsAny,
+		share.CriteriaOpContainsAll,
+		share.CriteriaOpContainsOtherThan,
+	}
+
+	for opIndex, op := range criteriaOps {
+		for modSetIndex, moduleSet := range moduleSets {
+			for _, testCase := range cases {
+				met, _ := isModulesCriterionMet(
+					&share.CLUSAdmRuleCriterion{
+						Name: share.CriteriaKeyModules,
+						Op: op,
+						Value: testCase.Value,
+						ValueSlice: strings.Split(testCase.Value, ","),
+					},
+					moduleSet,
+				)
+				if met != testCase.Expected[opIndex][modSetIndex] {
+					t.Errorf(
+						"Unexpected isModulesCriterionMet result: (%+v) expected: (%+v)\n\toperation: (%s)\n\tcriterion value: (%s)\n\tmodule set: (%+v)\n",
+						// "Unexpected isModulesCriterionMet result(%+v) expected: (%v) for criterion value: %s (testCaseIndex: %d), and module set: %+v\n",
+						met,
+						testCase.Expected[opIndex][modSetIndex],
+						op,
+						testCase.Value,
+						moduleSet,
+					)
+				}
+			}
+		}
+	}
+
+	postTest()
+}
+
 func TestIsMapCriterionMet(t *testing.T) {
 	preTest()
 
@@ -291,25 +489,40 @@ func TestIsMapCriterionMet(t *testing.T) {
 			Op:    share.CriteriaOpContainsOtherThan,
 			Value: "label1,label2=value2,label3=value3",
 		},
+		&share.CLUSAdmRuleCriterion{
+			Name:  share.CriteriaKeyLabels,
+			Op:    share.CriteriaOpContainsAny,
+			Value: "label1=value1,label1=value2",
+		},
+		&share.CLUSAdmRuleCriterion{
+			Name:  share.CriteriaKeyLabels,
+			Op:    share.CriteriaOpContainsOtherThan,
+			Value: "label2=value1,label2=value2",
+		},
+		&share.CLUSAdmRuleCriterion{
+			Name:  share.CriteriaKeyLabels,
+			Op:    share.CriteriaOpContainsAny,
+			Value: "label1",
+		},
 	}
-	expected1 := []bool{true, false, true, true, true, true}
+	expected1 := []bool{true, false, true, true, true, true, true, true, true}
 	ctnerLabels1 := map[string]string{
 		"token":  "100",
 		"label1": "value1",
 	}
-	expected2 := []bool{true, false, false, false, true, false}
+	expected2 := []bool{true, false, false, false, true, false, false, true, true}
 	ctnerLabels2 := map[string]string{
 		"label1": "",
 		"label2": "value2",
 	}
-	expected3 := []bool{true, false, false, false, true, false}
+	expected3 := []bool{true, false, false, false, true, false, false, false, false}
 	ctnerLabels3 := map[string]string{
 		"label2": "value2",
 	}
-	expected4 := []bool{false, false, true, false, false, false}
+	expected4 := []bool{false, false, true, false, false, false, false, false, false}
 	ctnerLabels4 := map[string]string{}
 
-	expected5 := []bool{false, false, true, true, true, true}
+	expected5 := []bool{false, false, true, true, true, true, false, true, false}
 	ctnerLabels5 := map[string]string{
 		"token": "100",
 	}

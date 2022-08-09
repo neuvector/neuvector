@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type purgeFilterFunc func(epName, key string) bool
@@ -274,6 +274,7 @@ func (ep cfgEndpoint) getTempFilePrefix() string {
 	return fmt.Sprintf("nvcfg.%s", ep.name)
 }
 
+// the written-to-file backup values are always in text format
 func (ep cfgEndpoint) backup(fedRole string) error {
 	log.WithFields(log.Fields{"endpoint": ep.name}).Debug()
 
@@ -352,6 +353,7 @@ func (ep cfgEndpoint) backup(fedRole string) error {
 	return nil
 }
 
+// value of each key in the file is always in text format (i.e. non-gzip format). Compress it if it's >= 512k before restoring to kv
 func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterTransact) error {
 	fedEndpointCfg := false
 	source := ep.getBackupFilename()
@@ -386,6 +388,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 	// Restore key/value from files
 	count := 0
 	r := bufio.NewReader(f)
+	policyZipRuleListKey := share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName)
 	for {
 		key, value, err := readKeyValue(r)
 		if err == io.EOF {
@@ -481,13 +484,20 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 				log.WithFields(log.Fields{"error": err, "key": key, "value": value}).Error("Failed to upgrade key/value")
 				return ErrInvalidFileFormat
 			}
-			if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
+			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)
 				//zip rulelist before put to cluster during restore
 				clusHelper.PutPolicyRuleListZip(key, array)
 			} else {
 				clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
-				txn.Put(key, array)
+				//for CLUSConfigSystemKey only
+				clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+				if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
+					zb := utils.GzipBytes(array)
+					txn.PutBinary(key, zb)
+				} else {
+					txn.Put(key, array)
+				}
 				if txn.Size() >= 64 {
 					applyTransaction(txn, nil, false, 0)
 				}
@@ -501,6 +511,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 	return nil
 }
 
+// the written-to-file values are always in text format. If it's in gzip format, unzip it before writing to file for the backup/export
 func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 	var filterFedObjectType int
 	var fedMasterOnlyKeys, filterSubKeyPrefix, alwaysFilterKeys []string
@@ -554,6 +565,13 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 						continue // filter fed policy objects on non-master cluster
 					} else if newValue != nil {
 						value = newValue
+					}
+					// [31, 139] is the first 2 bytes of gzip-format data
+					if strings.HasPrefix(key, share.CLUSConfigCrdStore) && len(value) >= 2 && value[0] == 31 && value[1] == 139 {
+						if value = utils.GunzipBytes(value); value == nil {
+							log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
+							continue
+						}
 					}
 					line := fmt.Sprintf("%s\n%s\n", key, value)
 					if _, err = writer.WriteString(line); err != nil {

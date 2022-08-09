@@ -1,7 +1,6 @@
 package system
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -164,11 +163,10 @@ func TestHostProcess(t *testing.T) {
 2:cpu:/
 1:cpuset:/`
 	r := strings.NewReader(cgroup)
-	id, did, err, flushed := getContainerIDByCgroupReader(r)
-	if id != "" {
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	if id != "" || err != nil {
 		t.Errorf("detect wrong container ID: %v\n", id)
 	}
-	fmt.Printf("id=%s, did=%t, err=%s, flushed=%t\n", id, did, err, flushed)
 }
 
 func TestNsEnterProcess(t *testing.T) {
@@ -187,12 +185,10 @@ func TestNsEnterProcess(t *testing.T) {
 2:cpu:/user/1000.user/c2.session
 1:cpuset:/`
 	r := strings.NewReader(cgroup)
-	id, did, err, flushed := getContainerIDByCgroupReader(r)
-	if id != "" {
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	if id != "" || err != nil {
 		t.Errorf("detect wrong container ID: %v\n", id)
 	}
-
-	fmt.Printf("id=%s, did=%t, err=%s, flushed=%t\n", id, did, err, flushed)
 }
 
 func TestK8sProxyProcess(t *testing.T) {
@@ -1428,5 +1424,52 @@ func TestUpperDir_Overlay_MutipleMounts2(t *testing.T) {
 
 	if upper != res_upper {
 		t.Errorf("failed to obtain upperDir: %v\n", upper)
+	}
+}
+
+func TestContainerd_Container_Cgroupv2(t *testing.T) {
+	// crictl version: 1.24.0
+	// containerd: 1.6.4
+	// k8s: 1.24
+	// container process: /proc/<pid>
+	cgroup := `
+	0::/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod9493223b_520e_4a97_a45f_359dcf967006.slice/cri-containerd-25d057a4c6c9555f2a0eb106e8896968c28f1c44aca4754174851aca7f89ad26.scope
+	`
+	mountinfo := `
+	1350 1279 0:155 / / rw,relatime master:461 - overlay overlay rw,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/67/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/66/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/65/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/64/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/63/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/62/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/61/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/60/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/59/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/58/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/93/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/93/work
+	1351 1350 0:157 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+	1352 1350 0:158 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+	1353 1352 0:159 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+	1354 1352 0:146 / /dev/mqueue rw,nosuid,nodev,noexec,relatime - mqueue mqueue rw
+	1355 1350 0:151 / /sys ro,nosuid,nodev,noexec,relatime - sysfs sysfs ro
+	1356 1355 0:28 /kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod9493223b_520e_4a97_a45f_359dcf967006.slice/cri-containerd-25d057a4c6c9555f2a0eb106e8896968c28f1c44aca4754174851aca7f89ad26.scope /sys/fs/cgroup ro,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw
+	1357 1350 253:0 /var/lib/kubelet/pods/9493223b-520e-4a97-a45f-359dcf967006/etc-hosts /etc/hosts rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+	1358 1352 253:0 /var/lib/kubelet/pods/9493223b-520e-4a97-a45f-359dcf967006/containers/iperfserver/401d6fe2 /dev/termination-log rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+	1359 1350 253:0 /var/lib/containerd/io.containerd.grpc.v1.cri/sandboxes/f34e6ab6ed679d809c8d4a385777c4f72441f1d3ec7b1334d35c10f4d25e6f40/hostname /etc/hostname rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+	1360 1350 253:0 /var/lib/containerd/io.containerd.grpc.v1.cri/sandboxes/f34e6ab6ed679d809c8d4a385777c4f72441f1d3ec7b1334d35c10f4d25e6f40/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/mapper/ubuntu--vg-ubuntu--lv rw
+	1361 1352 0:143 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=65536k,inode64
+	1362 1350 0:142 / /var/run/secrets/kubernetes.io/serviceaccount ro,relatime - tmpfs tmpfs rw,size=8039888k,inode64
+	1281 1351 0:157 /bus /proc/bus ro,nosuid,nodev,noexec,relatime - proc proc rw
+	1282 1351 0:157 /fs /proc/fs ro,nosuid,nodev,noexec,relatime - proc proc rw
+	1283 1351 0:157 /irq /proc/irq ro,nosuid,nodev,noexec,relatime - proc proc rw
+	1284 1351 0:157 /sys /proc/sys ro,nosuid,nodev,noexec,relatime - proc proc rw
+	1285 1351 0:157 /sysrq-trigger /proc/sysrq-trigger ro,nosuid,nodev,noexec,relatime - proc proc rw
+	1286 1351 0:160 / /proc/acpi ro,relatime - tmpfs tmpfs ro,inode64
+	1287 1351 0:158 /null /proc/kcore rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+	1288 1351 0:158 /null /proc/keys rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+	1289 1351 0:158 /null /proc/timer_list rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+	1290 1351 0:161 / /proc/scsi ro,relatime - tmpfs tmpfs ro,inode64
+	1291 1355 0:162 / /sys/firmware ro,relatime - tmpfs tmpfs ro,inode64
+	`
+	r := strings.NewReader(cgroup)
+	id, _, found := getContainerIDByCgroupReaderV2(r, from_cgroup)
+	if id != "25d057a4c6c9555f2a0eb106e8896968c28f1c44aca4754174851aca7f89ad26" || !found {
+		t.Errorf("detect wrong container ID, cgroup: %v, %v\n", id, found)
+	}
+
+	r = strings.NewReader(mountinfo)
+	id, _, found = getContainerIDByCgroupReaderV2(r, from_hostname)
+	if id != "f34e6ab6ed679d809c8d4a385777c4f72441f1d3ec7b1334d35c10f4d25e6f40" || !found { // pod ID
+		t.Errorf("detect wrong pod ID, cgroup:  %v, %v\n", id, found)
 	}
 }

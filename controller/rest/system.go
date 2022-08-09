@@ -217,6 +217,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 		} else {
 			sort.Slice(rconf.Webhooks, func(i, j int) bool { return rconf.Webhooks[i].Name < rconf.Webhooks[j].Name })
 		}
+		if !k8sPlatform && scope == share.ScopeLocal {
+			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
+			rconf.ScannerAutoscale.Strategy = api.AutoScaleNA
+		}
 	}
 
 	resp := &api.RESTSystemConfigData{}
@@ -255,6 +259,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						ControllerDebug:    rconf.ControllerDebug,
 						MonitorServiceMesh: rconf.MonitorServiceMesh,
 						XffEnabled:         rconf.XffEnabled,
+						NoTelemetryReport:  rconf.NoTelemetryReport,
 					},
 					Webhooks: rconf.Webhooks,
 					Proxy: api.RESTSystemConfigProxyV2{
@@ -279,6 +284,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						ModeAutoM2P:         rconf.ModeAutoM2P,
 						ModeAutoM2PDuration: rconf.ModeAutoM2PDuration,
 					},
+					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
@@ -868,7 +874,7 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete system webhook")
 }
 
-func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
@@ -882,6 +888,56 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	var rconf api.RESTSystemConfigConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
+	if err == nil && apiVer == "v2" {
+		if rconf.ConfigV2 != nil {
+			config := &api.RESTSystemConfigConfig{}
+			configV2 := rconf.ConfigV2
+			if configV2.SvcCfg != nil {
+				config.NewServicePolicyMode = configV2.SvcCfg.NewServicePolicyMode
+				config.NewServiceProfileBaseline = configV2.SvcCfg.NewServiceProfileBaseline
+			}
+			if configV2.SyslogCfg != nil {
+				config.SyslogServer = configV2.SyslogCfg.SyslogServer
+				config.SyslogIPProto = configV2.SyslogCfg.SyslogIPProto
+				config.SyslogPort = configV2.SyslogCfg.SyslogPort
+				config.SyslogLevel = configV2.SyslogCfg.SyslogLevel
+				config.SyslogEnable = configV2.SyslogCfg.SyslogEnable
+				config.SyslogCategories = configV2.SyslogCfg.SyslogCategories
+				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
+				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
+			}
+			if configV2.AuthCfg != nil {
+				config.AuthOrder = configV2.AuthCfg.AuthOrder
+				config.AuthByPlatform = configV2.AuthCfg.AuthByPlatform
+				config.RancherEP = configV2.AuthCfg.RancherEP
+			}
+			if configV2.ProxyCfg != nil {
+				config.RegistryHttpProxyEnable = configV2.ProxyCfg.RegistryHttpProxyEnable
+				config.RegistryHttpsProxyEnable = configV2.ProxyCfg.RegistryHttpsProxyEnable
+				config.RegistryHttpProxy = configV2.ProxyCfg.RegistryHttpProxy
+				config.RegistryHttpsProxy = configV2.ProxyCfg.RegistryHttpsProxy
+			}
+			if configV2.Webhooks != nil {
+				config.Webhooks = configV2.Webhooks
+			}
+			if configV2.IbmsaCfg != nil {
+				config.IBMSAEpEnabled = configV2.IbmsaCfg.IBMSAEpEnabled
+				config.IBMSAEpDashboardURL = configV2.IbmsaCfg.IBMSAEpDashboardURL
+			}
+			if configV2.MiscCfg != nil {
+				config.UnusedGroupAging = configV2.MiscCfg.UnusedGroupAging
+				config.ClusterName = configV2.MiscCfg.ClusterName
+				config.ControllerDebug = configV2.MiscCfg.ControllerDebug
+				config.MonitorServiceMesh = configV2.MiscCfg.MonitorServiceMesh
+				config.XffEnabled = configV2.MiscCfg.XffEnabled
+				config.NoTelemetryReport = configV2.MiscCfg.NoTelemetryReport
+			}
+			config.ScannerAutoscale = configV2.ScannerAutoscale
+			rconf.Config = config
+		} else {
+			rconf.Config = nil
+		}
+	}
 	if err != nil || (rconf.Config == nil && rconf.FedConfig == nil && rconf.NetConfig == nil && rconf.AtmoConfig == nil) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1285,6 +1341,60 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
 				}
 			}
+
+			// scanner autoscale
+			if k8sPlatform && rc.ScannerAutoscale != nil {
+				autoscale := rc.ScannerAutoscale
+				if autoscale.Strategy != nil || autoscale.MinPods != nil || autoscale.MaxPods != nil {
+					invalidValue := false
+					strategy := cconf.ScannerAutoscale.Strategy
+					min := cconf.ScannerAutoscale.MinPods
+					max := cconf.ScannerAutoscale.MaxPods
+					if autoscale.MinPods != nil {
+						min = *autoscale.MinPods
+					}
+					if autoscale.MaxPods != nil {
+						max = *autoscale.MaxPods
+					}
+					if max > 128 || max < min || min == 0 {
+						invalidValue = true
+					}
+					if !invalidValue && autoscale.Strategy != nil {
+						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
+							// someone tries to enable autoscaling
+							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, false); err != nil {
+								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
+								return
+							}
+							if min == 0 {
+								min = 3
+							}
+							if max == 0 {
+								max = 3
+							}
+						}
+						strategy = *autoscale.Strategy
+						allowed := utils.NewSet(api.AutoScaleNone, api.AutoScaleImmediate, api.AutoScaleDelayed)
+						if !allowed.Contains(strategy) {
+							invalidValue = true
+						}
+					}
+					if invalidValue {
+						e := "Invalid autoscale value"
+						log.Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return
+					}
+					cconf.ScannerAutoscale.Strategy = strategy
+					cconf.ScannerAutoscale.MinPods = min
+					cconf.ScannerAutoscale.MaxPods = max
+				}
+			}
+
+			// telemetry report
+			if rc.NoTelemetryReport != nil {
+				cconf.NoTelemetryReport = *rc.NoTelemetryReport
+			}
 		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
 			// webhook for fed system config
 			if rconf.FedConfig.Webhooks != nil {
@@ -1333,6 +1443,14 @@ func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure system settings")
+}
+
+func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemConfigBase("v1", w, r, ps)
+}
+
+func handlerSystemConfigV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	handlerSystemConfigBase("v2", w, r, ps)
 }
 
 func session2REST(s *share.CLUSSession) *api.RESTSession {
@@ -1616,10 +1734,48 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		ClusterRoleErrors:        emptySlice,
 		ClusterRoleBindingErrors: emptySlice,
 		RoleBindingErrors:        emptySlice,
+		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
+		ScannerUpgradeInfo:       &api.RESTCheckUpgradeInfo{},
 	}
 	if k8sPlatform {
 		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, false)
+	}
+
+	var nvUpgradeInfo, scannerUpgradeInfo share.CLUSCheckUpgradeInfo
+	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+		json.Unmarshal(value, &nvUpgradeInfo)
+	}
+	if value, _ := cluster.Get(share.CLUSTelemetryStore + "scanner"); value != nil {
+		json.Unmarshal(value, &scannerUpgradeInfo)
+	}
+
+	empty := share.CLUSCheckUpgradeVersion{}
+	allUpgradeInfo := map[*share.CLUSCheckUpgradeInfo]*api.RESTCheckUpgradeInfo{
+		&nvUpgradeInfo:      resp.NvUpgradeInfo,
+		&scannerUpgradeInfo: resp.ScannerUpgradeInfo,
+	}
+	for upgradeInfo, respField := range allUpgradeInfo {
+		if upgradeInfo.MinUpgradeVersion != empty {
+			respField.MinUpgradeVersion = &api.RESTUpgradeInfo{
+				Version:     upgradeInfo.MinUpgradeVersion.Version,
+				ReleaseDate: upgradeInfo.MinUpgradeVersion.ReleaseDate,
+				Tag:         upgradeInfo.MinUpgradeVersion.Tag,
+			}
+		}
+		if upgradeInfo.MaxUpgradeVersion != empty {
+			respField.MaxUpgradeVersion = &api.RESTUpgradeInfo{
+				Version:     upgradeInfo.MaxUpgradeVersion.Version,
+				ReleaseDate: upgradeInfo.MaxUpgradeVersion.ReleaseDate,
+				Tag:         upgradeInfo.MaxUpgradeVersion.Tag,
+			}
+		}
+	}
+	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
+		resp.NvUpgradeInfo = nil
+	}
+	if scannerUpgradeInfo.MinUpgradeVersion == empty && scannerUpgradeInfo.MaxUpgradeVersion == empty {
+		resp.ScannerUpgradeInfo = nil
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")

@@ -59,6 +59,17 @@ type RPCEndpoint struct {
 	RPCServerPort uint16
 }
 
+type TelemetryData struct {
+	Hosts          int // nodes
+	Groups         int
+	PolicyRules    int
+	Clusters       int
+	AdmCtrlEnabled bool
+	InFederate     bool
+	PrimaryCluster bool
+	UseProxy       int // for http client, not for telemetry
+}
+
 type CacheEventFunc func(ev share.TLogEvent, msg string) error
 
 var ErrObjectNotFound error = errors.New("Object not found")
@@ -297,6 +308,7 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvMemoryPressureController:    {api.EventNameMemoryPressureController, api.EventCatController, api.LogLevelWARNING},
 	share.CLUSEvK8sNvRBAC:                   {api.EventNameK8sNvRBAC, api.EventCatConfig, api.LogLevelWARNING},
 	share.CLUSEvGroupAutoPromote:            {api.EventNameGroupAutoPromote, api.EventCatGroup, api.LogLevelINFO},
+	share.CLUSEvAuthDefAdminPwdUnchanged:    {api.EventNameAuthDefAdminPwdUnchanged, api.EventCatAuth, api.LogLevelWARNING},
 }
 
 type LogIncidentInfo struct {

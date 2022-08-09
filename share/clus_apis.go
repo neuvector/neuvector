@@ -116,6 +116,8 @@ const CLUSCloudStore string = CLUSObjectStore + "cloud/"
 const CLUSCrdProcStore string = "crdcontent/"
 const CLUSCertStore string = CLUSObjectStore + "cert/"
 const CLUSLicenseStore string = CLUSObjectStore + "license/"
+const CLUSTelemetryStore string = CLUSObjectStore + "telemetry/"
+const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
@@ -155,6 +157,7 @@ const CLUSCtrlUsageReportStore string = CLUSStateStore + "usage_report/"
 const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
+const CLUSUpgradeInfoStore string = CLUSStateStore + "upgrade_info/"
 
 func CLUSExpiredTokenKey(token string) string {
 	return fmt.Sprintf("%s%s", CLUSExpiredTokenStore, token)
@@ -715,30 +718,38 @@ type CLUSSystemConfig struct {
 	NewServiceProfileBaseline string `json:"new_service_profile_baseline"`
 	UnusedGroupAging          uint8  `json:"unused_group_aging"`
 	CLUSSyslogConfig
-	SingleCVEPerSyslog   bool                 `json:"single_cve_per_syslog"`
-	AuthOrder            []string             `json:"auth_order"`
-	AuthByPlatform       bool                 `json:"auth_by_platform"`
-	RancherEP            string               `json:"rancher_ep"`
-	InternalSubnets      []string             `json:"configured_internal_subnets,omitempty"`
-	WebhookEnable_UNUSED bool                 `json:"webhook_enable"`
-	WebhookUrl_UNUSED    string               `json:"webhook_url"`
-	Webhooks             []CLUSWebhook        `json:"webhooks"`
-	ClusterName          string               `json:"cluster_name"`
-	ControllerDebug      []string             `json:"controller_debug"`
-	TapProxymesh         bool                 `json:"tap_proxymesh"`
-	RegistryHttpProxy    CLUSProxy            `json:"registry_http_proxy"`
-	RegistryHttpsProxy   CLUSProxy            `json:"registry_https_proxy"`
-	IBMSAConfigNV        CLUSIBMSAConfigNV    `json:"ibmsa_config_nv"`
-	IBMSAConfig          CLUSIBMSAConfig      `json:"ibmsa_config"`
-	IBMSAOnboardData     CLUSIBMSAOnboardData `json:"ibmsa_onboard_data"`
-	XffEnabled           bool                 `json:"xff_enabled"`
-	CfgType              TCfgType             `json:"cfg_type"`
-	NetServiceStatus     bool                 `json:"net_service_status"`
-	NetServicePolicyMode string               `json:"net_service_policy_mode"`
-	ModeAutoD2M          bool                 `json:"mode_auto_d2m"`
-	ModeAutoD2MDuration  int64                `json:"mode_auto_d2m_duration"`
-	ModeAutoM2P          bool                 `json:"mode_auto_m2p"`
-	ModeAutoM2PDuration  int64                `json:"mode_auto_m2p_duration"`
+	SingleCVEPerSyslog   bool                      `json:"single_cve_per_syslog"`
+	AuthOrder            []string                  `json:"auth_order"`
+	AuthByPlatform       bool                      `json:"auth_by_platform"`
+	RancherEP            string                    `json:"rancher_ep"`
+	InternalSubnets      []string                  `json:"configured_internal_subnets,omitempty"`
+	WebhookEnable_UNUSED bool                      `json:"webhook_enable"`
+	WebhookUrl_UNUSED    string                    `json:"webhook_url"`
+	Webhooks             []CLUSWebhook             `json:"webhooks"`
+	ClusterName          string                    `json:"cluster_name"`
+	ControllerDebug      []string                  `json:"controller_debug"`
+	TapProxymesh         bool                      `json:"tap_proxymesh"`
+	RegistryHttpProxy    CLUSProxy                 `json:"registry_http_proxy"`
+	RegistryHttpsProxy   CLUSProxy                 `json:"registry_https_proxy"`
+	IBMSAConfigNV        CLUSIBMSAConfigNV         `json:"ibmsa_config_nv"`
+	IBMSAConfig          CLUSIBMSAConfig           `json:"ibmsa_config"`
+	IBMSAOnboardData     CLUSIBMSAOnboardData      `json:"ibmsa_onboard_data"`
+	XffEnabled           bool                      `json:"xff_enabled"`
+	CfgType              TCfgType                  `json:"cfg_type"`
+	NetServiceStatus     bool                      `json:"net_service_status"`
+	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
+	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
+	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
+	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
+}
+
+type CLUSSystemConfigAutoscale struct {
+	Strategy string `json:"strategy"`
+	MinPods  uint32 `json:"min_pods"`
+	MaxPods  uint32 `json:"max_pods"`
 }
 
 type CLUSEULA struct {
@@ -1224,6 +1235,7 @@ const (
 	CLUSEvMemoryPressureController
 	CLUSEvK8sNvRBAC
 	CLUSEvGroupAutoPromote
+	CLUSEvAuthDefAdminPwdUnchanged // default admin's password is not changed yet. reported every 24 hours
 )
 
 const (
@@ -1949,6 +1961,7 @@ const (
 	StartFedRestServer
 	StopFedRestServer
 	UpdateProxyInfo
+	ReportTelemetryData
 )
 
 const (
@@ -2593,3 +2606,20 @@ const (
 	ReviewTypeDisplayDLP       = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF       = "WAF Configurations"               // interactive import
 )
+
+// Telemetry (upgrade responder)
+type CLUSCheckUpgradeVersion struct {
+	Version     string
+	ReleaseDate string
+	Tag         string
+}
+
+type CLUSCheckUpgradeInfo struct {
+	MinUpgradeVersion CLUSCheckUpgradeVersion
+	MaxUpgradeVersion CLUSCheckUpgradeVersion
+}
+
+// throttled events/logs
+type CLUSThrottledEvents struct {
+	LastReportTime map[TLogEvent]int64 `json:"last_report_at"` // key is event id, value is time.Unix()
+}

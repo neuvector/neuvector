@@ -331,3 +331,13 @@ func GetProxy(registry string) string {
 		}
 	}
 }
+
+func RegTaskCount() int {
+	var count int
+
+	if regScher != nil {
+		count = regScher.TaskCount()
+	}
+
+	return count
+}

@@ -470,7 +470,7 @@ func sendRestRequest(idTarget string, method, urlStr, token string, cookie *http
 	var usedProxy bool
 	var err error
 
-	if idTarget == "rancher" {
+	if idTarget == "rancher" || idTarget == "telemetry" {
 		useProxy = *specificProxy
 	} else {
 		if specificProxy != nil {
@@ -1253,9 +1253,13 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 				case api.FedRoleMaster:
 					cluster := cacher.GetFedMasterCluster(acc)
 					if cluster.RestInfo.Server != reqData.RestInfo.Server || cluster.RestInfo.Port != reqData.RestInfo.Port {
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
-							"Exposed REST server info is read-only when the cluster is the primary cluster")
-						return
+						if joined := cacher.GetFedJoinedClusterCount(); joined > 0 {
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
+								"Exposed REST server info is read-only when there is other cluster in the federation")
+							return
+						}
+						m.LocalRestInfo = *reqData.RestInfo
+						m.MasterCluster.RestInfo = *reqData.RestInfo
 					}
 					if reqData.PingInterval != nil && *reqData.PingInterval > 0 {
 						m.PingInterval = *reqData.PingInterval
@@ -1677,7 +1681,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			}
 		}
 	} else if statusCode != 0 {
-		log.WithFields(log.Fields{"statusCode": statusCode, "data": string(data), "localServer": req.Server, "localPort": req.Port, "proxyUsed": proxyUsed}).Error()
+		log.WithFields(log.Fields{"statusCode": statusCode, "data": string(data), "localServer": req.Server, "localPort": req.Port,
+			"proxyUsed": proxyUsed, "kv_version": reqTo.FedKvVersion}).Error()
 		var restErr api.RESTError
 		if json.Unmarshal(data, &restErr) == nil {
 			if restErr.Code == _fedMasterUpgradeRequired {
@@ -1825,7 +1830,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 				return
 			}
 			// join request contains fed kv version for the joining cluster. if it's different from this cluster's fed kv version, it means they are not compatible
-			met, result := kv.CheckFedKvVersion("master", reqData.FedKvVersion)
+			met, result, err := kv.CheckFedKvVersion("master", reqData.FedKvVersion)
 			if met {
 				for _, joinedName := range cacher.GetFedJoinedClusterNameList(accReadAll) {
 					if joinedName == reqData.JointCluster.Name {
@@ -1843,6 +1848,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 				if result == _fedMasterUpgradeRequired || result == _fedJointUpgradeRequired {
 					errCode = result
 				}
+				log.WithFields(log.Fields{"err": err, "result": result}).Error()
 				restRespError(w, http.StatusUpgradeRequired, errCode)
 				return
 			}
@@ -2005,7 +2011,7 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 			accReadAll := access.NewReaderAccessControl()
 			if jointCluster := cacher.GetFedLocalJointCluster(accReadAll); jointCluster.ID != "" {
 				if _, err := jwtValidateToken(req.Token, jointCluster.Secret, nil); err == nil {
-					if met, result := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
+					if met, result, _ := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
 						resp.Result = result
 					}
 					restRespSuccess(w, r, &resp, nil, nil, nil, "")
@@ -2397,7 +2403,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		PollInterval: atomic.LoadUint32(&_fedPollInterval),
 	}
 	var status int
-	if met, result := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
+	if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
 		resp.Result = result
 		status = result
 	} else {
@@ -2449,7 +2455,7 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	// command request contains fed kv version for the joining cluster. if it's different from this cluster's fed kv version, it means they are not compatible
-	if met, result := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
+	if met, result, _ := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
 		resp.Result = result
 	} else {
 		switch req.Command {

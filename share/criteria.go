@@ -45,6 +45,7 @@ const (
 	CriteriaKeyAllowPrivEscalation string = "allowPrivEscalation"
 	CriteriaKeyPspCompliance       string = "pspCompliance" // psp compliance violation
 	CriteriaKeyRequestLimit        string = "resourceLimit"
+	CriteriaKeyModules			   string = "modules"
 )
 
 const (

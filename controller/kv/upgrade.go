@@ -565,37 +565,38 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	}
 	var v interface{}
 	var wrt bool
-	var unzipped bool = false
-	var uzb []byte
+	var policyListKey bool
+	var crdKey bool
 
 	if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
-		//do unzip first for rulelist
-		uzb = utils.GunzipBytes(value)
-		if uzb == nil {
-			log.Error("Failed to unzip data")
-			return value, nil, false
-		} else {
-			v, wrt = doUpgrade(key, uzb)
-			unzipped = true
-		}
-	} else {
-		v, wrt = doUpgrade(key, value)
+		policyListKey = true
 	}
+	if strings.HasPrefix(key, share.CLUSCrdProcStore) || strings.HasPrefix(key, share.CLUSConfigCrdStore) {
+		crdKey = true
+	}
+	// [31, 139] is the first 2 bytes of gzip-format data
+	if policyListKey || (crdKey && len(value) >= 2 && value[0] == 31 && value[1] == 139) {
+		if value = utils.GunzipBytes(value); value == nil {
+			log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
+			return value, nil, false
+		}
+	}
+	v, wrt = doUpgrade(key, value)
 
 	if v != nil && wrt {
-		if !unzipped {
-			// Write back to the cluster if needed.
-			newv, _ := json.Marshal(v)
-			if err := cluster.Put(key, newv); err != nil {
-				wrt = false
-			}
+		var err error
+		newv, _ := json.Marshal(v)
+		// currently we only zip nw policy rulelist & longer-than-512k-crd-keys
+		if policyListKey || (crdKey && len(newv) >= cluster.KVValueSizeMax) { // 512 * 1024
+			new_zb := utils.GzipBytes(newv)
+			err = cluster.PutBinary(key, new_zb)
 		} else {
-			//need to zip rulelist before put to cluster
-			tmpv, _ := json.Marshal(v)
-			new_zb := utils.GzipBytes(tmpv)
-			if err := cluster.PutBinary(key, new_zb); err != nil {
-				wrt = false
-			}
+			// Write back to the cluster if needed.
+			err = cluster.Put(key, newv)
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"key": key}).Error(err)
+			wrt = false
 		}
 	} else {
 		wrt = false
@@ -654,12 +655,7 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	}
 
 	if v == nil {
-		if !unzipped {
-			return value, nil, wrt
-		} else {
-			//return unzipped rulelist
-			return uzb, nil, wrt
-		}
+		return value, nil, wrt
 	} else {
 		value, err := json.Marshal(v)
 		return value, err, wrt
@@ -754,7 +750,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"825C9419", createDefWafRuleSensor},
 
-	{"7B3D205C", nil},
+	{"7B3D205C", addFmonRpmPackageDB},
+
+	{"168EE3FA", nil},
 }
 
 func latestKVVersion() string {
@@ -911,14 +909,14 @@ const (
 // 2. if not, it means they shouldn't handle requests from each other
 //	  2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
 //	  2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
-func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int) {
+func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 	ver := getControlVersion()
 	if ver.KVVersion != latestKVVersion() {
 		// kv version is not the same as the last phase in the running controller because this controller is not upgraded yet in multi-controllers env
-		return false, _fedClusterUpgradeOngoing
+		return false, _fedClusterUpgradeOngoing, fmt.Errorf("kv_version: %s, latest: %s", ver.KVVersion, latestKVVersion())
 	}
 	if GetFedKvVer() == reqFedKvVer {
-		return true, _fedSuccess
+		return true, _fedSuccess, nil
 	} else {
 		var retCode int = -1
 		for i := 0; i < len(phases); i++ {
@@ -940,7 +938,7 @@ func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int) {
 			}
 		}
 		log.WithFields(log.Fields{"req": reqFedKvVer, "verifier": verifier, "handler": GetFedKvVer()}).Warn("version not qualified")
-		return false, retCode
+		return false, retCode, fmt.Errorf("fed_version: %s, req: %s", GetFedKvVer(), reqFedKvVer)
 	}
 }
 
@@ -1569,4 +1567,9 @@ func upgradeDlpSensor(cfg *share.CLUSDlpSensor) (bool, bool) {
 func resetDlpCfgType() {
 	clusHelper.GetAllDlpSensors()
 	clusHelper.GetAllGroups(share.ScopeLocal, access.NewReaderAccessControl())
+}
+
+func addFmonRpmPackageDB() {
+	// additional file monitor entry
+	addPredefinedFileRule(share.FileAccessBehaviorMonitor, "/var/lib/rpm/Packages.db", "")
 }

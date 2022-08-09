@@ -30,6 +30,7 @@
 #define ENV_CTRL_SERVER_PORT   "CTRL_SERVER_PORT"
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
+#define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
 #define ENV_TAP_INTERFACE      "TAP_INTERFACE"
 #define ENV_TAP_ALL_CONTAINERS "TAP_ALL_CONTAINERS"
 #define ENV_DOCKER_URL         "DOCKER_URL"
@@ -41,9 +42,15 @@
 #define ENV_SHOW_MONITOR_TRACE "ENF_MONITOR_TRACE"
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
+#define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
+#define ENV_TELE_NEUVECTOR_EP  "TELEMETRY_NEUVECTOR_EP"
+#define ENV_TELE_SCANNER_EP    "TELEMETRY_SCANNER_EP"
+#define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
+#define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
+#define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -194,7 +201,8 @@ static pid_t fork_exec(int i)
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit, *rancher_ep;
+    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level;
+    char *telemetry_neuvector_ep, *telemetry_scanner_ep, *telemetry_current_ver, *telemetry_freq;
     int a;
 
     switch (i) {
@@ -367,6 +375,27 @@ static pid_t fork_exec(int i)
                 args[a ++] = "-rancher_sso";
             }
         }
+        if ((telemetry_neuvector_ep = getenv(ENV_TELE_NEUVECTOR_EP)) != NULL) {
+            args[a++] = "-telemetry_neuvector_ep";
+            args[a++] = telemetry_neuvector_ep;
+        }
+        if ((telemetry_scanner_ep = getenv(ENV_TELE_SCANNER_EP)) != NULL) {
+            args[a++] = "-telemetry_scanner_ep";
+            args[a++] = telemetry_scanner_ep;
+        }
+        if ((telemetry_current_ver = getenv(ENV_TELE_CURRENT_VER)) != NULL) {
+            args[a++] = "-telemetry_current_ver";
+            args[a++] = telemetry_current_ver;
+        }
+        if ((telemetry_freq = getenv(ENV_TELEMETRY_FREQ)) != NULL) {
+            args[a++] = "-telemetry_freq";
+            args[a++] = telemetry_freq;
+        }
+        if ((enable = getenv(ENV_NO_DEFAULT_ADMIN)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-no_def_admin";
+            }
+        }
         args[a] = NULL;
         break;
     case PROC_AGENT:
@@ -416,6 +445,10 @@ static pid_t fork_exec(int i)
                 args[a ++] = "-d";
             }
         }
+        if ((debug_level = getenv(ENV_DEBUG_LEVEL)) != NULL) {
+            args[a ++] = "-v";
+            args[a ++] = debug_level;
+        }
         if ((cnet_type = getenv(ENV_CNET_TYPE)) != NULL) {
             args[a ++] = "-n";
             args[a ++] = cnet_type;
@@ -431,6 +464,9 @@ static pid_t fork_exec(int i)
         }
         if (getenv(ENV_NO_SCAN_SECRETS)) {
             args[a ++] = "-no_scrt";
+        }
+        if (getenv(ENV_NO_AUTO_BENCHMARK)) {
+            args[a ++] = "-no_auto_benchmark";
         }
         args[a] = NULL;
         break;

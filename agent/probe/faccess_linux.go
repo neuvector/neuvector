@@ -2,13 +2,11 @@ package probe
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -60,6 +58,8 @@ type FileAccessCtrl struct {
 	lastReportPid int                // filtering reppeated report
 	marks         int                // monitor total aloocated marks
 	cflag         uint64             // fanotify configuration flags( open-perm or exec-perm)
+	bKubePlatform bool
+	kubeFlavor    string
 }
 
 type FileAccessProbeData struct {
@@ -150,11 +150,13 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 		bEnabled: false,
 		roots:    make(map[string]*rootFd),
 		prober:   p,
+		bKubePlatform: p.bKubePlatform,
+		kubeFlavor:    p.kubeFlavor,
 	}
 
 	// docker cp (file changes) might change the polling behaviors,
 	// remove the non-block io to controller the polling timeouts
-	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE
+	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE | fsmon.FAN_NONBLOCK
 	fn, err := fsmon.Initialize(flags, unix.O_RDONLY | unix.O_LARGEFILE)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FA: Initialize")
@@ -252,7 +254,6 @@ func (fa *FileAccessCtrl) Close() {
 
 	fa.lockMux()
 	defer fa.unlockMux()
-
 	for _, cRoot := range fa.roots {
 		fa.removeDirMarks(cRoot.pid, cRoot.dirMonitorList)
 		cRoot.dirMonitorList = nil
@@ -630,16 +631,14 @@ func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, st
 	return allowed, name, path, pgid
 }
 
-func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, path, svcGroup string, cmds []string, pid, res int) string {
+func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup string, pid, res int) string {
 	if fa.prober == nil {
 		return ""
 	}
-	name := filepath.Base(path) // open app
+
 	sid, pgid := osutil.GetSessionId(pid), osutil.GetProcessGroupId(pid)
 	ppid, _, _, _, _ := osutil.GetProcessPIDs(pid)
-	if len(cmds) == 0 {
-		cmds, _ = global.SYS.ReadCmdLine(pid)
-	}
+	cmds, _ := global.SYS.ReadCmdLine(pid)
 	proc := &procInternal{pid: pid, name: name, path: path, cmds: cmds, ppid: ppid, sid: sid, pgid: pgid}
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, Action: share.PolicyActionAllow, DerivedGroup: svcGroup}
 
@@ -671,6 +670,8 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 		return id, profileSetting, svcGroup, res // allow agent operations
 	}
 
+	fa.lockMux()
+	defer fa.unlockMux()
 	// log.WithFields(log.Fields{"id": id, "found": found, "path": path}).Debug("FA: ")
 	if cRoot, ok := fa.roots[id]; ok {
 		profileSetting = cRoot.setting
@@ -693,129 +694,102 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 	bPass := true
 	if (ev.Mask & fa.cflag) > 0 {
-		var ppath, pname, name, path string
-		var cmds []string
+		var ppath, path string
 		var err error
 
 		res := rule_allowed // by default
 
 		// scenario: a parent process (ppid) tries to open a child executable (path)
 		ppid := (int)(ev.Pid)
-		if fa.prober != nil {
-			// obtains parent process information
-			if proc, ok := fa.prober.GetProcessInfo(ppid); ok {
-				if ppath == "" && pname == "" {
-					pname = proc.pname
-					ppath = proc.ppath
-				} else {
-					pname = proc.name
-					ppath = proc.path
+		if ppath, _ = global.SYS.GetFilePath(ppid); ppath == "" {
+			// empty when executing a file created with
+			// via fexecve() or execveat(AT_EMPTY_PATH).mfd_create()
+			if pgid := osutil.GetProcessGroupId(ppid); pgid > 0 {
+				ppath, _ = global.SYS.GetFilePath(pgid)
+			}
+		}
+
+		if path, err = os.Readlink(fmt.Sprintf(procSelfFd, ev.File.Fd())); err == nil {
+			name := filepath.Base(path) // estimated child executable
+			if fa.isParentProcessException(ppath, path, name) {
+				return bPass
+			}
+
+			var id, profileSetting, svcGroup, rule_uuid string
+			id, profileSetting, svcGroup, res = fa.whiteListCheck(path, ppid)
+			// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
+			if profileSetting == share.ProfileZeroDrift {
+				switch res {
+				case rule_denied, rule_allowed:	// matched a rule or bypass
+				default:
+					if rule_uuid = fa.checkAllowedShieldProcess(id, name, path, svcGroup, ppid, res); rule_uuid == "" {
+						res = rule_allowed_zdrift
+						log.WithFields(log.Fields{"id": id, "rule_uuid": rule_uuid}).Debug("SHD: allowed")
+					} else {
+						res = rule_not_defined // reject it
+					}
 				}
-				cmds = proc.cmds
+			} else {	// basic
+				if res >= rule_allowed {
+					res = rule_allowed
+				}
 			}
-		}
 
-		if pname == "" {
-			pname, _, _, _ = osutil.GetProcessUIDs(ppid)
-		}
-
-		if ppath == "" {
-			if ppath, _ = global.SYS.GetFilePath(ppid); ppath == "" {
-				// empty when executing a file created with memfd_create() via fexecve() or execveat(AT_EMPTY_PATH).
-				ppath = pname
-			}
-		}
-
-		if path, err = os.Readlink( fmt.Sprintf(procSelfFd, ev.File.Fd())); err == nil {
-			name = filepath.Base(path) // estimated child executable
-			if !fa.isParentProcessException(pname, ppath, name, path) {
-				var id, profileSetting, svcGroup, rule_uuid string
-				id, profileSetting, svcGroup, res = fa.whiteListCheck(path, ppid)
-				// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
-				if profileSetting == share.ProfileZeroDrift {
-					switch res {
-					case rule_denied, rule_allowed:	// matched a rule or bypass
-					default:
-						if rule_uuid = fa.checkAllowedShieldProcess(id, path, svcGroup, cmds, ppid, res); rule_uuid == "" {
-							res = rule_allowed_zdrift
-							log.WithFields(log.Fields{"id": id, "rule_uuid": rule_uuid}).Debug("SHD: allowed")
-						} else {
-							res = rule_not_defined // reject it
+			if res < rule_allowed {
+				// the same event with the same pid will come into the routine twice
+				if fa.lastReportPid != ppid { // it solve 80% case, let the aggregater to filter out the same pid's reports
+					go func() {
+						var msg string
+						switch rule_uuid {
+						case share.CLUSReservedUuidAnchorMode:
+							msg = "Process profile violation, not from an image file: execution denied"
+						case share.CLUSReservedUuidShieldMode:
+							msg = "Process profile violation, not from its root process: execution denied"
+						default:
+							msg = "Process profile violation: execution denied"
 						}
-					}
-				} else {	// basic
-					if res >= rule_allowed {
-						res = rule_allowed
-					}
-				}
 
-				if res < rule_allowed {
-					// the same event with the same pid will come into the routine twice
-					if fa.lastReportPid != ppid { // it solve 80% case, let the aggregater to filter out the same pid's reports
-						go func() {
-							var msg string
-							switch rule_uuid {
-							case share.CLUSReservedUuidAnchorMode:
-								msg = "Process profile violation, not from an image file: execution denied"
-							case share.CLUSReservedUuidShieldMode:
-								msg = "Process profile violation, not from its root process: execution denied"
-							default:
-								msg = "Process profile violation: execution denied"
-							}
-
-							pmsg := &ProbeProcess{
+						pmsg := &ProbeProcess{
 								ID:    id,
 								Pid:   ppid,
 								Path:  path,
 								Name:  name,
 								PPath: ppath,
-								PName: pname,
+								PName: filepath.Base(ppath),
 								Msg:   msg,
 								Group: svcGroup,
 								RuleID: rule_uuid,
-							}
+						}
 
-							if fa.prober != nil {
-								if pmsg.RuleID == "" {
-									pmsg.Group, pmsg.RuleID = fa.prober.getEstimateProcGroup(pmsg.ID, pmsg.Name, pmsg.Path)
-								}
+						if fa.prober != nil {
+							if pmsg.RuleID == "" {
+								pmsg.Group, pmsg.RuleID = fa.prober.getEstimateProcGroup(pmsg.ID, pmsg.Name, pmsg.Path)
+							}
 								// log.WithFields(log.Fields{"id": id, "alert": *alert}).Info("FA: Process denied")
-								rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_DENIED, Process: pmsg, ContainerIDs: utils.NewSet(id)}
-								fa.prober.SendAggregateProbeReport(&rpt, true)
-							}
-						}()
+							rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_DENIED, Process: pmsg, ContainerIDs: utils.NewSet(id)}
+							fa.prober.SendAggregateProbeReport(&rpt, true)
+						}
+					}()
 
-						fa.lastReportPid = ppid // it is incremental and wrapped-around
-					}
+					fa.lastReportPid = ppid // it is incremental and wrapped-around
 				}
 			}
 		}
 
 		bPass = res > rule_denied
 		if !bPass {
-			log.WithFields(log.Fields{"path": path, "ppid": ppid, "pname": pname}).Debug("FA: denied")
+			log.WithFields(log.Fields{"path": path, "ppid": ppid, "ppath": ppath}).Debug("FA: denied")
 		} else {
-			log.WithFields(log.Fields{"ppid": ppid}).Debug("FA: allowed")
+			log.WithFields(log.Fields{"ppid": ppid, "path": path, "ppath": ppath}).Debug("FA: allowed")
 		}
 	}
 	return bPass
 }
 
 func (fa *FileAccessCtrl) handleEvents() {
-	for {
-		if ev, err := fa.fanfd.GetEvent(); err != nil {
-			if errors.Is(err, syscall.EAGAIN) {
-				continue  // try later
-			}
-			break
-		} else {
-			bPass := true
-			if ev.Version == fsmon.FANOTIFY_METADATA_VERSION {
-				bPass = fa.processEvent(ev)
-			} else {
-				log.Error("FA: wrong metadata version")
-			}
-			fa.fanfd.Response(ev, bPass)
+	if events, err := fa.fanfd.GetEvents(); err == nil {
+		for _, ev := range events {
+			fa.fanfd.Response(ev, fa.processEvent(ev))
 			ev.File.Close()
 		}
 	}
@@ -834,6 +808,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 			log.WithFields(log.Fields{"err": err}).Error("FA: poll returns error")
 			break
 		}
+
 		if n <= 0 {
 			if n == 0 && !fa.bEnabled { // timeout at exit stage
 				waitCnt += 1
@@ -845,9 +820,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			fa.lockMux()
 			fa.handleEvents()
-			fa.unlockMux()
 			waitCnt = 0
 		}
 	}
@@ -883,28 +856,43 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 // Definitively, we want to bypass "ps" here and screen them at the process killer
 // For example, the "ps" commands (opening "/bin/busybox") for runtime services:
 //     crio uses "docker-runc-current", but docker-native uses "docker"
-func (fa *FileAccessCtrl) isParentProcessException(pname, ppath, name, path string) bool {
-	// mlog.WithFields(log.Fields{"pname": pname, "ppath": ppath, "name": name, "path": path}).Debug("FA:")
+func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) bool {
+	// mlog.WithFields(log.Fields{"ppath": ppath, "path": path}).Debug("FA:")
 	if name == "ps" {
 		return true // common service call
 	}
 
-	if filepath.Base(ppath) == "pod" && pname == "pod" { // pod services
+	// parent: matching only from binary
+	pname := filepath.Base(ppath)
+	if fa.bKubePlatform {
+		switch pname {
+		case "pod", "kubelet":
+			return true
+		}
+
+		// oc specific
+		if fa.kubeFlavor == share.FlavorOpenShift {
+			switch pname  {
+			case "hyperkube", "coreutils":
+				return true
+			case "openshift-sdn-node":
+				return name == "sh" || name == "bash"
+			}
+		}
+	}
+
+	if global.RT.IsRuntimeProcess(pname, nil) && global.RT.IsRuntimeProcess(name, nil) {
 		return true
 	}
 
-	if filepath.Base(ppath) == "kubelet" && pname == "kubelet" { // kubelet services
-		return true
-	}
-
-	if filepath.Base(ppath) == "hyperkube" && pname == "hyperkube" { // hyperkube services
+	if ppath == "/usr/local/bin/nstools" {
 		return true
 	}
 
 	// runtime or cni commands
 	if global.RT.IsRuntimeProcess(pname, nil) || filepath.Dir(ppath) == "/opt/cni/bin" {
 		switch name {
-		case "portmap", "containerd", "sleep", "uptime", "ip": // NV4856
+		case "portmap", "containerd", "sleep", "uptime", "ip", "nice":
 			return true
 		case "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true

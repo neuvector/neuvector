@@ -287,6 +287,15 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			case "":
 				// If the enforcer say it's not from external, respect that.
 				if !conn.ExternalPeer {
+					if conn.LinkLocal {
+						// link local 169.254.0.0 is special svc loopback
+						// used by cilium CNI
+						conn.ClientWL = conn.ServerWL
+						ca.external = false
+						ca.workload = true
+						ca.managed = true
+						return &ca, &sa, &stip, true
+					}
 					cctx.ConnLog.WithFields(log.Fields{
 						"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 					}).Debug("Ignore ingress connection from unknown subnet")
@@ -327,6 +336,12 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			sa.external = false
 			sa.workload = true
 			sa.managed = true
+			if conn.MeshToSvr {
+				if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+					conn.ServerWL = ep
+					sa.addrgrp = true
+				}
+			}
 			return &ca, &sa, &stip, true
 		} else if isDeviceIP(net.IP(conn.ServerIP)) {
 			cctx.ConnLog.WithFields(log.Fields{
@@ -341,6 +356,11 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			if svc := getSvcAddrGroup(net.IP(conn.ServerIP), uint16(conn.ServerPort)); svc != nil {
 				conn.ServerWL = svc.group.Name
 				sa.ipsvcgrp = true
+				if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+					conn.ServerWL = ep
+					sa.addrgrp = true
+					return &ca, &sa, &stip, true
+				}
 				// Ignore egress connection to service group that is hidden
 				if isIPSvcGrpHidden(svc) {
 					cctx.ConnLog.WithFields(log.Fields{
@@ -377,6 +397,15 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 				case "":
 					// If the enforcer say it's not to external, respect that.
 					if !conn.ExternalPeer {
+						if conn.LinkLocal {
+							// link local 169.254.0.0 is special svc loopback
+							// used by cilium CNI
+							conn.ServerWL = conn.ClientWL
+							sa.external = false
+							sa.workload = true
+							sa.managed = true
+							return &ca, &sa, &stip, true
+						}
 						// Consider it as unknown global workload
 						if !connectPAIToGlobal(conn, &sa, &stip) {
 							return &ca, &sa, &stip, false

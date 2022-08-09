@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -190,41 +190,6 @@ func getConfigKvData(key string) ([]byte, bool) {
 	return cacher.GetConfigKvData(key)
 }
 
-func lookupK8sContainerID(id, role string, containers []*container.ContainerMeta) (string, error) {
-	var podname string
-
-	// (1) identify it is a POD or container
-	for _, c := range containers {
-		if strings.HasPrefix(c.Name, "k8s_POD") {
-			// parent: POD
-			if c.ID == id {
-				podname, _ = c.Labels[container.KubeKeyPodName]
-				break
-			}
-		} else {
-			// found: it is a child, container
-			if c.ID == id {
-				return c.ID, nil
-			}
-		}
-	}
-
-	// (2) search its child pod
-	for _, c := range containers {
-		if !strings.HasPrefix(c.Name, "k8s_POD") {
-			if name, ok := c.Labels[container.KubeKeyPodName]; ok && (name == podname) {
-				if v, ok := c.Labels[share.NeuVectorLabelRole]; ok {
-					if strings.Contains(v, role) {
-						// neuvector image role: it might have more than one children
-						return c.ID, nil
-					}
-				}
-			}
-		}
-	}
-	return id, fmt.Errorf("failed to find container")
-}
-
 func main() {
 	var joinAddr, advAddr, bindAddr string
 	var err error
@@ -268,6 +233,11 @@ func main() {
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
+	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
+	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")                       // for testing only
+	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
+	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
+	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
 	flag.Parse()
 
 	if *debug {
@@ -304,6 +274,11 @@ func main() {
 	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
+		if err == global.ErrEmptyContainerList {
+			// Temporary get container list error
+			// => exit the process but the container doesn't need to be restarted
+			os.Exit(-1)
+		}
 		os.Exit(-2)
 	}
 
@@ -336,7 +311,7 @@ func main() {
 	}
 
 	if platform == share.PlatformKubernetes {
-		if selfID, err = lookupK8sContainerID(selfID, share.NeuVectorRoleEnforcer, containers); err != nil {
+		if selfID, err = global.IdentifyK8sContainerID(selfID); err != nil {
 			log.WithFields(log.Fields{"selfID": selfID, "error": err}).Error("lookup")
 		}
 	}
@@ -472,7 +447,7 @@ func main() {
 
 	isNewCluster := likelyNewCluster()
 
-	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster}).Info()
+	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster, "noDefAdmin": *noDefAdmin}).Info()
 
 	purgeFedRulesOnJoint := false
 	if Ctrler.Leader {
@@ -534,12 +509,20 @@ func main() {
 
 	if Ctrler.Leader {
 		kv.ValidateWebhookCert()
+		if isNewCluster && *noDefAdmin {
+			kv.GetClusterHelper().DeleteUser(common.DefaultAdminUser)
+		}
 		setConfigLoaded()
 	} else {
 		// The lead can take some time to restore the PV. Synchronize here so when non-lead
 		// read from the KV, such as policy list, it knows the data is complete.
 		waitConfigLoaded(isNewCluster)
 		kv.ValidateWebhookCert()
+	}
+
+	checkDefAdminFreq := *pwdValidUnit // check default admin's password every 24 hours by default
+	if isNewCluster && *noDefAdmin {
+		checkDefAdminFreq = 0 // do not check default admin's password if it's disabled
 	}
 
 	// pre-build compliance map
@@ -550,11 +533,30 @@ func main() {
 	orchObjChan := make(chan *resource.Event, 32)
 	orchScanChan := make(chan *resource.Event, 16)
 
+	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+		var ver share.CLUSCtrlVersion
+		json.Unmarshal(value, &ver)
+		if !strings.HasPrefix(ver.CtrlVersion, "interim/") {
+			// it's official release image
+			if *teleNeuvectorEP == "" {
+				*teleNeuvectorEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
+			}
+			if *teleScannerEP == "" {
+				*teleScannerEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
+			}
+		}
+	}
+	if *teleNeuvectorEP == "" && *teleScannerEP == "" {
+		*telemetryFreq = 0
+	}
+
 	// Initialize cache
 	// - Start policy learning thread and build learnedPolicyRuleWrapper from KV
 	cctx := cache.Context{
 		RancherEP:                *rancherEP,
 		RancherSSO:               *rancherSSO,
+		TelemetryFreq:            *telemetryFreq,
+		CheckDefAdminFreq:        checkDefAdminFreq,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
 		AuditQueue:               auditQueue,
@@ -604,15 +606,18 @@ func main() {
 
 	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
-		LocalDev:     dev,
-		EvQueue:      evqueue,
-		AuditQueue:   auditQueue,
-		Messenger:    messenger,
-		Cacher:       cacher,
-		Scanner:      scanner,
-		RESTPort:     *restPort,
-		FedPort:      *fedPort,
-		PwdValidUnit: *pwdValidUnit,
+		LocalDev:         dev,
+		EvQueue:          evqueue,
+		AuditQueue:       auditQueue,
+		Messenger:        messenger,
+		Cacher:           cacher,
+		Scanner:          scanner,
+		RESTPort:         *restPort,
+		FedPort:          *fedPort,
+		PwdValidUnit:     *pwdValidUnit,
+		TeleNeuvectorURL: *teleNeuvectorEP,
+		TeleScannerURL:   *teleScannerEP,
+		TeleCurrentVer:   *teleCurrentVer,
 	}
 	rest.InitContext(&rctx)
 

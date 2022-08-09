@@ -353,8 +353,32 @@ void dpi_inject_reset(dpi_packet_t *p, bool to_server)
     dpi_inject_reset_by_session(p->session, to_server);
 }
 
+// return true if packet is ingress to i/f
+static bool nfq_packet_direction(dpi_packet_t *p)
+{
+    io_app_t *app = NULL;
+    if (p->eth_type == ETH_P_IP) {//ipv4
+        struct iphdr *iph = (struct iphdr *)(p->pkt + p->l3);
+        int idx;
+        if (p->ep && p->ep->pips) {
+            for (idx = 0; idx < p->ep->pips->count; idx++) {
+                if ((iph->daddr ^ p->ep->pips->list[idx].ip) == 0) {
+                    return true;
+                } else if ((iph->saddr ^ p->ep->pips->list[idx].ip) == 0) {
+                    return false;
+                }
+            }
+        }
+    }
+    app = dpi_ep_app_map_lookup(p->ep, p->dport, p->ip_proto);
+    if (app != NULL) return true;
+    app = dpi_ep_app_map_lookup(p->ep, p->sport, p->ip_proto);
+    if (app != NULL) return false;
+    return p->dport < p->sport;
+}
+
 // return true if packet is ingress to "lo" i/f
-static bool proxymesh_packet_direction(io_ctx_t *ctx, dpi_packet_t *p)
+static bool proxymesh_packet_direction(dpi_packet_t *p)
 {
     io_app_t *app = NULL;
     if (p->eth_type == ETH_P_IP) {//ipv4
@@ -464,6 +488,9 @@ int dpi_recv_packet(io_ctx_t *ctx, uint8_t *ptr, int len)
             if (th_session4_proxymesh_map.map == NULL) {
                 dpi_session_proxymesh_init();
             }
+        } else if (nfq) {
+            //cilium ep use nfq in protect mode
+            mac = rcu_map_lookup(&g_ep_map, &ctx->ep_mac.ether_addr_octet);
         }
         if (likely(mac != NULL)) {
             tap = mac->ep->tap;
@@ -484,7 +511,7 @@ int dpi_recv_packet(io_ctx_t *ctx, uint8_t *ptr, int len)
                 }
             }
 
-            if (!isproxymesh) {
+            if (!isproxymesh && !nfq) {
                 if (th_packet.flags & DPI_PKT_FLAG_INGRESS) {
                     th_packet.ep_all_metry = &th_packet.ep_stats->in;
                     th_packet.all_metry = &th_packet.stats->in;
@@ -534,10 +561,16 @@ int dpi_recv_packet(io_ctx_t *ctx, uint8_t *ptr, int len)
         return 0;
     }
 
-    if (isproxymesh) {
-        //direction WRT "lo" i/f is opsite WRT to WL ep
-        if (!proxymesh_packet_direction(ctx, &th_packet)) {
-            th_packet.flags |= DPI_PKT_FLAG_INGRESS;
+    if (isproxymesh || nfq) {
+        if (isproxymesh) {
+            //direction WRT "lo" i/f is opsite WRT to WL ep
+            if (!proxymesh_packet_direction(&th_packet)) {
+                th_packet.flags |= DPI_PKT_FLAG_INGRESS;
+            }
+        } else if (nfq) {
+            if (nfq_packet_direction(&th_packet)) {
+                th_packet.flags |= DPI_PKT_FLAG_INGRESS;
+            }
         }
         if (th_packet.flags & DPI_PKT_FLAG_INGRESS) {
             th_packet.ep_all_metry = &th_packet.ep_stats->in;

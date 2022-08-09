@@ -73,7 +73,7 @@ func isAgentContainer(id string) bool {
 
 func getHostIPs() {
 	addrs := getHostAddrs()
-	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU = parseHostAddrs(addrs, Host.Platform, Host.Network)
+	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
 		Host.TunnelIP = tun
 	}
@@ -191,7 +191,7 @@ func checkAntiAffinity(containers []*container.ContainerMeta, skips ...string) e
 
 func cbRerunKube(cmd, cmdRemap string) {
 	if Host.CapKubeBench {
-		bench.RerunKube(cmd, cmdRemap)
+		bench.RerunKube(cmd, cmdRemap, false)
 	}
 }
 
@@ -222,41 +222,6 @@ func dumpGoroutineStack() {
 	}
 }
 
-func lookupK8sContainerID(id, role string, containers []*container.ContainerMeta) (string, error) {
-	var podname string
-
-	// (1) identify it is a POD or container
-	for _, c := range containers {
-		if strings.HasPrefix(c.Name, "k8s_POD") {
-			// parent: POD
-			if c.ID == id {
-				podname, _ = c.Labels[container.KubeKeyPodName]
-				break
-			}
-		} else {
-			// found: it is a child, container
-			if c.ID == id {
-				return c.ID, nil
-			}
-		}
-	}
-
-	// (2) search its child pod
-	for _, c := range containers {
-		if !strings.HasPrefix(c.Name, "k8s_POD") {
-			if name, ok := c.Labels[container.KubeKeyPodName]; ok && (name == podname) {
-				if v, ok := c.Labels[share.NeuVectorLabelRole]; ok {
-					if strings.Contains(v, role) {
-						// neuvector image role: it might have more than one children
-						return c.ID, nil
-					}
-				}
-			}
-		}
-	}
-	return id, fmt.Errorf("failed to find container")
-}
-
 func main() {
 	var joinAddr, advAddr, bindAddr string
 	var err error
@@ -279,6 +244,7 @@ func main() {
 
 	withCtlr := flag.Bool("c", false, "Coexist controller and ranger")
 	debug := flag.Bool("d", false, "Enable control path debug")
+	debug_level := flag.String("v", "", "debug level")
 	join := flag.String("j", "", "Cluster join address")
 	adv := flag.String("a", "", "Cluster advertise address")
 	bind := flag.String("b", "", "Cluster bind address")
@@ -291,11 +257,20 @@ func main() {
 	show_monitor_trace := flag.Bool("m", false, "Show process/file monitor traces")
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
+	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
 	flag.Parse()
 
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 		gInfo.agentConfig.Debug = []string{"ctrl"}
+	}
+
+	if *debug_level != "" {
+		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, strings.Split(*debug_level, " ")...))
+		if !*debug && levels.Contains("ctrl") {
+			levels.Remove("ctrl")
+		}
+		gInfo.agentConfig.Debug = levels.ToStringSlice()
 	}
 
 	agentEnv.kvCongestCtrl = true
@@ -308,6 +283,12 @@ func main() {
 	if *disable_scan_secrets {
 		log.Info("Scanning secrets on containers is disabled")
 		agentEnv.scanSecrets = false
+	}
+
+	agentEnv.autoBenchmark = true
+	if *disable_auto_benchmark {
+		log.Info("Auto benchmark is disabled")
+		agentEnv.autoBenchmark = false
 	}
 
 	if *join != "" {
@@ -340,6 +321,11 @@ func main() {
 	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, nil)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
+		if err == global.ErrEmptyContainerList {
+			// Temporary get container list error
+			// => exit the process but the container doesn't need to be restarted
+			os.Exit(-1)
+		}
 		os.Exit(-2)
 	}
 
@@ -367,7 +353,7 @@ func main() {
 	}
 
 	if platform == share.PlatformKubernetes {
-		if selfID, err = lookupK8sContainerID(selfID, share.NeuVectorRoleEnforcer, containers); err != nil {
+		if selfID, err = global.IdentifyK8sContainerID(selfID); err != nil {
 			log.WithFields(log.Fields{"selfID": selfID, "error": err}).Error("lookup")
 		}
 	}
@@ -462,9 +448,13 @@ func main() {
 		driver = pipe.PIPE_NOTC
 	} else {
 		driver = pipe.PIPE_TC
+		if gInfo.ciliumCNI {
+			driver = pipe.PIPE_CLM
+		} else {
+			driver = pipe.PIPE_TC
+		}
 	}
-	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU}).Info("")
-
+	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU, "ciliumCNI": gInfo.ciliumCNI}).Info("")
 	if nvSvcPort, nvSvcBrPort, err = pipe.Open(driver, cnet_type, Agent.Pid, gInfo.jumboFrameMTU); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to open pipe driver")
 		os.Exit(-2)
@@ -523,7 +513,7 @@ func main() {
 	go bench.BenchLoop()
 
 	if Host.CapDockerBench {
-		bench.RerunDocker()
+		bench.RerunDocker(false)
 	} else {
 		// If the older version write status into the cluster, clear it.
 		bench.ResetDockerStatus()
@@ -656,7 +646,7 @@ func main() {
 
 	waitContainerTaskExit()
 
-	if driver != pipe.PIPE_NOTC {
+	if driver != pipe.PIPE_NOTC  && driver != pipe.PIPE_CLM {
 		dp.DPCtrlDelSrvcPort(nvSvcPort)
 	}
 

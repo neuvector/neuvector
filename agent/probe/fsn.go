@@ -46,6 +46,7 @@ type fsnRootFd struct {
 	id        string
 	cLayer    string // on the local node's path
 	cLayerLen int
+	imgLayer  string // btrfs: image folder
 	pid       int
 	dirs      utils.Set            // keep a record of marked directories
 	files     map[string]*fileInfo // new files: [path]= bExec, hashValue
@@ -445,7 +446,7 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, m
 	if fsn.storageDrv == drv_btrfs {
 		// It is composed of the image files and the new created files
 		// differentiate the "..._init" folder to filter out the image files
-		root.dirs, root.files = fsn.enumBtrfsInitFiles(path, id)
+		root.dirs, root.files, root.imgLayer = fsn.enumBtrfsInitFiles(path, id)
 	} else {
 		root.dirs, root.files = fsn.enumFiles(path, id, true)
 	}
@@ -521,14 +522,24 @@ func (fsn *FileNotificationCtr) GetUpperFileInfo(id, file string) (*fileInfo, bo
 				return finfo, true
 			}
 
-			if fsn.storageDrv != drv_btrfs {
-				if fi, err := os.Stat(filepath.Join(root.cLayer, file)); err == nil {
-					finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, file)
-					finfo.fileType = file_added
-					root.files[file] = finfo
-					// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
-					return finfo, true // patch missing event
+			fpath := filepath.Join(root.cLayer, file)
+			if fi, err := os.Stat(fpath); err == nil {
+				finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, fpath)
+				if fsn.storageDrv == drv_btrfs {
+					ipath := filepath.Join(root.imgLayer, file)
+					if ifi, err := os.Stat(ipath); err == nil {
+						bExec, length, hashValue := calculateFileInfo(ifi, ipath)
+						if finfo.bExec == bExec && finfo.length == length && finfo.hashValue == hashValue {
+							// no update
+							return finfo, false // image layers: return safe
+						}
+					}
 				}
+
+				finfo.fileType = file_added
+				root.files[file] = finfo
+				// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
+				return finfo, true // patch missing event
 			}
 
 			// possible image file
@@ -575,7 +586,7 @@ func (fsn *FileNotificationCtr) IsNotExistingImageFile(id, file string) (*fileIn
 	return finfo, false
 }
 
-func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.Set, map[string]*fileInfo) {
+func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.Set, map[string]*fileInfo, string) {
 	var err error
 	var bytesValue []byte
 
@@ -685,8 +696,8 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.S
 			}
 		}
 	}
-	log.WithFields(log.Fields{"path": rootPath, "fCount": len(files), "dCount": dirs.Cardinality(), "error": err}).Debug("FSN:")
-	return dirs, files
+	log.WithFields(log.Fields{"path": rootPath, "fCount": len(files), "dCount": dirs.Cardinality(), "imgLayer": initPath, "error": err}).Debug("FSN:")
+	return dirs, files, initPath
 }
 
 ///////////////////////

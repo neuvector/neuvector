@@ -142,13 +142,14 @@ func DPCtrlDelTapPort(netns, iface string) {
 	dpSendMsg(msg)
 }
 
-func DPCtrlAddNfqPort(netns, iface string, epmac net.HardwareAddr, jumboframe *bool) {
+func DPCtrlAddNfqPort(netns, iface string, qno int, epmac net.HardwareAddr, jumboframe *bool) {
 	log.WithFields(log.Fields{"netns": netns, "iface": iface}).Debug("")
 
 	data := DPAddNfqPortReq{
 		AddNfqPort: &DPNfqPort{
 			NetNS: netns,
 			Iface: iface,
+			Qnum:  qno,
 			EPMAC: epmac.String(),
 		},
 	}
@@ -725,8 +726,8 @@ func DPCtrlConfigDlp(wldlprule *DPWorkloadDlpRule) int {
 		"workload": wldlprule.WlID, "mac": wldlprule.WorkloadMac,
 		"policyids": wldlprule.PolicyRuleIds,
 		"polwafids": wldlprule.PolWafRuleIds,
-		"num": num,
-		"num1": num1,
+		"dlprulenum": num,
+		"wafrulenum": num1,
 		"total": total,
 	}).Debug("config dlp")
 
@@ -769,6 +770,7 @@ func DPCtrlConfigDlp(wldlprule *DPWorkloadDlpRule) int {
 				RuleIds:      wldlprule.PolicyRuleIds,
 				WafRuleIds:   wldlprule.PolWafRuleIds,
 				RuleType:     wldlprule.RuleType,
+				WafRuleType:  wldlprule.WafRuleType,
 			},
 		}
 		for _, drn := range wldlprule.DlpRuleNames[start:end] {

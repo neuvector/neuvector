@@ -16,10 +16,14 @@
 package fsmon
 
 import (
+	"bytes"
 	"bufio"
 	"encoding/binary"
+	"io"
 	"os"
 	"syscall"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Flags used as first parameter to Initiliaze
@@ -128,6 +132,8 @@ type eventMetadata struct {
 	Pid         int32
 }
 
+const FA_EVENT_LEN = 24
+
 // Internal response struct, used for fanotify comm
 type response struct {
 	Fd       int32
@@ -201,4 +207,32 @@ func (nd *NotifyFD) GetFd() int32 {
 }
 func (nd *NotifyFD) Close() {
 	nd.f.Close()
+}
+
+// Get an event from the fanotify handle
+func (nd *NotifyFD) GetEvents() ([]*EventMetadata, error) {
+	var events []*EventMetadata
+	buffer := make([]byte, 4800) // should be enough: 24 bytes/event*200 events = 4800 bytes
+	n, err := io.ReadAtLeast(nd.r, buffer, FA_EVENT_LEN)
+	if err != nil {
+		log.WithFields(log.Fields{"n": n, "error": err}).Error("FA:")
+		return nil, err
+	}
+
+	if (n % FA_EVENT_LEN) != 0 {
+		log.WithFields(log.Fields{"n": n}).Error("FA: incomplete")
+	}
+
+	reader := bytes.NewReader(buffer)
+	for i := 0; i < (n / FA_EVENT_LEN); i ++ {
+		ev := &eventMetadata{}
+		if err = binary.Read(reader, binary.LittleEndian, ev); err == nil { // only have the EOF error
+			if ev.Version == FANOTIFY_METADATA_VERSION {
+				if f := os.NewFile(uintptr(ev.Fd), ""); f != nil {
+					events = append(events, &EventMetadata{ev.Len, ev.Version, ev.Reserved, ev.MetadataLen, ev.Mask, f, ev.Pid})
+				}
+			}
+		}
+	}
+	return events, err
 }

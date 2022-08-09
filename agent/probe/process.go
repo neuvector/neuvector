@@ -588,7 +588,11 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 }
 
 func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
-	// children of nstools
+	// children of nstools, bench script: nstools -> sh -> executables
+	if pproc, ok := p.pidProcMap[proc.ppid]; ok && pproc.ppath == "/usr/local/bin/nstools" {
+		return true
+	}
+	// bench script: work into a different mount namespace
 	return proc.ppath == "/usr/local/bin/nstools" || p.agentMntNsId != global.SYS.GetMntNamespaceId(proc.pid)
 }
 
@@ -749,8 +753,10 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		}
 
 		if proc.name != "" {
-			if _, ok := p.isSuspiciousProcess(proc, c.id); !ok {
-				proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
+			if proc.action != share.PolicyActionCheckApp { // preserve the suspicious process name
+				if _, ok := p.isSuspiciousProcess(proc, c.id); !ok {
+					proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
+				}
 			}
 		} else {
 			proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -858,7 +864,7 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 	parent, ok := p.pidProcMap[proc.ppid]
 	if !ok { // parent has not been caught
 		if !osutil.IsPidValid(proc.ppid) {
-			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Info("PROC: parent exited")
+			log.WithFields(log.Fields{"ppid": proc.ppid, "pid": proc.pid}).Debug("PROC: parent exited")
 			p.unlockProcMux() // minimum section lock
 			return
 		}
@@ -2138,9 +2144,10 @@ func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 
 // a runc building-command during "docker run" (not from root process but exists parallelly)
 func (p *Probe) isAllowRuncInitCommand(path string, cmds[]string) bool {
-	if filepath.Base(path) == "runc" {
+	// in-memory execution: cmd=[docker-runc init ] name=5 parent=docker-runc path=/memfd:runc_cloned:/proc/self/ex ppath=/run/torcx/unpack/docker/bin/runc
+	if filepath.Base(path) == "runc" || strings.HasPrefix(path, "/memfd:runc_cloned") {
 		for i, cmd := range cmds {
-			if i == 0 && filepath.Base(cmds[0]) != "runc" {
+			if i == 0 && !global.RT.IsRuntimeProcess(filepath.Base(cmds[0]), nil) {
 				break
 			}
 
@@ -2162,29 +2169,25 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
-	if bRtProcP && proc.path == "/usr/bin/pod" && proc.name == "pod" {
-		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
-		return true
-	}
 
-	// oc specific
-	if p.kubeFlavor == share.FlavorOpenShift {
-		if bZeroDrift && bRtProcP && proc.path == "/usr/bin/coreutils" && proc.name == "coreutils" {
-			log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
+	// parent: matching only from binary
+	pname := filepath.Base(proc.ppath)
+	if p.bKubePlatform {
+		switch pname {
+		case "pod", "kubelet":
 			return true
 		}
 
-		if filepath.Base(proc.ppath) == "pod" && proc.pname == "pod" { // pod services
-			return true
+		// oc specific
+		if p.kubeFlavor == share.FlavorOpenShift {
+			switch pname  {
+			case "hyperkube", "coreutils":
+				return true
+			case "openshift-sdn-node":
+				name := filepath.Base(proc.path)
+				return  name == "sh" || name == "bash"
+			}
 		}
-	}
-
-	if filepath.Base(proc.ppath) == "kubelet" && proc.pname == "kubelet" { // kubelet services
-		return true
-	}
-
-	if filepath.Base(proc.ppath) == "hyperkube" && proc.pname == "hyperkube" { // hyperkube services
-		return true
 	}
 
 	// both names are in the runtime list
@@ -2202,7 +2205,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	// CNI commands from node
 	if bRtProcP || (bParentHostProc && p.isAllowCniCommand(proc.ppath)) {
 		switch proc.name {
-		case "portmap", "containerd", "sleep", "uptime": // NV4856
+		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
 		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
@@ -2265,11 +2268,13 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) (string, bool) {
 	if filepath.Base(proc.path) != proc.name {
-		// update name
-		if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
-			proc.name = name
-		} else {
-			proc.name = filepath.Base(proc.path)
+		if proc.action != share.PolicyActionCheckApp { // preserve the suspicious process name
+			// update name
+			if name, ppid, _, _ := osutil.GetProcessUIDs(proc.pid); ppid > 0 && len(name) > 0 {
+				proc.name = name
+			} else {
+				proc.name = filepath.Base(proc.path)
+			}
 		}
 	}
 
@@ -3003,6 +3008,12 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 		return
 	}
 
+	if proc, ok := p.pidProcMap[rootPid]; ok {
+		if proc.ppid > 0 {	// exclude its runtime init process
+			allPids.Remove(proc.ppid)
+		}
+	}
+
 	// (1) make a sorting slice of the outsiders
 	pids := allPids.ToInt32Slice()
 	sort.Slice(pids, func(i, j int) bool { return pids[i] < pids[j] }) //sorting in increasing order
@@ -3019,6 +3030,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	// (3) rebuild two sets
 	c.children.Add(rootPid) // from the beginning
 	for _, pid := range pids {
+
 		if proc, ok := p.pidProcMap[int(pid)]; ok {
 			if isFamilyProcess(c.children, proc) {
 				c.children.Add(int(pid))
@@ -3090,8 +3102,11 @@ func (p *Probe) UpdateFromAllowRule(id, path string) {
 
 func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
 	p.lockProcMux()
-	proc, ok := p.pidProcMap[pid]
-	p.unlockProcMux()
-	mLog.WithFields(log.Fields{"proc": proc, "pid": pid}).Debug("FA:")
-	return proc, ok
+	defer p.unlockProcMux()
+	if proc, ok := p.pidProcMap[pid]; ok {
+		mLog.WithFields(log.Fields{"name": proc.name, "pname": proc.pname, "pid": pid}).Debug("FA:")
+		return proc, true
+	}
+	mLog.WithFields(log.Fields{"pid": pid}).Debug("FA:")
+	return nil, false
 }
