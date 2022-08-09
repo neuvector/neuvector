@@ -760,27 +760,17 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 	}
 }
 
-// does propMap contain key=value(when value is not "") or key(when value is "")
-func doesMapContain(key, value string, propMap map[string]string) bool {
-	if propValue, exist := propMap[key]; exist {
-		// propMap contains key
-		if value != "" {
-			// does propMap contain key=value?
-			return share.EqualMatch(value, propValue)
-		}
-		return true
-	}
-	return false
+type criterionValue struct {
+	Value string
+	Operator string
+	Test func(string, string) bool
 }
 
-
-func doesCrtContainProp(propKey, propValue string, kvMap map[string][]string) bool {
+func doesCrtContainProp(propKey, propValue string, kvMap map[string][]criterionValue) bool {
 	if crtValues, exist := kvMap[propKey]; exist {
 		// kvMap contains propKey
 		for _, crtValue := range crtValues {
-			// crtValue of "" means user only cares whether propKey exists in criteria
-			// otherwise check that propValue equals crtValue
-			if crtValue == "" || share.EqualMatch(crtValue, propValue) {
+			if crtValue.Test(crtValue.Value, propValue) {
 				return true
 			}
 		}
@@ -788,118 +778,139 @@ func doesCrtContainProp(propKey, propValue string, kvMap map[string][]string) bo
 	return false
 }
 
-func isMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string]string) (bool, bool) {
-	if len(propMap) > 0 {
-		kvMap := make(map[string][]string) // the key=value configured in criteria
-		for _, crtValue := range crt.ValueSlice {
-			var key, value string
-			if i := strings.Index(crtValue, "="); i >= 0 {
-				key = strings.TrimSpace(crtValue[:i])
-				value = strings.TrimSpace(crtValue[i+1:])
-				kvMap[key] = append(kvMap[key], value)
-			} else {
-				key = strings.TrimSpace(crtValue)
-				kvMap[key] = append(kvMap[key], "")
-			}
-		}
-		switch crt.Op {
-		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny:
-			for key, values := range kvMap {
-				for _, value := range values {
-					switch crt.Op {
-					case share.CriteriaOpContainsAll:
-						if !doesMapContain(key, value, propMap) {
-							return false, true
-						}
-					case share.CriteriaOpContainsAny:
-						if doesMapContain(key, value, propMap) {
-							return true, true
-						}
-					case share.CriteriaOpNotContainsAny:
-						if doesMapContain(key, value, propMap) {
-							return false, false
-						}
-					default:
-						log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
-					}
-				}
-			}
-		case share.CriteriaOpContainsOtherThan:
-			for propKey, propValue := range propMap {
-				if !doesCrtContainProp(propKey, propValue, kvMap) {
-					// in propMap there is an entry that doesn't match crtValue
-					return true, true
-				}
-			}
-		default:
-			log.WithFields(log.Fields{"name": crt.Name, "op": crt.Op}).Error("unsupported op")
-		}
-	}
-	switch crt.Op {
-	case share.CriteriaOpContainsAll:
-		if len(propMap) > 0 {
-			return true, true
-		} else {
-			return false, true
-		}
-	case share.CriteriaOpContainsAny:
-		return false, true
-	case share.CriteriaOpNotContainsAny:
-		return true, false
-	case share.CriteriaOpContainsOtherThan:
-		return false, true
-	default:
-		return false, true
-	}
-}
-
 // does propMap contain key=value(when value is not "") or key(when value is "")
-func doesComplexMapContain(key, value string, propMap map[string][]string) bool {
+func doesPropMapMatchCrtValue(key string, crtVal criterionValue, propMap map[string][]string) bool {
 	if propValues, exist := propMap[key]; exist {
-		// propMap contains key
-		if value != "" {
-			// does propMap contain key=value?
-			for _, propValue := range propValues {
-				if share.EqualMatch(value, propValue) {
-					return true
-				}
+		for _, propValue := range propValues {
+			if crtVal.Test(crtVal.Value, propValue) {
+				return true
 			}
-		} else {
-			return true
 		}
 	}
 	return false
 }
 
-func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string][]string) (bool, bool) {
-	if len(propMap) > 0 {
-		kvMap := make(map[string][]string) // the key=value configured in criteria
-		for _, crtValue := range crt.ValueSlice {
-			var key, value string
-			if i := strings.Index(crtValue, "="); i >= 0 {
-				key = strings.TrimSpace(crtValue[:i])
-				value = strings.TrimSpace(crtValue[i+1:])
-				kvMap[key] = append(kvMap[key], value)
-			} else {
-				key = strings.TrimSpace(crtValue)
-				kvMap[key] = append(kvMap[key], "")
+func getValidMapOperators(crt *share.CLUSAdmRuleCriterion) []string {
+	validOperators := []string{"="}
+
+	if crt.Name == share.CriteriaKeyModules {
+		validOperators = append(validOperators, []string{">", "<", ">=", "<="}...)
+	}
+
+	return validOperators
+}
+
+func getCrtValOperator(crtValString string, validOperators []string) (string, int) {
+	for _, operator := range validOperators {
+		if operatorIndex := strings.Index(crtValString, operator); operatorIndex >= 0 {
+			return operator, operatorIndex
+		}
+	}
+	return "", -1
+}
+
+func getCrtTestFunction(crt *share.CLUSAdmRuleCriterion, comparisonOp string) func(string, string) bool {
+	if comparisonOp == "EXISTS" {
+		return func(crtVal string, propVal string) bool {
+			// if this function is being run, its because the same key exists in a propMap
+			// and a crtValueMap, thus return true
+			return true
+		}
+	}
+
+	if crt.Name == share.CriteriaKeyModules {
+		switch comparisonOp {
+		case ">":
+			return func(crtVal string, propVal string) bool {
+				propVersion, propErr := utils.NewVersion(propVal)
+				crtVersion, crtErr := utils.NewVersion(crtVal)
+
+				if propErr != nil || crtErr != nil {
+					// when a semantic version isn't provided in the criteria or propMap
+					// fail comparison by default by returning false
+					return false
+				}
+
+				return propVersion.Compare(crtVersion) == 1
+			}
+		case "<":
+			return func(crtVal string, propVal string) bool {
+				propVersion, propErr := utils.NewVersion(propVal)
+				crtVersion, crtErr := utils.NewVersion(crtVal)
+
+				if propErr != nil || crtErr != nil {
+					return false
+				}
+
+				return propVersion.Compare(crtVersion) == -1
+			}
+		case ">=":
+			return func(crtVal string, propVal string) bool {
+				propVersion, propErr := utils.NewVersion(propVal)
+				crtVersion, crtErr := utils.NewVersion(crtVal)
+
+				if propErr != nil || crtErr != nil {
+					return false
+				}
+
+				return propVersion.Compare(crtVersion) >= 0
+			}
+		case "<=":
+			return func(crtVal string, propVal string) bool {
+				propVersion, propErr := utils.NewVersion(propVal)
+				crtVersion, crtErr := utils.NewVersion(crtVal)
+
+				if propErr != nil || crtErr != nil {
+					return false
+				}
+
+				return propVersion.Compare(crtVersion) <= 0
 			}
 		}
+	}
+
+	return func(crtVal string, propVal string) bool {
+		return share.EqualMatch(crtVal, propVal)
+	}
+}
+
+func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string][]string) (bool, bool) {
+	if len(propMap) > 0 {
+		crtValMap := map[string][]criterionValue{}
+		for _, crtValString := range crt.ValueSlice {
+			var key string
+			var val criterionValue
+			if operator, operatorIndex := getCrtValOperator(crtValString, getValidMapOperators(crt)); operator != "" {
+				key = strings.TrimSpace(crtValString[:operatorIndex])
+				val = criterionValue{
+					Value: strings.TrimSpace(crtValString[operatorIndex+len(operator):]),
+					Operator: operator,
+				}
+			} else {
+				key = strings.TrimSpace(crtValString)
+				val = criterionValue{
+					Operator: "EXISTS",
+				}
+			}
+			val.Test = getCrtTestFunction(crt, val.Operator)
+			crtValMap[key] = append(crtValMap[key], val)
+		}
+
 		switch crt.Op {
 		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny:
-			for key, values := range kvMap {
+			for key, values := range crtValMap {
 				for _, value := range values {
 					switch crt.Op {
 					case share.CriteriaOpContainsAll:
-						if !doesComplexMapContain(key, value, propMap) {
+						if !doesPropMapMatchCrtValue(key, value, propMap) {
 							return false, true
 						}
 					case share.CriteriaOpContainsAny:
-						if doesComplexMapContain(key, value, propMap) {
+						if doesPropMapMatchCrtValue(key, value, propMap) {
 							return true, true
 						}
 					case share.CriteriaOpNotContainsAny:
-						if doesComplexMapContain(key, value, propMap) {
+						if doesPropMapMatchCrtValue(key, value, propMap) {
 							return false, false
 						}
 					default:
@@ -910,7 +921,7 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 		case share.CriteriaOpContainsOtherThan:
 			for propKey, propValues := range propMap {
 				for _, propValue := range propValues {
-					if !doesCrtContainProp(propKey, propValue, kvMap) {
+					if !doesCrtContainProp(propKey, propValue, crtValMap) {
 						// in propMap there is an entry that doesn't match crtValue
 						return true, true
 					}
@@ -936,6 +947,14 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 	default:
 		return false, true
 	}
+}
+
+func isMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[string]string) (bool, bool) {
+	complexPropMap := map[string][]string{}
+	for key, value := range propMap {
+		complexPropMap[key] = []string{value}
+	}
+	return isComplexMapCriterionMet(crt, complexPropMap)
 }
 
 func isResourceLimitCriterionMet(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo) (bool, bool) {
