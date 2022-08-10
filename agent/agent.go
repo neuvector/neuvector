@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/pipe"
 	"github.com/neuvector/neuvector/agent/probe"
+	"github.com/neuvector/neuvector/agent/resource"
 	"github.com/neuvector/neuvector/agent/workerlet"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -318,7 +319,7 @@ func main() {
 	}
 
 	// Set global objects at the very first
-	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, nil)
+	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
 		if err == global.ErrEmptyContainerList {
@@ -334,7 +335,16 @@ func main() {
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
-		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer}).Info()
+		if k8sVer != "" && ocVer == "" {
+			if err := global.ORCH.RegisterResource("image"); err == nil {
+				// Use ImageStream as an indication of OpenShift
+				flavor = share.FlavorOpenShift
+				global.ORCH.SetFlavor(flavor)
+			} else {
+				log.WithFields(log.Fields{"error": err}).Info("register image failed")
+			}
+		}
+		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
 	}
 
 	var selfID string
