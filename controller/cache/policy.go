@@ -724,6 +724,11 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			wlAddr := share.CLUSWorkloadAddr{
 				WlID: m.(string),
 			}
+			//set PolicyMode here to avoid 'Missing policy mode'
+			//errror at the adjustAction().
+			if wlCache1, ok1 := wlCacheMap[m.(string)]; ok1 {
+				wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache1)
+			}
 			if isDst {
 				fillPortsForWorkloadAddress(&wlAddr, ports, apps)
 			}
