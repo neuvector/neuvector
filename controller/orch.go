@@ -15,7 +15,7 @@ import (
 
 type orchConnInterface interface {
 	LeadChangeNotify(leader bool)
-	Start()
+	Start(ocRegImage bool)
 	Stop()
 	Close()
 }
@@ -39,7 +39,7 @@ func (c *orchConn) cbWatcherState(state string, err error) {
 		value, _ := json.Marshal(Ctrler)
 		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
 		if err := cluster.Put(key, value); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
+			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
 }
@@ -123,34 +123,29 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 	log.WithFields(log.Fields{"event": event, "type": rt}).Debug("Event done")
 }
 
-func (c *orchConn) Start() {
+func (c *orchConn) Start(ocImageRegistered bool) {
 	var r string
-	var regImage bool
 
 	// Make sure register resource first, otherwise it may trigger a race condition in k8s client library
 	// between Watch()
-	r = resource.RscTypeImage
-	if err := global.ORCH.RegisterResource(r); err == nil {
-		// Use ImageStream as an indication of OpenShift
-		Host.Flavor = share.FlavorOpenShift
-		regImage = true
-	} else {
-		log.WithFields(log.Fields{"watch": r, "error": err}).Error("Fail to register image watch")
+	if !ocImageRegistered {
+        r = resource.RscTypeImage
+		if err := global.ORCH.RegisterResource(r); err == nil {
+			// Use ImageStream as an indication of OpenShift
+			Host.Flavor = share.FlavorOpenShift
+			ocImageRegistered = true
+		}
 	}
 
-	r = resource.RscTypeNode
+    r = resource.RscTypeNode
 	if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
-		log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
-
 		if err != resource.ErrMethodNotSupported {
 			c.cbWatcherState(resource.ConnStateDisconnected, err)
 		}
 	}
 
-	r = resource.RscTypeNamespace
+    r = resource.RscTypeNamespace
 	if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
-		log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
-
 		if err != resource.ErrMethodNotSupported {
 			c.cbWatcherState(resource.ConnStateDisconnected, err)
 		}
@@ -162,9 +157,7 @@ func (c *orchConn) Start() {
 		rscTypes = append(rscTypes, resource.RscTypeValidatingWebhookConfiguration)
 	}
 	for _, r := range rscTypes {
-		if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, nil); err != nil {
-			log.WithFields(log.Fields{"watch": r, "error": err}).Error()
-		}
+		global.ORCH.StartWatchResource(r, c.cbResourceWatcher, nil)
 	}
 
 	rscTypes = []string{
@@ -175,16 +168,12 @@ func (c *orchConn) Start() {
 		resource.RscTypeCrdWafSecurityRule,
 	}
 	for _, r := range rscTypes {
-		if err := global.ORCH.RegisterResource(r); err != nil {
-			log.WithFields(log.Fields{"watch": r, "error": err}).Error("Fail to register")
-		}
+		global.ORCH.RegisterResource(r)
 	}
 
-	if regImage {
-		r = resource.RscTypeImage
-		if err := global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState); err != nil {
-			log.WithFields(log.Fields{"watch": r, "error": err}).Error("")
-		}
+	if ocImageRegistered {
+        r = resource.RscTypeImage
+		global.ORCH.StartWatchResource(r, c.cbResourceWatcher, c.cbWatcherState)
 	}
 }
 

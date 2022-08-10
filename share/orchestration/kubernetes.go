@@ -397,7 +397,7 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
 	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
-		return d.GetServiceFromPodLabels( namespace, pod, meta.Labels)
+		return d.GetServiceFromPodLabels(namespace, pod, meta.Labels)
 	}
 
 	return baseDriver.GetService(meta)
@@ -623,4 +623,9 @@ func (d *kubernetes) isKubeProxy(wl *share.CLUSWorkload) bool {
 	}
 
 	return false
+}
+
+func (d *kubernetes) SetFlavor(flavor string) error {
+	d.flavor = flavor
+	return nil
 }

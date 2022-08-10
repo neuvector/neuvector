@@ -33,7 +33,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	SYS = system.NewSystemTools()
 
 	RT, err = container.Connect(rtSocket, SYS)
- 	if err != nil {
+	if err != nil {
 		return "", "", "", nil, err
 	}
 
@@ -177,4 +177,13 @@ func getPlatform(containers []*container.ContainerMeta) (string, string, string)
 	}
 
 	return platform, flavor, network
+}
+
+func (d *orchHub) SetFlavor(flavor string) error {
+	d.Driver.SetFlavor(flavor)
+	if d.ResourceDriver != nil {
+		d.ResourceDriver.SetFlavor(flavor)
+	}
+
+	return nil
 }
