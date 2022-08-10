@@ -82,3 +82,7 @@ func (d *noop) SupportKubeCISBench() bool {
 func (d *noop) CleanupHostPorts(hostPorts map[string][]share.CLUSIPAddr) error {
 	return ErrMethodNotSupported
 }
+
+func (d *noop) SetFlavor(flavor string) error {
+	return ErrMethodNotSupported
+}

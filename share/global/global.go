@@ -213,3 +213,12 @@ func IdentifyK8sContainerID(id string) (string, error) {
 	}
 	return id, ErrContainerNotFound
 }
+
+func (d *orchHub) SetFlavor(flavor string) error {
+	d.Driver.SetFlavor(flavor)
+	if d.ResourceDriver != nil {
+		d.ResourceDriver.SetFlavor(flavor)
+	}
+
+	return nil
+}

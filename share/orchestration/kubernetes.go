@@ -625,3 +625,8 @@ func (d *kubernetes) isKubeProxy(wl *share.CLUSWorkload) bool {
 
 	return false
 }
+
+func (d *kubernetes) SetFlavor(flavor string) error {
+	d.flavor = flavor
+	return nil
+}
