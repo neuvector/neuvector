@@ -484,7 +484,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"scannerTask", "/usr/local/bin/scannerTask"},
 
@@ -547,7 +546,6 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
@@ -628,7 +626,6 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"scannerTask", "/usr/local/bin/scannerTask"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
