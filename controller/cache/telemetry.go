@@ -33,6 +33,7 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 	}
 	var past time.Duration = time.Minute * time.Duration(telemetryFreq)
 	if time.Since(lastUploadTime) < past {
+		cacheMutexRUnlock()
 		return false, teleData
 	}
 
