@@ -234,7 +234,6 @@ func main() {
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
 	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
-	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")                       // for testing only
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
@@ -549,12 +548,9 @@ func main() {
 			if *teleNeuvectorEP == "" {
 				*teleNeuvectorEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
 			}
-			if *teleScannerEP == "" {
-				*teleScannerEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
-			}
 		}
 	}
-	if *teleNeuvectorEP == "" && *teleScannerEP == "" {
+	if *teleNeuvectorEP == "" {
 		*telemetryFreq = 0
 	}
 
@@ -624,7 +620,6 @@ func main() {
 		FedPort:          *fedPort,
 		PwdValidUnit:     *pwdValidUnit,
 		TeleNeuvectorURL: *teleNeuvectorEP,
-		TeleScannerURL:   *teleScannerEP,
 		TeleCurrentVer:   *teleCurrentVer,
 	}
 	rest.InitContext(&rctx)
