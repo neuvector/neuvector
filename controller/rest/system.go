@@ -1735,47 +1735,34 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		ClusterRoleBindingErrors: emptySlice,
 		RoleBindingErrors:        emptySlice,
 		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
-		ScannerUpgradeInfo:       &api.RESTCheckUpgradeInfo{},
 	}
 	if k8sPlatform {
 		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, false)
 	}
 
-	var nvUpgradeInfo, scannerUpgradeInfo share.CLUSCheckUpgradeInfo
+	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
 	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
 		json.Unmarshal(value, &nvUpgradeInfo)
 	}
-	if value, _ := cluster.Get(share.CLUSTelemetryStore + "scanner"); value != nil {
-		json.Unmarshal(value, &scannerUpgradeInfo)
-	}
 
 	empty := share.CLUSCheckUpgradeVersion{}
-	allUpgradeInfo := map[*share.CLUSCheckUpgradeInfo]*api.RESTCheckUpgradeInfo{
-		&nvUpgradeInfo:      resp.NvUpgradeInfo,
-		&scannerUpgradeInfo: resp.ScannerUpgradeInfo,
-	}
-	for upgradeInfo, respField := range allUpgradeInfo {
-		if upgradeInfo.MinUpgradeVersion != empty {
-			respField.MinUpgradeVersion = &api.RESTUpgradeInfo{
-				Version:     upgradeInfo.MinUpgradeVersion.Version,
-				ReleaseDate: upgradeInfo.MinUpgradeVersion.ReleaseDate,
-				Tag:         upgradeInfo.MinUpgradeVersion.Tag,
-			}
+	if nvUpgradeInfo.MinUpgradeVersion != empty {
+		resp.NvUpgradeInfo.MinUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
 		}
-		if upgradeInfo.MaxUpgradeVersion != empty {
-			respField.MaxUpgradeVersion = &api.RESTUpgradeInfo{
-				Version:     upgradeInfo.MaxUpgradeVersion.Version,
-				ReleaseDate: upgradeInfo.MaxUpgradeVersion.ReleaseDate,
-				Tag:         upgradeInfo.MaxUpgradeVersion.Tag,
-			}
+	}
+	if nvUpgradeInfo.MaxUpgradeVersion != empty {
+		resp.NvUpgradeInfo.MaxUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
 		}
 	}
 	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
 		resp.NvUpgradeInfo = nil
-	}
-	if scannerUpgradeInfo.MinUpgradeVersion == empty && scannerUpgradeInfo.MaxUpgradeVersion == empty {
-		resp.ScannerUpgradeInfo = nil
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")

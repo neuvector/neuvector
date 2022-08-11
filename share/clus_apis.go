@@ -157,7 +157,6 @@ const CLUSCtrlUsageReportStore string = CLUSStateStore + "usage_report/"
 const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
-const CLUSUpgradeInfoStore string = CLUSStateStore + "upgrade_info/"
 
 func CLUSExpiredTokenKey(token string) string {
 	return fmt.Sprintf("%s%s", CLUSExpiredTokenStore, token)
@@ -2609,14 +2608,15 @@ const (
 
 // Telemetry (upgrade responder)
 type CLUSCheckUpgradeVersion struct {
-	Version     string
-	ReleaseDate string
-	Tag         string
+	Version     string `json:"version"`
+	ReleaseDate string `json:"release_date"`
+	Tag         string `json:"tag"`
 }
 
 type CLUSCheckUpgradeInfo struct {
-	MinUpgradeVersion CLUSCheckUpgradeVersion
-	MaxUpgradeVersion CLUSCheckUpgradeVersion
+	MinUpgradeVersion CLUSCheckUpgradeVersion `json:"min_upgrade_version"`
+	MaxUpgradeVersion CLUSCheckUpgradeVersion `json:"max_upgrade_version"`
+	LastUploadTime    time.Time               `json:"last_upload_time"`
 }
 
 // throttled events/logs

@@ -63,10 +63,8 @@ type TelemetryData struct {
 	Hosts          int // nodes
 	Groups         int
 	PolicyRules    int
-	Clusters       int
-	AdmCtrlEnabled bool
-	InFederate     bool
-	PrimaryCluster bool
+	PrimaryCluster int // 1 for master cluster, 0 otherwise
+	Clusters       int // all clusters in fed for master cluster, 0 for worker cluster, or 1 for standalone.
 	UseProxy       int // for http client, not for telemetry
 }
 

@@ -1652,7 +1652,7 @@ func startWorkerThread(ctx *Context) {
 			case <-teleReportTicker.C:
 				if isLeader() {
 					if !noTelemetry {
-						if sendTelemetry, teleData := getTelemetryData(); sendTelemetry {
+						if sendTelemetry, teleData := getTelemetryData(telemetryFreq); sendTelemetry {
 							var param interface{} = &teleData
 							cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
 						}
