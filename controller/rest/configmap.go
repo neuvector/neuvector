@@ -19,6 +19,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
+	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -594,32 +595,39 @@ func handlecustomrolecfg(yaml_data []byte, load bool, skip *bool, context *confi
 }
 
 func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
+	create := false
 	user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
-	if user == nil {
-		log.WithFields(log.Fields{"error": err}).Error("Admin user date not find")
-		return
+	if user != nil {
+		if user.PasswordHash != utils.HashPassword(common.DefaultAdminPass) {
+			log.WithFields(log.Fields{"Password of": common.DefaultAdminUser}).Info("already updated")
+			return
+		}
+	} else {
+		fedRole := cacher.GetFedMembershipRoleNoAuth()
+		roleForDefaultAdmin := api.UserRoleAdmin
+		if fedRole == api.FedRoleMaster {
+			roleForDefaultAdmin = api.UserRoleFedAdmin
+		}
+		user = &share.CLUSUser{
+			Fullname:    common.DefaultAdminUser,
+			Username:    common.DefaultAdminUser,
+			Role:        roleForDefaultAdmin,
+			RoleDomains: make(map[string][]string),
+			Locale:      common.OEMDefaultUserLocale,
+		}
+		create = true
 	}
-
-	if user.PasswordHash != utils.HashPassword(common.DefaultAdminPass) {
-		e := "already updated"
-		log.WithFields(log.Fields{"Password of": common.DefaultAdminUser}).Error(e)
-		return
-	}
-
 	if weak, _, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil); weak {
 		log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
 		return
-	} else {
-		user.PasswordHash = utils.HashPassword(ruser.Password)
-		user.PwdResetTime = time.Now().UTC()
 	}
+	user.PasswordHash = utils.HashPassword(ruser.Password)
+	user.PwdResetTime = time.Now().UTC()
 
 	if ruser.Timeout == 0 {
 		ruser.Timeout = common.DefaultIdleTimeout
-	} else if ruser.Timeout > api.UserIdleTimeoutMax ||
-		ruser.Timeout < api.UserIdleTimeoutMin {
-		e := "Invalid idle timeout value"
-		log.WithFields(log.Fields{"create": common.DefaultAdminUser, "timeout": ruser.Timeout}).Error(e)
+	} else if ruser.Timeout > api.UserIdleTimeoutMax || ruser.Timeout < api.UserIdleTimeoutMin {
+		log.WithFields(log.Fields{"user": common.DefaultAdminUser, "timeout": ruser.Timeout}).Error("Invalid idle timeout value")
 		return
 	}
 	user.Timeout = ruser.Timeout
@@ -628,8 +636,14 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		user.EMail = ruser.EMail
 	}
 
-	if err := clusHelper.PutUserRev(user, rev); err != nil {
-		log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
+	if create {
+		value, _ := json.Marshal(user)
+		err = cluster.PutIfNotExist(share.CLUSUserKey(common.DefaultAdminUser), value, true)
+	} else {
+		err = clusHelper.PutUserRev(user, rev)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "create": create}).Error()
 	}
 }
 
@@ -893,12 +907,12 @@ func HandleAdminUserUpdate() {
 
 			}
 
-			accAdmin := access.NewAdminAccessControl()
+			accFedAdmin := access.NewFedAdminAccessControl()
 			for _, ruser := range rconf.Users {
 				if ruser == nil || ruser.Fullname != common.DefaultAdminUser {
 					continue
 				}
-				updateAdminPass(ruser, accAdmin)
+				updateAdminPass(ruser, accFedAdmin)
 				break
 			}
 		} else {
