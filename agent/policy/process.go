@@ -173,13 +173,13 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 		var matchedEntry *share.CLUSProcessProfileEntry
 		for _, p := range profile.Process {
 			if len(p.ProbeCmds) > 0 {
-			//	if p.Name == "sh" && p.Path == "*" {		// replace
-			//		if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
-			//			p.Name = "*"
-			//			p.Path = app
-			//		}
-			//	}
-				continue  // trigger a learning event
+				//	if p.Name == "sh" && p.Path == "*" {		// replace
+				//		if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
+				//			p.Name = "*"
+				//			p.Path = app
+				//		}
+				//	}
+				continue // trigger a learning event
 			}
 
 			if MatchProfileProcess(p, proc) {
@@ -387,7 +387,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"lsof", "/bin/busybox"}, // replaced
+		{"lsof", "/bin/busybox"},    // replaced
 		{"netstat", "/bin/busybox"},
 		{"ps", "/bin/busybox"}, // replaced
 		{"sh", "/bin/busybox"},
@@ -404,8 +404,8 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"top", "/usr/bin/top"}, // new procps package
 		{"kill", "/bin/kill"},   // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"},  // replaced
-		{"top", "/bin/busybox"},   // replaced
+		{"kill", "/bin/busybox"}, // replaced
+		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"tee", "/usr/bin/tee"},
@@ -416,7 +416,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"}, 			 // CIS bench tests
+		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "*"},
 		{"sed", "*"},
 	}
@@ -449,7 +449,7 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ps", "/usr/bin/ps"}, // new procps package
 		{"kill", "/bin/kill"}, // new procps package
 		{"ls", "/bin/busybox"},
-		{"lsof", "/usr/bin/lsof"},   // new lsof package
+		{"lsof", "/usr/bin/lsof"}, // new lsof package
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -460,7 +460,7 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"}, 			 // CIS bench tests
+		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "*"},
 		{"sed", "*"},
 	}
@@ -474,12 +474,11 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
 		// /usr/local/bin
-		{"consul", "*"},				// monitor also calls it through a shell command
+		{"consul", "*"}, // monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"scannerTask", "/usr/local/bin/scannerTask"},
 
@@ -510,8 +509,8 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"top", "/usr/bin/top"}, // new procps package
 		{"kill", "/bin/kill"},   // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"},  // replaced
-		{"top", "/bin/busybox"},   // replaced
+		{"kill", "/bin/busybox"}, // replaced
+		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -522,7 +521,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"}, 			 // CIS bench tests
+		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "*"},
 		{"sed", "*"},
 	}
@@ -537,12 +536,11 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		/////////////////////////////////
 		// /usr/local/bin
 		{"agent", "/usr/local/bin/agent"},
-		{"consul", "*"},			// monitor also calls it through a shell command
+		{"consul", "*"}, // monitor also calls it through a shell command
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
@@ -579,8 +577,8 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"top", "/usr/bin/top"},                         // new procps package
 		{"kill", "/bin/kill"},                           // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"},  // replaced
-		{"top", "/bin/busybox"},   // replaced
+		{"kill", "/bin/busybox"}, // replaced
+		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -591,7 +589,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"}, 			 // CIS bench tests
+		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "*"},
 		{"sed", "*"},
 	}
@@ -617,13 +615,12 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// /usr/local/bin
 		//  {"*", "/usr/local/bin/*"}, // wildcard for below commented execs
 		{"agent", "/usr/local/bin/agent"},
-		{"consul", "*"},			// monitor also calls it through a shell command
+		{"consul", "*"}, // monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
 		{"scanner", "/usr/local/bin/scanner"},
-		{"sidekick", "/usr/local/bin/sidekick"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"scannerTask", "/usr/local/bin/scannerTask"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
@@ -664,8 +661,8 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"top", "/usr/bin/top"},                         // new procps package
 		{"kill", "/bin/kill"},                           // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"},  // replaced
-		{"top", "/bin/busybox"},   // replaced
+		{"kill", "/bin/busybox"}, // replaced
+		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
@@ -675,7 +672,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"}, 			 // CIS bench tests
+		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "*"},
 		{"sed", "*"},
 	}

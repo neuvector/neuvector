@@ -38,11 +38,10 @@ const defaultHostCgroup string = "/sys/fs/cgroup/"
 const mappedHostCgroup string = "/host/cgroup/"
 const maxStatCmdLen = 15
 const (
-	ExecNSTool   string = "/usr/local/bin/nstools"
-	ExecSidekick string = "/usr/local/bin/sidekick"
-	NSActGet     string = "get"
-	NSActRun     string = "run"
-	NSActExist   string = "exist"
+	ExecNSTool string = "/usr/local/bin/nstools"
+	NSActGet   string = "get"
+	NSActRun   string = "run"
+	NSActExist string = "exist"
 )
 
 const nanoSecondsPerSecond = 1e9
@@ -217,18 +216,18 @@ func (s *SystemTools) GetHostname(pid int) string {
 }
 
 func (s *SystemTools) GetHostRouteIfaceAddr(addr net.IP) (net.IP, error) {
-	path := fmt.Sprintf("%s --act route --ip %s", ExecSidekick, addr.String())
-	value, err := s.NsRunBinary(1, path)
+	var ipnet *net.IPNet
+	var err error
+
+	s.CallNetNamespaceFunc(1, func(params interface{}) {
+		_, ipnet, err = sk.GetRouteIfaceAddr(addr)
+	}, nil)
+
 	if err != nil {
 		return nil, err
+	} else {
+		return ipnet.IP, nil
 	}
-
-	ip, _, err := net.ParseCIDR(string(value[:]))
-	if err != nil {
-		return nil, err
-	}
-
-	return ip, nil
 }
 
 func (s *SystemTools) GetBindAddr(addr net.IP) (string, *net.IPNet) {

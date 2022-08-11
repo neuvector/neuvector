@@ -1,29 +1,23 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
-	"github.com/neuvector/neuvector/share/system"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
 func getHostAddrs() map[string]sk.NetIface {
-	path := fmt.Sprintf("%s --act ports", system.ExecSidekick)
-	value, err := global.SYS.NsRunBinary(1, path)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Error getting host IP")
-		return make(map[string]sk.NetIface)
-	}
-
 	var ifaces map[string]sk.NetIface
-	json.Unmarshal(value, &ifaces)
+
+	global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
+		ifaces = sk.GetGlobalAddrs()
+	}, nil)
+
 	return ifaces
 }
 
@@ -49,7 +43,7 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 	ciliumCNI := false
 
 	for name, iface := range ifaces {
-		log.WithFields(log.Fields{"link": name, "type": iface.Type, "mtu": iface.Mtu,"flags":iface.Flags,}).Info("link")
+		log.WithFields(log.Fields{"link": name, "type": iface.Type, "mtu": iface.Mtu, "flags": iface.Flags}).Info("link")
 
 		if strings.HasPrefix(name, "cilium") {
 			ciliumCNI = true
@@ -92,8 +86,8 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 			}
 		}
 	}
-	log.WithFields(log.Fields{"maxMTU": maxMTU, "ciliumCNI":ciliumCNI}).Info("")
-	if maxMTU > share.NV_VBR_PORT_MTU {//jumbo frame mtu
+	log.WithFields(log.Fields{"maxMTU": maxMTU, "ciliumCNI": ciliumCNI}).Info("")
+	if maxMTU > share.NV_VBR_PORT_MTU { //jumbo frame mtu
 		return devs, ips, true, ciliumCNI
 	} else {
 		return devs, ips, false, ciliumCNI
