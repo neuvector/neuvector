@@ -3,7 +3,6 @@
 REPO_URL = 10.1.127.3:5000
 REPO_REL_URL = 10.1.127.12:5000
 STAGE_DIR = stage
-S_DATA_FILE = ubistage.tgz
 
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
@@ -12,7 +11,6 @@ copy_ctrl:
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/tools/sidekick/sidekick ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
 	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
@@ -56,7 +54,6 @@ copy_enf:
 	cp neuvector/agent/tools/host_package.sh ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/tools/container_package.sh ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/tools/sidekick/sidekick ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
 	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/
