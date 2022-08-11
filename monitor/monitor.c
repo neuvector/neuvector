@@ -47,7 +47,6 @@
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
 #define ENV_TELE_NEUVECTOR_EP  "TELEMETRY_NEUVECTOR_EP"
-#define ENV_TELE_SCANNER_EP    "TELEMETRY_SCANNER_EP"
 #define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
 #define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
@@ -202,7 +201,7 @@ static pid_t fork_exec(int i)
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level;
-    char *telemetry_neuvector_ep, *telemetry_scanner_ep, *telemetry_current_ver, *telemetry_freq;
+    char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq;
     int a;
 
     switch (i) {
@@ -378,10 +377,6 @@ static pid_t fork_exec(int i)
         if ((telemetry_neuvector_ep = getenv(ENV_TELE_NEUVECTOR_EP)) != NULL) {
             args[a++] = "-telemetry_neuvector_ep";
             args[a++] = telemetry_neuvector_ep;
-        }
-        if ((telemetry_scanner_ep = getenv(ENV_TELE_SCANNER_EP)) != NULL) {
-            args[a++] = "-telemetry_scanner_ep";
-            args[a++] = telemetry_scanner_ep;
         }
         if ((telemetry_current_ver = getenv(ENV_TELE_CURRENT_VER)) != NULL) {
             args[a++] = "-telemetry_current_ver";

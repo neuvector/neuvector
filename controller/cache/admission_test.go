@@ -313,6 +313,13 @@ func TestIsModulesCriterionMet(t *testing.T) {
 			},
 		},
 		/********************************************/
+		[]*share.ScanModule{
+			&share.ScanModule{
+				Name: "vim",
+				Version: "2.0.0",
+			},
+		},
+		/********************************************/
 	}
 
 	type criteriaTestCase struct {
@@ -324,97 +331,105 @@ func TestIsModulesCriterionMet(t *testing.T) {
 		criteriaTestCase{
 			Value: "vim",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true}, // first array is for CriteriaOpContainsAny
-				[]bool {true, true, true, false, true}, // second array is for CriteriaOpContainsAll
-				[]bool {false, true, true, true, true}, // third array is for CriteriaOpContainsOtherThan
+				[]bool {true, true, true, false, true, true}, // first array is for CriteriaOpContainsAny
+				[]bool {true, true, true, false, true, true}, // second array is for CriteriaOpContainsAll
+				[]bool {false, true, true, true, true, false}, // third array is for CriteriaOpContainsOtherThan
 			},
 		},
 		criteriaTestCase{
 			Value: "vim, curl",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, true, true, false, false},
-				[]bool {false, false, true, true, true},
+				[]bool {true, true, true, false, true, true},
+				[]bool {false, true, true, false, false, false},
+				[]bool {false, false, true, true, true, false},
 			},
 		},
 		criteriaTestCase{
 			Value: "curl",
 			Expected: [][]bool {
-				[]bool {false, true, true, false, false},
-				[]bool {false, true, true, false, false},
-				[]bool {true, true, true, true, true},
+				[]bool {false, true, true, false, false, false},
+				[]bool {false, true, true, false, false, false},
+				[]bool {true, true, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {true, true, true, false, true},
-				[]bool {false, true, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, true, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, false, false, false, false},
-				[]bool {false, true, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, false, false, false, false, false},
+				[]bool {false, true, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=9.9.9999-9.cm1",
 			Expected: [][]bool {
-				[]bool {false, false, false, false, false},
-				[]bool {false, false, false, false, false},
-				[]bool {true, true, true, true, true},
+				[]bool {false, false, false, false, false, false},
+				[]bool {false, false, false, false, false, false},
+				[]bool {true, true, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1, curl",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, true, true, false, false},
-				[]bool {false, false, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, true, true, false, false, false},
+				[]bool {false, false, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1, curl",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, false, false, false, false},
-				[]bool {false, false, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, false, false, false, false, false},
+				[]bool {false, false, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=9.9.9999-9.cm1, curl",
 			Expected: [][]bool {
-				[]bool {false, true, true, false, false},
-				[]bool {false, false, false, false, false},
-				[]bool {true, true, true, true, true},
+				[]bool {false, true, true, false, false, false},
+				[]bool {false, false, false, false, false, false},
+				[]bool {true, true, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1, curl=9.9.9999-9.cm1",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, true, true, false, false},
-				[]bool {false, false, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, true, true, false, false, false},
+				[]bool {false, false, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
 			Value: "vim=8.2.4081-1.cm1, vim=9.9.9999-9.cm1, curl=9.9.9999-9.cm1",
 			Expected: [][]bool {
-				[]bool {true, true, true, false, true},
-				[]bool {false, false, false, false, false},
-				[]bool {false, false, true, true, true},
+				[]bool {true, true, true, false, true, false},
+				[]bool {false, false, false, false, false, false},
+				[]bool {false, false, true, true, true, true},
 			},
 		},
 		criteriaTestCase{
-			Value: "vim=9.9.9999-9.cm1, curl=9.9.9999-9.cm1",
+			Value: "vim>1.0.0",
 			Expected: [][]bool {
-				[]bool {false, true, true, false, false},
-				[]bool {false, false, false, false, false},
-				[]bool {true, true, true, true, true},
+				[]bool {true, true, true, false, true, true},
+				[]bool {true, true, true, false, true, true},
+				[]bool {false, true, true, true, true, false},
+			},
+		},
+		criteriaTestCase{
+			Value: "vim<5.0.0",
+			Expected: [][]bool {
+				[]bool {false, false, false, false, false, true},
+				[]bool {false, false, false, false, false, true},
+				[]bool {true, true, true, true, true, false},
 			},
 		},
 	}

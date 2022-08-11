@@ -72,7 +72,6 @@ var _fedServerChan chan bool
 var _licSigKeyEnv int
 
 var _teleNeuvectorURL string
-var _teleScannerURL string
 
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
@@ -1216,7 +1215,6 @@ type Context struct {
 	RESTPort         uint
 	PwdValidUnit     uint
 	TeleNeuvectorURL string
-	TeleScannerURL   string
 	TeleCurrentVer   string
 }
 
@@ -1243,7 +1241,6 @@ func InitContext(ctx *Context) {
 	}
 
 	_teleNeuvectorURL = ctx.TeleNeuvectorURL
-	_teleScannerURL = ctx.TeleScannerURL
 	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
 		// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
 		// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]

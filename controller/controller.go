@@ -234,7 +234,6 @@ func main() {
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
 	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
-	teleScannerEP := flag.String("telemetry_scanner_ep", "", "")                       // for testing only
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
@@ -282,12 +281,20 @@ func main() {
 		os.Exit(-2)
 	}
 
+	ocImageRegistered := false
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 		if flavor == "" && resource.IsRancherFlavor() {
 			flavor = share.FlavorRancher
 			global.ORCH.SetFlavor(flavor)
+		} else if k8sVer != "" && ocVer == "" {
+			if err := global.ORCH.RegisterResource(resource.RscTypeImage); err == nil {
+				// Use ImageStream as an indication of OpenShift
+				flavor = share.FlavorOpenShift
+				global.ORCH.SetFlavor(flavor)
+				ocImageRegistered = true
+			}
 		}
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
 	}
@@ -541,12 +548,9 @@ func main() {
 			if *teleNeuvectorEP == "" {
 				*teleNeuvectorEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
 			}
-			if *teleScannerEP == "" {
-				*teleScannerEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
-			}
 		}
 	}
-	if *teleNeuvectorEP == "" && *teleScannerEP == "" {
+	if *teleNeuvectorEP == "" {
 		*telemetryFreq = 0
 	}
 
@@ -599,7 +603,7 @@ func main() {
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start()
+	orchConnector.Start(ocImageRegistered)
 
 	// GRPC should be started after cacher as the handler are cache functions
 	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
@@ -616,7 +620,6 @@ func main() {
 		FedPort:          *fedPort,
 		PwdValidUnit:     *pwdValidUnit,
 		TeleNeuvectorURL: *teleNeuvectorEP,
-		TeleScannerURL:   *teleScannerEP,
 		TeleCurrentVer:   *teleCurrentVer,
 	}
 	rest.InitContext(&rctx)

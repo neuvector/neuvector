@@ -1041,58 +1041,59 @@ func (d *kubernetes) watchResource(rt string, maker *resourceMaker, watcher *k8s
 }
 
 func (d *kubernetes) RegisterResource(rt string) error {
+	var err error
 	switch rt {
 	case RscTypeImage:
-		d.lock.Lock()
-		k8s.Register("image.openshift.io", "v1", "imagestreams", true, &ocImageStream{})
-		k8s.RegisterList("image.openshift.io", "v1", "imagestreams", true, &ocImageStreamList{})
-		d.lock.Unlock()
-
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
+		if err == nil {
+			d.lock.Lock()
+			k8s.Register("image.openshift.io", "v1", "imagestreams", true, &ocImageStream{})
+			k8s.RegisterList("image.openshift.io", "v1", "imagestreams", true, &ocImageStreamList{})
+			d.lock.Unlock()
+		}
 	case RscTypeCrdSecurityRule:
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRuleList{})
 		d.lock.Unlock()
 
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
 	case RscTypeCrdClusterSecurityRule:
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
 		d.lock.Unlock()
 
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
 	case RscTypeCrdAdmCtrlSecurityRule:
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRuleList{})
 		d.lock.Unlock()
 
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
 	case RscTypeCrdDlpSecurityRule:
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRuleList{})
 		d.lock.Unlock()
 
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
 	case RscTypeCrdWafSecurityRule:
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRuleList{})
 		d.lock.Unlock()
 
-		_, err := d.discoverResource(rt)
-		return err
+		_, err = d.discoverResource(rt)
 	default:
-		return ErrResourceNotSupported
+		err = ErrResourceNotSupported
 	}
+	if err != nil {
+		log.WithFields(log.Fields{"resource": rt, "error": err}).Info("fail to register")
+	}
+
+	return err
 }
 
 func (d *kubernetes) ListResource(rt string) ([]interface{}, error) {
@@ -1141,31 +1142,37 @@ func (d *kubernetes) listResource(rt string) ([]interface{}, error) {
 }
 
 func (d *kubernetes) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
-	if rt == RscTypeRBAC {
-		var err error
-		if err = d.startWatchResource(k8sRscTypeRole, ns, d.cbResourceRole, scb); err != nil {
-			d.StopWatchResource(rt)
-			return err
+	var err error
+	for range []bool{true} {
+		if rt == RscTypeRBAC {
+			if err = d.startWatchResource(k8sRscTypeRole, ns, d.cbResourceRole, scb); err != nil {
+				d.StopWatchResource(rt)
+				break
+			}
+			if err = d.startWatchResource(K8sRscTypeClusRole, ns, d.cbResourceRole, scb); err != nil {
+				d.StopWatchResource(rt)
+				break
+			}
+			if err = d.startWatchResource(k8sRscTypeRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
+				d.StopWatchResource(rt)
+				break
+			}
+			if err = d.startWatchResource(K8sRscTypeClusRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
+				d.StopWatchResource(rt)
+				break
+			}
+			d.lock.Lock()
+			d.watchers[rt] = &resourceWatcher{cb: wcb}
+			d.lock.Unlock()
+		} else {
+			err = d.startWatchResource(rt, ns, wcb, scb)
 		}
-		if err = d.startWatchResource(K8sRscTypeClusRole, ns, d.cbResourceRole, scb); err != nil {
-			d.StopWatchResource(rt)
-			return err
-		}
-		if err = d.startWatchResource(k8sRscTypeRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-			d.StopWatchResource(rt)
-			return err
-		}
-		if err = d.startWatchResource(K8sRscTypeClusRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-			d.StopWatchResource(rt)
-			return err
-		}
-		d.lock.Lock()
-		d.watchers[rt] = &resourceWatcher{cb: wcb}
-		d.lock.Unlock()
-		return nil
-	} else {
-		return d.startWatchResource(rt, ns, wcb, scb)
 	}
+	if err != nil {
+		log.WithFields(log.Fields{"watch": rt, "error": err}).Error()
+	}
+
+	return err
 }
 
 func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
