@@ -11,7 +11,6 @@ echo "==> Making agent"
 cd monitor; make || exit $?; cd ..
 cd dp; make || exit $?; cd ..
 cd tools/nstools; make || exit $?; cd ../..
-cd tools/sidekick; make || exit $?; cd ../..
 cd agent/workerlet/pathWalker; make || exit $?; cd ../../..
 cd agent; make || exit $?; cd ..
 
