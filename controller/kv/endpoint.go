@@ -88,8 +88,8 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 
 	&cfgEndpoint{name: share.CFGEndpointLicense, key: share.CLUSConfigLicenseKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	// &cfgEndpoint{name: CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
-	//	section: api.ConfEndpointConfig, lock: share.CLUSLockConfigKey},
+	&cfgEndpoint{name: share.CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
+		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 
 	// Not to export uniconf, if the exported config is going to be used on other systems,
 	// uniconf settings are not portable; if the export config is used on the system itself,
