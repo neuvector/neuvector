@@ -714,7 +714,7 @@ func scanAgentDelete(id string, param interface{}) {
 	defer scanMutexUnlock()
 	for task, info := range scanMap {
 		if info.agentId == id {
-			if info.cveDBCreateTime ==  "" {	// incompleted, not done yet
+			if info.cveDBCreateTime == "" { // incompleted, not done yet
 				log.WithFields(log.Fields{"task": task, "info": info}).Info()
 				delete(scanMap, task)
 			}
@@ -1045,29 +1045,37 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 		if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_NonEmpty {
 			// init/had scanning task -> no scanning task now
 			lastTaskQState = task_Q_Empty
-			setTimeWindow = true
+			setTimeWindow = true // start calculation time window
 		} else {
 			// had no scanning task -> still has no scanning task now
-			if time.Since(contTaskQStateTime) > time.Duration(180)*time.Second {
+			if time.Since(contTaskQStateTime) > time.Duration(3)*time.Minute {
 				// it has been continuously long enough time that no scanning task is waiting in the queue. reduce scanner count by 1
+				// it could take about 3 ~ 4 minutes to terminate a scanner considering scannerTicker is 1 minute
 				newReplicas = newReplicas - 1
-				lastTaskQState = task_Q_Unknown // reset calculation time window
-				contTaskQStateTime = time.Time{}
+				setTimeWindow = true // reset calculation time window
 			}
 		}
 	} else {
 		// there is scanning task waiting in the queue now
-		if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_Empty {
-			// init/had no scanning task -> has scanning task now
+		if autoscaleCfg.Strategy == api.AutoScaleImmediate {
+			// increase scanner count by 1 with immediate stragedy.
+			// it could take about 0 ~ 1 minute to start a new scanner considering scannerTicker is 1 minute
+			newReplicas = newReplicas + 1
 			lastTaskQState = task_Q_NonEmpty
-			setTimeWindow = true
-		} else {
-			// had scanning task -> still has scanning task now
-			if autoscaleCfg.Strategy == api.AutoScaleImmediate || time.Since(contTaskQStateTime) > time.Duration(90)*time.Second {
-				// it has been continuously long enough time that at lease one scanning task is waiting in the queue. increase scanner count by 1
-				newReplicas = newReplicas + 1
-				lastTaskQState = task_Q_Unknown // reset calculation time window
-				contTaskQStateTime = time.Time{}
+			setTimeWindow = true // reset calculation time window
+		} else if autoscaleCfg.Strategy == api.AutoScaleDelayed {
+			if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_Empty {
+				// init/had no scanning task -> has scanning task now
+				lastTaskQState = task_Q_NonEmpty
+				setTimeWindow = true // start calculation time window
+			} else {
+				// had scanning task -> still has scanning task now
+				if time.Since(contTaskQStateTime) > time.Duration(5)*time.Minute {
+					// it has been continuously long enough time that at lease one scanning task is waiting in the queue. increase scanner count by 1
+					// it could take about 5 ~ 6 minutes to start a new scanner considering scannerTicker is 1 minute
+					newReplicas = newReplicas + 1
+					setTimeWindow = true // reset calculation time window
+				}
 			}
 		}
 	}
