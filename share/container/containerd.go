@@ -125,10 +125,7 @@ func (d *containerdDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMe
 }
 
 // When a container task is killed, 'task' can still be retrieved; but when it is deleted, task will be nil
-func (d *containerdDriver) getSpecs(c containerd.Container) (*containers.Container, *oci.Spec, containerd.Task, *containerd.Status, int, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container) (*containers.Container, *oci.Spec, containerd.Task, *containerd.Status, int, error) {
 	info, err := c.Info(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
@@ -295,7 +292,7 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 
 	metas := make([]*ContainerMeta, 0, len(containers))
 	for _, c := range containers {
-		info, spec, task, status, attempt, err := d.getSpecs(c)
+		info, spec, task, status, attempt, err := d.getSpecs(ctx, c)
 		if err != nil {
 			log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
 			continue
@@ -313,16 +310,14 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 
 func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	c, err := d.client.LoadContainer(ctx, id)
-	cancel()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to get container")
 		return nil, err
 	}
 
-	ctx, cancel = context.WithCancel(context.Background())
-	info, spec, task, status, attempt, err := d.getSpecs(c)
-	cancel()
+	info, spec, task, status, attempt, err := d.getSpecs(ctx, c)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
 		return nil, err
@@ -355,8 +350,6 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 		}
 	}
 
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
 	if img, err := c.Image(ctx); err == nil {
 		meta.ImageDigest = img.Target().Digest.String()
 		if imgCfg, err := img.Config(ctx); err == nil {
