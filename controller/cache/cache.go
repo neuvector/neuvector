@@ -1714,13 +1714,11 @@ func startWorkerThread(ctx *Context) {
 					taskCount := scan.RegTaskCount()
 					taskCount = taskCount + scanScher.TaskCount()
 					replicas := atomic.LoadUint32(&scannerReplicas)
-					if (autoscaleCfg.Strategy != api.AutoScaleImmediate && autoscaleCfg.Strategy != api.AutoScaleDelayed) ||
-						(autoscaleCfg.MinPods == autoscaleCfg.MaxPods) || (replicas == 0) ||
-						(replicas <= autoscaleCfg.MinPods && taskCount == 0) ||
-						(replicas >= autoscaleCfg.MaxPods && taskCount > 0) {
+					if (autoscaleCfg.Strategy != api.AutoScaleImmediate && autoscaleCfg.Strategy != api.AutoScaleDelayed) || (replicas == 0) ||
+						(replicas <= autoscaleCfg.MinPods && taskCount == 0) || (replicas >= autoscaleCfg.MaxPods && taskCount > 0) {
 						// no need to autoscale when:
 						// 1. autoscale is not enabled
-						// 2. the minimum scanner value is the same as the maximum scanner value
+						// 2. scanner replicas is 0 (either scanner is not deployed or is manually set to 0 replicas)
 						// 3. there is no task in the queue & the scanner count is the minimum configured value
 						// 4. there is task in the queue & the scanner count is the maximum configured value
 					} else {
@@ -1923,12 +1921,21 @@ func startWorkerThread(ctx *Context) {
 						}
 					}
 				case resource.RscTypeDeployment:
-					var replicas uint32
+					var n, o *resource.Deployment
 					if ev.ResourceNew != nil {
-						n := ev.ResourceNew.(*resource.Deployment)
-						replicas = uint32(n.Replicas)
+						n = ev.ResourceNew.(*resource.Deployment)
+					} else if ev.ResourceOld != nil {
+						o = ev.ResourceNew.(*resource.Deployment)
 					}
-					atomic.StoreUint32(&scannerReplicas, replicas)
+					if n != nil {
+						if n.Domain == resource.NvAdmSvcNamespace && n.Name == "neuvector-scanner-pod" {
+							atomic.StoreUint32(&scannerReplicas, uint32(n.Replicas))
+						}
+					} else if o != nil { // delete
+						if o.Domain == resource.NvAdmSvcNamespace && o.Name == "neuvector-scanner-pod" {
+							atomic.StoreUint32(&scannerReplicas, 0)
+						}
+					}
 				/*
 						case resource.RscTypeMutatingWebhookConfiguration:
 							var n, o *resource.AdmissionWebhookConfiguration

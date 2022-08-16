@@ -1357,7 +1357,11 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 						max = *autoscale.MaxPods
 					}
 					if max > 128 || max < min || min == 0 {
-						invalidValue = true
+						if strategy == api.AutoScaleNone && min == 0 && max == 0 {
+							// allow this in fresh deployment
+						} else {
+							invalidValue = true
+						}
 					}
 					if !invalidValue && autoscale.Strategy != nil {
 						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {

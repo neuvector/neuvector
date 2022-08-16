@@ -758,10 +758,7 @@ func xlateDeployment(obj k8s.Resource) (string, interface{}) {
 			UID:      meta.GetUid(),
 			Name:     meta.GetName(),
 			Domain:   meta.GetNamespace(),
-			Replicas: 1,
-		}
-		if o.Spec.Replicas != nil && *o.Spec.Replicas > 0 {
-			r.Replicas = *o.Spec.Replicas
+			Replicas: o.Spec.GetReplicas(),
 		}
 		return r.UID, r
 	}
