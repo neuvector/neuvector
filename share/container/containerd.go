@@ -284,7 +284,7 @@ func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string, bSandBox bool
 func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	containers, err := d.client.Containers(ctx)
-	cancel()
+	defer cancel()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to list containers")
 		return nil, err
