@@ -1995,7 +1995,7 @@ type RESTVulnerabilityAsset struct {
 	Name        string                              `json:"name"`
 	Severity    string                              `json:"severity"`
 	Description string                              `json:"description"`
-	Packages    map[string][]RESTVulnPackageVersion `json:"packages`
+	Packages    map[string][]RESTVulnPackageVersion `json:"packages"`
 	Link        string                              `json:"link"`
 	Score       float32                             `json:"score"`
 	Vectors     string                              `json:"vectors"`
