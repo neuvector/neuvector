@@ -72,6 +72,7 @@ require (
 	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/neuvector/k8s v1.2.1-0.20220214174348-d0b3f377461e
+	github.com/nikolaydubina/go-cover-treemap v1.3.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
