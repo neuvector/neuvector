@@ -176,7 +176,8 @@ void dpi_print_ip4_internal_fp(FILE *logfp)
 bool dpi_is_ip4_internal(uint32_t ip)
 {
     int i;
-    if (unlikely(th_internal_subnet4 == NULL) || (th_internal_subnet4->count == 0) ) {
+    if (unlikely(th_internal_subnet4 == NULL) || (th_internal_subnet4->count == 0)
+        || ip == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(ip))) {
         return true;
     }
     for (i = 0; i < th_internal_subnet4->count; i++) {

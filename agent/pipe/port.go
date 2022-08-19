@@ -1224,6 +1224,48 @@ func resetIptablesNvRules() {
 	shellCombined(cmd)
 }
 
+const nvInputQuarChain  string = "NV_INPUT_QUAR_PROXYMESH"
+const nvOutputQuarChain string = "NV_OUTPUT_QUAR_PROXYMESH"
+func deleteIptablesNvQuarRules() {
+	var cmd string
+	//disassociate OUTPUT/INPUT with NV_OUTPUT/NV_INPUT
+	cmd = fmt.Sprintf("iptables -D OUTPUT -j %v", nvOutputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -D INPUT -j %v", nvInputQuarChain)
+	shellCombined(cmd)
+
+	//flush custom chain of its rules
+	cmd = fmt.Sprintf("iptables -F %v", nvOutputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -F %v", nvInputQuarChain)
+	shellCombined(cmd)
+
+	//delete custom chain
+	cmd = fmt.Sprintf("iptables -X %v", nvOutputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -X %v", nvInputQuarChain)
+	shellCombined(cmd)
+}
+
+func createIptablesNvQuarRules() {
+	var cmd string
+	//create custom chains
+	cmd = fmt.Sprintf("iptables -N %v", nvInputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -N %v", nvOutputQuarChain)
+	shellCombined(cmd)
+	//append drop rule
+	cmd = fmt.Sprintf("iptables -I %v -j DROP", nvInputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -I %v -j DROP", nvOutputQuarChain)
+	shellCombined(cmd)
+	//associate NV_OUTPUT_QUAR/NV_INPUT_QUAR with OUTPUT/INPUT chain
+	cmd = fmt.Sprintf("iptables -I INPUT -j %v", nvInputQuarChain)
+	shellCombined(cmd)
+	cmd = fmt.Sprintf("iptables -I OUTPUT -j %v", nvOutputQuarChain)
+	shellCombined(cmd)
+}
+
 func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	var cmd string
 	if appMap == nil || len(appMap) <= 0 {
@@ -1380,10 +1422,50 @@ func createIptablesNvRules(intf string, isloopback bool, qno int, appMap map[sha
 	insertIptablesNvRules(intf, isloopback, qno, appMap)
 
 	//associate NV_OUTPUT/NV_INPUT with OUTPUT/INPUT chain
-	cmd = fmt.Sprintf("iptables -I INPUT -j %v", nvInputChain)
+	cmd = fmt.Sprintf("iptables -A INPUT -j %v", nvInputChain)
 	shellCombined(cmd)
-	cmd = fmt.Sprintf("iptables -I OUTPUT -j %v", nvOutputChain)
+	cmd = fmt.Sprintf("iptables -A OUTPUT -j %v", nvOutputChain)
 	shellCombined(cmd)
+}
+
+//setup iptable rules for quarantine
+func CreateNfqQuarRules(pid int, create bool) error {
+	log.WithFields(log.Fields{"pid": pid}).Debug("")
+
+	// Lock the OS Thread so we don't accidentally switch namespaces
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// Remember current NS
+	curNs, err := netns.Get()
+	if err != nil {
+		return err
+	}
+	defer curNs.Close()
+
+	// Get container NS
+	var containerNs netns.NsHandle
+	netns_path := global.SYS.GetNetNamespacePath(pid)
+	if containerNs, err = netns.GetFromPath(netns_path); err != nil {
+		return err
+	}
+	defer containerNs.Close()
+
+	// Switch to container NS
+	log.WithFields(log.Fields{"ns": containerNs, "pid": pid}).Debug("Enter container ns")
+	if err = netns.Set(containerNs); err != nil {
+		return err
+	}
+
+	deleteIptablesNvQuarRules()
+	if create {
+		createIptablesNvQuarRules()
+	}
+	// Switch back to original NS
+	log.WithFields(log.Fields{"ns": curNs}).Debug("Restore ns")
+	err = netns.Set(curNs)
+
+	return err
 }
 
 //setup iptable rules with NFQUEUE target
@@ -1461,6 +1543,7 @@ func DeleteNfqRules(pid int) error {
 
 	//delete iptable rules
 	resetIptablesNvRules()
+	deleteIptablesNvQuarRules()
 
 	// Switch back to original NS
 	log.WithFields(log.Fields{"ns": curNs}).Debug("Restore ns")
