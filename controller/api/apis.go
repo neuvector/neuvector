@@ -2068,7 +2068,7 @@ type RESTVulnerability struct {
 	CPEs           []string `json:"cpes,omitempty"`
 	CVEs           []string `json:"cves,omitempty"`
 	FeedRating     string   `json:"feed_rating"`
-	InBaseImage    bool     `json:"in_base_image"`
+	InBaseImage    bool     `json:"in_base_image,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
 }
 
