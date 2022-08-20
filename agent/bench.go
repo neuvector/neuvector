@@ -767,6 +767,10 @@ func (b *Bench) runDockerHostBench() ([]byte, error) {
 }
 
 func (b *Bench) doDockerHostBench() error {
+	if !agentEnv.autoBenchmark {
+		return nil
+	}
+
 	log.Debug()
 
 	b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusRunning)
@@ -791,6 +795,10 @@ func (b *Bench) doDockerHostBench() error {
 }
 
 func (b *Bench) doDockerContainerBench(containers map[string]string) error {
+	if !agentEnv.autoBenchmark {
+		return nil
+	}
+
 	b.putBenchReport(Host.ID, share.BenchDockerContainer, nil, share.BenchStatusRunning)
 	if out, err := b.runDockerContainerBench(containers); err != nil {
 		b.logBenchFailure(benchPlatDocker, share.BenchStatusDockerContainerFail)
