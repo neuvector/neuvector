@@ -972,18 +972,18 @@ func createDefaultPwdProfile() {
 	profile := &share.CLUSPwdProfile{
 		Name:                        share.CLUSDefPwdProfileName,
 		Comment:                     share.CLUSDefPwdProfileName,
-		MinLen:                      6,
-		MinUpperCount:               0,
-		MinLowerCount:               0,
-		MinDigitCount:               0,
+		MinLen:                      8,
+		MinUpperCount:               1,
+		MinLowerCount:               1,
+		MinDigitCount:               1,
 		MinSpecialCount:             0,
 		EnablePwdExpiration:         false,
 		PwdExpireAfterDays:          0,
 		EnablePwdHistory:            false,
 		PwdHistoryCount:             0,
-		EnableBlockAfterFailedLogin: false,
-		BlockAfterFailedCount:       0,
-		BlockMinutes:                0,
+		EnableBlockAfterFailedLogin: true,
+		BlockAfterFailedCount:       5,
+		BlockMinutes:                60,
 	}
 	value, _ := json.Marshal(profile)
 	cluster.Put(key, value)
@@ -1051,7 +1051,7 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 			}
 
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
-			far.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps:make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior,}
+			far.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps: make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior}
 			clusHelper.PutFileAccessRule(group, far, rev)
 		}
 	}
