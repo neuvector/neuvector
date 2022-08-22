@@ -1239,9 +1239,28 @@ func programBridge(c *containerData) {
 		for _, pair := range c.intcpPairs {
 			pipe.ResetPortPair(c.pid, pair)
 		}
+		if driver == pipe.PIPE_CLM {
+			err := pipe.CreateNfqQuarRules(c.pid, true)
+			if err != nil {
+				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create quarantine iptable rules")
+			}
+		}
 	} else if c.inline {
 		for _, pair := range c.intcpPairs {
 			pipe.FwdPortPair(c.pid, pair)
+		}
+		if driver == pipe.PIPE_CLM {
+			err := pipe.CreateNfqQuarRules(c.pid, false)
+			if err != nil {
+				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
+			}
+		}
+	} else {
+		if driver == pipe.PIPE_CLM {
+			err := pipe.CreateNfqQuarRules(c.pid, false)
+			if err != nil {
+				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
+			}
 		}
 	}
 }
@@ -1299,23 +1318,23 @@ func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe
 			}
 		}
 	} else {
-	   for _, pair := range c.intcpPairs {
-		  if macChangePairs != nil {
-			 if oldPair, ok := macChangePairs[pair.Port]; ok {
-				oldMAC = oldPair.MAC
-			 }
-		  }
-		  dp.DPCtrlAddTapPort(netns, pair.Port, pair.MAC)
-		  dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, nil)
-	   }
-	   tap = true
+		for _, pair := range c.intcpPairs {
+			if macChangePairs != nil {
+				if oldPair, ok := macChangePairs[pair.Port]; ok {
+					oldMAC = oldPair.MAC
+				}
+			}
+			dp.DPCtrlAddTapPort(netns, pair.Port, pair.MAC)
+			dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, nil)
+		}
+		tap = true
 	}
 	if cfgApp {
-	   dp.DPCtrlConfigMAC(macs, &tap, c.appMap)
+		dp.DPCtrlConfigMAC(macs, &tap, c.appMap)
 	} else {
-	   dp.DPCtrlConfigMAC(macs, &tap, nil)
+		dp.DPCtrlConfigMAC(macs, &tap, nil)
 	}
- }
+}
 
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
 	if driver == pipe.PIPE_CLM {
