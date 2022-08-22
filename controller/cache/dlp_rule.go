@@ -720,6 +720,7 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 		rdre := &api.RESTDlpRule{
 			Name: cdre.Name,
 			ID:   cdre.ID,
+			CfgType: cfgTypeMapping[cdre.CfgType],
 		}
 		for _, cpt := range cdre.Patterns {
 			if cpt.Context == "" {
@@ -745,6 +746,7 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 			rdre := &api.RESTDlpRule{
 				Name: cdre.Name,
 				ID:   cdre.ID,
+				CfgType: cfgTypeMapping[cdre.CfgType],
 			}
 			for _, cpt := range cdre.Patterns {
 				if cpt.Context == "" {
@@ -796,6 +798,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 				rdre := &api.RESTDlpRule{
 					Name: cdre.Name,
 					ID:   cdre.ID,
+					CfgType: cfgTypeMapping[cdre.CfgType],
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -816,6 +819,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTDlpRule{
 						Name: cdre.Name,
 						ID:   cdre.ID,
+						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -838,6 +842,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTDlpRule{
 						Name: common.GetOrigDlpRuleName(cdrename),
 						ID:   cdre.ID,
+						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -857,6 +862,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 						rdre := &api.RESTDlpRule{
 							Name: common.GetOrigDlpRuleName(cdre.Name),
 							ID:   cdre.ID,
+							CfgType: cfgTypeMapping[cdre.CfgType],
 						}
 						for _, cpt := range cdre.Patterns {
 							if cpt.Context == "" {
@@ -921,6 +927,7 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 				rdre := &api.RESTDlpRule{
 					Name: cdre.Name,
 					ID:   cdre.ID,
+					CfgType: cfgTypeMapping[cdre.CfgType],
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -941,6 +948,7 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 					rdre := &api.RESTDlpRule{
 						Name: cdre.Name,
 						ID:   cdre.ID,
+						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -963,6 +971,7 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 					rdre := &api.RESTDlpRule{
 						Name: common.GetOrigDlpRuleName(cdre.Name),
 						ID:   cdre.ID,
+						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -982,6 +991,7 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 						rdre := &api.RESTDlpRule{
 							Name: common.GetOrigDlpRuleName(cdre.Name),
 							ID:   cdre.ID,
+							CfgType: cfgTypeMapping[cdre.CfgType],
 						}
 						for _, cpt := range cdre.Patterns {
 							if cpt.Context == "" {
