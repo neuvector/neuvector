@@ -172,7 +172,7 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 	if ok {
 		var matchedEntry *share.CLUSProcessProfileEntry
 		for _, p := range profile.Process {
-			if len(p.ProbeCmds) > 0 {
+			if profile.Mode == share.PolicyModeLearn && len(p.ProbeCmds) > 0 {
 				//	if p.Name == "sh" && p.Path == "*" {		// replace
 				//		if ok, app, _ := global.SYS.DefaultShellCmd(pid, "sh"); ok {
 				//			p.Name = "*"
@@ -240,10 +240,12 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 				}
 			}
 		} else {
-			//not found in profile
-			act := defaultProcessAction(profile.Mode)
-			proc.Action = act
-			proc.Uuid = share.CLUSReservedUuidNotAlllowed
+			if profile.Baseline == share.ProfileBasic  || !e.IsK8sGroupWithProbe(name){
+				//not found in profile
+				act := defaultProcessAction(profile.Mode)
+				proc.Action = act
+				proc.Uuid = share.CLUSReservedUuidNotAlllowed
+			}
 		}
 		//log.WithFields(log.Fields{"group": name, "proc": proc}).Debug("")
 	} else {
