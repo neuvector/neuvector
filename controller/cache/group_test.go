@@ -21,28 +21,28 @@ func TestGroupPosMatch(t *testing.T) {
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "mysql", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "oracle", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "mysql", Domain: "sales"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
@@ -60,28 +60,28 @@ func TestGroupNegMatch(t *testing.T) {
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "mysql", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "oracle", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "oracle", Domain: "sales"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
@@ -99,28 +99,28 @@ func TestGroupMixMatch(t *testing.T) {
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "mysql", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "oracle", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "oracle", Domain: "sales"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 
@@ -138,14 +138,14 @@ func TestGroupEqualMatch(t *testing.T) {
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis.abc", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == false {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == false {
 		t.Errorf("Workload %+v should be selected by %v.", *wlc.workload, cts)
 	}
 
@@ -157,7 +157,7 @@ func TestGroupEqualMatch(t *testing.T) {
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
 	}
-	if share.IsWorkloadSelected(wlc.workload, cts) == true {
+	if share.IsWorkloadSelected(wlc.workload, cts, nil) == true {
 		t.Errorf("Workload %+v should not be selected by %v.", *wlc.workload, cts)
 	}
 	postTest()

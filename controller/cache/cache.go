@@ -1799,7 +1799,7 @@ func startWorkerThread(ctx *Context) {
 					if o == nil && n != nil {
 						// ignore neuvector domain
 						if n.Name != localDev.Ctrler.Domain {
-							domainAdd(n.Name)
+							domainAdd(n.Name, n.Labels)
 						}
 					} else if o != nil && n == nil {
 						domainDelete(o.Name)
@@ -2151,7 +2151,7 @@ func (m CacheMethod) IsGroupMember(name, id string) bool {
 	defer cacheMutexRUnlock()
 	if groupCache, ok := groupCacheMap[name]; ok {
 		if wlCache, ok := wlCacheMap[id]; ok {
-			return share.IsGroupMember(groupCache.group, wlCache.workload)
+			return share.IsGroupMember(groupCache.group, wlCache.workload, getDomainData(wlCache.workload.Domain))
 		}
 	}
 	return true // unknown, but play safe here, it eventually flushed by other events

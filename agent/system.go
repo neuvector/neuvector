@@ -31,6 +31,17 @@ var learnedProcessMtx sync.Mutex
 
 const maxLearnedProcess int = 2000
 
+type domainCache struct {
+	domain *share.CLUSDomain
+}
+
+var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
+var domainMutex sync.RWMutex
+
+func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
+	return &share.CLUSDomain{Name: name, Labels: nsLabels}
+}
+
 func policyInit() {
 	if global.ORCH.ApplyPolicyAtIngress() {
 		policyApplyDir = C.DP_POLICY_APPLY_INGRESS
@@ -1092,4 +1103,40 @@ func addLearnedProcess(svcGroup string, proc *share.CLUSProcessProfileEntry) {
 		log.WithFields(log.Fields{"report": *report}).Debug("Too many - drop")
 	}
 	learnedProcessMtx.Unlock()
+}
+
+func getDomainData(name string) *share.CLUSDomain {
+	domainMutex.RLock()
+	defer domainMutex.RUnlock()
+	if domainCache, ok := domainCacheMap[name]; ok {
+		return domainCache.domain
+	}
+	return nil
+}
+
+func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
+	name := share.CLUSDomainKey2Name(key)
+	switch nType {
+	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
+		var domain share.CLUSDomain
+		json.Unmarshal(value, &domain)
+
+		domainMutex.Lock()
+		defer domainMutex.Unlock()
+
+		domainCacheMap[name] = &domainCache{domain: &domain}
+		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
+
+	case cluster.ClusterNotifyDelete:
+		domainMutex.Lock()
+		defer domainMutex.Unlock()
+
+		if _, ok := domainCacheMap[name]; !ok {
+			log.WithFields(log.Fields{"domain": name}).Error("Unknown domain")
+			return
+		}
+
+		// Shouldn't happen, but have the logic anyway. Not delete kv, only initial the cache
+		domainCacheMap[name] = &domainCache{domain: initDomain(name, nil)}
+	}
 }

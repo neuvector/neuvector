@@ -977,10 +977,9 @@ func (b *Bench) runDockerContainerBench(containers map[string]string) ([]byte, e
 func (b *Bench) runCustomScript(wl *share.CLUSWorkload) []*benchItem {
 	items := make([]*benchItem, 0)
 	grpScripts := make(map[string]*share.CLUSCustomCheckGroup, 0)
-
 	groupMux.Lock()
 	for _, grp := range groups {
-		if grp.script != nil && share.IsGroupMember(grp.group, wl) {
+		if grp.script != nil && share.IsGroupMember(grp.group, wl, getDomainData(wl.Domain)) {
 			grpScripts[grp.group.Name] = grp.script
 		}
 	}

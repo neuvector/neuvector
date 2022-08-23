@@ -1661,9 +1661,6 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 
 	hostMode := isContainerNetHostMode(info, parent)
 	fillContainerProperties(c, parent, info, hostMode)
-
-	// entry to apply group policies
-	workloadJoinGroup(c)
 	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, info.Privileged)
 	prober.HandleAnchorModeChange(true, c.id, c.upperDir, c.pid)
 
@@ -1699,7 +1696,8 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		parent.pods.Add(id)
 		gInfoUnlock()
 	}
-
+	// entry to apply group policies
+	workloadJoinGroup(c)
 	updateAppPorts(c, parent)
 
 	notifyContainerChanges(c, parent, changeInit)

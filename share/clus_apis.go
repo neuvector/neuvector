@@ -974,10 +974,11 @@ type CLUSWorkload struct {
 }
 
 type CLUSDomain struct {
-	Name    string   `json:"name"`
-	Dummy   bool     `json:"dummy"`
-	Disable bool     `json:"disable"`
-	Tags    []string `json:"tags"`
+	Name    string            `json:"name"`
+	Dummy   bool              `json:"dummy"`
+	Disable bool              `json:"disable"`
+	Tags    []string          `json:"tags"`		// compliance tags
+	Labels  map[string]string `json:"labels"`	// from k8s
 }
 
 type CLUSCriteriaEntry struct {

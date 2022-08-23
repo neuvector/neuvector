@@ -137,11 +137,11 @@ func IsSvcIpGroupSelected(svcipgroup *CLUSGroup, selector []CLUSCriteriaEntry) b
 	return true
 }
 
-func IsGroupMember(group *CLUSGroup, workload *CLUSWorkload) bool {
+func IsGroupMember(group *CLUSGroup, workload *CLUSWorkload, domain *CLUSDomain) bool {
 	if group == nil || workload == nil {
 		return false
 	}
-	if !IsWorkloadSelected(workload, group.Criteria) {
+	if !IsWorkloadSelected(workload, group.Criteria, domain) {
 		return false
 	} else if group.CreaterDomains == nil {
 		return true
@@ -158,13 +158,12 @@ func IsGroupMember(group *CLUSGroup, workload *CLUSWorkload) bool {
 // For criteria of same type, apply 'or' if there is at least one positive match;
 //                            apply 'and' if all are negative match;
 // For different criteria type, apply 'and'
-func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry) bool {
+func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, domain *CLUSDomain) bool {
 	var ret, positive bool
 	var rets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
-	for _, crt := range selector {
+	for i, crt := range selector {
 		key := crt.Key
-
 		switch key {
 		case CriteriaKeyImage:
 			ret, positive = isCriterionMet(&crt, workload.Image)
@@ -180,12 +179,19 @@ func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry) bo
 			// Address criteria doesn't match workload address for now
 			return false
 		default:
-			key = "label"
-			if v, ok := workload.Labels[crt.Key]; ok {
-				ret, positive = isCriterionMet(&crt, v)
+			key = fmt.Sprintf("label%d", i)	// local reference
+			ret = false
+			positive = true
+			if strings.HasPrefix(crt.Key, "ns:") {
+				if domain != nil {
+					if v, ok := domain.Labels[crt.Key[3:]]; ok {
+						ret, positive = isCriterionMet(&crt, v)
+					}
+				}
 			} else {
-				ret = false
-				positive = true
+				if v, ok := workload.Labels[crt.Key]; ok {
+					ret, positive = isCriterionMet(&crt, v)
+				}
 			}
 		}
 
