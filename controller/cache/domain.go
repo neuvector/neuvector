@@ -20,18 +20,16 @@ type domainCache struct {
 var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
 var domainMutex sync.RWMutex
 
-func initDomain(name string) *share.CLUSDomain {
-	return &share.CLUSDomain{Name: name, Tags: []string{}}
+func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
+	return &share.CLUSDomain{Name: name, Labels: nsLabels}
 }
 
-func domainAdd(name string) {
+func domainAdd(name string, labels map[string]string) {
 	log.WithFields(log.Fields{"domain": name}).Debug()
-
 	domainMutex.Lock()
 	defer domainMutex.Unlock()
-
 	if _, ok := domainCacheMap[name]; !ok {
-		cd := initDomain(name)
+		cd := initDomain(name, labels)
 		// When controller restarts/upgrades, domains are added again, don't change domain
 		// settings already in the KV.
 		if err := clusHelper.PutDomainIfNotExist(cd); err != nil {
@@ -44,15 +42,22 @@ func domainAdd(name string) {
 
 func domainDelete(name string) {
 	log.WithFields(log.Fields{"domain": name}).Debug()
-
 	domainMutex.Lock()
 	defer domainMutex.Unlock()
-
 	if err := clusHelper.DeleteDomain(name); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
 	} else {
 		delete(domainCacheMap, name)
 	}
+}
+
+func getDomainData(name string) *share.CLUSDomain {
+	domainMutex.RLock()
+	defer domainMutex.RUnlock()
+	if domainCache, ok := domainCacheMap[name]; ok {
+		return domainCache.domain
+	}
+	return nil
 }
 
 func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -62,14 +67,15 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		var domain share.CLUSDomain
 		json.Unmarshal(value, &domain)
 
-		domainMutex.RLock()
-		defer domainMutex.RUnlock()
+		domainMutex.Lock()
+		defer domainMutex.Unlock()
 
 		domainCacheMap[name] = &domainCache{domain: &domain}
+		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
 
 	case cluster.ClusterNotifyDelete:
-		domainMutex.RLock()
-		defer domainMutex.RUnlock()
+		domainMutex.Lock()
+		defer domainMutex.Unlock()
 
 		if _, ok := domainCacheMap[name]; !ok {
 			log.WithFields(log.Fields{"domain": name}).Error("Unknown domain")
@@ -77,7 +83,7 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		}
 
 		// Shouldn't happen, but have the logic anyway. Not delete kv, only initial the cache
-		domainCacheMap[name] = &domainCache{domain: initDomain(name)}
+		domainCacheMap[name] = &domainCache{domain: initDomain(name, nil)}
 	}
 }
 

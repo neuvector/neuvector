@@ -917,9 +917,9 @@ func createDefaultComplianceProfile() {
 }
 
 func createDefaultDomains() {
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}}, 0)
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}}, 0)
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}}, 0)
+	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, 0)
+	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, 0)
+	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, 0)
 }
 
 func setDefaultUnusedGroupAging() {

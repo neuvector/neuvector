@@ -1227,7 +1227,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 			continue
 		}
 
-		if share.IsGroupMember(cache.group, wlc.workload) {
+		if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) && wlc.workload.ShareNetNS == "" { // POD-level only
 			if !cache.members.Contains(wl.ID) {
 				wlc.groups.Add(cache.group.Name)
 				cache.members.Add(wl.ID)
@@ -1339,7 +1339,8 @@ func refreshGroupMember(cache *groupCache) {
 		if !wlc.workload.Running {
 			continue
 		}
-		if share.IsGroupMember(cache.group, wlc.workload) {
+
+		if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) && wlc.workload.ShareNetNS == "" {	// POD-level only
 			cache.members.Add(wlc.workload.ID)
 			wlc.groups.Add(cache.group.Name)
 

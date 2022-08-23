@@ -324,7 +324,7 @@ func isContainerSelected(c *containerData, group *share.CLUSGroup) bool {
 	wl.Name = c.name
 	wl.Service = c.service
 	wl.Domain = c.domain
-	return share.IsGroupMember(group, wl)
+	return share.IsGroupMember(group, wl, getDomainData(wl.Domain))
 }
 
 ///////
@@ -338,7 +338,12 @@ func refreshGroupMembers(grpCache *groupProfileData) {
 	gInfoRLock()
 	for _, c := range gInfo.activeContainers {
 		if isContainerSelected(c, grpCache.group) {
-			grpCache.members.Add(c.id)
+			if c.parentNS == "" { // docker-native or k8s pod-level
+				if strings.HasPrefix(c.name, "k8s_POD_") {	// k8s pod-level
+					grpCache.members = grpCache.members.Union(c.pods)
+				}
+				grpCache.members.Add(c.id)
+			}
 		}
 	}
 	gInfoRUnlock()
@@ -864,6 +869,7 @@ func workloadJoinGroup(c *containerData) {
 			access: &share.CLUSFileAccessRule{Filters: make(map[string]*share.CLUSFileAccessFilterRule)},
 		}
 	}
+	groups := wlProfileMap[c.id].groups
 	wlCacheLock.Unlock()
 
 	grpCacheLock.Lock()
@@ -874,9 +880,21 @@ func workloadJoinGroup(c *containerData) {
 		}
 		if !grpCache.members.Contains(c.id) {
 			if isContainerSelected(c, grpCache.group) {
-				grpCache.members.Add(c.id)
-				// reference
-				wlProfileMap[c.id].groups.Add(name)
+				if c.parentNS == "" { // docker-native or k8s pod-level
+					if strings.HasPrefix(c.name, "k8s_POD_") {	// k8s pod-level
+						grpCache.members = grpCache.members.Union(c.pods)
+						grpNotifyProc = grpNotifyProc.Union(c.pods)
+						grpNotifyFile = grpNotifyFile.Union(c.pods)
+					}
+					grpCache.members.Add(c.id)
+					groups.Add(name)	// reference
+				} else {	// k8s child-level
+					// patch: the joined pod was not filled with previous pod's members.
+					if grpCache.members.Contains(c.parentNS) {
+						grpCache.members.Add(c.id)
+						groups.Add(name)	// reference
+					}
+				}
 			}
 		}
 	}
