@@ -710,14 +710,18 @@ func getWorkloadNameForLogging(id string) *workloadNames {
 			}
 			return names
 		}
-		//if id is service ip group name
 		if grpcache, ok := groupCacheMap[id]; ok {
 			names := &workloadNames{
 				name:   id,
 				domain: grpcache.group.Domain,
 			}
+			// if id is service ip group name
 			if strings.HasPrefix(id, api.LearnedSvcGroupPrefix) {
 				names.service = id[len(api.LearnedSvcGroupPrefix):]
+			} else {
+				// UI relies on this field to show rule review button.
+				// Workload group should not come here, so use the id directly.
+				names.service = id
 			}
 			return names
 		}
