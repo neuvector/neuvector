@@ -761,9 +761,9 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 }
 
 type criterionValue struct {
-	Value string
+	Value    string
 	Operator string
-	Test func(string, string) bool
+	Test     func(string, string) bool
 }
 
 func doesCrtContainProp(propKey, propValue string, kvMap map[string][]criterionValue) bool {
@@ -803,6 +803,20 @@ func getValidMapOperators(crt *share.CLUSAdmRuleCriterion) []string {
 func getCrtValOperator(crtValString string, validOperators []string) (string, int) {
 	for _, operator := range validOperators {
 		if operatorIndex := strings.Index(crtValString, operator); operatorIndex >= 0 {
+			// The following checks ensure that something like the ">=" operator
+			// doesn't get interpreted as the "=" or ">" operator
+			if operator == "=" && operatorIndex != 0 {
+				prevChar := string(crtValString[operatorIndex-1])
+				if prevChar == ">" || prevChar == "<" {
+					continue
+				}
+			}
+			if (operator == ">" || operator == "<") && operatorIndex != len(crtValString)-1 {
+				nextChar := string(crtValString[operatorIndex+1])
+				if nextChar == "=" {
+					continue
+				}
+			}
 			return operator, operatorIndex
 		}
 	}
@@ -883,7 +897,7 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 			if operator, operatorIndex := getCrtValOperator(crtValString, getValidMapOperators(crt)); operator != "" {
 				key = strings.TrimSpace(crtValString[:operatorIndex])
 				val = criterionValue{
-					Value: strings.TrimSpace(crtValString[operatorIndex+len(operator):]),
+					Value:    strings.TrimSpace(crtValString[operatorIndex+len(operator):]),
 					Operator: operator,
 				}
 			} else {
