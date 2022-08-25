@@ -40,6 +40,13 @@ var serverityString2ID = map[string]int8{
 	share.VulnSeverityCritical: vulnSeverityCritical,
 }
 
+var severityID2String = map[int8]string{
+	vulnSeverityLow:      share.VulnSeverityLow,
+	vulnSeverityMedium:   share.VulnSeverityMedium,
+	vulnSeverityHigh:     share.VulnSeverityHigh,
+	vulnSeverityCritical: share.VulnSeverityCritical,
+}
+
 // These are the unique attributes of vul. that can be different in different workload,
 // other info can get from cvedb
 type VulTrait struct {
@@ -472,6 +479,9 @@ func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag str
 			PackageName:    vt.pkgName,
 			PackageVersion: vt.pkgVer,
 			FixedVersion:   vt.fixVer,
+		}
+		if sev, ok := severityID2String[vt.severity]; ok {
+			vul.Severity = sev
 		}
 
 		// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
