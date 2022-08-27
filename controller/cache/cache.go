@@ -1800,13 +1800,12 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Namespace)
 					}
-					if o == nil && n != nil {
-						// ignore neuvector domain
-						if n.Name != localDev.Ctrler.Domain {
-							domainAdd(n.Name, n.Labels)
+					if n == nil {
+						if o != nil {
+							domainDelete(o.Name)
 						}
-					} else if o != nil && n == nil {
-						domainDelete(o.Name)
+					} else {
+						domainAdd(n.Name, n.Labels)
 					}
 					if n != nil {
 						if skip := atomic.LoadUint32(&nvDeployDeleted); skip == 0 && isLeader() && admission.IsNsSelectorSupported() {
