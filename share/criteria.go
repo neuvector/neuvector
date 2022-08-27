@@ -162,7 +162,7 @@ func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, do
 	var ret, positive bool
 	var rets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
-	for i, crt := range selector {
+	for _, crt := range selector {
 		key := crt.Key
 		switch key {
 		case CriteriaKeyImage:
@@ -179,16 +179,17 @@ func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, do
 			// Address criteria doesn't match workload address for now
 			return false
 		default:
-			key = fmt.Sprintf("label%d", i)	// local reference
 			ret = false
 			positive = true
 			if strings.HasPrefix(crt.Key, "ns:") {
 				if domain != nil {
+					key = "ns-label"	// create "or" combination
 					if v, ok := domain.Labels[crt.Key[3:]]; ok {
 						ret, positive = isCriterionMet(&crt, v)
 					}
 				}
 			} else {
+				key = "pod-label"		// create "or" combination
 				if v, ok := workload.Labels[crt.Key]; ok {
 					ret, positive = isCriterionMet(&crt, v)
 				}
