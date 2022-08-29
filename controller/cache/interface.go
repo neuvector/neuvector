@@ -180,7 +180,7 @@ type CacheInterface interface {
 	// Multi-Clusters (Federation) - UI
 	GetFedMembershipRole(acc *access.AccessControl) (string, error)
 	GetFedMember(statusMap map[int]string, acc *access.AccessControl) (*api.RESTFedMembereshipData, error)
-	GetFedLocalRestInfo(acc *access.AccessControl) (share.CLUSRestServerInfo, string, share.CLUSProxy)
+	GetFedLocalRestInfo(proxyPreference *string, acc *access.AccessControl) (share.CLUSRestServerInfo, string, share.CLUSProxy)
 	GetFedMasterCluster(acc *access.AccessControl) api.RESTFedMasterClusterInfo
 	GetFedLocalJointCluster(acc *access.AccessControl) api.RESTFedJointClusterInfo
 	GetFedJoinedClusterToken(id, mainSessionID string, acc *access.AccessControl) (string, error)
