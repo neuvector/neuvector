@@ -24,30 +24,31 @@ func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
 	return &share.CLUSDomain{Name: name, Labels: nsLabels}
 }
 
+// This is from the k8s namespace resource watcher.
+// It should not have our predefined domain, like "_images", "_containers" or "_nodes"
 func domainAdd(name string, labels map[string]string) {
 	log.WithFields(log.Fields{"domain": name}).Debug()
-	domainMutex.Lock()
-	defer domainMutex.Unlock()
-	if _, ok := domainCacheMap[name]; !ok {
-		cd := initDomain(name, labels)
-		// When controller restarts/upgrades, domains are added again, don't change domain
-		// settings already in the KV.
-		if err := clusHelper.PutDomainIfNotExist(cd); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
+	accReadAll := access.NewReaderAccessControl()
+	retry := 0
+	for retry < retryClusterMax {
+		cd, rev, _ := clusHelper.GetDomain(name, accReadAll)
+		if cd == nil {
+			cd = initDomain(name, labels)
+		}
+		cd.Labels = labels
+		if err := clusHelper.PutDomain(cd, rev); err == nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+			retry++
 		} else {
-			domainCacheMap[name] = &domainCache{domain: cd}
+			break
 		}
 	}
 }
 
 func domainDelete(name string) {
 	log.WithFields(log.Fields{"domain": name}).Debug()
-	domainMutex.Lock()
-	defer domainMutex.Unlock()
 	if err := clusHelper.DeleteDomain(name); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
-	} else {
-		delete(domainCacheMap, name)
 	}
 }
 
