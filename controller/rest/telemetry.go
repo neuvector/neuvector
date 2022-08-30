@@ -54,16 +54,9 @@ func reportTelemetryData(rawData common.TelemetryData) {
 	if ss := strings.Split(nvAppFullVersion, "."); len(ss) >= 2 { // in the format {major}.{minor}[.{patch}][-s{#}]
 		nvMajorMinor = fmt.Sprintf("%s.%s", ss[0], ss[1])
 	}
-	var useProxy string
 	reqPayload := tTelemetryReqData{
 		AppVersion: nvSemanticVersion, // in the format v{major}.{minor}.{patch}
 		ExtraInfo:  extraInfo,
-	}
-
-	if rawData.UseProxy == const_https_proxy {
-		useProxy = "https"
-	} else if rawData.UseProxy == const_http_proxy {
-		useProxy = "http"
 	}
 
 	today := time.Now().UTC().Day()
@@ -86,7 +79,7 @@ func reportTelemetryData(rawData common.TelemetryData) {
 	}
 
 	bodyTo, _ := json.Marshal(&reqPayload)
-	if data, _, _, err := sendRestRequest("telemetry", http.MethodPost, _teleNeuvectorURL, "", nil, bodyTo, logError, &useProxy, nil); err == nil {
+	if data, _, _, err := sendRestRequest("telemetry", http.MethodPost, _teleNeuvectorURL, "", nil, bodyTo, logError, nil, nil); err == nil {
 		uploadTime := time.Now().UTC()
 		lastTeleErrorDay = -1
 		var resp tTelemetryResponse
