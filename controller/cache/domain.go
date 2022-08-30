@@ -36,7 +36,7 @@ func domainAdd(name string, labels map[string]string) {
 			cd = initDomain(name, labels)
 		}
 		cd.Labels = labels
-		if err := clusHelper.PutDomain(cd, rev); err == nil {
+		if err := clusHelper.PutDomain(cd, rev); err != nil {
 			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
 			retry++
 		} else {
