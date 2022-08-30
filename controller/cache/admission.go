@@ -761,9 +761,9 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 }
 
 type criterionValue struct {
-	Value string
+	Value    string
 	Operator string
-	Test func(string, string) bool
+	Test     func(string, string) bool
 }
 
 func doesCrtContainProp(propKey, propValue string, kvMap map[string][]criterionValue) bool {
@@ -883,7 +883,7 @@ func isComplexMapCriterionMet(crt *share.CLUSAdmRuleCriterion, propMap map[strin
 			if operator, operatorIndex := getCrtValOperator(crtValString, getValidMapOperators(crt)); operator != "" {
 				key = strings.TrimSpace(crtValString[:operatorIndex])
 				val = criterionValue{
-					Value: strings.TrimSpace(crtValString[operatorIndex+len(operator):]),
+					Value:    strings.TrimSpace(crtValString[operatorIndex+len(operator):]),
 					Operator: operator,
 				}
 			} else {
@@ -1191,6 +1191,34 @@ func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]st
 	return union
 }
 
+type Deployment struct {
+	AdmResObj *nvsysadmission.AdmResObject
+	Container *nvsysadmission.AdmContainerInfo
+	Image     *nvsysadmission.ScannedImageSummary
+}
+
+func (d *Deployment) violatesRestrictedPolicy() bool {
+	return (d.Container.AllowPrivilegeEscalation ||
+		((d.Container.RunAsUser == 0) || (d.Container.RunAsUser == -1 && d.Image.RunAsRoot)))
+}
+
+func (d *Deployment) violatesBaselinePolicy() bool {
+	return (d.Container.Privileged ||
+		d.Container.HostIPC ||
+		d.Container.HostPID ||
+		d.Container.HostNetwork)
+}
+
+func isPsaComplianceCriterionMet(crt *share.CLUSAdmRuleCriterion, d Deployment) bool {
+	crt.Value = strings.ToLower(strings.TrimSpace(crt.Value))
+	if crt.Value == share.PsaPolicyRestricted {
+		if d.violatesRestrictedPolicy() {
+			return false
+		}
+	}
+	return d.violatesBaselinePolicy()
+}
+
 // For criteria of same type, apply 'and' for all negative matches until the first positive match;
 //                            apply 'or' after the first positive match;
 // For different criteria type, apply 'and'
@@ -1305,6 +1333,16 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 					break
 				}
 			}
+		case share.CriteriaKeyPsaCompliance:
+			met = isPsaComplianceCriterionMet(
+				crt,
+				Deployment{
+					AdmResObj: admResObject,
+					Container: c,
+					Image:     scannedImage,
+				},
+			)
+			positive = met
 		case share.CriteriaKeyRequestLimit:
 			met, positive = isResourceLimitCriterionMet(crt, c)
 		case share.CriteriaKeyModules:

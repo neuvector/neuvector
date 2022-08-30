@@ -45,7 +45,8 @@ const (
 	CriteriaKeyAllowPrivEscalation string = "allowPrivEscalation"
 	CriteriaKeyPspCompliance       string = "pspCompliance" // psp compliance violation
 	CriteriaKeyRequestLimit        string = "resourceLimit"
-	CriteriaKeyModules			   string = "modules"
+	CriteriaKeyModules             string = "modules"
+	CriteriaKeyPsaCompliance       string = "psaCompliance" // psa compliance violation
 )
 
 const (
@@ -79,6 +80,11 @@ const (
 )
 
 const CriteriaValueAny string = "any"
+
+const (
+	PsaPolicyRestricted string = "restricted"
+	PsaPolicyBaseline   string = "baseline"
+)
 
 func IsSvcIpGroupMember(usergroup *CLUSGroup, svcipgroup *CLUSGroup) bool {
 	if usergroup == nil || svcipgroup == nil {

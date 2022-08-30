@@ -169,6 +169,7 @@ var allSetOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAn
 var setOps1 = []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny}
 var boolOps = []string{"true", "false"}
 var boolTrueOp = []string{"true"}
+var psaPolicies = []string{share.PsaPolicyRestricted, share.PsaPolicyBaseline}
 
 func (info AdmContainerInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(*newJSONAdmContainerInfo(&info))
@@ -385,6 +386,12 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyModules,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyPsaCompliance: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyPsaCompliance,
+				Ops:      []string{share.CriteriaOpEqual},
+				Values:   psaPolicies,
+				MatchSrc: api.MatchSrcBoth,
 			},
 		}
 	}
