@@ -1559,6 +1559,7 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 		uniconfUpdate(nType, key, value)
 	case "cert":
 		certObjectUpdate(nType, key, value)
+	case "throttled", "telemetry":
 	default:
 		log.WithFields(log.Fields{"key": key}).Error("Not supported")
 	}

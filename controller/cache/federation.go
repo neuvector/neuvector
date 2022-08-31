@@ -331,15 +331,18 @@ func (m CacheMethod) GetFedMember(statusMap map[int]string, acc *access.AccessCo
 }
 
 // return rest info, use system https/http proxy or not
-func (m CacheMethod) GetFedLocalRestInfo(acc *access.AccessControl) (share.CLUSRestServerInfo, string) {
+func (m CacheMethod) GetFedLocalRestInfo(acc *access.AccessControl) (share.CLUSRestServerInfo, int8) {
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	useProxy := fedMembershipCache.UseProxy
+	var useProxy int8
+	if fedMembershipCache.UseProxy == "https" {
+		useProxy = 1 // 1 means const_https_proxy
+	}
 	if acc.Authorize(&fedMembershipCache, nil) {
 		return fedMembershipCache.LocalRestInfo, useProxy
 	}
-	return share.CLUSRestServerInfo{}, ""
+	return share.CLUSRestServerInfo{}, useProxy
 }
 
 func (m CacheMethod) GetFedMasterCluster(acc *access.AccessControl) api.RESTFedMasterClusterInfo {
