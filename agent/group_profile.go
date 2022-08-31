@@ -1104,3 +1104,44 @@ func updateContainerFamilyTrees(name string) {
 		}
 	}
 }
+
+func domainChange(domain share.CLUSDomain) {
+	log.WithFields(log.Fields{"domain": domain}).Debug()
+
+	var groups []*groupProfileData
+	targets := utils.NewSet()
+
+	// rebuild custom group's members
+	grpCacheLock.Lock()
+	for _, cache := range grpProfileCacheMap {
+		if utils.IsCustomProfileGroup(cache.group.Name) {
+			for _, crt := range cache.group.Criteria {
+				if strings.HasPrefix(crt.Key, "ns:") {
+					groups = append(groups, cache)
+					break
+				}
+			}
+		}
+	}
+	grpCacheLock.Unlock()
+
+	gInfoRLock()
+	for _, c := range gInfo.activeContainers {
+		targets.Add(c.id)	// include all containers
+	}
+
+	for _, cache := range groups {
+		cache.members.Clear()	// reset
+		for _, c := range gInfo.activeContainers {
+			if isContainerSelected(c, cache.group) {
+				cache.members.Add(c.id)
+			}
+		}
+	}
+	gInfoRUnlock()
+
+	grpCacheLock.Lock()
+	grpNotifyProc = grpNotifyProc.Union(targets)
+	grpNotifyFile = grpNotifyFile.Union(targets)
+	grpCacheLock.Unlock()
+}

@@ -1840,3 +1840,40 @@ func isNeuvectorContainerName(name string) bool {
 	}
 	return false
 }
+
+func domainChange(domain share.CLUSDomain) {
+	log.WithFields(log.Fields{"domain": domain}).Debug()
+
+	var groups []*groupCache
+
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+
+	for _, cache := range groupCacheMap {
+		if utils.IsCustomProfileGroup(cache.group.Name) {
+			for _, crt := range cache.group.Criteria {
+				if strings.HasPrefix(crt.Key, "ns:") {
+					groups = append(groups, cache)
+					break
+				}
+			}
+		}
+	}
+
+	// For every workload, re-calculate its membership
+	for _, cache := range groups {
+		cache.members.Clear()	// reset
+		for _, wlc := range wlCacheMap {
+			if !wlc.workload.Running {
+				continue
+			}
+
+			if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) {
+				cache.members.Add(wlc.workload.ID)
+				wlc.groups.Add(cache.group.Name)
+			} else {
+				wlc.groups.Remove(cache.group.Name)
+			}
+		}
+	}
+}
