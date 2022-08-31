@@ -408,10 +408,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	putInternalIPNetToCluseter(true)
 	cacheMutexUnlock()
 
-	fedCacheMutexLock()
-	fedHttpsProxyCache = systemConfigCache.RegistryHttpsProxy
-	fedHttpProxyCache = systemConfigCache.RegistryHttpProxy
-	fedCacheMutexUnlock()
+	fedProxyMutex.Lock()
+	fedHttpsProxyCache = cfg.RegistryHttpsProxy
+	fedHttpProxyCache = cfg.RegistryHttpProxy
+	fedProxyMutex.Unlock()
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {

@@ -2,7 +2,6 @@ package rest
 
 import (
 	"crypto/rsa"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"math"
 	mathRand "math/rand"
 	"net/http"
-	"net/http/cookiejar"
 	"strings"
 	"sync"
 	"time"
@@ -421,47 +419,17 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	var err error
 	var statusCode int
 	var proxyUsed bool
-	var useProxy string
-	var proxyInfo share.CLUSProxy
+	var useProxy string // "http", "https", or ""
 	var rancherUser tRancherUser = tRancherUser{domainRoles: make(map[string]string)}
 
 	// Rancher SSO: how to enable controller to go thru proxy for communications with Rancher?
-	if useProxy == "http" {
-		proxyInfo = share.CLUSProxy{
-			Enable:   cfg.RegistryHttpProxyEnable,
-			URL:      cfg.RegistryHttpProxy.URL,
-			Username: cfg.RegistryHttpProxy.Username,
-			Password: cfg.RegistryHttpProxy.Password,
-		}
-	} else if useProxy == "https" {
-		proxyInfo = share.CLUSProxy{
-			Enable:   cfg.RegistryHttpsProxyEnable,
-			URL:      cfg.RegistryHttpsProxy.URL,
-			Username: cfg.RegistryHttpsProxy.Username,
-			Password: cfg.RegistryHttpsProxy.Password,
-		}
-	}
-
 	cookie := &http.Cookie{
 		Name:  "R_SESS",
 		Value: rsessToken,
 	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error("creating cookie jar")
-		return rancherUser, err
-	}
-	httpClient := &http.Client{
-		Jar: jar,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: clusterAuthTimeout,
-	}
+
 	url := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
-	data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+	data, statusCode, proxyUsed, err = sendReqToMasterCluster("rancher", http.MethodGet, url, "", cookie, []byte{}, true, &useProxy, acc)
 	if err == nil {
 		var domainRoles map[string]string
 		var rancherUsers api.UserCollection
@@ -482,7 +450,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 				rancherUser.name = rancherUsers.Data[idx].Username
 				rancherUser.token = rsessToken
 				url = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
-				data, statusCode, proxyUsed, err = sendReqToMasterCluster(httpClient, http.MethodGet, url, "", cookie, []byte{}, true, useProxy, &proxyInfo, acc)
+				data, statusCode, proxyUsed, err = sendReqToMasterCluster("rancher", http.MethodGet, url, "", cookie, []byte{}, true, &useProxy, acc)
 				//-> if user-id changes, reset mapped roles
 				//-> if mapped role changes, reset mapped roles in token
 				if err == nil {
@@ -553,7 +521,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 
 	if !rancherUser.valid || len(rancherUser.domainRoles) == 0 {
 		err = fmt.Errorf("cannot find a mapped role")
-		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "useProxy": useProxy, "proxyEnable": proxyInfo.Enable, "proxyUsed": proxyUsed}).Error()
+		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "useProxy": useProxy, "proxyUsed": proxyUsed}).Error()
 	}
 
 	return rancherUser, err
@@ -1124,6 +1092,11 @@ func jwtReadKeys() error {
 
 func resetFedJointKeys() {
 	fedClientPoolMutex.Lock()
+	for _, fedClient := range _fedHttpClients {
+		if fedClient != nil && fedClient.httpClient != nil {
+			fedClient.httpClient.CloseIdleConnections()
+		}
+	}
 	_fedHttpClients = make(map[string]*tFedHttpClient)
 	fedClientPoolMutex.Unlock()
 

@@ -47,6 +47,7 @@ var fedHttpProxyCache share.CLUSProxy
 var fedJoinedClustersCache = make(map[string]*fedClusterCache) // key is cluster id
 var fedJoinedClusterStatusCache = make(map[string]int)         // key is cluster id, value ex: _fedClusterJoined, _fedClusterSynced
 var fedCacheMutex sync.RWMutex                                 // for accessing fedMembershipCache/fedJoinedClustersCache/fedJoinedClusterStatusCache
+var fedProxyMutex sync.RWMutex                                 // for accessing fedHttpsProxyCache/fedHttpProxyCache
 
 func fedInit() {
 	m := clusHelper.GetFedMembership()
@@ -335,21 +336,31 @@ func (m CacheMethod) GetFedMember(statusMap map[int]string, acc *access.AccessCo
 }
 
 // return rest info, use system https proxy or not, system https proxy info
-func (m CacheMethod) GetFedLocalRestInfo(acc *access.AccessControl) (share.CLUSRestServerInfo, string, share.CLUSProxy) {
-	fedCacheMutexRLock()
-	defer fedCacheMutexRUnlock()
+func (m CacheMethod) GetFedLocalRestInfo(proxyPreference *string, acc *access.AccessControl) (share.CLUSRestServerInfo, string, share.CLUSProxy) {
+	var useProxy string
+	var proxyInfo share.CLUSProxy
+	var restServerInfo share.CLUSRestServerInfo
 
-	var fedProxyCache share.CLUSProxy
-	useProxy := fedMembershipCache.UseProxy
-	if fedMembershipCache.UseProxy == "https" {
-		fedProxyCache = fedHttpsProxyCache
-	} else if fedMembershipCache.UseProxy == "http" {
-		fedProxyCache = fedHttpProxyCache
+	fedRole := fedMembershipCache.FedRole
+	if fedRole != api.FedRoleNone {
+		if !acc.Authorize(&share.CLUSFedMembership{}, nil) {
+			return share.CLUSRestServerInfo{}, "", share.CLUSProxy{}
+		}
+		useProxy = fedMembershipCache.UseProxy
+		restServerInfo = fedMembershipCache.LocalRestInfo
+	} else if proxyPreference != nil {
+		useProxy = *proxyPreference
 	}
-	if acc.Authorize(&fedMembershipCache, nil) {
-		return fedMembershipCache.LocalRestInfo, useProxy, fedProxyCache
+
+	fedProxyMutex.RLock()
+	if useProxy == "https" {
+		proxyInfo = fedHttpsProxyCache
+	} else if useProxy == "http" {
+		proxyInfo = fedHttpProxyCache
 	}
-	return share.CLUSRestServerInfo{}, "", share.CLUSProxy{}
+	fedProxyMutex.RUnlock()
+
+	return restServerInfo, useProxy, proxyInfo
 }
 
 func (m CacheMethod) GetFedMasterCluster(acc *access.AccessControl) api.RESTFedMasterClusterInfo {
