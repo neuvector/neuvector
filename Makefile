@@ -97,7 +97,6 @@ stage_all: stage_init copy_ctrl copy_enf copy_mgr
 	cp neuvector/build/supervisord.all.conf ${STAGE_DIR}/etc/supervisor/conf.d/supervisord.conf
 
 pull_fleet_base:
-	docker pull neuvector/fleet_base:latest
 	docker pull neuvector/controller_base:latest
 	docker pull neuvector/enforcer_base:latest
 
