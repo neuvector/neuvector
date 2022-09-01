@@ -830,7 +830,7 @@ func applyFileGroupProfile(c *containerData) bool {
 
 		//
 		fileWatcher.ContainerCleanup(c.pid)
-		if len(file.Filters) > 0 {
+		if len(file.Filters) > 0 && c.pid != 0 {
 			fileWatcher.StartWatch(c.id, c.pid, config, c.capBlock, false)
 		}
 		return true

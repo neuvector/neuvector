@@ -161,7 +161,7 @@ func (ns *NetlinkSocket) EPollReceive(tv *syscall.Timeval) ([]syscall.NetlinkMes
 	timeout := int(tv.Nano() / 1000000)
 	n, err = syscall.EpollWait(epfd, events[:], timeout)
 	if err != nil {
-		return nil, fmt.Errorf("epoll_wait: %v", err)
+		return nil, err
 	} else if n > 0 {
 		return ns.Receive()
 	}

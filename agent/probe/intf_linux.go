@@ -70,6 +70,10 @@ func (m *netlinkIntfMonitor) WaitAddrChange(intval *syscall.Timeval) (bool, erro
 		// select() changes timer value, so reinitiate every time.
 		tv := *intval
 		if msgs, err := m.ns.EPollReceive(&tv); err != nil {
+			if err == syscall.EINTR || err == syscall.EAGAIN {		// interrupted by a signal, return, make a yield
+				// log.WithFields(log.Fields{"error": err}).Debug("Receive signal")
+				return false, nil
+			}
 			log.WithFields(log.Fields{"error": err}).Debug("Receive error")
 			return false, err
 		} else if len(msgs) == 0 {
@@ -88,6 +92,7 @@ func (m *netlinkIntfMonitor) WaitAddrChange(intval *syscall.Timeval) (bool, erro
 					log.WithFields(log.Fields{"family": m.family, "table": m.table}).Debug("New route")
 					chg = true
 				default:
+					// log.WithFields(log.Fields{"type": msg.Header.Type}).Debug()
 					// ignore other msgs such as DELADDR and DELROUTE and select again
 				}
 			}

@@ -3044,19 +3044,21 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 
 func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int) {
 	if bAdd {
-		if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
-			log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
-		} else {
-			p.lockProcMux()
-			if c, ok := p.containerMap[id]; ok {
-				for file, info := range files {
-					if info.bExec || info.length == -1 { // +deleted files from its first snapshot
-						log.WithFields(log.Fields{"file": file, "info": info}).Debug("AN: add")
-						c.fInfo[file] = info
+		if rootPid != 0 {
+			if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
+				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
+			} else {
+				p.lockProcMux()
+				if c, ok := p.containerMap[id]; ok {
+					for file, info := range files {
+						if info.bExec || info.length == -1 { // +deleted files from its first snapshot
+							log.WithFields(log.Fields{"file": file, "info": info}).Debug("AN: add")
+							c.fInfo[file] = info
+						}
 					}
 				}
+				p.unlockProcMux()
 			}
-			p.unlockProcMux()
 		}
 	} else { // Removed
 		if ok := p.fsnCtr.RemoveContainer(id, cPath); !ok {
