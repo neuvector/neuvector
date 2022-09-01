@@ -1,7 +1,5 @@
 .PHONY: fleet
 
-REPO_URL = 10.1.127.3:5000
-REPO_REL_URL = 10.1.127.12:5000
 STAGE_DIR = stage
 
 copy_ctrl:
@@ -99,12 +97,12 @@ stage_all: stage_init copy_ctrl copy_enf copy_mgr
 	cp neuvector/build/supervisord.all.conf ${STAGE_DIR}/etc/supervisor/conf.d/supervisord.conf
 
 pull_fleet_base:
-	docker pull $(REPO_REL_URL)/neuvector/fleet_base:latest
-	docker pull $(REPO_REL_URL)/neuvector/controller_base:latest
-	docker pull $(REPO_REL_URL)/neuvector/enforcer_base:latest
+	docker pull neuvector/fleet_base:latest
+	docker pull neuvector/controller_base:latest
+	docker pull neuvector/enforcer_base:latest
 
 pull_all_base:
-	docker pull $(REPO_REL_URL)/neuvector/all_base:jdk11
+	docker pull neuvector/all_base:jdk11
 
 
 api_image:
@@ -122,5 +120,5 @@ all_image: pull_all_base stage_all
 fleet:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
-	@docker pull $(REPO_REL_URL)/neuvector/build
-	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh $(REPO_REL_URL)/neuvector/build
+	@docker pull neuvector/build_fleet
+	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet
