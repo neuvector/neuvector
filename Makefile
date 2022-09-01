@@ -101,7 +101,7 @@ pull_fleet_base:
 	docker pull neuvector/enforcer_base:latest
 
 pull_all_base:
-	docker pull neuvector/all_base:jdk11
+	docker pull neuvector/all_base:latest
 
 
 api_image:
