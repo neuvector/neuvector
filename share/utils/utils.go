@@ -954,10 +954,6 @@ func EncryptPasswordForURL(password string) string {
 	return encrypted
 }
 
-func GetCVEDBEncryptKey() []byte {
-	return cveDBEncryptKey
-}
-
 // Determine if a directory is a mountpoint, by comparing the device for the directory
 // with the device for it's parent.  If they are the same, it's not a mountpoint, if they're
 // different, it is.

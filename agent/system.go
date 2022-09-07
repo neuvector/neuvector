@@ -1122,9 +1122,13 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		json.Unmarshal(value, &domain)
 
 		domainMutex.Lock()
-		defer domainMutex.Unlock()
-
+		oDomain, _ := domainCacheMap[name]
 		domainCacheMap[name] = &domainCache{domain: &domain}
+		domainMutex.Unlock()
+
+		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
+			domainChange(domain)
+		}
 		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
 
 	case cluster.ClusterNotifyDelete:
