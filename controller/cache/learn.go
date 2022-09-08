@@ -133,13 +133,17 @@ func qualifyPortLink(conn *share.CLUSConnection, port string, attr *polAttr) boo
 	if attr != nil && attr.ports.Contains(port) {
 		return true
 	}
-
-	if conn.PolicyAction == C.DP_POLICY_ACTION_LEARN {
+	/*
+	 * NVSHAS-6687,traffic for previously learned rule with app identified
+	 * will cause violation under monitor/protect mode when app is empty in
+	 * session, so we still need to learn this port even it is seen before.
+	 */
+	/*if conn.PolicyAction == C.DP_POLICY_ACTION_LEARN {
 		// Do not learn the port rule if app rule on the same port has been learned
 		if attr != nil && !attr.ports.Contains(port) && attr.portsSeen.Contains(port) {
 			return false
 		}
-	}
+	}*/
 
 	if conn.IPProto == syscall.IPPROTO_UDP {
 		// For UDP, the server port might be misidentified. So we will not
