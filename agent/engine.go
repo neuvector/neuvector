@@ -77,6 +77,7 @@ type containerData struct {
 	propertyFilled bool
 	benchReported  bool
 	pushPHistory   bool
+	examIntface    bool
 	scanCache      []byte
 }
 
@@ -812,6 +813,15 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 				ports: translateMappedPort(parent.portMap),
 			}
 			ClusterEventChan <- &parentEv
+		} else if change == changeIntf {
+			if c.examIntface { // only if POD's pid is 0
+				// Notify the children/POD for interface change
+				parent.intcpPairs = c.intcpPairs
+				ClusterEventChan <- &ClusterEvent{ event: EV_UPDATE_CONTAINER, id: parent.id, ifaces: ifaces,}
+				for podID := range parent.pods.Iter() {
+					ClusterEventChan <- &ClusterEvent{ event: EV_UPDATE_CONTAINER, id: podID.(string), ifaces: ifaces,}
+				}
+			}
 		}
 	}
 }
@@ -916,6 +926,7 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 	if !ok || (info != nil && c.pid != info.Pid) || !c.propertyFilled {
 		return
 	}
+
 	info = c.info
 
 	intfAdded, addrChanged, subnetChanged, macChangePairs, err := programUpdatePairs(c, false)
@@ -948,7 +959,8 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 		}
 
 		if intfAdded || addrChanged {
-			notifyContainerChanges(c, nil, changeIntf)
+			_, parent := getSharedContainer(info)
+			notifyContainerChanges(c, parent, changeIntf)
 		}
 	}
 }
@@ -1169,7 +1181,7 @@ func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, err
 		return nil, errHostModeUnsupported
 	}
 	// we check parentNS
-	if c.parentNS != "" {
+	if c.parentNS != "" && !c.examIntface {
 		return nil, errChildUnsupported
 	}
 
@@ -1199,7 +1211,7 @@ func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error)
 	if c.hostMode {
 		return nil, errHostModeUnsupported
 	}
-	if c.parentNS != "" {
+	if c.parentNS != "" && !c.examIntface {
 		return nil, errChildUnsupported
 	}
 
@@ -1502,7 +1514,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 
 	// Because activePid2ID doesn't have neuvector container in it, we cannot always get
 	// the parent container id, but the isChild flag is correct.
-	isChild, _ := global.RT.GetParent(info, gInfo.activePid2ID)
+	isChild, parent_cid := global.RT.GetParent(info, gInfo.activePid2ID)
 
 	// svc:
 	// (1) native runtime env.: name of the image
@@ -1516,13 +1528,23 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	gInfoLock() // guarding from deleting old instance
 	gInfo.allContainers.Add(id)
 	gInfo.neuContainers[id] = c
+	parent, _ := gInfo.neuContainers[parent_cid]
 	gInfoUnlock()
 
 	// Send event to controller
 	if !isChild {
-		prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
-
-		examNeuVectorInterface(c, changeInit)
+		if c.pid != 0 {
+			c.examIntface = true
+			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
+			examNeuVectorInterface(c, changeInit)
+		}
+	} else {
+		if parent != nil && !parent.examIntface {
+			parent.examIntface = true
+			c.examIntface = true
+			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
+			examNeuVectorInterface(c, changeInit)
+		}
 	}
 
 	// process monitor : protect mode, process profiles for all neuvector containers
@@ -1542,7 +1564,9 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		})
 		conf.Profile.Mode = share.PolicyModeEnforce
 		conf.Profile.Group = group
-		go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
+		if info.Pid != 0 {
+			go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
+		}
 	}
 }
 
@@ -1613,6 +1637,28 @@ func stopNeuVectorMonitor(c *containerData) {
 	return
 }
 
+func examNetworkInterface(c *containerData) bool {
+	if c.examIntface {
+		return false
+	}
+
+	c.examIntface = true
+	prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
+	intfAdded, _, subnetChanged, _, err := programUpdatePairs(c, false)
+	if err == nil {
+		if intfAdded {
+			programBridge(c)
+			programDP(c, false, nil)
+		}
+
+		if subnetChanged == true {
+			dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
+		}
+		return true
+	}
+	return false
+}
+
 func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	c, ok := gInfo.activeContainers[id]
 	if !ok {
@@ -1665,22 +1711,19 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	prober.HandleAnchorModeChange(true, c.id, c.upperDir, c.pid)
 
 	if parent == nil {
-		if !hostMode {
-			prober.StartMonitorInterface(id, c.pid, containerReexamIntfMax)
-
-			intfAdded, _, subnetChanged, _, err := programUpdatePairs(c, false)
-			if err == nil {
-				if intfAdded {
-					programBridge(c)
-					programDP(c, false, nil)
-				}
-
-				if subnetChanged == true {
-					dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
+		if !hostMode && c.pid != 0 {
+			examNetworkInterface(c)
+		}
+	} else {
+		if !hostMode && parent.pid == 0 {
+			if parent.examIntface == false {
+				parent.examIntface = true	// only monitor one child container
+				if examNetworkInterface(c) {
+					notifyContainerChanges(c, parent, changeIntf)
 				}
 			}
 		}
-	} else {
+
 		info.Sidecar = isSidecarContainer(info.Labels)
 		if info.Sidecar {
 			parent.info.ProxyMesh = true
@@ -1699,7 +1742,6 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	// entry to apply group policies
 	workloadJoinGroup(c)
 	updateAppPorts(c, parent)
-
 	notifyContainerChanges(c, parent, changeInit)
 }
 
@@ -1811,7 +1853,9 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	gInfo.activePid2ID[c.pid] = id
 	gInfoUnlock()
 
-	bench.AddContainer(id, info.Name)
+	if c.pid != 0 {
+		bench.AddContainer(id, info.Name)
+	}
 
 	since := time.Since(info.StartedAt)
 	if since < containerGracePeriod {
