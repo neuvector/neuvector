@@ -233,7 +233,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	case "controller+enforcer+manager", "allinone":
 		entryPtSig = "/usr/bin/supervisord" // a python app
 	case "updater":
-		entryPtSig = "/usr/local/bin/upgrader"
+		entryPtSig = "sleep" 				// 4.4: "/usr/local/bin/upgrader"
 	case "fetcher":
 		entryPtSig = "/usr/local/bin/fetcher"
 	default:
@@ -270,16 +270,7 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 		return "", false
 	}
 
-	//  only for docker runtime engine
-	//  not present for controller, updater releases
-	//	if vendor, ok := labels["vendor"]; !ok || vendor != "NeuVector Inc." {
-	//		log.WithFields(log.Fields{"labels": labels}).Debug("PROC")
-	//		return "", false
-	//	}
-
-	//  only for docker runtime engine (inc docker native)
 	if role, ok := labels[share.NeuVectorLabelRole]; ok {
-		//	log.WithFields(log.Fields{"labels": labels}).Debug("PROC")
 		if isNeuvectorFunctionRole(role, info.Pid) {
 			return role, true
 		}
