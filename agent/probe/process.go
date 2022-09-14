@@ -1710,6 +1710,10 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 
 // Application event handler: locked by calling functions
 func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bool) {
+	if !p.bProfileEnable {
+		return
+	}
+
 	if proc.path == "" || proc.path == "/" {
 		// path is required, it can not be either "" or "/".
 		// log.WithFields(log.Fields{"proc": proc}).Debug("PROC: ignored, no path")
@@ -2680,8 +2684,10 @@ func (p *Probe) applyProcessBlockingPolicy(id string, pid int, pg *share.CLUSPro
 
 //////
 func (p *Probe) HandleProcessPolicyChange(id string, pid int, pg *share.CLUSProcessProfile, bAddContainer, bBlocking bool) {
-	p.processProfileReeval(id, pg, bAddContainer)
-	p.applyProcessBlockingPolicy(id, pid, pg, bBlocking)
+	if p.bProfileEnable {
+		p.processProfileReeval(id, pg, bAddContainer)
+		p.applyProcessBlockingPolicy(id, pid, pg, bBlocking)
+	}
 }
 
 func (p *Probe) SetMonitorTrace(bEnable bool) {
@@ -2806,6 +2812,9 @@ func negativeResByMode(mode string) string {
 
 func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInternal, ppe *share.CLUSProcessProfileEntry, bFromPmon bool) bool {
 	var bPass, bImageFile, bModified bool
+	if !p.bProfileEnable {
+		return true
+	}
 
 	if id == "" { // nodes
 		return true
@@ -3003,6 +3012,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
+	if !p.bProfileEnable {
+		return
+	}
 
 	p.lockProcMux()
 	defer p.unlockProcMux()
@@ -3076,6 +3088,9 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 }
 
 func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int) {
+	if !p.bProfileEnable {
+		return
+	}
 	if bAdd {
 		if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
 			log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
@@ -3107,6 +3122,10 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 }
 
 func (p *Probe) UpdateFromAllowRule(id, path string) {
+	if !p.bProfileEnable {
+		return
+	}
+
 	p.lockProcMux()
 	if c, ok := p.containerMap[id]; ok {
 		if _, ok = c.fInfo[path]; ok {
