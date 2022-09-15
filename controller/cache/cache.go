@@ -1928,7 +1928,7 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceNew != nil {
 						n = ev.ResourceNew.(*resource.Deployment)
 					} else if ev.ResourceOld != nil {
-						o = ev.ResourceNew.(*resource.Deployment)
+						o = ev.ResourceOld.(*resource.Deployment)
 					}
 					if n != nil {
 						if n.Domain == resource.NvAdmSvcNamespace && n.Name == "neuvector-scanner-pod" {
