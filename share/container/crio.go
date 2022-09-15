@@ -253,7 +253,6 @@ func (d *crioDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtr
 	return getDevice(id, d, d.sys)
 }
 
-///////
 type criContainerInfo struct {
 	Info struct {
 		SandboxID  string `json:"sandboxID"`
@@ -422,6 +421,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			meta.ImageDigest = imageRef2Digest(meta.Image)
 			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
 				meta.ImageID = imageMeta.ID
+				meta.Author = imageMeta.Author
 			}
 		}
 	} else {
@@ -460,11 +460,13 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		// image ID
 		if image, _ := d.GetImage(meta.Image); image != nil {
 			meta.ImageID = image.ID
+			meta.Author = image.Author
 		} else {
 			// 2nd chance
 			if meta.ImageID == "" && meta.ImageDigest != "" {
 				if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
 					meta.ImageID = image.ID
+					meta.Author = image.Author
 				}
 			}
 		}
@@ -512,26 +514,7 @@ func (d *crioDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 }
 
 func (d *crioDriver) GetImage(name string) (*ImageMeta, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cimg := criRT.NewImageServiceClient(d.criClient)
-	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}}
-	// Extra check for resp and resp.Image because of NVSHAS-4778
-	if resp, err := cimg.ImageStatus(ctx, req); err == nil && resp != nil && resp.Image != nil {
-		meta := &ImageMeta{
-			ID:     resp.Image.Id,
-			Size:   int64(resp.Image.Size_),
-			Labels: make(map[string]string),
-		}
-		if len(resp.Image.RepoDigests) > 0 {
-			meta.Digest = resp.Image.RepoDigests[0]
-		}
-		return meta, nil
-	} else {
-		log.WithFields(log.Fields{"error": err, "name": name}).Error("Fail to get image")
-		return nil, err
-	}
+	return getCriImageMeta(d.criClient, name)
 }
 
 func (d *crioDriver) GetImageFile(id string) (io.ReadCloser, error) {
