@@ -67,3 +67,14 @@ func (s *SystemTools) StopToolProcesses() {
 	// clear the map with no entry
 	toolProc.pMap = make(map[int]string)
 }
+
+func (s *SystemTools) IsToolProcess(sid, pgid int) bool {
+	toolProc.mutex.Lock()
+	defer toolProc.mutex.Unlock()
+	if _, ok := toolProc.pMap[pgid]; ok {
+		return true
+	}
+
+	_, ok := toolProc.pMap[sid]
+	return ok
+}
