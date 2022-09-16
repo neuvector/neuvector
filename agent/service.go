@@ -292,7 +292,7 @@ func (rs *RPCService) GetSessionList(f *share.CLUSFilter, stream share.EnforcerS
 
 		list = make([]*share.CLUSSession, 0)
 	} else {
-		// Add host mode container sessions if not filtere dy workload.
+		// Add host mode container sessions if not filtered by workload.
 		// TODO: a bit of hack here. We assume host-mode container won't be filtered later.
 		list = prober.GetHostModeSessions(nil)
 	}

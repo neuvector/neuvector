@@ -36,6 +36,7 @@ const containerTaskChanSizeMin = 256
 
 var errHostModeUnsupported = errors.New("Host mode not supported")
 var errChildUnsupported = errors.New("Child container not supported")
+var errZeroPidUnsupported = errors.New("Container pid zero not supported")
 
 var containerGracePeriod time.Duration = (time.Second * 1)
 var ContainerTaskChan chan *ContainerTask
@@ -45,6 +46,7 @@ var ContainerTaskChan chan *ContainerTask
 //           Platform and host mode containers cannot be intercepted.
 //           If not interceptable, the container cannot be quarantined
 // hasDatapath: parent and non-platform-containers, could be host mode
+// in the case that parent's pid==0, child's hasDatapath could be true
 type containerData struct {
 	id             string
 	name           string
@@ -443,7 +445,7 @@ func notifyDPContainerApps(c *containerData) {
 	for i, pair := range c.intcpPairs {
 		macs[i] = pair.MAC.String()
 	}
-	if gInfo.tapProxymesh && c.info.ProxyMesh {
+	if gInfo.tapProxymesh && (c.info.ProxyMesh || c.hasDatapath) {
 		lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 		macs = append(macs, lomac_str)
 	}
@@ -499,8 +501,19 @@ func changeContainerWire(c *containerData, inline bool, quar bool, quarReason *s
 	updatePods(c, quarReason)
 }
 
+func isProxyMesh(c *containerData) bool {
+	if c.info.ProxyMesh == false && c.hasDatapath == false {
+		//child and no dp
+		return false
+	} else if c.info.ProxyMesh == true && c.pid == 0 {
+		//parent and pid==0
+		return false
+	}
+	return true
+}
+
 func updateProxyMeshMac(c *containerData, withlock bool) {
-	if c.info.ProxyMesh == false {
+	if !isProxyMesh(c) {
 		return
 	}
 	//POD with proxy injection
@@ -509,14 +522,20 @@ func updateProxyMeshMac(c *containerData, withlock bool) {
 	if !withlock {
 		gInfoLock()
 	}
-	gInfo.macContainerMap[lomac_str] = c.id
+	if c.info.ProxyMesh == false {
+		//child, map mac to parent id because in
+		//network activity page parent is drawn
+		gInfo.macContainerMap[lomac_str] = c.parentNS
+	} else {
+		gInfo.macContainerMap[lomac_str] = c.id
+	}
 	if !withlock {
 		gInfoUnlock()
 	}
 }
 
 func delProxyMeshMac(c *containerData, withlock bool) {
-	if c.info.ProxyMesh == false {
+	if !isProxyMesh(c) {
 		return
 	}
 	lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
@@ -552,7 +571,7 @@ func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPor
 }
 
 func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
-	if c.info.ProxyMesh == false { //parent only
+	if !isProxyMesh(c) {
 		return
 	}
 	log.WithFields(log.Fields{"container": c.id}).Debug("proxymesh")
@@ -628,7 +647,7 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 }
 
 func programDelProxyMeshDP(c *containerData, ns string) {
-	if c.info.ProxyMesh == false {
+	if !isProxyMesh(c) {
 		return
 	}
 	var netns string
@@ -861,7 +880,13 @@ func programUpdatePairs(c *containerData, restore bool) (bool, bool, bool, map[s
 				if bytes.Compare(pairOld.MAC, pairNew.MAC) != 0 {
 					delete(gInfo.macContainerMap, pairOld.MAC.String())
 					delete(gInfo.macPortPairMap, pairOld.MAC.String())
-					gInfo.macContainerMap[pairNew.MAC.String()] = c.id
+					if c.parentNS != "" {
+						//child, map mac to parent id because in
+						//network activity page parent is drawn
+						gInfo.macContainerMap[pairNew.MAC.String()] = c.parentNS
+					} else {
+						gInfo.macContainerMap[pairNew.MAC.String()] = c.id
+					}
 					gInfo.macPortPairMap[pairNew.MAC.String()] = pairNew
 					macChangePairs[pairOld.Port] = pairOld
 				}
@@ -872,7 +897,13 @@ func programUpdatePairs(c *containerData, restore bool) (bool, bool, bool, map[s
 
 	if len(c.intcpPairs) != len(intcpPairs) {
 		for _, pair := range intcpPairs {
-			gInfo.macContainerMap[pair.MAC.String()] = c.id
+			if c.parentNS != "" {
+				//child, map mac to parent id because in
+				//network activity page parent is drawn
+				gInfo.macContainerMap[pair.MAC.String()] = c.parentNS
+			} else {
+				gInfo.macContainerMap[pair.MAC.String()] = c.id
+			}
 			gInfo.macPortPairMap[pair.MAC.String()] = pair
 		}
 		intfAdded = true
@@ -1109,6 +1140,14 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		c.inline = parent.inline
 		c.blocking = parent.blocking
 		c.quar = parent.quar
+		if parent.pid == 0 {
+			//in taskInterceptContainer there is logic for parent to
+			//reach this function first, child come later so set child
+			//hasDatapath=parent.hasDatapath, set parent.hasDatapath=false
+			//to prevent duplicate child/ep to be pushed to dp
+			c.hasDatapath = parent.hasDatapath
+			parent.hasDatapath = false
+		}
 	}
 	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
 	c.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
@@ -1171,6 +1210,10 @@ func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, err
 	if c.hostMode {
 		return nil, errHostModeUnsupported
 	}
+	//check container pid
+	if c.pid == 0 {
+		return nil, errZeroPidUnsupported
+	}
 	// we check parentNS
 	if c.parentNS != "" && !c.examIntface {
 		return nil, errChildUnsupported
@@ -1201,6 +1244,10 @@ func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error)
 	// we check parentNS
 	if c.hostMode {
 		return nil, errHostModeUnsupported
+	}
+	//check container pid
+	if c.pid == 0 {
+		return nil, errZeroPidUnsupported
 	}
 	if c.parentNS != "" && !c.examIntface {
 		return nil, errChildUnsupported
@@ -1944,7 +1991,7 @@ func taskStopContainer(id string, pid int) {
 	}
 
 	gInfoLock()
-	if !c.hostMode && c.parentNS == "" {
+	if !c.hostMode && ((c.parentNS == "" && c.pid != 0) || (c.parentNS != "" && c.hasDatapath)) {
 		for _, pair := range c.intcpPairs {
 			delete(gInfo.macContainerMap, pair.MAC.String())
 			delete(gInfo.macPortPairMap, pair.MAC.String())
@@ -2151,6 +2198,9 @@ func containerTaskExit() {
 	}
 	// The following operations are optional
 	for _, c := range gInfo.activeContainers {
+		if c.pid == 0 {
+			continue
+		}
 		netns := global.SYS.GetNetNamespacePath(c.pid)
 		if c.inline || c.quar {
 			for _, pair := range c.intcpPairs {

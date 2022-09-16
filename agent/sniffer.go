@@ -326,6 +326,22 @@ func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 		}
 
 		pid = c.pid
+		//NVSHAS-6635 and NVSHAS-6682,ep is parent whose pid could be zero
+		if pid == 0 {
+			for podID := range c.pods.Iter() {
+				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+					if pod.pid != 0 && pod.hasDatapath {
+						pid = pod.pid
+						break
+					}
+				}
+			}
+		}
+		if pid == 0 {
+			err := fmt.Errorf("Container pid zero")
+			return "", grpc.Errorf(codes.InvalidArgument, err.Error())
+
+		}
 	} else {
 		err := fmt.Errorf("Container cannot be found or not running")
 		return "", grpc.Errorf(codes.InvalidArgument, err.Error())
