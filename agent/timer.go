@@ -474,7 +474,7 @@ func updateHostConnection(conns []*dp.ConnectionData) {
 				continue
 			}
 		}
-		if !c.hasDatapath {
+		if c.pid !=0 && !c.hasDatapath {
 			gInfoRUnlock()
 			continue
 		}

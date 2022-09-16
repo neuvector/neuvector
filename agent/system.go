@@ -305,14 +305,20 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 		gInfoRUnlock()
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	} else if c.parentNS != "" {
-		wlID = &c.parentNS
-		c, ok = gInfo.activeContainers[*wlID]
-		if !ok {
-			gInfoRUnlock()
-			log.WithFields(log.Fields{
-				"wlID": *wlID,
-			}).Error("cannot find parent container")
-			return 0, C.DP_POLICY_ACTION_OPEN, false
+		pc ,exist := gInfo.activeContainers[c.parentNS]
+		if exist {
+			if pc.pid != 0 {
+				wlID = &c.parentNS
+				c, _ = gInfo.activeContainers[*wlID]
+			}
+		} else {
+			if !c.hasDatapath {
+				gInfoRUnlock()
+				log.WithFields(log.Fields{
+					"wlID": *wlID,
+				}).Error("cannot find parent container")
+				return 0, C.DP_POLICY_ACTION_OPEN, false
+			}
 		}
 	}
 
