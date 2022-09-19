@@ -323,6 +323,10 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[s
 		return nil
 	}
 
+	if seviceName, ok := labels[container.NeuvectorSetServiceName]; ok {
+		return &Service{Domain: namespace, Name: seviceName}
+	}
+
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
 	if d.flavor == share.FlavorRancher && namespace == container.KubeRancherPodNamespace {

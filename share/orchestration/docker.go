@@ -75,6 +75,10 @@ func (d *base) GetServiceFromPodLabels(namespace, pod string, labels map[string]
 }
 
 func (d *base) GetService(meta *container.ContainerMeta) *Service {
+	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok {
+		return &Service{Name: seviceName}
+	}
+
 	project, _ := meta.Labels[container.DockerComposeProjectKey]
 	service, _ := meta.Labels[container.DockerComposeServiceKey]
 	if project != "" && service != "" {

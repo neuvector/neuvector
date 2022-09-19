@@ -27,6 +27,10 @@ func (d *ecs) GetServiceFromPodLabels(namespace, pod string, labels map[string]s
 }
 
 func (d *ecs) GetService(meta *container.ContainerMeta) *Service {
+	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok {
+		return &Service{Name: seviceName}
+	}
+
 	cluster, _ := meta.Labels[container.ECSCluster]
 	task, _ := meta.Labels[container.ECSTaskDefinition]
 	container, _ := meta.Labels[container.ECSContainerName]

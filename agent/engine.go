@@ -1504,7 +1504,6 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	c.info = info      // update
 	c.pid = c.info.Pid // update
 	log.WithFields(log.Fields{"container": id, "rootPid": c.info.Pid}).Debug("")
-
 	// The order to call this function for parent and child container is not guaranteed, wait for the parent
 	// if the child comes first
 	// TODO: Why check parent.service? The order is not guaranteed even when parent exists, because it is added

@@ -92,6 +92,10 @@ const (
 )
 
 const (
+    NeuvectorSetServiceName              = "io.neuvector.service.name"
+)
+
+const (
 	PlatformContainerNone                = ""
 	PlatformContainerNeuVector           = "NeuVector"
 	PlatformContainerDockerUCPCtrl       = "Docker-UCP-Controller"
