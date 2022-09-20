@@ -1661,6 +1661,10 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 //
 func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
 	if id == p.selfID {
+		if p.agentSessionID == proc.sid {
+			return true
+		}
+
 		if c, ok := p.containerMap[p.selfID]; ok {
 			return isFamilyProcess(c.children, proc)
 		}
@@ -1678,7 +1682,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 
 	// only allowing the NS op from the agent's root session
 	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc) {
-		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored agent NS ops")
+		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
 		return
 	}
 
