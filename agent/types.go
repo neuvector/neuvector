@@ -20,6 +20,7 @@ type AgentEnvInfo struct {
 	kvCongestCtrl        bool
 	scanSecrets          bool
 	autoBenchmark        bool
+	systemProfiles       bool
 }
 
 const (

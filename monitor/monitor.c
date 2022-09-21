@@ -43,6 +43,7 @@
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
 #define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
+#define ENV_NO_SYSTEM_PROTECT  "ENF_NO_SYSTEM_PROFILES"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
@@ -463,6 +464,10 @@ static pid_t fork_exec(int i)
         if (getenv(ENV_NO_AUTO_BENCHMARK)) {
             args[a ++] = "-no_auto_benchmark";
         }
+        if (getenv(ENV_NO_SYSTEM_PROTECT)) {
+            args[a ++] = "-no_sys_protect";
+        }
+
         args[a] = NULL;
         break;
     default:

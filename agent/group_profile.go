@@ -208,8 +208,11 @@ func addGroupCache(name string, grp share.CLUSGroup) bool {
 
 ///////
 func updateGroupProfileCache(nType cluster.ClusterNotifyType, name string, obj interface{}) bool {
-	log.WithFields(log.Fields{"group": name}).Debug("GRP:")
+	if !agentEnv.systemProfiles {
+		return false
+	}
 
+	log.WithFields(log.Fields{"group": name}).Debug("GRP:")
 	procUpdated := false
 	fileUpdated := false
 	grpCacheLock.Lock()
@@ -858,6 +861,10 @@ func uppdateFileGroupAccess(c *containerData) bool {
 
 /////// "host" is not an actual workload, will NOT enter this function
 func workloadJoinGroup(c *containerData) {
+	if !agentEnv.systemProfiles {
+		return
+	}
+
 	log.WithFields(log.Fields{"id": c.id}).Debug("GRP: ")
 
 	wlCacheLock.Lock()
@@ -906,6 +913,10 @@ func workloadJoinGroup(c *containerData) {
 
 ///////
 func workloadLeaveGroup(c *containerData) {
+	if !agentEnv.systemProfiles {
+		return
+	}
+
 	// log.WithFields(log.Fields{"cid": id}).Debug("GRP: ")
 	// remove monitors
 	prober.RemoveProcessControl(c.id)
@@ -1106,6 +1117,10 @@ func updateContainerFamilyTrees(name string) {
 }
 
 func domainChange(domain share.CLUSDomain) {
+	if !agentEnv.systemProfiles {
+		return
+	}
+
 	log.WithFields(log.Fields{"domain": domain}).Debug()
 
 	var groups []*groupProfileData
