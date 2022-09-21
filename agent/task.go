@@ -64,8 +64,34 @@ func isContainerQuarantine(c *containerData) bool {
 // be consistent with the local cache.
 func taskConfigContainer(id string, newconf *share.CLUSWorkloadConfig) {
 	log.WithFields(log.Fields{"container": id, "config": *newconf}).Debug("")
+	cid := ""
 	gInfo.containerConfig[id] = newconf
 	if c, ok := gInfo.activeContainers[id]; ok && c.capIntcp {
+		//NVSHAS-6716,the traffic is not blocked when container is in quarantine oc 4.9+
+		//when parent's pid==0 changeContainerWire only change parent's inline/quar value
+		//but does not really setup datapath correctly, so we need to go through same func
+		//with child whose pid!=0 to setup datapath right
+		if c.pid == 0 {
+			for podID := range c.pods.Iter() {
+				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+					if pod.pid != 0 && pod.hasDatapath {
+						cid = podID.(string)
+						break
+					}
+				}
+			}
+			//log.WithFields(log.Fields{"cid": cid}).Debug("")
+			if cid != "" {
+				gInfo.containerConfig[cid] = newconf
+				if pc, exist := gInfo.activeContainers[cid]; exist && pc.capIntcp {
+					inline := isContainerInline(pc)
+					quar := isContainerQuarantine(pc)
+					if inline != pc.inline || quar != pc.quar {
+						changeContainerWire(pc, inline, quar, &newconf.QuarReason)
+					}
+				}
+			}
+		}
 		inline := isContainerInline(c)
 		quar := isContainerQuarantine(c)
 		if inline != c.inline || quar != c.quar {

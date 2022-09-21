@@ -52,7 +52,33 @@ func policyInit() {
 }
 
 func updateContainerPolicyMode(id, policyMode string) {
+	cid := ""
 	if c, ok := gInfo.activeContainers[id]; ok {
+		//NVSHAS-6719,sometimes the real traffic is pass even the action is block in oc 4.9+
+		//when parent's pid==0, we need to execute func with child first to make sure datapath
+		//is setup correctly
+		if c.pid == 0 {
+			for podID := range c.pods.Iter() {
+				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+					if pod.pid != 0 && pod.hasDatapath {
+						cid = podID.(string)
+						break
+					}
+				}
+			}
+			//log.WithFields(log.Fields{"cid": cid}).Debug("")
+			if cid != "" {
+				if pc, exist := gInfo.activeContainers[cid]; exist {
+					if pc.policyMode != policyMode {
+						pc.policyMode = policyMode
+						inline := isContainerInline(pc)
+						if inline != pc.inline {
+							changeContainerWire(pc, inline, pc.quar, nil)
+						}
+					}
+				}
+			}
+		}
 		if c.policyMode != policyMode {
 			c.policyMode = policyMode
 			inline := isContainerInline(c)
