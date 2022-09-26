@@ -1861,6 +1861,7 @@ func domainChange(domain share.CLUSDomain) {
 	}
 
 	// For every workload, re-calculate its membership
+	dptLearnedGrpAdds := utils.NewSet()
 	for _, cache := range groups {
 		cache.members.Clear()	// reset
 		for _, wlc := range wlCacheMap {
@@ -1871,9 +1872,11 @@ func domainChange(domain share.CLUSDomain) {
 			if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) {
 				cache.members.Add(wlc.workload.ID)
 				wlc.groups.Add(cache.group.Name)
+				dptLearnedGrpAdds.Add(wlc.learnedGroupName)
 			} else {
 				wlc.groups.Remove(cache.group.Name)
 			}
 		}
+		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
 	}
 }

@@ -259,6 +259,7 @@ func main() {
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
 	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
+	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
 	flag.Parse()
 
 	if *debug {
@@ -290,6 +291,12 @@ func main() {
 	if *disable_auto_benchmark {
 		log.Info("Auto benchmark is disabled")
 		agentEnv.autoBenchmark = false
+	}
+
+	agentEnv.systemProfiles = true
+	if *disable_system_protection {
+		log.Info("System protection is disabled (process/file profiles)")
+		agentEnv.systemProfiles = false
 	}
 
 	if *join != "" {
@@ -541,6 +548,7 @@ func main() {
 	faEndChan := make(chan bool, 1)
 	fsmonEndChan := make(chan bool, 1)
 	probeConfig := probe.ProbeConfig{
+		ProfileEnable:        agentEnv.systemProfiles,
 		Pid:                  Agent.Pid,
 		PidMode:              Agent.PidMode,
 		DpTaskCallback:       dpTaskCallback,
@@ -570,6 +578,7 @@ func main() {
 	}
 
 	fmonConfig := fsmon.FileMonitorConfig{
+		ProfileEnable:  agentEnv.systemProfiles,
 		IsAufs:         global.RT.GetStorageDriver() == "aufs",
 		EnableTrace:    *show_monitor_trace,
 		EndChan:        fsmonEndChan,
@@ -610,7 +619,10 @@ func main() {
 
 	go statsLoop(bPassiveContainerDetect)
 	go timerLoop()
-	go group_profile_loop()
+
+	if agentEnv.systemProfiles {
+		go group_profile_loop()
+	}
 
 	// Wait for SIGTREM
 	go func() {

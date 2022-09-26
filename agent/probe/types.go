@@ -11,6 +11,7 @@ import (
 )
 
 type ProbeConfig struct {
+	ProfileEnable        bool
 	Pid                  int
 	PidMode              string
 	DpTaskCallback       dp.DPTaskCallback
