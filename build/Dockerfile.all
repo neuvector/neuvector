@@ -1,5 +1,5 @@
 ARG BASE_PREFIX
-FROM 10.1.127.12:5000/neuvector/${BASE_PREFIX}all_base:jdk11
+FROM neuvector/${BASE_PREFIX}all_base:jdk11
 
 COPY stage /
 
