@@ -22,6 +22,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+
 	//	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -33,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/scan/secrets"
@@ -256,9 +257,59 @@ func parseReqImageName(admContainerInfo *nvsysadmission.AdmContainerInfo) error 
 	return nil
 }
 
+type typedSpecContainer struct {
+	k8sType       nvsysadmission.K8sContainerType
+	containerInfo corev1.Container
+}
+
+const appArmorAnnotation = "container.apparmor.security.beta.kubernetes.io"
+
+func getAppArmorProfilesByContainer(specAnnotations map[string]string) map[string]string {
+	profilesByContainer := make(map[string]string)
+	if specAnnotations == nil {
+		return profilesByContainer
+	}
+	for key, value := range specAnnotations {
+		keySeparatorIndex := strings.Index(key, "/")
+		if keySeparatorIndex == -1 {
+			continue
+		}
+		annotationType := key[:keySeparatorIndex]
+		if annotationType == appArmorAnnotation {
+			target := key[keySeparatorIndex+1:]
+			profilesByContainer[target] = value
+		}
+	}
+	return profilesByContainer
+}
+
 func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsysadmission.AdmContainerInfo, error) {
 	vols := make(map[string]string, len(spec.Volumes))
-	containers := make([]*nvsysadmission.AdmContainerInfo, 0, len(spec.Containers))
+	numOfContainers := len(spec.Containers) + len(spec.EphemeralContainers) + len(spec.InitContainers)
+	containers := make([]*nvsysadmission.AdmContainerInfo, 0, numOfContainers)
+	typedSpecContainers := make([]typedSpecContainer, 0, numOfContainers)
+	appArmorProfilesByContainer := getAppArmorProfilesByContainer(objectMeta.Annotations)
+
+	for _, standardContainer := range spec.Containers {
+		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
+			k8sType:       nvsysadmission.K8sStandardContainer,
+			containerInfo: standardContainer,
+		})
+	}
+
+	for _, initContainer := range spec.InitContainers {
+		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
+			k8sType:       nvsysadmission.K8sInitContainer,
+			containerInfo: initContainer,
+		})
+	}
+
+	for _, ephemeralContainer := range spec.EphemeralContainers {
+		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
+			k8sType:       nvsysadmission.K8SEphemeralContainer,
+			containerInfo: corev1.Container(ephemeralContainer.EphemeralContainerCommon),
+		})
+	}
 
 	for _, vol := range spec.Volumes {
 		if vol.VolumeSource.HostPath != nil {
@@ -266,8 +317,8 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 		}
 	}
 
-	for _, c := range spec.Containers {
-		//volMounts := make([]string, 0, len(c.VolumeMounts))
+	for _, sc := range typedSpecContainers {
+		c := sc.containerInfo
 		volMounts := utils.NewSet()
 		for _, volMnt := range c.VolumeMounts {
 			if path, exist := vols[volMnt.Name]; exist {
@@ -349,6 +400,27 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 			HostNetwork: spec.HostNetwork,
 			HostPID:     spec.HostPID,
 			HostIPC:     spec.HostIPC,
+			Type:        sc.k8sType,
+			Volumes:     spec.Volumes,
+			Capabilities: nvsysadmission.LinuxCapabilities{
+				Add:  []string{},
+				Drop: []string{},
+			},
+			HostPorts:      []int32{},
+			SELinuxOptions: nvsysadmission.SELinuxOptions{},
+			Sysctls:        []string{},
+		}
+
+		if c.Ports != nil {
+			for _, port := range c.Ports {
+				if port.HostPort != 0 {
+					admContainerInfo.HostPorts = append(admContainerInfo.HostPorts, port.HostPort)
+				}
+			}
+		}
+
+		if appArmorProfile, hasProfile := appArmorProfilesByContainer[c.Name]; hasProfile {
+			admContainerInfo.AppArmorProfile = &appArmorProfile
 		}
 
 		cpuRequestSpecified := false
@@ -389,6 +461,31 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 
 		admContainerInfo.EnvSecrets = scanEnvVarSecrets(regualrEnvVars)
 
+		if spec.SecurityContext != nil {
+			// pod selinux options
+			if spec.SecurityContext.SELinuxOptions != nil {
+				admContainerInfo.SELinuxOptions.Type = spec.SecurityContext.SELinuxOptions.Type
+				admContainerInfo.SELinuxOptions.User = spec.SecurityContext.SELinuxOptions.User
+				admContainerInfo.SELinuxOptions.Role = spec.SecurityContext.SELinuxOptions.Role
+			}
+
+			// sysctls
+			if spec.SecurityContext.Sysctls != nil {
+				for _, sysctl := range spec.SecurityContext.Sysctls {
+					admContainerInfo.Sysctls = append(admContainerInfo.Sysctls, sysctl.Name)
+				}
+			}
+
+			// pod seccomp (TODO: update k8s package to version that includes seccomp profile in api)
+			// if spec.SecurityContext.SeccompProfile != nil {
+			// 	admContainerInfo.SeccompProfile = spec.SecurityContext.SeccompProfile.Type
+			// }
+		}
+
+		if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
+			admContainerInfo.RunAsUser = *spec.SecurityContext.RunAsUser
+		}
+
 		if c.SecurityContext != nil { // c.SecurityContext is type SecurityContext
 			if c.SecurityContext.Privileged != nil {
 				admContainerInfo.Privileged = *c.SecurityContext.Privileged
@@ -405,16 +502,43 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 			if c.SecurityContext.AllowPrivilegeEscalation != nil && *c.SecurityContext.AllowPrivilegeEscalation {
 				admContainerInfo.AllowPrivilegeEscalation = true
 			}
+
+			// linux capabilities
 			if c.SecurityContext.Capabilities != nil {
-				for _, add := range c.SecurityContext.Capabilities.Add {
-					if add == "SYS_ADMIN" {
-						admContainerInfo.AllowPrivilegeEscalation = true
-						break
+				if c.SecurityContext.Capabilities.Add != nil {
+
+					for _, addedCapability := range c.SecurityContext.Capabilities.Add {
+						if addedCapability == "SYS_ADMIN" {
+							admContainerInfo.AllowPrivilegeEscalation = true
+						}
+						admContainerInfo.Capabilities.Add = append(admContainerInfo.Capabilities.Add, string(addedCapability))
+					}
+				}
+				if c.SecurityContext.Capabilities.Drop != nil {
+					for _, droppedCapability := range c.SecurityContext.Capabilities.Drop {
+						admContainerInfo.Capabilities.Drop = append(admContainerInfo.Capabilities.Drop, string(droppedCapability))
 					}
 				}
 			}
-		} else if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
-			admContainerInfo.RunAsUser = *spec.SecurityContext.RunAsUser
+
+			// container selinux options
+			if c.SecurityContext.SELinuxOptions != nil {
+				admContainerInfo.SELinuxOptions.Type = c.SecurityContext.SELinuxOptions.Type
+				admContainerInfo.SELinuxOptions.User = c.SecurityContext.SELinuxOptions.User
+				admContainerInfo.SELinuxOptions.Role = c.SecurityContext.SELinuxOptions.Role
+			}
+
+			// proc masks
+			if c.SecurityContext.ProcMount != nil {
+				admContainerInfo.ProcMount = string(*c.SecurityContext.ProcMount)
+			} else {
+				admContainerInfo.ProcMount = ""
+			}
+
+			// container seccomp (TODO: update k8s package to version that includes seccomp profile in api)
+			// if c.SecurityContext.SeccompProfile != nil {
+			// 	admContainerInfo.SeccompProfile = c.SecurityContext.SeccompProfile.Type
+			// }
 		}
 		admContainerInfo.Name = c.Name
 		admContainerInfo.Image = c.Image

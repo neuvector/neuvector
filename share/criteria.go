@@ -45,7 +45,8 @@ const (
 	CriteriaKeyAllowPrivEscalation string = "allowPrivEscalation"
 	CriteriaKeyPspCompliance       string = "pspCompliance" // psp compliance violation
 	CriteriaKeyRequestLimit        string = "resourceLimit"
-	CriteriaKeyModules			   string = "modules"
+	CriteriaKeyModules             string = "modules"
+	CriteriaKeyHasPssViolation     string = "hasPssViolation"
 )
 
 const (
@@ -79,6 +80,11 @@ const (
 )
 
 const CriteriaValueAny string = "any"
+
+const (
+	PssPolicyBaseline   string = "baseline"
+	PssPolicyRestricted string = "restricted"
+)
 
 func IsSvcIpGroupMember(usergroup *CLUSGroup, svcipgroup *CLUSGroup) bool {
 	if usergroup == nil || svcipgroup == nil {
@@ -183,13 +189,13 @@ func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, do
 			positive = true
 			if strings.HasPrefix(crt.Key, "ns:") {
 				if domain != nil {
-					key = "ns-label"	// create "or" combination
+					key = "ns-label" // create "or" combination
 					if v, ok := domain.Labels[crt.Key[3:]]; ok {
 						ret, positive = isCriterionMet(&crt, v)
 					}
 				}
 			} else {
-				key = "pod-label"		// create "or" combination
+				key = "pod-label" // create "or" combination
 				if v, ok := workload.Labels[crt.Key]; ok {
 					ret, positive = isCriterionMet(&crt, v)
 				}

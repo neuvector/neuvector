@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -58,6 +60,25 @@ type ScannedImageSummary struct {
 	Modules         []*share.ScanModule
 }
 
+type K8sContainerType string
+
+const (
+	K8sStandardContainer  K8sContainerType = "standard"
+	K8sInitContainer      K8sContainerType = "init"
+	K8SEphemeralContainer K8sContainerType = "ephemeral"
+)
+
+type LinuxCapabilities struct {
+	Add  []string
+	Drop []string
+}
+
+type SELinuxOptions struct {
+	Type string
+	User string
+	Role string
+}
+
 type AdmContainerInfo struct {
 	Name                     string                `json:"name"`
 	Image                    string                `json:"image"` // original spec.container.image value in the yaml file
@@ -77,6 +98,15 @@ type AdmContainerInfo struct {
 	CpuRequests              float64               `json:"cpu_requests"`
 	MemoryLimits             int64                 `json:"memory_limits"`
 	MemoryRequests           int64                 `json:"memory_requests"`
+	Type                     K8sContainerType      `json:"type"`
+	Capabilities             LinuxCapabilities     `json:"capabilities"`
+	Volumes                  []corev1.Volume       `json:"volumes"`
+	HostPorts                []int32               `json:"host_ports"`
+	AppArmorProfile          *string               `json:"app_armor_profile"`
+	SELinuxOptions           SELinuxOptions        `json:"se_linux_options"`
+	ProcMount                string                `json:"proc_mount"`
+	SeccompProfile           string                `json:"seccomp_profile"`
+	Sysctls                  []string              `json:"sysctls"`
 }
 
 type JSONAdmContainerInfo struct { // for debugging purpose only
@@ -169,6 +199,7 @@ var allSetOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAn
 var setOps1 = []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny}
 var boolOps = []string{"true", "false"}
 var boolTrueOp = []string{"true"}
+var pssPolicies = []string{share.PssPolicyRestricted, share.PssPolicyBaseline}
 
 func (info AdmContainerInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(*newJSONAdmContainerInfo(&info))
@@ -385,6 +416,12 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyModules,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyHasPssViolation: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyHasPssViolation,
+				Ops:      []string{share.CriteriaOpEqual},
+				Values:   pssPolicies,
+				MatchSrc: api.MatchSrcBoth,
 			},
 		}
 	}
