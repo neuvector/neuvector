@@ -107,6 +107,7 @@ type AdmContainerInfo struct {
 	ProcMount                string                `json:"proc_mount"`
 	SeccompProfile           string                `json:"seccomp_profile"`
 	Sysctls                  []string              `json:"sysctls"`
+	RunAsNonRoot             bool                  `json:"run_as_non_root"`
 }
 
 type JSONAdmContainerInfo struct { // for debugging purpose only

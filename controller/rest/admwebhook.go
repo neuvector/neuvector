@@ -480,6 +480,13 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 			// if spec.SecurityContext.SeccompProfile != nil {
 			// 	admContainerInfo.SeccompProfile = spec.SecurityContext.SeccompProfile.Type
 			// }
+
+			// run as non root
+			if spec.SecurityContext.RunAsNonRoot != nil {
+				admContainerInfo.RunAsNonRoot = *spec.SecurityContext.RunAsNonRoot
+			} else {
+				admContainerInfo.RunAsNonRoot = false
+			}
 		}
 
 		if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
@@ -539,6 +546,13 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 			// if c.SecurityContext.SeccompProfile != nil {
 			// 	admContainerInfo.SeccompProfile = c.SecurityContext.SeccompProfile.Type
 			// }
+
+			// container run as non root
+			if c.SecurityContext.RunAsNonRoot != nil {
+				admContainerInfo.RunAsNonRoot = *c.SecurityContext.RunAsNonRoot
+			} else {
+				admContainerInfo.RunAsNonRoot = false
+			}
 		}
 		admContainerInfo.Name = c.Name
 		admContainerInfo.Image = c.Image

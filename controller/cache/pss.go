@@ -187,7 +187,7 @@ func allowsPrivelegeEscalation(c *nvsysadmission.AdmContainerInfo) bool {
 
 // Restricted Policy - Running as Non-root & Running as Non-root user (v1.23+)
 func allowsRootUsers(c *nvsysadmission.AdmContainerInfo) bool {
-	return c.RunAsUser != 0
+	return c.RunAsUser == 0 || !c.RunAsNonRoot
 }
 
 // Restricted Policy - Seccomp (v1.19+)
