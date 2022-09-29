@@ -624,7 +624,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		}
 	}
 
-	registries := scanner.GetAllRegistrySummary(acc)
+	registries := scanner.GetAllRegistrySummary(share.ScopeAll, acc)
 	for _, reg := range registries {
 		if vmap, nmap, err := scanner.GetRegistryVulnerabilities(reg.Name, vpf, "", acc); err == nil {
 			for id, vuls := range vmap {

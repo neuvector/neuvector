@@ -51,9 +51,10 @@ var _fedKeyInfo = map[string]fedKeyInfo{
 	share.CFGEndpointFileAccessRule:   fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
 	share.CFGEndpointResponseRule:     fedKeyInfo{fedMasterOnlyKeys: []string{share.CLUSConfigFedResponseRuleKey}},
 	share.CFGEndpointAdmissionControl: fedKeyInfo{fedMasterOnlyKeys: []string{share.CLUSConfigFedAdmCtrlKey}},
+	share.CFGEndpointRegistry:         fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}}, // filter keys like object/config/registry/fed.registry-1
 	share.CFGEndpointFederation: fedKeyInfo{
-		alwaysFilterKeys:   []string{share.CLUSFedClustersStatusKey, share.CLUSFedToPingPollKey},
-		fedMasterOnlyKeys:  []string{share.CLUSFedSystemKey},
+		alwaysFilterKeys:   []string{share.CLUSFedKey(share.CLUSFedClustersStatusSubKey), share.CLUSFedKey(share.CLUSFedToPingPollSubKey)},
+		fedMasterOnlyKeys:  []string{share.CLUSFedKey(share.CFGEndpointSystem)},
 		filterSubKeyPrefix: []string{share.CLUSFedRulesRevisionSubKey},
 	},
 }
@@ -64,6 +65,8 @@ var _skipKeyInfo = map[string][]string{
 	share.CFGEndpointCrd:              []string{share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName)},
 }
 
+var fedCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointFederation, key: share.CLUSConfigFederationStore, isStore: true,
+	section: api.ConfSectionPolicy, lock: share.CLUSLockFedKey, purgeFilter: purgeFedFilter} // federation cfgEndpoint
 var groupCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointGroup, key: share.CLUSConfigGroupStore, isStore: true,
 	section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey, purgeFilter: purgeGroupFilter} // group cfgEndpoint
 var pprofileCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointProcessProfile, key: share.CLUSConfigProcessProfileStore, isStore: true,
@@ -77,8 +80,7 @@ var registryCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointRegis
 
 // Order is important
 var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
-	&cfgEndpoint{name: share.CFGEndpointFederation, key: share.CLUSConfigFederationStore, isStore: true,
-		section: api.ConfSectionPolicy, lock: share.CLUSLockFedKey, purgeFilter: purgeFedFilter},
+	fedCfgEndpoint,
 	&cfgEndpoint{name: share.CFGEndpointUserRole, key: share.CLUSConfigUserRoleStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockUserKey},
 	&cfgEndpoint{name: share.CFGEndpointPwdProfile, key: share.CLUSConfigPwdProfileStore, isStore: true,
@@ -137,8 +139,6 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 
 // Endpoint name to endping
 var cfgEndpointMap map[string]*cfgEndpoint = make(map[string]*cfgEndpoint)
-
-var restoredFedRole string
 
 func purgeFedFilter(epName, key string) bool {
 	return false // no purge
@@ -377,7 +377,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 	var filterFedObjectType int
 	var fedMasterOnlyKeys, filterSubKeyPrefix, alwaysFilterKeys []string
 	if keyInfo, ok := _fedKeyInfo[ep.name]; ok {
-		if restoredFedRole != api.FedRoleMaster { // need to filter fed rule keys on non-master cluster
+		if importInfo.fedRole != api.FedRoleMaster { // need to filter fed rule keys on non-master cluster
 			filterFedObjectType = keyInfo.filterFedObjectType
 			fedMasterOnlyKeys = keyInfo.fedMasterOnlyKeys
 			filterSubKeyPrefix = keyInfo.filterSubKeyPrefix
@@ -404,12 +404,13 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 
 		if fedEndpointCfg {
 			// special handling for federation backup file because fedRole is unknown when Restore() is called
-			if key == share.CLUSFedMembershipKey {
+			subKey := share.CLUSKeyNthToken(key, 3)
+			if subKey == share.CLUSFedMembershipSubKey {
 				var m share.CLUSFedMembership
 				if err := json.Unmarshal([]byte(value), &m); err == nil {
-					restoredFedRole = m.FedRole
+					importInfo.fedRole = m.FedRole
 					if keyInfo, ok := _fedKeyInfo[ep.name]; ok {
-						if restoredFedRole != api.FedRoleMaster { // need to filter fed rule keys on non-master cluster
+						if importInfo.fedRole != api.FedRoleMaster { // need to filter fed rule keys on non-master cluster
 							filterFedObjectType = keyInfo.filterFedObjectType
 							fedMasterOnlyKeys = keyInfo.fedMasterOnlyKeys
 							filterSubKeyPrefix = keyInfo.filterSubKeyPrefix
@@ -421,8 +422,8 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 						alwaysFilterKeys = keyInfo.alwaysFilterKeys
 					}
 				}
-			} else if key == share.CLUSFedRulesRevisionKey {
-				if restoredFedRole == api.FedRoleMaster {
+			} else if subKey == share.CLUSFedRulesRevisionSubKey {
+				if importInfo.fedRole == api.FedRoleMaster {
 					importInfo.fedRulesRevValue = value
 					// do not write to kv now. postpone it at the last write
 					continue

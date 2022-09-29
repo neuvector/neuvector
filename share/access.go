@@ -305,36 +305,40 @@ func (o *CLUSResponseRule) GetDomain(f GetAccessObjectFunc) ([]string, []string)
 }
 
 func (o *CLUSRegistryConfig) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
-	var domains []string
-	// This includes both nil and empty array
-	if len(o.Domains) != 0 {
-		domains = o.Domains
+	if o.CfgType == FederalCfg || strings.HasPrefix(o.Name, "fed.") {
+		return _fedDomainSlice, _fedDomainSlice
 	} else {
-		domains = o.CreaterDomains
-	}
-
-	if o.Type == RegistryTypeOpenShift && len(o.ParsedFilters) > 0 {
-		domainsMap := make(map[string]bool, len(domains)+len(o.ParsedFilters))
-		for _, d := range domains {
-			domainsMap[d] = true
+		var domains []string
+		// This includes both nil and empty array
+		if len(o.Domains) != 0 {
+			domains = o.Domains
+		} else {
+			domains = o.CreaterDomains
 		}
-		for _, f := range o.ParsedFilters {
-			var org string
-			if f.Org != "" {
-				org = f.Org
-			} else if f.Repo == ".*" {
-				org = AccessAllAsReader
+
+		if o.Type == RegistryTypeOpenShift && len(o.ParsedFilters) > 0 {
+			domainsMap := make(map[string]bool, len(domains)+len(o.ParsedFilters))
+			for _, d := range domains {
+				domainsMap[d] = true
 			}
-			if org != "" {
-				if _, ok := domainsMap[f.Org]; !ok {
-					domains = append(domains, org)
-					domainsMap[org] = true
+			for _, f := range o.ParsedFilters {
+				var org string
+				if f.Org != "" {
+					org = f.Org
+				} else if f.Repo == ".*" {
+					org = AccessAllAsReader
+				}
+				if org != "" {
+					if _, ok := domainsMap[f.Org]; !ok {
+						domains = append(domains, org)
+						domainsMap[org] = true
+					}
 				}
 			}
 		}
-	}
 
-	return domains, nil
+		return domains, nil
+	}
 }
 
 // for registry filter in openshift registry only

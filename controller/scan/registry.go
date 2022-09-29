@@ -32,8 +32,6 @@ const (
 	scanReqSafetyTimeOut = time.Minute * 30 // Should be longer than scanReqTimeout
 
 	scanPersistImageExtra = 32
-
-	registryRepoScanName = "_repo_scan"
 )
 
 type scanContext struct {
@@ -85,6 +83,7 @@ type Registry struct {
 }
 
 var repoScanRegistry *Registry
+var repoFedScanRegistry *Registry
 var regMap map[string]*Registry = make(map[string]*Registry)
 var regMux sync.RWMutex
 
@@ -119,16 +118,32 @@ func (rs *Registry) stateUnlock() {
 	smd.mutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released ...")
 }
 
-func regMapToArray() []*Registry {
+func regMapToArray(getLocal, getFed bool) []*Registry {
 	regReadLock()
 	defer regReadUnlock()
-	rss := make([]*Registry, len(regMap))
 
-	i := 0
+	var i int
+
 	for _, rs := range regMap {
-		rss[i] = rs
-		i++
+		if getLocal && rs.config.CfgType != share.FederalCfg {
+			i += 1
+		}
+		if getFed && rs.config.CfgType == share.FederalCfg {
+			i += 1
+		}
 	}
+
+	rss := make([]*Registry, 0, i)
+
+	for _, rs := range regMap {
+		if getLocal && rs.config.CfgType != share.FederalCfg {
+			rss = append(rss, rs)
+		}
+		if getFed && rs.config.CfgType == share.FederalCfg {
+			rss = append(rss, rs)
+		}
+	}
+
 	return rss
 }
 
@@ -149,8 +164,9 @@ func registryInit() {
 	}
 
 	// Get all registry config first. We will get notified again.
-	newRepoScanRegistry()
-	configs := clusHelper.GetAllRegistry()
+	newRepoScanRegistry(common.RegistryRepoScanName)
+	newRepoScanRegistry(common.RegistryFedRepoScanName) // only managed clusters need to reference master cluster's repo scan result
+	configs := clusHelper.GetAllRegistry(share.ScopeAll)
 	for _, config := range configs {
 		regLock()
 		regMap[config.Name] = newRegistry(config)
@@ -161,7 +177,12 @@ func registryInit() {
 func becomeScanner() {
 	log.Debug()
 
-	regs := regMapToArray()
+	getLocal := true
+	getFed := true
+	if smd.fedRole == api.FedRoleJoint {
+		getFed = false
+	}
+	regs := regMapToArray(getLocal, getFed)
 
 	for _, reg := range regs {
 		reg.stateLock()
@@ -183,150 +204,184 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	name := share.CLUSKeyNthToken(key, 3)
+
+	// is it a full functioning registry or just a fed registry deployed to managed cluster for refernece only?
+	// (fed registry on master clster is also full functioning registry)
+	isFullFuncReg := false
+	if !strings.HasPrefix(name, api.FederalGroupPrefix) || smd.fedRole == api.FedRoleMaster {
+		isFullFuncReg = true
+	}
+
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var config share.CLUSRegistryConfig
 		json.Unmarshal(value, &config)
 
-		var oldFilters []string
-		oldSchedule := api.ScanSchManual
-		var credChanged bool
+		if isFullFuncReg {
+			var oldFilters []string
+			oldSchedule := api.ScanSchManual
+			var credChanged bool
 
-		reg, ok := regMapLookup(config.Name)
+			reg, ok := regMapLookup(config.Name)
 
-		if ok && reg.config.Name != "" {
-			oldSchedule = reg.config.Schedule
-			oldFilters = reg.config.Filters
+			if ok && reg.config.Name != "" {
+				oldSchedule = reg.config.Schedule
+				oldFilters = reg.config.Filters
 
-			oldCfg := reg.config
-			reg.config = &config
+				oldCfg := reg.config
+				reg.config = &config
 
-			// Clear last error if configuration is changed.
-			reg.state.ErrMsg = ""
-			public := isPublicRegistry(&config)
-			reg.driver.SetConfig(&config)
-			reg.backupDrv.SetConfig(&config)
+				// Clear last error if configuration is changed.
+				reg.state.ErrMsg = ""
+				public := isPublicRegistry(&config)
+				reg.driver.SetConfig(&config)
+				reg.backupDrv.SetConfig(&config)
 
-			if oldCfg.Registry != config.Registry || oldCfg.AuthWithToken != config.AuthWithToken ||
-				(oldCfg.AuthWithToken && oldCfg.AuthToken != config.AuthToken) ||
-				(!oldCfg.AuthWithToken && (oldCfg.Username != config.Username || oldCfg.Password != config.Password)) ||
-				public != reg.public {
-				// URL or credential changed, stop scan and force logout
-				credChanged = true
-				reg.driver.Logout(true)
-				reg.backupDrv.Logout(true)
-				// if the public change, need to renew the driver type.
-				if public != reg.public {
-					reg.public = public
-					reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
+				if oldCfg.Registry != config.Registry || oldCfg.AuthWithToken != config.AuthWithToken ||
+					(oldCfg.AuthWithToken && oldCfg.AuthToken != config.AuthToken) ||
+					(!oldCfg.AuthWithToken && (oldCfg.Username != config.Username || oldCfg.Password != config.Password)) ||
+					public != reg.public {
+					// URL or credential changed, stop scan and force logout
+					credChanged = true
+					reg.driver.Logout(true)
+					reg.backupDrv.Logout(true)
+					// if the public change, need to renew the driver type.
+					if public != reg.public {
+						reg.public = public
+						reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
+					}
+					if isScanner() {
+						reg.stateLock()
+						if reg.state.Status == api.RegistryStatusScanning {
+							// stopScan() will be called
+							state := share.CLUSRegistryState{Status: api.RegistryStatusIdle, StartedAt: reg.state.StartedAt}
+							clusHelper.PutRegistryState(reg.config.Name, &state)
+						}
+						reg.stateUnlock()
+					}
 				}
 				if isScanner() {
-					reg.stateLock()
-					if reg.state.Status == api.RegistryStatusScanning {
-						// stopScan() will be called
-						state := share.CLUSRegistryState{Status: api.RegistryStatusIdle, StartedAt: reg.state.StartedAt}
-						clusHelper.PutRegistryState(reg.config.Name, &state)
+					if oldCfg.Schedule == api.ScanSchPeriodical &&
+						config.Schedule != api.ScanSchPeriodical && reg.pctx != nil {
+						reg.pctx.cancel()
+						reg.pctx = nil
+					} else if oldCfg.Schedule != api.ScanSchPeriodical &&
+						config.Schedule == api.ScanSchPeriodical {
+						ctx, cancel := context.WithCancel(context.Background())
+						reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
+						go reg.polling(ctx)
+					} else if config.Schedule == api.ScanSchPeriodical &&
+						oldCfg.PollPeriod != config.PollPeriod && reg.pctx != nil {
+						reg.pctx.cancel()
+						ctx, cancel := context.WithCancel(context.Background())
+						reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
+						go reg.polling(ctx)
 					}
-					reg.stateUnlock()
+				}
+
+				// Assume that state is always created way after config is created, so no check
+				// of state here.
+			} else {
+				oldFilters = make([]string, 0)
+
+				reg = newRegistry(&config)
+				// put recovery images summary into new created registry
+				if oldReg, ok := regMapLookup(config.Name); ok && len(oldReg.summary) > 0 {
+					reg.summary = oldReg.summary
+					reg.image2ID = oldReg.image2ID
+					reg.digest2ID = oldReg.digest2ID
+				}
+				if isScanner() && reg.config.Schedule == api.ScanSchPeriodical {
+					ctx, cancel := context.WithCancel(context.Background())
+					reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
+					go reg.polling(ctx)
+				}
+
+				regLock()
+				regMap[config.Name] = reg
+				regUnlock()
+			}
+
+			if reg.config.Type == share.RegistryTypeOpenShift {
+				if oldSchedule == api.ScanSchManual && config.Schedule == api.ScanSchAuto {
+					registerImageBank(api.RegistryImageSourceOpenShift, reg.config.Name)
+				} else if oldSchedule == api.ScanSchAuto && config.Schedule == api.ScanSchManual {
+					deregisterImageBank(api.RegistryImageSourceOpenShift, reg.config.Name)
 				}
 			}
+
+			if credChanged {
+				return
+			}
+
 			if isScanner() {
-				if oldCfg.Schedule == api.ScanSchPeriodical &&
-					config.Schedule != api.ScanSchPeriodical && reg.pctx != nil {
-					reg.pctx.cancel()
-					reg.pctx = nil
-				} else if oldCfg.Schedule != api.ScanSchPeriodical &&
-					config.Schedule == api.ScanSchPeriodical {
-					ctx, cancel := context.WithCancel(context.Background())
-					reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
-					go reg.polling(ctx)
-				} else if config.Schedule == api.ScanSchPeriodical &&
-					oldCfg.PollPeriod != config.PollPeriod && reg.pctx != nil {
-					reg.pctx.cancel()
-					ctx, cancel := context.WithCancel(context.Background())
-					reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
-					go reg.polling(ctx)
-				}
-			}
-
-			// Assume that state is always created way after config is created, so no check
-			// of state here.
-		} else {
-			oldFilters = make([]string, 0)
-
-			reg = newRegistry(&config)
-			// put recovery images summary into new created registry
-			if oldReg, ok := regMapLookup(config.Name); ok && len(oldReg.summary) > 0 {
-				reg.summary = oldReg.summary
-				reg.image2ID = oldReg.image2ID
-				reg.digest2ID = oldReg.digest2ID
-			}
-			if isScanner() && reg.config.Schedule == api.ScanSchPeriodical {
-				ctx, cancel := context.WithCancel(context.Background())
-				reg.pctx = &pollContext{ctx: ctx, cancel: cancel}
-				go reg.polling(ctx)
-			}
-
-			regLock()
-			regMap[config.Name] = reg
-			regUnlock()
-		}
-
-		if reg.config.Type == share.RegistryTypeOpenShift {
-			if oldSchedule == api.ScanSchManual && config.Schedule == api.ScanSchAuto {
-				registerImageBank(api.RegistryImageSourceOpenShift, reg.config.Name)
-			} else if oldSchedule == api.ScanSchAuto && config.Schedule == api.ScanSchManual {
-				deregisterImageBank(api.RegistryImageSourceOpenShift, reg.config.Name)
-			}
-		}
-
-		if credChanged {
-			return
-		}
-
-		if isScanner() {
-			if oldSchedule == api.ScanSchManual && config.Schedule == api.ScanSchAuto {
-				reg.stateLock()
-				if reg.state.Status == api.RegistryStatusIdle {
-					// Start scanning if not
-					state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-					clusHelper.PutRegistryState(reg.config.Name, &state)
-				}
-				reg.stateUnlock()
-			} else if config.Schedule == api.ScanSchAuto && !reflect.DeepEqual(oldFilters, config.Filters) {
-				// Filter changes (including order change) with auto-scan enabled
-				/*
+				if oldSchedule == api.ScanSchManual && config.Schedule == api.ScanSchAuto {
+					reg.stateLock()
 					if reg.state.Status == api.RegistryStatusIdle {
 						// Start scanning if not
 						state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
 						clusHelper.PutRegistryState(reg.config.Name, &state)
-					} else if reg.sctx != nil && !reg.sctx.refreshing {
-						// We don't want to block config change handler for too long, but if filters keeps changing, we don't want
-						// them to run in parallel. Use a flag to discard later changes. We could use another context to cancel
-						// the current and keep last one.
-						reg.sctx.refreshing = true
-						go reg.imageScanRefresh(false)
 					}
-				*/
+					reg.stateUnlock()
+				} else if config.Schedule == api.ScanSchAuto && !reflect.DeepEqual(oldFilters, config.Filters) {
+					// Filter changes (including order change) with auto-scan enabled
+					/*
+						if reg.state.Status == api.RegistryStatusIdle {
+							// Start scanning if not
+							state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
+							clusHelper.PutRegistryState(reg.config.Name, &state)
+						} else if reg.sctx != nil && !reg.sctx.refreshing {
+							// We don't want to block config change handler for too long, but if filters keeps changing, we don't want
+							// them to run in parallel. Use a flag to discard later changes. We could use another context to cancel
+							// the current and keep last one.
+							reg.sctx.refreshing = true
+							go reg.imageScanRefresh(false)
+						}
+					*/
+				}
+			}
+		} else {
+			reg, ok := regMapLookup(config.Name)
+
+			if ok && reg.config.Name != "" {
+				reg.config = &config
+				// Clear last error if configuration is changed.
+				//reg.state.ErrMsg = ""
+				reg.public = isPublicRegistry(&config)
+			} else {
+				// fed registry doesn't trigger any scanning task on managed clusters.
+				// fed images' scan data is deployed from master cluster
+				reg := newRegistry(&config)
+				if oldReg, ok := regMapLookup(config.Name); ok && len(oldReg.summary) > 0 {
+					reg.summary = oldReg.summary
+					reg.image2ID = oldReg.image2ID
+					reg.digest2ID = oldReg.digest2ID
+				}
+				regLock()
+				regMap[config.Name] = reg
+				regUnlock()
 			}
 		}
 
 	case cluster.ClusterNotifyDelete:
+		// when managed cluster is notified that a fed registry kv key is deleted, simply remove that fed registry entry from regMap
 		regLock()
 		reg, ok := regMap[name]
 		if ok {
-			// It's possible that new scan get kicked in, we just cancel it here.
-			if reg.sctx != nil {
-				reg.sctx.cancel()
-				reg.sctx = nil
-				reg.driver.Logout(true)
+			if isFullFuncReg {
+				// It's possible that new scan get kicked in, we just cancel it here.
+				if reg.sctx != nil {
+					reg.sctx.cancel()
+					reg.sctx = nil
+					reg.driver.Logout(true)
+				}
+				if reg.pctx != nil {
+					reg.pctx.cancel()
+					reg.pctx = nil
+				}
+				// It's possible backupDrv never logged in
+				reg.backupDrv.Logout(true)
 			}
-			if reg.pctx != nil {
-				reg.pctx.cancel()
-				reg.pctx = nil
-			}
-			// It's possible backupDrv never logged in
-			reg.backupDrv.Logout(true)
 			delete(regMap, name)
 		}
 		regUnlock()
@@ -334,7 +389,7 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 		if ok && isScanner() {
 			reg.cleanup()
 
-			if reg.config.Schedule == api.ScanSchAuto {
+			if isFullFuncReg && reg.config.Schedule == api.ScanSchAuto {
 				if reg.config.Type == share.RegistryTypeOpenShift {
 					deregisterImageBank(api.RegistryImageSourceOpenShift, reg.config.Name)
 				}
@@ -384,8 +439,10 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	var rs *Registry
 
 	// We assume that report is always created way after config is created, so ignore if config doesn't exist
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, _ = regMapLookup(name); rs == nil {
 		return nil, nil, nil
 	}
@@ -458,8 +515,12 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
 	log.Debug()
 
-	regs := regMapToArray()
+	regs := regMapToArray(true, true)
 	for _, rs := range regs {
+		if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) && smd.fedRole == api.FedRoleNone {
+			continue
+		}
+
 		rs.stateLock()
 		for id, sum := range rs.summary {
 			if sum.Status == api.ScanStatusFinished {
@@ -514,7 +575,7 @@ func newRegistryDriver(cfg *share.CLUSRegistryConfig, public bool, tracer httptr
 }
 
 func newRegistry(config *share.CLUSRegistryConfig) *Registry {
-	smd.scanLog.WithFields(log.Fields{"registry": config.Name}).Debug("")
+	smd.scanLog.WithFields(log.Fields{"registry": config.Name}).Debug()
 
 	rs := &Registry{
 		config:    config,
@@ -527,20 +588,29 @@ func newRegistry(config *share.CLUSRegistryConfig) *Registry {
 		public:    isPublicRegistry(config),
 	}
 
-	rs.driver = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
-	rs.backupDrv = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
+	// fed registries do no trigger image scanning on non-master clusters
+	if !strings.HasPrefix(config.Name, api.FederalGroupPrefix) || smd.fedRole != api.FedRoleJoint {
+		rs.driver = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
+		rs.backupDrv = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
+	}
+
 	return rs
 }
 
-func newRepoScanRegistry() {
-	repoScanRegistry = &Registry{
-		config:    &share.CLUSRegistryConfig{Name: registryRepoScanName, Type: share.RegistryTypeDocker},
+func newRepoScanRegistry(name string) {
+	reg := &Registry{
+		config:    &share.CLUSRegistryConfig{Name: name, Type: share.RegistryTypeDocker},
 		state:     &share.CLUSRegistryState{Status: api.RegistryStatusIdle},
 		summary:   make(map[string]*share.CLUSRegistryImageSummary),
 		cache:     make(map[string]*imageInfoCache),
 		image2ID:  make(map[share.CLUSImage]string),
 		digest2ID: make(map[string]string),
 		taskQueue: utils.NewSet(),
+	}
+	if name == common.RegistryRepoScanName {
+		repoScanRegistry = reg
+	} else if name == common.RegistryFedRepoScanName {
+		repoFedScanRegistry = reg
 	}
 }
 
@@ -783,13 +853,11 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		}
 
 		if sum.Status == api.ScanStatusFinished {
-			clusHelper.PutRegistryImageSummaryAndReport(rs.config.Name, id, sum, &report)
+			clusHelper.PutRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole, sum, &report)
 
 			if len(rs.summary) > api.ScanPersistImageMax+scanPersistImageExtra {
 				rs.cleanupOldImages()
 			}
-		} else {
-			clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum)
 		}
 	}
 
@@ -1102,7 +1170,7 @@ func (rs *Registry) cleanupOldImages() {
 
 // Lock protected
 func (rs *Registry) cleanupOneImage(id string) {
-	clusHelper.DeleteRegistryImageSummaryAndReport(rs.config.Name, id)
+	clusHelper.DeleteRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole)
 	// rs.summary will be cleaned up when responding the key removal
 }
 
@@ -1449,6 +1517,13 @@ func (rs *Registry) getConfigSummary(acc *access.AccessControl) *api.RESTRegistr
 	if rs.state.StartedAt != 0 {
 		summary.StartedAt = api.RESTTimeString(time.Unix(rs.state.StartedAt, 0))
 	}
+	if rs.config.CfgType == share.FederalCfg {
+		summary.CfgType = api.CfgTypeFederal
+	} else if rs.config.CfgType == share.GroundCfg {
+		summary.CfgType = api.CfgTypeGround
+	} else {
+		summary.CfgType = api.CfgTypeUserCreated
+	}
 
 	return summary
 }
@@ -1552,4 +1627,31 @@ func (t *regScanTask) Handler(scanner string) scheduler.Action {
 	}()
 
 	return scheduler.TaskActionWait
+}
+
+func GetFedRegistryCache() []*share.CLUSRegistryConfig {
+	regReadLock()
+	defer regReadUnlock()
+
+	count := 0
+	for _, rs := range regMap {
+		if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) {
+			count += 1
+		}
+	}
+
+	rss := make([]*share.CLUSRegistryConfig, 0, count)
+	for _, rs := range regMap {
+		if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) {
+			rss = append(rss, &share.CLUSRegistryConfig{
+				Registry: rs.config.Registry,
+				Name:     rs.config.Name,
+				Type:     rs.config.Type,
+				Filters:  rs.config.Filters,
+				CfgType:  share.FederalCfg,
+			})
+		}
+	}
+
+	return rss
 }

@@ -1,8 +1,10 @@
 package rest
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +41,8 @@ import (
 
 const retryClusterMax int = 3
 const clusterLockWait = time.Duration(time.Second * 20)
+
+const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's give ip/tcp/http header 300 bytes
 
 var evqueue cluster.ObjectQueueInterface
 var auditQueue cluster.ObjectQueueInterface
@@ -181,7 +185,7 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 			}
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusPartialContent)
 	if data != nil {
@@ -192,31 +196,43 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 	acc *access.AccessControl, login *loginSession, req interface{}, msg string) {
 
+	var ct string = jsonContentType
 	var data []byte
 	if resp != nil {
 		if restIsSupportReq(r) {
 			var m common.MaskMarshaller
 			data, _ = m.Marshal(resp)
 		} else {
-			var e common.EmptyMarshaller
-			data, _ = e.Marshal(resp)
+			accept := r.Header.Get("Accept")
+			if accept == "application/gob" {
+				var buf bytes.Buffer
+				enc := gob.NewEncoder(&buf)
+				enc.Encode(resp)
+				data = buf.Bytes()
+				ct = accept
+			} else {
+				var e common.EmptyMarshaller
+				data, _ = e.Marshal(resp)
+			}
 		}
 
-		if hdrs, ok := r.Header["Accept-Encoding"]; ok {
-		loop:
-			for _, hdr := range hdrs {
-				// Accept-Encoding: gzip, deflate
-				for _, enc := range strings.Split(hdr, ",") {
-					if enc == "gzip" {
-						w.Header().Set("Content-Encoding", "gzip")
-						data = utils.GzipBytes(data)
-						break loop
+		if len(data) > gzipThreshold {
+			if hdrs, ok := r.Header["Accept-Encoding"]; ok {
+			loop:
+				for _, hdr := range hdrs {
+					// Accept-Encoding: gzip, deflate
+					for _, enc := range strings.Split(hdr, ",") {
+						if enc == "gzip" {
+							w.Header().Set("Content-Encoding", "gzip")
+							data = utils.GzipBytes(data)
+							break loop
+						}
 					}
 				}
 			}
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	if data != nil {
@@ -242,7 +258,7 @@ func restRespErrorMessage(w http.ResponseWriter, status int, code int, msg strin
 	if w == nil {
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	w.WriteHeader(status)
 
 	var e string
@@ -263,7 +279,7 @@ func restRespErrorMessageEx(w http.ResponseWriter, status int, code int, msg str
 	if w == nil {
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	w.WriteHeader(status)
 
 	var e string
@@ -1186,12 +1202,18 @@ func (w writer) Write(a []byte) (int, error) {
 
 func (w writer) WriteHeader(statusCode int) {
 	url := w.req.URL.String()
-	if (statusCode == http.StatusOK) && (strings.HasSuffix(url, "/fed/ping_internal") || strings.HasSuffix(url, "/fed/poll_internal")) {
-		w.writer.WriteHeader(statusCode)
-	} else {
-		log.WithFields(log.Fields{"Method": w.req.Method, "URL": url}).Debug(statusCode)
-		w.writer.WriteHeader(statusCode)
+	if statusCode == http.StatusOK {
+		suffixes := []string{"/fed/ping_internal", "/fed/poll_internal", "/fed/scan_data_internal"}
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(url, suffix) {
+				w.writer.WriteHeader(statusCode)
+				return
+			}
+		}
 	}
+
+	log.WithFields(log.Fields{"Method": w.req.Method, "URL": url}).Debug(statusCode)
+	w.writer.WriteHeader(statusCode)
 }
 
 type restLogger struct {
@@ -1512,7 +1534,7 @@ func StartRESTServer() {
 	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
 	r.POST("/v1/scan/registry/:name/test", handlerRegistryTest)         // debug
 	r.DELETE("/v1/scan/registry/:name/test", handlerRegistryTestCancel) // debug
-	r.GET("/v1/scan/registry", handlerRegistryList)
+	r.GET("/v1/scan/registry", handlerRegistryList)                     // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v1/scan/registry/:name", handlerRegistryShow)
 	r.GET("/v1/scan/registry/:name/images", handlerRegistryImageSummary)
 	r.DELETE("/v1/scan/registry/:name", handlerRegistryDelete)
@@ -1639,9 +1661,10 @@ func startFedRestServer(fedPingInterval uint32) {
 	r.NotFound = http.HandlerFunc(handlerNotFound)
 	r.MethodNotAllowed = http.HandlerFunc(handlerMethodNotAllowed)
 
-	r.POST("/v1/fed/join_internal", handlerJoinFedInternal)      // Skip API document, called from joining cluster to master cluster
-	r.POST("/v1/fed/poll_internal", handlerPollFedRulesInternal) // Skip API document, called from joint cluster to master cluster
-	r.POST("/v1/fed/leave_internal", handlerLeaveFedInternal)    // Skip API document, called from joint cluster to master cluster
+	r.POST("/v1/fed/join_internal", handlerJoinFedInternal)              // Skip API document, called from joining cluster to master cluster
+	r.POST("/v1/fed/poll_internal", handlerPollFedRulesInternal)         // Skip API document, called from joint cluster to master cluster
+	r.POST("/v1/fed/scan_data_internal", handlerPollFedScanDataInternal) // Skip API document, called from joint cluster to master cluster
+	r.POST("/v1/fed/leave_internal", handlerLeaveFedInternal)            // Skip API document, called from joint cluster to master cluster
 
 	config := &tls.Config{MinVersion: tls.VersionTLS11}
 	server := &http.Server{

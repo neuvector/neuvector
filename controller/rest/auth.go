@@ -426,7 +426,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		Value: rsessToken,
 	}
 	urlStr := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
-	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", cookie, []byte{}, true, nil, acc)
+	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", cookie, []byte{}, true, nil, acc)
 	if err == nil {
 		var domainRoles map[string]string
 		var rancherUsers api.UserCollection
@@ -447,7 +447,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 				rancherUser.name = rancherUsers.Data[idx].Username
 				rancherUser.token = rsessToken
 				urlStr = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
-				data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", cookie, []byte{}, true, nil, acc)
+				data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", cookie, []byte{}, true, nil, acc)
 				//-> if user-id changes, reset mapped roles
 				//-> if mapped role changes, reset mapped roles in token
 				if err == nil {
@@ -1769,6 +1769,9 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	var user *share.CLUSUser
 	var blockAfterFailedCount int
 
+	if pw.Username[0] == '$' {
+		return nil, false, false, false, 0, errors.New("User not found")
+	}
 	now := time.Now()
 
 	// Retrieve user from the cluster
@@ -1866,7 +1869,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	return user, false, false, true, 0, nil
 }
 
-func fedMasterTokenAuth(userName, masterToken, secret string, acc *access.AccessControl) (*share.CLUSUser, *tokenClaim, error) {
+func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, *tokenClaim, error) {
 	var user *share.CLUSUser
 
 	claims, err := jwtValidateToken(masterToken, secret, nil)
@@ -1878,8 +1881,28 @@ func fedMasterTokenAuth(userName, masterToken, secret string, acc *access.Access
 		return nil, nil, errTokenExpired
 	}
 
+	acc := access.NewAdminAccessControl()
 	// Retrieve user from the cluster
 	user, _, _ = clusHelper.GetUserRev(userName, acc)
+	if user == nil && userName == common.ReservedFedUser {
+		secret, _ := utils.GetGuid()
+		// hidden fed user for POST("/v1/fed_auth") request on worker clusters
+		u := share.CLUSUser{
+			Fullname:     userName,
+			Username:     userName,
+			PasswordHash: utils.HashPassword(secret),
+			Domain:       "",
+			Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
+			Timeout:      common.DefaultIdleTimeout,
+			RoleDomains:  make(map[string][]string),
+			Locale:       common.OEMDefaultUserLocale,
+			PwdResetTime: time.Now().UTC(),
+		}
+		value, _ := json.Marshal(u)
+		key := share.CLUSUserKey(userName)
+		cluster.PutIfNotExist(key, value, false)
+		user, _, _ = clusHelper.GetUserRev(userName, acc)
+	}
 	if user == nil || user.Server != "" {
 		return nil, nil, errors.New("User not found")
 	}
@@ -2219,7 +2242,11 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		remote = remote[:i]
 	}
 
-	user, claims, err := fedMasterTokenAuth(auth.JointUsername, auth.MasterToken, jointCluster.Secret, accReadAll)
+	userName := auth.JointUsername
+	if auth.JointUsername == common.DefaultAdminUser {
+		userName = common.ReservedFedUser
+	}
+	user, claims, err := fedMasterTokenAuth(userName, auth.MasterToken, jointCluster.Secret)
 	if err != nil || user == nil {
 		var status = http.StatusUnauthorized
 		if err == errTokenExpired {

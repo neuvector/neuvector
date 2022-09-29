@@ -10,6 +10,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 )
@@ -167,10 +168,10 @@ func TestIBMSAIntegration(t *testing.T) {
 
 	// GET("/v1/partner/ibm_sa/%s/setup") requires default admin user in kv as a user template for generating a token for the reserved ibmsa user
 	user := &share.CLUSUser{
-		Fullname:     "admin",
-		Username:     "admin",
+		Fullname:     common.ReservedUserNameIBMSA,
+		Username:     common.ReservedUserNameIBMSA,
 		PasswordHash: "c7ad44cbad762a5da0a452f9e854fdc1e0e7a52a38015f23f3eab1d80b931dd472634dfac71cd34ebc35d16ab7fb8a90c81f975113d6c7538dc69dd8de9077ec",
-		Role:         "admin",
+		Role:         api.UserRoleIBMSA,
 		RoleDomains:  map[string][]string{},
 		Locale:       "en",
 		Timeout:      300,
@@ -187,7 +188,7 @@ func TestIBMSAIntegration(t *testing.T) {
 			t.Fatalf("Invalid NV login token")
 		}
 	}
-	clusHelper.DeleteUser("admin")
+	clusHelper.DeleteUser(common.ReservedUserNameIBMSA)
 	if len(loginSessions) != 1 {
 		t.Fatalf("Incorrect number of login users: %v", len(loginSessions))
 	}

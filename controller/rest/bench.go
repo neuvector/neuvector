@@ -913,7 +913,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 	}
 
-	registries := scanner.GetAllRegistrySummary(acc)
+	registries := scanner.GetAllRegistrySummary(share.ScopeLocal, acc)
 	for _, reg := range registries {
 		if cmap, nmap, err := scanner.GetRegistryBenches(reg.Name, cpf.filter, acc); err == nil {
 			for id, checks := range cmap {

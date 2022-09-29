@@ -577,12 +577,18 @@ func main() {
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead)
 	cache.ScannerChangeNotify(Ctrler.Leader)
 
+	var fedRole string
+	if m := kv.GetClusterHelper().GetFedMembership(); m != nil {
+		fedRole = m.FedRole
+	}
+
 	sctx := scan.Context{
 		AuditQueue: auditQueue,
 		ScanChan:   orchScanChan,
 		TimerWheel: timerWheel,
 		MutexLog:   mutexLog,
 		ScanLog:    scanLog,
+		FedRole:    fedRole,
 	}
 	scanner = scan.Init(&sctx, Ctrler.Leader)
 	scan.ScannerChangeNotify(Ctrler.Leader)
@@ -636,9 +642,7 @@ func main() {
 	cluster.RegisterStoreWatcher(share.CLUSScannerStore, cache.ScannerUpdateHandler, false)
 	cluster.RegisterStoreWatcher(share.CLUSScanStateStore, cache.ScanUpdateHandler, false)
 
-	if m := kv.GetClusterHelper().GetFedMembership(); m != nil {
-		access.UpdateUserRoleForFedRoleChange(m.FedRole)
-	}
+	access.UpdateUserRoleForFedRoleChange(fedRole)
 
 	// start rest server
 	rest.LoadInitCfg(Ctrler.Leader) // Load config from ConfigMap
