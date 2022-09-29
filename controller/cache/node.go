@@ -141,7 +141,6 @@ func scheduleHostRemoval(cache *hostCache) {
 
 // Protected by cacheMutexLock
 func cancelHostRemoval(cache *hostCache) {
-	cache.state = ""
 	markWorkloadState(cache.workloads, "")
 	if cache.timerTask != "" {
 		log.WithFields(log.Fields{

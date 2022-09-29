@@ -352,6 +352,7 @@ func initHostCache(id string) *hostCache {
 		ipWLMap:      make(map[string]*workloadDigest), // ip of host-scope to workload ID
 		runningPods:  utils.NewSet(),
 		runningCntrs: utils.NewSet(),
+		state:        api.StateOnline,
 	}
 }
 
