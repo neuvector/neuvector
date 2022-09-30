@@ -28,6 +28,7 @@ type Context struct {
 	TimerWheel *utils.TimerWheel
 	ScanLog    *log.Logger
 	MutexLog   *log.Logger
+	FedRole    string
 }
 
 type scanMethod struct {
@@ -41,6 +42,7 @@ type scanMethod struct {
 	mutexLog   *log.Logger
 	httpProxy  string
 	httpsProxy string
+	fedRole    string
 }
 
 var smd *scanMethod
@@ -174,6 +176,12 @@ func LeadChangeNotify(isLeader bool) {
 	smd.isLeader = isLeader
 }
 
+func FedRoleChangeNotify(fedRole string) {
+	log.WithFields(log.Fields{"fedRole": fedRole}).Info()
+
+	smd.fedRole = fedRole
+}
+
 func AddScanner(id string) {
 	log.WithFields(log.Fields{"id": id}).Info()
 
@@ -209,8 +217,11 @@ func ScannerDBChange(db *share.CLUSScannerDB) {
 	// rescan registries. Skip if this is first time scanner is registered, because it is
 	// likely the controller just starts, we don't want to scan starts automatically.
 	if oldVer != "" && oldVer != db.CVEDBVersion && isScanner() {
-		regs := regMapToArray()
+		regs := regMapToArray(true, true)
 		for _, reg := range regs {
+			if strings.HasPrefix(reg.config.Name, api.FederalGroupPrefix) && smd.fedRole != api.FedRoleMaster {
+				continue
+			}
 			if reg.config.RescanImage {
 				reg.stateLock()
 				state := clusHelper.GetRegistryState(reg.config.Name)
@@ -243,6 +254,7 @@ func Init(ctx *Context, leader bool) ScanInterface {
 			mutexLog:   ctx.MutexLog,
 			timerWheel: ctx.TimerWheel,
 			isLeader:   leader,
+			fedRole:    ctx.FedRole,
 		}
 	} else {
 		smd.auditQueue = ctx.AuditQueue
@@ -251,6 +263,7 @@ func Init(ctx *Context, leader bool) ScanInterface {
 		smd.mutexLog = ctx.MutexLog
 		smd.timerWheel = ctx.TimerWheel
 		smd.isLeader = leader
+		smd.fedRole = ctx.FedRole
 	}
 
 	clusHelper = kv.GetClusterHelper()

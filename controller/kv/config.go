@@ -55,6 +55,7 @@ type configHelper struct {
 
 type fedRulesRevInfo struct {
 	fedRulesRevValue string
+	fedRole          string
 }
 
 const clusterLockWait = time.Duration(time.Second * 20)
@@ -356,6 +357,12 @@ func (c *configHelper) Restore() (string, error) {
 	ch := make(chan error)
 	eps := utils.NewSetFromSliceKind(cfgEndpoints)
 
+	// restore federation endpoint
+	if rc := restoreEP(fedCfgEndpoint, nil, &importInfo); rc != nil {
+		err = rc
+	}
+	eps.Remove(fedCfgEndpoint)
+
 	// restore process profile/file monitor/access rule endpoints to avoid unnecessary kv PutIfNotExists calls when groups are updated in cache
 	priorityCfgEndpoints := utils.NewSet(pprofileCfgEndpoint, fmonitorCfgEndpoint, faccessCfgEndpoint, registryCfgEndpoint)
 	if rc := restoreEPs(priorityCfgEndpoints, ch, &importInfo); rc != nil {
@@ -373,7 +380,9 @@ func (c *configHelper) Restore() (string, error) {
 		err = rc
 	}
 
-	go restoreRegistry(ch)
+	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}, nil)
+
+	go restoreRegistry(ch, importInfo)
 
 	ver := getBackupVersion()
 	putControlVersion(ver)
@@ -387,7 +396,7 @@ func (c *configHelper) Restore() (string, error) {
 		}
 	}
 
-	return restoredFedRole, err
+	return importInfo.fedRole, err
 }
 
 type configHeader struct {
@@ -532,7 +541,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	}
 
 	currFedRole, currFedRulesRev := getFedRole()
-	log.WithFields(log.Fields{"currFedRole": currFedRole}).Info("Before import")
+	log.WithFields(log.Fields{"currFedRole": currFedRole, "ignoreFed": ignoreFed}).Info("Before import")
 	if i := strings.Index(string(line), `"exported_from_role"`); i > 0 {
 		// if the export is from 3.2(which has "exported_from_role" field) or newer, we can check if the import is allowed or not earlier
 		importFedRole = header.ExportedFromRole
@@ -619,16 +628,14 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				}
 			}
 
-			if ignoreFed {
-				if key == share.CLUSFedMembershipKey {
-					var m share.CLUSFedMembership
-					b, _ := json.Marshal(m)
-					value = string(b)
-				}
-			}
-
 			if ep.name == share.CFGEndpointFederation {
-				if key == share.CLUSFedMembershipKey {
+				subKey := share.CLUSKeyNthToken(key, 3)
+				if subKey == share.CLUSFedMembershipSubKey {
+					if ignoreFed {
+						var m share.CLUSFedMembership
+						b, _ := json.Marshal(m)
+						value = string(b)
+					}
 					var m share.CLUSFedMembership
 					var dec common.DecryptUnmarshaller
 					if err := dec.Unmarshal([]byte(value), &m); err == nil {
@@ -645,10 +652,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						// otherwise, Import() doesn't change the existing clusters membership.
 						return nil
 					}
-				} else if strings.HasPrefix(key, share.CLUSFedClustersKey) {
+				} else if subKey == share.CLUSFedClustersSubKey {
 					// do not change the joint clusters list no matter what
 					return nil
-				} else if key == share.CLUSFedRulesRevisionKey {
+				} else if subKey == share.CLUSFedRulesRevisionSubKey {
 					if currFedRole == api.FedRoleMaster || importFedRole == api.FedRoleMaster {
 						// force a full fed rules sync because fed rules could have changed because of import
 						if currFedRulesRev == nil {

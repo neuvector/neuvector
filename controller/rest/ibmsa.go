@@ -26,7 +26,8 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
-	//"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 type ibmsaToken struct {
@@ -315,9 +316,26 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, acc); user != nil {
-		user.Fullname = api.ReservedUserNameIBMSA
-		user.Role = api.UserRoleIBMSA
+	user, _, _ := clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+	if user == nil {
+		secret, _ := utils.GetGuid()
+		u := share.CLUSUser{
+			Fullname:     common.ReservedUserNameIBMSA,
+			Username:     common.ReservedUserNameIBMSA,
+			PasswordHash: utils.HashPassword(secret),
+			Domain:       "",
+			Role:         api.UserRoleIBMSA,
+			Timeout:      common.DefaultIdleTimeout,
+			RoleDomains:  make(map[string][]string),
+			Locale:       common.OEMDefaultUserLocale,
+			PwdResetTime: time.Now().UTC(),
+		}
+		value, _ := json.Marshal(u)
+		key := share.CLUSUserKey(common.ReservedUserNameIBMSA)
+		cluster.PutIfNotExist(key, value, false)
+		user, _, _ = clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+	}
+	if user != nil {
 		remote := r.RemoteAddr
 		if i := strings.Index(remote, ":"); i > 0 {
 			remote = remote[:i]

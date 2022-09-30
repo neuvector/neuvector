@@ -19,6 +19,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -29,21 +30,21 @@ type fedClusterCache struct { // only master cluster needs to get/set this cache
 	tokenCache map[string]string // key is mainSessionID (from claim.id in login token of master cluster). value is token with admin role
 }
 
-type tFedSettingsCache struct {
-	revisions map[string]uint64
-	settings  []byte
-}
-
 // On master cluster, it stores the revision of all types of fed rules.
 // On joint cluster, it stores the last downloaded revision of all types of fed rules.
 var fedRulesRevisionCache share.CLUSFedRulesRevision
 
-var cachedFedSettingsRev map[string]uint64
-var cachedFedSettingBytes []byte
+// On master cluster, it stores the revision of scanned images in fed registries & "_repo_scan" repo
+// On joint cluster, it stores the last downloaded revisions of scanned images in fed registries & "_repo_scan" repo on master cluster
+var fedScanResultRevsCache share.CLUSFedScanRevisions
+
+var cachedFedSettingsRev map[string]uint64 // contains only the revisions of the fed rules subset for the last polling managed cluster
+var cachedFedSettingBytes []byte           // contains only the fed rules subset for the last polling managed cluster
 
 var fedMembershipCache share.CLUSFedMembership
 var fedJoinedClustersCache = make(map[string]*fedClusterCache) // key is cluster id
 var fedJoinedClusterStatusCache = make(map[string]int)         // key is cluster id, value ex: _fedClusterJoined, _fedClusterSynced
+var fedConfigCache share.CLUSFedConfiguration                  // general fed settings
 var fedCacheMutex sync.RWMutex                                 // for accessing fedMembershipCache/fedJoinedClustersCache/fedJoinedClusterStatusCache
 
 func fedInit() {
@@ -75,6 +76,10 @@ func fedInit() {
 		}
 		fedRulesRevisionCache.Revisions = revCache.Revisions
 	}
+
+	if fedScanResultRevsCache.ScanReportRevisions == nil {
+		fedScanResultRevsCache.ScanReportRevisions = make(map[string]map[string]string)
+	}
 }
 
 func fedCacheMutexLock() {
@@ -93,6 +98,26 @@ func fedCacheMutexRLock() {
 }
 
 func fedCacheMutexRUnlock() {
+	fedCacheMutex.RUnlock()
+	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released")
+}
+
+func fedScanDataCacheMutexLock() {
+	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Acquire ...")
+	fedCacheMutex.Lock()
+}
+
+func fedScanDataCacheMutexUnlock() {
+	fedCacheMutex.Unlock()
+	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released")
+}
+
+func fedScanDataCacheMutexRLock() {
+	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Acquire ...")
+	fedCacheMutex.RLock()
+}
+
+func fedScanDataCacheMutexRUnlock() {
 	fedCacheMutex.RUnlock()
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released")
 }
@@ -161,8 +186,11 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				purgeFiles("fed.master.")
 				purgeFiles("fed.client.")
 				fedSystemConfigCache = share.CLUSSystemConfig{CfgType: share.FederalCfg}
+				cachedFedSettingsRev = nil
+				cachedFedSettingBytes = nil
 			}
 			fedMembershipCache = m
+			scan.FedRoleChangeNotify(m.FedRole)
 		case share.CLUSFedClustersSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			if id != "" {
@@ -240,6 +268,10 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			}
 			fedWebhookCacheMap = fedWebhookCacheTemp
 			fedSystemConfigCache = cfg
+		case share.CLUSFedConfigSubKey:
+			var cfg share.CLUSFedConfiguration
+			json.Unmarshal(value, &cfg)
+			fedConfigCache = cfg
 		}
 	case cluster.ClusterNotifyDelete:
 		switch cfgType {
@@ -473,7 +505,6 @@ func (m CacheMethod) SetFedJoinedClusterToken(id, mainSessionID, token string) {
 
 // only called by master cluster. caller doesn't own cache lock
 func (m CacheMethod) GetFedRules(reqRevs map[string]uint64, acc *access.AccessControl) ([]byte, map[string]uint64, error) {
-	var current *api.RESTFedRulesSettings
 	askRevMap := make(map[string]uint64, len(reqRevs))
 
 	fedCacheMutexLock()
@@ -486,70 +517,190 @@ func (m CacheMethod) GetFedRules(reqRevs map[string]uint64, acc *access.AccessCo
 			}
 		}
 	}
-	if len(askRevMap) == 0 {
-		return nil, askRevMap, nil
-	} else {
-		if len(cachedFedSettingBytes) > 0 {
-			useCache := true
-			if len(askRevMap) == len(cachedFedSettingsRev) {
-				for ruleType, rev := range askRevMap {
-					if cacheRev, ok := cachedFedSettingsRev[ruleType]; !ok || rev != cacheRev {
-						useCache = false
-						break
-					}
-				}
-			} else {
-				useCache = false
-			}
-			if useCache {
-				settings := make([]byte, len(cachedFedSettingBytes))
-				copy(settings, cachedFedSettingBytes)
-				return settings, askRevMap, nil
-			}
-		}
-	}
-	cacheMutexRLock()
-	for ruleType, fedRev := range askRevMap {
-		if current == nil {
-			current = &api.RESTFedRulesSettings{}
-		}
-		switch ruleType {
-		case share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType:
-			if current.AdmCtrlRulesData == nil {
-				current.AdmCtrlRulesData = &share.CLUSFedAdmCtrlRulesData{Revision: fedRev, Rules: make(map[string]*share.CLUSAdmissionRules)}
-			}
-			current.AdmCtrlRulesData.Rules[ruleType], _ = m.GetFedAdmissionRulesCache(admission.NvAdmValidateType, ruleType)
-		case share.FedNetworkRulesType:
-			current.NetworkRulesData = &share.CLUSFedNetworkRulesData{Revision: fedRev}
-			current.NetworkRulesData.Rules, current.NetworkRulesData.RuleHeads = m.GetFedNetworkRulesCache()
-		case share.FedGroupType:
-			current.GroupsData = &share.CLUSFedGroupsData{Revision: fedRev, Groups: m.GetFedGroupsCache()}
-		case share.FedResponseRulesType:
-			current.ResponseRulesData = &share.CLUSFedResponseRulesData{Revision: fedRev}
-			current.ResponseRulesData.Rules, current.ResponseRulesData.RuleHeads = m.GetFedResponseRulesCache()
-		case share.FedFileMonitorProfilesType:
-			current.FileMonitorData = &share.CLUSFedFileMonitorData{Revision: fedRev}
-			current.FileMonitorData.Profiles, current.FileMonitorData.AccessRules = m.GetFedFileMonitorProfileCache()
-		case share.FedProcessProfilesType:
-			current.ProcessProfilesData = &share.CLUSFedProcessProfileData{Revision: fedRev, Profiles: m.GetFedProcessProfileCache()}
-		case share.FedSystemConfigType:
-			current.SystemConfigData = &share.CLUSFedSystemConfigData{Revision: fedRev, SystemConfig: m.GetFedSystemConfig(acc)}
-		}
-	}
-	var settings []byte
-	if current != nil {
-		settings, _ = json.Marshal(*current)
-	}
-	cacheMutexRUnlock()
 
-	if cachedFedSettingBytes == nil {
-		tempSettings := make([]byte, len(settings))
-		copy(tempSettings, settings)
-		cachedFedSettingsRev = askRevMap
-		cachedFedSettingBytes = tempSettings
+	// now askRevMap contains only those fed rules that the managed cluster misses
+	var settings []byte
+	if len(askRevMap) > 0 {
+		useCache := true
+		if len(askRevMap) == len(cachedFedSettingsRev) {
+			for ruleType, rev := range askRevMap {
+				if cacheRev, ok := cachedFedSettingsRev[ruleType]; !ok || rev != cacheRev {
+					useCache = false
+					break
+				}
+			}
+		} else {
+			useCache = false
+		}
+		if useCache {
+			settings = make([]byte, len(cachedFedSettingBytes))
+			copy(settings, cachedFedSettingBytes)
+		} else {
+			var current api.RESTFedRulesSettings
+			cacheMutexRLock()
+			for ruleType, fedRev := range askRevMap {
+				switch ruleType {
+				case share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType:
+					if current.AdmCtrlRulesData == nil {
+						current.AdmCtrlRulesData = &share.CLUSFedAdmCtrlRulesData{Revision: fedRev, Rules: make(map[string]*share.CLUSAdmissionRules)}
+					}
+					current.AdmCtrlRulesData.Rules[ruleType], _ = m.GetFedAdmissionRulesCache(admission.NvAdmValidateType, ruleType)
+				case share.FedNetworkRulesType:
+					current.NetworkRulesData = &share.CLUSFedNetworkRulesData{Revision: fedRev}
+					current.NetworkRulesData.Rules, current.NetworkRulesData.RuleHeads = m.GetFedNetworkRulesCache()
+				case share.FedGroupType:
+					current.GroupsData = &share.CLUSFedGroupsData{Revision: fedRev, Groups: m.GetFedGroupsCache()}
+				case share.FedResponseRulesType:
+					current.ResponseRulesData = &share.CLUSFedResponseRulesData{Revision: fedRev}
+					current.ResponseRulesData.Rules, current.ResponseRulesData.RuleHeads = m.GetFedResponseRulesCache()
+				case share.FedFileMonitorProfilesType:
+					current.FileMonitorData = &share.CLUSFedFileMonitorData{Revision: fedRev}
+					current.FileMonitorData.Profiles, current.FileMonitorData.AccessRules = m.GetFedFileMonitorProfileCache()
+				case share.FedProcessProfilesType:
+					current.ProcessProfilesData = &share.CLUSFedProcessProfileData{Revision: fedRev, Profiles: m.GetFedProcessProfileCache()}
+				case share.FedSystemConfigType:
+					current.SystemConfigData = &share.CLUSFedSystemConfigData{Revision: fedRev, SystemConfig: m.GetFedSystemConfig(acc)}
+				}
+			}
+			cacheMutexRUnlock()
+			settings, _ = json.Marshal(current)
+
+			tempSettings := make([]byte, len(settings))
+			copy(tempSettings, settings)
+			cachedFedSettingsRev = askRevMap
+			cachedFedSettingBytes = tempSettings
+		}
 	}
 
 	return settings, askRevMap, nil
+}
+
+func collectUpdatedScanData(regName, imageID, currRev string, updatedResults map[string]*api.RESTFedImageScanResult) bool {
+	const maxScanDataCount int = 2
+
+	if len(updatedResults) >= maxScanDataCount {
+		return false
+	} else {
+		name := regName
+		if name == common.RegistryFedRepoScanName {
+			// on master cluster, the scan summary/data of images in "fed._repo_scan" repo are actually from "_repo_scan" repo
+			name = common.RegistryRepoScanName
+		}
+		summary := clusHelper.GetRegistryImageSummary(name, imageID)
+		if summary != nil && summary.Status == api.ScanStatusFinished {
+			updatedResults[imageID] = &api.RESTFedImageScanResult{
+				Revision: currRev,
+				Summary:  summary,
+				Report:   clusHelper.GetScanReport(share.CLUSRegistryImageDataKey(name, imageID)),
+			}
+		}
+	}
+
+	return true
+}
+
+// only called by master cluster. caller doesn't own cache lock
+// managed clusters call master cluster with lastScannedImagesRev/lastScanReportRevisions they know from the last polling.
+func (m CacheMethod) GetFedScanData(req api.RESTPollFedScanDataReq, resp *api.RESTPollFedScanDataResp) error {
+	var hasPartialScanData bool = false
+
+	fedScanDataCacheMutexRLock()
+	defer fedScanDataCacheMutexRUnlock()
+
+	var registryData *share.CLUSFedRegistriesData
+	scanData := api.RESTFedScanData{
+		UpdatedScanResults: make(map[string]map[string]*api.RESTFedImageScanResult), // registry name : image id : scan result
+		DeletedScanResults: make(map[string][]string),                               // registry name : []image id
+	}
+
+	// check whethere any fed registry setting changes
+	if fedScanResultRevsCache.RegistryRevision != req.RegistryRevision {
+		registryData = &share.CLUSFedRegistriesData{Revision: fedScanResultRevsCache.RegistryRevision, Registries: scan.GetFedRegistryCache()}
+		if fedScanResultRevsCache.ScannedRegImagesRev != req.ScannedRegImagesRev {
+			hasPartialScanData = true
+		}
+	} else {
+		// check whethere any image scan report in fed registry changes
+		if fedScanResultRevsCache.ScannedRegImagesRev != req.ScannedRegImagesRev {
+			// 1. check whether there is scan result change for any image in those fed registries that managed cluster knows
+			for regName, lastImageRevs := range req.ScanReportRevisions {
+				if currImageRevs, ok := fedScanResultRevsCache.ScanReportRevisions[regName]; !ok {
+					// 1-1. the fed registry remembered by managed cluster is already deleted on master cluster
+					scanData.DeletedScanResults[regName] = nil
+				} else {
+					// 1-2. the fed registry remembered by managed cluster still exists on master cluster
+					var deletedResults []string                                       // []image id
+					updatedResults := make(map[string]*api.RESTFedImageScanResult, 4) // image id : scan result
+					// lastImageRevs: fed registry's scan results that managed cluster remembers
+					// currImageRevs: latest fed registry's scan results on master cluster
+					for imageID, lastRev := range lastImageRevs {
+						if currRev, ok := currImageRevs[imageID]; !ok {
+							// 1-2-1. the image's scan report has been deleted on master cluster
+							if deletedResults == nil {
+								deletedResults = make([]string, 0, 4)
+							}
+							deletedResults = append(deletedResults, imageID)
+						} else if !hasPartialScanData && currRev != lastRev {
+							// 1-2-2. the image's scan report has been changed on master cluster
+							if collectUpdatedScanData(regName, imageID, currRev, updatedResults) == false {
+								// for network bandwidth consideration, we only return at most maxScanDataCount scan results in one polling.
+								hasPartialScanData = true
+								break
+							}
+						}
+					}
+					if !hasPartialScanData { // we haven't reached the max scan data to send yet
+						// 1-3. check whether there is a new image (in a known fed registry) scanned on master cluster that managed cluster is unaware of
+						for imageID, currRev := range currImageRevs {
+							if _, ok := lastImageRevs[imageID]; !ok {
+								if collectUpdatedScanData(regName, imageID, currRev, updatedResults) == false {
+									// for network bandwidth consideration, we only return at most maxScanDataCount scan results in one polling.
+									hasPartialScanData = true
+									break
+								}
+							}
+						}
+					}
+					if len(updatedResults) > 0 {
+						scanData.UpdatedScanResults[regName] = updatedResults
+					}
+					if deletedResults != nil {
+						scanData.DeletedScanResults[regName] = deletedResults
+					}
+				}
+			}
+
+			if !hasPartialScanData {
+				// 2. check whether there is new fed registry created on master cluster that managed cluster is unaware of
+				for regName, currImageRevs := range fedScanResultRevsCache.ScanReportRevisions {
+					if _, ok := req.ScanReportRevisions[regName]; !ok {
+						// found a new fed registry on master cluster that managed cluster is unaware of
+						updatedResults := make(map[string]*api.RESTFedImageScanResult) // image id : scan result
+						for imageID, currRev := range currImageRevs {
+							if collectUpdatedScanData(regName, imageID, currRev, updatedResults) == false {
+								// for network bandwidth consideration, we only return at most maxScanDataCount scan results in one polling.
+								hasPartialScanData = true
+								break
+							}
+						}
+						if len(updatedResults) > 0 {
+							scanData.UpdatedScanResults[regName] = updatedResults
+						}
+					}
+					if hasPartialScanData {
+						break
+					}
+				}
+			}
+		}
+	}
+	resp.RegistryRevision = fedScanResultRevsCache.RegistryRevision
+	resp.RegistryData = registryData
+	resp.ScannedRegImagesRev = fedScanResultRevsCache.ScannedRegImagesRev
+	resp.FedScanData = scanData
+	resp.HasPartialScanData = hasPartialScanData
+
+	return nil
 }
 
 func (m CacheMethod) GetAllFedRulesRevisions() map[string]uint64 {
@@ -562,4 +713,31 @@ func (m CacheMethod) GetAllFedRulesRevisions() map[string]uint64 {
 	}
 
 	return revisions
+}
+
+// called by managed clusters
+func (m CacheMethod) GetFedScanDataRevisions(getAll bool) (uint64, uint64, map[string]map[string]string) {
+	fedScanDataCacheMutexRLock()
+	defer fedScanDataCacheMutexRUnlock()
+
+	var scanReportRevs map[string]map[string]string
+	if getAll {
+		scanReportRevs = make(map[string]map[string]string, len(fedScanResultRevsCache.ScanReportRevisions)) // registry name : image id : scan report md5
+		for regName, currImageRevs := range fedScanResultRevsCache.ScanReportRevisions {
+			scanReportImageRevs := make(map[string]string, len(currImageRevs)) // // image id : scan report md5
+			for imageID, currRev := range currImageRevs {
+				scanReportImageRevs[imageID] = currRev
+			}
+			scanReportRevs[regName] = scanReportImageRevs
+		}
+	}
+
+	return fedScanResultRevsCache.RegistryRevision, fedScanResultRevsCache.ScannedRegImagesRev, scanReportRevs
+}
+
+func (m CacheMethod) GetFedConfiguration() share.CLUSFedConfiguration {
+	fedCacheMutexRLock()
+	defer fedCacheMutexRUnlock()
+
+	return fedConfigCache
 }

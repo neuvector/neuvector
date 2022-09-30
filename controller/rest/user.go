@@ -99,6 +99,10 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	ruser := rconf.User
 	username := ruser.Fullname
+	if username[0] == '$' {
+		restRespAccessDenied(w, login)
+		return
+	}
 
 	// User's own domain does't matter, only domains they can manage matters.
 
@@ -111,9 +115,6 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, true); e != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
-		return
-	} else if ruser.Fullname == api.ReservedUserNameIBMSA {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Reserved user name")
 		return
 	}
 
@@ -232,6 +233,10 @@ func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
+	if fullname[0] == '$' {
+		handlerNotFound(w, r)
+		return
+	}
 
 	// Retrieve user from the cluster
 	user, _, err := clusHelper.GetUserRev(fullname, acc)
@@ -320,6 +325,11 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 			if !acc.Authorize(user, nil) {
 				continue
 			}
+		}
+
+		// skip hidden user
+		if user.Fullname[0] == '$' {
+			continue
 		}
 
 		// Domain user can only list user of its domain
@@ -445,6 +455,9 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		e := "Username not match"
 		log.WithFields(log.Fields{"name": fullname, "config": rconf.Config.Fullname}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	} else if fullname[0] == '$' {
+		restRespAccessDenied(w, login)
 		return
 	}
 
@@ -679,6 +692,10 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
+	if fullname[0] == '$' {
+		restRespAccessDenied(w, login)
+		return
+	}
 
 	// Read request
 	body, _ := ioutil.ReadAll(r.Body)
@@ -804,6 +821,10 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
 	role := ps.ByName("role")
+	if fullname[0] == '$' {
+		restRespAccessDenied(w, login)
+		return
+	}
 
 	// Read request
 	body, _ := ioutil.ReadAll(r.Body)
@@ -928,6 +949,10 @@ func handlerUserDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
+	if fullname[0] == '$' {
+		restRespAccessDenied(w, login)
+		return
+	}
 
 	// Retrieve user from the cluster
 	user, _, err := clusHelper.GetUserRev(fullname, acc)

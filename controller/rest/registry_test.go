@@ -114,7 +114,7 @@ func countRegistry(role string, roles map[string][]string) int {
 	acc := access.NewAccessControl(r, access.AccessOPRead, login.domainRoles)
 
 	var count int
-	all := clusHelper.GetAllRegistry()
+	all := clusHelper.GetAllRegistry(share.ScopeLocal)
 	for _, r := range all {
 		if acc.Authorize(r, nil) {
 			count++

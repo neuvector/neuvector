@@ -1,9 +1,12 @@
 package kv
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +22,11 @@ import (
 const registryDataDir = NeuvectorDir + "registry/"
 const summarySuffix = ".sum"
 const reportSuffix = ".gz"
+
+type regImageSummaryReport struct {
+	Summary []byte `json:"summary"`
+	Report  []byte `json:"report"`
+}
 
 func registryImageSummaryFileName(name, id string) string {
 	return fmt.Sprintf("%s%s/%s%s", registryDataDir, name, id, summarySuffix)
@@ -96,30 +104,44 @@ func deleteRegistryDir(name string) error {
 	return os.RemoveAll(path)
 }
 
-func restoreToCluster(reg string) {
+func restoreToCluster(reg, fedRole string, fedScanReportRevisions map[string]map[string]string) {
+	var imageRevs map[string]string
+	isFedReg := false
+	if strings.HasPrefix(reg, api.FederalGroupPrefix) {
+		isFedReg = true
+		if _, ok := fedScanReportRevisions[reg]; !ok {
+			fedScanReportRevisions[reg] = make(map[string]string, 1)
+		}
+		imageRevs = fedScanReportRevisions[reg]
+	}
+
 	regPath := fmt.Sprintf("%s%s", registryDataDir, reg)
-	log.WithFields(log.Fields{"regPath": regPath, "name": reg}).Debug("Restore to cluster")
+	log.WithFields(log.Fields{"regPath": regPath, "name": reg, "fedRole": fedRole}).Debug("Restore to cluster")
 
 	// 1. Read summary first
 	sums := make([]*share.CLUSRegistryImageSummary, 0)
-	filepath.Walk(regPath, func(path string, info os.FileInfo, err error) error {
-		if info != nil && strings.HasSuffix(path, summarySuffix) {
-			value, err := ioutil.ReadFile(path)
-			if err == nil {
-				var sum share.CLUSRegistryImageSummary
-				if err = json.Unmarshal(value, &sum); err == nil {
-					if sum.Status == api.ScanStatusFinished {
-						sums = append(sums, &sum)
+	if !isFedReg || fedRole == api.FedRoleMaster || (fedRole == api.FedRoleJoint && isFedReg) {
+		filepath.Walk(regPath, func(path string, info os.FileInfo, err error) error {
+			if info != nil && strings.HasSuffix(path, summarySuffix) {
+				value, err := ioutil.ReadFile(path)
+				if err == nil {
+					var sum share.CLUSRegistryImageSummary
+					if err = json.Unmarshal(value, &sum); err == nil {
+						if sum.Status == api.ScanStatusFinished {
+							sums = append(sums, &sum)
+						}
+					} else {
+						log.WithFields(log.Fields{"error": err, "path": path}).Error("Failed to unmarshal summary")
 					}
 				} else {
-					log.WithFields(log.Fields{"error": err, "path": path}).Error("Failed to unmarshal summary")
+					log.WithFields(log.Fields{"error": err, "path": path}).Error("Failed to read summary")
 				}
-			} else {
-				log.WithFields(log.Fields{"error": err, "path": path}).Error("Failed to read summary")
 			}
-		}
-		return nil
-	})
+			return nil
+		})
+	} else {
+		os.RemoveAll(regPath)
+	}
 
 	// 2. Sort summary new to old, and remove the old ones
 	if len(sums) > api.ScanPersistImageMax {
@@ -136,37 +158,99 @@ func restoreToCluster(reg string) {
 
 	// 3. Read the report and write both into kv
 	for _, sum := range sums {
+		var sErr error
 		key := share.CLUSRegistryImageStateKey(reg, sum.ImageID)
-		value, _ := json.Marshal(&sum)
-		if err := cluster.Put(key, value); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to restore summary to cluster")
+		vSummary, _ := json.Marshal(&sum)
+		if sErr = cluster.Put(key, vSummary); sErr != nil {
+			log.WithFields(log.Fields{"error": sErr}).Error("Failed to restore summary to cluster")
 		}
 
 		rptFile := fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix)
-		value, err := ioutil.ReadFile(rptFile)
-		if err == nil {
+		vReport, vErr := ioutil.ReadFile(rptFile)
+		if vErr == nil {
 			key = share.CLUSRegistryImageDataKey(reg, sum.ImageID)
-			if err = cluster.PutBinary(key, value); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Failed to restore report to cluster")
+			if vErr = cluster.PutBinary(key, vReport); vErr != nil {
+				log.WithFields(log.Fields{"error": vErr}).Error("Failed to restore report to cluster")
 			}
 		} else {
-			log.WithFields(log.Fields{"error": err, "path": rptFile}).Error("Failed to read report")
+			log.WithFields(log.Fields{"error": vErr, "path": rptFile}).Error("Failed to read report")
 		}
+
+		if sErr == nil && vErr == nil && isFedReg && imageRevs != nil {
+			scan_data := regImageSummaryReport{
+				Summary: vSummary,
+				Report:  vReport,
+			}
+			data, _ := json.Marshal(&scan_data)
+			md5Sum := md5.Sum(data)
+			imageRevs[sum.ImageID] = hex.EncodeToString(md5Sum[:])
+		}
+	}
+
+	// 4. (for restoring scan result of the images in fed registry on master cluster only)
+	if isFedReg && len(imageRevs) > 0 {
+		fedScanReportRevisions[reg] = imageRevs
 	}
 }
 
-func restoreRegistry(ch chan<- error) {
+func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 	files, err := ioutil.ReadDir(registryDataDir)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Failed to read registry directory")
+		log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Debug("Failed to read registry directory")
 	} else {
+		fedScanReportRevisions := make(map[string]map[string]string) // registry name : image id : scan report md5
 		for _, info := range files {
 			name := info.Name()
 			if info.IsDir() && name != "" && name != "." {
-				restoreToCluster(name)
+				restoreToCluster(name, importInfo.fedRole, fedScanReportRevisions)
+			}
+		}
+
+		if len(fedScanReportRevisions) > 0 {
+			lock, err := clusHelper.AcquireLock(share.CLUSLockFedScanDataKey, clusterLockWait)
+			if err != nil {
+				return
+			}
+			defer clusHelper.ReleaseLock(lock)
+
+			retry := 0
+			for retry < 3 {
+				scanRevs, rev, err := clusHelper.GetFedScanRevisions()
+				if err != nil {
+					break
+				}
+
+				scanRevs.RegistryRevision = 0
+				scanRevs.ScannedRegImagesRev = 0
+				// assign random numbers to scanRevs.RegistryRevision & scanRevs.ScannedRegImagesRev on managed clusters so that the first scan data polling is always triggered
+				if importInfo.fedRole == api.FedRoleJoint {
+					scanRevs.RegistryRevision = rand.Uint64()
+					scanRevs.ScannedRegImagesRev = rand.Uint64()
+				} else if importInfo.fedRole == api.FedRoleMaster {
+					scanRevs.RegistryRevision = 1
+					scanRevs.ScannedRegImagesRev = 1
+				}
+				for regName, imageRevs := range fedScanReportRevisions {
+					if existing, ok := scanRevs.ScanReportRevisions[regName]; !ok {
+						scanRevs.ScanReportRevisions[regName] = imageRevs
+					} else {
+						for imageID, imageRev := range imageRevs {
+							if imageRev != existing[imageID] {
+								existing[imageID] = imageRev
+							}
+						}
+					}
+				}
+				if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
+					break
+				}
+				retry++
+			}
+			if retry >= 3 {
+				log.WithFields(log.Fields{"error": err}).Error("Failed to update fed scan revisions")
 			}
 		}
 	}
 
-	ch <- err
+	//ch <- err
 }

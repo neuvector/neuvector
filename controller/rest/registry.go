@@ -15,8 +15,10 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -169,6 +171,20 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	var e string
+	if rconf.CfgType == api.CfgTypeFederal {
+		if !strings.HasPrefix(rconf.Name, api.FederalGroupPrefix) || rconf.Name == api.FederalGroupPrefix {
+			e = "Federal registry name must start with 'fed.' but cannot be just 'fed.'"
+		}
+	} else if strings.HasPrefix(rconf.Name, api.FederalGroupPrefix) {
+		e = "Local registry name must not start with 'fed.'"
+	}
+	if e != "" {
+		log.WithFields(log.Fields{"name": rconf.Name}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
+
 	if cc, _, _ := clusHelper.GetRegistry(rconf.Name, acc); cc != nil {
 		log.WithFields(log.Fields{"Name": cc.Name}).Error("Duplicate registry name")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, "Duplicate registry name found")
@@ -178,6 +194,10 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	config := share.CLUSRegistryConfig{
 		Name:           rconf.Name,
 		CreaterDomains: acc.GetAdminDomains(share.PERM_REG_SCAN),
+		CfgType:        share.UserCreated,
+	}
+	if rconf.CfgType == api.CfgTypeFederal {
+		config.CfgType = share.FederalCfg
 	}
 
 	if registryTypeSet.Contains(rconf.Type) {
@@ -432,6 +452,12 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	if config.CfgType == share.FederalCfg {
+		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, "", "")
+		}
+	}
+
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Create registry")
 }
 
@@ -469,6 +495,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	retry := 0
+	var cfgType share.TCfgType
 	for retry < retryClusterMax {
 		config, rev, err := clusHelper.GetRegistry(name, acc)
 		if config == nil {
@@ -480,6 +507,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Registry type can't be changed")
 			return
 		}
+		cfgType = config.CfgType
 
 		if rconf.Schedule == nil {
 		} else if rconf.Schedule.Schedule == "" {
@@ -716,6 +744,12 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	if cfgType == share.FederalCfg {
+		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, "", "")
+		}
+	}
+
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure registry")
 }
 
@@ -827,7 +861,10 @@ func handlerRegistryList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	if acc == nil {
 		return
 	} else {
-		list := scanner.GetAllRegistrySummary(acc)
+		query := restParseQuery(r)
+		scope, _ := query.pairs[api.QueryScope] // empty string means fed & local groups
+
+		list := scanner.GetAllRegistrySummary(scope, acc)
 		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 		log.WithFields(log.Fields{"entries": len(list)}).Debug("Response")
 
@@ -1022,6 +1059,7 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	var cfgType share.TCfgType
 	// Need furthur authorize for namespace users
 	// For every domain that a registry is in, the user must have PERM_REG_SCAN(modify) permission in the domain
 	// (use a copy object without parsed filters so that the registr's domains/creatorDomains are used for access control checking)
@@ -1029,6 +1067,7 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	} else {
+		cfgType = cc.CfgType
 		ccTemp := *cc
 		ccTemp.ParsedFilters = nil
 		if !acc.AuthorizeOwn(&ccTemp, nil) {
@@ -1037,11 +1076,69 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 	}
 
-	if err := clusHelper.DeleteRegistry(name); err != nil {
+	if err := clusHelper.DeleteRegistry(nil, name); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	}
 
+	if cfgType == share.FederalCfg {
+		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+			clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, "", "")
+		}
+	}
+
 	restRespSuccess(w, r, nil, acc, login, nil, "Registry delete")
+}
+
+func diffStringSlices(a, b []string) []string {
+	mb := make(map[string]struct{}, len(b))
+	for _, x := range b {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range a {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
+}
+
+// called by managed clusters
+func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
+	old := clusHelper.GetAllRegistry(share.ScopeFed)
+	oldRegs := make(map[string]*share.CLUSRegistryConfig, len(old))
+	for _, o := range old {
+		oldRegs[o.Name] = o
+	}
+
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	for _, n := range newRegs {
+		o, ok := oldRegs[n.Name]
+		if ok {
+			// found in existing kv keys
+			if o.Registry != n.Registry || o.Type != n.Type || len(o.Filters) != len(n.Filters) {
+				ok = false
+			} else {
+				oldFilters := utils.NewSetFromSliceKind(o.Filters)
+				newFilters := utils.NewSetFromSliceKind(n.Filters)
+				if diff := oldFilters.SymmetricDifference(newFilters); diff.Cardinality() > 0 {
+					ok = false
+				}
+			}
+			delete(oldRegs, n.Name)
+		}
+		if !ok {
+			value, _ := json.Marshal(*n)
+			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
+		}
+	}
+	for name, _ := range oldRegs {
+		txn.Delete(share.CLUSRegistryConfigKey(name))
+	}
+
+	return applyTransact(nil, txn) == nil
 }

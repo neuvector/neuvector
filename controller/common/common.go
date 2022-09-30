@@ -26,6 +26,8 @@ import (
 const DefaultIdleTimeout uint32 = 300
 const DefaultAdminUser string = "admin"
 const DefaultAdminPass string = "admin"
+const ReservedFedUser string = "~fedOperator" // user name with prefix "~" cannot be created thru configmap/rest api
+const ReservedUserNameIBMSA string = "~nv.reserved.ibmsa"
 
 const ScanPlatformID = "platform"
 
@@ -82,6 +84,9 @@ var defaultSyslogCategory []string = []string{
 }
 
 const defaultClusterName string = "cluster.local"
+
+const RegistryRepoScanName string = "_repo_scan"
+const RegistryFedRepoScanName string = "fed._repo_scan"
 
 var DefaultSystemConfig = share.CLUSSystemConfig{
 	NewServicePolicyMode:      share.PolicyModeLearn,

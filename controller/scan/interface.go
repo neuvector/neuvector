@@ -24,7 +24,7 @@ type ScanInterface interface {
 	GetRegistry(name string, acc *access.AccessControl) (*api.RESTRegistry, error)
 	GetRegistryState(name string, acc *access.AccessControl) (*share.CLUSRegistryState, error)
 	GetRegistrySummary(name string, acc *access.AccessControl) (*api.RESTRegistrySummary, error)
-	GetAllRegistrySummary(acc *access.AccessControl) []*api.RESTRegistrySummary
+	GetAllRegistrySummary(scope string, acc *access.AccessControl) []*api.RESTRegistrySummary
 	GetRegistryImageSummary(name string, vpf scanUtils.VPFInterface, acc *access.AccessControl) []*api.RESTRegistryImageSummary
 	GetRegistryVulnerabilities(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) (map[string][]*api.RESTVulnerability, map[string][]api.RESTIDName, error)
 	GetRegistryBenches(name string, tagMap map[string][]string, acc *access.AccessControl) (map[string][]*api.RESTBenchItem, map[string][]api.RESTIDName, error)
@@ -85,47 +85,51 @@ func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vp
 		reqImgRegistrySlice[i] = strings.ToLower(r)
 	}
 
-	// 1. check repo scan images, add registry to repo to locate scanner images in registry
-	rs := repoScanRegistry
-	for _, reqRegistry := range reqImgRegistrySlice {
-		clusImage := share.CLUSImage{
-			Repo: fmt.Sprintf("%s:%s", reqRegistry, reqImgRepo),
-			Tag:  reqImgTag,
-		}
-
-		rs.stateLock()
-		if id, exist := rs.digest2ID[reqImgTag]; exist {
-			// if image tag is of sha256: format
-			addScannedImage(rs, id, sumMap, vpf)
-		} else if id, exist := rs.image2ID[clusImage]; exist {
-			addScannedImage(rs, id, sumMap, vpf)
-		}
-		rs.stateUnlock()
-	}
-
-	if len(sumMap) > 0 {
-		return sumMap
-	}
-
-	// 2. check repo scan images, ignore registry in request. This is to match if it is
-	// the local image (without registry) that was scanned
 	clusImage := share.CLUSImage{
 		Repo: reqImgRepo,
 		Tag:  reqImgTag,
 	}
+	rss := [2]*Registry{repoFedScanRegistry, repoScanRegistry}
+	for _, rs := range rss {
+		if rs == nil {
+			continue
+		}
+		// 1. check repo scan images, add registry to repo to locate scanner images in registry
+		for _, reqRegistry := range reqImgRegistrySlice {
+			clusImage := share.CLUSImage{
+				Repo: fmt.Sprintf("%s:%s", reqRegistry, reqImgRepo),
+				Tag:  reqImgTag,
+			}
 
-	rs.stateLock()
-	if id, exist := rs.image2ID[clusImage]; exist {
-		addScannedImage(rs, id, sumMap, vpf)
-	}
-	rs.stateUnlock()
+			rs.stateLock()
+			if id, exist := rs.digest2ID[reqImgTag]; exist {
+				// if image tag is of sha256: format
+				addScannedImage(rs, id, sumMap, vpf)
+			} else if id, exist := rs.image2ID[clusImage]; exist {
+				addScannedImage(rs, id, sumMap, vpf)
+			}
+			rs.stateUnlock()
+		}
 
-	if len(sumMap) > 0 {
-		return sumMap
+		if len(sumMap) > 0 {
+			return sumMap
+		}
+
+		// 2. check repo scan images, ignore registry in request. This is to match if it is
+		// the local image (without registry) that was scanned
+		rs.stateLock()
+		if id, exist := rs.image2ID[clusImage]; exist {
+			addScannedImage(rs, id, sumMap, vpf)
+		}
+		rs.stateUnlock()
+
+		if len(sumMap) > 0 {
+			return sumMap
+		}
 	}
 
 	// 3. scan normal registry
-	regs := regMapToArray()
+	regs := regMapToArray(true, true)
 
 	for _, reqRegistry := range reqImgRegistrySlice {
 		for _, rs := range regs {
@@ -188,7 +192,7 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			Labels:          make(map[string]string, len(s.cache.labels)),
 			SecretsCnt:      len(s.cache.secrets),
 			SetIDPermCnt:    len(s.cache.setIDPerm),
-			Modules:		 s.cache.modules,
+			Modules:         s.cache.modules,
 		}
 		for _, v := range s.cache.vulTraits {
 			if !v.IsFiltered() {
@@ -297,7 +301,7 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 	sum := &share.CLUSRegistryImageSummary{
 		ImageID:   result.ImageID,
 		Registry:  result.Registry,
-		RegName:   registryRepoScanName,
+		RegName:   common.RegistryRepoScanName,
 		Images:    imgs,
 		Digest:    result.Digest,
 		ScannedAt: time.Now().UTC(),
@@ -319,7 +323,7 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		ScanResult: *result,
 	}
 
-	clusHelper.PutRegistryImageSummaryAndReport(registryRepoScanName, result.ImageID, sum, &report)
+	clusHelper.PutRegistryImageSummaryAndReport(common.RegistryRepoScanName, result.ImageID, smd.fedRole, sum, &report)
 
 	if len(rs.summary) > api.ScanPersistImageMax+scanPersistImageExtra {
 		rs.cleanupOldImages()
@@ -332,10 +336,12 @@ func (m *scanMethod) GetRegistryState(name string, acc *access.AccessControl) (*
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
-		if !acc.Authorize(&share.CLUSRegistryConfig{}, nil) {
+		if !acc.Authorize(&share.CLUSRegistryConfig{Name: name}, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
 		return nil, common.ErrObjectNotFound
@@ -373,8 +379,10 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
 		return nil, nil, common.ErrObjectNotFound
 	}
@@ -419,8 +427,10 @@ func (m *scanMethod) GetRegistryBenches(name string, tagMap map[string][]string,
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
 		return nil, nil, common.ErrObjectNotFound
 	}
@@ -460,10 +470,12 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
-		if !acc.Authorize(&share.CLUSRegistryConfig{}, nil) {
+		if !acc.Authorize(&share.CLUSRegistryConfig{Name: name}, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
 		return nil, common.ErrObjectNotFound
@@ -522,10 +534,12 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
-		if !acc.Authorize(&share.CLUSRegistryConfig{}, nil) {
+		if !acc.Authorize(&share.CLUSRegistryConfig{Name: name}, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
 		return nil, common.ErrObjectNotFound
@@ -578,8 +592,10 @@ func (m *scanMethod) GetRegistryImageSummary(name string, vpf scanUtils.VPFInter
 	var rs *Registry
 	var ok bool
 
-	if name == registryRepoScanName {
+	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
 	} else if rs, ok = regMapLookup(name); !ok {
 		return list
 	}
@@ -614,7 +630,7 @@ func (m *scanMethod) GetRegistryImageSummary(name string, vpf scanUtils.VPFInter
 
 func (m *scanMethod) GetRegistry(name string, acc *access.AccessControl) (*api.RESTRegistry, error) {
 	if rs, ok := regMapLookup(name); !ok {
-		if !acc.Authorize(&share.CLUSRegistryConfig{}, nil) {
+		if !acc.Authorize(&share.CLUSRegistryConfig{Name: name}, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
 		return nil, common.ErrObjectNotFound
@@ -629,7 +645,7 @@ func (m *scanMethod) GetRegistrySummary(name string, acc *access.AccessControl) 
 	rs, ok := regMapLookup(name)
 
 	if !ok {
-		if !acc.Authorize(&share.CLUSRegistryConfig{}, nil) {
+		if !acc.Authorize(&share.CLUSRegistryConfig{Name: name}, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
 		return nil, common.ErrObjectNotFound
@@ -640,8 +656,21 @@ func (m *scanMethod) GetRegistrySummary(name string, acc *access.AccessControl) 
 	}
 }
 
-func (m *scanMethod) GetAllRegistrySummary(acc *access.AccessControl) []*api.RESTRegistrySummary {
-	regs := regMapToArray()
+func (m *scanMethod) GetAllRegistrySummary(scope string, acc *access.AccessControl) []*api.RESTRegistrySummary {
+	var getLocal, getFed bool
+
+	if scope == share.ScopeLocal {
+		getLocal = true
+	} else if scope == share.ScopeFed {
+		getFed = true
+	} else if scope == share.ScopeAll {
+		getLocal = true
+		getFed = true
+	} else {
+		return nil
+	}
+
+	regs := regMapToArray(getLocal, getFed)
 
 	list := make([]*api.RESTRegistrySummary, 0)
 	for _, rs := range regs {

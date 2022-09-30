@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,6 +128,7 @@ var reqTokenLock sync.Mutex
 
 var _fedPingOngoing uint32
 var _fedPollOngoing uint32
+var _fedScanDataPollOngoing uint32
 var _fedDeployCount uint32
 var _fedFullPolling uint32                                                                      // 0: modified rules polling, 1: full rules polling
 var _fedPollInterval uint32 = 1                                                                 // in minutes
@@ -399,8 +401,9 @@ func createHttpClient(proxyOption int8, timeout time.Duration) (*http.Client, st
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
+		MaxIdleConns:       100,
+		IdleConnTimeout:    90 * time.Second,
+		DisableCompression: true,
 	}
 	if proxyOption != const_no_proxy {
 		_sysProxyMutex.RLock()
@@ -482,7 +485,7 @@ func getProxyOptions(id string, useProxy int8) []int8 {
 	return proxyOptions
 }
 
-func sendRestRequest(idTarget string, method, urlStr, token string, cookie *http.Cookie, body []byte,
+func sendRestRequest(idTarget string, method, urlStr, token, cntType string, cookie *http.Cookie, body []byte,
 	logError bool, specificProxy *int8, acc *access.AccessControl) ([]byte, int, bool, error) {
 
 	var useProxy int8
@@ -512,7 +515,7 @@ func sendRestRequest(idTarget string, method, urlStr, token string, cookie *http
 		_httpClientMutex.RLock()
 		nvHttpClient = _nvHttpClients[proxyOption]
 		_httpClientMutex.RUnlock()
-		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, proxyOption, cookie, body, logError); err == nil {
+		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, cntType, proxyOption, cookie, body, logError); err == nil {
 			_httpClientMutex.Lock()
 			_proxyOptionHistory[idTarget] = proxyOption
 			_httpClientMutex.Unlock()
@@ -526,11 +529,18 @@ func sendRestRequest(idTarget string, method, urlStr, token string, cookie *http
 	return data, statusCode, usedProxy, err
 }
 
-func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token string, proxyOption int8, cookie *http.Cookie, body []byte, logError bool) ([]byte, int, error) {
+func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cntType string, proxyOption int8, cookie *http.Cookie, body []byte, logError bool) (
+	[]byte, int, error) {
 
 	var httpClient *http.Client = nvHttpClient.httpClient
 	var req *http.Request
+	var gzipped bool
 	var err error
+
+	if len(body) > gzipThreshold {
+		body = utils.GzipBytes(body)
+		gzipped = true
+	}
 
 	switch method {
 	case "GET":
@@ -542,10 +552,18 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token stri
 		log.WithFields(log.Fields{"url": urlStr, "error": err, "proxyOption": proxyOption}).Error("Failed to create request")
 		return nil, 0, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
+	if cntType == "" {
+		req.Header.Set("Accept", jsonContentType)
+		req.Header.Set("Content-Type", jsonContentType)
+	} else {
+		req.Header.Set("Accept", cntType)
+		req.Header.Set("Content-Type", cntType)
+	}
 	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set(_headerProxy, nvHttpClient.proxyUrlStr)
+	if gzipped {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 	if token != "" {
 		req.Header.Set(api.RESTTokenHeader, token)
 	}
@@ -682,7 +700,7 @@ func initHttpClients() {
 
 // it returns (headers, statusCode, data, proxyUsed, err)
 func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method, request, contentType, tag, txnID string,
-	body []byte, forward, remoteExport, logError bool, acc *access.AccessControl) (map[string]string, int, []byte, bool, error) {
+	body []byte, gzipped, forward, remoteExport, logError bool, acc *access.AccessControl) (map[string]string, int, []byte, bool, error) {
 
 	var headers map[string]string
 	var statusCode int
@@ -709,7 +727,7 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 			nvHttpClient.httpClient.Timeout = repoScanLingeringDuration + time.Duration(30*time.Second)
 		}
 		headers, statusCode, data, err = sendReqToJointClusterInternal(nvHttpClient, method, urlStr, token, contentType, tag, txnID,
-			proxyOption, body, forward, remoteExport, logError)
+			proxyOption, body, gzipped, forward, remoteExport, logError)
 		if scanRepository {
 			nvHttpClient.httpClient.Timeout = clusterAuthTimeout
 		}
@@ -728,9 +746,14 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 }
 
 func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, contentType, tag, txnID string,
-	proxyOption int8, body []byte, forward, remoteExport, logError bool) (map[string]string, int, []byte, error) {
+	proxyOption int8, body []byte, gzipped, forward, remoteExport, logError bool) (map[string]string, int, []byte, error) {
 
 	var httpClient *http.Client = nvHttpClient.httpClient
+
+	if !gzipped && len(body) > gzipThreshold {
+		body = utils.GzipBytes(body)
+		gzipped = true
+	}
 
 	req, err := http.NewRequest(method, urlStr, bytes.NewBuffer(body))
 	if err != nil {
@@ -741,6 +764,9 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set(_headerProxy, nvHttpClient.proxyUrlStr)
+	if gzipped {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 	if token != "" {
 		req.Header.Set(api.RESTTokenHeader, token)
 	}
@@ -824,7 +850,7 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 		body, _ := json.Marshal(reqTo)
 		// call joint cluster for generating a regular auth token
 		if _, statusCode, data, proxyUsed, err = sendReqToJointCluster(rc.RestInfo, clusterID, "", http.MethodPost, "v1/fed_auth",
-			"", jsonContentType, _tagAuthJointCluster, body, _notForward, false, true, acc); err == nil {
+			"", jsonContentType, _tagAuthJointCluster, body, false, _notForward, false, true, acc); err == nil {
 			if statusCode != http.StatusOK {
 				log.WithFields(log.Fields{"cluster": rc.RestInfo.Server, "status": statusCode, "proxyUsed": proxyUsed}).Error("Unable to authenticate with the cluster")
 				err = errors.New("Unable to authenticate with the cluster")
@@ -858,7 +884,7 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 		status = http.StatusBadRequest
 		if token, err := getJointClusterToken(rc, id, user, refreshToken, acc, login); token != "" { // get a regular token for accessing joint cluster
 			if _, statusCode, data, proxyUsed, err := sendReqToJointCluster(rc.RestInfo, id, token, method,
-				request, jsonContentType, tag, "", body, _notForward, false, refreshToken, acc); err == nil {
+				request, jsonContentType, tag, "", body, false, _notForward, false, refreshToken, acc); err == nil {
 				if statusCode == http.StatusRequestTimeout {
 					continue
 				} else if statusCode == http.StatusOK || statusCode == http.StatusCreated || statusCode == http.StatusAccepted {
@@ -965,11 +991,25 @@ func cleanFedRules() {
 		RuleHeads: make([]*share.CLUSRuleHead, 0),
 	}
 	replaceFedResponseRules(resRulesData.Rules, resRulesData.RuleHeads)
-	cluster.Delete(share.CLUSFedSystemKey)
 
 	deleteFedGroupPolicy()
 
-	clusHelper.UpdateFedRulesRevision(nil)
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	txn.Delete(share.CLUSFedKey(share.CFGEndpointSystem))
+	clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision())
+	clusHelper.PutFedConfiguration(txn, share.CLUSFedConfiguration{})
+	txn.Delete(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey))
+	fedRegs := clusHelper.GetAllRegistry(share.ScopeFed)
+	for _, reg := range fedRegs {
+		clusHelper.DeleteRegistry(txn, reg.Name)
+	}
+
+	if ok, err := txn.Apply(); err != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+	}
+
 }
 
 func leaveFedCleanup(masterID, jointID string) {
@@ -989,6 +1029,7 @@ func leaveFedCleanup(masterID, jointID string) {
 	delAllFedSessionTokens()
 	resetFedJointKeys()
 	cleanFedRules()
+	cluster.Delete(share.CLUSUserKey(common.ReservedFedUser))
 }
 
 func updateSystemClusterName(newName string, acc *access.AccessControl) string {
@@ -1100,7 +1141,7 @@ func pingJointCluster(tag, urlStr string, jointCluster share.CLUSFedJointCluster
 
 	for _, logError := range []bool{false, true} {
 		_, statusCode, data, proxyUsed, err = sendReqToJointCluster(jointCluster.RestInfo, id, "", http.MethodPost,
-			urlStr, jsonContentType, tag, "", bodyTo, _notForward, false, logError, acc)
+			urlStr, jsonContentType, tag, "", bodyTo, false, _notForward, false, logError, acc)
 		if err == nil {
 			if statusCode == http.StatusGone {
 				cmdResp.result = _fedClusterLeft
@@ -1197,17 +1238,29 @@ func pingJointClusters() bool {
 
 // caller must own share.CLUSLockFedKey lock
 func preConditionCheck() string {
+	var msg string
+
 	nameSet := clusHelper.GetAllGroupNames(share.ScopeFed)
-	if nameSet.Cardinality() > 0 {
+	regs := clusHelper.GetAllRegistry(share.ScopeFed)
+	if nameSet.Cardinality() > 0 || len(regs) > 0 {
 		cleanFedRules()
 		nameSet = clusHelper.GetAllGroupNames(share.ScopeFed)
+		regs := clusHelper.GetAllRegistry(share.ScopeFed)
+		if nameSet.Cardinality() > 0 {
+			groupNames := nameSet.ToStringSlice()
+			msg = strings.Join(groupNames[:], ",")
+			log.WithFields(log.Fields{"groups": msg}).Error("Group name with reserved prefix for fed exists")
+		}
+		if len(regs) > 0 {
+			regNames := make([]string, 0, len(regs))
+			for _, reg := range regs {
+				regNames = append(regNames, reg.Name)
+			}
+			msg = strings.Join(regNames[:], ",")
+			log.WithFields(log.Fields{"registry": msg}).Error("Registry name with reserved prefix for fed exists")
+		}
 	}
-	if nameSet.Cardinality() == 0 {
-		return ""
-	}
-	groupNames := nameSet.ToStringSlice()
-	msg := strings.Join(groupNames[:], ",")
-	log.WithFields(log.Fields{"groups": msg}).Error("Group name with reserved prefix for fed exists")
+
 	return msg
 }
 
@@ -1231,6 +1284,9 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			_lastFedMemberPingTime = time.Now().Add(restForInstantPing)
 		}
 	}
+
+	cfg := cacher.GetFedConfiguration()
+	org.DeployRegScanData = cfg.DeployRegScanData
 
 	restRespSuccess(w, r, org, acc, login, nil, "Get federation config")
 }
@@ -1327,6 +1383,19 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 			if err := clusHelper.PutFedMembership(m); err != nil {
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
 				return
+			}
+		}
+	}
+
+	if reqData.DeployRegScanData != nil {
+		if fedRole == api.FedRoleMaster {
+			cfg := clusHelper.GetFedConfiguration()
+			newCfg := cfg
+			if cfg.DeployRegScanData != *reqData.DeployRegScanData {
+				newCfg.DeployRegScanData = *reqData.DeployRegScanData
+			}
+			if newCfg != cfg {
+				clusHelper.PutFedConfiguration(nil, newCfg)
 			}
 		}
 	}
@@ -1444,6 +1513,12 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	kv.CreateDefaultFedGroups()
 
+	var cfg share.CLUSFedConfiguration
+	if reqData.DeployRegScanData != nil {
+		cfg.DeployRegScanData = *reqData.DeployRegScanData
+	}
+	clusHelper.PutFedConfiguration(nil, cfg)
+
 	resp := api.RESTFedPromoteRespData{
 		FedRole: api.FedRoleMaster,
 		//NewToken: login.token,
@@ -1451,8 +1526,13 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 			ID:       masterID,
 			RestInfo: m.MasterCluster.RestInfo,
 		},
-		UseProxy: useProxy,
+		UseProxy:          useProxy,
+		DeployRegScanData: cfg.DeployRegScanData,
 	}
+
+	revisions := share.CLUSEmptyFedRulesRevision()
+	clusHelper.PutFedRulesRevision(nil, revisions)
+	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}, nil)
 
 	accFedAdmin := access.NewFedAdminAccessControl()
 	cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles)
@@ -1670,7 +1750,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var proxyUsed bool
 	// call master cluster for joining federation
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/join_internal", req.Server, req.Port)
-	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", nil, bodyTo, true, &specificProxy, acc)
+	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", "", nil, bodyTo, true, &specificProxy, acc)
 	if err == nil {
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
@@ -1716,6 +1796,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 				UseProxy: useProxy,
 			}
 			if err = clusHelper.PutFedMembership(&m); err == nil {
+				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}, nil)
 				updateClusterState(respTo.MasterCluster.ID, _fedClusterConnected, acc)
 				updateClusterState(jointID, _fedClusterJoined, acc)
 				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, req.Server)
@@ -1787,7 +1868,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	if bodyTo, err := json.Marshal(&reqTo); err == nil {
 		// call master cluster for leaving federation
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/leave_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
-		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", nil, bodyTo, true, nil, acc)
+		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", nil, bodyTo, true, nil, acc)
 		if err == nil || req.Force {
 			m := &share.CLUSFedMembership{
 				FedRole:          api.FedRoleNone,
@@ -2226,6 +2307,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 }
 
+// called by managed clusters
 func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint64, localRevs map[string]uint64, acc *access.AccessControl) bool {
 	updated := false
 	if len(fedRevs) > 0 {
@@ -2289,11 +2371,77 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 	return updated
 }
 
+// called by managed clusters
+func workFedScanData(reqTo *api.RESTPollFedScanDataReq, respTo *api.RESTPollFedScanDataResp) {
+	var err error
+	var lock cluster.LockInterface
+	if lock, err = lockClusKey(nil, share.CLUSLockFedScanDataKey); err != nil {
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	if reqTo.RegistryRevision != respTo.RegistryRevision {
+		replaceFedRegistryConfig(respTo.RegistryData.Registries)
+	}
+	fedRegistryRev := respTo.RegistryRevision
+
+	fedScannedImagesRev := respTo.ScannedRegImagesRev
+	// 1. handle deleted images in fed registry
+	for regName, imageIDs := range respTo.FedScanData.DeletedScanResults { // registry name : []image id
+		if imageRevs, ok := reqTo.ScanReportRevisions[regName]; ok {
+			if imageIDs == nil {
+				// 1-1. this fed registry has been deleted on master cluster
+				delete(reqTo.ScanReportRevisions, regName)
+				clusHelper.DeleteRegistryKeys(regName)
+			} else {
+				// 1-2. in this fed registry, some images' scan result has been deleted on master cluster
+				for _, imageID := range imageIDs {
+					if err = clusHelper.DeleteRegistryImageSummaryAndReport(regName, imageID, api.FedRoleJoint); err == nil {
+						delete(imageRevs, imageID)
+					} else {
+						fedScannedImagesRev = reqTo.ScannedRegImagesRev
+					}
+				}
+			}
+		}
+	}
+
+	// 2. handle new/updated images scan result in fed registry
+	for regName, newScanResults := range respTo.FedScanData.UpdatedScanResults { // registry name : image id : scan result
+		imageRevs, ok := reqTo.ScanReportRevisions[regName] // image id : scan report md5
+		if !ok {
+			// it's scan result for a new fed registry
+			imageRevs = make(map[string]string, len(newScanResults))
+		}
+		for imageID, scanResult := range newScanResults {
+			if oldRev, ok := imageRevs[imageID]; !ok || oldRev != scanResult.Revision {
+				// it's "scan result for a new image in fed registry" or "different scan result for an image in fed registry"
+				if err = clusHelper.PutRegistryImageSummaryAndReport(regName, imageID, api.FedRoleJoint, scanResult.Summary, scanResult.Report); err == nil {
+					imageRevs[imageID] = scanResult.Revision
+				} else {
+					fedScannedImagesRev = reqTo.ScannedRegImagesRev
+				}
+			}
+		}
+		reqTo.ScanReportRevisions[regName] = imageRevs
+	}
+
+	if respTo.HasPartialScanData {
+		fedScannedImagesRev = reqTo.ScannedRegImagesRev
+	}
+	scanRevs := share.CLUSFedScanRevisions{
+		RegistryRevision:    fedRegistryRev,
+		ScannedRegImagesRev: fedScannedImagesRev,
+		ScanReportRevisions: reqTo.ScanReportRevisions,
+	}
+	clusHelper.PutFedScanRevisions(&scanRevs, nil)
+}
+
 func pollFedRules(forcePulling bool, tryTimes int) bool {
 	doPoll := atomic.CompareAndSwapUint32(&_fedPollOngoing, 0, 1)
-	defer atomic.StoreUint32(&_fedPollOngoing, 0)
-
 	if doPoll {
+		defer atomic.StoreUint32(&_fedPollOngoing, 0)
+
 		accReadAll := access.NewReaderAccessControl()
 		reqTo := api.RESTPollFedRulesReq{
 			FedKvVersion: kv.GetFedKvVer(),
@@ -2309,10 +2457,13 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		reqTo.ID = jointCluster.ID
 		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
+		reqTo.RegistryRevision, reqTo.ScannedRegImagesRev, _ = cacher.GetFedScanDataRevisions(false) // piggy back scan_data info in fed rules polling
 		if forcePulling {
 			for ruleType, _ := range reqTo.Revisions {
 				reqTo.Revisions[ruleType] = 0
 			}
+			reqTo.RegistryRevision = 0
+			reqTo.ScannedRegImagesRev = 0
 		}
 
 		status := _fedClusterDisconnected
@@ -2325,7 +2476,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
-				"", nil, bodyTo, false, nil, accReadAll); err == nil {
+				"", "", nil, bodyTo, false, nil, accReadAll); err == nil {
 				break
 			} else {
 				time.Sleep(time.Second)
@@ -2341,6 +2492,13 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
 					updateClusterState(masterCluster.ID, _fedClusterConnected, accReadAll)
 					status = _fedSuccess
+					fedCfg := cacher.GetFedConfiguration()
+					// if k8sPlatform {
+					if respTo.DeployRegScanData != fedCfg.DeployRegScanData {
+						fedCfg.DeployRegScanData = respTo.DeployRegScanData
+						clusHelper.PutFedConfiguration(nil, fedCfg)
+					}
+					// }
 					if respTo.Settings != nil {
 						var settings api.RESTFedRulesSettings
 						if err = json.Unmarshal(respTo.Settings, &settings); err == nil {
@@ -2348,12 +2506,23 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							if workFedRules(&settings, respTo.Revisions, reqTo.Revisions, accReadAll) {
 								// if any fed rule is updated, re-send polling request simply for updating joint cluster info on master cluster
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+								reqTo.Revisions = respTo.Revisions
 								bodyTo, _ := json.Marshal(&reqTo)
 								_, statusCode, _, _ = sendRestRequest("", http.MethodPost, urlStr,
-									"", nil, bodyTo, true, nil, accReadAll)
+									"", "", nil, bodyTo, true, nil, accReadAll)
 							}
 						}
 					}
+					//if k8sPlatform {
+					if respTo.DeployRegScanData {
+						respToDebug := respTo
+						respToDebug.Settings = nil
+						if respTo.RegistryRevision != reqTo.RegistryRevision || respTo.ScannedRegImagesRev != reqTo.ScannedRegImagesRev {
+							// fed registry & scan data on master cluster is different. Trigger scan data polling
+							go getFedRegScanData(false, 1)
+						}
+					}
+					//}
 					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
 				} else if respTo.Result == _fedMasterUpgradeRequired {
 					updateClusterState(jointCluster.ID, _fedJointVersionTooNew, accReadAll)
@@ -2385,9 +2554,99 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 	return doPoll
 }
 
+func getFedRegScanData(forcePulling bool, tryTimes int) {
+	pollScanData := atomic.CompareAndSwapUint32(&_fedScanDataPollOngoing, 0, 1)
+	if pollScanData {
+		defer atomic.StoreUint32(&_fedScanDataPollOngoing, 0)
+
+		i := 1
+		throttleTime := pollFedScanData(forcePulling, 1)
+		for throttleTime != 0 {
+			throttleTime = pollFedScanData(forcePulling, 1)
+			i += 1
+		}
+		log.WithFields(log.Fields{"iter": i, "forcePulling": forcePulling}).Info()
+	}
+}
+
+func pollFedScanData(forcePulling bool, tryTimes int) uint32 {
+	var throttleTime uint32
+
+	accReadAll := access.NewReaderAccessControl()
+	reqTo := api.RESTPollFedScanDataReq{
+		FedKvVersion: kv.GetFedKvVer(),
+		RestVersion:  kv.GetRestVer(),
+		Name:         cacher.GetSystemConfigClusterName(accReadAll),
+	}
+
+	masterCluster := cacher.GetFedMasterCluster(accReadAll)
+	jointCluster := cacher.GetFedLocalJointCluster(accReadAll)
+	if masterCluster.ID == "" || jointCluster.ID == "" {
+		return 0
+	}
+	reqTo.ID = jointCluster.ID
+	reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	reqTo.RegistryRevision, reqTo.ScannedRegImagesRev, reqTo.ScanReportRevisions = cacher.GetFedScanDataRevisions(true)
+	if forcePulling {
+		reqTo.RegistryRevision = 0
+		reqTo.ScannedRegImagesRev = 0
+		for regName, _ := range reqTo.ScanReportRevisions {
+			clusHelper.DeleteRegistryKeys(regName)
+		}
+		reqTo.ScanReportRevisions = make(map[string]map[string]string)
+	}
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	enc.Encode(&reqTo)
+	bodyTo := buf.Bytes()
+	// call master cluster for polling fed rules
+	var respData []byte
+	var statusCode int
+	var proxyUsed bool
+	var err error = common.ErrObjectAccessDenied
+	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/scan_data_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
+	for i := 0; i < tryTimes; i++ {
+		if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
+			"", "application/gob", nil, bodyTo, false, nil, accReadAll); err == nil {
+			break
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
+	if err == nil {
+		respTo := api.RESTPollFedScanDataResp{}
+		buf := bytes.NewBuffer(respData)
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(&respTo); err == nil {
+			//if respTo.PollInterval > 0 {
+			//	atomic.StoreUint32(&_fedPollInterval, respTo.PollInterval)
+			//}
+			if respTo.Result == _fedSuccess { // success
+				if respTo.RegistryRevision != reqTo.RegistryRevision || respTo.ScannedRegImagesRev != reqTo.ScannedRegImagesRev {
+					workFedScanData(&reqTo, &respTo)
+					if respTo.HasPartialScanData {
+						throttleTime = respTo.ThrottleTime
+					}
+				}
+			} else {
+				log.WithFields(log.Fields{"result": respTo.Result, "statusCode": statusCode, "proxyUsed": proxyUsed}).Error("Request failed")
+			}
+		}
+	} else {
+		if m := time.Now().Minute() % 10; m == 0 {
+			respErr := api.RESTError{}
+			json.Unmarshal(respData, &respErr)
+			log.WithFields(log.Fields{"err": err, "msg": respErr, "statusCode": statusCode, "proxyUsed": proxyUsed}).Error("Request failed")
+		}
+	}
+
+	return throttleTime
+}
+
 // handles polling requests on master cluster
 func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	//log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -2420,50 +2679,119 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	fedCfg := cacher.GetFedConfiguration()
+	resp := api.RESTPollFedRulesResp{
+		Result:            _fedSuccess,
+		PollInterval:      atomic.LoadUint32(&_fedPollInterval),
+		DeployRegScanData: fedCfg.DeployRegScanData,
+	}
 	if kv.IsImporting() {
 		// do not give out master's fed policies when master cluster is importing config
-		resp := api.RESTPollFedRulesResp{
-			Result:       _fedClusterImporting,
-			PollInterval: atomic.LoadUint32(&_fedPollInterval),
+		resp.Result = _fedClusterImporting
+	} else {
+		if (req.Name != "" && req.Name != jointCluster.Name) || req.RestVersion != jointCluster.RestVersion {
+			var lock cluster.LockInterface
+			if lock, err = lockClusKey(w, share.CLUSLockFedKey); err == nil {
+				if c := clusHelper.GetFedJointCluster(jointCluster.ID); c != nil {
+					if req.Name != "" && req.Name != jointCluster.Name {
+						c.Name = req.Name
+					}
+					if req.RestVersion != jointCluster.RestVersion {
+						c.RestVersion = req.RestVersion
+					}
+					clusHelper.PutFedJointCluster(c)
+				}
+				clusHelper.ReleaseLock(lock)
+			}
 		}
-		restRespSuccess(w, r, &resp, accReadAll, nil, nil, "")
+
+		var status int
+		if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
+			resp.Result = result
+			status = result
+		} else {
+			if fedCfg.DeployRegScanData {
+				resp.RegistryRevision, resp.ScannedRegImagesRev, _ = cacher.GetFedScanDataRevisions(false)
+			}
+			resp.Settings, resp.Revisions, _ = cacher.GetFedRules(req.Revisions, accReadAll)
+			if len(resp.Revisions) > 0 {
+				status = _fedClusterOutOfSync
+			} else {
+				status = _fedClusterSynced
+			}
+		}
+		updateClusterState(jointCluster.ID, status, accReadAll)
+	}
+
+	restRespSuccess(w, r, &resp, accReadAll, nil, nil, "") // no event log
+}
+
+// handles scan data polling requests on master cluster
+func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+
+	accReadAll := access.NewReaderAccessControl()
+	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
 		return
 	}
 
-	if (req.Name != "" && req.Name != jointCluster.Name) || req.RestVersion != jointCluster.RestVersion {
-		var lock cluster.LockInterface
-		if lock, err = lockClusKey(w, share.CLUSLockFedKey); err == nil {
-			if c := clusHelper.GetFedJointCluster(jointCluster.ID); c != nil {
-				if req.Name != "" && req.Name != jointCluster.Name {
-					c.Name = req.Name
-				}
-				if req.RestVersion != jointCluster.RestVersion {
-					c.RestVersion = req.RestVersion
-				}
-				clusHelper.PutFedJointCluster(c)
-			}
-			clusHelper.ReleaseLock(lock)
-		}
+	ct := r.Header.Get("Content-Type")
+	ce := r.Header.Get("Content-Encoding")
+
+	var err error
+	var req api.RESTPollFedScanDataReq
+	body, _ := ioutil.ReadAll(r.Body)
+	if ce == "gzip" {
+		body = utils.GunzipBytes(body)
+	}
+	if ct == "application/gob" {
+		buf := bytes.NewBuffer(body)
+		dec := gob.NewDecoder(buf)
+		err = dec.Decode(&req)
+	} else {
+		err = fmt.Errorf("unexpected content-type: %s", ct)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
-	resp := api.RESTPollFedRulesResp{
+	// Validate token
+	jointCluster := cacher.GetFedJoinedCluster(req.ID, accReadAll)
+	if jointCluster.ID != req.ID {
+		statusCode := http.StatusBadRequest
+		if jointCluster.ID == "" {
+			statusCode = http.StatusGone
+		}
+		restRespError(w, statusCode, api.RESTErrInvalidRequest)
+		return
+	} else if jointCluster.Disabled {
+		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
+		return
+	}
+	if err = jwtValidateFedJoinTicket(req.JointTicket, jointCluster.Secret); err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
+		return
+	}
+
+	resp := api.RESTPollFedScanDataResp{
 		Result:       _fedSuccess,
 		PollInterval: atomic.LoadUint32(&_fedPollInterval),
 	}
-	var status int
-	if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
-		resp.Result = result
-		status = result
+	if kv.IsImporting() {
+		// do not give out master's fed registries when master cluster is importing config
+		resp.Result = _fedClusterImporting
 	} else {
-		resp.Settings, resp.Revisions, _ = cacher.GetFedRules(req.Revisions, accReadAll)
-		if len(resp.Revisions) > 0 {
-			log.WithFields(log.Fields{"id": req.ID, "remote": req.Revisions, "fed": resp.Revisions}).Debug()
-			status = _fedClusterOutOfSync
+		if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
+			resp.Result = result
 		} else {
-			status = _fedClusterSynced
+			cacher.GetFedScanData(req, &resp)
+			if resp.HasPartialScanData {
+				resp.ThrottleTime = 100 // ms
+			}
 		}
 	}
-	updateClusterState(jointCluster.ID, status, accReadAll)
 
 	restRespSuccess(w, r, &resp, accReadAll, nil, nil, "") // no event log
 }
@@ -2638,6 +2966,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 
 	for _, refreshToken := range []bool{false, true} {
 		if token, err := getJointClusterToken(&rc, id, user, refreshToken, acc, login); token != "" {
+			gzipped := false
 			methodToUse := method
 			if request == "/v1/file/group" && method == http.MethodGet {
 				methodToUse = http.MethodPost
@@ -2650,6 +2979,9 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 						contentType = r.Header.Get("Content-Type")
 					}
 				}
+			}
+			if ce := r.Header.Get("Content-Encoding"); ce == "gzip" {
+				gzipped = true
 			}
 
 			// for export-related APIs thru remote console, we don't override the response header or they cannot be exported successfully
@@ -2685,7 +3017,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 			}
 
 			if headers, statusCode, data, _, err := sendReqToJointCluster(rc.RestInfo, id, token, methodToUse,
-				request, contentType, _tagFedForward, txnID, body, _isForward, remoteExport, refreshToken, acc); err != nil {
+				request, contentType, _tagFedForward, txnID, body, gzipped, _isForward, remoteExport, refreshToken, acc); err != nil {
 				if !refreshToken {
 					continue
 				}

@@ -1626,7 +1626,13 @@ func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mod
 	// Only the lead run backup, because the typical use case for backup is to save config
 	// on persistent storage. If all controllers backup, they overwrite the same file.
 	if isLeader() {
-		if config != share.CFGEndpointFederation || !strings.HasPrefix(key, share.CLUSFedClustersStatusKey) {
+		var subKey string
+		if config == share.CFGEndpointFederation {
+			subKey = share.CLUSKeyNthToken(key, 3)
+			if subKey != share.CLUSFedClustersStatusSubKey {
+				cfgHelper.NotifyConfigChange(config)
+			}
+		} else {
 			cfgHelper.NotifyConfigChange(config)
 		}
 	}

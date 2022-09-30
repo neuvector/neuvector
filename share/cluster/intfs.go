@@ -534,6 +534,19 @@ func PutBinary(key string, value []byte) error {
 	return err
 }
 
+func PutBinaryRev(key string, value []byte, rev uint64) error {
+	var err error
+	if len(value) >= KVValueSizeMax {
+		// we assume binary data is already in gzip format so do not try to gzip it again
+		err = errSizeTooBig
+		log.WithFields(log.Fields{"key": key, "size": len(value)}).Error(err)
+	} else {
+		log.WithFields(log.Fields{"key": key}).Debug()
+		err = putRev(key, value, rev)
+	}
+	return err
+}
+
 func PutQuietRev(key string, value []byte, rev uint64) error {
 	var err error
 	if len(value) >= KVValueSizeMax {
@@ -699,6 +712,8 @@ func (t *ClusterTransact) PutBinary(key string, value []byte) {
 		// we assume binary data is already in gzip format so do not try to gzip it again
 		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
 	} else {
+		log.WithFields(log.Fields{"key": key}).Debug("Transact")
+
 		t.entries = append(t.entries, transactEntry{
 			verb: clusterTransactPut, key: key, value: value,
 		})
@@ -713,7 +728,9 @@ func (t *ClusterTransact) Put(key string, value []byte) {
 	} else {
 		log.WithFields(log.Fields{"key": key, "value": string(value)}).Debug("Transact")
 
-		t.PutBinary(key, value)
+		t.entries = append(t.entries, transactEntry{
+			verb: clusterTransactPut, key: key, value: value,
+		})
 	}
 }
 
@@ -723,7 +740,11 @@ func (t *ClusterTransact) PutQuiet(key string, value []byte) {
 		// future: consider auto-gzip text data if text size >= 512k (kv watcher handler needs to take care auto-unzip)
 		log.WithFields(log.Fields{"key": key, "len": len(value)}).Error(errSizeTooBig)
 	} else {
-		t.PutBinary(key, value)
+		log.WithFields(log.Fields{"key": key}).Debug("Transact")
+
+		t.entries = append(t.entries, transactEntry{
+			verb: clusterTransactPut, key: key, value: value,
+		})
 	}
 }
 

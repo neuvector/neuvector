@@ -112,8 +112,6 @@ const UserRoleImportStatus string = "_hidden_import_status_#" // it's a hidden r
 const UserRoleFedAdmin string = "fedAdmin"
 const UserRoleFedReader string = "fedReader"
 
-const ReservedUserNameIBMSA string = "nv.reserved.ibmsa"
-
 const LearnedGroupPrefix string = "nv."
 const LearnedSvcGroupPrefix string = "nv.ip."
 const FederalGroupPrefix string = "fed."
@@ -2967,6 +2965,7 @@ type RESTRegistry struct {
 	GitlabPrivateToken string             `json:"gitlab_private_token,cloak"`
 	IBMCloudTokenURL   string             `json:"ibm_cloud_token_url"`
 	IBMCloudAccount    string             `json:"ibm_cloud_account"`
+	CfgType            string             `json:"cfg_type"`
 }
 
 type RESTRegistryConfig struct {
@@ -2992,6 +2991,7 @@ type RESTRegistryConfig struct {
 	GitlabPrivateToken *string                  `json:"gitlab_private_token,omitempty,cloak"`
 	IBMCloudTokenURL   *string                  `json:"ibm_cloud_token_url,omitempty"`
 	IBMCloudAccount    *string                  `json:"ibm_cloud_account,omitempty"`
+	CfgType            string                   `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 }
 
 type RESTRegistryConfigData struct {
@@ -3004,6 +3004,7 @@ type RESTRegistrySummary struct {
 	ErrMsg    string `json:"error_message"`
 	ErrDetail string `json:"error_detail"`
 	StartedAt string `json:"started_at"`
+	CfgType   string `json:"cfg_type"`
 	RESTScanStatus
 }
 

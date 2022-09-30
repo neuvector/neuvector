@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -890,19 +891,48 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		alives, highs, meds := scan.RegistryImageStateUpdate(name, id, &sum, vpf)
 
+		fedRole := fedMembershipCache.FedRole
 		key := share.CLUSRegistryImageDataKey(name, id)
-		if report := clusHelper.GetScanReport(key); report != nil {
-			if alives != nil {
-				clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
-				auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
-			}
+		if fedRole != api.FedRoleJoint && !strings.HasPrefix(name, api.FederalGroupPrefix) {
+			report := clusHelper.GetScanReport(key)
+			if report != nil {
+				if alives != nil {
+					clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
+					auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
+				}
 
-			clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
-			benchUpdate(share.EventCompliance, clog)
+				clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
+				benchUpdate(share.EventCompliance, clog)
+			}
 		}
 
 	case cluster.ClusterNotifyDelete:
 		scan.RegistryImageStateUpdate(name, id, nil, nil)
+	}
+}
+
+func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
+	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
+
+	fedScanDataCacheMutexLock()
+	defer fedScanDataCacheMutexUnlock()
+
+	switch nType {
+	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
+		var scanRevs share.CLUSFedScanRevisions
+		// [31, 139] is the first 2 bytes of gzip-format data
+		if len(value) >= 2 && value[0] == 31 && value[1] == 139 {
+			value = utils.GunzipBytes(value)
+			if value == nil {
+				cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Error("Failed to unzip data")
+				return
+			}
+		}
+		json.Unmarshal(value, &scanRevs)
+		fedScanResultRevsCache = scanRevs
+
+	case cluster.ClusterNotifyDelete:
+		fedScanResultRevsCache = share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}
 	}
 }
 
@@ -989,6 +1019,8 @@ func ScanUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 		registryStateHandler(nType, key, value)
 	case "image":
 		registryImageStateHandler(nType, key, value)
+	case share.CLUSFedScanDataRevSubKey:
+		fedScanRevsHandler(nType, key, value)
 	}
 }
 
@@ -1101,6 +1133,11 @@ func scanInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, _ := clusHelper.GetScanConfigRev(acc)
 	scanCfg = *cfg
+
+	key := share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName)
+	if value, err := cluster.Get(key); err == nil {
+		vulnerabilityConfigUpdate(cluster.ClusterNotifyModify, key, value)
+	}
 }
 
 /*----------------------------------------------------------------------*/

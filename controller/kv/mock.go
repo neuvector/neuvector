@@ -269,7 +269,7 @@ func (m *MockCluster) GetRegistry(name string, acc *access.AccessControl) (*shar
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m *MockCluster) GetAllRegistry() []*share.CLUSRegistryConfig {
+func (m *MockCluster) GetAllRegistry(scope string) []*share.CLUSRegistryConfig {
 	list := make([]*share.CLUSRegistryConfig, 0)
 	for _, r := range m.registries {
 		list = append(list, r)
@@ -289,7 +289,7 @@ func (m *MockCluster) PutRegistryIfNotExist(config *share.CLUSRegistryConfig) er
 	return m.PutRegistry(config, 0)
 }
 
-func (m *MockCluster) DeleteRegistry(name string) error {
+func (m *MockCluster) DeleteRegistry(txn *cluster.ClusterTransact, name string) error {
 	if _, ok := m.registries[name]; ok {
 		delete(m.registries, name)
 		return nil
@@ -425,7 +425,7 @@ func (m *MockCluster) PutRegistryImageSummary(name, id string, sum *share.CLUSRe
 	return nil
 }
 
-func (m *MockCluster) DeleteRegistryImageSummaryAndReport(name, id string) error {
+func (m *MockCluster) DeleteRegistryImageSummaryAndReport(name, id, fedRole string) error {
 	return nil
 }
 
@@ -512,7 +512,7 @@ func (m *MockCluster) GetAllCustomCheckConfig() map[string]*share.CLUSCustomChec
 	return make(map[string]*share.CLUSCustomCheckGroup)
 }
 
-func (m *MockCluster) PutRegistryImageSummaryAndReport(name, id string, sum *share.CLUSRegistryImageSummary, report *share.CLUSScanReport) error {
+func (m *MockCluster) PutRegistryImageSummaryAndReport(name, id, fedRole string, sum *share.CLUSRegistryImageSummary, report *share.CLUSScanReport) error {
 	m.ScanSums[share.CLUSRegistryImageStateKey(name, id)] = sum
 	m.ScanRpts[share.CLUSRegistryImageDataKey(name, id)] = report
 	return nil

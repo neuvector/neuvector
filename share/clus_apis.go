@@ -32,6 +32,7 @@ const CLUSLockFedKey string = CLUSLockStore + "federation"
 const CLUSLockScannerKey string = CLUSLockStore + "scanner"
 const CLUSLockCrdQueueKey string = CLUSLockStore + "crd_queue"
 const CLUSLockCloudKey string = CLUSLockStore + "cloud"
+const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -393,6 +394,10 @@ func CLUSDomainConfigKey(name string) string {
 
 func CLUSRegistryConfigKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigRegistryStore, name)
+}
+
+func CLUSScanStateKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSScanStateStore, name)
 }
 
 func CLUSRegistryStateKey(name string) string {
@@ -977,8 +982,8 @@ type CLUSDomain struct {
 	Name    string            `json:"name"`
 	Dummy   bool              `json:"dummy"`
 	Disable bool              `json:"disable"`
-	Tags    []string          `json:"tags"`		// compliance tags
-	Labels  map[string]string `json:"labels"`	// from k8s
+	Tags    []string          `json:"tags"`   // compliance tags
+	Labels  map[string]string `json:"labels"` // from k8s
 }
 
 type CLUSCriteriaEntry struct {
@@ -1594,6 +1599,7 @@ type CLUSRegistryConfig struct {
 	GitlabPrivateToken string                `json:"gitlab_private_token,cloak"`
 	IBMCloudAccount    string                `json:"ibmcloud_account"`
 	IBMCloudTokenURL   string                `json:"ibmcloud_token_url"`
+	CfgType            TCfgType              `json:"cfg_type"`
 }
 
 type CLUSImage struct {
@@ -1971,16 +1977,8 @@ const (
 	CLUSFedClustersSubKey       = "clusters"
 	CLUSFedRulesRevisionSubKey  = "rules_revision"
 	CLUSFedToPingPollSubKey     = "ping_poll"
-)
-
-const (
-	CLUSFedMembershipKey     = CLUSConfigFederationStore + CLUSFedMembershipSubKey     // stores CLUSFedMembership
-	CLUSFedClustersListKey   = CLUSConfigFederationStore + CLUSFedClustersListSubKey   // stores CLUSFedJoinedClusterList
-	CLUSFedClustersStatusKey = CLUSConfigFederationStore + CLUSFedClustersStatusSubKey // each subkey stores CLUSFedClusterStatus
-	CLUSFedClustersKey       = CLUSConfigFederationStore + CLUSFedClustersSubKey       // each subkey stores CLUSFedJointClusterInfo
-	CLUSFedRulesRevisionKey  = CLUSConfigFederationStore + CLUSFedRulesRevisionSubKey  // stores CLUSFedRulesRevision
-	CLUSFedToPingPollKey     = CLUSConfigFederationStore + CLUSFedToPingPollSubKey     // stores CLUSFedDoPingPoll
-	CLUSFedSystemKey         = CLUSConfigFederationStore + CFGEndpointSystem           // stores CLUSFedSystemConfig
+	CLUSFedConfigSubKey         = "config"
+	CLUSFedScanDataRevSubKey    = "scan_revisions"
 )
 
 func CLUSEmptyFedRulesRevision() *CLUSFedRulesRevision {
@@ -2000,14 +1998,19 @@ func CLUSEmptyFedRulesRevision() *CLUSFedRulesRevision {
 	return fedRev
 }
 
+func CLUSFedKey(name string) string {
+	// ex: object/config/federation/{name}
+	return fmt.Sprintf("%s%s", CLUSConfigFederationStore, name)
+}
+
 func CLUSFedJointClusterKey(id string) string {
 	// ex: object/config/federation/clusters/{000-111-222}
-	return fmt.Sprintf("%s/%s", CLUSFedClustersKey, id)
+	return fmt.Sprintf("%s%s/%s", CLUSConfigFederationStore, CLUSFedClustersSubKey, id)
 }
 
 func CLUSFedJointClusterStatusKey(id string) string {
 	// ex: object/config/federation/clusters_status/{000-111-222}
-	return fmt.Sprintf("%s/%s", CLUSFedClustersStatusKey, id)
+	return fmt.Sprintf("%s%s/%s", CLUSConfigFederationStore, CLUSFedClustersStatusSubKey, id)
 }
 
 func CLUSFedKey2CfgKey(key string) string {
@@ -2056,6 +2059,10 @@ type CLUSFedMembership struct { // stored on each cluster (master & joint cluste
 	PendingDismiss   bool                     `json:"pending_dismiss"`          // set to true when the cluster is demoted/kicked & leaves fed. set to false when the fed rules cleanup is done
 	PendingDismissAt time.Time                `json:"pending_dismiss_at"`
 	UseProxy         string                   `json:"use_proxy"` // http / https
+}
+
+type CLUSFedConfiguration struct { // stored on each cluster (master & joint cluster)
+	DeployRegScanData bool `json:"deploy_scan_data"` // whether scan data deployment is enabled
 }
 
 type CLUSFedClusterStatus struct {
@@ -2113,6 +2120,17 @@ type CLUSFedProcessProfileData struct {
 type CLUSFedSystemConfigData struct {
 	Revision     uint64            `json:"revision"`
 	SystemConfig *CLUSSystemConfig `json:"system_config"`
+}
+
+type CLUSFedRegistriesData struct { //-> AAA
+	Revision   uint64                `json:"revision"`
+	Registries []*CLUSRegistryConfig `json:"registries,omitempty"`
+}
+
+type CLUSFedScanRevisions struct { //-> AAA
+	RegistryRevision    uint64                       `json:"registry_revision"`           // fed registry revision
+	ScannedRegImagesRev uint64                       `json:"scanned_reg_images_revision"` // increases whenever the scan result of any image in a fed registry is changed
+	ScanReportRevisions map[string]map[string]string `json:"scan_report_revisions"`       // registry name : image id : scan report revision
 }
 
 //dlp rule

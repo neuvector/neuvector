@@ -209,6 +209,10 @@ func upgradeRegistry(cfg *share.CLUSRegistryConfig) (bool, bool) {
 		cfg.JfrogMode = share.JFrogModeRepositoryPath
 		upd = true
 	}
+	if cfg.CfgType == 0 {
+		cfg.CfgType = share.UserCreated
+		upd = true
+	}
 	// Don't write back to the cluster yet as we could be in the process of rolling upgrade,
 	// old controllers might not accept the new configs.
 	return upd, false
@@ -752,7 +756,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"7B3D205C", addFmonRpmPackageDB},
 
-	{"168EE3FA", nil},
+	{"168EE3FA", resetRegistryCfgType},
+
+	{"28ea479c", nil},
 }
 
 func latestKVVersion() string {
@@ -1572,4 +1578,8 @@ func resetDlpCfgType() {
 func addFmonRpmPackageDB() {
 	// additional file monitor entry
 	addPredefinedFileRule(share.FileAccessBehaviorMonitor, "/var/lib/rpm/Packages.db", "")
+}
+
+func resetRegistryCfgType() {
+	clusHelper.GetAllRegistry(share.ScopeLocal)
 }

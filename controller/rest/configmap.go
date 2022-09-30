@@ -945,24 +945,27 @@ func LoadInitCfg(load bool) {
 	var context configMapHandlerContext
 
 	for _, configMap := range configMaps {
+		var errMsg string
 		if _, err := os.Stat(configMap.FileName); err == nil {
 			if yaml_data, err := ioutil.ReadFile(configMap.FileName); err == nil {
 				skip = false
 				err = configMap.HandlerFunc(yaml_data, load, &skip, &context)
 				log.WithFields(log.Fields{"cfg": configMap.Type, "skip": skip, "error": err}).Debug()
 				if err == nil {
-					e := fmt.Sprintf("    %s init configmap loaded", configMap.Type)
-					loaded = append(loaded, e)
+					msg := fmt.Sprintf("    %s init configmap loaded", configMap.Type)
+					loaded = append(loaded, msg)
 				} else {
-					e := fmt.Sprintf("    %s init configmap failed: %s ", configMap.Type, err.Error())
-					log.Error(e)
-					failed = append(loaded, e)
+					errMsg = fmt.Sprintf("    %s init configmap failed: %s ", configMap.Type, err.Error())
 				}
 			} else {
-				e := fmt.Sprintf("    %s init configmap read error: %s ", configMap.Type, err.Error())
-				log.Error(e)
-				failed = append(loaded, e)
+				errMsg = fmt.Sprintf("    %s init configmap read error: %s ", configMap.Type, err.Error())
 			}
+		} else {
+			errMsg = fmt.Sprintf("    %s init configmap file error: %s ", configMap.Type, err.Error())
+		}
+		if errMsg != "" {
+			log.Error(errMsg)
+			failed = append(failed, errMsg)
 		}
 	}
 
@@ -975,5 +978,6 @@ func LoadInitCfg(load bool) {
 		e := "Following k8s configmap as neuvector init config failed to load "
 		k8sResourceLog(share.CLUSEvInitCfgMapError, e, failed)
 	}
+	log.WithFields(log.Fields{"load": load}).Info("done")
 
 }

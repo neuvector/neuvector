@@ -59,33 +59,37 @@ type RESTFedJointClusterInfo struct {
 }
 
 type RESTFedMembereshipData struct { // including all clusters in the federation
-	FedRole       string                     `json:"fed_role"`                 // FedRoleMaster / FedRoleJoint / FedRoleNone (see above)
-	LocalRestInfo share.CLUSRestServerInfo   `json:"local_rest_info"`          //
-	MasterCluster *RESTFedMasterClusterInfo  `json:"master_cluster,omitempty"` // master cluster
-	JointClusters []*RESTFedJointClusterInfo `json:"joint_clusters"`           // all non-master clusters in the federation
-	UseProxy      string                     `json:"use_proxy"`                // http / https
+	FedRole           string                     `json:"fed_role"`                 // FedRoleMaster / FedRoleJoint / FedRoleNone (see above)
+	LocalRestInfo     share.CLUSRestServerInfo   `json:"local_rest_info"`          //
+	MasterCluster     *RESTFedMasterClusterInfo  `json:"master_cluster,omitempty"` // master cluster
+	JointClusters     []*RESTFedJointClusterInfo `json:"joint_clusters"`           // all non-master clusters in the federation
+	UseProxy          string                     `json:"use_proxy"`                // http / https
+	DeployRegScanData bool                       `json:"deploy_reg_scan_data"`     // whether fed registry scan data deployment is enabled
 }
 
 type RESTFedConfigData struct { // including all clusters in the federation
-	PingInterval *uint32                   `json:"ping_interval,omitempty"` // in minute
-	PollInterval *uint32                   `json:"poll_interval,omitempty"` // in minute
-	Name         *string                   `json:"name,omitempty"`          // cluster name
-	RestInfo     *share.CLUSRestServerInfo `json:"rest_info,omitempty"`
-	UseProxy     *string                   `json:"use_proxy,omitempty"` // http / https
+	PingInterval      *uint32                   `json:"ping_interval,omitempty"` // in minute
+	PollInterval      *uint32                   `json:"poll_interval,omitempty"` // in minute
+	Name              *string                   `json:"name,omitempty"`          // cluster name
+	RestInfo          *share.CLUSRestServerInfo `json:"rest_info,omitempty"`
+	UseProxy          *string                   `json:"use_proxy,omitempty"`  // http / https
+	DeployRegScanData *bool                     `json:"deploy_reg_scan_data"` // whether fed registry scan data deployment is enabled
 }
 
 type RESTFedPromoteReqData struct {
-	Name           string                    `json:"name,omitempty"`             // cluster name
-	PingInterval   uint32                    `json:"ping_interval"`              // in minute
-	PollInterval   uint32                    `json:"poll_interval"`              // in minute
-	MasterRestInfo *share.CLUSRestServerInfo `json:"master_rest_info,omitempty"` // rest info about this master cluster
-	UseProxy       *string                   `json:"use_proxy,omitempty"`        // http / https
+	Name              string                    `json:"name,omitempty"`             // cluster name
+	PingInterval      uint32                    `json:"ping_interval"`              // in minute
+	PollInterval      uint32                    `json:"poll_interval"`              // in minute
+	MasterRestInfo    *share.CLUSRestServerInfo `json:"master_rest_info,omitempty"` // rest info about this master cluster
+	UseProxy          *string                   `json:"use_proxy,omitempty"`        // http / https
+	DeployRegScanData *bool                     `json:"deploy_reg_scan_data"`       // whether fed registry scan data deployment is enabled
 }
 
 type RESTFedPromoteRespData struct {
-	FedRole       string                   `json:"fed_role"`
-	MasterCluster RESTFedMasterClusterInfo `json:"master_cluster"`      // info about this master cluster
-	UseProxy      string                   `json:"use_proxy,omitempty"` // http / https
+	FedRole           string                   `json:"fed_role"`
+	MasterCluster     RESTFedMasterClusterInfo `json:"master_cluster"`       // info about this master cluster
+	UseProxy          string                   `json:"use_proxy,omitempty"`  // http / https
+	DeployRegScanData bool                     `json:"deploy_reg_scan_data"` // whether fed registry scan data deployment is enabled
 }
 
 type RESTFedJoinToken struct { // json of the join token that contains master cluster server/port & encrypted join_ticket
@@ -160,6 +164,17 @@ type RESTFedRulesSettings struct {
 	SystemConfigData    *share.CLUSFedSystemConfigData   `json:"system_config_data,omitempty"`
 }
 
+type RESTFedImageScanResult struct {
+	Revision string                          `json:"revision"` // it's md5 of json.marshal(Summary+Report)
+	Summary  *share.CLUSRegistryImageSummary `json:"summary,omitempty"`
+	Report   *share.CLUSScanReport           `json:"report,omitempty"`
+}
+
+type RESTFedScanData struct {
+	UpdatedScanResults map[string]map[string]*RESTFedImageScanResult `json:"updated_scan_result,omitempty"` // registry name : image id : scan result; it contains only new/updated scan results
+	DeletedScanResults map[string][]string                           `json:"deleted_scan_result,omitempty"` // registry name : []image id. map value being nil means the registry is deleted
+}
+
 type RESTFedInternalCommandReq struct {
 	FedKvVersion string            `json:"fed_kv_version"` // kv version in the code of master cluster
 	Command      string            `json:"command"`        // currently supported commands: _cmdPollFedRules / _cmdForcePullFedRules
@@ -182,19 +197,46 @@ type RESTFedPingResp struct { // from manager to joint cluster
 
 // for polling fed rules/settings from joint clusters to master cluster
 type RESTPollFedRulesReq struct {
-	ID           string            `json:"id"`                     // id of joint cluster
-	Name         string            `json:"name"`                   // name of joint cluster
-	JointTicket  string            `json:"joint_ticket"`           // generated using joint cluster's secret
-	FedKvVersion string            `json:"fed_kv_version"`         // kv version in the code of joint cluster
-	RestVersion  string            `json:"rest_version,omitempty"` // rest version in the code of joint cluster
-	Revisions    map[string]uint64 `json:"revisions"`              // key is fed rules type, value is the revision
+	ID                  string            `json:"id"`                          // id of joint cluster
+	Name                string            `json:"name"`                        // name of joint cluster
+	JointTicket         string            `json:"joint_ticket"`                // generated using joint cluster's secret
+	FedKvVersion        string            `json:"fed_kv_version"`              // kv version in the code of joint cluster
+	RestVersion         string            `json:"rest_version,omitempty"`      // rest version in the code of joint cluster
+	Revisions           map[string]uint64 `json:"revisions"`                   // key is fed rules type, value is the revision
+	RegistryRevision    uint64            `json:"registry_revision"`           // fed registry revision
+	ScannedRegImagesRev uint64            `json:"scanned_reg_images_revision"` // scanned images' revision in fed registries on master cluster
 }
 
 type RESTPollFedRulesResp struct {
-	Result       int               `json:"result"`        // value: _fedSuccess/....
-	PollInterval uint32            `json:"poll_interval"` // in minute
-	Settings     []byte            `json:"settings"`      // marshall of RESTFedRulesSettings
-	Revisions    map[string]uint64 `json:"revisions"`     // key is fed rules type, value is the revision
+	Result              int               `json:"result"`                      // value: _fedSuccess/....
+	PollInterval        uint32            `json:"poll_interval"`               // in minute
+	Settings            []byte            `json:"settings,omitempty"`          // marshall of RESTFedRulesSettings, which contains only modified settings (for ~5.0.x)
+	Revisions           map[string]uint64 `json:"revisions"`                   // key is fed rules type, value is the revision. It contains only revisions of modified settings
+	RegistryRevision    uint64            `json:"registry_revision"`           // fed registry revision
+	ScannedRegImagesRev uint64            `json:"scanned_reg_images_revision"` // scanned images' revision in fed registries on master cluster
+	DeployRegScanData   bool              `json:"deploy_reg_scan_data"`        // for informing whether master cluster accepts registry scan data polling
+}
+
+type RESTPollFedScanDataReq struct {
+	ID                  string                       `json:"id"`                          // id of joint cluster
+	Name                string                       `json:"name"`                        // name of joint cluster
+	JointTicket         string                       `json:"joint_ticket"`                // generated using joint cluster's secret
+	FedKvVersion        string                       `json:"fed_kv_version"`              // kv version in the code of joint cluster
+	RestVersion         string                       `json:"rest_version,omitempty"`      // rest version in the code of joint cluster
+	RegistryRevision    uint64                       `json:"registry_revision"`           // fed registry revision
+	ScannedRegImagesRev uint64                       `json:"scanned_reg_images_revision"` // scanned images' revision in fed registries on master cluster that the managed cluster remembers
+	ScanReportRevisions map[string]map[string]string `json:"scan_report_revisions"`       // registry name : image id : scan report md5
+}
+
+type RESTPollFedScanDataResp struct {
+	Result              int                          `json:"result"`                      // value: _fedSuccess/....
+	PollInterval        uint32                       `json:"poll_interval"`               // in minute
+	RegistryRevision    uint64                       `json:"registry_revision"`           // fed registry revision
+	RegistryData        *share.CLUSFedRegistriesData `json:"registry_data,omitempty"`     // all fed registry settings if there is any change since last polling
+	ScannedRegImagesRev uint64                       `json:"scanned_reg_images_revision"` // scanned images' revision in fed registries on master cluster
+	FedScanData         RESTFedScanData              `json:"fed_scan_data"`               // (partial) updated/deleted scan result since last polling
+	HasPartialScanData  bool                         `json:"has_partial_scan_data"`       // true when master cluster returns partial new scan data. managed clusters should keep polling based on bandwidth consideration.
+	ThrottleTime        uint32                       `json:"throttle_time"`               // in ms
 }
 
 type RESTFedView struct {

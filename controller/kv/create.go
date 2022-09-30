@@ -26,11 +26,11 @@ const (
 )
 
 const (
-	commentSsnSensor     = "Sensor for SSN detection"
-	commentCcSensor      = "Sensor for Credit Card detection, Credit Card includes visa, master, discover, american express, diner and jcb"
-	commentDefaultSensor = "Hidden default sensor"
-	commentLog4shSensor  = "Log4Shell - 0Day RCE exploit found in Log4j"
-	commentSpr4shSensor  = "Spring4Shell - 0day RCE Vulnerability found in Java Spring Framework"
+	commentSsnSensor        = "Sensor for SSN detection"
+	commentCcSensor         = "Sensor for Credit Card detection, Credit Card includes visa, master, discover, american express, diner and jcb"
+	commentDefaultSensor    = "Hidden default sensor"
+	commentLog4shSensor     = "Log4Shell - 0Day RCE exploit found in Log4j"
+	commentSpr4shSensor     = "Spring4Shell - 0day RCE Vulnerability found in Java Spring Framework"
 	commentDefaultWafSensor = "Hidden default waf sensor"
 )
 
@@ -722,17 +722,17 @@ var preWafRuleLog4sh = &share.CLUSWafRule{
 	Name: common.GetInternalWafRuleName(share.WafRuleNameLog4sh, share.CLUSWafLog4shSensor),
 	Patterns: []share.CLUSWafCriteriaEntry{
 		share.CLUSWafCriteriaEntry{
-			Key:   "pattern",
-			Op:    share.CriteriaOpRegex,
+			Key:     "pattern",
+			Op:      share.CriteriaOpRegex,
 			Context: share.DlpPatternContextHEAD,
-			Value: "\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*",
+			Value:   "\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*",
 		},
 	},
 	CfgType: share.UserCreated,
 }
 
 var Log4shWafSensor = &share.CLUSWafSensor{
-	Name: share.CLUSWafLog4shSensor,
+	Name:        share.CLUSWafLog4shSensor,
 	Groups:      make(map[string]string),
 	RuleList:    make(map[string]*share.CLUSWafRule),
 	PreRuleList: make(map[string][]*share.CLUSWafRule),
@@ -748,17 +748,17 @@ var preWafRuleSpring4sh = &share.CLUSWafRule{
 	Name: common.GetInternalWafRuleName(share.WafRuleNameSpr4sh, share.CLUSWafSpr4shSensor),
 	Patterns: []share.CLUSWafCriteriaEntry{
 		share.CLUSWafCriteriaEntry{
-			Key:   "pattern",
-			Op:    share.CriteriaOpRegex,
+			Key:     "pattern",
+			Op:      share.CriteriaOpRegex,
 			Context: share.DlpPatternContextBODY,
-			Value: "if.*equals.*request\\.getParameter.*pwd.*getRuntime.*exec.*request\\.getParameter.*cmd.*getInputStream.*read.*print.*classLoader",
+			Value:   "if.*equals.*request\\.getParameter.*pwd.*getRuntime.*exec.*request\\.getParameter.*cmd.*getInputStream.*read.*print.*classLoader",
 		},
 	},
 	CfgType: share.UserCreated,
 }
 
 var Spring4shWafSensor = &share.CLUSWafSensor{
-	Name: share.CLUSWafSpr4shSensor,
+	Name:        share.CLUSWafSpr4shSensor,
 	Groups:      make(map[string]string),
 	RuleList:    make(map[string]*share.CLUSWafRule),
 	PreRuleList: make(map[string][]*share.CLUSWafRule),
@@ -794,16 +794,16 @@ func CreatePreWafSensor(withlock bool) {
 }
 
 var defaultSensorAllWafRule = &share.CLUSWafSensor{
-	Name:     share.CLUSWafDefaultSensor,
-	Groups:   make(map[string]string),
-	RuleList: map[string]*share.CLUSWafRule {
-		preWafRuleLog4sh.Name:      preWafRuleLog4sh,
-		preWafRuleSpring4sh.Name:   preWafRuleSpring4sh,
+	Name:   share.CLUSWafDefaultSensor,
+	Groups: make(map[string]string),
+	RuleList: map[string]*share.CLUSWafRule{
+		preWafRuleLog4sh.Name:    preWafRuleLog4sh,
+		preWafRuleSpring4sh.Name: preWafRuleSpring4sh,
 	},
 	PreRuleList: make(map[string][]*share.CLUSWafRule),
-	Comment:   commentDefaultWafSensor,
-	Predefine: true,
-	CfgType:   share.SystemDefined,
+	Comment:     commentDefaultWafSensor,
+	Predefine:   true,
+	CfgType:     share.SystemDefined,
 }
 
 func CreateDefWafRules(withlock bool) {
