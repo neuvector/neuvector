@@ -161,14 +161,10 @@ func (p *Probe) removeHostPool(pid int) {
 
 func (p *Probe) addProcessPool(pid, ppid int) (*procContainer, bool) {
 	if c, ok := p.pidContainerMap[ppid]; ok && c.id != ""{
-		if c.id == p.selfID {
-			c.children.Add(pid) // the children of the nstools are ambiguous and can be in other namespaces
+		if c.children.Contains(ppid) {
+			c.children.Add(pid)
 		} else {
-			if c.children.Contains(ppid) {
-				c.children.Add(pid)
-			} else {
-				c.outsider.Add(pid)
-			}
+			c.outsider.Add(pid)
 		}
 		p.removeHostPool(pid)
 		return c, true
@@ -505,7 +501,9 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 		}
 
 		if c.id == p.selfID {
-			c.children.Add(pid) // the children of the nstools are ambiguous and can be in other namespaces
+			if proc, ok := p.pidProcMap[pid]; ok && isFamilyProcess(c.children, proc) {
+				c.children.Add(pid)	// make an early decision
+			}
 		} else {
 			c.outsider.Add(pid) // temporary: c.children
 		}
@@ -588,12 +586,7 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 }
 
 func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
-	// children of nstools, bench script: nstools -> sh -> executables
-	if pproc, ok := p.pidProcMap[proc.ppid]; ok && pproc.ppath == "/usr/local/bin/nstools" {
-		return true
-	}
-	// bench script: work into a different mount namespace
-	return proc.ppath == "/usr/local/bin/nstools" || p.agentMntNsId != global.SYS.GetMntNamespaceId(proc.pid)
+	return global.SYS.IsToolProcess(proc.sid, proc.pgid)
 }
 
 func (p *Probe) isAgentProcess(sid int, id string) bool {
@@ -1668,6 +1661,10 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 //
 func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
 	if id == p.selfID {
+		if p.agentSessionID == proc.sid {
+			return true
+		}
+
 		if c, ok := p.containerMap[p.selfID]; ok {
 			return isFamilyProcess(c.children, proc)
 		}
@@ -1684,8 +1681,8 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	// only allowing the NS op from the agent's root session
-	if p.isAgentChildren(proc, id) && p.isAgentNsOperation(proc) {
-		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored agent NS ops")
+	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc) {
+		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
 		return
 	}
 
