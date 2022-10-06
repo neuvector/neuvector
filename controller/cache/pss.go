@@ -119,7 +119,7 @@ func usesIllegalSELinuxOptions(c *nvsysadmission.AdmContainerInfo) bool {
 
 // Baseline Policy - /proc Mount Type
 func usesCustomProcMount(c *nvsysadmission.AdmContainerInfo) bool {
-	return c.ProcMount != "" || !strings.EqualFold(c.ProcMount, "default")
+	return c.ProcMount != "" && !strings.EqualFold(c.ProcMount, "default")
 }
 
 // Baseline Policy - Seccomp
