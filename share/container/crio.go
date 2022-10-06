@@ -406,9 +406,13 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		meta = &ContainerMetaExtra{
 			ContainerMeta: *d.getPodMeta(id, pod, podInfo),
 			Privileged:    d.isPrivileged(pod.Status, nil),
-			CreatedAt:     time.Unix(0, pod.Status.CreatedAt),
 			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
 			Networks:      utils.NewSet(),
+		}
+
+		if pod.Status.CreatedAt > 0 {
+			meta.CreatedAt = time.Unix(0, pod.Status.CreatedAt)
+			meta.StartedAt = meta.CreatedAt
 		}
 
 		// image ID
@@ -448,13 +452,24 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			ContainerMeta: *d.getContainerMeta(id, cs, pod, csInfo),
 			ImageDigest:   imageRef2Digest(cs.Status.ImageRef),
 			Privileged:    d.isPrivileged(pod.Status, csInfo),
-			CreatedAt:     time.Unix(0, cs.Status.CreatedAt),
-			StartedAt:     time.Unix(0, cs.Status.StartedAt),
-			FinishedAt:    time.Unix(0, cs.Status.FinishedAt),
 			ExitCode:      int(cs.Status.ExitCode),
 			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 			Networks:      utils.NewSet(),
 			LogPath:       cs.Status.LogPath,
+		}
+
+		if cs.Status.CreatedAt > 0 {
+			meta.CreatedAt = time.Unix(0, cs.Status.CreatedAt)
+		}
+
+		if cs.Status.StartedAt > 0 {
+			meta.StartedAt = time.Unix(0, cs.Status.StartedAt)
+		} else {
+			meta.StartedAt = meta.CreatedAt
+		}
+
+		if cs.Status.FinishedAt > 0 {
+			meta.FinishedAt = time.Unix(0, cs.Status.FinishedAt)
 		}
 
 		// image ID
