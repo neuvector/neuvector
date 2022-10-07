@@ -476,10 +476,10 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 				}
 			}
 
-			// pod seccomp (TODO: update k8s package to version that includes seccomp profile in api)
-			// if spec.SecurityContext.SeccompProfile != nil {
-			// 	admContainerInfo.SeccompProfile = spec.SecurityContext.SeccompProfile.Type
-			// }
+			// pod seccomp profile type
+			if spec.SecurityContext.SeccompProfile != nil {
+				admContainerInfo.SeccompProfileType = &spec.SecurityContext.SeccompProfile.Type
+			}
 
 			// run as non root
 			if spec.SecurityContext.RunAsNonRoot != nil {
@@ -542,10 +542,10 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 				admContainerInfo.ProcMount = ""
 			}
 
-			// container seccomp (TODO: update k8s package to version that includes seccomp profile in api)
-			// if c.SecurityContext.SeccompProfile != nil {
-			// 	admContainerInfo.SeccompProfile = c.SecurityContext.SeccompProfile.Type
-			// }
+			// container seccomp profile type
+			if c.SecurityContext.SeccompProfile != nil {
+				admContainerInfo.SeccompProfileType = &c.SecurityContext.SeccompProfile.Type
+			}
 
 			// container run as non root
 			if c.SecurityContext.RunAsNonRoot != nil {

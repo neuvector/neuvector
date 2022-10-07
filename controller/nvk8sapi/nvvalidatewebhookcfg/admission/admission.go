@@ -80,34 +80,34 @@ type SELinuxOptions struct {
 }
 
 type AdmContainerInfo struct {
-	Name                     string                `json:"name"`
-	Image                    string                `json:"image"` // original spec.container.image value in the yaml file
-	ImageRegistry            utils.Set             `json:"image_registry"`
-	ImageRepo                string                `json:"image_repo"`
-	ImageTag                 string                `json:"image_tag"`
-	Privileged               bool                  `json:"privileged,omitempty"`
-	RunAsUser                int64                 `json:"run_as_user,omitempty"`
-	VolMounts                utils.Set             `json:"vol_mounts,omitempty"`
-	EnvVars                  map[string]string     `json:"env_vars,omitempty"`
-	EnvSecrets               []share.ScanSecretLog `json:"env_secrets,omitempty"`
-	HostNetwork              bool                  `json:"host_network,omitempty"`
-	HostPID                  bool                  `json:"host_pid,omitempty"`
-	HostIPC                  bool                  `json:"host_ipc,omitempty"`
-	AllowPrivilegeEscalation bool                  `json:"allow_privilege_escalation,omitempty"`
-	CpuLimits                float64               `json:"cpu_limits"`
-	CpuRequests              float64               `json:"cpu_requests"`
-	MemoryLimits             int64                 `json:"memory_limits"`
-	MemoryRequests           int64                 `json:"memory_requests"`
-	Type                     K8sContainerType      `json:"type"`
-	Capabilities             LinuxCapabilities     `json:"capabilities"`
-	Volumes                  []corev1.Volume       `json:"volumes"`
-	HostPorts                []int32               `json:"host_ports"`
-	AppArmorProfile          *string               `json:"app_armor_profile"`
-	SELinuxOptions           SELinuxOptions        `json:"se_linux_options"`
-	ProcMount                string                `json:"proc_mount"`
-	SeccompProfile           string                `json:"seccomp_profile"`
-	Sysctls                  []string              `json:"sysctls"`
-	RunAsNonRoot             bool                  `json:"run_as_non_root"`
+	Name                     string                     `json:"name"`
+	Image                    string                     `json:"image"` // original spec.container.image value in the yaml file
+	ImageRegistry            utils.Set                  `json:"image_registry"`
+	ImageRepo                string                     `json:"image_repo"`
+	ImageTag                 string                     `json:"image_tag"`
+	Privileged               bool                       `json:"privileged,omitempty"`
+	RunAsUser                int64                      `json:"run_as_user,omitempty"`
+	VolMounts                utils.Set                  `json:"vol_mounts,omitempty"`
+	EnvVars                  map[string]string          `json:"env_vars,omitempty"`
+	EnvSecrets               []share.ScanSecretLog      `json:"env_secrets,omitempty"`
+	HostNetwork              bool                       `json:"host_network,omitempty"`
+	HostPID                  bool                       `json:"host_pid,omitempty"`
+	HostIPC                  bool                       `json:"host_ipc,omitempty"`
+	AllowPrivilegeEscalation bool                       `json:"allow_privilege_escalation,omitempty"`
+	CpuLimits                float64                    `json:"cpu_limits"`
+	CpuRequests              float64                    `json:"cpu_requests"`
+	MemoryLimits             int64                      `json:"memory_limits"`
+	MemoryRequests           int64                      `json:"memory_requests"`
+	Type                     K8sContainerType           `json:"type"`
+	Capabilities             LinuxCapabilities          `json:"capabilities"`
+	Volumes                  []corev1.Volume            `json:"volumes"`
+	HostPorts                []int32                    `json:"host_ports"`
+	AppArmorProfile          *string                    `json:"app_armor_profile"`
+	SELinuxOptions           SELinuxOptions             `json:"se_linux_options"`
+	ProcMount                string                     `json:"proc_mount"`
+	SeccompProfileType       *corev1.SeccompProfileType `json:"seccomp_profile"`
+	Sysctls                  []string                   `json:"sysctls"`
+	RunAsNonRoot             bool                       `json:"run_as_non_root"`
 }
 
 type JSONAdmContainerInfo struct { // for debugging purpose only
