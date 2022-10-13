@@ -1154,11 +1154,6 @@ paths:
       summary: Get EULA agreement acceptance status
       produces:
         - application/json
-      parameters:
-        - in: header
-          name: X-Auth-Token
-          required: true
-          type: string
       responses:
         '200':
           description: Success
