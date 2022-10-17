@@ -366,6 +366,34 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 		return err
 	}
 
+	if fedEndpointCfg {
+		f, err := os.Open(source)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "file": source}).Error("Unable to open file to read")
+			return err
+		}
+		r := bufio.NewReader(f)
+		for {
+			key, value, err := readKeyValue(r)
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				break
+			}
+			// get fedRole first
+			subKey := share.CLUSKeyNthToken(key, 3)
+			if subKey == share.CLUSFedMembershipSubKey {
+				var m share.CLUSFedMembership
+				if err := json.Unmarshal([]byte(value), &m); err == nil {
+					importInfo.fedRole = m.FedRole
+					log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Info()
+				}
+				break
+			}
+		}
+		f.Close()
+	}
+
 	f, err := os.Open(source)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "file": source}).Error("Unable to open file to read")
@@ -402,32 +430,12 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			continue
 		}
 
-		if fedEndpointCfg {
-			// special handling for federation backup file because fedRole is unknown when Restore() is called
+		if fedEndpointCfg && importInfo.fedRole == api.FedRoleMaster {
 			subKey := share.CLUSKeyNthToken(key, 3)
-			if subKey == share.CLUSFedMembershipSubKey {
-				var m share.CLUSFedMembership
-				if err := json.Unmarshal([]byte(value), &m); err == nil {
-					importInfo.fedRole = m.FedRole
-					if keyInfo, ok := _fedKeyInfo[ep.name]; ok {
-						if importInfo.fedRole != api.FedRoleMaster { // need to filter fed rule keys on non-master cluster
-							filterFedObjectType = keyInfo.filterFedObjectType
-							fedMasterOnlyKeys = keyInfo.fedMasterOnlyKeys
-							filterSubKeyPrefix = keyInfo.filterSubKeyPrefix
-						} else {
-							filterFedObjectType = 0
-							fedMasterOnlyKeys = nil
-							filterSubKeyPrefix = nil
-						}
-						alwaysFilterKeys = keyInfo.alwaysFilterKeys
-					}
-				}
-			} else if subKey == share.CLUSFedRulesRevisionSubKey {
-				if importInfo.fedRole == api.FedRoleMaster {
-					importInfo.fedRulesRevValue = value
-					// do not write to kv now. postpone it at the last write
-					continue
-				}
+			if subKey == share.CLUSFedRulesRevisionSubKey {
+				importInfo.fedRulesRevValue = value
+				// do not write to kv now. postpone it at the last write
+				continue
 			}
 		}
 
