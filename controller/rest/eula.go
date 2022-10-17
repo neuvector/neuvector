@@ -6,20 +6,15 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	log "github.com/sirupsen/logrus"
 )
 
 func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
-
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	}
 
 	var resp api.RESTEULAData
 
@@ -34,7 +29,7 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		resp.EULA = &api.RESTEULA{Accepted: false}
 	}
 
-	restRespSuccess(w, r, &resp, acc, login, nil, "Get EULA")
+	restRespSuccess(w, r, &resp, nil, nil, nil, "Get EULA")
 }
 
 func handlerEULAConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
