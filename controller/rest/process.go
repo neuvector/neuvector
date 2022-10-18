@@ -363,7 +363,8 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 
 				idx, found := common.FindProcessInProfile(profile.Process, p)
 				if found {
-					deleted[proc.Name] = profile.Process[idx]
+					key := proc.Name + ":" + proc.Path
+					deleted[key] = profile.Process[idx]
 				} else {
 					log.WithFields(log.Fields{"group": group, "rule": p}).Error("Cannot find rule")
 					restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
@@ -373,7 +374,8 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 
 			list := make([]*share.CLUSProcessProfileEntry, 0)
 			for _, p := range profile.Process {
-				if d, ok := deleted[p.Name]; ok && (d.Path == p.Path) && (d.CfgType == p.CfgType) {
+				key := p.Name + ":" + p.Path
+				if d, ok := deleted[key]; ok && (d.CfgType == p.CfgType) {
 					// meet all comparing criteria
 					continue
 				}
@@ -386,7 +388,8 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		if conf.ProcessChgList != nil {
 			for _, proc := range *conf.ProcessChgList {
 				var created time.Time
-				if d, ok := deleted[proc.Name]; ok && (d.Path == proc.Path) {
+				key := proc.Name + ":" + proc.Path
+				if d, ok := deleted[key]; ok {
 					log.WithFields(log.Fields{"rule": d}).Debug("precedent")
 					created = d.CreatedAt
 				}
