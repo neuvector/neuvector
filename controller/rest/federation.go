@@ -2865,6 +2865,21 @@ func handlerGetJointClusterView(w http.ResponseWriter, r *http.Request, ps httpr
 	restRespSuccess(w, r, &resp, acc, login, nil, "")
 }
 
+func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
+	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+		atomic.LoadUint64(&fedRestServerState)
+		if fedRestServerState == _fedRestServerRunning_ {
+			restRespSuccess(w, r, nil, nil, nil, nil, "")
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+}
+
 var forbiddenFwUrl = map[string][]string{
 	"/v1/fed_auth": []string{http.MethodPost, http.MethodDelete},
 	"/v1/user":     []string{http.MethodPost},
