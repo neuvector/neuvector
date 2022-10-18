@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // The following functions are meant to represent the policy controls as listed
@@ -124,8 +125,11 @@ func usesCustomProcMount(c *nvsysadmission.AdmContainerInfo) bool {
 
 // Baseline Policy - Seccomp
 func usesIllegalSeccompProfile(c *nvsysadmission.AdmContainerInfo) bool {
-	profile := strings.ToLower(c.SeccompProfile)
-	return profile != "" && profile != "runtimedefault" && profile != "localhost"
+	if c.SeccompProfileType == nil {
+		return false
+	}
+
+	return *c.SeccompProfileType == corev1.SeccompProfileTypeUnconfined
 }
 
 // Baseline Policy - Sysctls
@@ -192,8 +196,12 @@ func allowsRootUsers(c *nvsysadmission.AdmContainerInfo) bool {
 
 // Restricted Policy - Seccomp (v1.19+)
 func doesNotSetLegalSeccompProfile(c *nvsysadmission.AdmContainerInfo) bool {
-	profile := strings.ToLower(c.SeccompProfile)
-	return profile != "runtimedefault" && profile != "localhost"
+	if c.SeccompProfileType == nil {
+		return true
+	}
+
+	return *c.SeccompProfileType != corev1.SeccompProfileTypeRuntimeDefault &&
+		*c.SeccompProfileType != corev1.SeccompProfileTypeLocalhost
 }
 
 // Restricted Policy - Capabilities (v1.22+)

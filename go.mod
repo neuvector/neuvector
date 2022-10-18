@@ -14,32 +14,32 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc => google.golang.org/grpc v1.30.1
-	k8s.io/api => k8s.io/api v0.18.19
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.19
+	k8s.io/api => k8s.io/api v0.19.0
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.17.17
-	k8s.io/apiserver => k8s.io/apiserver v0.18.19
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.18.19
-	k8s.io/client-go => k8s.io/client-go v0.18.19
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.18.19
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.18.19
-	k8s.io/code-generator => k8s.io/code-generator v0.18.19
-	k8s.io/component-base => k8s.io/component-base v0.18.19
+	k8s.io/apiserver => k8s.io/apiserver v0.19.0
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.19.0
+	k8s.io/client-go => k8s.io/client-go v0.19.0
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.19.0
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.19.0
+	k8s.io/code-generator => k8s.io/code-generator v0.19.0
+	k8s.io/component-base => k8s.io/component-base v0.19.0
 	k8s.io/component-helpers => k8s.io/component-helpers v0.20.14
 	k8s.io/controller-manager => k8s.io/controller-manager v0.20.14
-	k8s.io/cri-api => k8s.io/cri-api v0.18.19
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.19
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.18.19
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.18.19
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.18.19
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.18.19
-	k8s.io/kubectl => k8s.io/kubectl v0.18.19
-	k8s.io/kubelet => k8s.io/kubelet v0.18.19
+	k8s.io/cri-api => k8s.io/cri-api v0.19.0
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.19.0
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.19.0
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.19.0
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.19.0
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.19.0
+	k8s.io/kubectl => k8s.io/kubectl v0.19.0
+	k8s.io/kubelet => k8s.io/kubelet v0.19.0
 	k8s.io/kubernetes => k8s.io/kubernetes v1.23.1
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.18.19
-	k8s.io/metrics => k8s.io/metrics v0.18.19
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.19.0
+	k8s.io/metrics => k8s.io/metrics v0.19.0
 	k8s.io/mount-utils => k8s.io/mount-utils v0.20.14
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.5
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.19
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.0
 )
 
 require (
@@ -72,7 +72,6 @@ require (
 	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/neuvector/k8s v1.2.1-0.20220214174348-d0b3f377461e
-	github.com/nikolaydubina/go-cover-treemap v1.3.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
@@ -85,15 +84,15 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/tools v0.1.10 // indirect
 	google.golang.org/grpc v1.40.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.22.5
-	k8s.io/apimachinery v0.22.5
+	k8s.io/apimachinery v0.25.2
 	k8s.io/cri-api v0.0.0
 )
