@@ -606,7 +606,7 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		return
 	}
 
-	if weak, _, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil); weak {
+	if weak, _, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil, nil); weak {
 		log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
 		return
 	} else {
@@ -749,15 +749,18 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		context.gotAllCustomRoles = true
 	}
 
-	var pwdProfiles map[string]*share.CLUSPwdProfile
-	activePwdProfileName := clusHelper.GetActivePwdProfileName()
-	if context != nil && context.pwdProfile != nil && context.pwdProfile.Name == activePwdProfileName {
-		pwdProfiles = map[string]*share.CLUSPwdProfile{context.pwdProfile.Name: context.pwdProfile}
+	// occasionally the timing for kv callback to update cache about kv changes is just not right during start-up period.
+	// so we simply read password profile from kv & pass it to isWeakPassword() later
+	var activePwdProfileName string
+	if context != nil && context.pwdProfile != nil {
+		activePwdProfileName = context.pwdProfile.Name
 	} else {
-		pwdProfiles = clusHelper.GetAllPwdProfiles(accAdmin)
+		activePwdProfileName = clusHelper.GetActivePwdProfileName()
 	}
-	if activePwdProfileName != "" && len(pwdProfiles) > 0 {
-		cacher.PutPwdProfiles(activePwdProfileName, pwdProfiles)
+	profile, _, err := clusHelper.GetPwdProfileRev(activePwdProfileName, accAdmin)
+	if err != nil {
+		log.WithFields(log.Fields{"profile": activePwdProfileName, "error": err}).Error("Failed to get password profile")
+		return err
 	}
 
 	for _, ruser := range rconf.Users {
@@ -819,7 +822,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			newuser = false
 		}
 
-		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, user.PasswordHash, user.PwdHashHistory); weak {
+		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, user.PasswordHash, user.PwdHashHistory, profile); weak {
 			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 			continue
 		} else {

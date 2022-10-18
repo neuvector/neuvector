@@ -237,5 +237,4 @@ type CacheInterface interface {
 	// password profile
 	GetPwdProfile(name string) (share.CLUSPwdProfile, error)
 	GetAllPwdProfiles() (string, map[string]share.CLUSPwdProfile)
-	PutPwdProfiles(activeName string, profiles map[string]*share.CLUSPwdProfile)
 }
