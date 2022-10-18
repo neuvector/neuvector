@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 5.0.0
+  version: 5.1.0
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -71,6 +71,8 @@ tags:
     description: Operations about waf Rule
   - name: Container
     description: Operations about Container
+  - name: Federation
+    description: Operations about Federation
 
 ################################################################################
 #                                  Paths                                       #
@@ -4332,7 +4334,14 @@ paths:
       responses:
         '200':
           description: Success
-
+  /v1/fed/healthcheck:
+    get:
+      tags:
+        - Federation
+      summary: Health Check of Federate Primary REST server
+      responses:
+        '200':
+          description: Success
 
 ################################################################################
 #                                 Definitions                                  #
