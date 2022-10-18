@@ -146,7 +146,7 @@ type ClusterHelper interface {
 	GetRegistryImageSummary(name, id string) *share.CLUSRegistryImageSummary
 	PutRegistryImageSummaryAndReport(name, id, fedRole string, sum *share.CLUSRegistryImageSummary, report *share.CLUSScanReport) error
 	DeleteRegistryImageSummaryAndReport(name, id, fedRole string) error
-	UpdateFedScanDataRevisions(regOp, scanDataOp, regName, id, strMd5 string) error
+	UpdateFedScanDataRevisions(regOp, scanDataOp, regName, id string) error
 	GetFedScanRevisions() (share.CLUSFedScanRevisions, uint64, error)
 	PutFedScanRevisions(scanRevs *share.CLUSFedScanRevisions, rev *uint64) error
 
@@ -203,8 +203,8 @@ type ClusterHelper interface {
 	FedTriggerInstantPingPoll(cmd, fullPolling uint32)
 	EnableDisableJointClusters(ids []string, toDisable bool, fedKeyLocked bool)
 	ConfigFedRole(userName, role string, acc *access.AccessControl) error
-	GetFedConfiguration() share.CLUSFedConfiguration
-	PutFedConfiguration(txn *cluster.ClusterTransact, cfg share.CLUSFedConfiguration) error
+	GetFedSettings() share.CLUSFedSettings
+	PutFedSettings(txn *cluster.ClusterTransact, cfg share.CLUSFedSettings) error
 
 	GetDlpSensor(name string) *share.CLUSDlpSensor
 	GetAllDlpSensors() []*share.CLUSDlpSensor
@@ -400,6 +400,35 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	}
 }
 
+func (m clusterHelper) putSizeAware(key string, value []byte) error {
+	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
+		zb := utils.GzipBytes(value)
+		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
+			err := fmt.Errorf("zip data(%d) too big", len(zb))
+			log.WithFields(log.Fields{"key": key}).Error(err)
+			return err
+		}
+		return cluster.PutBinary(key, zb)
+	} else {
+		return cluster.Put(key, value)
+	}
+}
+
+/*
+func (m clusterHelper) putSizeAwareRev(key string, value []byte, rev uint64) error {
+	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
+		zb := utils.GzipBytes(value)
+		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
+			err := fmt.Errorf("zip data(%d) too big", len(zb))
+			log.WithFields(log.Fields{"key": key}).Error(err)
+			return err
+		}
+		return cluster.PutBinaryRev(key, zb, rev)
+	} else {
+		return cluster.PutRev(key, value, rev)
+	}
+}
+
 // do not consider UpgradeAndConvert yet. if need to do UpgradeAndConvert, value size needs to be considered in UpgradeAndConvert()
 func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
 	value, rev, err := cluster.GetRev(key)
@@ -417,34 +446,7 @@ func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
 	}
 }
 
-func (m clusterHelper) putSizeAware(key string, value []byte) error {
-	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
-		zb := utils.GzipBytes(value)
-		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
-			err := fmt.Errorf("zip data(%d) too big", len(zb))
-			log.WithFields(log.Fields{"key": key}).Error(err)
-			return err
-		}
-		return cluster.PutBinary(key, zb)
-	} else {
-		return cluster.Put(key, value)
-	}
-}
-
-func (m clusterHelper) putSizeAwareRev(key string, value []byte, rev uint64) error {
-	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
-		zb := utils.GzipBytes(value)
-		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
-			err := fmt.Errorf("zip data(%d) too big", len(zb))
-			log.WithFields(log.Fields{"key": key}).Error(err)
-			return err
-		}
-		return cluster.PutBinaryRev(key, zb, rev)
-	} else {
-		return cluster.PutRev(key, value, rev)
-	}
-}
-
+*/
 func (m clusterHelper) PutInstallationID() (string, error) {
 	if id, _ := m.GetInstallationID(); id != "" {
 		return id, nil
@@ -1392,9 +1394,19 @@ func (m clusterHelper) GetRegistryImageSummary(name, id string) *share.CLUSRegis
 	return nil
 }
 
-func (m clusterHelper) UpdateFedScanDataRevisions(regOp, scanDataOp, regName, id, strMd5 string) error {
+// called only on master cluster
+func (m clusterHelper) UpdateFedScanDataRevisions(regOp, scanDataOp, regName, id string) error {
 	var err error
 	retry := 0
+	isForRepo := false
+	if regName == common.RegistryRepoScanName {
+		// whenever scan summary for an image under "_repo_scan" repo is updated/deleted on master cluster, we increase "fed._repo_scan" repo's revision
+		regName = common.RegistryFedRepoScanName
+		isForRepo = true
+	} else if !strings.HasPrefix(regName, api.FederalGroupPrefix) {
+		return nil
+	}
+	key := share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey)
 	for retry < 3 {
 		scanRevs, rev, err := m.GetFedScanRevisions()
 		if err != nil {
@@ -1402,33 +1414,36 @@ func (m clusterHelper) UpdateFedScanDataRevisions(regOp, scanDataOp, regName, id
 		}
 		if regOp != "" {
 			// there is fed registry configuration change
-			scanRevs.RegistryRevision += 1
+			scanRevs.RegConfigRev += 1
+			if scanRevs.RegConfigRev == 0 {
+				scanRevs.RegConfigRev += 1
+			}
 			if regOp == resource.Delete {
-				if _, ok := scanRevs.ScanReportRevisions[regName]; ok {
-					delete(scanRevs.ScanReportRevisions, regName)
-					scanRevs.ScannedRegImagesRev += 1
-				}
-			}
-		}
-		if scanDataOp != "" && regName != "" && id != "" {
-			// there is scan result change for an image in fed registry
-			if scanDataOp == resource.Update {
-				if imageRevs, ok := scanRevs.ScanReportRevisions[regName]; !ok {
-					imageRevs = make(map[string]string, 1)
-					imageRevs[id] = strMd5
-					scanRevs.ScanReportRevisions[regName] = imageRevs
+				if isForRepo {
+					// "fed._repo_scan" repo actually is "_repo_scan" repo on master cluster. it can never be deleted by users
 				} else {
-					imageRevs[id] = strMd5
-				}
-			} else if scanDataOp == resource.Delete {
-				if imageRevs, ok := scanRevs.ScanReportRevisions[regName]; ok {
-					delete(imageRevs, id)
+					delete(scanRevs.ScannedRegRevs, regName)
 				}
 			}
-			scanRevs.ScannedRegImagesRev += 1
 		}
+		if scanDataOp != "" && id != "" {
+			// there is scan result change for an image in a fed registry/repo
+			if isForRepo {
+				scanRevs.ScannedRepoRev += 1
+				if scanRevs.ScannedRepoRev == 0 {
+					scanRevs.ScannedRepoRev += 1
+				}
+			} else {
+				rev := scanRevs.ScannedRegRevs[regName] + 1
+				if rev == 0 {
+					rev += 1
+				}
+				scanRevs.ScannedRegRevs[regName] = rev
+			}
+		}
+
 		value, _ := json.Marshal(&scanRevs)
-		if err = m.putSizeAwareRev(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey), value, rev); err == nil {
+		if err = cluster.PutRev(key, value, rev); err == nil {
 			break
 		}
 		retry++
@@ -1454,12 +1469,7 @@ func (m clusterHelper) DeleteRegistryImageSummaryAndReport(name, id, fedRole str
 	}
 
 	if fedRole == api.FedRoleMaster {
-		if name == common.RegistryRepoScanName {
-			// whenever scan summary for an image under "_repo_scan" repo is deleted on master cluster, we increase "fed._repo_scan" repo's revision
-			m.UpdateFedScanDataRevisions("", resource.Delete, common.RegistryFedRepoScanName, id, "")
-		} else if strings.HasPrefix(name, api.FederalGroupPrefix) {
-			m.UpdateFedScanDataRevisions("", resource.Delete, name, id, "")
-		}
+		m.UpdateFedScanDataRevisions("", resource.Delete, name, id)
 	}
 
 	if m.persist {
@@ -1471,7 +1481,6 @@ func (m clusterHelper) DeleteRegistryImageSummaryAndReport(name, id, fedRole str
 }
 
 func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string, sum *share.CLUSRegistryImageSummary, report *share.CLUSScanReport) error {
-
 	txn := cluster.Transact()
 	defer txn.Close()
 
@@ -1493,19 +1502,7 @@ func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string
 	}
 
 	if fedRole == api.FedRoleMaster {
-		scan_data := regImageSummaryReport{
-			Summary: vSum,
-			Report:  zbRpt,
-		}
-		data, _ := json.Marshal(&scan_data)
-		md5Sum := md5.Sum(data)
-		strMd5 := hex.EncodeToString(md5Sum[:])
-		if name == common.RegistryRepoScanName {
-			// whenever scan summary for an image under "_repo_scan" repo is written on master cluster, we increase "fed._repo_scan" repo's revision
-			m.UpdateFedScanDataRevisions("", resource.Update, common.RegistryFedRepoScanName, id, strMd5)
-		} else if strings.HasPrefix(name, api.FederalGroupPrefix) {
-			m.UpdateFedScanDataRevisions("", resource.Update, name, id, strMd5)
-		}
+		m.UpdateFedScanDataRevisions("", resource.Update, name, id)
 	}
 
 	if m.persist {
@@ -1519,7 +1516,7 @@ func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string
 func (m clusterHelper) GetFedScanRevisions() (share.CLUSFedScanRevisions, uint64, error) {
 	var scanRevs share.CLUSFedScanRevisions
 
-	value, rev, err := m.getGzipAware(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey))
+	value, rev, err := m.get(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey))
 	if err != nil {
 		return scanRevs, 0, err
 	}
@@ -1530,11 +1527,12 @@ func (m clusterHelper) GetFedScanRevisions() (share.CLUSFedScanRevisions, uint64
 }
 
 func (m clusterHelper) PutFedScanRevisions(scanRevs *share.CLUSFedScanRevisions, rev *uint64) error {
+	key := share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey)
 	value, _ := json.Marshal(&scanRevs)
 	if rev != nil {
-		return m.putSizeAwareRev(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey), value, *rev)
+		return cluster.PutRev(key, value, *rev)
 	} else {
-		return m.putSizeAware(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey), value)
+		return cluster.Put(key, value)
 	}
 }
 
@@ -2310,27 +2308,26 @@ func (m clusterHelper) ConfigFedRole(userName, role string, acc *access.AccessCo
 	return nil
 }
 
-func (m clusterHelper) GetFedConfiguration() share.CLUSFedConfiguration {
-	var cfg share.CLUSFedConfiguration
-	key := share.CLUSFedKey(share.CLUSFedConfigSubKey)
+func (m clusterHelper) GetFedSettings() share.CLUSFedSettings {
+	var cfg share.CLUSFedSettings
+	key := share.CLUSFedKey(share.CLUSFedSettingsSubKey)
 	if value, _, _ := m.get(key); value != nil {
 		json.Unmarshal(value, &cfg)
 	}
 	return cfg
 }
 
-func (m clusterHelper) PutFedConfiguration(txn *cluster.ClusterTransact, cfg share.CLUSFedConfiguration) error {
+func (m clusterHelper) PutFedSettings(txn *cluster.ClusterTransact, cfg share.CLUSFedSettings) error {
+	var err error
 	var value []byte
-	key := share.CLUSFedKey(share.CLUSFedConfigSubKey)
+	key := share.CLUSFedKey(share.CLUSFedSettingsSubKey)
 	value, _ = json.Marshal(cfg)
 	if txn != nil {
 		txn.Put(key, value)
 	} else {
-		if err := cluster.Put(key, value); err != nil {
-			return err
-		}
+		err = cluster.Put(key, value)
 	}
-	return nil
+	return err
 }
 
 // dlp sensor

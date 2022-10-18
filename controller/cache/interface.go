@@ -193,12 +193,11 @@ type CacheInterface interface {
 	GetFedMembershipRoleNoAuth() string
 	SetFedJoinedClusterToken(id, mainSessionID, token string)
 	GetFedRules(reqRevs map[string]uint64, acc *access.AccessControl) ([]byte, map[string]uint64, error)
-	GetFedScanData(req api.RESTPollFedScanDataReq, resp *api.RESTPollFedScanDataResp) error
-	//GetFedScanData(lastRegistryRevision, lastScannedImagesRev uint64, lastScanReportRevisions map[string]map[string]uint64) (
-	//	uint64, *share.CLUSFedRegistriesData, uint64, api.RESTFedScanData, bool, error)
 	GetAllFedRulesRevisions() map[string]uint64
-	GetFedScanDataRevisions(getAll bool) (uint64, uint64, map[string]map[string]string)
-	GetFedConfiguration() share.CLUSFedConfiguration
+	GetFedSettings() share.CLUSFedSettings
+	GetFedScanResult(reqRegConfigRev uint64, reqKnownFedRegs []string, reqScanResultMD5 map[string]map[string]string) (api.RESTPollFedScanDataResp, bool)
+	GetFedScanDataRevisions(getRegScanData, getRepoScanData bool) api.RESTFedScanDataRevs
+	GetFedScanResultMD5(cachedScanDataRevs, masterScanDataRevs api.RESTFedScanDataRevs) map[string]map[string]string
 
 	// Dlp rule
 	GetDlpSensor(sensor string, acc *access.AccessControl) (*api.RESTDlpSensor, error)

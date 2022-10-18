@@ -177,12 +177,11 @@ func registryInit() {
 func becomeScanner() {
 	log.Debug()
 
-	getLocal := true
-	getFed := true
-	if smd.fedRole == api.FedRoleJoint {
-		getFed = false
+	var getFed bool
+	if smd.fedRole == api.FedRoleMaster {
+		getFed = true
 	}
-	regs := regMapToArray(getLocal, getFed)
+	regs := regMapToArray(true, getFed)
 
 	for _, reg := range regs {
 		reg.stateLock()
@@ -205,7 +204,7 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 
 	name := share.CLUSKeyNthToken(key, 3)
 
-	// is it a full functioning registry or just a fed registry deployed to managed cluster for refernece only?
+	// decide it is a full functioning registry or just a fed registry deployed to managed cluster for refernece only
 	// (fed registry on master clster is also full functioning registry)
 	isFullFuncReg := false
 	if !strings.HasPrefix(name, api.FederalGroupPrefix) || smd.fedRole == api.FedRoleMaster {
@@ -588,7 +587,7 @@ func newRegistry(config *share.CLUSRegistryConfig) *Registry {
 		public:    isPublicRegistry(config),
 	}
 
-	// fed registries do no trigger image scanning on non-master clusters
+	// fed registry does no trigger image scanning on non-master clusters
 	if !strings.HasPrefix(config.Name, api.FederalGroupPrefix) || smd.fedRole != api.FedRoleJoint {
 		rs.driver = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
 		rs.backupDrv = newRegistryDriver(rs.config, rs.public, new(httptrace.NopTracer))
@@ -858,6 +857,8 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 			if len(rs.summary) > api.ScanPersistImageMax+scanPersistImageExtra {
 				rs.cleanupOldImages()
 			}
+		} else {
+			clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum)
 		}
 	}
 
@@ -1627,31 +1628,4 @@ func (t *regScanTask) Handler(scanner string) scheduler.Action {
 	}()
 
 	return scheduler.TaskActionWait
-}
-
-func GetFedRegistryCache() []*share.CLUSRegistryConfig {
-	regReadLock()
-	defer regReadUnlock()
-
-	count := 0
-	for _, rs := range regMap {
-		if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) {
-			count += 1
-		}
-	}
-
-	rss := make([]*share.CLUSRegistryConfig, 0, count)
-	for _, rs := range regMap {
-		if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) {
-			rss = append(rss, &share.CLUSRegistryConfig{
-				Registry: rs.config.Registry,
-				Name:     rs.config.Name,
-				Type:     rs.config.Type,
-				Filters:  rs.config.Filters,
-				CfgType:  share.FederalCfg,
-			})
-		}
-	}
-
-	return rss
 }

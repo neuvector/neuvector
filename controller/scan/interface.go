@@ -33,6 +33,7 @@ type ScanInterface interface {
 	GetRegistryDebugImages(source string) []*api.RESTRegistryDebugImage
 	StartRegistry(name string) error
 	StopRegistry(name string) error
+	GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRegistryConfig, utils.Set)
 
 	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary
 	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string)
@@ -616,7 +617,7 @@ func (m *scanMethod) GetRegistryImageSummary(name string, vpf scanUtils.VPFInter
 				s := *rsum
 				if image.Domain != "" {
 					s.Domain = image.Domain
-				} else if domains, _ := rs.config.GetDomain(nil); len(domains) != 0 {
+				} else if domains, _ := rs.config.GetDomain(nil); len(domains) != 0 && domains[0] != share.HiddenFedDomain {
 					s.Domain = domains[0]
 				}
 				s.Repository = image.Repo
@@ -682,6 +683,53 @@ func (m *scanMethod) GetAllRegistrySummary(scope string, acc *access.AccessContr
 	}
 
 	return list
+}
+
+func (m *scanMethod) GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRegistryConfig, utils.Set) {
+	regReadLock()
+	defer regReadUnlock()
+
+	var list []*share.CLUSRegistryConfig
+	var names utils.Set
+
+	if getCfg {
+		regs := regMapToArray(false, true)
+
+		list = make([]*share.CLUSRegistryConfig, 0, len(regs))
+
+		for _, rs := range regs {
+			cfg := *rs.config
+			for _, p := range []*string{&cfg.Username, &cfg.Password, &cfg.AuthToken, &cfg.GitlabApiUrl, &cfg.GitlabPrivateToken, &cfg.IBMCloudAccount, &cfg.IBMCloudTokenURL} {
+				if *p != "" {
+					*p = "****"
+				}
+			}
+			cfg.Domains = nil
+			cfg.CreaterDomains = nil
+			cfg.ParsedFilters = nil
+			if rs.config.AwsKey != nil {
+				cfg.AwsKey = &share.CLUSAWSAccountKey{
+					ID:              "****",
+					AccessKeyID:     "****",
+					SecretAccessKey: "****",
+					Region:          rs.config.AwsKey.Region,
+				}
+			}
+			cfg.GcrKey = nil
+			cfg.CfgType = share.FederalCfg
+			list = append(list, &cfg)
+		}
+	}
+	if getNames {
+		names = utils.NewSet()
+		for _, rs := range regMap {
+			if strings.HasPrefix(rs.config.Name, api.FederalGroupPrefix) {
+				names.Add(rs.config.Name)
+			}
+		}
+	}
+
+	return list, names
 }
 
 func (m *scanMethod) StartRegistry(name string) error {

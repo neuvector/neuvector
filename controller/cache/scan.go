@@ -3,7 +3,9 @@ package cache
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -29,6 +31,11 @@ import (
 type scannerCache struct {
 	scanner  *share.CLUSScanner
 	errCount int
+}
+
+type regImageSummaryReport struct {
+	Summary []byte
+	Report  *share.CLUSScanReport
 }
 
 var scannerCacheMap map[string]*scannerCache = make(map[string]*scannerCache)
@@ -878,10 +885,21 @@ func registryStateHandler(nType cluster.ClusterNotifyType, key string, value []b
 }
 
 func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
-	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	name := share.CLUSKeyNthToken(key, 3)
 	id := share.CLUSKeyNthToken(key, 4)
+
+	var fedRegName string
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if fedRole == api.FedRoleMaster && name == common.RegistryRepoScanName {
+		fedRegName = common.RegistryFedRepoScanName
+	} else if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) {
+		fedRegName = name
+	}
+	if fedRegName != "" && fedScanResultMD5 == nil {
+		fedScanResultMD5 = make(map[string]map[string]string)
+	}
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -891,10 +909,11 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		alives, highs, meds := scan.RegistryImageStateUpdate(name, id, &sum, vpf)
 
-		fedRole := fedMembershipCache.FedRole
+		var report *share.CLUSScanReport
 		key := share.CLUSRegistryImageDataKey(name, id)
-		if fedRole != api.FedRoleJoint && !strings.HasPrefix(name, api.FederalGroupPrefix) {
-			report := clusHelper.GetScanReport(key)
+		// for any scna report on master/standalone cluster & non-fed scan report on managed cluster
+		if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
+			report = clusHelper.GetScanReport(key)
 			if report != nil {
 				if alives != nil {
 					clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
@@ -906,33 +925,54 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			}
 		}
 
+		if fedRegName != "" {
+			scanResult := regImageSummaryReport{
+				Summary: value,
+				Report:  report,
+			}
+			fedScanDataCacheMutexLock()
+			currImagesMD5, ok := fedScanResultMD5[fedRegName]
+			if !ok {
+				fedScanResultMD5[fedRegName] = make(map[string]string, 1)
+				currImagesMD5, _ = fedScanResultMD5[fedRegName]
+			}
+			if currImagesMD5 != nil {
+				var buf bytes.Buffer
+				enc := gob.NewEncoder(&buf)
+				enc.Encode(&scanResult)
+				md5Sum := md5.Sum(buf.Bytes())
+				currImagesMD5[id] = hex.EncodeToString(md5Sum[:])
+			}
+			fedScanDataCacheMutexUnlock()
+		}
+
 	case cluster.ClusterNotifyDelete:
 		scan.RegistryImageStateUpdate(name, id, nil, nil)
+		if fedRegName != "" {
+			fedScanDataCacheMutexLock()
+			if currImagesMD5, ok := fedScanResultMD5[fedRegName]; ok {
+				delete(currImagesMD5, id)
+			}
+			fedScanDataCacheMutexUnlock()
+		}
 	}
 }
 
 func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
-	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
+	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug() //-> AAA
 
 	fedScanDataCacheMutexLock()
 	defer fedScanDataCacheMutexUnlock()
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		var scanRevs share.CLUSFedScanRevisions
-		// [31, 139] is the first 2 bytes of gzip-format data
-		if len(value) >= 2 && value[0] == 31 && value[1] == 139 {
-			value = utils.GunzipBytes(value)
-			if value == nil {
-				cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Error("Failed to unzip data")
-				return
-			}
-		}
-		json.Unmarshal(value, &scanRevs)
-		fedScanResultRevsCache = scanRevs
+		var scanDataRevs share.CLUSFedScanRevisions
+		json.Unmarshal(value, &scanDataRevs)
+		fedScanDataRevsCache = scanDataRevs
 
 	case cluster.ClusterNotifyDelete:
-		fedScanResultRevsCache = share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}
+		fedScanDataRevsCache = share.CLUSFedScanRevisions{}
+		fedScanResultMD5 = make(map[string]map[string]string)
 	}
 }
 

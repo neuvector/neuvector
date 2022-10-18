@@ -217,11 +217,13 @@ func ScannerDBChange(db *share.CLUSScannerDB) {
 	// rescan registries. Skip if this is first time scanner is registered, because it is
 	// likely the controller just starts, we don't want to scan starts automatically.
 	if oldVer != "" && oldVer != db.CVEDBVersion && isScanner() {
-		regs := regMapToArray(true, true)
+		var getFed bool
+		// when scan db changes, do nothing for fed registry on non-master cluster
+		if smd.fedRole == api.FedRoleMaster {
+			getFed = true
+		}
+		regs := regMapToArray(true, getFed)
 		for _, reg := range regs {
-			if strings.HasPrefix(reg.config.Name, api.FederalGroupPrefix) && smd.fedRole != api.FedRoleMaster {
-				continue
-			}
 			if reg.config.RescanImage {
 				reg.stateLock()
 				state := clusHelper.GetRegistryState(reg.config.Name)
