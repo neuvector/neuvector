@@ -277,7 +277,7 @@ func TestUserCfg(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 	accAdmin := access.NewAdminAccessControl()
-	cacher = &mockCache{
+	mockCacheInstance := &mockCache{
 		activePwdProfile: share.CLUSDefPwdProfileName,
 		pwdProfiles: map[string]*share.CLUSPwdProfile{
 			share.CLUSDefPwdProfileName: &share.CLUSPwdProfile{
@@ -291,8 +291,12 @@ func TestUserCfg(t *testing.T) {
 			},
 		},
 	}
+	cacher = mockCacheInstance
 	cache.MockCacheInit()
 	mockCluster.SetCacheMockCallback(share.CLUSConfigUserRoleStore, cache.MockUserRoleConfigUpdate)
+
+	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
+	clusHelper.PutPwdProfileRev(defProfile, 0)
 
 	var context configMapHandlerContext
 	// test variation of  white space before/after value etc
@@ -400,7 +404,7 @@ func TestUserCfgNegative(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 	accAdmin := access.NewAdminAccessControl()
-	cacher = &mockCache{
+	mockCacheInstance := &mockCache{
 		activePwdProfile: share.CLUSDefPwdProfileName,
 		pwdProfiles: map[string]*share.CLUSPwdProfile{
 			share.CLUSDefPwdProfileName: &share.CLUSPwdProfile{
@@ -414,6 +418,10 @@ func TestUserCfgNegative(t *testing.T) {
 			},
 		},
 	}
+
+	cacher = mockCacheInstance
+	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
+	clusHelper.PutPwdProfileRev(defProfile, 0)
 
 	// negative test about user assigned a non-existing custom role
 

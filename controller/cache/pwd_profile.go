@@ -72,14 +72,3 @@ func (m CacheMethod) GetAllPwdProfiles() (string, map[string]share.CLUSPwdProfil
 
 	return activePwdProfileName, profiles
 }
-
-func (m CacheMethod) PutPwdProfiles(activeName string, profiles map[string]*share.CLUSPwdProfile) {
-	for _, profile := range profiles {
-		key := share.CLUSPwdProfileKey(profile.Name)
-		value, _ := json.Marshal(profile)
-		pwdProfileConfigUpdate(cluster.ClusterNotifyAdd, key, value)
-	}
-	cfg := share.CLUSActivePwdProfileConfig{Name: activeName}
-	value, _ := json.Marshal(&cfg)
-	pwdProfileConfigUpdate(cluster.ClusterNotifyAdd, share.CLUSConfigPwdProfileStore, value)
-}

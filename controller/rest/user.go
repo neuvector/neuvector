@@ -22,11 +22,18 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string) (bool, int, api.RESTPwdProfileBasic, string) { // return (isWeak, pwdHistoryToKeep, profileBasic, message)
+// return (isWeak, pwdHistoryToKeep, profileBasic, message)
+func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile *share.CLUSPwdProfile) (bool, int, api.RESTPwdProfileBasic, string) {
 	var upperCount, lowerCount, digitCount, specialCount int
 	var profileBasic api.RESTPwdProfileBasic
+	var profile share.CLUSPwdProfile
+	var err error
 
-	profile, err := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+	if useProfile == nil {
+		profile, err = cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+	} else {
+		profile = *useProfile
+	}
 	if err == nil {
 		profileBasic = api.RESTPwdProfileBasic{
 			MinLen:          profile.MinLen,
@@ -149,7 +156,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Check weak password
-	if weak, _, profileBasic, e := isWeakPassword(ruser.Password, "", nil); weak {
+	if weak, _, profileBasic, e := isWeakPassword(ruser.Password, "", nil, nil); weak {
 		log.WithFields(log.Fields{"login": login.fullname, "create": ruser.Fullname}).Error(e)
 		restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 		return
@@ -538,7 +545,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 				return
 			}
 
-			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory); weak {
+			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
 				log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 				return
@@ -761,7 +768,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 				return
 			}
 
-			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory); weak {
+			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
 				log.WithFields(log.Fields{"user": fullname}).Error(e)
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 				return
