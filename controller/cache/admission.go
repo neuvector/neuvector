@@ -20,8 +20,8 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
@@ -1205,6 +1205,19 @@ func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]st
 	return union
 }
 
+func hasPssViolation(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo) bool {
+	selectedPolicy := strings.TrimSpace(strings.ToLower(crt.Value))
+
+	switch selectedPolicy {
+	case share.PssPolicyBaseline:
+		return violatesBaseLinePolicy(c)
+	case share.PssPolicyRestricted:
+		return violatesRestrictedPolicy(c)
+	}
+
+	return false // invalid policy
+}
+
 // For criteria of same type, apply 'and' for all negative matches until the first positive match;
 //                            apply 'or' after the first positive match;
 // For different criteria type, apply 'and'
@@ -1215,6 +1228,12 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 	var mets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
 	for _, crt := range criteria {
+		if c.Type == nvsysadmission.K8SEphemeralContainer || c.Type == nvsysadmission.K8sInitContainer {
+			if crt.Name != share.CriteriaKeyHasPssViolation {
+				// don't check non-pss criteria for ephemeral or init containers
+				continue
+			}
+		}
 		key := crt.Name
 		switch crt.Name {
 		case share.CriteriaKeyUser:
@@ -1323,6 +1342,9 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			met, positive = isResourceLimitCriterionMet(crt, c)
 		case share.CriteriaKeyModules:
 			met, positive = isModulesCriterionMet(crt, scannedImage.Modules)
+		case share.CriteriaKeyHasPssViolation:
+			met = hasPssViolation(crt, c)
+			positive = true
 		default:
 			met, positive = false, true
 		}
