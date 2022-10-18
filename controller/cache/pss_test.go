@@ -8,6 +8,7 @@ import (
 )
 
 func getValidTestContainer() nvsysadmission.AdmContainerInfo {
+	validProfileType := corev1.SeccompProfileTypeRuntimeDefault
 	return nvsysadmission.AdmContainerInfo{
 		HostNetwork: false,
 		HostPID:     false,
@@ -29,7 +30,7 @@ func getValidTestContainer() nvsysadmission.AdmContainerInfo {
 		AllowPrivilegeEscalation: false,
 		RunAsUser:                1,
 		RunAsNonRoot:             true,
-		SeccompProfile:           "runtimedefault",
+		SeccompProfileType:       &validProfileType,
 	}
 }
 
@@ -182,6 +183,19 @@ func TestUsesCustomProcMount(t *testing.T) {
 	postTest()
 }
 
+func TestUsesIllegalSeccompProfile(t *testing.T) {
+	preTest()
+
+	testContainer := getValidTestContainer()
+	invalidProfileType := corev1.SeccompProfileTypeUnconfined
+	testContainer.SeccompProfileType = &invalidProfileType
+	if !doesNotSetLegalSeccompProfile(&testContainer) {
+		t.Error("container that sets seccomp profile to unconfined should violate restricted policy")
+	}
+
+	postTest()
+}
+
 func TestUsesIllegalSysctls(t *testing.T) {
 	preTest()
 
@@ -228,8 +242,9 @@ func TestDoesNotSetLegalSeccompProfile(t *testing.T) {
 	preTest()
 
 	testContainer := getValidTestContainer()
-	testContainer.SeccompProfile = "illegal_seccomp_profile"
-	if !usesIllegalSeccompProfile(&testContainer) {
+	invalidProfileType := corev1.SeccompProfileTypeUnconfined
+	testContainer.SeccompProfileType = &invalidProfileType
+	if !doesNotSetLegalSeccompProfile(&testContainer) {
 		t.Error("container that does not explicitly set legal seccomp profile should violate restricted policy")
 	}
 
