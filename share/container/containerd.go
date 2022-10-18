@@ -334,15 +334,20 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 		ContainerMeta: *cmeta,
 		Author:        author,
 		Privileged:    d.isPrivileged(spec, c.ID(), bSandBox),
-		CreatedAt:     info.CreatedAt,
-		StartedAt:     info.CreatedAt,
 		Networks:      utils.NewSet(),
+	}
+
+	if !info.CreatedAt.IsZero() {
+		meta.CreatedAt = info.CreatedAt
+		meta.StartedAt = meta.CreatedAt
 	}
 
 	if status != nil {
 		meta.Running = (status.Status == containerd.Running)
 		meta.ExitCode = int(status.ExitStatus)
-		meta.FinishedAt = status.ExitTime
+		if !status.ExitTime.IsZero() {
+			meta.FinishedAt = status.ExitTime
+		}
 	}
 	if spec.Linux != nil && spec.Linux.Resources != nil {
 		r := spec.Linux.Resources
@@ -609,9 +614,6 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 		}
 
 		meta = &ContainerMetaExtra{
-			CreatedAt:     time.Unix(0, cs.Status.CreatedAt),
-			StartedAt:     time.Unix(0, cs.Status.StartedAt),
-			FinishedAt:    time.Unix(0, cs.Status.FinishedAt),
 			ExitCode:      int(cs.Status.ExitCode),
 			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 		}
