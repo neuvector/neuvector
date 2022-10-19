@@ -1,5 +1,5 @@
 ARG BASE_PREFIX
-FROM neuvector/${BASE_PREFIX}enforcer_base
+FROM neuvector/${BASE_PREFIX}enforcer_base:latest
 
 COPY stage /
 
