@@ -57,6 +57,10 @@ const (
 	K8sResReplicasets             = "replicasets"
 	K8sResServices                = "services"
 	K8sResStatefulSets            = "statefulsets"
+	K8sResRoles                   = "roles"
+	K8sResRolebindings            = "rolebindings"
+	K8sResClusterRoles            = "clusterroles"
+	K8sResClusterRolebindings     = "clusterrolebindings"
 	K8sResRbacRoles               = "roles.rbac.authorization.k8s.io"
 	K8sResRbacClusterRoles        = "clusterroles.rbac.authorization.k8s.io"
 	K8sResRbacRolebindings        = "rolebindings.rbac.authorization.k8s.io"
@@ -123,6 +127,7 @@ type resourceMaker struct {
 	newObject  func() k8s.Resource
 	newList    func() k8s.ResourceList
 	xlate      func(obj k8s.Resource) (string, interface{})
+	xlate2     func(obj k8s.Resource, action string)
 }
 
 type k8sResource struct {
@@ -213,7 +218,8 @@ var NvCrdValidatingWebhookName string
 var NvStatusValidatingWebhookName string
 var NvValidatingWebhookNameList []string
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets)
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResRoles, K8sResRolebindings)
+var admResForCreateSet2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
 var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets)
 var AdmResForOpsSettings = []NvAdmRegRuleSetting{
 	// do not change the order of the following elements!
@@ -226,6 +232,11 @@ var AdmResForOpsSettings = []NvAdmRegRuleSetting{
 		Operations: utils.NewSet(Update),
 		Resources:  admResForUpdateSet,
 		Scope:      apiv1beta1.NamespacedScope,
+	},
+	NvAdmRegRuleSetting{
+		Operations: utils.NewSet(Create),
+		Resources:  admResForCreateSet2,
+		Scope:      apiv1beta1.AllScopes,
 	},
 }
 
@@ -283,6 +294,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(corev1.Node) },
 				func() k8s.ResourceList { return new(corev1.NodeList) },
 				xlateNode,
+				nil,
 			},
 		},
 	},
@@ -294,6 +306,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(corev1.Namespace) },
 				func() k8s.ResourceList { return new(corev1.NamespaceList) },
 				xlateNamespace,
+				nil,
 			},
 		},
 	},
@@ -305,6 +318,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(corev1.Service) },
 				func() k8s.ResourceList { return new(corev1.ServiceList) },
 				xlateService,
+				nil,
 			},
 		},
 	},
@@ -316,6 +330,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(corev1.Pod) },
 				func() k8s.ResourceList { return new(corev1.PodList) },
 				xlatePod,
+				nil,
 			},
 		},
 	},
@@ -327,6 +342,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(appsv1.Deployment) },
 				func() k8s.ResourceList { return new(appsv1.DeploymentList) },
 				xlateDeployment,
+				nil,
 			},
 		},
 	},
@@ -338,6 +354,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(ocImageStream) },
 				func() k8s.ResourceList { return new(ocImageStreamList) },
 				xlateImage,
+				nil,
 			},
 		},
 	},
@@ -349,12 +366,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(rbacv1.Role) },
 				func() k8s.ResourceList { return new(rbacv1.RoleList) },
 				xlateRole,
+				xlateRole2,
 			},
 			&resourceMaker{
 				"v1beta1",
 				func() k8s.Resource { return new(rbacv1b1.Role) },
 				func() k8s.ResourceList { return new(rbacv1b1.RoleList) },
 				xlateRole,
+				xlateRole2,
 			},
 		},
 	},
@@ -366,12 +385,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(rbacv1.ClusterRole) },
 				func() k8s.ResourceList { return new(rbacv1.ClusterRoleList) },
 				xlateClusRole,
+				xlateClusRole2,
 			},
 			&resourceMaker{
 				"v1beta1",
 				func() k8s.Resource { return new(rbacv1b1.ClusterRole) },
 				func() k8s.ResourceList { return new(rbacv1b1.ClusterRoleList) },
 				xlateClusRole,
+				xlateClusRole2,
 			},
 		},
 	},
@@ -383,12 +404,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(rbacv1.RoleBinding) },
 				func() k8s.ResourceList { return new(rbacv1.RoleBindingList) },
 				xlateRoleBinding,
+				xlateRoleBinding2,
 			},
 			&resourceMaker{
 				"v1beta1",
 				func() k8s.Resource { return new(rbacv1b1.RoleBinding) },
 				func() k8s.ResourceList { return new(rbacv1b1.RoleBindingList) },
 				xlateRoleBinding,
+				xlateRoleBinding2,
 			},
 		},
 	},
@@ -400,12 +423,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(rbacv1.ClusterRoleBinding) },
 				func() k8s.ResourceList { return new(rbacv1.ClusterRoleBindingList) },
 				xlateClusRoleBinding,
+				xlateClusRoleBinding2,
 			},
 			&resourceMaker{
 				"v1beta1",
 				func() k8s.Resource { return new(rbacv1b1.ClusterRoleBinding) },
 				func() k8s.ResourceList { return new(rbacv1b1.ClusterRoleBindingList) },
 				xlateClusRoleBinding,
+				xlateClusRoleBinding2,
 			},
 		},
 	},
@@ -417,12 +442,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(apiextv1b1.CustomResourceDefinition) },
 				func() k8s.ResourceList { return new(apiextv1b1.CustomResourceDefinitionList) },
 				xlateCrd,
+				nil,
 			},
 			&resourceMaker{
 				"v1",
 				func() k8s.Resource { return new(apiextv1.CustomResourceDefinition) },
 				func() k8s.ResourceList { return new(apiextv1.CustomResourceDefinitionList) },
 				xlateCrd,
+				nil,
 			},
 		},
 	},
@@ -434,6 +461,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvSecurityRule) },
 				func() k8s.ResourceList { return new(NvSecurityRuleList) },
 				xlateCrdNvSecurityRule,
+				nil,
 			},
 		},
 	},
@@ -446,6 +474,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvClusterSecurityRule) },
 				func() k8s.ResourceList { return new(NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
+				nil,
 			},
 		},
 	},
@@ -457,6 +486,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvAdmCtrlSecurityRule) },
 				func() k8s.ResourceList { return new(NvAdmCtrlSecurityRuleList) },
 				xlateCrdAdmCtrlRule,
+				nil,
 			},
 		},
 	},
@@ -468,6 +498,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvDlpSecurityRule) },
 				func() k8s.ResourceList { return new(NvDlpSecurityRuleList) },
 				xlateCrdDlpSecurityRule,
+				nil,
 			},
 		},
 	},
@@ -479,6 +510,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(NvWafSecurityRule) },
 				func() k8s.ResourceList { return new(NvWafSecurityRuleList) },
 				xlateCrdWafSecurityRule,
+				nil,
 			},
 		},
 	},
@@ -520,12 +552,14 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(apiv1.ValidatingWebhookConfiguration) },
 				func() k8s.ResourceList { return new(apiv1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
+				nil,
 			},
 			&resourceMaker{
 				"v1beta1",
 				func() k8s.Resource { return new(apiv1beta1.ValidatingWebhookConfiguration) },
 				func() k8s.ResourceList { return new(apiv1beta1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
+				nil,
 			},
 		},
 	},
@@ -1026,11 +1060,19 @@ func (d *kubernetes) watchResource(rt string, maker *resourceMaker, watcher *k8s
 						cb(rt, ev, res, old)
 					}
 				}
+
+				if maker.xlate2 != nil {
+					maker.xlate2(obj, evt)
+				}
 			case "DELETED":
 				if id, res := maker.xlate(obj); res != nil {
 					if ev, old := d.deleteResourceCache(rt, id); ev != "" {
 						cb(rt, ev, res, old)
 					}
+				}
+
+				if maker.xlate2 != nil {
+					maker.xlate2(obj, evt)
 				}
 			}
 		}

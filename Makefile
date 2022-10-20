@@ -5,6 +5,7 @@ STAGE_DIR = stage
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
 	mkdir -p ${STAGE_DIR}/etc/
+	mkdir -p ${STAGE_DIR}/etc/neuvector/templates
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
@@ -13,6 +14,8 @@ copy_ctrl:
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
 	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
+	#
+	cp neuvector/templates/podTemplate.json ${STAGE_DIR}/etc/neuvector/templates/podTemplate.json
 
 copy_enf:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/

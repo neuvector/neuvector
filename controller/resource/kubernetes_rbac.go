@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
@@ -1414,4 +1416,100 @@ func VerifyNvK8sRBAC(flavor string, existOnly bool) ([]string, []string, []strin
 	}
 
 	return clusterRoleErrors, clusterRoleBindingErrors, roleBindingErrors
+}
+
+func xlateRole2(obj k8s.Resource, action string) {
+	if o, ok := obj.(*rbacv1.Role); ok {
+
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+
+	} else if o, ok := obj.(*rbacv1b1.Role); ok {
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	}
+}
+
+func xlateRoleBinding2(obj k8s.Resource, action string) {
+	if o, ok := obj.(*rbacv1.RoleBinding); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	}
+}
+
+func xlateClusRole2(obj k8s.Resource, action string) {
+	if o, ok := obj.(*rbacv1.ClusterRole); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	}
+}
+
+func xlateClusRoleBinding2(obj k8s.Resource, action string) {
+	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
+		meta := o.Metadata
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
+		rbacv1, _ := json.Marshal(o)
+
+		if action == "ADDED" || action == "MODIFIED" {
+			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+		} else if action == "DELETED" {
+			opa.DeleteDocument(docKey)
+		}
+	}
 }

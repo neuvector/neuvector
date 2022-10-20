@@ -72,6 +72,8 @@ const (
 	CriteriaOpContainsAny       string = "containsAny"
 	CriteriaOpNotContainsAny    string = "notContainsAny"
 	CriteriaOpContainsOtherThan string = "containsOtherThan"
+	CriteriaOpExist             string = "exist"
+	CriteriaOpNotExist          string = "notExist"
 )
 
 const (

@@ -1,0 +1,524 @@
+{
+  "metadata": {
+    "name": "nameValue",
+    "namespace": "namespaceValue"
+  },
+  "spec": {
+    "initContainers": [
+      {
+        "name": "nameValue",
+        "image": "imageValue",
+        "command": [
+          "commandValue"
+        ],
+        "args": [
+          "argsValue"
+        ],
+        "ports": [
+          {
+            "name": "nameValue",
+            "hostPort": 2,
+            "containerPort": 3,
+            "protocol": "protocolValue",
+            "hostIP": "hostIPValue"
+          }
+        ],
+        "livenessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "readinessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "startupProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "lifecycle": {
+          "postStart": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          },
+          "preStop": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          }
+        },
+        "securityContext": {
+          "capabilities": {
+            "add": [
+              "addValue"
+            ],
+            "drop": [
+              "dropValue"
+            ]
+          },
+          "privileged": true,
+          "seLinuxOptions": {
+            "user": "userValue",
+            "role": "roleValue",
+            "type": "typeValue",
+            "level": "levelValue"
+          },
+          "runAsUser": 4,
+          "runAsGroup": 8,
+          "runAsNonRoot": true,
+          "readOnlyRootFilesystem": true,
+          "allowPrivilegeEscalation": true,
+          "procMount": "procMountValue",
+          "seccompProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        },
+        "stdin": true,
+        "stdinOnce": true,
+        "tty": true
+      }
+    ],
+    "containers": [
+      {
+        "name": "nameValue",
+        "image": "imageValue",
+        "command": [
+          "commandValue"
+        ],
+        "args": [
+          "argsValue"
+        ],
+        "ports": [
+          {
+            "name": "nameValue",
+            "hostPort": 2,
+            "containerPort": 3,
+            "protocol": "protocolValue",
+            "hostIP": "hostIPValue"
+          }
+        ],
+        "livenessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "readinessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "startupProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "lifecycle": {
+          "postStart": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          },
+          "preStop": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          }
+        },
+        "securityContext": {
+          "capabilities": {
+            "add": [
+              "addValue"
+            ],
+            "drop": [
+              "dropValue"
+            ]
+          },
+          "privileged": true,
+          "seLinuxOptions": {
+            "user": "userValue",
+            "role": "roleValue",
+            "type": "typeValue",
+            "level": "levelValue"
+          },
+          "runAsUser": 4,
+          "runAsGroup": 8,
+          "runAsNonRoot": true,
+          "readOnlyRootFilesystem": true,
+          "allowPrivilegeEscalation": true,
+          "procMount": "procMountValue",
+          "seccompProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        },
+        "stdin": true,
+        "stdinOnce": true,
+        "tty": true
+      }
+    ],
+    "ephemeralContainers": [
+      {
+        "name": "nameValue",
+        "image": "imageValue",
+        "command": [
+          "commandValue"
+        ],
+        "args": [
+          "argsValue"
+        ],
+        "ports": [
+          {
+            "name": "nameValue",
+            "hostPort": 2,
+            "containerPort": 3,
+            "protocol": "protocolValue",
+            "hostIP": "hostIPValue"
+          }
+        ],
+        "livenessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "readinessProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "startupProbe": {
+          "exec": {
+            "command": [
+              "commandValue"
+            ]
+          },
+          "httpGet": {
+            "path": "pathValue",
+            "port": "portValue",
+            "host": "hostValue",
+            "scheme": "schemeValue",
+            "httpHeaders": {}
+          },
+          "tcpSocket": {
+            "port": "portValue",
+            "host": "hostValue"
+          },
+          "grpc": {
+            "port": 1,
+            "service": "serviceValue"
+          }
+        },
+        "lifecycle": {
+          "postStart": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          },
+          "preStop": {
+            "exec": {
+              "command": [
+                "commandValue"
+              ]
+            },
+            "httpGet": {
+              "path": "pathValue",
+              "port": "portValue",
+              "host": "hostValue",
+              "scheme": "schemeValue",
+              "httpHeaders": {}
+            },
+            "tcpSocket": {
+              "port": "portValue",
+              "host": "hostValue"
+            }
+          }
+        },
+        "securityContext": {
+          "capabilities": {
+            "add": [
+              "addValue"
+            ],
+            "drop": [
+              "dropValue"
+            ]
+          },
+          "privileged": true,
+          "seLinuxOptions": {
+            "user": "userValue",
+            "role": "roleValue",
+            "type": "typeValue",
+            "level": "levelValue"
+          },
+          "runAsUser": 4,
+          "runAsGroup": 8,
+          "runAsNonRoot": true,
+          "readOnlyRootFilesystem": true,
+          "allowPrivilegeEscalation": true,
+          "procMount": "procMountValue",
+          "seccompProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        },
+        "stdin": true,
+        "stdinOnce": true,
+        "tty": true
+      }
+    ],
+    "restartPolicy": "restartPolicyValue",
+    "serviceAccountName": "serviceAccountNameValue",
+    "serviceAccount": "serviceAccountValue",
+    "automountServiceAccountToken": true,
+    "nodeName": "nodeNameValue",
+    "hostNetwork": true,
+    "hostPID": true,
+    "hostIPC": true,
+    "shareProcessNamespace": true,
+    "securityContext": {
+      "seLinuxOptions": {
+        "user": "userValue",
+        "role": "roleValue",
+        "type": "typeValue",
+        "level": "levelValue"
+      },
+      "runAsUser": 2,
+      "runAsGroup": 6,
+      "runAsNonRoot": true,
+      "supplementalGroups": [
+        4
+      ],
+      "fsGroup": 5,
+      "sysctls": [
+        {
+          "name": "nameValue",
+          "value": "valueValue"
+        }
+      ],
+      "fsGroupChangePolicy": "fsGroupChangePolicyValue",
+      "seccompProfile": {
+        "type": "typeValue",
+        "localhostProfile": "localhostProfileValue"
+      }
+    },
+    "imagePullSecrets": [
+      {
+        "name": "nameValue"
+      }
+    ],
+    "hostname": "hostnameValue",
+    "subdomain": "subdomainValue",
+    "schedulerName": "schedulerNameValue",
+    "priorityClassName": "priorityClassNameValue",
+    "readinessGates": [
+      {
+        "conditionType": "conditionTypeValue"
+      }
+    ],
+    "setHostnameAsFQDN": true,
+    "hostUsers": true
+  }
+}
