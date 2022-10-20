@@ -1,5 +1,5 @@
 ARG BASE_PREFIX
-FROM neuvector/${BASE_PREFIX}controller_base
+FROM neuvector/${BASE_PREFIX}controller_base:latest
 
 COPY stage /
 
