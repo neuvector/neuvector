@@ -540,6 +540,12 @@ func (cs *ControllerService) ResetLoginTokenTimer(ctx context.Context, ops *shar
 	return &share.RPCVoid{}, nil
 }
 
+func (cs *ControllerService) ReportK8SResToOPA(ctx context.Context, ops *share.CLUSKubernetesResInfo) (*share.RPCVoid, error) {
+	rest.ReportK8SResToOPA(ops)
+	log.WithFields(log.Fields{"ops": ops}).Debug("ReportK8SResToOPA (gprc-server)")
+	return &share.RPCVoid{}, nil
+}
+
 func startGRPCServer(port uint16) (*cluster.GRPCServer, uint16) {
 	var grpc *cluster.GRPCServer
 	var err error

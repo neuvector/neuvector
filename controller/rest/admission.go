@@ -24,6 +24,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -71,13 +72,22 @@ func getRuleId(w http.ResponseWriter, ps httprouter.Params) (uint32, error) {
 	return uint32(id), nil
 }
 
-func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map[string]*api.RESTAdmissionRuleOption) error {
+func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map[string]*api.RESTAdmissionRuleOption, ruleType string) error {
 	if criteria != nil && options == nil {
 		return fmt.Errorf("Invalid criteria options")
 	}
+
+	hasCustomCriteria := false
 	numOps := utils.NewSet(share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan)
 	for _, crt := range criteria {
 		var allowedOp, allowedValue bool
+
+		// Skip checking custom criteria
+		if crt.Type != "" {
+			hasCustomCriteria = true
+			continue
+		}
+
 		if option, exist := options[crt.Name]; exist {
 			if len(option.Ops) == 0 {
 				allowedOp = true
@@ -128,7 +138,7 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 				}
 			}
 			if len(crt.SubCriteria) > 0 {
-				if err := validateAdmCtrlCriteria(crt.SubCriteria, option.SubOptions); err != nil {
+				if err := validateAdmCtrlCriteria(crt.SubCriteria, option.SubOptions, ruleType); err != nil {
 					return err
 				}
 			}
@@ -136,6 +146,16 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 			return fmt.Errorf("Unsupported criterion name: %s", crt.Name)
 		}
 	}
+
+	// check for custom criteria
+	// need to check [RuleType], if rule contains custom criteria, the rule is only for deny
+	// but we don't have [RuleType] in the parameter... need to add it..
+	if hasCustomCriteria {
+		if ruleType != api.ValidatingDenyRuleType {
+			return fmt.Errorf("Unsupported rule type: %s", ruleType)
+		}
+	}
+
 	return nil
 }
 
@@ -552,7 +572,10 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 			DenyOptions:      nvsysadmission.GetAdmRuleTypeOptions(api.ValidatingDenyRuleType),
 			ExceptionOptions: nvsysadmission.GetAdmRuleTypeOptions(api.ValidatingExceptRuleType),
 		},
-		K8sEnv: k8sPlatform,
+		K8sEnv:                  k8sPlatform,
+		CustomCriteriaOptions:   nvsysadmission.GetCustomCriteriaOptions(),
+		CustomCriteriaTemplates: nvsysadmission.GetCustomCriteriaTemplates(),
+		PredefinedRiskyRoles:    nvsysadmission.GetPredefinedRiskyRoles(),
 	}
 	keys := []string{share.CriteriaKeyRunAsPrivileged, share.CriteriaKeyRunAsRoot, share.CriteriaKeySharePidWithHost,
 		share.CriteriaKeyShareIpcWithHost, share.CriteriaKeyShareNetWithHost, share.CriteriaKeyAllowPrivEscalation}
@@ -781,6 +804,7 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 			clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, delRuleType.keepRuleList)
 			for id := range delRuleType.delRules.Iter() {
 				clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id.(uint32))
+				opa.DeletePolicy(id.(uint32))
 			}
 			if ruleTypeKey == share.FedAdmCtrlExceptRulesType || ruleTypeKey == share.FedAdmCtrlDenyRulesType {
 				delFedRuleTypes = append(delFedRuleTypes, ruleTypeKey)
@@ -796,6 +820,7 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 			} else {
 				for id := range delRuleType.delRules.Iter() {
 					clusHelper.DeleteAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, id.(uint32))
+					opa.DeletePolicy(id.(uint32))
 				}
 				if ruleTypeKey == share.FedAdmCtrlExceptRulesType || ruleTypeKey == share.FedAdmCtrlDenyRulesType {
 					delFedRuleTypes = append(delFedRuleTypes, ruleTypeKey)
@@ -952,7 +977,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		clusConf.Disable = *ruleCfg.Disable
 	}
 	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(ruleCfg.RuleType)
-	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions); err != nil {
+	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, ruleCfg.RuleType); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Admission rule validation failed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
@@ -995,6 +1020,8 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 			resp.Rule.Criteria[idx] = c
 		}
 	}
+
+	opa.ConvertToRegoRule(clusConf)
 
 	restRespSuccess(w, r, &resp, acc, login, &confData, "Add admission control rule")
 }
@@ -1078,7 +1105,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(confData.Config.RuleType)
-	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions); err != nil {
+	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, confData.Config.RuleType); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Admission rule validation failed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
@@ -1092,6 +1119,8 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	if confData.Config.CfgType == api.CfgTypeFederal {
 		updateFedRulesRevision([]string{ruleTypeKey}, acc, login)
 	}
+
+	opa.ConvertToRegoRule(clusConf)
 
 	restRespSuccess(w, r, nil, acc, login, &confData, "Patch admission control rule")
 }
@@ -1165,6 +1194,8 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 
 	clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, arhs)
 	clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id)
+	opa.DeletePolicy(id)
+
 	if applyTransact(w, txn) != nil {
 		return
 	}

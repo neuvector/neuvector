@@ -39,6 +39,7 @@ It has these top-level messages:
 	CLUSStoreWatcherInfo
 	CLUSKickLoginSessionsRequest
 	CLUSLoginTokenInfo
+	CLUSKubernetesResInfo
 	CLUSKick
 	CLUSFilter
 	CLUSSession

@@ -566,6 +566,18 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSc
 													"value": &apiextv1.JSONSchemaProps{
 														Type: &b.schemaTypeString,
 													},
+													"type": &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"template_kind": &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"path": &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"value_type": &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
 													"sub_criteria": &apiextv1.JSONSchemaProps{
 														Type: &b.schemaTypeArray,
 														Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -670,6 +682,18 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 														Type: &b.schemaTypeString,
 													},
 													"value": &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"type": &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"template_kind": &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"path": &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+													"value_type": &apiextv1b1.JSONSchemaProps{
 														Type: &b.schemaTypeString,
 													},
 													"sub_criteria": &apiextv1b1.JSONSchemaProps{
@@ -986,7 +1010,57 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
 	if err == nil {
 		crdSchemaConfigured = true
-		if crdInfo.MetaName == resource.NvAdmCtrlSecurityRuleName || crdInfo.MetaName == resource.NvDlpSecurityRuleName || crdInfo.MetaName == resource.NvWafSecurityRuleName {
+		if crdInfo.MetaName == resource.NvAdmCtrlSecurityRuleName {
+			if res, ok := obj.(*apiextv1.CustomResourceDefinition); ok && res.Spec != nil {
+				verRead = *res.Metadata.ResourceVersion
+
+				if len(res.Spec.Versions) > 0 {
+					schema := res.Spec.Versions[0].Schema
+					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
+						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+							if rules, ok := spec.Properties["rules"]; ok {
+								if crit, ok := rules.Items.Schema.Properties["criteria"]; ok {
+									if _, ok := crit.Items.Schema.Properties["template_kind"]; ok {
+										if _, ok := crit.Items.Schema.Properties["type"]; ok {
+											if _, ok := crit.Items.Schema.Properties["value"]; ok {
+												if _, ok := crit.Items.Schema.Properties["value_type"]; ok {
+													crdSchemaExpected = true
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			} else if res, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && res.Spec != nil {
+				verRead = *res.Metadata.ResourceVersion
+
+				if len(res.Spec.Versions) > 0 {
+					schema := res.Spec.Versions[0].Schema
+					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
+						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+							if rules, ok := spec.Properties["rules"]; ok {
+								if crit, ok := rules.Items.Schema.Properties["criteria"]; ok {
+									if _, ok := crit.Items.Schema.Properties["template_kind"]; ok {
+										if _, ok := crit.Items.Schema.Properties["type"]; ok {
+											if _, ok := crit.Items.Schema.Properties["value"]; ok {
+												if _, ok := crit.Items.Schema.Properties["value_type"]; ok {
+													crdSchemaExpected = true
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "verRead": verRead, "crdSchemaExpected": crdSchemaExpected}).Info("initK8sCrdSchema NvAdmCtrlSecurityRuleName")
+		} else if crdInfo.MetaName == resource.NvDlpSecurityRuleName || crdInfo.MetaName == resource.NvWafSecurityRuleName {
 			crdSchemaExpected = true
 		} else {
 			if res, ok := obj.(*apiextv1.CustomResourceDefinition); ok && res.Spec != nil {

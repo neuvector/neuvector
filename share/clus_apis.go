@@ -1764,17 +1764,22 @@ type CLUSAdmRuleCriterion struct { // see type RESTAdmRuleCriterion
 	Value       string                  `json:"value"`
 	ValueSlice  []string                `json:"value_slice"`
 	SubCriteria []*CLUSAdmRuleCriterion `json:"sub_criteria,omitempty"`
+	Type        string                  `json:"type,omitempty"`
+	Kind        string                  `json:"template_kind,omitempty"`
+	Path        string                  `json:"path,omitempty"`
+	ValueType   string                  `json:"value_type,omitempty"`
 }
 
 type CLUSAdmissionRule struct { // see type RESTAdmissionRule
-	ID       uint32                  `json:"id"`
-	Category string                  `json:"category"`
-	Comment  string                  `json:"comment"`
-	Criteria []*CLUSAdmRuleCriterion `json:"criteria"`
-	Disable  bool                    `json:"disable"`
-	Critical bool                    `json:"critical"`
-	CfgType  TCfgType                `json:"cfg_type"`
-	RuleType string                  `json:"rule_type"` // "exception", "deny"
+	ID                uint32                  `json:"id"`
+	Category          string                  `json:"category"`
+	Comment           string                  `json:"comment"`
+	Criteria          []*CLUSAdmRuleCriterion `json:"criteria"`
+	Disable           bool                    `json:"disable"`
+	Critical          bool                    `json:"critical"`
+	CfgType           TCfgType                `json:"cfg_type"`
+	RuleType          string                  `json:"rule_type"` // "exception", "deny"
+	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
 }
 
 type CLUSAdmissionRules struct {

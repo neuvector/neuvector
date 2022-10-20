@@ -22,12 +22,14 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
 
 const (
@@ -246,9 +248,13 @@ func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 	criteria := make([]*api.RESTAdmRuleCriterion, 0, len(rule.Criteria))
 	for _, crit := range rule.Criteria {
 		c := &api.RESTAdmRuleCriterion{
-			Name:  crit.Name,
-			Op:    crit.Op,
-			Value: crit.Value,
+			Name:      crit.Name,
+			Op:        crit.Op,
+			Value:     crit.Value,
+			Type:      crit.Type,
+			Kind:      crit.Kind,
+			Path:      crit.Path,
+			ValueType: crit.ValueType,
 		}
 		if len(crit.SubCriteria) > 0 {
 			c.SubCriteria = make([]*api.RESTAdmRuleCriterion, 0, len(crit.SubCriteria))
@@ -497,6 +503,9 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			if rule.RuleType == api.ValidatingExceptRuleType || rule.RuleType == share.FedAdmCtrlExceptRulesType {
 				evalAdmCtrlRulesForAllowedNS(admStateCache.Enable)
 			}
+
+			opa.ConvertToRegoRule(&rule)
+			log.WithFields(log.Fields{"nType": nType, "cfgType": cfgType, "rule.ID": rule.ID}).Debug("admissionConfigUpdate, add/modify to opa")
 		case share.CLUSAdmissionCfgRuleList:
 			var heads []*share.CLUSRuleHead
 			json.Unmarshal(value, &heads)
@@ -508,6 +517,8 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			for id, _ := range admPolicyCache.RuleMap {
 				if !ids.Contains(id) {
 					delete(admPolicyCache.RuleMap, id)
+					opa.DeletePolicy(id)
+					log.WithFields(log.Fields{"nType": nType, "cfgType": cfgType, "id": id}).Debug("admissionConfigUpdate, delete OPA")
 				}
 			}
 		case share.CLUSAdmissionStatistics:
@@ -525,6 +536,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			id := share.CLUSPolicyRuleKey2ID(key)
 			if r, ok := admPolicyCache.RuleMap[id]; ok {
 				delete(admPolicyCache.RuleMap, id)
+				opa.DeletePolicy(id)
 				if r.RuleType == api.ValidatingExceptRuleType || r.RuleType == share.FedAdmCtrlExceptRulesType {
 					evalAdmCtrlRulesForAllowedNS(admStateCache.Enable)
 				}
@@ -1222,11 +1234,12 @@ func hasPssViolation(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmConta
 //                            apply 'or' after the first positive match;
 // For different criteria type, apply 'and'
 func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo, scannedImage *nvsysadmission.ScannedImageSummary,
-	criteria []*share.CLUSAdmRuleCriterion, rootAvail bool) (bool, string) { // return (matched, matched data source)
+	criteria []*share.CLUSAdmRuleCriterion, rootAvail bool, ar *admissionv1beta1.AdmissionReview, ruleID uint32) (bool, string) { // return (matched, matched data source)
 	var met, positive bool
 	var matchedSource string
 	var mets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
+	var hasCustomCriteria bool
 	for _, crt := range criteria {
 		if c.Type == nvsysadmission.K8SEphemeralContainer || c.Type == nvsysadmission.K8sInitContainer {
 			if crt.Name != share.CriteriaKeyHasPssViolation {
@@ -1234,6 +1247,13 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 				continue
 			}
 		}
+
+		// only handle predefined criteria
+		if crt.Type != "" {
+			hasCustomCriteria = true
+			continue
+		}
+
 		key := crt.Name
 		switch crt.Name {
 		case share.CriteriaKeyUser:
@@ -1360,6 +1380,35 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 				mets[key] = v || met
 			}
 			poss[key] = p || positive
+		}
+	}
+
+	if hasCustomCriteria {
+		// handle custom criteria,
+		// OPA requres the data wrapped under "input" key
+		type AdmissionReviewWrapper struct {
+			Review *admissionv1beta1.AdmissionReview `json:"input"`
+		}
+
+		ar2 := AdmissionReviewWrapper{Review: ar}
+		jsonData, _ := json.Marshal(ar2)
+
+		policyUrl := fmt.Sprintf("/v1/data/neuvector_policy_%d", ruleID)
+
+		statusCode, body, err := opa.OpaEvalByString(policyUrl, string(jsonData))
+
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
+		} else {
+			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
+
+			met, err := opa.AnalyzeResult(body)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "body": body}).Error("isAdmissionRuleMet, opa.AnalyzeResult() failed")
+			}
+
+			mets["custom_criteria"] = met
+			poss["custom_criteria"] = true
 		}
 	}
 
@@ -1546,7 +1595,7 @@ func isApiPathAvailable(ctrlStates map[string]*share.CLUSAdmCtrlState) bool {
 
 // matchCfgType being 0 means to compare with default(critical) rules only
 func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmResult) bool { // return true means mtach
+	matchData *nvsysadmission.AdmMatchData, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmResult, ar *admissionv1beta1.AdmissionReview) bool { // return true means mtach
 	admPolicyCache := selectAdminPolicyCache(admType, ruleType)
 	if admPolicyCache != nil {
 		cacheMutexRLock()
@@ -1555,7 +1604,7 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok && !rule.Disable && rule.Category == admission.AdmRuleCatK8s {
 				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
 					for _, scannedImage := range scannedImages {
-						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, matchData.RootAvail); matched {
+						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, matchData.RootAvail, ar, rule.ID); matched {
 							//populateAdmResult(c, result, scannedImage, rule, ruleType, dataSource)
 							result.RuleID = rule.ID
 							result.RuleCfgType = rule.CfgType
@@ -1702,7 +1751,7 @@ func (m CacheMethod) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, i
 }
 
 func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps) (*nvsysadmission.AdmResult, bool) {
+	matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) (*nvsysadmission.AdmResult, bool) {
 	result := &nvsysadmission.AdmResult{}
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	stamps.GonnaFetch = time.Now()
@@ -1732,7 +1781,7 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 	// we compare with default allow rules first when this container doesn't match any rule yet
 	if matchData.MatchState == nvsysadmission.MatchedNone {
 		if matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, _criticalRulesOnly,
-			admResObject, c, matchData, scannedImages, result) {
+			admResObject, c, matchData, scannedImages, result, ar) {
 			return result, true
 		}
 	}
@@ -1741,14 +1790,14 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
 		if matchData.MatchState == nvsysadmission.MatchedNone {
 			if matchK8sAdmissionRules(admType, share.FedAdmCtrlExceptRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result) {
+				admResObject, c, matchData, scannedImages, result, ar) {
 				result.MatchFedRule = true
 				return result, true
 			}
 		}
 		if matchData.MatchState != nvsysadmission.MatchedDeny {
 			if matchK8sAdmissionRules(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result) {
+				admResObject, c, matchData, scannedImages, result, ar) {
 				result.MatchDeny = true
 				result.MatchFedRule = true
 				return result, true
@@ -1765,7 +1814,7 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 		// we compare with allow rules when this container doesn't match any rule yet
 		if matchData.MatchState == nvsysadmission.MatchedNone {
 			if matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result) {
+				admResObject, c, matchData, scannedImages, result, ar) {
 				return result, true
 			}
 		}
@@ -1773,7 +1822,7 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 		// we compare with deny rules when this container doesn't match any deny rule yet
 		if matchData.MatchState != nvsysadmission.MatchedDeny {
 			if matchK8sAdmissionRules(admType, api.ValidatingDenyRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result) {
+				admResObject, c, matchData, scannedImages, result, ar) {
 				result.MatchDeny = true
 				return result, true
 			}
@@ -1890,8 +1939,12 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 	clus := make([]*share.CLUSAdmRuleCriterion, 0, len(criteria))
 	for _, crit := range criteria {
 		c := &share.CLUSAdmRuleCriterion{
-			Name: crit.Name,
-			Op:   crit.Op,
+			Name:      crit.Name,
+			Op:        crit.Op,
+			Type:      crit.Type,
+			Kind:      crit.Kind,
+			Path:      crit.Path,
+			ValueType: crit.ValueType,
 		}
 		var critValues []string
 		if c.Op == share.CriteriaOpContainsAll || c.Op == share.CriteriaOpContainsAny || c.Op == share.CriteriaOpNotContainsAny || c.Op == share.CriteriaOpContainsOtherThan {
@@ -1906,6 +1959,9 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 			if len(critValues) > idx { // found empty string element in critValues
 				critValues = critValues[:idx]
 			}
+		} else if c.Op == share.CriteriaOpExist || c.Op == share.CriteriaOpNotExist {
+			clus = append(clus, c)
+			continue
 		} else {
 			critValues = []string{strings.TrimSpace(crit.Value)}
 		}
@@ -2166,4 +2222,181 @@ func fillDenyMessageFromRule(c *nvsysadmission.AdmContainerInfo, rule *share.CLU
 		}
 	}
 	return message
+}
+
+func PopulateRulesToOpa() {
+	ruleTypes := make([]string, 0, 4)
+	ruleTypes = append(ruleTypes, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
+
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	for _, ruleType := range ruleTypes {
+		admPolicyCache := selectAdminPolicyCache(admission.NvAdmValidateType, ruleType)
+		if admPolicyCache == nil {
+			continue
+		}
+
+		for _, head := range admPolicyCache.RuleHeads {
+			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok {
+				opa.ConvertToRegoRule(rule)
+			}
+		}
+	}
+}
+
+func PopulateDefRiskyRules() {
+
+	var defaultRules = []*share.CLUSAdmissionRule{
+		&share.CLUSAdmissionRule{
+			Category: admission.AdmRuleCatK8s,
+			Comment:  "risky_role_view_secret",
+			Criteria: []*share.CLUSAdmRuleCriterion{
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].resources[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].resources[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "secrets, *",
+					ValueType: "string",
+				},
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].verbs[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].verbs[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "*, get, list, watch",
+					ValueType: "string",
+				},
+			},
+			Disable:           false,
+			Critical:          false,
+			RuleType:          api.ValidatingDenyRuleType,
+			CfgType:           share.UserCreated,
+			UseAsRiskyRoleTag: true,
+		},
+		&share.CLUSAdmissionRule{
+			Category: admission.AdmRuleCatK8s,
+			Comment:  "risky_role_create_pod",
+			Criteria: []*share.CLUSAdmRuleCriterion{
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].resources[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].resources[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
+					ValueType: "string",
+				},
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].verbs[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].verbs[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "*, create",
+					ValueType: "string",
+				},
+			},
+			Disable:           false,
+			Critical:          false,
+			RuleType:          api.ValidatingDenyRuleType,
+			CfgType:           share.UserCreated,
+			UseAsRiskyRoleTag: true,
+		},
+		&share.CLUSAdmissionRule{
+			Category: admission.AdmRuleCatK8s,
+			Comment:  "risky_role_any_action_workload",
+			Criteria: []*share.CLUSAdmRuleCriterion{
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].resources[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].resources[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
+					ValueType: "string",
+				},
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].verbs[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].verbs[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "*",
+					ValueType: "string",
+				},
+			},
+			Disable:           false,
+			Critical:          false,
+			RuleType:          api.ValidatingDenyRuleType,
+			CfgType:           share.UserCreated,
+			UseAsRiskyRoleTag: true,
+		},
+		&share.CLUSAdmissionRule{
+			Category: admission.AdmRuleCatK8s,
+			Comment:  "risky_role_any_action_rbac",
+			Criteria: []*share.CLUSAdmRuleCriterion{
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].resources[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].resources[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "roles,clusterroles,rolebindings,clusterrolebindings, *",
+					ValueType: "string",
+				},
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].verbs[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].verbs[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "*",
+					ValueType: "string",
+				},
+			},
+			Disable:           false,
+			Critical:          false,
+			RuleType:          api.ValidatingDenyRuleType,
+			CfgType:           share.UserCreated,
+			UseAsRiskyRoleTag: true,
+		},
+		&share.CLUSAdmissionRule{
+			Category: admission.AdmRuleCatK8s,
+			Comment:  "risky_role_exec_into_container",
+			Criteria: []*share.CLUSAdmRuleCriterion{
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].resources[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].resources[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "pods/exec",
+					ValueType: "string",
+				},
+				&share.CLUSAdmRuleCriterion{
+					Name:      "item.rules[_].verbs[_]",
+					Op:        "arrayContainsAny",
+					Path:      "item.rules[_].verbs[_]",
+					Kind:      "Roles",
+					Type:      "customPath",
+					Value:     "*,create",
+					ValueType: "string",
+				},
+			},
+			Disable:           false,
+			Critical:          false,
+			RuleType:          api.ValidatingDenyRuleType,
+			CfgType:           share.UserCreated,
+			UseAsRiskyRoleTag: true,
+		},
+	}
+
+	for i, r := range defaultRules {
+		r.ID = uint32(2000 + i + 1)
+		opa.ConvertToRegoRule(r)
+	}
 }
