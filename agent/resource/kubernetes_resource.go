@@ -31,7 +31,6 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(ocImageStream) },
 				func() k8s.ResourceList { return new(ocImageStreamList) },
 				nil,
-				nil,
 			},
 		},
 	},
