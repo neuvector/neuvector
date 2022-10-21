@@ -22,6 +22,7 @@ typedef struct dpi_rule_key_ {
 typedef struct dpi_policy_desc_ {
     uint32_t id;
     uint8_t action;
+    uint8_t pad[3];
     uint16_t flags;
 #define POLICY_DESC_CHECK_VER      0x0001
 #define POLICY_DESC_INTERNAL       0x0002
