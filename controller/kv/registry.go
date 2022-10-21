@@ -1,8 +1,6 @@
 package kv
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 )
@@ -104,15 +103,10 @@ func deleteRegistryDir(name string) error {
 	return os.RemoveAll(path)
 }
 
-func restoreToCluster(reg, fedRole string, fedScanReportRevisions map[string]map[string]string) {
-	var imageRevs map[string]string
+func restoreToCluster(reg, fedRole string) {
 	isFedReg := false
 	if strings.HasPrefix(reg, api.FederalGroupPrefix) {
 		isFedReg = true
-		if _, ok := fedScanReportRevisions[reg]; !ok {
-			fedScanReportRevisions[reg] = make(map[string]string, 1)
-		}
-		imageRevs = fedScanReportRevisions[reg]
 	}
 
 	regPath := fmt.Sprintf("%s%s", registryDataDir, reg)
@@ -158,38 +152,26 @@ func restoreToCluster(reg, fedRole string, fedScanReportRevisions map[string]map
 
 	// 3. Read the report and write both into kv
 	for _, sum := range sums {
-		var sErr error
-		key := share.CLUSRegistryImageStateKey(reg, sum.ImageID)
-		vSummary, _ := json.Marshal(&sum)
-		if sErr = cluster.Put(key, vSummary); sErr != nil {
-			log.WithFields(log.Fields{"error": sErr}).Error("Failed to restore summary to cluster")
-		}
-
 		rptFile := fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix)
 		vReport, vErr := ioutil.ReadFile(rptFile)
 		if vErr == nil {
-			key = share.CLUSRegistryImageDataKey(reg, sum.ImageID)
-			if vErr = cluster.PutBinary(key, vReport); vErr != nil {
-				log.WithFields(log.Fields{"error": vErr}).Error("Failed to restore report to cluster")
+			// 3-1. must restore scan/data/image/{reg}/{id} key first !
+			vKey := share.CLUSRegistryImageDataKey(reg, sum.ImageID)
+			if err := cluster.PutBinary(vKey, vReport); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Failed to restore report to cluster")
+			} else {
+				// 3-2. then restore scan/state/image/{reg}/{id} key
+				var sErr error
+				sKey := share.CLUSRegistryImageStateKey(reg, sum.ImageID)
+				vSummary, _ := json.Marshal(&sum)
+				if sErr = cluster.Put(sKey, vSummary); sErr != nil {
+					cluster.Delete(vKey)
+					log.WithFields(log.Fields{"error": sErr}).Error("Failed to restore summary to cluster")
+				}
 			}
 		} else {
 			log.WithFields(log.Fields{"error": vErr, "path": rptFile}).Error("Failed to read report")
 		}
-
-		if sErr == nil && vErr == nil && isFedReg && imageRevs != nil {
-			scan_data := regImageSummaryReport{
-				Summary: vSummary,
-				Report:  vReport,
-			}
-			data, _ := json.Marshal(&scan_data)
-			md5Sum := md5.Sum(data)
-			imageRevs[sum.ImageID] = hex.EncodeToString(md5Sum[:])
-		}
-	}
-
-	// 4. (for restoring scan result of the images in fed registry on master cluster only)
-	if isFedReg && len(imageRevs) > 0 {
-		fedScanReportRevisions[reg] = imageRevs
 	}
 }
 
@@ -198,57 +180,57 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 	if err != nil {
 		log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Debug("Failed to read registry directory")
 	} else {
-		fedScanReportRevisions := make(map[string]map[string]string) // registry name : image id : scan report md5
+		randRev := uint64(rand.Uint32())
+		if randRev == 0 {
+			randRev = uint64(rand.Uint32())
+		}
+		fedScannedRegRevs := make(map[string]uint64)
+		var fedScannedRepoRev uint64 = 0
 		for _, info := range files {
 			name := info.Name()
 			if info.IsDir() && name != "" && name != "." {
-				restoreToCluster(name, importInfo.fedRole, fedScanReportRevisions)
+				// on master cluster, no matter deployRegScanData/deployRepoScanData is true or not, always restore fed registry/repo scan result(if any in backup)
+				restoreToCluster(name, importInfo.fedRole)
+				if strings.HasPrefix(name, api.FederalGroupPrefix) {
+					if name == common.RegistryFedRepoScanName {
+						// scan/state/image/fed._repo_scan/... & scan/data/image/fed._repo_scan/... are only available on managed clusters
+						if importInfo.fedRole == api.FedRoleJoint {
+							fedScannedRepoRev = randRev
+						}
+					} else {
+						fedScannedRegRevs[name] = randRev
+					}
+				} else if name == common.RegistryRepoScanName && importInfo.fedRole == api.FedRoleMaster {
+					// scan/state/image/_repo_scan/... & scan/data/image/_repo_scan/... on master cluster are for fed repo
+					fedScannedRepoRev = randRev
+				}
 			}
 		}
 
-		if len(fedScanReportRevisions) > 0 {
-			lock, err := clusHelper.AcquireLock(share.CLUSLockFedScanDataKey, clusterLockWait)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockFedScanDataKey, clusterLockWait)
+		if err != nil {
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+
+		retry := 0
+		for retry < 3 {
+			scanRevs, rev, err := clusHelper.GetFedScanRevisions()
 			if err != nil {
-				return
+				break
 			}
-			defer clusHelper.ReleaseLock(lock)
 
-			retry := 0
-			for retry < 3 {
-				scanRevs, rev, err := clusHelper.GetFedScanRevisions()
-				if err != nil {
-					break
-				}
-
-				scanRevs.RegistryRevision = 0
-				scanRevs.ScannedRegImagesRev = 0
-				// assign random numbers to scanRevs.RegistryRevision & scanRevs.ScannedRegImagesRev on managed clusters so that the first scan data polling is always triggered
-				if importInfo.fedRole == api.FedRoleJoint {
-					scanRevs.RegistryRevision = rand.Uint64()
-					scanRevs.ScannedRegImagesRev = rand.Uint64()
-				} else if importInfo.fedRole == api.FedRoleMaster {
-					scanRevs.RegistryRevision = 1
-					scanRevs.ScannedRegImagesRev = 1
-				}
-				for regName, imageRevs := range fedScanReportRevisions {
-					if existing, ok := scanRevs.ScanReportRevisions[regName]; !ok {
-						scanRevs.ScanReportRevisions[regName] = imageRevs
-					} else {
-						for imageID, imageRev := range imageRevs {
-							if imageRev != existing[imageID] {
-								existing[imageID] = imageRev
-							}
-						}
-					}
-				}
-				if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
-					break
-				}
-				retry++
+			// assign random numbers to RegConfigRev, ScannedRegRevs & ScannedRepoRev on managed clusters so that the first scan data polling is always triggered
+			scanRevs.RegConfigRev = randRev
+			scanRevs.ScannedRegRevs = fedScannedRegRevs
+			scanRevs.ScannedRepoRev = fedScannedRepoRev
+			if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
+				break
 			}
-			if retry >= 3 {
-				log.WithFields(log.Fields{"error": err}).Error("Failed to update fed scan revisions")
-			}
+			retry++
+		}
+		if retry >= 3 {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to update fed scan revisions")
 		}
 	}
 

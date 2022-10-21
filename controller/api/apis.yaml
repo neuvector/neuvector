@@ -2548,6 +2548,14 @@ paths:
           name: X-Auth-Token
           required: true
           type: string
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - fed
+            - local
+          description: "When set to fed, returned fed registries. When set to local, returned local-defined registries. If there is no query string 'scope', all registries will be returned."
       responses:
         '200':
           description: Success

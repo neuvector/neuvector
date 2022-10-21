@@ -30,6 +30,23 @@ const (
 	ibmcloudDefaultTokenUrl = "https://iam.cloud.ibm.com/identity/token"
 )
 
+type tFedRegistryConfig struct {
+	Registry      string
+	Name          string
+	Type          string
+	AuthWithToken bool
+	RescanImage   bool
+	ScanLayers    bool
+	DisableFiles  bool
+	RepoLimit     int
+	TagLimit      int
+	Schedule      string
+	PollPeriod    int
+	JfrogMode     string
+	JfrogAQL      bool
+	CfgType       share.TCfgType
+}
+
 var orgRegexp = regexp.MustCompile(`^[a-zA-Z0-9.\-_]*$`)
 
 var registryTypeList []string = []string{
@@ -454,7 +471,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if config.CfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, "", "")
+			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, "")
 		}
 	}
 
@@ -746,7 +763,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, "", "")
+			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, "")
 		}
 	}
 
@@ -1084,7 +1101,7 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, "", "")
+			clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, "")
 		}
 	}
 
@@ -1117,21 +1134,53 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 	defer txn.Close()
 
 	for _, n := range newRegs {
-		o, ok := oldRegs[n.Name]
-		if ok {
-			// found in existing kv keys
-			if o.Registry != n.Registry || o.Type != n.Type || len(o.Filters) != len(n.Filters) {
-				ok = false
-			} else {
+		foundSameReg := false
+		if o, ok := oldRegs[n.Name]; ok {
+			// found same-name fed registry in existing kv keys
+			if ((o.AwsKey == nil && n.AwsKey == nil) || (*o.AwsKey == *n.AwsKey)) && len(o.Filters) == len(n.Filters) {
 				oldFilters := utils.NewSetFromSliceKind(o.Filters)
 				newFilters := utils.NewSetFromSliceKind(n.Filters)
-				if diff := oldFilters.SymmetricDifference(newFilters); diff.Cardinality() > 0 {
-					ok = false
+				if diff := oldFilters.SymmetricDifference(newFilters); diff.Cardinality() == 0 {
+					oTemp := tFedRegistryConfig{
+						Registry:      o.Registry,
+						Name:          o.Name,
+						Type:          o.Type,
+						AuthWithToken: o.AuthWithToken,
+						RescanImage:   o.RescanImage,
+						ScanLayers:    o.ScanLayers,
+						DisableFiles:  o.DisableFiles,
+						RepoLimit:     o.RepoLimit,
+						TagLimit:      o.TagLimit,
+						Schedule:      o.Schedule,
+						PollPeriod:    o.PollPeriod,
+						JfrogMode:     o.JfrogMode,
+						JfrogAQL:      o.JfrogAQL,
+						CfgType:       o.CfgType,
+					}
+					nTemp := tFedRegistryConfig{
+						Registry:      n.Registry,
+						Name:          n.Name,
+						Type:          n.Type,
+						AuthWithToken: n.AuthWithToken,
+						RescanImage:   n.RescanImage,
+						ScanLayers:    n.ScanLayers,
+						DisableFiles:  n.DisableFiles,
+						RepoLimit:     n.RepoLimit,
+						TagLimit:      n.TagLimit,
+						Schedule:      n.Schedule,
+						PollPeriod:    n.PollPeriod,
+						JfrogMode:     n.JfrogMode,
+						JfrogAQL:      n.JfrogAQL,
+						CfgType:       n.CfgType,
+					}
+					if oTemp == nTemp {
+						foundSameReg = true
+					}
 				}
 			}
 			delete(oldRegs, n.Name)
 		}
-		if !ok {
+		if !foundSameReg {
 			value, _ := json.Marshal(*n)
 			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
 		}

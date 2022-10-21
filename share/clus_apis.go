@@ -1982,7 +1982,7 @@ const (
 	CLUSFedClustersSubKey       = "clusters"
 	CLUSFedRulesRevisionSubKey  = "rules_revision"
 	CLUSFedToPingPollSubKey     = "ping_poll"
-	CLUSFedConfigSubKey         = "config"
+	CLUSFedSettingsSubKey       = "settings"
 	CLUSFedScanDataRevSubKey    = "scan_revisions"
 )
 
@@ -2066,8 +2066,9 @@ type CLUSFedMembership struct { // stored on each cluster (master & joint cluste
 	UseProxy         string                   `json:"use_proxy"` // http / https
 }
 
-type CLUSFedConfiguration struct { // stored on each cluster (master & joint cluster)
-	DeployRegScanData bool `json:"deploy_scan_data"` // whether scan data deployment is enabled
+type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
+	DeployRegScanData  bool `json:"deploy_reg_scan_data"`  // whether fed registry scan data deployment is enabled
+	DeployRepoScanData bool `json:"deploy_repo_scan_data"` // whether fed repo scan data(for _repo_scan on master cluster) deployment is enabled
 }
 
 type CLUSFedClusterStatus struct {
@@ -2127,15 +2128,15 @@ type CLUSFedSystemConfigData struct {
 	SystemConfig *CLUSSystemConfig `json:"system_config"`
 }
 
-type CLUSFedRegistriesData struct { //-> AAA
+type CLUSFedRegistriesData struct {
 	Revision   uint64                `json:"revision"`
 	Registries []*CLUSRegistryConfig `json:"registries,omitempty"`
 }
 
-type CLUSFedScanRevisions struct { //-> AAA
-	RegistryRevision    uint64                       `json:"registry_revision"`           // fed registry revision
-	ScannedRegImagesRev uint64                       `json:"scanned_reg_images_revision"` // increases whenever the scan result of any image in a fed registry is changed
-	ScanReportRevisions map[string]map[string]string `json:"scan_report_revisions"`       // registry name : image id : scan report revision
+type CLUSFedScanRevisions struct {
+	RegConfigRev   uint64            `json:"reg_config_rev"`   // fed registry revision
+	ScannedRegRevs map[string]uint64 `json:"scanned_reg_revs"` // increases whenever the scan result of any image in a fed registry is changed (registry name : revision)
+	ScannedRepoRev uint64            `json:"scanned_repo_rev"` // increases whenever there is any change in master cluster's repo scan data
 }
 
 //dlp rule

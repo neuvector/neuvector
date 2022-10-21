@@ -3004,7 +3004,6 @@ type RESTRegistrySummary struct {
 	ErrMsg    string `json:"error_message"`
 	ErrDetail string `json:"error_detail"`
 	StartedAt string `json:"started_at"`
-	CfgType   string `json:"cfg_type"`
 	RESTScanStatus
 }
 

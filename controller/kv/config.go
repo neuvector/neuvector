@@ -380,7 +380,7 @@ func (c *configHelper) Restore() (string, error) {
 		err = rc
 	}
 
-	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScanReportRevisions: make(map[string]map[string]string)}, nil)
+	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
 
 	go restoreRegistry(ch, importInfo)
 
