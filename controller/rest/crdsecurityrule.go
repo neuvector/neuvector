@@ -2113,7 +2113,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 			var criteria []*share.CLUSAdmRuleCriterion
 			if criteria, err = cache.AdmCriteria2CLUS(crdRule.Criteria); err == nil {
 				options, _ := admRuleOptions[crdRuleType]
-				err = validateAdmCtrlCriteria(criteria, options.K8sOptions.RuleOptions)
+				err = validateAdmCtrlCriteria(criteria, options.K8sOptions.RuleOptions, crdRuleType)
 			}
 			if err != nil {
 				errMsg = fmt.Sprintf("%s Rule format error:   Rule #%d in %s validatation error %s", reviewTypeDisplay, idx, name, err.Error())

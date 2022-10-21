@@ -291,3 +291,19 @@ func ResetLoginTokenTimer(ip string, port uint16, req share.CLUSLoginTokenInfo) 
 	return err
 
 }
+
+func ReportK8SResToOPA(ip string, port uint16, req share.CLUSKubernetesResInfo) error {
+	log.WithFields(log.Fields{"target": ip, "port": port}).Debug("rpc.ReportK8SResToOPA")
+
+	client, err := getControllerServiceClient(ip, port)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
+	defer cancel()
+
+	_, err = client.ReportK8SResToOPA(ctx, &req)
+	return err
+
+}

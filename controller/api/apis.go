@@ -3084,9 +3084,12 @@ type RESTAdmissionState struct {
 }
 
 type RESTAdmissionConfigData struct {
-	State   *RESTAdmissionState     `json:"state,omitempty"`
-	Options *RESTAdmRuleTypeOptions `json:"admission_options,omitempty"`
-	K8sEnv  bool                    `json:"k8s_env"`
+	State                   *RESTAdmissionState               `json:"state,omitempty"`
+	Options                 *RESTAdmRuleTypeOptions           `json:"admission_options,omitempty"`
+	K8sEnv                  bool                              `json:"k8s_env"`
+	CustomCriteriaOptions   []*RESTAdminCustomCriteriaOptions `json:"admission_custom_criteria_options,omitempty"`
+	CustomCriteriaTemplates []*RESTAdminCriteriaTemplate      `json:"admission_custom_criteria_templates,omitempty"`
+	PredefinedRiskyRoles    []string                          `json:"predefined_risky_roles,omitempty"`
 }
 
 type RESTAdmRuleCriterion struct { // same type CLUSAdmRuleCriterion
@@ -3094,6 +3097,10 @@ type RESTAdmRuleCriterion struct { // same type CLUSAdmRuleCriterion
 	Op          string                  `json:"op"`
 	Value       string                  `json:"value"`
 	SubCriteria []*RESTAdmRuleCriterion `json:"sub_criteria,omitempty"`
+	Type        string                  `json:"type,omitempty"`
+	Kind        string                  `json:"template_kind,omitempty"`
+	Path        string                  `json:"path,omitempty"`
+	ValueType   string                  `json:"value_type,omitempty"`
 }
 
 const (
@@ -3342,4 +3349,15 @@ type RESTPolicyPromoteRequestData struct {
 
 type RESTAdmCtrlPromoteRequestData struct {
 	Request *RESTAdmCtrlPromoteRequest `json:"request"`
+}
+
+type RESTAdminCustomCriteriaOptions struct {
+	Ops       []string `json:"ops"`
+	Values    []string `json:"values,omitempty"`
+	ValueType string   `json:"valuetype"`
+}
+
+type RESTAdminCriteriaTemplate struct {
+	Kind    string `json:"kind"`
+	RawJson string `json:"rawjson"`
 }

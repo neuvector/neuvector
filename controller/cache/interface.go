@@ -9,6 +9,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
 
 type CacheInterface interface {
@@ -163,7 +164,7 @@ type CacheInterface interface {
 	WaitUntilApiPathReady() bool
 	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps) (*nvsysadmission.AdmResult, bool)
+		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) (*nvsysadmission.AdmResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()

@@ -2,6 +2,7 @@ package nvsysadmission
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -563,4 +564,63 @@ func GetAdmRuleTypeOptions(ruleType string) *api.RESTAdmCatOptions {
 		}
 	}
 	return admRuleTypeOptions[ruleType]
+}
+
+func GetCustomCriteriaOptions() []*api.RESTAdminCustomCriteriaOptions {
+	options := make([]*api.RESTAdminCustomCriteriaOptions, 0)
+
+	// add key type (when no value is selected)
+	options = append(options, &api.RESTAdminCustomCriteriaOptions{
+		ValueType: "key",
+		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist},
+	})
+
+	// add string type
+	options = append(options, &api.RESTAdminCustomCriteriaOptions{
+		ValueType: "string",
+		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist, "containsAll", "containsAny", "notContainsAny", "containsOtherThan"},
+	})
+
+	// add number type
+	options = append(options, &api.RESTAdminCustomCriteriaOptions{
+		ValueType: "number",
+		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist, share.CriteriaOpEqual, share.CriteriaOpNotEqual, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
+	})
+
+	// add boolean type
+	options = append(options, &api.RESTAdminCustomCriteriaOptions{
+		ValueType: "boolean",
+		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist, share.CriteriaOpEqual},
+		Values:    boolOps,
+	})
+
+	return options
+}
+
+func GetCustomCriteriaTemplates() []*api.RESTAdminCriteriaTemplate {
+	templates := make([]*api.RESTAdminCriteriaTemplate, 0)
+
+	sources := map[string]string{
+		"podTemplate": "/etc/neuvector/templates/podTemplate.json",
+	}
+
+	for k, v := range sources {
+		bytesData, err := ioutil.ReadFile(v)
+		if err != nil {
+			return templates
+		}
+
+		template := api.RESTAdminCriteriaTemplate{
+			Kind:    k,
+			RawJson: string(bytesData),
+		}
+
+		templates = append(templates, &template)
+	}
+	return templates
+}
+
+func GetPredefinedRiskyRoles() []string {
+	riskyRoles := []string{"risky_role_view_secret", "risky_role_any_action_workload", "risky_role_any_action_rbac", "risky_role_create_pod", "risky_role_exec_into_container"}
+	return riskyRoles
 }

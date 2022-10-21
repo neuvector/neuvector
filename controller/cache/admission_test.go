@@ -899,7 +899,7 @@ func TestIsLabelCriterionMet1(t *testing.T) {
 		tag := 0
 		for _, admResObject := range admResObjects {
 			for _, scannedImage := range scannedImages {
-				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false)
+				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false, nil, 0)
 				if matched != expected[idx][tag].matched || matchedSource != expected[idx][tag].matchedSource {
 					t.Errorf("Unexpected isAdmissionRuleMet[%d:%d] result(%+v,%+v) for (yaml:%+v, image:%+v, scanned:%+v) %s %s, expect:(%+v,%+v)\n",
 						idx, tag, matched, matchedSource, admResObject.Labels, scannedImage.Labels, scannedImage.Scanned, crts[0].Op, crts[0].Value, expected[idx][tag].matched, expected[idx][tag].matchedSource)
@@ -1004,7 +1004,7 @@ func TestIsLabelCriterionMet2(t *testing.T) {
 		tag := 0
 		for _, admResObject := range admResObjects {
 			for _, scannedImage := range scannedImages {
-				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false)
+				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false, nil, 0)
 				if matched != expected[idx][tag].matched || matchedSource != expected[idx][tag].matchedSource {
 					t.Errorf("Unexpected isAdmissionRuleMet[%d:%d] result(%+v,%+v) for (yaml:%+v, image:%+v, scanned:%+v) %s %s, expect:(%+v,%+v)\n",
 						idx, tag, matched, matchedSource, admResObject.Labels, scannedImage.Labels, scannedImage.Scanned, crts[0].Op, crts[0].Value, expected[idx][tag].matched, expected[idx][tag].matchedSource)
@@ -1108,7 +1108,7 @@ func TestIsLabelCriterionMet3(t *testing.T) {
 		tag := 0
 		for _, admResObject := range admResObjects {
 			for _, scannedImage := range scannedImages {
-				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false)
+				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false, nil, 0)
 				if matched != expected[idx][tag].matched || matchedSource != expected[idx][tag].matchedSource {
 					t.Errorf("Unexpected isAdmissionRuleMet[%d:%d] result(%+v,%+v) for (yaml:%+v, image:%+v, scanned:%+v) %s %s, expect:(%+v,%+v)\n",
 						idx, tag, matched, matchedSource, admResObject.Labels, scannedImage.Labels, scannedImage.Scanned, crts[0].Op, crts[0].Value, expected[idx][tag].matched, expected[idx][tag].matchedSource)
@@ -1242,7 +1242,7 @@ func TestIsLabelCriterionMet4(t *testing.T) {
 		tag := 0
 		for _, admResObject := range admResObjects {
 			for _, scannedImage := range scannedImages {
-				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false)
+				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false, nil, 0)
 				if matched != expected[idx][tag].matched || matchedSource != expected[idx][tag].matchedSource {
 					t.Errorf("Unexpected isAdmissionRuleMet[%d:%d] result(%+v,%+v) for (yaml:%+v, image:%+v, scanned:%+v) %s %s, expect:(%+v,%+v)\n",
 						idx, tag, matched, matchedSource, admResObject.Labels, scannedImage.Labels, scannedImage.Scanned, crts[0].Op, crts[0].Value, expected[idx][tag].matched, expected[idx][tag].matchedSource)
@@ -1376,7 +1376,7 @@ func TestIsLabelCriterionMet5(t *testing.T) {
 		tag := 0
 		for _, admResObject := range admResObjects {
 			for _, scannedImage := range scannedImages {
-				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false)
+				matched, matchedSource = isAdmissionRuleMet(admResObject, cs[0], scannedImage, crts, false, nil, 0)
 				if matched != expected[idx][tag].matched || matchedSource != expected[idx][tag].matchedSource {
 					t.Errorf("Unexpected isAdmissionRuleMet[%d:%d] result(%+v,%+v) for (yaml:%+v, image:%+v, scanned:%+v) %s %s, expect:(%+v,%+v)\n",
 						idx, tag, matched, matchedSource, admResObject.Labels, scannedImage.Labels, scannedImage.Scanned, crts[0].Op, crts[0].Value, expected[idx][tag].matched, expected[idx][tag].matchedSource)

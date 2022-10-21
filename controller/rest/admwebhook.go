@@ -33,10 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
@@ -108,6 +111,10 @@ const (
 	k8sKindReplicaSet            = "ReplicaSet"
 	k8sKindService               = "Service"
 	K8sKindStatefulSet           = "StatefulSet"
+	K8sKindRole                  = "Role"
+	K8sKindClusterRole           = "ClusterRole"
+	K8sKindRoleBinding           = "RoleBinding"
+	K8sKindClusterRoleBinding    = "ClusterRoleBinding"
 )
 
 var sidecarImages = []*ContainerImage{
@@ -679,7 +686,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	return resObject, nil
 }
 
-func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps) *nvsysadmission.AdmResult {
+func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) *nvsysadmission.AdmResult {
 	matchData := &nvsysadmission.AdmMatchData{}
 	if len(admResObject.OwnerUIDs) > 0 {
 		// If there is owner for this resource, check if the root owner's cache is still available.
@@ -727,7 +734,7 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	for _, c := range admResObject.Containers {
 		var thisStamp api.AdmCtlTimeStamps
 		perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
-		result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp)
+		result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar)
 		if !licenseAllowed {
 			continue
 		}
@@ -1048,6 +1055,17 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			return composeResponse(nil), reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
+	case K8sKindRole, K8sKindRoleBinding, K8sKindClusterRole, K8sKindClusterRoleBinding:
+		docKey := formatOpaDocKey(ar)
+		jsonData, err := json.Marshal(ar)
+		if err != nil {
+			// log error message
+			log.WithFields(log.Fields{"docKey": docKey, "err": err}).Info("failed add rbac res to OPA")
+		} else {
+			opa.AddDocument(docKey, string(jsonData))
+			updateToOtherControllers(docKey, string(jsonData))
+		}
+		return composeResponse(nil), reqIgnored
 	default:
 		return composeResponse(nil), reqIgnored
 	}
@@ -1079,13 +1097,26 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		var subMsg, ruleScope, msgHeader string
 		// check if the containers are allowed
-		admResult = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps)
+		admResult = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar)
 		if req.DryRun != nil && *req.DryRun {
 			msgHeader = "<Server Dry Run> "
 		} else if forTesting {
 			msgHeader = "<Assessment> "
 		}
 		stamps.Matched = time.Now()
+
+		// for debug, remove later
+		if true {
+			const (
+				DDMMYYYYhhmmss = "2006-01-02-15-04-05"
+			)
+			now := time.Now().UTC()
+
+			jsonData, _ := json.Marshal(ar)
+			docKey := fmt.Sprintf("/v1/data/debug/ar/%s_%s_%s_MatchDeny_%v", now.Format(DDMMYYYYhhmmss), ar.Request.UID, req.Kind.Kind, admResult.MatchDeny)
+			opa.AddDocument(docKey, string(jsonData))
+		}
+
 		if !admResult.NoLogging {
 			admResult.RuleCategory = admission.AdmRuleCatK8s
 			admResult.User = requestedBy
@@ -1562,4 +1593,44 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 		}
 	}
 	return slogs
+}
+
+func updateToOtherControllers(docKey string, jsonData string) {
+	// call grpc
+	info := share.CLUSKubernetesResInfo{
+		DocKey: docKey,
+		Data:   jsonData,
+	}
+
+	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
+	for _, ep := range eps {
+		log.WithFields(log.Fields{"ep.ClusterIP": ep.ClusterIP, "ClusterIP": localDev.Ctrler.ClusterIP}).Debug("updateToOtherControllers(grpc-client)")
+
+		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
+			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
+		}
+	}
+}
+
+func formatOpaDocKey(ar *admissionv1beta1.AdmissionReview) string {
+	req := ar.Request
+	switch req.Kind.Kind {
+	case K8sKindRole:
+		return fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", req.Namespace, req.Name)
+	case K8sKindRoleBinding:
+		return fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", req.Namespace, req.Name)
+	case K8sKindClusterRole:
+		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", req.Name)
+	case K8sKindClusterRoleBinding:
+		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", req.Name)
+	}
+	return ""
+}
+
+func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
+	docKey := info.DocKey
+	json_data := info.Data
+	b := opa.AddDocument(docKey, string(json_data))
+
+	log.WithFields(log.Fields{"docKey": info.DocKey, "AddDocument_Result": b}).Debug("ReportK8SResToOPA(grpc-server)")
 }

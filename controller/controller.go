@@ -19,6 +19,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	nvcrd "github.com/neuvector/neuvector/controller/nvk8sapi/neuvectorcrd"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
@@ -239,11 +240,11 @@ func main() {
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
 	flag.Parse()
 
-	if *debug {
-		log.SetLevel(log.DebugLevel)
-		scanLog.SetLevel(log.DebugLevel)
-		ctrlEnv.debugCPath = true
-	}
+	// if *debug {
+	log.SetLevel(log.DebugLevel)
+	scanLog.SetLevel(log.DebugLevel)
+	ctrlEnv.debugCPath = true
+	// }
 	if *join != "" {
 		// Join addresses might not be all ready. Accept whatever input is, resolve them
 		// when starting the cluster.
@@ -607,6 +608,9 @@ func main() {
 		}
 	}
 
+	// start OPA server, should be started before RegisterStoreWatcher()
+	opaServer := opa.StartOpaServer()
+
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
 	orchConnector.Start(ocImageRegistered)
@@ -670,6 +674,9 @@ func main() {
 	logController(share.CLUSEvControllerStart)
 	logController(share.CLUSEvControllerJoin)
 
+	cache.PopulateRulesToOpa()
+	cache.PopulateDefRiskyRules()
+
 	go func() {
 		var memStatsControllerResetMark uint64 = memControllerTopPeak - memSafeGap
 
@@ -715,4 +722,5 @@ func main() {
 	ctrlDeleteLocalInfo()
 	cluster.LeaveCluster(true)
 	grpcServer.Stop()
+	opaServer.Process.Kill()
 }
