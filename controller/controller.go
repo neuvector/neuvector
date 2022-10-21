@@ -240,11 +240,11 @@ func main() {
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
 	flag.Parse()
 
-	// if *debug {
-	log.SetLevel(log.DebugLevel)
-	scanLog.SetLevel(log.DebugLevel)
-	ctrlEnv.debugCPath = true
-	// }
+	if *debug {
+		log.SetLevel(log.DebugLevel)
+		scanLog.SetLevel(log.DebugLevel)
+		ctrlEnv.debugCPath = true
+	}
 	if *join != "" {
 		// Join addresses might not be all ready. Accept whatever input is, resolve them
 		// when starting the cluster.

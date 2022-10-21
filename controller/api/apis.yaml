@@ -4883,6 +4883,15 @@ definitions:
       k8s_env:
         type: boolean
         example: false
+      admission_custom_criteria_options:
+        $ref: '#/definitions/RESTAdminCustomCriteriaOptions'
+      admission_custom_criteria_templates:
+        $ref: '#/definitions/RESTAdminCriteriaTemplate'
+      predefined_risky_roles:
+        type: array
+        items:
+          type: string
+          example: ["risky_role_view_secret","risky_role_create_pod"]
   RESTAdmissionRule:
     type: object
     required:
@@ -5036,6 +5045,18 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTAdmRuleCriterion'
+      type:
+        type: string
+        example: customPath
+      template_kind:
+        type: string
+        example: podTemplate
+      path:
+        type: string
+        example: item.spec.serviceAccountName
+      value_type:
+        type: string
+        example: string
   RESTAdmRuleOptions:
     type: object
     required:
@@ -12501,3 +12522,34 @@ definitions:
       server_ip:
         type: string
         example: 172.17.0.3
+  RESTAdminCustomCriteriaOptions:
+    type: object
+    required:
+      - ops
+      - valuetype
+    properties:
+      ops:
+        type: array
+        items:
+          type: string
+          example: ["exist","notExist"]
+      values:
+        type: array
+        items:
+          type: string
+          example: ["true", "false"]
+      valuetype:
+        type: string
+        example: "key"
+  RESTAdminCriteriaTemplate:
+    type: object
+    required:
+      - kind
+      - rawjson
+    properties:
+      kind:
+        type: string
+        example: "podTemplate"
+      rawjson:
+        type: string
+        example: "{\"key\": \"value\"}"
