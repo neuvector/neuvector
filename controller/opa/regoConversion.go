@@ -113,6 +113,9 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	for _, c := range rule.Criteria {
 		if c.Type != "" {
 			hasCusomCriteria = true
+
+			// normalize the path
+			c.Path = strings.Replace(c.Path, ".0", "[_]", -1)
 		}
 	}
 
@@ -120,14 +123,12 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 		return ""
 	}
 
-	/////////////////////////////////////////
 	// print header
 	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
 	rego = append(rego, packageName)
 
 	rego = append(rego, printSpec())
 
-	// ===========================================
 	// main
 	mainFunc := `
 violation[result]{
@@ -166,35 +167,7 @@ violation[result]{
 			c_rego := convertGenericCriteria(j, c)
 			rego = append(rego, c_rego...)
 		}
-
-		// // type="saBindRiskyRole"
-		// if c.Op == "containsTagAny" {
-		// 	c_rego := convertRiskyRoleTagCriteria(j, c)
-		// 	rego = append(rego, c_rego...)
-		// } else {
-		// 	// type="customPath"
-		// 	c_rego := convertGenericCriteria(j, c)
-		// 	rego = append(rego, c_rego...)
-		// }
 	}
-
-	// handling type=3 (raw rego) individual criteria conversion
-	// for j, c := range rule.Criteria {
-	// 	if c.Type == 3 {
-	// 		// criteria_1(request){
-	// 		// 		main(request)    // *** user's raw rego function
-	// 		// }
-
-	// 		rego = append(rego, fmt.Sprintf("criteria_%d(request){", j))
-	// 		rego = append(rego, "	# calling user provided rego function")
-	// 		rego = append(rego, "	main(request)")
-	// 		rego = append(rego, "}\n")
-
-	// 		rego = append(rego, "# custom raw rego (start) ====== ")
-	// 		rego = append(rego, c.Value)
-	// 		rego = append(rego, "# custom raw rego (end) ====== ")
-	// 	}
-	// }
 
 	// generate troubleshooting code
 	// handling type=1 (general) keep track each individual criteria result
@@ -244,7 +217,7 @@ violationmsgs[msg]{
 
 		AddPolicy(policyUrl, strings.Join(rego2, "\n"))
 
-		log.WithFields(log.Fields{"policyUrl": policyUrl}).Debug("Add Policy with all comments.")
+		log.WithFields(log.Fields{"policyUrl": policyUrl}).Error("Add Policy with all comments")
 	}
 
 	return regoStr
@@ -272,39 +245,59 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 	rego = append(rego, functionName)
 	rego = append(rego, "{")
 
-	rego = append(rego, fmt.Sprintf("	# Custome Criteria name = %v", c.Name))
+	rego = append(rego, fmt.Sprintf("	# custom criteria name = %v", c.Name))
 	rego = append(rego, fmt.Sprintf("	# op = %v", c.Op))
 	rego = append(rego, fmt.Sprintf("	# value = %v", c.Value))
 	rego = append(rego, fmt.Sprintf("	# valueType = %v", c.ValueType))
-	rego = append(rego, fmt.Sprintf("	# path = %v\n", c.Path))
+	rego = append(rego, fmt.Sprintf("	# path(orig) = %v\n", c.Path))
+
+	path := c.Path
+	if strings.HasPrefix(c.Path, "item.") {
+		path = "request" + c.Path[4:]
+	}
 
 	// all ValueType (key, string, number, boolean) has "exist" and "notExist"
-	if c.Op == "exist" || c.Op == "notExist" {
-		path := c.Path
-		prefix := ""
-
-		if c.Op == "notExist" {
-			prefix = "not"
+	if c.Op == "exist" {
+		if strings.Contains(c.Path, "[_]") {
+			// array version of exist
+			idx := strings.Index(path, "[_]")
+			root := path[0:idx]
+			rego = append(rego, fmt.Sprintf("	total_count := count(%s)", root))
+			path2 := strings.Replace(path, "[_]", "[i]", 1)
+			rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+			rego = append(rego, "	total_count == count(exist_items)")
+			rego = append(rego, "}")
+			rego = append(rego, "\n")
+		} else {
+			// single value versio of exist
+			rego = append(rego, fmt.Sprintf("	%s", path))
+			rego = append(rego, "}")
+			rego = append(rego, "\n")
 		}
+	} else if c.Op == "notExist" {
+		if strings.Contains(c.Path, "[_]") {
+			path2 := strings.Replace(path, "[_]", "[i]", 1)
+			rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+			rego = append(rego, "	count(exist_items) == 0")
 
-		if strings.HasPrefix(c.Path, "item.") {
-			path = "request" + c.Path[4:]
+			rego = append(rego, "}")
+			rego = append(rego, "\n")
+		} else {
+			rego = append(rego, fmt.Sprintf("	not %s", path))
+			rego = append(rego, "}")
+			rego = append(rego, "\n")
 		}
-
-		rego = append(rego, fmt.Sprintf("	%s %s", prefix, path))
-
-		rego = append(rego, "}")
-		rego = append(rego, "\n")
 	} else if c.ValueType == "string" {
 		quotedString := parseQuotedString(c.Value)
 		line := fmt.Sprintf("	user_provided_data := [%s]", strings.Join(quotedString, ","))
 		rego = append(rego, line)
 
-		if strings.HasPrefix(c.Path, "item.") {
-			result := "request" + c.Path[4:]
-			rego = append(rego, fmt.Sprintf("	value = %s", result))
+		// if path is end with "[_]", like request.spec.containers[_].command[_]
+		//	we need to remove the ending "[_]" => request.spec.containers[_].command
+		if strings.HasSuffix(path, "[_]") {
+			rego = append(rego, fmt.Sprintf("	value = %s", path[0:len(path)-3]))
 		} else {
-			rego = append(rego, fmt.Sprintf("	value = %s", c.Path))
+			rego = append(rego, fmt.Sprintf("	value = %s", path))
 		}
 
 		if c.Op == "containsAll" {
@@ -337,7 +330,7 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		} else if c.Op == ">=" {
 			rego = append(rego, "	value >= user_provided_data")
 		} else if c.Op == ">" {
-			rego = append(rego, "	value >= user_provided_data")
+			rego = append(rego, "	value > user_provided_data")
 		} else if c.Op == "<=" {
 			rego = append(rego, "	value <= user_provided_data")
 		}
@@ -702,7 +695,8 @@ getRoleRef(binding):=rolRef
 operator_contains_all(criteria_values, items){
 	is_array(items)
 	matched := [name | items[i] == criteria_values[j]; name = items[i]]
-	count(items) == count(matched)
+	# count(items) == count(matched)
+	count(matched) == count(criteria_values)
 }
 
 ## operator -- contains all (single value)

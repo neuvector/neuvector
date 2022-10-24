@@ -75,6 +75,7 @@ enum {
     PROC_DP,
     PROC_AGENT,
     PROC_SCANNER_STANDALONE,
+    PROC_CTRL_OPA,
     PROC_MAX,
 };
 
@@ -115,6 +116,7 @@ static proc_info_t g_procs[PROC_MAX] = {
 [PROC_DP]                  {"dp", "/usr/local/bin/dp", },
 [PROC_AGENT]               {"agent", "/usr/local/bin/agent", },
 [PROC_SCANNER_STANDALONE]  {"scanner", "/usr/local/bin/scanner", },
+[PROC_CTRL_OPA]            {"opa", "/usr/local/bin/opa", },
 };
 
 static uint32_t g_dp_last_hb[MAX_DP_THREADS], g_dp_miss_hb[MAX_DP_THREADS];
@@ -470,6 +472,18 @@ static pid_t fork_exec(int i)
 
         args[a] = NULL;
         break;
+    
+    case PROC_CTRL_OPA:
+        args[0] = g_procs[i].path;
+        a = 1;
+
+        args[a ++] = "run";
+        args[a ++] = "--server";
+        args[a ++] = "--ignore=.*";
+        args[a ++] = "--addr=:8181";
+        args[a ++] = "--log-level=error";
+        args[a] = NULL;
+        break;
     default:
         return -1;
     }
@@ -797,6 +811,10 @@ int main (int argc, char **argv)
         g_procs[PROC_CTRL].active = true;
         // disable scanner in controller
         // g_procs[PROC_SCANNER].active = true;
+
+        if (access(g_procs[PROC_CTRL].path, F_OK) == 0) {
+            g_procs[PROC_CTRL_OPA].active = true;
+        }
         break;
     case MODE_AGENT:
         ret = system(SCRIPT_SYSCTL);

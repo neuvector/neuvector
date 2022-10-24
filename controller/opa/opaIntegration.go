@@ -15,44 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type OpaRuleHead struct {
-	Name string `json:"name"`
-}
-
-type OpaRule struct {
-	Head OpaRuleHead
-}
-
-type OpaPackageItem struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
-}
-
-type OpaPackage struct {
-	Items []OpaPackageItem `json:"path"`
-}
-
-type OpaPolicyAst struct {
-	Rules    []OpaRule  `json:"rules"`
-	Packages OpaPackage `json:"package"`
-}
-
-type OpaPolicy struct {
-	ID  string `json:"id"`
-	Raw string `json:"raw"`
-	// Ast OpaPolicyAst `json:"ast"`	// we don't need this part
-}
-
-type OpaPolicyResultList struct {
-	Result []OpaPolicy `json:"result"`
-}
-
-type OpaPolicyResult struct {
-	Result OpaPolicy `json:"result"`
-}
-
-//
-// for spec reading..
 type EvaluationResultSpec struct {
 	Spec RegoSpecification `json:"specification"`
 }
@@ -61,7 +23,6 @@ type OpaEvalResultSpec struct {
 	Result EvaluationResultSpec `json:"result"`
 }
 
-// for evaluation result
 type RegoResultEntryV1 struct {
 	Message     string `json:"message"`
 	CustomField string `json:"additional_message,omitempty"`
@@ -83,23 +44,55 @@ type OpaEvalResultV1 struct {
 	Result EvaluationResultV1 `json:"result"`
 }
 
-// this program is expected to compiled and run in Linux
-// the sqlite3 seems has compiling issue on Windows platform
-var (
-	// TLS version
-	// opaServer = "https://localhost:8181"
-
-	opaServer = "http://localhost:8181"
-)
-
 var UseOPA_HTTPS = false
-var opaCacheDoc map[string]string
-var opaCachePolicy map[string]string
+var isRestoring = false
+var opaCacheDoc map[string]string = make(map[string]string)
+var opaCachePolicy map[string]string = make(map[string]string)
 
 var (
+	opaServer       = "http://localhost:8181"
 	ContentTypeJson = "application/json; charset=utf-8"
 	ContentTypeText = "text/plain; charset=utf-8"
+	opaInitKey      = "/v1/data/neuvector/ready"
 )
+
+func InitOpaServer() {
+	t := time.Now()
+	tUnixNano := t.UnixNano()
+	data, _ := json.Marshal(tUnixNano)
+	AddDocument(opaInitKey, string(data))
+	log.WithFields(log.Fields{"ready": string(data)}).Error("InitOpaServer.")
+}
+
+func IsOpaRestarted() bool {
+	if isRestoring {
+		return false
+	}
+
+	// check if the ready-doc exist
+	// if not exist, it means we need to repopulate all rules and policies
+	client := getOpaHTTPClient()
+
+	url := fmt.Sprintf("%s%s", opaServer, opaInitKey)
+	resp, getErr := client.Get(url)
+	if getErr != nil {
+		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("OPA request")
+		return false
+	}
+	defer resp.Body.Close()
+
+	body, readErr := ioutil.ReadAll(resp.Body)
+	if readErr != nil {
+		log.WithFields(log.Fields{"error": readErr}).Error("OPA error on ReadAll")
+		return false
+	}
+
+	if resp.StatusCode == http.StatusOK && strings.Contains(string(body), "result") {
+		return false // exist
+	}
+
+	return true
+}
 
 func StartOpaServer() *exec.Cmd {
 	var cmd *exec.Cmd
@@ -126,13 +119,7 @@ func StartOpaServer() *exec.Cmd {
 		time.Sleep(2 * time.Second) // wait a while to let opa server start correctly..
 	}
 
-	if len(opaCacheDoc) == 0 {
-		opaCacheDoc = make(map[string]string)
-	}
-
-	if len(opaCachePolicy) == 0 {
-		opaCachePolicy = make(map[string]string)
-	}
+	InitOpaServer()
 
 	return cmd
 }
@@ -149,46 +136,35 @@ func getOpaHTTPClient() *http.Client {
 }
 
 func addObject(key string, contentType string, data string) bool {
+
+	if IsOpaRestarted() {
+		log.WithFields(log.Fields{"key": key}).Error("[addObject] opa restarted. need to init and restore.")
+		isRestoring = true
+		InitOpaServer()
+		RestoreOpaData()
+		isRestoring = false
+	}
+
 	client := getOpaHTTPClient()
 
 	// set the HTTP method, url, and request body
 	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s%s", opaServer, key), strings.NewReader(data))
 	if err != nil {
-		log.WithFields(log.Fields{
-			"key":         key,
-			"contentType": contentType,
-			"error":       err,
-		}).Error("OPA addObject NewRequest")
+		log.WithFields(log.Fields{"key": key, "contentType": contentType, "error": err}).Error("OPA addObject NewRequest")
 		return false
 	}
 
 	req.Header.Set("Content-Type", contentType)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"key":         key,
-			"contentType": contentType,
-			"error":       err,
-		}).Error("OPA addObject NewRequest - client.Do(req)")
-
-		// restart OPA process and restore data
-		if strings.Contains(err.Error(), "connection refused") {
-			fmt.Printf("OPA server failed. Try to start !\n")
-			StartOpaServer()
-			RestoreOpaData()
-		}
-
+		log.WithFields(log.Fields{"key": key, "contentType": contentType, "error": err}).Error("OPA addObject NewRequest - client.Do(req)")
 		return false
 	}
 	defer resp.Body.Close()
 
 	_, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
-		log.WithFields(log.Fields{
-			"key":         key,
-			"contentType": contentType,
-			"error":       err,
-		}).Error("OPA addObject NewRequest")
+		log.WithFields(log.Fields{"key": key, "contentType": contentType, "error": err}).Error("OPA addObject NewRequest")
 		return false
 	}
 
@@ -219,17 +195,12 @@ func AddDocument(key string, jsonData string) bool {
 }
 
 func AddDocumentIfNotExist(key string, jsonData string) bool {
-	// step-1: if key exist
 	client := getOpaHTTPClient()
 
-	// get populated policies
 	url := fmt.Sprintf("%s%s", opaServer, key)
 	resp, getErr := client.Get(url)
 	if getErr != nil {
-		log.WithFields(log.Fields{
-			"url":   url,
-			"error": getErr,
-		}).Error("OPA request")
+		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("OPA request")
 		return false
 	}
 
@@ -237,18 +208,18 @@ func AddDocumentIfNotExist(key string, jsonData string) bool {
 
 	body, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
-		log.WithFields(log.Fields{
-			"error": readErr,
-		}).Error("OPA error on ReadAll")
+		log.WithFields(log.Fields{"error": readErr}).Error("OPA error on ReadAll")
 		return false
 	}
 
 	if resp.StatusCode == http.StatusOK && strings.Contains(string(body), "result") {
-		// exist, return without add
 		return true
 	} else {
-		// not exist... we can add
-		return addObject(key, ContentTypeJson, jsonData)
+		result := addObject(key, ContentTypeJson, jsonData)
+		if result {
+			opaCacheDoc[key] = jsonData
+		}
+		return result
 	}
 }
 
@@ -257,78 +228,37 @@ func DeletePolicy(ruleId uint32) {
 }
 
 func DeleteDocument(key string) {
+	if IsOpaRestarted() {
+		log.WithFields(log.Fields{"key": key}).Error("[DeleteDocument] opa restarted. need to init and restore.")
+		isRestoring = true
+		InitOpaServer()
+		RestoreOpaData()
+		isRestoring = false
+	}
+
 	client := getOpaHTTPClient()
 
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s%s", opaServer, key), nil)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"key":   key,
-			"error": err,
-		}).Error("OPA delDocument NewRequest")
+		log.WithFields(log.Fields{"key": key, "error": err}).Error("OPA delDocument NewRequest")
 		return
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"key":   key,
-			"error": err,
-		}).Error("OPA delDocument NewRequest")
+		log.WithFields(log.Fields{"key": key, "error": err}).Error("OPA delDocument NewRequest")
 		return
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	_, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
-		log.WithFields(log.Fields{
-			"key":   key,
-			"error": readErr,
-		}).Error("OPA delDocument NewRequest")
+		log.WithFields(log.Fields{"key": key, "error": readErr}).Error("OPA delDocument NewRequest")
 		return
 	}
-
-	log.WithFields(log.Fields{
-		"key":        key,
-		"StatusCode": resp.StatusCode,
-		"body":       string(body),
-	}).Info("OPA delDocument returns")
 
 	delete(opaCacheDoc, key)
 	delete(opaCachePolicy, key)
-}
-
-func OpaGetPolicies() []OpaPolicy {
-	client := getOpaHTTPClient()
-
-	// get populated policies
-	url := fmt.Sprintf("%s%s", opaServer, "/v1/policies")
-	resp, getErr := client.Get(url)
-	if getErr != nil {
-		log.WithFields(log.Fields{
-			"url":   url,
-			"error": getErr,
-		}).Error("OpaGetPolicies get error")
-		return nil
-	}
-	defer resp.Body.Close()
-
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		log.WithFields(log.Fields{
-			"error": readErr,
-		}).Error("OpaGetPolicies error on ReadAll")
-		return nil
-	}
-
-	var results OpaPolicyResultList
-	if err := json.Unmarshal(body, &results); err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("OpaGetPolicies json.Unmarshal to []OpaPolicy failed")
-		return nil
-	}
-
-	return results.Result
 }
 
 func OpaEval(policyPath string, inputFile string) (int, string, error) {
@@ -341,6 +271,14 @@ func OpaEval(policyPath string, inputFile string) (int, string, error) {
 }
 
 func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
+	if IsOpaRestarted() {
+		log.WithFields(log.Fields{"policyPath": policyPath}).Error("[OpaEvalByString] opa restarted. need to init and restore.")
+		isRestoring = true
+		InitOpaServer()
+		RestoreOpaData()
+		isRestoring = false
+	}
+
 	client := getOpaHTTPClient()
 
 	// set the HTTP method, url, and request body
@@ -353,12 +291,6 @@ func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := client.Do(req)
 	if err != nil {
-		// restart OPA process and restore data
-		if strings.Contains(err.Error(), "connection refused") {
-			fmt.Printf("OPA server failed. Try to start !\n")
-			StartOpaServer()
-			RestoreOpaData()
-		}
 		return -1, "", err
 	}
 	defer resp.Body.Close()
@@ -437,20 +369,14 @@ func GetRiskyRoleRuleIDByName(ruleName string) int {
 	url := fmt.Sprintf("%s%s", opaServer, mappingKey)
 	resp, getErr := client.Get(url)
 	if getErr != nil {
-		log.WithFields(log.Fields{
-			"url":   url,
-			"error": getErr,
-		}).Error("GetRiskyRoleRuleIDByName get error")
+		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("GetRiskyRoleRuleIDByName get error")
 		return 0
 	}
 	defer resp.Body.Close()
 
 	body, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
-		log.WithFields(log.Fields{
-			"url":   url,
-			"error": getErr,
-		}).Error("GetRiskyRoleRuleIDByName error on ReadAll")
+		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("GetRiskyRoleRuleIDByName error on ReadAll")
 		return 0
 	}
 
