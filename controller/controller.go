@@ -609,7 +609,7 @@ func main() {
 	}
 
 	// start OPA server, should be started before RegisterStoreWatcher()
-	opaServer := opa.StartOpaServer()
+	opa.InitOpaServer()
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
@@ -722,5 +722,4 @@ func main() {
 	ctrlDeleteLocalInfo()
 	cluster.LeaveCluster(true)
 	grpcServer.Stop()
-	opaServer.Process.Kill()
 }
