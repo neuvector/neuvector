@@ -423,7 +423,7 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyHasPssViolation,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   pssPolicies,
-				MatchSrc: api.MatchSrcBoth,
+				MatchSrc: api.MatchSrcYaml,
 			},
 		}
 	}
