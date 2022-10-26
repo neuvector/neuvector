@@ -266,6 +266,7 @@ func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo) bool {
 		allowsPrivelegeEscalation,
 		allowsRootUsers,
 		doesNotSetLegalSeccompProfile,
+		exceedsRestrictedCapabilities,
 	}
 
 	return triggersPolicyViolation(c, restrictedViolations)
