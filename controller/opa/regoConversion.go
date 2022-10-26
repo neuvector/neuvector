@@ -370,6 +370,46 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		rego = append(rego, "\n")
 	}
 
+	// add supplemental criteria functions
+	if c.ValueType == "string" {
+		if c.Op == "notContainsAny" {
+			rego = append(rego, "# op=notContainsAny: if key not exist, treat it met")
+
+			rego = append(rego, functionName)
+			rego = append(rego, "{")
+
+			if strings.Contains(c.Path, "[_]") {
+				idx := strings.LastIndex(path, ".")
+				if idx != -1 {
+					path2 := path[0:idx]
+					key := path[idx+1:]
+					path2 = strings.Replace(path2, "[_]", "[i]", 1)
+					rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, key))
+					rego = append(rego, "	count(exist_items) == 0")
+				} else {
+					path2 := strings.Replace(path, "[_]", "[i]", 1)
+					rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+					rego = append(rego, "	count(exist_items) == 0")
+				}
+
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			} else {
+				idx := strings.LastIndex(path, ".")
+				if idx != -1 {
+					path2 := path[0:idx]
+					key := path[idx+1:]
+					rego = append(rego, fmt.Sprintf("	not has_key(%s, %q)", path2, key))
+				} else {
+					rego = append(rego, fmt.Sprintf("	not %s", path))
+				}
+
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			}
+		}
+	}
+
 	return rego
 }
 
