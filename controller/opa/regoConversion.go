@@ -96,9 +96,6 @@ get_parameter_verbs(p) := x {
 	return regoStr
 }
 
-// TODO: for podTemplate, we need to handle all resources have pod
-//
-//	deployment, daemonset, statefulset, cronjob, job, etc... (total is 8)
 func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	rego := []string{}
 
@@ -158,7 +155,7 @@ violation[result]{
 			continue
 		}
 
-		if c.Type == "saBindRiskyRole" && c.Op == "containsTagAny" {
+		if c.Type == "saBindRiskyRole" && c.Op == share.CriteriaOpContainsTagAny {
 			c_rego := convertRiskyRoleTagCriteria(j, c)
 			rego = append(rego, c_rego...)
 		}
@@ -276,14 +273,31 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		}
 	} else if c.Op == "notExist" {
 		if strings.Contains(c.Path, "[_]") {
-			path2 := strings.Replace(path, "[_]", "[i]", 1)
-			rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-			rego = append(rego, "	count(exist_items) == 0")
+			idx := strings.LastIndex(path, ".")
+			if idx != -1 {
+				path2 := path[0:idx]
+				key := path[idx+1:]
+				path2 = strings.Replace(path2, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, key))
+				rego = append(rego, "	count(exist_items) == 0")
+			} else {
+				path2 := strings.Replace(path, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+				rego = append(rego, "	count(exist_items) == 0")
+			}
 
 			rego = append(rego, "}")
 			rego = append(rego, "\n")
 		} else {
-			rego = append(rego, fmt.Sprintf("	not %s", path))
+			idx := strings.LastIndex(path, ".")
+			if idx != -1 {
+				path2 := path[0:idx]
+				key := path[idx+1:]
+				rego = append(rego, fmt.Sprintf("	not has_key(%s, %q)", path2, key))
+			} else {
+				rego = append(rego, fmt.Sprintf("	not %s", path))
+			}
+
 			rego = append(rego, "}")
 			rego = append(rego, "\n")
 		}
@@ -362,7 +376,7 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 	rego := []string{}
 
-	if c.Op != "containsTagAny" {
+	if c.Op != share.CriteriaOpContainsTagAny {
 		return rego
 	}
 
@@ -701,8 +715,10 @@ operator_contains_all(criteria_values, items){
 
 ## operator -- contains all (single value)
 operator_contains_all(criteria_values, item){
-	is_string(item)
-	check_contains(criteria_values, item)
+    is_string(item)
+    uniq_items := { x | x = criteria_values[_]}
+    count(uniq_items)==1
+    check_contains(criteria_values, item)
 }
 
 ## operator -- contains any (array)
@@ -743,6 +759,8 @@ operator_contains_other_than(criteria_values, item){
 	is_string(item)
 	not check_contains(criteria_values, item)
 }
+
+has_key(x, k) { _ = x[k] }
 
 check_contains(arrayData, elem) {
 	arrayData[_] == elem
