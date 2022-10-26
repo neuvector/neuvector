@@ -246,6 +246,7 @@ func violatesBaseLinePolicy(c *nvsysadmission.AdmContainerInfo) bool {
 		allowsPrivelegedContainers,
 		exceedsBaselineCapabilites,
 		hasHostPathVolumes,
+		usesHostPorts,
 		usesIllegalAppArmorProfile,
 		usesIllegalSELinuxOptions,
 		usesCustomProcMount,
