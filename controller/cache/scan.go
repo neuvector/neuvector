@@ -892,8 +892,12 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 
 	var fedRegName string
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
-	if fedRole == api.FedRoleMaster && name == common.RegistryRepoScanName {
-		fedRegName = common.RegistryFedRepoScanName
+	if fedRole == api.FedRoleMaster {
+		if name == common.RegistryRepoScanName {
+			fedRegName = common.RegistryFedRepoScanName
+		} else if strings.HasPrefix(name, api.FederalGroupPrefix) {
+			fedRegName = name
+		}
 	} else if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) {
 		fedRegName = name
 	}
