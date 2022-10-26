@@ -2551,7 +2551,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							}
 						}
 					}
-					if fedCfg.DeployRegScanData || fedCfg.DeployRepoScanData {
+					if respTo.DeployRegScanData || respTo.DeployRepoScanData {
 						go getFedRegScanData(false, fedCfg, respTo.ScanDataRevs, 1)
 					}
 					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
@@ -2825,13 +2825,11 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	body, _ := ioutil.ReadAll(r.Body)
 	if ce == "gzip" {
 		body = utils.GunzipBytes(body)
-		log.WithFields(log.Fields{"len(body)": len(body)}).Debug("=> test : 11") //-> AAA
 	}
 	if ct == "application/gob" {
 		buf := bytes.NewBuffer(body)
 		dec := gob.NewDecoder(buf)
 		err = dec.Decode(&req)
-		log.WithFields(log.Fields{"req": req}).Debug("=> test : 12") //-> AAA
 	} else {
 		err = fmt.Errorf("unexpected content-type: %s", ct)
 	}

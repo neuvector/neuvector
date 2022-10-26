@@ -1522,6 +1522,9 @@ func (m clusterHelper) GetFedScanRevisions() (share.CLUSFedScanRevisions, uint64
 	}
 
 	json.Unmarshal(value, &scanRevs)
+	if scanRevs.ScannedRegRevs == nil {
+		scanRevs.ScannedRegRevs = make(map[string]uint64)
+	}
 
 	return scanRevs, rev, nil
 }
