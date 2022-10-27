@@ -196,7 +196,7 @@ type CacheInterface interface {
 	GetFedRules(reqRevs map[string]uint64, acc *access.AccessControl) ([]byte, map[string]uint64, error)
 	GetAllFedRulesRevisions() map[string]uint64
 	GetFedSettings() share.CLUSFedSettings
-	GetFedScanResult(reqRegConfigRev uint64, reqKnownFedRegs []string, reqScanResultMD5 map[string]map[string]string) (api.RESTPollFedScanDataResp, bool)
+	GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 map[string]map[string]string, fedRegs utils.Set) (api.RESTPollFedScanDataResp, bool)
 	GetFedScanDataRevisions(getRegScanData, getRepoScanData bool) api.RESTFedScanDataRevs
 	GetFedScanResultMD5(cachedScanDataRevs, masterScanDataRevs api.RESTFedScanDataRevs) map[string]map[string]string
 
