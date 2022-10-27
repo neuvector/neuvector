@@ -2146,6 +2146,8 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 				for id := range pmsg.ContainerIDs.Iter() {
 					taskReexamIntfContainer(id.(string), nil, true)
 				}
+			case probe.PROBE_HOST_NEW_IP:
+				taskReexamHostIntf()
 			case probe.PROBE_REPORT_ESCALATION:
 				reportIncident(escalToIncidentLog(pmsg.Escalation, pmsg.Count, pmsg.StartAt))
 			case probe.PROBE_REPORT_SUSPICIOUS:

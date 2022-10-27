@@ -339,6 +339,16 @@ func putLocalInfo() {
 	}
 }
 
+func putHostIfInfo() {
+	log.Debug()
+
+	value, _ := json.Marshal(Host)
+	key := share.CLUSHostKey(Host.ID, "agent")
+	if err := cluster.Put(key, value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+	}
+}
+
 func deleteAgentInfo() {
 	log.Debug()
 
