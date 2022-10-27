@@ -963,7 +963,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 }
 
 func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
-	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug() //-> AAA
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	fedScanDataCacheMutexLock()
 	defer fedScanDataCacheMutexUnlock()

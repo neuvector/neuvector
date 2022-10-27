@@ -227,14 +227,13 @@ type RESTPollFedRulesResp struct {
 }
 
 type RESTPollFedScanDataReq struct {
-	ID            string                       `json:"id"`                       // id of joint cluster
-	Name          string                       `json:"name"`                     // name of joint cluster
-	JointTicket   string                       `json:"joint_ticket"`             // generated using joint cluster's secret
-	FedKvVersion  string                       `json:"fed_kv_version"`           // kv version in the code of joint cluster
-	RestVersion   string                       `json:"rest_version"`             // rest version in the code of joint cluster
-	RegConfigRev  uint64                       `json:"reg_config_rev"`           // revision of fed registry setting that the managed cluster remembers
-	KnownFedRegs  []string                     `json:"known_fed_regs,omitempty"` // all fed registry/repo names that the managed cluster remembers
-	ScanResultMD5 map[string]map[string]string `json:"scan_result_md5"`          // all scan result md5 of the scanned images in fed registry/repo that have different scan data revision from master (registry name : image id : scan result md5)
+	ID            string                       `json:"id"`              // id of joint cluster
+	Name          string                       `json:"name"`            // name of joint cluster
+	JointTicket   string                       `json:"joint_ticket"`    // generated using joint cluster's secret
+	FedKvVersion  string                       `json:"fed_kv_version"`  // kv version in the code of joint cluster
+	RestVersion   string                       `json:"rest_version"`    // rest version in the code of joint cluster
+	RegConfigRev  uint64                       `json:"reg_config_rev"`  // revision of fed registry setting that the managed cluster remembers
+	ScanResultMD5 map[string]map[string]string `json:"scan_result_md5"` // all scan result md5 of the scanned images in fed registry/repo that have different scan data revision from master (registry name : image id : scan result md5)
 }
 
 type RESTPollFedScanDataResp struct {

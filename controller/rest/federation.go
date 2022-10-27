@@ -2585,6 +2585,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 	return doPoll
 }
 
+// called by managed clusters only
 // get fed registry/repo scan data
 func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterScanDataRevs api.RESTFedScanDataRevs, tryTimes int) {
 
@@ -2592,26 +2593,36 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 	if pollScanData {
 		defer atomic.StoreUint32(&_fedScanDataPollOngoing, 0)
 
-		cachedScanDataRevs := cacher.GetFedScanDataRevisions(true, true)
+		var cachedScanDataRevs api.RESTFedScanDataRevs
+		if forcePulling {
+			cachedScanDataRevs.ScannedRegRevs = make(map[string]uint64)
+		} else {
+			cachedScanDataRevs = cacher.GetFedScanDataRevisions(true, true)
+		}
 		if masterScanDataRevs.RegConfigRev != cachedScanDataRevs.RegConfigRev ||
 			masterScanDataRevs.ScannedRepoRev != cachedScanDataRevs.ScannedRepoRev ||
 			!haveSameContent(masterScanDataRevs.ScannedRegRevs, cachedScanDataRevs.ScannedRegRevs) {
 			// get scan result md5 of the images in fed registry/repo that have different scan data revision(per fed registry/repo) from what master cluster has
-			cachedScanResultMD5 := cacher.GetFedScanResultMD5(cachedScanDataRevs, masterScanDataRevs)
-			// those fed registry/repo who have the same scan result md5 as master cluster are removed from cachedScanResultMD5 in each pollFedScanData loop
-			_, knownFedRegs := scanner.GetFedRegistryCache(false, true)
-			if _, ok := cachedScanResultMD5[common.RegistryFedRepoScanName]; ok {
-				knownFedRegs.Add(common.RegistryFedRepoScanName)
+			var cachedScanResultMD5 map[string]map[string]string
+			var knownFedRegs utils.Set
+			if forcePulling {
+				cachedScanResultMD5 = make(map[string]map[string]string)
+				knownFedRegs = utils.NewSet()
+			} else {
+				cachedScanResultMD5 = cacher.GetFedScanResultMD5(cachedScanDataRevs, masterScanDataRevs)
+				_, knownFedRegs = scanner.GetFedRegistryCache(false, true)
+				if _, ok := cachedScanResultMD5[common.RegistryFedRepoScanName]; ok {
+					knownFedRegs.Add(common.RegistryFedRepoScanName)
+				}
 			}
-
+			// those fed registry/repo who have the same scan result md5 as master cluster are removed from cachedScanResultMD5 in each pollFedScanData loop
 			i := 0
 			var throttleTime uint32 = 100
 			var interrupt bool
 			for throttleTime != 0 && !interrupt {
 				// cachedScanDataRevs.RegConfigRev is updated in each pollFedScanData() if there is fed registry setting change on master cluster
 				// cachedScanResultMD5/knownFedRegs are updated in each pollFedScanData()/workFedScanData() as well
-				throttleTime, interrupt = pollFedScanData(forcePulling, &cachedScanDataRevs.RegConfigRev, cachedScanResultMD5, knownFedRegs, fedCfg, 1)
-				forcePulling = false
+				throttleTime, interrupt = pollFedScanData(&cachedScanDataRevs.RegConfigRev, cachedScanResultMD5, knownFedRegs, fedCfg, 1)
 				i += 1
 			}
 			if !interrupt {
@@ -2641,7 +2652,7 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 // for the 1st polling request in this polling session,
 // cachedScanResultMD5: contains only the images md5 for fed registry/repo that are remembered by managed clusters & have different scan data revision from what master cluster has.
 // in each pollFedScanData(), some scan results are returned & their image md5 entries in cachedScanResultMD5 are updated.
-func pollFedScanData(forcePulling bool, cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]map[string]string,
+func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]map[string]string,
 	knownFedRegs utils.Set, fedCfg share.CLUSFedSettings, tryTimes int) (uint32, bool) {
 
 	var throttleTime uint32
@@ -2662,12 +2673,13 @@ func pollFedScanData(forcePulling bool, cachedRegConfigRev *uint64, cachedScanRe
 	reqTo.ID = jointCluster.ID
 	reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 	reqTo.RegConfigRev = *cachedRegConfigRev
-	reqTo.KnownFedRegs = knownFedRegs.ToStringSlice()
-	if forcePulling {
-		reqTo.ScanResultMD5 = nil
-	} else {
-		reqTo.ScanResultMD5 = cachedScanResultMD5
+	for regName := range knownFedRegs.Iter() {
+		name := regName.(string)
+		if _, ok := cachedScanResultMD5[name]; !ok {
+			cachedScanResultMD5[name] = make(map[string]string)
+		}
 	}
+	reqTo.ScanResultMD5 = cachedScanResultMD5
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -2810,7 +2822,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 // handles scan data polling requests on master cluster
 func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug() //-> AAA
+	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -2866,7 +2878,8 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 			resp.Result = result
 		} else {
 			var getFedRegCfg bool
-			resp, getFedRegCfg = cacher.GetFedScanResult(req.RegConfigRev, req.KnownFedRegs, req.ScanResultMD5)
+			_, fedRegs := scanner.GetFedRegistryCache(false, true)
+			resp, getFedRegCfg = cacher.GetFedScanResult(req.RegConfigRev, req.ScanResultMD5, fedRegs)
 			if getFedRegCfg && resp.RegistryCfg != nil {
 				resp.RegistryCfg.Registries, _ = scanner.GetFedRegistryCache(true, false)
 			}
