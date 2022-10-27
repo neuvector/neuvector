@@ -47,6 +47,8 @@ const (
 	CriteriaKeyRequestLimit        string = "resourceLimit"
 	CriteriaKeyModules             string = "modules"
 	CriteriaKeyHasPssViolation     string = "hasPssViolation"
+	CriteriaKeyCustomPath          string = "customPath"
+	CriteriaKeySaBindRiskyRole     string = "saBindRiskyRole"
 )
 
 const (
@@ -74,6 +76,7 @@ const (
 	CriteriaOpContainsOtherThan string = "containsOtherThan"
 	CriteriaOpExist             string = "exist"
 	CriteriaOpNotExist          string = "notExist"
+	CriteriaOpContainsTagAny    string = "containsTagAny"
 )
 
 const (

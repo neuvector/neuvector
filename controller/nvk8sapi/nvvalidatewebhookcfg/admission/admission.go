@@ -425,6 +425,16 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Values:   pssPolicies,
 				MatchSrc: api.MatchSrcYaml,
 			},
+			share.CriteriaKeyCustomPath: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCustomPath,
+				Ops:      []string{},
+				MatchSrc: api.MatchSrcYaml,
+			},
+			share.CriteriaKeySaBindRiskyRole: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeySaBindRiskyRole,
+				Ops:      []string{share.CriteriaOpContainsTagAny},
+				MatchSrc: api.MatchSrcYaml,
+			},
 		}
 	}
 	return admK8sDenyRuleOptions
@@ -578,7 +588,7 @@ func GetCustomCriteriaOptions() []*api.RESTAdminCustomCriteriaOptions {
 	// add string type
 	options = append(options, &api.RESTAdminCustomCriteriaOptions{
 		ValueType: "string",
-		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist, "containsAll", "containsAny", "notContainsAny", "containsOtherThan"},
+		Ops:       []string{share.CriteriaOpExist, share.CriteriaOpNotExist, share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan},
 	})
 
 	// add number type

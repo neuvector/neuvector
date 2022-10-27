@@ -1398,9 +1398,9 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		statusCode, body, err := opa.OpaEvalByString(policyUrl, string(jsonData))
 
 		if err != nil {
-			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
+			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID, "AdmissionReviewRaw": string(jsonData)}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
 		} else {
-			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
+			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID, "AdmissionReviewRaw": string(jsonData)}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
 
 			met, err := opa.AnalyzeResult(body)
 			if err != nil {
