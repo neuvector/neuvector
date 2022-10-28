@@ -257,7 +257,7 @@ func violatesBaseLinePolicy(c *nvsysadmission.AdmContainerInfo) bool {
 	return triggersPolicyViolation(c, baselineViolations)
 }
 
-func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo) bool {
+func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) bool {
 	if violatesBaseLinePolicy(c) {
 		return true
 	}
@@ -270,5 +270,5 @@ func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo) bool {
 		exceedsRestrictedCapabilities,
 	}
 
-	return triggersPolicyViolation(c, restrictedViolations)
+	return triggersPolicyViolation(c, restrictedViolations) || imageRunsAsRoot
 }

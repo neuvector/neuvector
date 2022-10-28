@@ -1217,14 +1217,14 @@ func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]st
 	return union
 }
 
-func hasPssViolation(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo) bool {
+func hasPssViolation(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) bool {
 	selectedPolicy := strings.TrimSpace(strings.ToLower(crt.Value))
 
 	switch selectedPolicy {
 	case share.PssPolicyBaseline:
 		return violatesBaseLinePolicy(c)
 	case share.PssPolicyRestricted:
-		return violatesRestrictedPolicy(c)
+		return violatesRestrictedPolicy(c, imageRunsAsRoot)
 	}
 
 	return false // invalid policy
@@ -1363,7 +1363,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyModules:
 			met, positive = isModulesCriterionMet(crt, scannedImage.Modules)
 		case share.CriteriaKeyHasPssViolation:
-			met = hasPssViolation(crt, c)
+			met = hasPssViolation(crt, c, scannedImage.RunAsRoot)
 			positive = true
 		default:
 			met, positive = false, true

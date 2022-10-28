@@ -290,9 +290,19 @@ func TestRestrictedPolicy_ValidContainer(t *testing.T) {
 	preTest()
 
 	testContainer := getValidTestContainer()
-	if violatesRestrictedPolicy(&testContainer) {
+	if violatesRestrictedPolicy(&testContainer, false) {
 		t.Error("valid container should not violate restricted policy")
 	}
 
 	postTest()
+}
+
+func TestRestrictedPolicy_ImageRunsAsRoot(t *testing.T) {
+	preTest()
+
+	testContainer := getValidTestContainer()
+	imageRunsAsRoot := true
+	if !violatesRestrictedPolicy(&testContainer, imageRunsAsRoot) {
+		t.Error("image running as root should violate restricted policy")
+	}
 }
