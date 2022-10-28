@@ -246,6 +246,7 @@ func violatesBaseLinePolicy(c *nvsysadmission.AdmContainerInfo) bool {
 		allowsPrivelegedContainers,
 		exceedsBaselineCapabilites,
 		hasHostPathVolumes,
+		usesHostPorts,
 		usesIllegalAppArmorProfile,
 		usesIllegalSELinuxOptions,
 		usesCustomProcMount,
@@ -256,7 +257,7 @@ func violatesBaseLinePolicy(c *nvsysadmission.AdmContainerInfo) bool {
 	return triggersPolicyViolation(c, baselineViolations)
 }
 
-func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo) bool {
+func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) bool {
 	if violatesBaseLinePolicy(c) {
 		return true
 	}
@@ -266,7 +267,8 @@ func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo) bool {
 		allowsPrivelegeEscalation,
 		allowsRootUsers,
 		doesNotSetLegalSeccompProfile,
+		exceedsRestrictedCapabilities,
 	}
 
-	return triggersPolicyViolation(c, restrictedViolations)
+	return triggersPolicyViolation(c, restrictedViolations) || imageRunsAsRoot
 }
