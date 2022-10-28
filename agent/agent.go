@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -83,6 +84,17 @@ func getHostIPs() {
 		addHostSubnets(Host.Ifaces, gInfo.localSubnetMap)
 	}
 	mergeLocalSubnets(gInfo.internalSubnets)
+}
+
+func taskReexamHostIntf() {
+	log.Debug()
+	oldIfaces := Host.Ifaces
+	oldTunnelIP := Host.TunnelIP
+	getHostIPs()
+	if reflect.DeepEqual(oldIfaces, Host.Ifaces) != true ||
+	reflect.DeepEqual(oldTunnelIP, Host.TunnelIP) != true {
+		putHostIfInfo()
+	}
 }
 
 func getLocalInfo(selfID string, pid2ID map[int]string) error {
@@ -613,6 +625,8 @@ func main() {
 	Agent.JoinedAt = time.Now().UTC()
 	putLocalInfo()
 	logAgent(share.CLUSEvAgentJoin)
+	//NVSHAS-6638,monitor host to see whether there is i/f or IP changes
+	prober.StartMonitorHostInterface(Host.ID, 1)
 
 	clusterLoop(existing)
 	existing = nil

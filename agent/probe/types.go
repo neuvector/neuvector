@@ -47,6 +47,7 @@ const (
 	PROBE_REPORT_FILE_MODIFIED
 	PROBE_REPORT_PROCESS_VIOLATION
 	PROBE_REPORT_PROCESS_DENIED
+	PROBE_HOST_NEW_IP
 )
 
 var ProbeMsgName = []string{
@@ -60,6 +61,7 @@ var ProbeMsgName = []string{
 	PROBE_REPORT_FILE_MODIFIED:     "file_modified",
 	PROBE_REPORT_PROCESS_VIOLATION: "process_profile_violation",
 	PROBE_REPORT_PROCESS_DENIED:    "process_profile_denied",
+	PROBE_HOST_NEW_IP:         		"host_new_ip",
 }
 
 type ProbeMessage struct {

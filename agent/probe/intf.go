@@ -87,3 +87,51 @@ func (p *Probe) StopMonitorInterface(id string) {
 		close(ch)
 	}
 }
+
+func (p *Probe) intfHostMonitorLoop(hid string, m intfMonitorInterface, stopCh chan struct{}) {
+	toNotify := false
+	pollTimeout := intfMonitorPollTimeoutLong
+
+	for {
+		select {
+		case <-stopCh:
+			log.WithFields(log.Fields{"hostid": hid}).Debug("Monitor host i/f Stopped")
+			m.Close()
+			return
+		default:
+			// Aggregate addr/route change notification.
+			changed, err := m.WaitAddrChange(&pollTimeout)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("Receive error")
+			} else if changed {
+				toNotify = true
+				pollTimeout = intfMonitorPollTimeoutShort
+			} else if toNotify {
+				log.WithFields(log.Fields{"hostid": hid}).Debug("Notify host addr or route changed")
+				toNotify = false
+				msg := ProbeMessage{Type: PROBE_HOST_NEW_IP}
+				p.notifyTaskChan <- &msg
+				pollTimeout = intfMonitorPollTimeoutLong
+			} else {
+				pollTimeout = intfMonitorPollTimeoutLong
+			}
+		}
+	}
+}
+
+func (p *Probe) StartMonitorHostInterface(hid string, pid int) {
+	log.WithFields(log.Fields{"hostid": hid}).Debug("")
+
+	m := p.openIntfMonitor(pid)
+	if m == nil {
+		log.WithFields(log.Fields{"hostid": hid}).Debug("start monitor host i/f fail")
+		return
+	}
+
+	stopCh := make(chan struct{})
+	p.intfMonMux.Lock()
+	p.intfMonMap[hid] = stopCh
+	p.intfMonMux.Unlock()
+
+	go p.intfHostMonitorLoop(hid, m, stopCh)
+}
