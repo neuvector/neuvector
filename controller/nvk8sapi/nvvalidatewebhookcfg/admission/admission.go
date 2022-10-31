@@ -629,8 +629,3 @@ func GetCustomCriteriaTemplates() []*api.RESTAdminCriteriaTemplate {
 	}
 	return templates
 }
-
-func GetPredefinedRiskyRoles() []string {
-	riskyRoles := []string{"risky_role_view_secret", "risky_role_any_action_workload", "risky_role_any_action_rbac", "risky_role_create_pod", "risky_role_exec_into_container"}
-	return riskyRoles
-}

@@ -575,7 +575,7 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 		K8sEnv:                  k8sPlatform,
 		CustomCriteriaOptions:   nvsysadmission.GetCustomCriteriaOptions(),
 		CustomCriteriaTemplates: nvsysadmission.GetCustomCriteriaTemplates(),
-		PredefinedRiskyRoles:    nvsysadmission.GetPredefinedRiskyRoles(),
+		PredefinedRiskyRoles:    cache.GetPredefinedRiskyRoles(),
 	}
 	keys := []string{share.CriteriaKeyRunAsPrivileged, share.CriteriaKeyRunAsRoot, share.CriteriaKeySharePidWithHost,
 		share.CriteriaKeyShareIpcWithHost, share.CriteriaKeyShareNetWithHost, share.CriteriaKeyAllowPrivEscalation}

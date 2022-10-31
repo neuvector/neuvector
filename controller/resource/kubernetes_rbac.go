@@ -1425,7 +1425,7 @@ func xlateRole2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1435,7 +1435,7 @@ func xlateRole2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1449,7 +1449,7 @@ func xlateRoleBinding2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1459,7 +1459,7 @@ func xlateRoleBinding2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1473,7 +1473,7 @@ func xlateClusRole2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1483,7 +1483,7 @@ func xlateClusRole2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1497,7 +1497,7 @@ func xlateClusRoleBinding2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
@@ -1507,7 +1507,7 @@ func xlateClusRoleBinding2(obj k8s.Resource, action string) {
 		rbacv1, _ := json.Marshal(o)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocumentIfNotExist(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacv1))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
