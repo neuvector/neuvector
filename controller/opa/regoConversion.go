@@ -640,6 +640,7 @@ specification = spec {
 func printHelperFunctions() string {
 	rego := `
 rawInput[msg]{
+	1==2
 	msg := input
 }
 

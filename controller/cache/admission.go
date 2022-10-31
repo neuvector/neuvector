@@ -89,6 +89,8 @@ var critDisplayName map[string]string = map[string]string{
 	share.CriteriaKeyAllowPrivEscalation: "allow privilege escalation",
 	share.CriteriaKeyPspCompliance:       "PSP best practice violation",
 	share.CriteriaKeyRequestLimit:        "resource limitation",
+	share.CriteriaKeyCustomPath:          "custom path violation",
+	share.CriteriaKeySaBindRiskyRole:     "service account bounds risky role violation",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
@@ -96,6 +98,14 @@ var critDisplayName2 map[string]string = map[string]string{ // for criteria that
 	share.CriteriaKeyCVEMediumCount:      "more than %s medium severity CVEs that were reported before %s days ago",
 	share.CriteriaKeyCVEHighWithFixCount: "more than %s high severity CVEs with fix that were reported before %s days ago",
 	share.CriteriaKeyCVEScoreCount:       "more than %s CVEs whose score >= %s",
+}
+
+var predefinedRiskyRoles map[string]string = map[string]string{
+	"risky_role_view_secret":         "view secret",
+	"risky_role_any_action_workload": "do any action on workload resources",
+	"risky_role_any_action_rbac":     "do any action on rbac resources",
+	"risky_role_create_pod":          "create workload resources",
+	"risky_role_exec_into_container": "execute into container",
 }
 
 func initStateCache(svcName string, stateCache *share.CLUSAdmissionState) {
@@ -1398,9 +1408,9 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		statusCode, body, err := opa.OpaEvalByString(policyUrl, string(jsonData))
 
 		if err != nil {
-			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID, "AdmissionReviewRaw": string(jsonData)}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
+			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
 		} else {
-			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID, "AdmissionReviewRaw": string(jsonData)}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
+			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
 
 			met, err := opa.AnalyzeResult(body)
 			if err != nil {
@@ -1478,6 +1488,12 @@ func getOpDisplay(crt *share.CLUSAdmRuleCriterion) string {
 		return "does not contain any in"
 	case share.CriteriaOpContainsOtherThan:
 		return "contains value other than"
+	case share.CriteriaOpExist:
+		return "exist"
+	case share.CriteriaOpNotExist:
+		return "does not exist"
+	case share.CriteriaOpContainsTagAny:
+		return "bounds to a risky role"
 	default:
 		return "unknown"
 	}
@@ -1513,6 +1529,11 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 		if str == "" {
 			opDsiplay := getOpDisplay(crt)
 			displayName = ""
+
+			if crt.Type != "" {
+				crt.Name = crt.Type
+			}
+
 			if displayName, ok = critDisplayName[crt.Name]; !ok {
 				displayName = crt.Name
 			}
@@ -1521,11 +1542,23 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 			} else {
 				switch crt.Op {
 				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
-					str = fmt.Sprintf("(%s %s {%s})", displayName, opDsiplay, crt.Value)
+					if crt.Type == "customPath" {
+						str = fmt.Sprintf("(%s, %s %s {%s})", displayName, crt.Path, opDsiplay, crt.Value)
+					} else {
+						str = fmt.Sprintf("(%s %s {%s})", displayName, opDsiplay, crt.Value)
+					}
 				case share.CriteriaOpRegex:
 					str = fmt.Sprintf("(%s %s regex(%s) )", displayName, opDsiplay, crt.Value)
+				case share.CriteriaOpExist, share.CriteriaOpNotExist:
+					str = fmt.Sprintf("(%s, path %s %s)", displayName, crt.Path, opDsiplay)
+				case share.CriteriaOpContainsTagAny:
+					str = fmt.Sprintf("the service account is bound to one of risky role {%s}", formatRiskyRoleCriteriaMsg(crt.Value))
 				default:
-					str = fmt.Sprintf("(%s %s %s)", displayName, opDsiplay, crt.Value)
+					if crt.Type == "customPath" {
+						str = fmt.Sprintf("(%s, value in %s %s %s)", displayName, crt.Path, opDsiplay, crt.Value)
+					} else {
+						str = fmt.Sprintf("(%s %s %s)", displayName, opDsiplay, crt.Value)
+					}
 				}
 			}
 			if len(strSub) > 0 {
@@ -1966,6 +1999,10 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 			critValues = []string{strings.TrimSpace(crit.Value)}
 		}
 
+		if c.Type == "customPath" || c.Type == "saBindRiskyRole" {
+			c.Name = c.Type
+		}
+
 		set := utils.NewSet()
 		for _, crtValue := range critValues {
 			if c.Name == share.CriteriaKeyCVENames {
@@ -2399,4 +2436,25 @@ func PopulateDefRiskyRules() {
 		r.ID = uint32(2000 + i + 1)
 		opa.ConvertToRegoRule(r)
 	}
+}
+
+func GetPredefinedRiskyRoles() []string {
+	keys := make([]string, 0, len(predefinedRiskyRoles))
+	for k := range predefinedRiskyRoles {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func formatRiskyRoleCriteriaMsg(critValue string) string {
+	results := []string{}
+	items := strings.Split(critValue, ",")
+	for _, k := range items {
+		k = strings.TrimSpace(k)
+		if _, ok := predefinedRiskyRoles[k]; ok {
+			results = append(results, predefinedRiskyRoles[k])
+		}
+	}
+
+	return strings.Join(results, ",")
 }

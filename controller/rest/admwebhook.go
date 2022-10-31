@@ -1060,7 +1060,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		jsonData, err := json.Marshal(ar)
 		if err != nil {
 			// log error message
-			log.WithFields(log.Fields{"docKey": docKey, "err": err}).Info("failed add rbac res to OPA")
+			log.WithFields(log.Fields{"docKey": docKey, "err": err}).Error("failed add rbac res to OPA")
 		} else {
 			opa.AddDocument(docKey, string(jsonData))
 			updateToOtherControllers(docKey, string(jsonData))

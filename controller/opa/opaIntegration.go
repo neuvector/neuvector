@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -48,6 +49,8 @@ var UseOPA_HTTPS = false
 var isRestoring = false
 var opaCacheDoc map[string]string = make(map[string]string)
 var opaCachePolicy map[string]string = make(map[string]string)
+var opaCacheDocMutex = &sync.RWMutex{}
+var opaCachePolicyMutex = &sync.RWMutex{}
 
 var (
 	opaServer       = "http://localhost:8181"
@@ -61,7 +64,7 @@ func InitOpaServer() {
 	tUnixNano := t.UnixNano()
 	data, _ := json.Marshal(tUnixNano)
 	AddDocument(opaInitKey, string(data))
-	log.WithFields(log.Fields{"ready": string(data)}).Error("InitOpaServer.")
+	log.WithFields(log.Fields{"ready": string(data)}).Debug("InitOpaServer.")
 }
 
 func IsOpaRestarted() bool {
@@ -69,8 +72,6 @@ func IsOpaRestarted() bool {
 		return false
 	}
 
-	// check if the ready-doc exist
-	// if not exist, it means we need to repopulate all rules and policies
 	client := getOpaHTTPClient()
 
 	url := fmt.Sprintf("%s%s", opaServer, opaInitKey)
@@ -138,11 +139,7 @@ func getOpaHTTPClient() *http.Client {
 func addObject(key string, contentType string, data string) bool {
 
 	if IsOpaRestarted() {
-		log.WithFields(log.Fields{"key": key}).Error("[addObject] opa restarted. need to init and restore.")
-		isRestoring = true
-		InitOpaServer()
 		RestoreOpaData()
-		isRestoring = false
 	}
 
 	client := getOpaHTTPClient()
@@ -177,8 +174,11 @@ func addObject(key string, contentType string, data string) bool {
 func AddPolicy(key string, regoStr string) bool {
 	result := addObject(key, ContentTypeText, regoStr)
 
-	if result {
+	// no need to add to cache if in restoring stage... it's already in cache..
+	if !isRestoring && result {
+		opaCachePolicyMutex.Lock()
 		opaCachePolicy[key] = regoStr
+		opaCachePolicyMutex.Unlock()
 	}
 
 	return result
@@ -187,40 +187,14 @@ func AddPolicy(key string, regoStr string) bool {
 func AddDocument(key string, jsonData string) bool {
 	result := addObject(key, ContentTypeJson, jsonData)
 
-	if result {
+	// no need to add to cache if in restoring stage... it's already in cache..
+	if !isRestoring && result {
+		opaCacheDocMutex.Lock()
 		opaCacheDoc[key] = jsonData
+		opaCacheDocMutex.Unlock()
 	}
 
 	return result
-}
-
-func AddDocumentIfNotExist(key string, jsonData string) bool {
-	client := getOpaHTTPClient()
-
-	url := fmt.Sprintf("%s%s", opaServer, key)
-	resp, getErr := client.Get(url)
-	if getErr != nil {
-		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("OPA request")
-		return false
-	}
-
-	defer resp.Body.Close()
-
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		log.WithFields(log.Fields{"error": readErr}).Error("OPA error on ReadAll")
-		return false
-	}
-
-	if resp.StatusCode == http.StatusOK && strings.Contains(string(body), "result") {
-		return true
-	} else {
-		result := addObject(key, ContentTypeJson, jsonData)
-		if result {
-			opaCacheDoc[key] = jsonData
-		}
-		return result
-	}
 }
 
 func DeletePolicy(ruleId uint32) {
@@ -229,11 +203,7 @@ func DeletePolicy(ruleId uint32) {
 
 func DeleteDocument(key string) {
 	if IsOpaRestarted() {
-		log.WithFields(log.Fields{"key": key}).Error("[DeleteDocument] opa restarted. need to init and restore.")
-		isRestoring = true
-		InitOpaServer()
 		RestoreOpaData()
-		isRestoring = false
 	}
 
 	client := getOpaHTTPClient()
@@ -257,8 +227,13 @@ func DeleteDocument(key string) {
 		return
 	}
 
+	opaCacheDocMutex.Lock()
 	delete(opaCacheDoc, key)
+	opaCacheDocMutex.Unlock()
+
+	opaCachePolicyMutex.Lock()
 	delete(opaCachePolicy, key)
+	opaCachePolicyMutex.Unlock()
 }
 
 func OpaEval(policyPath string, inputFile string) (int, string, error) {
@@ -272,11 +247,7 @@ func OpaEval(policyPath string, inputFile string) (int, string, error) {
 
 func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
 	if IsOpaRestarted() {
-		log.WithFields(log.Fields{"policyPath": policyPath}).Error("[OpaEvalByString] opa restarted. need to init and restore.")
-		isRestoring = true
-		InitOpaServer()
 		RestoreOpaData()
-		isRestoring = false
 	}
 
 	client := getOpaHTTPClient()
@@ -304,13 +275,19 @@ func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
 }
 
 func RestoreOpaData() {
+	log.WithFields(log.Fields{"doc_count": len(opaCacheDoc), "policy_count": len(opaCachePolicy)}).Debug("RestoreOpaData")
+
+	isRestoring = true
+	InitOpaServer()
+
 	for k, v := range opaCacheDoc {
 		AddDocument(k, v)
 	}
-
 	for k, v := range opaCachePolicy {
 		AddPolicy(k, v)
 	}
+
+	isRestoring = false
 }
 
 // this function should return matched or not
@@ -319,48 +296,29 @@ func AnalyzeResult(response string) (bool, error) {
 	// check the spec first
 	var spec OpaEvalResultSpec
 	if err := json.Unmarshal([]byte(response), &spec); err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("AnalyzeResult Unmarshal() to get spec.")
+		log.WithFields(log.Fields{"error": err}).Error("AnalyzeResult Unmarshal() to get spec.")
 		return false, errors.New("rego execution error, no specification found")
 	}
-
-	log.WithFields(log.Fields{
-		"spec": spec,
-	}).Info("AnalyzeResult spec.")
 
 	if spec.Result.Spec.Version == "v1" {
 		var results OpaEvalResultV1 // ## define a version,,   like OpaEvalResultV1 for extensibility.., and have a data field to indicate what version we should use
 		if err := json.Unmarshal([]byte(response), &results); err != nil {
-			log.WithFields(log.Fields{
-				"spec":  spec,
-				"error": err,
-			}).Error("AnalyzeResult Unmarshal()")
+			log.WithFields(log.Fields{"spec": spec, "error": err}).Error("AnalyzeResult Unmarshal()")
 			return false, errors.New("rego execution error, unable to parse to v1 specification")
-		}
-
-		// show violations
-		fmt.Printf("violations:\n")
-		for i, v := range results.Result.Violations {
-			fmt.Printf("	[%d] %s\n", i, v.Message)
-		}
-
-		// show violationmsgs
-		fmt.Printf("violationmsgs:\n")
-		for i, v := range results.Result.ViolationMsgs {
-			fmt.Printf("	[%d] %s\n", i, v)
 		}
 
 		return len(results.Result.Violations) > 0, nil
 	} else {
-		log.WithFields(log.Fields{
-			"spec": spec,
-		}).Error("AnalyzeResult unsupported spec.")
+		log.WithFields(log.Fields{"spec": spec}).Error("AnalyzeResult unsupported spec.")
 		return false, errors.New("rego execution error, unsupported spec")
 	}
 }
 
 func GetRiskyRoleRuleIDByName(ruleName string) int {
+	if IsOpaRestarted() {
+		RestoreOpaData()
+	}
+
 	client := getOpaHTTPClient()
 
 	// get the base64 string
@@ -380,8 +338,6 @@ func GetRiskyRoleRuleIDByName(ruleName string) int {
 		return 0
 	}
 
-	fmt.Printf("[GetRiskyRoleRuleIDByName] url=%s, body=%s\n", url, string(body))
-
 	type MappingRuleId struct {
 		RuldID int `json:"ruleid"`
 	}
@@ -391,7 +347,7 @@ func GetRiskyRoleRuleIDByName(ruleName string) int {
 	}{}
 
 	if err := json.Unmarshal(body, &response); err != nil {
-		fmt.Printf("json.Unmarshal to OpaPolicy failed. %v\n", err)
+		log.WithFields(log.Fields{"error": err}).Error("json.Unmarshal to OpaPolicy failed.")
 	}
 
 	return response.Result.RuldID
