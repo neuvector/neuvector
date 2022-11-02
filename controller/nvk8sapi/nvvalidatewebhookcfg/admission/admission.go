@@ -433,7 +433,7 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 			share.CriteriaKeySaBindRiskyRole: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeySaBindRiskyRole,
 				Ops:      []string{share.CriteriaOpContainsTagAny},
-				MatchSrc: api.MatchSrcYaml,
+				MatchSrc: api.MatchSrcBoth,
 			},
 		}
 	}
