@@ -1769,7 +1769,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	var user *share.CLUSUser
 	var blockAfterFailedCount int
 
-	if pw.Username[0] == '$' {
+	if pw.Username[0] == '~' {
 		return nil, false, false, false, 0, errors.New("User not found")
 	}
 	now := time.Now()

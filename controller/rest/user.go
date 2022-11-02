@@ -106,7 +106,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	ruser := rconf.User
 	username := ruser.Fullname
-	if username[0] == '$' {
+	if username[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -240,7 +240,7 @@ func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '$' {
+	if fullname[0] == '~' {
 		handlerNotFound(w, r)
 		return
 	}
@@ -335,7 +335,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		}
 
 		// skip hidden user
-		if user.Fullname[0] == '$' {
+		if user.Fullname[0] == '~' {
 			continue
 		}
 
@@ -463,7 +463,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		log.WithFields(log.Fields{"name": fullname, "config": rconf.Config.Fullname}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 		return
-	} else if fullname[0] == '$' {
+	} else if fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -699,7 +699,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '$' {
+	if fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -828,7 +828,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
 	role := ps.ByName("role")
-	if fullname[0] == '$' {
+	if fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -956,7 +956,7 @@ func handlerUserDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '$' {
+	if fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
