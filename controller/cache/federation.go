@@ -623,7 +623,7 @@ func collectUpdatedScanResult(regName, imageID, md5 string, updatedResults map[s
 // only called by master cluster. caller doesn't own cache lock
 // reqRegConfigRev/reqScanResultMD5: what the requesting managed cluster remembers from the last polling.
 // reqScanResultMD5: the images md5 for fed registry/repo that are remembered by managed clusters & have different scan data revision from what master cluster has.
-func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 map[string]map[string]string, fedRegs utils.Set) (
+func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 map[string]map[string]string, reqUpToDateRegs []string, fedRegs utils.Set) (
 	api.RESTPollFedScanDataResp, bool) {
 
 	var getFedRegCfg bool
@@ -642,6 +642,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 	scanResultData := api.RESTFedScanResultData{
 		UpdatedScanResults: make(map[string]map[string]*api.RESTFedImageScanResult), // registry name : image id : scan result
 		DeletedScanResults: make(map[string][]string),                               // registry name : []image id ('registry name : nil' means the reg is deleted on master cluster)
+		UpToDateRegs:       reqUpToDateRegs,
 	}
 
 	fedScanDataCacheMutexRLock()
@@ -661,6 +662,11 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 
 	// check whether any fed scan result needs to deploy to the requesting managed cluster
 	if fedSettings.DeployRegScanData || fedSettings.DeployRepoScanData {
+		if fedSettings.DeployRepoScanData {
+			if curImagesMD5, ok := fedScanResultMD5[common.RegistryFedRepoScanName]; ok && len(curImagesMD5) > 0 {
+				fedRegs.Add(common.RegistryFedRepoScanName)
+			}
+		}
 		// 1. check whether there is scan result change for the images in those fed registry/repo that managed cluster remembers
 		// reqImagesMD5: md5(regImageSummaryReport) of images in fed registry/repo that managed cluster remembers
 		for regName, reqImagesMD5 := range reqScanResultMD5 {
@@ -749,8 +755,12 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 		}
 
 		if !throttled {
+			upToDateRegs := utils.NewSetFromSliceKind(scanResultData.UpToDateRegs)
 			// 2. check whether there is new fed registry created on master cluster that managed cluster is unaware of
 			for regName, curImagesMD5 := range fedScanResultMD5 {
+				if upToDateRegs.Contains(regName) {
+					continue
+				}
 				isForRepoScan := false
 				if regName == common.RegistryFedRepoScanName {
 					isForRepoScan = true

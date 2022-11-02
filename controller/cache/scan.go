@@ -915,10 +915,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 
 		var report *share.CLUSScanReport
 		key := share.CLUSRegistryImageDataKey(name, id)
-		// for any scna report on master/standalone cluster & non-fed scan report on managed cluster
-		if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
-			report = clusHelper.GetScanReport(key)
-			if report != nil {
+		report = clusHelper.GetScanReport(key)
+		if report != nil {
+			// for any scan report on master/standalone cluster & non-fed scan report on managed cluster
+			if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
 				if alives != nil {
 					clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
 					auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
@@ -927,27 +927,25 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
 				benchUpdate(share.EventCompliance, clog)
 			}
-		}
 
-		if fedRegName != "" {
-			scanResult := regImageSummaryReport{
-				Summary: value,
-				Report:  report,
+			if fedRegName != "" {
+				scanResult := regImageSummaryReport{
+					Summary: value,
+					Report:  report,
+				}
+				fedScanDataCacheMutexLock()
+				currImagesMD5, ok := fedScanResultMD5[fedRegName]
+				if !ok {
+					fedScanResultMD5[fedRegName] = make(map[string]string, 1)
+					currImagesMD5, _ = fedScanResultMD5[fedRegName]
+				}
+				if currImagesMD5 != nil {
+					res, _ := json.Marshal(&scanResult)
+					md5Sum := md5.Sum(res)
+					currImagesMD5[id] = hex.EncodeToString(md5Sum[:])
+				}
+				fedScanDataCacheMutexUnlock()
 			}
-			fedScanDataCacheMutexLock()
-			currImagesMD5, ok := fedScanResultMD5[fedRegName]
-			if !ok {
-				fedScanResultMD5[fedRegName] = make(map[string]string, 1)
-				currImagesMD5, _ = fedScanResultMD5[fedRegName]
-			}
-			if currImagesMD5 != nil {
-				var buf bytes.Buffer
-				enc := gob.NewEncoder(&buf)
-				enc.Encode(&scanResult)
-				md5Sum := md5.Sum(buf.Bytes())
-				currImagesMD5[id] = hex.EncodeToString(md5Sum[:])
-			}
-			fedScanDataCacheMutexUnlock()
 		}
 
 	case cluster.ClusterNotifyDelete:
