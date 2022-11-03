@@ -302,7 +302,7 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 			rego = append(rego, "\n")
 		}
 	} else if c.ValueType == "string" {
-		quotedString := parseQuotedString(c.Value)
+		quotedString := parseQuotedSimpleRegexString(c.Value)
 		line := fmt.Sprintf("	user_provided_data := [%s]", strings.Join(quotedString, ","))
 		rego = append(rego, line)
 
@@ -544,8 +544,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	
 	roleNamespace := _get_namespace("get")
 	roleRefKind := roleRef.kind
-	# roleName := roleRef.name
-	roleName := sprintf("%v.%v", [roleNamespace, roleRef.name])
+	roleName := getRoleName(roleRefKind, roleRef.name, roleNamespace)
 	
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
 	roleName  == violationRoles[_]`
@@ -581,11 +580,9 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	
 	roleNamespace := _get_namespace("get")
 	roleRefKind := roleRef.kind
-	# roleName := roleRef.name
-	roleName := sprintf("%v.%v", [roleNamespace, roleRef.name])
+	roleName := getRoleName(roleRefKind, roleRef.name, roleNamespace)
 	
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
-	# roleName  == violationRoles[_]
 
 	violationRoleName = violationRoles[_]
     contains(violationRoleName, "_config_assessment_")		# format signature: 12345_config_assessment_
@@ -594,6 +591,20 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 
 	rego = append(rego, line)
 	rego = append(rego, "}\n")
+
+	// for rolebinding, it can also link to ClusterRole
+	line = `
+	getRoleName(roleRefKind, roleRefName, workloadNs):=rname{
+		roleRefKind == "ClusterRole"
+		rname := roleRefName
+	}
+
+	getRoleName(roleRefKind, roleRefName, workloadNs):=rname{
+		roleRefKind == "Role"
+		rname := sprintf("%v.%v", [workloadNs, roleRefName])
+	}
+	`
+	rego = append(rego, line)
 
 	// foreach rule, we need to generate a pair of these code..
 	for _, ruleID := range ruleIDs {
@@ -618,6 +629,29 @@ func parseQuotedString(input string) []string {
 
 	s := strings.Split(input, ",")
 	for _, v := range s {
+		quotedString = append(quotedString, fmt.Sprintf("%q", strings.TrimSpace(v)))
+	}
+
+	return quotedString
+}
+
+func parseQuotedSimpleRegexString(input string) []string {
+	quotedString := []string{}
+
+	s := strings.Split(input, ",")
+	for _, v := range s {
+
+		v = strings.TrimSpace(v)
+		if strings.ContainsAny(v, "?*") {
+			v = strings.Replace(v, ".", "\\.", -1)
+			v = strings.Replace(v, "?", ".", -1)
+			v = strings.Replace(v, "*", ".*", -1)
+
+			v = fmt.Sprintf("^%s$", v)
+		} else {
+			v = fmt.Sprintf("^%s$", v)
+		}
+
 		quotedString = append(quotedString, fmt.Sprintf("%q", strings.TrimSpace(v)))
 	}
 
@@ -749,8 +783,7 @@ getRoleRef(binding):=rolRef
 ## operator -- contains all (array)
 operator_contains_all(criteria_values, items){
 	is_array(items)
-	matched := [name | items[i] == criteria_values[j]; name = items[i]]
-	# count(items) == count(matched)
+	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
 	count(matched) == count(criteria_values)
 }
 
@@ -765,7 +798,7 @@ operator_contains_all(criteria_values, item){
 ## operator -- contains any (array)
 operator_contains_any(criteria_values, items){
 	is_array(items)
-	matched := [name | items[i] == criteria_values[j]; name = items[i]]
+	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
 	count(matched)>=1
 }
 
@@ -778,7 +811,7 @@ operator_contains_any(criteria_values, item){
 ## operator -- not contains any (array)
 operator_not_contains_any(criteria_values, items){
 	is_array(items)
-	matched := [name | items[i] == criteria_values[j]; name = items[i]]
+	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
 	count(matched)==0    
 }
 
@@ -791,7 +824,7 @@ operator_not_contains_any(criteria_values, item){
 ## operator -- contains other than  (array)
 operator_contains_other_than(criteria_values, items){
 	is_array(items)
-	matched := [name | items[i] == criteria_values[j]; name = items[i]]
+	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
 	count(items) != count(matched)
 }
 
@@ -803,8 +836,8 @@ operator_contains_other_than(criteria_values, item){
 
 has_key(x, k) { _ = x[k] }
 
-check_contains(arrayData, elem) {
-	arrayData[_] == elem
+check_contains(patterns, value) {
+    regex.match(patterns[_], value)
 }
 
 	`
