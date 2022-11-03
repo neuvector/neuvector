@@ -279,7 +279,7 @@ func TestBaselinePolicy_ValidContainer(t *testing.T) {
 	preTest()
 
 	testContainer := getValidTestContainer()
-	if violatesBaseLinePolicy(&testContainer) {
+	if len(baselinePolicyViolations(&testContainer)) > 0 {
 		t.Error("valid container should not violate baseline policy")
 	}
 
@@ -290,7 +290,7 @@ func TestRestrictedPolicy_ValidContainer(t *testing.T) {
 	preTest()
 
 	testContainer := getValidTestContainer()
-	if violatesRestrictedPolicy(&testContainer, false) {
+	if len(restrictedPolicyViolations(&testContainer, false)) > 0 {
 		t.Error("valid container should not violate restricted policy")
 	}
 
@@ -302,7 +302,7 @@ func TestRestrictedPolicy_ImageRunsAsRoot(t *testing.T) {
 
 	testContainer := getValidTestContainer()
 	imageRunsAsRoot := true
-	if !violatesRestrictedPolicy(&testContainer, imageRunsAsRoot) {
+	if len(restrictedPolicyViolations(&testContainer, imageRunsAsRoot)) != 1 {
 		t.Error("image running as root should violate restricted policy")
 	}
 }
