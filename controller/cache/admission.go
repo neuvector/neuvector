@@ -1227,21 +1227,23 @@ func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]st
 	return union
 }
 
-func hasPssViolation(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) bool {
+func pssViolations(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) []string {
 	selectedPolicy := strings.TrimSpace(strings.ToLower(crt.Value))
 
 	switch selectedPolicy {
 	case share.PssPolicyBaseline:
-		return violatesBaseLinePolicy(c)
+		return baselinePolicyViolations(c)
 	case share.PssPolicyRestricted:
-		return violatesRestrictedPolicy(c, imageRunsAsRoot)
+		return restrictedPolicyViolations(c, imageRunsAsRoot)
 	}
 
-	return false // invalid policy
+	return []string{} // invalid policy
 }
 
 // For criteria of same type, apply 'and' for all negative matches until the first positive match;
-//                            apply 'or' after the first positive match;
+//
+//	apply 'or' after the first positive match;
+//
 // For different criteria type, apply 'and'
 func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo, scannedImage *nvsysadmission.ScannedImageSummary,
 	criteria []*share.CLUSAdmRuleCriterion, rootAvail bool, ar *admissionv1beta1.AdmissionReview, ruleID uint32) (bool, string) { // return (matched, matched data source)
@@ -1373,7 +1375,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyModules:
 			met, positive = isModulesCriterionMet(crt, scannedImage.Modules)
 		case share.CriteriaKeyHasPssViolation:
-			met = hasPssViolation(crt, c, scannedImage.RunAsRoot)
+			met = len(pssViolations(crt, c, scannedImage.RunAsRoot)) > 0
 			positive = true
 		default:
 			met, positive = false, true
@@ -2252,6 +2254,11 @@ func fillDenyMessageFromRule(c *nvsysadmission.AdmContainerInfo, rule *share.CLU
 			}
 			if len(messages) > 0 {
 				message = fmt.Sprintf("Found %s.", strings.Join(messages, " or "))
+			}
+		case share.CriteriaKeyHasPssViolation:
+			selectedPolicyViolations := pssViolations(crt, c, scannedImage.RunAsRoot)
+			if len(selectedPolicyViolations) > 0 {
+				message = fmt.Sprintf("Deployment has PSS/PSA Violations: %s", strings.Join(selectedPolicyViolations, " "))
 			}
 		}
 		if message != "" {

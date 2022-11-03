@@ -228,47 +228,54 @@ func exceedsRestrictedCapabilities(c *nvsysadmission.AdmContainerInfo) bool {
 	return !strings.EqualFold(c.Capabilities.Add[0], "NET_BIND_SERVICE")
 }
 
-type policyViolationCheck func(*nvsysadmission.AdmContainerInfo) bool
+type PolicyCondition struct {
+	InViolation     func(*nvsysadmission.AdmContainerInfo) bool
+	ViolationReason string
+}
 
-func triggersPolicyViolation(c *nvsysadmission.AdmContainerInfo, checks []policyViolationCheck) bool {
-	for _, inViolation := range checks {
-		if inViolation(c) {
-			return true
+func policyViolations(c *nvsysadmission.AdmContainerInfo, policyConditions []PolicyCondition) []string {
+	policyViolationReasons := []string{}
+	for _, condition := range policyConditions {
+		if condition.InViolation(c) {
+			policyViolationReasons = append(policyViolationReasons, condition.ViolationReason)
 		}
 	}
-
-	return false
+	return policyViolationReasons
 }
 
-func violatesBaseLinePolicy(c *nvsysadmission.AdmContainerInfo) bool {
-	baselineViolations := []policyViolationCheck{
-		sharesHostNamespace,
-		allowsPrivelegedContainers,
-		exceedsBaselineCapabilites,
-		hasHostPathVolumes,
-		usesHostPorts,
-		usesIllegalAppArmorProfile,
-		usesIllegalSELinuxOptions,
-		usesCustomProcMount,
-		usesIllegalSeccompProfile,
-		usesIllegalSysctls,
+func baselinePolicyViolations(c *nvsysadmission.AdmContainerInfo) []string {
+	baselinePolicyConditions := []PolicyCondition{
+		{sharesHostNamespace, "Sets HostNetwork, HostPID, or HostIPC to true."},
+		{allowsPrivelegedContainers, "Allows privileged container(s)."},
+		{exceedsBaselineCapabilites, "Exceeds baseline safe set of Linux capabilities."},
+		{hasHostPathVolumes, "Uses hostpath volume(s)."},
+		{usesHostPorts, "Uses hostPort(s)."},
+		{usesIllegalAppArmorProfile, "Uses disallowed AppArmor profile."},
+		{usesIllegalSELinuxOptions, "Uses disallowed SELinux options."},
+		{usesCustomProcMount, "Uses custom procMount."},
+		{usesIllegalSeccompProfile, "Uses disallowed seccomp profile."},
+		{usesIllegalSysctls, "Uses disallowed Linyx sysctls."},
 	}
 
-	return triggersPolicyViolation(c, baselineViolations)
+	return policyViolations(c, baselinePolicyConditions)
 }
 
-func violatesRestrictedPolicy(c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) bool {
-	if violatesBaseLinePolicy(c) {
-		return true
+func restrictedPolicyViolations(c *nvsysadmission.AdmContainerInfo, imageRunsAsRoot bool) []string {
+	imageRunsAsRootCondition := PolicyCondition{
+		InViolation: func(c *nvsysadmission.AdmContainerInfo) bool {
+			return imageRunsAsRoot
+		},
+		ViolationReason: "Image flagged to run as root.",
 	}
 
-	restrictedViolations := []policyViolationCheck{
-		usesIllegalVolumeTypes,
-		allowsPrivelegeEscalation,
-		allowsRootUsers,
-		doesNotSetLegalSeccompProfile,
-		exceedsRestrictedCapabilities,
+	restrictedViolations := []PolicyCondition{
+		imageRunsAsRootCondition,
+		{usesIllegalVolumeTypes, "Uses illegal volume type."},
+		{allowsPrivelegeEscalation, "Allows privilege escalation."},
+		{allowsRootUsers, "Allows running as root user."},
+		{doesNotSetLegalSeccompProfile, "Does not explicitly set allowed seccomp profile."},
+		{exceedsRestrictedCapabilities, "Exceeds restricted safe set of Linux capabilities."},
 	}
 
-	return triggersPolicyViolation(c, restrictedViolations) || imageRunsAsRoot
+	return append(baselinePolicyViolations(c), policyViolations(c, restrictedViolations)...)
 }
