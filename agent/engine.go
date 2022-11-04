@@ -502,14 +502,22 @@ func changeContainerWire(c *containerData, inline bool, quar bool, quarReason *s
 }
 
 func isProxyMesh(c *containerData) bool {
-	if c.info.ProxyMesh == false && c.hasDatapath == false {
-		//child and no dp
-		return false
-	} else if c.info.ProxyMesh == true && c.pid == 0 {
-		//parent and pid==0
-		return false
+	//ProxyMesh==true also indicate it is parent,
+	//but we also need to check pid since oc4.9+
+	if c.info.ProxyMesh == true && c.pid != 0 {
+		return true
 	}
-	return true
+	//in case parent's pid is zero we need to use child's pid,
+	//but we need to make sure to exclude non-mesh case.
+	if c.parentNS != "" && c.hasDatapath && c.pid != 0 {//has parent
+		p, ok := gInfo.activeContainers[c.parentNS]
+		if ok {//parent exist
+			if p.info.ProxyMesh == true && p.pid == 0 {//parent is mesh and pid=0
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func updateProxyMeshMac(c *containerData, withlock bool) {
