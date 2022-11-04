@@ -82,9 +82,21 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 	for _, crt := range criteria {
 		var allowedOp, allowedValue bool
 
-		// Skip checking custom criteria
-		if crt.Type != "" {
-			hasCustomCriteria = true
+		if crt.Type == "customPath" {
+			allowedOp, allowedValue = validateCustomPathCriteria(crt)
+		}
+
+		if crt.Type == "saBindRiskyRole" {
+			allowedOp, allowedValue = validateSaBindRiskyRoleCriteria(crt, options)
+		}
+
+		if crt.Type == "customPath" || crt.Type == "saBindRiskyRole" {
+			if !allowedOp {
+				return fmt.Errorf("Invalid criterion operator: %s", crt.Op)
+			}
+			if !allowedValue {
+				return fmt.Errorf("Invalid criterion value: %s", crt.Value)
+			}
 			continue
 		}
 
@@ -1579,4 +1591,80 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
 
 	return
+}
+
+func validateCustomPathCriteria(crt *share.CLUSAdmRuleCriterion) (bool, bool) {
+	var allowedOp, allowedValue bool
+
+	options := nvsysadmission.GetCustomCriteriaOptions()
+
+	for _, oneType := range options {
+		if crt.ValueType == oneType.ValueType {
+			for _, v := range oneType.Ops {
+				if crt.Op == v {
+					allowedOp = true
+				}
+			}
+
+			if crt.ValueType == "string" {
+				if len(crt.Value) > 1 {
+					allowedValue = true
+				}
+			}
+
+			if crt.ValueType == "number" {
+				items := strings.Split(crt.Value, ",")
+				for _, v := range items {
+					if _, err := strconv.ParseFloat(v, 64); err == nil {
+						allowedValue = true // meaning any valid float value is allowed
+					} else {
+						return allowedOp, false
+					}
+				}
+			}
+
+			if crt.ValueType == "boolean" {
+				items := strings.Split(crt.Value, ",")
+				for _, v := range items {
+					if v == "true" || v == "false" {
+						allowedValue = true
+					} else {
+						return allowedOp, false
+					}
+				}
+			}
+		}
+	}
+
+	return allowedOp, allowedValue
+}
+
+func validateSaBindRiskyRoleCriteria(crt *share.CLUSAdmRuleCriterion, options map[string]*api.RESTAdmissionRuleOption) (bool, bool) {
+	var allowedOp, allowedValue bool
+
+	if option, exist := options[crt.Name]; exist {
+		for _, op := range option.Ops {
+			if op == crt.Op {
+				allowedOp = true
+				break
+			}
+		}
+	}
+
+	set := utils.NewSet()
+	validValues := cache.GetPredefinedRiskyRoles()
+	for _, v := range validValues {
+		set.Add(v)
+	}
+
+	items := strings.Split(crt.Value, ",")
+	for _, v := range items {
+		if set.Contains(v) {
+			allowedValue = true
+		} else {
+			return allowedOp, false
+		}
+	}
+
+	return allowedOp, allowedValue
 }
