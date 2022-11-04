@@ -476,24 +476,12 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		if image, _ := d.GetImage(meta.Image); image != nil {
 			meta.ImageID = image.ID
 			meta.Author = image.Author
-			for k, v := range image.Labels {
-				// Not to overwrite container labels when merging
-				if _, ok := meta.Labels[k]; !ok {
-					meta.Labels[k] = v
-				}
-			}
 		} else {
 			// 2nd chance
 			if meta.ImageID == "" && meta.ImageDigest != "" {
 				if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
 					meta.ImageID = image.ID
 					meta.Author = image.Author
-					for k, v := range image.Labels {
-						// Not to overwrite container labels when merging
-						if _, ok := meta.Labels[k]; !ok {
-							meta.Labels[k] = v
-						}
-					}
 				}
 			}
 		}

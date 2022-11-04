@@ -54,7 +54,6 @@ const (
 	KubeContainerNamePod   string = "POD"
 	KubeContainerNameProxy string = "kube-proxy"
 	KubePodNamePrefixProxy string = "kube-proxy"
-	KubeKeyAppName         string = "app"
 )
 
 const (
