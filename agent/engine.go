@@ -282,7 +282,13 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 	if podname, ok := labels[container.KubeKeyPodName]; ok {
 		role := nvPod2Role(podname)
 		if role == "" {
-			return "", false
+			// 2nd try
+			if app, ok := labels[container.KubeKeyAppName]; ok {
+				role = nvPod2Role(app)
+			}
+			if role == "" {
+				return "", false
+			}
 		}
 
 		if isNeuvectorFunctionRole(role, info.Pid) {
