@@ -324,7 +324,7 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[s
 	}
 
 	if seviceName, ok := labels[container.NeuvectorSetServiceName]; ok {
-		return &Service{Domain: namespace, Name: strings.ToLower(seviceName)}
+		return &Service{Domain: namespace, Name: utils.Dns1123NameChg(strings.ToLower(seviceName))}
 	}
 
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
@@ -368,7 +368,7 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[s
 	// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
 	if namespace == container.KubeNamespaceSystem {
 		if component, ok := labels[container.KubeKeyComponent]; ok {
-			return &Service{Domain: namespace, Name: strings.ToLower(component)}
+			return &Service{Domain: namespace, Name: utils.Dns1123NameChg(strings.ToLower(component))}
 		}
 	}
 
