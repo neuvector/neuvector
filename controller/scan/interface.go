@@ -34,6 +34,7 @@ type ScanInterface interface {
 	StartRegistry(name string) error
 	StopRegistry(name string) error
 	GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRegistryConfig, utils.Set)
+	CheckRegistry(name string) bool
 
 	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary
 	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string)
@@ -730,6 +731,14 @@ func (m *scanMethod) GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRe
 	}
 
 	return list, names
+}
+
+func (m *scanMethod) CheckRegistry(name string) bool {
+	regReadLock()
+	defer regReadUnlock()
+
+	_, ok := regMap[name]
+	return ok
 }
 
 func (m *scanMethod) StartRegistry(name string) error {
