@@ -28,7 +28,7 @@ extern int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const
 extern int dp_data_del_nfq(const char *netns, const char *iface, int thr_id);
 extern int dp_read_ring_stats(dp_stats_t *s, int thr_id);
 extern int dp_read_conn_stats(conn_stats_t *s, int thr_id);
-extern int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface,const char *ep_mac, int thr_id);
+extern int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface,const char *ep_mac, bool quar, int thr_id);
 extern int dp_data_del_port_pair(const char *vin_iface, const char *vex_iface, int thr_id);
 
 extern rcu_map_t g_ep_map;
@@ -239,12 +239,19 @@ static int dp_ctrl_del_srvc_port(json_t *msg)
 static int dp_ctrl_add_port_pair(json_t *msg)
 {
     const char *vex_iface, *vin_iface, *ep_mac;
+    json_t *quar_obj;
+    bool quar = false;
+
+    quar_obj = json_object_get(msg, "quar");
+    if (quar_obj != NULL) {
+        quar = json_boolean_value(quar_obj);
+    }
 
     vin_iface = json_string_value(json_object_get(msg, "vin_iface"));
     vex_iface = json_string_value(json_object_get(msg, "vex_iface"));
     ep_mac = json_string_value(json_object_get(msg, "epmac"));
-    DEBUG_CTRL("Add vin %s: vex %s  epmac: %s\n", vin_iface, vex_iface, ep_mac);
-    return dp_data_add_port_pair(vin_iface, vex_iface,ep_mac, 0);
+    DEBUG_CTRL("Add vin %s: vex %s  epmac: %s quar: %d\n", vin_iface, vex_iface, ep_mac, quar);
+    return dp_data_add_port_pair(vin_iface, vex_iface, ep_mac, quar, 0);
 }
 
 static int dp_ctrl_del_port_pair(json_t *msg)

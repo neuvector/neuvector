@@ -290,13 +290,16 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 	dpSendMsg(msg)
 }
 
-func DPCtrlAddPortPair(vex_iface, vin_iface string, epmac net.HardwareAddr) {
+func DPCtrlAddPortPair(vex_iface, vin_iface string, epmac net.HardwareAddr, quar *bool) {
 	data := DPAddPortPairReq{
 		AddPortPair: &DPPortPair{
 			IfaceVex: vex_iface,
 			IfaceVin: vin_iface,
 			EPMAC:    epmac.String(),
 		},
+	}
+	if quar != nil {
+		data.AddPortPair.Quar = quar
 	}
 	msg, _ := json.Marshal(data)
 	dpSendMsg(msg)

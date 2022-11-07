@@ -138,6 +138,7 @@ static dp_context_t *dp_alloc_context(const char *iface, int thr_id, bool tap, b
     ctx->fd = fd;
     ctx->tap = tap;
     ctx->tc = true;
+    ctx->quar = false;
     ctx->jumboframe = jumboframe;
     ctx->nfq = false;
 
@@ -179,6 +180,7 @@ static dp_context_t *dp_alloc_nfq_context(const char *iface, int qnum, int thr_i
     ctx->fd = fd;
     ctx->tap = tap;
     ctx->tc = true;
+    ctx->quar = false;
     ctx->jumboframe = jumboframe;
     ctx->nfq = true;
 
@@ -526,11 +528,13 @@ int dp_data_del_port(const char *iface, int thr_id)
     return ret;
 }
 
-int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const char *ep_mac, int thr_id) {
+int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const char *ep_mac, bool quar, int thr_id) {
     int ret = 0;
     thr_id = thr_id % MAX_DP_THREADS;
     dp_context_t *ctx_in = NULL; 
     dp_context_t *ctx_ex = NULL; 
+    bool new_in = false;
+    bool new_ex = false;
     
     if (th_epoll_fd(thr_id) == 0) {
         // TODO: May need to wait a while for dp thread ready
@@ -544,6 +548,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     // if context already exist, just use it. On error release all alloc resource
     ctx_in = dp_lookup_context(&th_ctx_list(thr_id), vin_iface);
     if (ctx_in == NULL) {
+        new_in = true;
         ctx_in = dp_alloc_context(vin_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
         if (ctx_in == NULL) {
             DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s\n", vin_iface);
@@ -553,9 +558,11 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
         ether_aton_r(ep_mac, &ctx_in->ep_mac);
         ctx_in->tc = false;
     } 
+    ctx_in->quar = quar;
     
     ctx_ex = dp_lookup_context(&th_ctx_list(thr_id), vex_iface);
     if (ctx_ex == NULL) {
+        new_ex = true;
         ctx_ex = dp_alloc_context(vex_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
         if (ctx_ex == NULL) {
             DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s , free context for %s\n", vex_iface, vin_iface);
@@ -565,26 +572,28 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
         ether_aton_r(ep_mac, &ctx_ex->ep_mac);
         ctx_ex->tc = false;
     } 
-
-    ctx_in->peer_ctx = ctx_ex;
-    ctx_ex->peer_ctx = ctx_in;
-  
-    if (dp_epoll_add_ctx(ctx_in, thr_id) < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_in for %s\n",vin_iface);
-        goto error;
-    }
-
-    if (dp_epoll_add_ctx(ctx_ex, thr_id) < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_ex for %s\n",vex_iface);
-        goto error;
-    }
+    ctx_ex->quar = quar;
 
     // All resouce allocated, add to list and map, link them 
-    cds_hlist_add_head_rcu(&ctx_in->link, &th_ctx_list(thr_id));
-    cds_hlist_add_head_rcu(&ctx_ex->link, &th_ctx_list(thr_id));
+    if (new_in) {
+        ctx_in->peer_ctx = ctx_ex;
+        if (dp_epoll_add_ctx(ctx_in, thr_id) < 0) {
+            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_in for %s\n",vin_iface);
+            goto error;
+        }
+        cds_hlist_add_head_rcu(&ctx_in->link, &th_ctx_list(thr_id));
+    }
+    if (new_ex) {
+        ctx_ex->peer_ctx = ctx_in;
+        if (dp_epoll_add_ctx(ctx_ex, thr_id) < 0) {
+            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_ex for %s\n",vex_iface);
+            goto error;
+        }
+        cds_hlist_add_head_rcu(&ctx_ex->link, &th_ctx_list(thr_id));
+    }
 
-    DEBUG_CTRL("dp_data_add_port_pair added iface=%s fd=%d\n", vin_iface, ctx_in->fd);
-    DEBUG_CTRL("dp_data_add_port_pair added iface=%s fd=%d\n", vex_iface, ctx_ex->fd);
+    DEBUG_CTRL("dp_data_add_port_pair added iface=%s fd=%d quar=%d new_in=%d\n", vin_iface, ctx_in->fd, ctx_in->quar, new_in);
+    DEBUG_CTRL("dp_data_add_port_pair added iface=%s fd=%d quar=%d new_ex=%d\n", vex_iface, ctx_ex->fd, ctx_ex->quar, new_ex);
 
     pthread_mutex_unlock(&th_ctrl_dp_lock(thr_id));
     return ret; 

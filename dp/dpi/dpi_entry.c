@@ -459,6 +459,13 @@ int dpi_recv_packet(io_ctx_t *ctx, uint8_t *ptr, int len)
                 return 0;
             }
  
+            // in case of quarantine for NON-TC mode we cannot rely on tc rule
+            // reset to drop traffic, so we stop send_packet to its peer ctx
+            if (ctx->quar) {
+                rcu_read_unlock();
+                return 1;
+            }
+
             if (mac_cmp(eth->h_source, ctx->ep_mac.ether_addr_octet)) {
                 mac = rcu_map_lookup(&g_ep_map, &eth->h_source);
             } else if (mac_cmp(eth->h_dest, ctx->ep_mac.ether_addr_octet)) { 

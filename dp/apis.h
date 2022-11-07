@@ -201,6 +201,7 @@ typedef struct io_ctx_ {
     bool large_frame;
     bool tap;
     bool tc;
+    bool quar;
     bool nfq;
 } io_ctx_t;
 

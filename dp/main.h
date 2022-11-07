@@ -91,6 +91,7 @@ typedef struct dp_context_ {
             released:1;
     bool tap;
     bool tc;
+    bool quar;
     bool jumboframe;
     bool nfq;
     bool epoll;

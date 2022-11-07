@@ -64,6 +64,7 @@ type DPPortPair struct {
 	IfaceVex string `json:"vex_iface"`
 	IfaceVin string `json:"vin_iface"`
 	EPMAC    string `json:"epmac"`
+	Quar     *bool  `json:"quar,omitempty"`
 }
 
 type DPAddPortPairReq struct {
