@@ -256,18 +256,36 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 	// all ValueType (key, string, number, boolean) has "exist" and "notExist"
 	if c.Op == "exist" {
 		if strings.Contains(c.Path, "[_]") {
-			// array version of exist
-			idx := strings.Index(path, "[_]")
-			root := path[0:idx]
-			rego = append(rego, fmt.Sprintf("	total_count := count(%s)", root))
-			path2 := strings.Replace(path, "[_]", "[i]", 1)
-			rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-			rego = append(rego, "	total_count == count(exist_items)")
-			rego = append(rego, "}")
-			rego = append(rego, "\n")
+			idx := strings.LastIndex(path, ".")
+			if idx != -1 {
+				rego = append(rego, fmt.Sprintf("	total_count := count(%s)", path[0:strings.Index(path, "[_]")]))
+
+				path2 := path[0:idx]
+				key := path[idx+1:]
+				path2 = strings.Replace(path2, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
+				rego = append(rego, "	total_count == count(exist_items)")
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			} else {
+				path2 := strings.Replace(path, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+				rego = append(rego, "	total_count == count(exist_items)")
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			}
 		} else {
-			// single value versio of exist
-			rego = append(rego, fmt.Sprintf("	%s", path))
+			// single value version of exist
+			idx := strings.LastIndex(path, ".")
+			if idx != -1 {
+				path2 := path[0:idx]
+				key := path[idx+1:]
+				path2 = strings.Replace(path2, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	has_key(%s, %q)", path2, strings.TrimSuffix(key, "[_]")))
+			} else {
+				rego = append(rego, fmt.Sprintf("	%s", path))
+			}
+
 			rego = append(rego, "}")
 			rego = append(rego, "\n")
 		}
@@ -278,7 +296,8 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 				path2 := path[0:idx]
 				key := path[idx+1:]
 				path2 = strings.Replace(path2, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, key))
+
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
 				rego = append(rego, "	count(exist_items) == 0")
 			} else {
 				path2 := strings.Replace(path, "[_]", "[i]", 1)
@@ -306,13 +325,7 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		line := fmt.Sprintf("	user_provided_data := [%s]", strings.Join(quotedString, ","))
 		rego = append(rego, line)
 
-		// if path is end with "[_]", like request.spec.containers[_].command[_]
-		//	we need to remove the ending "[_]" => request.spec.containers[_].command
-		if strings.HasSuffix(path, "[_]") {
-			rego = append(rego, fmt.Sprintf("	value = %s", path[0:len(path)-3]))
-		} else {
-			rego = append(rego, fmt.Sprintf("	value = %s", path))
-		}
+		rego = append(rego, fmt.Sprintf("	value = %s", strings.TrimSuffix(path, "[_]")))
 
 		if c.Op == "containsAll" {
 			rego = append(rego, "	operator_contains_all(user_provided_data, value)")
@@ -384,7 +397,7 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 					path2 := path[0:idx]
 					key := path[idx+1:]
 					path2 = strings.Replace(path2, "[_]", "[i]", 1)
-					rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, key))
+					rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
 					rego = append(rego, "	count(exist_items) == 0")
 				} else {
 					path2 := strings.Replace(path, "[_]", "[i]", 1)
