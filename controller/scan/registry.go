@@ -540,6 +540,10 @@ func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
 	}
 }
 
+func CheckRegistry(name string) bool {
+	return smd.CheckRegistry(name)
+}
+
 func isPublicRegistry(cfg *share.CLUSRegistryConfig) bool {
 	return strings.Contains(cfg.Registry, ".docker.com") || strings.Contains(cfg.Registry, ".docker.io") ||
 		cfg.Type == share.RegistryTypeRedhat

@@ -910,6 +910,22 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		var sum share.CLUSRegistryImageSummary
 		json.Unmarshal(value, &sum)
 
+		if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) && (name != common.RegistryFedRepoScanName) {
+			// when a new fed registry with its image scan result are deployed to a worker cluster, it's possible that
+			//  "object/config/" watcher handler is called after "scan/" watcher handler.
+			// when this happens, we need to make sure the fed registry is known by worker cluster or the fed scan result will be ignored.
+			if exist := scan.CheckRegistry(name); !exist {
+				key := share.CLUSRegistryConfigKey(name)
+				if config, _, err := clusHelper.GetRegistry(key, access.NewAdminAccessControl()); config != nil {
+					var enc common.EncryptMarshaller
+					value, _ := enc.Marshal(config)
+					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, key, value)
+				} else {
+					cctx.ScanLog.WithFields(log.Fields{"error": err, "name": name}).Error()
+				}
+			}
+		}
+
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		alives, highs, meds := scan.RegistryImageStateUpdate(name, id, &sum, vpf)
 

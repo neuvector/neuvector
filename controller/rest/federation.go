@@ -1549,7 +1549,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 
 	revisions := share.CLUSEmptyFedRulesRevision()
 	clusHelper.PutFedRulesRevision(nil, revisions)
-	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{}, nil)
+	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
 
 	accFedAdmin := access.NewFedAdminAccessControl()
 	cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles)
@@ -1813,7 +1813,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 				UseProxy: useProxy,
 			}
 			if err = clusHelper.PutFedMembership(&m); err == nil {
-				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{}, nil)
+				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
 				updateClusterState(respTo.MasterCluster.ID, _fedClusterConnected, acc)
 				updateClusterState(jointID, _fedClusterJoined, acc)
 				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, req.Server)
