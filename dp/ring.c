@@ -116,6 +116,7 @@ static int dp_rx_v1(dp_context_t *ctx, uint32_t tick)
     context.stats_slot = g_stats_slot;
     context.tap = ctx->tap;
     context.tc = ctx->tc;
+    context.quar = ctx->quar;
     context.nfq = false;
     mac_cpy(context.ep_mac.ether_addr_octet, ctx->ep_mac.ether_addr_octet);
 

@@ -483,6 +483,9 @@ func changeContainerWire(c *containerData, inline bool, quar bool, quarReason *s
 		c.inline = inline
 		c.quar = quar
 
+		if driver == pipe.PIPE_NOTC {
+			programBridgeNoTc(c)
+		}
 		programBridge(c)
 	} else {
 		c.inline = inline
@@ -1400,6 +1403,19 @@ func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe
 	}
 }
 
+func programBridgeNoTc(c *containerData) {
+	if c.hostMode || !c.hasDatapath {
+		return
+	}
+
+	log.WithFields(log.Fields{"container": c.id}).Debug("")
+
+	quar := c.quar
+	for _, pair := range c.intcpPairs {
+		dp.DPCtrlAddPortPair(pair.ExPort(), pair.InPort(), pair.MAC, &quar)
+	}
+}
+
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
 	if driver == pipe.PIPE_CLM {
 		programNfqDP(c, cfgApp, macChangePairs)
@@ -1421,6 +1437,7 @@ func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.In
 
 	var oldMAC, pMAC net.HardwareAddr
 	tap := false
+	quar := c.quar
 	if c.quar || c.inline {
 		for _, pair := range c.intcpPairs {
 			if macChangePairs != nil {
@@ -1431,7 +1448,7 @@ func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.In
 			dp.DPCtrlDelTapPort(netns, pair.Port)
 			dp.DPCtrlAddMAC(nvSvcPort, pair.MAC, pair.UCMAC, pair.BCMAC, oldMAC, pMAC, nil)
 			if driver == pipe.PIPE_NOTC {
-				dp.DPCtrlAddPortPair(pair.ExPort(), pair.InPort(), pair.MAC)
+				dp.DPCtrlAddPortPair(pair.ExPort(), pair.InPort(), pair.MAC, &quar)
 			}
 		}
 	} else {

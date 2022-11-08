@@ -475,12 +475,13 @@ func main() {
 		driver = pipe.PIPE_OVS
 	} else if *pipeType == "no_tc" {
 		driver = pipe.PIPE_NOTC
+		if gInfo.ciliumCNI {
+			driver = pipe.PIPE_CLM
+		}
 	} else {
 		driver = pipe.PIPE_TC
 		if gInfo.ciliumCNI {
 			driver = pipe.PIPE_CLM
-		} else {
-			driver = pipe.PIPE_TC
 		}
 	}
 	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU, "ciliumCNI": gInfo.ciliumCNI}).Info("")
