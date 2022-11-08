@@ -2664,7 +2664,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		tgroup := group2RESTConfig(group)
-		kindName := dns1123NameChg(gname)
+		kindName := utils.Dns1123NameChg(gname)
 		targetNs := ""
 		targetKind := resource.NvClusterSecurityRuleKind
 		apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvClusterSecurityRuleVersion)
