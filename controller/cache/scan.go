@@ -915,8 +915,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			//  "object/config/" watcher handler is called after "scan/" watcher handler.
 			// when this happens, we need to make sure the fed registry is known by worker cluster or the fed scan result will be ignored.
 			if exist := scan.CheckRegistry(name); !exist {
-				key := share.CLUSRegistryConfigKey(name)
-				if config, _, err := clusHelper.GetRegistry(key, access.NewAdminAccessControl()); config != nil {
+				if config, _, err := clusHelper.GetRegistry(name, access.NewFedAdminAccessControl()); config != nil {
 					var enc common.EncryptMarshaller
 					value, _ := enc.Marshal(config)
 					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, key, value)
