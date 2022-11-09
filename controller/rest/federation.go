@@ -2213,7 +2213,8 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
 		return
 	}
-	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", login.fullname, login.remote, login.id, login.domainRoles)
+	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
+	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles)
 	go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
 	restRespSuccess(w, r, nil, acc, login, nil, "Leave federation by primary cluster's request")
 }
