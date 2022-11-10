@@ -76,6 +76,7 @@ var _fedServerChan chan bool
 var _licSigKeyEnv int
 
 var _teleNeuvectorURL string
+var _teleFreq uint
 
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
@@ -1238,6 +1239,7 @@ type Context struct {
 	PwdValidUnit     uint
 	TeleNeuvectorURL string
 	TeleCurrentVer   string
+	TeleFreq         uint
 }
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
@@ -1283,6 +1285,10 @@ func InitContext(ctx *Context) {
 		if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
 			nvSemanticVersion = "v" + ss[0]
 		}
+	}
+	_teleFreq = ctx.TeleFreq
+	if _teleFreq == 0 {
+		_teleFreq = 60
 	}
 
 	initHttpClients()

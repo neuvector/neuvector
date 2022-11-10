@@ -1529,7 +1529,23 @@ type RESTSystemUsageReport struct {
 }
 
 type RESTSystemUsageReportData struct {
-	Usage []*RESTSystemUsageReport `json:"usage"`
+	Usage           []*RESTSystemUsageReport `json:"usage"`
+	TelemetryStatus RESTTeleStatus           `json:"telemetry_status"`
+}
+
+type RESTUpgradeVersionInfo struct {
+	Version     string `json:"version"`
+	ReleaseDate string `json:"release_date"`
+	Tag         string `json:"tag"`
+}
+
+type RESTTeleStatus struct {
+	TeleFreq           uint                   `json:"telemetry_freq"`
+	TeleURL            string                 `json:"telemetry_url"`
+	CurrentVersion     string                 `json:"current_version"`
+	MinUpgradeVersion  RESTUpgradeVersionInfo `json:"min_upgrade_version"`
+	MaxUpgradeVersion  RESTUpgradeVersionInfo `json:"max_upgrade_version"`
+	LastTeleUploadTime string                 `json:"last_telemetry_upload_time"`
 }
 
 type RESTSystemSummary struct {

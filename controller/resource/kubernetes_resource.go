@@ -1659,49 +1659,36 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 		return true // ignore other webhooks for now
 	}
 
-	if len(wh.Rules) != len(nvOpResources) {
+	if len(wh.Rules) != len(nvOpResources) || wh.FailurePolicy == nil || *wh.FailurePolicy != failurePolicy {
 		return false
 	}
+	isNvRulesFound := make([]bool, len(nvOpResources))
 	expectedApiVersions := utils.NewSet(K8sApiVersionV1, K8sApiVersionV1Beta1, K8sApiVersionV1Beta2)
 	for _, k8sWhRule := range wh.Rules {
-		foundOps := false
+		foundRule := false
+		k8sApiGroups := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiGroups)
+		k8sApiVersions := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiVersions)
 		k8sRuleOperations := utils.NewSetFromSliceKind(k8sWhRule.Operations)
+		k8sRuleResources := utils.NewSetFromSliceKind(k8sWhRule.Rule.Resources)
 		for j := 0; j < len(nvOpResources); j++ {
-			if nvOpResources[j].Operations.Equal(k8sRuleOperations) {
-				foundOps = true
-				if k8sWhRule.Rule.Scope == nil || *k8sWhRule.Rule.Scope != nvOpResources[j].Scope {
-					return false
+			if nvOpResources[j].Resources.IsSubset(k8sRuleResources) && nvOpResources[j].Operations.IsSubset(k8sRuleOperations) &&
+				expectedApiVersions.IsSubset(k8sApiVersions) && (k8sWhRule.Rule.Scope != nil || *k8sWhRule.Rule.Scope == nvOpResources[j].Scope) &&
+				(nvOpResources[j].ApiGroups.IsSubset(k8sApiGroups) || k8sApiGroups.Contains("*")) {
+				if k8sWhRule.Rule.Scope != nil && *k8sWhRule.Rule.Scope == nvOpResources[j].Scope {
+					foundRule = true
+					isNvRulesFound[j] = true
+					break
 				}
-				k8sRuleResources := utils.NewSetFromSliceKind(k8sWhRule.Rule.Resources)
-				if !nvOpResources[j].Resources.Equal(k8sRuleResources) {
-					return false
-				}
-				k8sApiGroups := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiGroups)
-				if !nvOpResources[j].ApiGroups.Equal(k8sApiGroups) {
-					allApiGroup := false
-					for _, apiGroup := range k8sWhRule.Rule.ApiGroups {
-						if apiGroup == "*" {
-							allApiGroup = true
-							break
-						}
-					}
-					if !allApiGroup {
-						return false
-					}
-				}
-				k8sApiVersions := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiVersions)
-				if !expectedApiVersions.Equal(k8sApiVersions) {
-					return false
-				}
-				break
 			}
 		}
-		if !foundOps {
+		if !foundRule {
 			return false
 		}
 	}
-	if wh.FailurePolicy == nil || *wh.FailurePolicy != failurePolicy {
-		return false
+	for _, found := range isNvRulesFound {
+		if !found {
+			return false
+		}
 	}
 	if checkNsSelector {
 		var ctrlPlaneOpInWhExpr string
@@ -1866,7 +1853,6 @@ func getUpdaterCronJobSvcAccount() (string, error) {
 	name := "neuvector-updater-pod"
 	obj, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, name)
 	if err != nil {
-		log.WithFields(log.Fields{"name": name, "err": err}).Error("resource no found")
 		return "", err
 	} else {
 		sa := nvSA

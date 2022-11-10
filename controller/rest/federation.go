@@ -485,8 +485,8 @@ func getProxyOptions(id string, useProxy int8) []int8 {
 	return proxyOptions
 }
 
-func sendRestRequest(idTarget string, method, urlStr, token, cntType string, cookie *http.Cookie, body []byte,
-	logError bool, specificProxy *int8, acc *access.AccessControl) ([]byte, int, bool, error) {
+func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicket, jointID string, cookie *http.Cookie,
+	body []byte, logError bool, specificProxy *int8, acc *access.AccessControl) ([]byte, int, bool, error) {
 
 	var useProxy int8
 	var data []byte
@@ -515,7 +515,9 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType string, coo
 		_httpClientMutex.RLock()
 		nvHttpClient = _nvHttpClients[proxyOption]
 		_httpClientMutex.RUnlock()
-		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, cntType, proxyOption, cookie, body, logError); err == nil {
+		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, cntType,
+			jointTicket, jointID, proxyOption, cookie, body, logError); err == nil {
+
 			_httpClientMutex.Lock()
 			_proxyOptionHistory[idTarget] = proxyOption
 			_httpClientMutex.Unlock()
@@ -529,17 +531,19 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType string, coo
 	return data, statusCode, usedProxy, err
 }
 
-func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cntType string, proxyOption int8, cookie *http.Cookie, body []byte, logError bool) (
-	[]byte, int, error) {
+func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cntType, jointTicket, jointID string,
+	proxyOption int8, cookie *http.Cookie, body []byte, logError bool) ([]byte, int, error) {
 
 	var httpClient *http.Client = nvHttpClient.httpClient
 	var req *http.Request
 	var gzipped bool
 	var err error
 
-	if len(body) > gzipThreshold {
-		body = utils.GzipBytes(body)
-		gzipped = true
+	if jointTicket != "" && jointID != "" {
+		if len(body) > gzipThreshold {
+			body = utils.GzipBytes(body)
+			gzipped = true
+		}
 	}
 
 	switch method {
@@ -561,6 +565,12 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cnt
 	}
 	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set(_headerProxy, nvHttpClient.proxyUrlStr)
+	if jointTicket != "" {
+		req.Header.Set("X-NV-Joint-Ticket", jointTicket)
+	}
+	if jointID != "" {
+		req.Header.Set("X-NV-Joint-ID", jointID)
+	}
 	if gzipped {
 		req.Header.Set("Content-Encoding", "gzip")
 	}
@@ -749,11 +759,6 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 	proxyOption int8, body []byte, gzipped, forward, remoteExport, logError bool) (map[string]string, int, []byte, error) {
 
 	var httpClient *http.Client = nvHttpClient.httpClient
-
-	if !gzipped && len(body) > gzipThreshold {
-		body = utils.GzipBytes(body)
-		gzipped = true
-	}
 
 	req, err := http.NewRequest(method, urlStr, bytes.NewBuffer(body))
 	if err != nil {
@@ -1767,7 +1772,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var proxyUsed bool
 	// call master cluster for joining federation
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/join_internal", req.Server, req.Port)
-	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", "", nil, bodyTo, true, &specificProxy, acc)
+	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, &specificProxy, acc)
 	if err == nil {
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
@@ -1885,7 +1890,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	if bodyTo, err := json.Marshal(&reqTo); err == nil {
 		// call master cluster for leaving federation
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/leave_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
-		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", nil, bodyTo, true, nil, acc)
+		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, acc)
 		if err == nil || req.Force {
 			m := &share.CLUSFedMembership{
 				FedRole:          api.FedRoleNone,
@@ -2517,7 +2522,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
-				"", "", nil, bodyTo, false, nil, accReadAll); err == nil {
+				"", "", "", "", nil, bodyTo, false, nil, accReadAll); err == nil {
 				break
 			} else {
 				time.Sleep(time.Second)
@@ -2567,8 +2572,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 								reqTo.Revisions = respTo.Revisions
 								bodyTo, _ := json.Marshal(&reqTo)
-								_, statusCode, _, _ = sendRestRequest("", http.MethodPost, urlStr,
-									"", "", nil, bodyTo, true, nil, accReadAll)
+								_, statusCode, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
 							}
 						}
 					}
@@ -2732,7 +2736,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/scan_data_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 	for i := 0; i < tryTimes; i++ {
 		if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
-			"", "application/gob", nil, bodyTo, false, nil, accReadAll); err == nil {
+			"", "application/gob", reqTo.JointTicket, reqTo.ID, nil, bodyTo, false, nil, accReadAll); err == nil {
 			break
 		} else {
 			time.Sleep(time.Second)
@@ -2871,10 +2875,38 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
+	var err error
+	var jointCluster share.CLUSFedJointClusterInfo
+
+	jointID := r.Header.Get("X-NV-Joint-ID")
+	jointTicket := r.Header.Get("X-NV-Joint-Ticket")
+	if jointTicket != "" && jointID != "" {
+		// Validate the request is from a valid joint cluster
+		jointCluster = cacher.GetFedJoinedCluster(jointID, accReadAll)
+		if jointCluster.ID != jointID {
+			statusCode := http.StatusBadRequest
+			if jointCluster.ID == "" {
+				statusCode = http.StatusGone
+			}
+			restRespError(w, statusCode, api.RESTErrInvalidRequest)
+			return
+		} else if jointCluster.Disabled {
+			restRespError(w, http.StatusNotFound, api.RESTErrInvalidRequest)
+			return
+		} else {
+			if err = jwtValidateFedJoinTicket(jointTicket, jointCluster.Secret); err != nil {
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
+				return
+			}
+		}
+	} else {
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
 	ct := r.Header.Get("Content-Type")
 	ce := r.Header.Get("Content-Encoding")
 
-	var err error
 	var req api.RESTPollFedScanDataReq
 	body, _ := ioutil.ReadAll(r.Body)
 	if ce == "gzip" {
@@ -2890,24 +2922,6 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error()
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	// Validate token
-	jointCluster := cacher.GetFedJoinedCluster(req.ID, accReadAll)
-	if jointCluster.ID != req.ID {
-		statusCode := http.StatusBadRequest
-		if jointCluster.ID == "" {
-			statusCode = http.StatusGone
-		}
-		restRespError(w, statusCode, api.RESTErrInvalidRequest)
-		return
-	} else if jointCluster.Disabled {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-		return
-	}
-	if err = jwtValidateFedJoinTicket(req.JointTicket, jointCluster.Secret); err != nil {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
 		return
 	}
 

@@ -1,5 +1,6 @@
 ARG BASE_PREFIX
-FROM neuvector/${BASE_PREFIX}all_base:latest
+ARG BASE_IMAGE_TAG
+FROM neuvector/${BASE_PREFIX}all_base:${BASE_IMAGE_TAG}
 
 COPY stage /
 

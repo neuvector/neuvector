@@ -674,18 +674,6 @@ func UnregK8sAdmissionControl(admType, nvAdmName string) error {
 	return configK8sAdmCtrlValidateResource(K8sResOpDelete, "", k8sResInfo)
 }
 
-func ValidateK8sSetting(k8sResInfo ValidatingWebhookConfigInfo) bool {
-	for _, whInfo := range k8sResInfo.WebhooksInfo {
-		if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
-			_, svcInfo := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
-			whInfo.ClientConfig.Port = svcInfo.SvcNodePort
-		}
-	}
-	k8sConfigured, matchedCfg, _, err := isK8sConfiguredAsExpected(k8sResInfo)
-
-	return err == nil && k8sConfigured && matchedCfg
-}
-
 func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) {
 	svcInfo := &ValidateWebhookSvcInfo{
 		SvcNodePort: 443,

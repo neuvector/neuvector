@@ -426,7 +426,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		Value: rsessToken,
 	}
 	urlStr := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
-	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", cookie, []byte{}, true, nil, acc)
+	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", "", "", cookie, []byte{}, true, nil, acc)
 	if err == nil {
 		var domainRoles map[string]string
 		var rancherUsers api.UserCollection
@@ -447,7 +447,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 				rancherUser.name = rancherUsers.Data[idx].Username
 				rancherUser.token = rsessToken
 				urlStr = fmt.Sprintf("%s/v3/principals?me=true", cfg.RancherEP)
-				data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", cookie, []byte{}, true, nil, acc)
+				data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", "", "", cookie, []byte{}, true, nil, acc)
 				//-> if user-id changes, reset mapped roles
 				//-> if mapped role changes, reset mapped roles in token
 				if err == nil {

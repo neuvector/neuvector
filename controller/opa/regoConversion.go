@@ -259,19 +259,22 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 	}
 
 	// all ValueType (key, string, number, boolean) has "exist" and "notExist"
-	if c.Op == "exist" || c.Op == "notExist" {
-		prefixOp := ""
-		if c.Op == "notExist" {
-			prefixOp = "not"
-		}
-
+	if c.Op == "exist" {
 		upPath, key := splitPathKey(path)
 		rego = append(rego, addSidecarContainerCheck(path)...)
 		upPath = replacePerContainerPath(upPath)
 
-		rego = append(rego, fmt.Sprintf("  %s has_key(%s, %q)", prefixOp, upPath, strings.TrimSuffix(key, "[_]")))
+		rego = append(rego, fmt.Sprintf("	has_key(%s, %q)", upPath, strings.TrimSuffix(key, "[_]")))
 		rego = append(rego, "}")
 		rego = append(rego, "\n")
+	} else if c.Op == "notExist" {
+		// end current function context first
+		rego = append(rego, "	1 == 2  # op=notExist, it needs to check all the way up to root. Expanded below.")
+		rego = append(rego, "}")
+		rego = append(rego, "\n")
+
+		path = replacePerContainerPath(path)
+		rego = append(rego, generateNotExitFunctions(idx, path)...)
 	} else if c.ValueType == "string" {
 		quotedString := parseQuotedSimpleRegexString(c.Value)
 		line := fmt.Sprintf("	user_provided_data := [%s]\n", strings.Join(quotedString, ","))
@@ -360,14 +363,15 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 
 	////////////////////////////////////
 	// start rego generation part 1A (for regular rbac data check)
+	regoPart := []string{}
 	functionName := convertCriteriaFunctionCall(idx, c, false)
 	rego = append(rego, "# [part 1A] for regular RBAC data check (clusterrolebindings)")
 	rego = append(rego, functionName)
 	rego = append(rego, "{")
-	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
-	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	regoPart = append(regoPart, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
+	regoPart = append(regoPart, "	ruleId := rulesToCheck[_]")
+	regoPart = append(regoPart, "	sa := get_serviceAccountName(request)")
 
 	line := `
 	# ==============================================
@@ -378,8 +382,9 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
-	rego = append(rego, line)
+	regoPart = append(regoPart, line)
 
 	line = `
 	# ==============================================
@@ -391,7 +396,15 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
 	roleName  == violationRoles[_]`
-	rego = append(rego, line)
+	regoPart = append(regoPart, line)
+
+	rego = append(rego, regoPart...)
+	rego = append(rego, "}\n")
+
+	// part 1A debug
+	rego = append(rego, `dbg_crb[msg]{ request := _get_input("get")`)
+	rego = append(rego, regoPart...)
+	rego = append(rego, `	msg := sprintf("ruleId=%v, sa=%v, namespace=%v, roleName=%v, crb_name=%v", [ruleId, sa, subject.namespace, roleName, crb_name])`)
 	rego = append(rego, "}\n")
 
 	////////////////////////////////////
@@ -402,7 +415,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
 	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	rego = append(rego, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -413,6 +426,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
 	rego = append(rego, line)
 
@@ -437,14 +451,16 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 
 	////////////////////////////////////
 	// start rego generation part 2A (for regular rbac data check)
+	regoPart2 := []string{}
 	functionName = convertCriteriaFunctionCall(idx, c, false)
 	rego = append(rego, "# [part 2A] for regular RBAC data check (rolebindings)")
 	rego = append(rego, functionName)
 	rego = append(rego, "{")
-	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
-	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	regoPart2 = append(regoPart2, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
+	regoPart2 = append(regoPart2, "	ruleId := rulesToCheck[_]")
+
+	regoPart2 = append(regoPart2, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -455,8 +471,9 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
-	rego = append(rego, line)
+	regoPart2 = append(regoPart2, line)
 
 	line = `
 	# ==============================================
@@ -470,7 +487,14 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
 	roleName  == violationRoles[_]`
 
-	rego = append(rego, line)
+	regoPart2 = append(regoPart2, line)
+	rego = append(rego, regoPart2...)
+	rego = append(rego, "}\n")
+
+	// part 2A debug
+	rego = append(rego, `dbg_rb[msg]{ request := _get_input("get")`)
+	rego = append(rego, regoPart2...)
+	rego = append(rego, `	msg := sprintf("ruleId=%v, sa=%v, namespace=%v, roleName=%v, rb_name=%v", [ruleId, sa, subject.namespace, roleName, crb_name])`)
 	rego = append(rego, "}\n")
 
 	////////////////////////////////////
@@ -480,7 +504,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	rego = append(rego, "{")
 	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
 	rego = append(rego, "	ruleId := rulesToCheck[_]")
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	rego = append(rego, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -491,6 +515,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
 	rego = append(rego, line)
 
@@ -770,6 +795,16 @@ inSidecarContainerList(image){
 	true
 }
 
+get_serviceAccountName(request) := sa {
+    not has_key(request.spec, "serviceAccountName")
+    sa = "default"
+}
+
+get_serviceAccountName(request) := sa {
+    has_key(request.spec, "serviceAccountName")
+    sa = request.spec.serviceAccountName
+}
+
 	`
 
 	return rego
@@ -943,4 +978,76 @@ func replacePerContainerPath(path string) string {
 		return strings.Replace(path, "ephemeralContainers[_]", "ephemeralContainers[i]", 1)
 	}
 	return path
+}
+
+func generateNotExitFunctions(criteria_index int, path string) []string {
+	rego := []string{}
+	containerKeys := []string{"request.spec.containers[i]", "request.spec.initContainers[i]", "request.spec.ephemeralContainers[i]"}
+	containerKeys2 := []string{"containers", "initContainers", "ephemeralContainers"}
+
+	for i, containerKey := range containerKeys {
+		if strings.HasPrefix(path, containerKey) {
+			rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
+			rego = append(rego, "{")
+			rego = append(rego, `	not has_key(request, "spec")`)
+			rego = append(rego, "}\n")
+
+			rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
+			rego = append(rego, "{")
+			rego = append(rego, fmt.Sprintf("	not has_key(request.spec, %q)", containerKeys2[i]))
+
+			rego = append(rego, "}\n")
+
+			items := strings.Split(path[len(containerKey)+1:], ".")
+
+			for idx, item := range items {
+				rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
+				rego = append(rego, "{")
+				if idx > 0 {
+					rego = append(rego, fmt.Sprintf("	image := %s.image", containerKey))
+					rego = append(rego, "	not inSidecarContainerList(image)\n")
+
+					itemsForKey := items[0:idx]
+					key := fmt.Sprintf("%s.%s", containerKey, strings.Join(itemsForKey, "."))
+
+					rego = append(rego, fmt.Sprintf("	items:=[i | has_key(%s,%q)]", key, strings.TrimSuffix(item, "[_]")))
+					rego = append(rego, "	count(items)==0")
+				} else {
+					rego = append(rego, fmt.Sprintf("	items:=[i | has_key(%s,%q)]", containerKey, strings.TrimSuffix(item, "[_]")))
+					rego = append(rego, "	count(items)==0")
+				}
+				rego = append(rego, "}\n")
+			}
+		}
+	}
+
+	// not within containers
+	if len(rego) == 0 {
+		rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
+		rego = append(rego, "{")
+		rego = append(rego, `	not has_key(request, "spec")`)
+		rego = append(rego, "}\n")
+
+		items := strings.Split(path[len("request.spec")+1:], ".")
+		for idx, item := range items {
+			rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
+			rego = append(rego, "{")
+			if idx > 0 {
+				itemsForKey := items[0:idx]
+				key := fmt.Sprintf("request.spec.%s", strings.Join(itemsForKey, "."))
+
+				if strings.Contains(key, "[_]") {
+					rego = append(rego, fmt.Sprintf("	items:=[ v | has_key(%s,%q); v:=%q]", key, strings.TrimSuffix(item, "[_]"), strings.TrimSuffix(item, "[_]")))
+					rego = append(rego, "	count(items)==0")
+				} else {
+					rego = append(rego, fmt.Sprintf("	not has_key(%s,%q)", key, strings.TrimSuffix(item, "[_]")))
+				}
+			} else {
+				rego = append(rego, fmt.Sprintf("	not has_key(%s,%q)", "request.spec", strings.TrimSuffix(item, "[_]")))
+			}
+			rego = append(rego, "}\n")
+		}
+	}
+
+	return rego
 }
