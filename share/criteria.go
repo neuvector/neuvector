@@ -46,7 +46,7 @@ const (
 	CriteriaKeyPspCompliance       string = "pspCompliance" // psp compliance violation
 	CriteriaKeyRequestLimit        string = "resourceLimit"
 	CriteriaKeyModules             string = "modules"
-	CriteriaKeyHasPssViolation     string = "hasPssViolation"
+	CriteriaKeyHasPssViolation     string = "pssViolation"
 	CriteriaKeyCustomPath          string = "customPath"
 	CriteriaKeySaBindRiskyRole     string = "saBindRiskyRole"
 )
