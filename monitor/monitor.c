@@ -125,6 +125,7 @@ static int g_mode = MODE_CTRL;
 static int g_pipe_driver = RC_CONFIG_TC;
 static volatile sig_atomic_t g_exit_signal = 0;
 static int g_exit_monitor_on_proc_exit = 0;
+static int g_debugOpa = 0;
 
 static void debug_ts(FILE *logfp)
 {
@@ -317,6 +318,7 @@ static pid_t fork_exec(int i)
         if ((enable = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-d";
+                g_debugOpa = 1;
             }
         }
         if ((join = getenv(ENV_CLUSTER_JOIN)) != NULL) {
@@ -480,7 +482,11 @@ static pid_t fork_exec(int i)
         args[a ++] = "run";
         args[a ++] = "--server";
         args[a ++] = "--ignore=.*";
-        args[a ++] = "--addr=127.0.0.1:8181";
+        if (g_debugOpa == 0) {
+            args[a ++] = "--addr=127.0.0.1:8181";
+        } else {
+            args[a ++] = "--addr=:8181";
+        }
         args[a ++] = "--log-level=error";
         args[a] = NULL;
         break;
