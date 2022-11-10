@@ -1105,17 +1105,16 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		stamps.Matched = time.Now()
 
-		// for debug, remove later
-		if true {
-			const (
-				DDMMYYYYhhmmss = "2006-01-02-15-04-05"
-			)
-			now := time.Now().UTC()
+		// if whsvr.dumpRequestObj {
+		// 	const (
+		// 		DDMMYYYYhhmmss = "2006-01-02-15-04-05"
+		// 	)
+		// 	now := time.Now().UTC()
 
-			jsonData, _ := json.Marshal(ar)
-			docKey := fmt.Sprintf("/v1/data/debug/ar/%s_%s_%s_MatchDeny_%v", now.Format(DDMMYYYYhhmmss), ar.Request.UID, req.Kind.Kind, admResult.MatchDeny)
-			opa.AddDocument(docKey, string(jsonData))
-		}
+		// 	jsonData, _ := json.Marshal(ar)
+		// 	docKey := fmt.Sprintf("/v1/data/debug/ar/%s_%s_%s_MatchDeny_%v", now.Format(DDMMYYYYhhmmss), ar.Request.UID, req.Kind.Kind, admResult.MatchDeny)
+		// 	opa.AddDocument(docKey, string(jsonData))
+		// }
 
 		if !admResult.NoLogging {
 			admResult.RuleCategory = admission.AdmRuleCatK8s

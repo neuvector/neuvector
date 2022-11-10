@@ -197,7 +197,7 @@ violationmsgs[msg]{
 
 	policyUrl := formatPolicyUrl(rule.ID)
 	success := AddPolicy(policyUrl, regoStr)
-	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success}).Debug("Add Policy")
+	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success, "regoStr": regoStr}).Debug("Add Policy")
 
 	if !success {
 		// unable to add the rego

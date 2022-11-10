@@ -480,7 +480,7 @@ static pid_t fork_exec(int i)
         args[a ++] = "run";
         args[a ++] = "--server";
         args[a ++] = "--ignore=.*";
-        args[a ++] = "--addr=:8181";
+        args[a ++] = "--addr=127.0.0.1:8181";
         args[a ++] = "--log-level=error";
         args[a] = NULL;
         break;
@@ -837,6 +837,10 @@ int main (int argc, char **argv)
         // g_procs[PROC_SCANNER].active = true;
         g_procs[PROC_DP].active = true;
         g_procs[PROC_AGENT].active = true;
+
+        if (access(g_procs[PROC_CTRL].path, F_OK) == 0) {
+            g_procs[PROC_CTRL_OPA].active = true;
+        }
 
         ret = WEXITSTATUS(system(SCRIPT_CONFIG));
         if (ret != RC_CONFIG_TC && ret != RC_CONFIG_OVS && ret != RC_CONFIG_NOTC) {
