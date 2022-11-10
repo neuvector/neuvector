@@ -197,7 +197,7 @@ violationmsgs[msg]{
 
 	policyUrl := formatPolicyUrl(rule.ID)
 	success := AddPolicy(policyUrl, regoStr)
-	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success}).Debug("Add Policy")
+	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success, "regoStr": regoStr}).Debug("Add Policy")
 
 	if !success {
 		// unable to add the rego
@@ -340,30 +340,66 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		rego = append(rego, "}")
 		rego = append(rego, "\n")
 	} else if c.ValueType == "number" {
-		line := fmt.Sprintf("	user_provided_data := %s", c.Value)
-		rego = append(rego, line)
+		if strings.Contains(c.Path, "[_]") {
+			// array version
+			idx := strings.LastIndex(path, ".")
+			if idx != -1 {
+				rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
+				rego = append(rego, fmt.Sprintf("	total_count := count(%s)", path[0:strings.Index(path, "[_]")]))
 
-		if strings.HasPrefix(c.Path, "item.") {
-			result := "request" + c.Path[4:]
-			rego = append(rego, fmt.Sprintf("	value = %s", result))
+				path2 := strings.Replace(path, "[_]", "[i]", 1)
+
+				opStr := "=="
+				if c.Op == "=" {
+					opStr = "=="
+				} else if c.Op == "!=" {
+					opStr = "!="
+				} else if c.Op == ">=" {
+					opStr = ">="
+				} else if c.Op == ">" {
+					opStr = ">"
+				} else if c.Op == "<=" {
+					opStr = "<="
+				}
+
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | d:=%s; d %s user_provided_data]", path2, opStr))
+				rego = append(rego, "	total_count == count(exist_items)")
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			} else {
+				path2 := strings.Replace(path, "[_]", "[i]", 1)
+				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
+				rego = append(rego, "	total_count == count(exist_items)")
+				rego = append(rego, "}")
+				rego = append(rego, "\n")
+			}
 		} else {
-			rego = append(rego, fmt.Sprintf("	value = %s", c.Path))
-		}
+			//	single value version
+			line := fmt.Sprintf("	user_provided_data := %s", c.Value)
+			rego = append(rego, line)
 
-		if c.Op == "=" {
-			rego = append(rego, "	value == user_provided_data")
-		} else if c.Op == "!=" {
-			rego = append(rego, "	value != user_provided_data")
-		} else if c.Op == ">=" {
-			rego = append(rego, "	value >= user_provided_data")
-		} else if c.Op == ">" {
-			rego = append(rego, "	value > user_provided_data")
-		} else if c.Op == "<=" {
-			rego = append(rego, "	value <= user_provided_data")
-		}
+			if strings.HasPrefix(c.Path, "item.") {
+				result := "request" + c.Path[4:]
+				rego = append(rego, fmt.Sprintf("	value = %s", result))
+			} else {
+				rego = append(rego, fmt.Sprintf("	value = %s", c.Path))
+			}
 
-		rego = append(rego, "}")
-		rego = append(rego, "\n")
+			if c.Op == "=" {
+				rego = append(rego, "	value == user_provided_data")
+			} else if c.Op == "!=" {
+				rego = append(rego, "	value != user_provided_data")
+			} else if c.Op == ">=" {
+				rego = append(rego, "	value >= user_provided_data")
+			} else if c.Op == ">" {
+				rego = append(rego, "	value > user_provided_data")
+			} else if c.Op == "<=" {
+				rego = append(rego, "	value <= user_provided_data")
+			}
+
+			rego = append(rego, "}")
+			rego = append(rego, "\n")
+		}
 	} else if c.ValueType == "boolean" {
 		line := fmt.Sprintf("	user_provided_data := %s", c.Value)
 		rego = append(rego, line)

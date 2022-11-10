@@ -1606,8 +1606,9 @@ func validateCustomPathCriteria(crt *share.CLUSAdmRuleCriterion) (bool, bool) {
 				}
 			}
 
-			if crt.ValueType == "key" {
+			if crt.ValueType == "key" || crt.Op == share.CriteriaOpExist || crt.Op == share.CriteriaOpNotExist {
 				allowedValue = true
+				return allowedOp, allowedValue
 			}
 
 			if crt.ValueType == "string" {

@@ -1105,8 +1105,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		stamps.Matched = time.Now()
 
-		// for debug, remove later
-		if true {
+		if whsvr.dumpRequestObj {
 			const (
 				DDMMYYYYhhmmss = "2006-01-02-15-04-05"
 			)
