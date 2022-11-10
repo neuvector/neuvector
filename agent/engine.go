@@ -246,7 +246,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	// passed the 1st screening
 
 	// 2nd screening: handle the exited child container at the last part
-	if rootPid == 0 {
+	if !osutil.IsPidValid(rootPid) {
 		// log.Debug("invalid root pid")
 		return true // skipped the test
 	}
