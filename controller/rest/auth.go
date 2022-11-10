@@ -233,7 +233,7 @@ func _registerLoginSession(login *loginSession) int {
 		var msg string
 		domainRoles := login.domainRoles
 		if login.mainSessionUser != "" {
-			userName = fmt.Sprintf("%s (master cluster)", login.mainSessionUser)
+			userName = fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
 		} else {
 			userName = login.fullname
 		}
@@ -334,7 +334,7 @@ func (s *loginSession) _logout() {
 	var userName string
 	domainRoles := s.domainRoles
 	if s.mainSessionUser != "" {
-		userName = fmt.Sprintf("%s (master cluster)", s.mainSessionUser)
+		userName = fmt.Sprintf("%s (primary cluster)", s.mainSessionUser)
 	} else {
 		userName = s.fullname
 	}
@@ -360,7 +360,7 @@ func (s *loginSession) _expire() {
 	} else {
 		var userName string
 		if s.mainSessionUser != "" {
-			userName = fmt.Sprintf("%s (master cluster)", s.mainSessionUser)
+			userName = fmt.Sprintf("%s (primary cluster)", s.mainSessionUser)
 		} else {
 			userName = s.fullname
 		}
