@@ -585,7 +585,19 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 	}
 }
 
-func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
+func (p *Probe) isAgentNsOperation(proc *procInternal, id string) bool {
+	if proc.ppath == "/usr/local/bin/nstools" {
+		// pathWalker can initiate nstools sessions, too.
+		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
+			//log.WithFields(log.Fields{"pproc": pproc}).Debug("PROC:")
+			if id == p.selfID  && pproc.ppath == "/usr/local/bin/pathWalker" {
+				if c, ok := p.containerMap[p.selfID]; ok {
+					c.children.Add(proc.pgid)
+				}
+				return true
+			}
+		}
+	}
 	return global.SYS.IsToolProcess(proc.sid, proc.pgid)
 }
 
@@ -1685,7 +1697,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	// only allowing the NS op from the agent's root session
-	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc) {
+	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc, id) {
 		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
 		return
 	}
