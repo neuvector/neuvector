@@ -39,6 +39,7 @@ const (
 	RscTypeRbacRolebindings               = "rolebindings"
 	RscTypeRbacClusterRolebindings        = "clusterrolebindings"
 	RscTypeDeployment                     = "deployment"
+	RscTypeCronJob                        = "cronjob"
 )
 
 const (
@@ -123,6 +124,12 @@ type Deployment struct {
 	Name     string
 	Domain   string
 	Replicas int32
+}
+
+type CronJob struct {
+	UID    string
+	Name   string
+	Domain string
 }
 
 type ImageTag struct {

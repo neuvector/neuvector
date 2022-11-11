@@ -836,36 +836,38 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 		}
 
 		// if it's nv-required role, check whether its configuration meets nv's need
-		if roleInfo, ok := nvClusterRoles[n.name]; ok {
-			evtLog := false
-			for _, roleInfoRule := range roleInfo.rules {
-				found := false
-				for apiGroup, rtVerbs := range n.apiRtVerbs {
-					if apiGroup != "*" && apiGroup != roleInfoRule.apiGroup {
-						continue
-					}
-					foundResources := utils.NewSet()
-					for rt, verbs := range rtVerbs {
-						if verbs.IsSuperset(roleInfoRule.verbs) || verbs.Contains("*") {
-							foundResources.Add(rt)
+		if n.domain == NvAdmSvcNamespace {
+			if roleInfo, ok := nvClusterRoles[n.name]; ok {
+				evtLog := false
+				for _, roleInfoRule := range roleInfo.rules {
+					found := false
+					for apiGroup, rtVerbs := range n.apiRtVerbs {
+						if apiGroup != "*" && apiGroup != roleInfoRule.apiGroup {
+							continue
+						}
+						foundResources := utils.NewSet()
+						for rt, verbs := range rtVerbs {
+							if verbs.IsSuperset(roleInfoRule.verbs) || verbs.Contains("*") {
+								foundResources.Add(rt)
+							}
+						}
+						if foundResources.IsSuperset(roleInfoRule.resources) || foundResources.Contains("*") {
+							found = true
+							break
 						}
 					}
-					if foundResources.IsSuperset(roleInfoRule.resources) || foundResources.Contains("*") {
-						found = true
+					if !found {
+						evtLog = true
 						break
 					}
 				}
-				if !found {
-					evtLog = true
-					break
-				}
-			}
-			if evtLog {
-				if resources, verbs := collectRoleResVerbs(n.name); len(resources) > 0 && len(verbs) > 0 {
-					msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is required to grant %s permission(s) on %s resource(s).`,
-						n.name, strings.Join(verbs, ","), strings.Join(resources, ","))
-					log.Warn(msg)
-					cacheRbacEvent(d.flavor, msg, false)
+				if evtLog {
+					if resources, verbs := collectRoleResVerbs(n.name); len(resources) > 0 && len(verbs) > 0 {
+						msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is required to grant %s permission(s) on %s resource(s).`,
+							n.name, strings.Join(verbs, ","), strings.Join(resources, ","))
+						log.Warn(msg)
+						cacheRbacEvent(d.flavor, msg, false)
+					}
 				}
 			}
 		}
@@ -1280,9 +1282,22 @@ func VerifyNvClusterRoleBindings(bindingNames []string, existOnly bool) ([]strin
 	return errors, k8sRbac403
 }
 
-func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
+func verifyNvRoleBinding(bindingName, namespace string, saNames utils.Set, existOnly bool) error {
 	var err error
 	if bindingInfo, ok := nvRoleBindings[bindingName]; ok {
+		var saNamesStr string
+		for saName := range saNames.Iter() {
+			temp := fmt.Sprintf("%s:%s", NvAdmSvcNamespace, saName)
+			if saNamesStr != "" {
+				saNamesStr += " & "
+			}
+			saNamesStr += temp
+		}
+		saStr := "service account"
+		if saNames.Cardinality() > 1 {
+			saStr += "s"
+		}
+
 		var obj interface{}
 		if obj, err = global.ORCH.GetResource(k8sRscTypeRoleBinding, namespace, bindingName); err == nil {
 			if !existOnly {
@@ -1301,20 +1316,24 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 				if binding != nil {
 					if binding.roleKind == bindingInfo.roleKind {
 						ok = false
-						if binding.role.name == bindingInfo.roleName {
-							ok = true
-						} else if superRoles, _ := k8sClusterRoles[bindingInfo.roleName]; superRoles != nil {
+						if superRoles, _ := k8sClusterRoles[bindingInfo.roleName]; superRoles != nil {
 							k8sDefaultRole = true
 							if superRoles.Contains(binding.role.name) {
 								ok = true
 							}
 						}
+						if !ok && binding.role.name == bindingInfo.roleName {
+							ok = true
+						}
 						if ok {
+							saFound := 0
 							for _, sa := range binding.svcAccounts {
-								if sa.name == nvSA && sa.domain == NvAdmSvcNamespace {
-									found = true
-									break
+								if saNames.Contains(sa.name) && sa.domain == NvAdmSvcNamespace {
+									saFound += 1
 								}
+							}
+							if saFound == saNames.Cardinality() {
+								found = true
 							}
 						}
 					}
@@ -1324,11 +1343,11 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 				if err == nil && !found {
 					var fmtStr string
 					if k8sDefaultRole {
-						fmtStr = `Kubernetes rolebinding "%s" is required to bind %s "%s" to service account %s:%s.`
+						fmtStr = `Kubernetes rolebinding "%s" is required to bind %s "%s" to %s %s.`
 					} else {
-						fmtStr = `Kubernetes rolebinding "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.`
+						fmtStr = `Kubernetes rolebinding "%s" is required to grant the permissions defined in %s "%s" to %s %s.`
 					}
-					err = fmt.Errorf(fmtStr, bindingName, strings.ToLower(bindingInfo.roleKind), bindingInfo.roleName, NvAdmSvcNamespace, nvSA)
+					err = fmt.Errorf(fmtStr, bindingName, strings.ToLower(bindingInfo.roleKind), bindingInfo.roleName, saStr, saNamesStr)
 				}
 			}
 		} else {
@@ -1337,8 +1356,8 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 		if err != nil {
 			log.WithFields(log.Fields{"rolebinding": bindingName, "error": err}).Error()
 			if strings.Contains(err.Error(), " 403 ") {
-				err = fmt.Errorf(`Kubernetes clusterrolebinding "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,
-					NvRbacRoleBinding, NvRbacRole, NvAdmSvcNamespace, nvSA)
+				err = fmt.Errorf(`Kubernetes clusterrolebinding "%s" is required to grant the permissions defined in clusterrole "%s" to %s %s.`,
+					NvRbacRoleBinding, NvRbacRole, saStr, saNamesStr)
 				log.WithFields(log.Fields{"error": err}).Error()
 			}
 		}
@@ -1347,6 +1366,19 @@ func VerifyNvRoleBinding(bindingName, namespace string, existOnly bool) error {
 	}
 
 	return err
+}
+
+func VerifyNvRoleBinding(bindingName, namespace string, nvSAOnly, existOnly bool) error {
+	saNames := utils.NewSet()
+	if !nvSAOnly {
+		// get updater cronjob's service account
+		updaterSA, err := getUpdaterCronJobSvcAccount()
+		if err == nil && updaterSA != "" {
+			saNames.Add(updaterSA)
+		}
+	}
+	saNames.Add(nvSA)
+	return verifyNvRoleBinding(bindingName, namespace, saNames, existOnly)
 }
 
 func GetNvServiceAccount(objFunc common.CacheEventFunc) {
@@ -1408,7 +1440,7 @@ func VerifyNvK8sRBAC(flavor string, existOnly bool) ([]string, []string, []strin
 		clusterRoleBindingErrors, k8sRbac403 = VerifyNvClusterRoleBindings(k8sClusterRoleBindings, existOnly)
 		if !k8sRbac403 {
 			errors := make([]string, 0, 1)
-			if err := VerifyNvRoleBinding(NvAdminRoleBinding, NvAdmSvcNamespace, existOnly); err != nil {
+			if err := VerifyNvRoleBinding(NvAdminRoleBinding, NvAdmSvcNamespace, false, existOnly); err != nil {
 				errors = append(errors, err.Error())
 			}
 			roleBindingErrors = errors

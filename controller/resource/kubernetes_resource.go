@@ -23,6 +23,7 @@ import (
 	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
 	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
 	appsv1 "github.com/neuvector/k8s/apis/apps/v1"
+	batchv1b1 "github.com/neuvector/k8s/apis/batch/v1beta1"
 	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
@@ -342,6 +343,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(appsv1.Deployment) },
 				func() k8s.ResourceList { return new(appsv1.DeploymentList) },
 				xlateDeployment,
+				nil,
+			},
+		},
+	},
+	RscTypeCronJob: k8sResource{
+		apiGroup: "batch",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1beta1",
+				func() k8s.Resource { return new(batchv1b1.CronJob) },
+				func() k8s.ResourceList { return new(batchv1b1.CronJobList) },
+				xlateCronJob,
 				nil,
 			},
 		},
@@ -793,6 +806,23 @@ func xlateDeployment(obj k8s.Resource) (string, interface{}) {
 			Name:     meta.GetName(),
 			Domain:   meta.GetNamespace(),
 			Replicas: o.Spec.GetReplicas(),
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
+func xlateCronJob(obj k8s.Resource) (string, interface{}) {
+	if o, ok := obj.(*batchv1b1.CronJob); ok && o != nil {
+		meta := o.Metadata
+		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-Updater-pod" {
+			return "", nil
+		}
+		r := &CronJob{
+			UID:    meta.GetUid(),
+			Name:   meta.GetName(),
+			Domain: meta.GetNamespace(),
 		}
 		return r.UID, r
 	}
@@ -1415,7 +1445,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment:
+		RscTypeDeployment, RscTypeCronJob:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -1802,4 +1832,25 @@ func UpdateDeploymentReplicates(name string, replicas int32) error {
 	}
 
 	return nil
+}
+
+func getUpdaterCronJobSvcAccount() (string, error) {
+	name := "neuvector-updater-pod"
+	obj, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, name)
+	if err != nil {
+		return "", err
+	} else {
+		sa := nvSA
+		cronjobObj := obj.(*batchv1b1.CronJob)
+		if cronjobObj != nil && cronjobObj.Spec != nil && cronjobObj.Spec.JobTemplate != nil && cronjobObj.Spec.JobTemplate.Spec != nil &&
+			cronjobObj.Spec.JobTemplate.Spec.Template != nil && cronjobObj.Spec.JobTemplate.Spec.Template.Spec != nil {
+			spec := cronjobObj.Spec.JobTemplate.Spec.Template.Spec
+			if spec.ServiceAccountName != nil {
+				sa = *spec.ServiceAccountName
+			} else if spec.ServiceAccount != nil {
+				sa = *spec.ServiceAccount
+			}
+		}
+		return sa, nil
+	}
 }
