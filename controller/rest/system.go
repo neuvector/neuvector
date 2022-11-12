@@ -1366,7 +1366,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 					if !invalidValue && autoscale.Strategy != nil {
 						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
 							// someone tries to enable autoscaling
-							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, false); err != nil {
+							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, true, false); err != nil {
 								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
 								return
 							}
