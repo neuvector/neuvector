@@ -1554,7 +1554,7 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 				case share.CriteriaOpExist, share.CriteriaOpNotExist:
 					str = fmt.Sprintf("(%s, path %s %s)", displayName, crt.Path, opDsiplay)
 				case share.CriteriaOpContainsTagAny:
-					str = fmt.Sprintf("the service account is bound to one of risky role {%s}", formatRiskyRoleCriteriaMsg(crt.Value))
+					str = fmt.Sprintf("(the service account is bound to one of risky role {%s})", formatRiskyRoleCriteriaMsg(crt.Value))
 				default:
 					if crt.Type == "customPath" {
 						str = fmt.Sprintf("(%s, value in %s %s %s)", displayName, crt.Path, opDsiplay, crt.Value)
