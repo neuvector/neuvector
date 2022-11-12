@@ -43,6 +43,7 @@ const (
 	K8sAllApiGroup                = "*"
 	K8sAdmApiGroup                = "admissionregistration.k8s.io"
 	K8sCrdApiGroup                = "apiextensions.k8s.io"
+	K8sRbacApiGroup               = "rbac.authorization.k8s.io"
 	K8sAllApiVersion              = "*"
 	K8sApiVersionV1               = "v1"
 	K8sApiVersionV1Beta1          = "v1beta1"
@@ -191,6 +192,7 @@ type K8sAdmRegValidatingWebhookConfiguration struct {
 }
 
 type NvAdmRegRuleSetting struct {
+	ApiGroups  utils.Set
 	Operations utils.Set
 	Resources  utils.Set
 	Scope      string
@@ -219,31 +221,47 @@ var NvCrdValidatingWebhookName string
 var NvStatusValidatingWebhookName string
 var NvValidatingWebhookNameList []string
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResRoles, K8sResRolebindings)
-var admResForCreateSet2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
+var allApiGroups = utils.NewSet(K8sAllApiGroup)
+var rbacApiGroups = utils.NewSet(K8sRbacApiGroup)
+
+var opCreateDelete = utils.NewSet(Create, Update)
+
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets)
 var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets)
-var AdmResForOpsSettings = []NvAdmRegRuleSetting{
+var admRbacResForCreateUpdate1 = utils.NewSet(K8sResRoles, K8sResRolebindings)
+var admRbacResForCreateUpdate2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
+var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 	// do not change the order of the following elements!
-	NvAdmRegRuleSetting{
+	&NvAdmRegRuleSetting{
+		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create),
 		Resources:  admResForCreateSet,
 		Scope:      apiv1beta1.NamespacedScope,
 	},
-	NvAdmRegRuleSetting{
+	&NvAdmRegRuleSetting{
+		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Update),
 		Resources:  admResForUpdateSet,
 		Scope:      apiv1beta1.NamespacedScope,
 	},
-	NvAdmRegRuleSetting{
-		Operations: utils.NewSet(Create),
-		Resources:  admResForCreateSet2,
+	&NvAdmRegRuleSetting{
+		ApiGroups:  rbacApiGroups,
+		Operations: opCreateDelete,
+		Resources:  admRbacResForCreateUpdate1,
+		Scope:      apiv1beta1.NamespacedScope,
+	},
+	&NvAdmRegRuleSetting{
+		ApiGroups:  rbacApiGroups,
+		Operations: opCreateDelete,
+		Resources:  admRbacResForCreateUpdate2,
 		Scope:      apiv1beta1.AllScopes,
 	},
 }
 
 var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule)
-var CrdResForOpsSettings = []NvAdmRegRuleSetting{
-	NvAdmRegRuleSetting{
+var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
+	&NvAdmRegRuleSetting{
+		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create, Update, Delete),
 		Resources:  crdResForAllOpSet,
 		Scope:      apiv1beta1.AllScopes,
@@ -252,13 +270,15 @@ var CrdResForOpsSettings = []NvAdmRegRuleSetting{
 
 var statusResForCreateUpdateSet = utils.NewSet(K8sResServices)
 var statusResForDeleteSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResServices, K8sResStatefulSets)
-var StatusResForOpsSettings = []NvAdmRegRuleSetting{
-	NvAdmRegRuleSetting{
-		Operations: utils.NewSet(Create, Update),
+var StatusResForOpsSettings = []*NvAdmRegRuleSetting{
+	&NvAdmRegRuleSetting{
+		ApiGroups:  allApiGroups,
+		Operations: opCreateDelete,
 		Resources:  statusResForCreateUpdateSet,
 		Scope:      apiv1beta1.NamespacedScope,
 	},
-	NvAdmRegRuleSetting{
+	&NvAdmRegRuleSetting{
+		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Delete),
 		Resources:  statusResForDeleteSet,
 		Scope:      apiv1beta1.NamespacedScope,
@@ -1622,7 +1642,7 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 }
 
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool) bool {
-	var nvOpResources []NvAdmRegRuleSetting // is for what nv expects
+	var nvOpResources []*NvAdmRegRuleSetting // is for what nv expects
 	// key/operator in webhook NamespaceSelector's MatchExpressions.
 	selKeyOps := map[string]string{NsSelectorKeyCtrlPlane: NsSelectorOpNotExist}
 	switch whName {
@@ -1643,7 +1663,6 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 		return false
 	}
 	expectedApiVersions := utils.NewSet(K8sApiVersionV1, K8sApiVersionV1Beta1, K8sApiVersionV1Beta2)
-	expectedApiGroups := utils.NewSet(K8sAllApiGroup)
 	for _, k8sWhRule := range wh.Rules {
 		foundOps := false
 		k8sRuleOperations := utils.NewSetFromSliceKind(k8sWhRule.Operations)
@@ -1658,8 +1677,17 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 					return false
 				}
 				k8sApiGroups := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiGroups)
-				if !expectedApiGroups.Equal(k8sApiGroups) {
-					return false
+				if !nvOpResources[j].ApiGroups.Equal(k8sApiGroups) {
+					allApiGroup := false
+					for _, apiGroup := range k8sWhRule.Rule.ApiGroups {
+						if apiGroup == "*" {
+							allApiGroup = true
+							break
+						}
+					}
+					if !allApiGroup {
+						return false
+					}
 				}
 				k8sApiVersions := utils.NewSetFromSliceKind(k8sWhRule.Rule.ApiVersions)
 				if !expectedApiVersions.Equal(k8sApiVersions) {
@@ -1838,6 +1866,7 @@ func getUpdaterCronJobSvcAccount() (string, error) {
 	name := "neuvector-updater-pod"
 	obj, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, name)
 	if err != nil {
+		log.WithFields(log.Fields{"name": name, "err": err}).Error("resource no found")
 		return "", err
 	} else {
 		sa := nvSA
