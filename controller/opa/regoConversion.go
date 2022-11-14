@@ -3,7 +3,7 @@ package opa
 import (
 	b64 "encoding/base64"
 	"fmt"
-	"github.com/neuvector/neuvector/share" // * official build
+	"github.com/neuvector/neuvector/share"
 	log "github.com/sirupsen/logrus"
 	"strings"
 )
@@ -253,77 +253,32 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		path = "request" + c.Path[4:]
 	}
 
+	if strings.LastIndex(path, ".") == -1 {
+		rego = append(rego, fmt.Sprintf("	# Invalid path = %v\n", path))
+		return rego
+	}
+
 	// all ValueType (key, string, number, boolean) has "exist" and "notExist"
-	if c.Op == "exist" {
-		if strings.Contains(c.Path, "[_]") {
-			idx := strings.LastIndex(path, ".")
-			if idx != -1 {
-				rego = append(rego, fmt.Sprintf("	total_count := count(%s)", path[0:strings.Index(path, "[_]")]))
-
-				path2 := path[0:idx]
-				key := path[idx+1:]
-				path2 = strings.Replace(path2, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
-				rego = append(rego, "	total_count == count(exist_items)")
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			} else {
-				path2 := strings.Replace(path, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-				rego = append(rego, "	total_count == count(exist_items)")
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			}
-		} else {
-			// single value version of exist
-			idx := strings.LastIndex(path, ".")
-			if idx != -1 {
-				path2 := path[0:idx]
-				key := path[idx+1:]
-				path2 = strings.Replace(path2, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	has_key(%s, %q)", path2, strings.TrimSuffix(key, "[_]")))
-			} else {
-				rego = append(rego, fmt.Sprintf("	%s", path))
-			}
-
-			rego = append(rego, "}")
-			rego = append(rego, "\n")
+	if c.Op == "exist" || c.Op == "notExist" {
+		prefixOp := ""
+		if c.Op == "notExist" {
+			prefixOp = "not"
 		}
-	} else if c.Op == "notExist" {
-		if strings.Contains(c.Path, "[_]") {
-			idx := strings.LastIndex(path, ".")
-			if idx != -1 {
-				path2 := path[0:idx]
-				key := path[idx+1:]
-				path2 = strings.Replace(path2, "[_]", "[i]", 1)
 
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
-				rego = append(rego, "	count(exist_items) == 0")
-			} else {
-				path2 := strings.Replace(path, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-				rego = append(rego, "	count(exist_items) == 0")
-			}
+		upPath, key := splitPathKey(path)
+		rego = append(rego, addSidecarContainerCheck(path)...)
+		upPath = replacePerContainerPath(upPath)
 
-			rego = append(rego, "}")
-			rego = append(rego, "\n")
-		} else {
-			idx := strings.LastIndex(path, ".")
-			if idx != -1 {
-				path2 := path[0:idx]
-				key := path[idx+1:]
-				rego = append(rego, fmt.Sprintf("	not has_key(%s, %q)", path2, key))
-			} else {
-				rego = append(rego, fmt.Sprintf("	not %s", path))
-			}
-
-			rego = append(rego, "}")
-			rego = append(rego, "\n")
-		}
+		rego = append(rego, fmt.Sprintf("  %s has_key(%s, %q)", prefixOp, upPath, strings.TrimSuffix(key, "[_]")))
+		rego = append(rego, "}")
+		rego = append(rego, "\n")
 	} else if c.ValueType == "string" {
 		quotedString := parseQuotedSimpleRegexString(c.Value)
-		line := fmt.Sprintf("	user_provided_data := [%s]", strings.Join(quotedString, ","))
+		line := fmt.Sprintf("	user_provided_data := [%s]\n", strings.Join(quotedString, ","))
 		rego = append(rego, line)
+
+		rego = append(rego, addSidecarContainerCheck(path)...)
+		path = replacePerContainerPath(path)
 
 		rego = append(rego, fmt.Sprintf("	value = %s", strings.TrimSuffix(path, "[_]")))
 
@@ -340,76 +295,33 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		rego = append(rego, "}")
 		rego = append(rego, "\n")
 	} else if c.ValueType == "number" {
-		if strings.Contains(c.Path, "[_]") {
-			// array version
-			idx := strings.LastIndex(path, ".")
-			if idx != -1 {
-				rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
-				rego = append(rego, fmt.Sprintf("	total_count := count(%s)", path[0:strings.Index(path, "[_]")]))
+		rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
+		rego = append(rego, addSidecarContainerCheck(path)...)
+		path = replacePerContainerPath(path)
 
-				path2 := strings.Replace(path, "[_]", "[i]", 1)
-
-				opStr := "=="
-				if c.Op == "=" {
-					opStr = "=="
-				} else if c.Op == "!=" {
-					opStr = "!="
-				} else if c.Op == ">=" {
-					opStr = ">="
-				} else if c.Op == ">" {
-					opStr = ">"
-				} else if c.Op == "<=" {
-					opStr = "<="
-				}
-
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | d:=%s; d %s user_provided_data]", path2, opStr))
-				rego = append(rego, "	total_count == count(exist_items)")
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			} else {
-				path2 := strings.Replace(path, "[_]", "[i]", 1)
-				rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-				rego = append(rego, "	total_count == count(exist_items)")
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			}
-		} else {
-			//	single value version
-			line := fmt.Sprintf("	user_provided_data := %s", c.Value)
-			rego = append(rego, line)
-
-			if strings.HasPrefix(c.Path, "item.") {
-				result := "request" + c.Path[4:]
-				rego = append(rego, fmt.Sprintf("	value = %s", result))
-			} else {
-				rego = append(rego, fmt.Sprintf("	value = %s", c.Path))
-			}
-
-			if c.Op == "=" {
-				rego = append(rego, "	value == user_provided_data")
-			} else if c.Op == "!=" {
-				rego = append(rego, "	value != user_provided_data")
-			} else if c.Op == ">=" {
-				rego = append(rego, "	value >= user_provided_data")
-			} else if c.Op == ">" {
-				rego = append(rego, "	value > user_provided_data")
-			} else if c.Op == "<=" {
-				rego = append(rego, "	value <= user_provided_data")
-			}
-
-			rego = append(rego, "}")
-			rego = append(rego, "\n")
+		opStr := "=="
+		if c.Op == "=" {
+			opStr = "=="
+		} else if c.Op == "!=" {
+			opStr = "!="
+		} else if c.Op == ">=" {
+			opStr = ">="
+		} else if c.Op == ">" {
+			opStr = ">"
+		} else if c.Op == "<=" {
+			opStr = "<="
 		}
+
+		rego = append(rego, fmt.Sprintf("	value = %s", path))
+		rego = append(rego, fmt.Sprintf("	value %s user_provided_data", opStr))
+		rego = append(rego, "}")
+		rego = append(rego, "\n")
 	} else if c.ValueType == "boolean" {
-		line := fmt.Sprintf("	user_provided_data := %s", c.Value)
-		rego = append(rego, line)
+		rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
+		rego = append(rego, addSidecarContainerCheck(path)...)
+		path = replacePerContainerPath(path)
 
-		if strings.HasPrefix(c.Path, "item.") {
-			result := "request" + c.Path[4:]
-			rego = append(rego, fmt.Sprintf("	value = %s", result))
-		} else {
-			rego = append(rego, fmt.Sprintf("	value = %s", c.Path))
-		}
+		rego = append(rego, fmt.Sprintf("	value = %s", path))
 
 		if c.Op == "=" {
 			rego = append(rego, "	value == user_provided_data")
@@ -417,46 +329,6 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 
 		rego = append(rego, "}")
 		rego = append(rego, "\n")
-	}
-
-	// add supplemental criteria functions
-	if c.ValueType == "string" {
-		if c.Op == "notContainsAny" {
-			rego = append(rego, "# op=notContainsAny: if key not exist, treat it met")
-
-			rego = append(rego, functionName)
-			rego = append(rego, "{")
-
-			if strings.Contains(c.Path, "[_]") {
-				idx := strings.LastIndex(path, ".")
-				if idx != -1 {
-					path2 := path[0:idx]
-					key := path[idx+1:]
-					path2 = strings.Replace(path2, "[_]", "[i]", 1)
-					rego = append(rego, fmt.Sprintf("	exist_items := [i | has_key(%s, %q)]", path2, strings.TrimSuffix(key, "[_]")))
-					rego = append(rego, "	count(exist_items) == 0")
-				} else {
-					path2 := strings.Replace(path, "[_]", "[i]", 1)
-					rego = append(rego, fmt.Sprintf("	exist_items := [i | %s]", path2))
-					rego = append(rego, "	count(exist_items) == 0")
-				}
-
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			} else {
-				idx := strings.LastIndex(path, ".")
-				if idx != -1 {
-					path2 := path[0:idx]
-					key := path[idx+1:]
-					rego = append(rego, fmt.Sprintf("	not has_key(%s, %q)", path2, key))
-				} else {
-					rego = append(rego, fmt.Sprintf("	not %s", path))
-				}
-
-				rego = append(rego, "}")
-				rego = append(rego, "\n")
-			}
-		}
 	}
 
 	return rego
@@ -889,6 +761,15 @@ check_contains(patterns, value) {
     regex.match(patterns[_], value)
 }
 
+inSidecarContainerList(image){
+	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2", 
+						"linkerd-io/proxy","https://gcr.io/linkerd-io/proxy",
+						"istio-release/proxyv2", "https://gcr.io/istio-release/proxyv2"]
+    startswith(image, sidecarImages[_])
+}else = false{
+	true
+}
+
 	`
 
 	return rego
@@ -1025,4 +906,41 @@ func AddRiskyRuleMapping(ruleName string, ruleId int) {
 
 func arrayToString(a []int, delim string) string {
 	return strings.Trim(strings.Replace(fmt.Sprint(a), " ", delim, -1), "[]")
+}
+
+func splitPathKey(path string) (string, string) {
+	idx := strings.LastIndex(path, ".")
+	if idx != -1 {
+		return path[0:idx], path[idx+1:]
+	}
+	return path, ""
+}
+
+func addSidecarContainerCheck(path string) []string {
+	rego := []string{}
+
+	rego = append(rego, fmt.Sprintf("	# parameter path = %s", path))
+
+	if strings.Contains(path, "containers[_]") {
+		rego = append(rego, "	image := request.spec.containers[i].image")
+		rego = append(rego, "	not inSidecarContainerList(image)\n")
+	} else if strings.Contains(path, "initContainers[_]") {
+		rego = append(rego, "	image := request.spec.initContainers[i].image")
+		rego = append(rego, "	not inSidecarContainerList(image)\n")
+	} else if strings.Contains(path, "ephemeralContainers[_]") {
+		rego = append(rego, "	image := request.spec.ephemeralContainers[i].image")
+		rego = append(rego, "	not inSidecarContainerList(image)\n")
+	}
+	return rego
+}
+
+func replacePerContainerPath(path string) string {
+	if strings.Contains(path, "containers[_]") {
+		return strings.Replace(path, "containers[_]", "containers[i]", 1)
+	} else if strings.Contains(path, "initContainers[_]") {
+		return strings.Replace(path, "initContainers[_]", "initContainers[i]", 1)
+	} else if strings.Contains(path, "ephemeralContainers[_]") {
+		return strings.Replace(path, "ephemeralContainers[_]", "ephemeralContainers[i]", 1)
+	}
+	return path
 }
