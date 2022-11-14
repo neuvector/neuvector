@@ -595,7 +595,7 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetName() == nvSA && s.GetNamespace() == NvAdmSvcNamespace {
+				if s.GetNamespace() == NvAdmSvcNamespace {
 					objRef := k8sObjectRef{name: s.GetName(), domain: s.GetNamespace()}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
@@ -1282,6 +1282,7 @@ func VerifyNvClusterRoleBindings(bindingNames []string, existOnly bool) ([]strin
 	return errors, k8sRbac403
 }
 
+// verify whether the serviceAccounts specified in {bindingName} rolebinding contains all in saNames
 func verifyNvRoleBinding(bindingName, namespace string, saNames utils.Set, existOnly bool) error {
 	var err error
 	if bindingInfo, ok := nvRoleBindings[bindingName]; ok {
@@ -1326,13 +1327,12 @@ func verifyNvRoleBinding(bindingName, namespace string, saNames utils.Set, exist
 							ok = true
 						}
 						if ok {
-							saFound := 0
 							for _, sa := range binding.svcAccounts {
 								if saNames.Contains(sa.name) && sa.domain == NvAdmSvcNamespace {
-									saFound += 1
+									saNames.Remove(sa.name)
 								}
 							}
-							if saFound == saNames.Cardinality() {
+							if saNames.Cardinality() == 0 {
 								found = true
 							}
 						}
