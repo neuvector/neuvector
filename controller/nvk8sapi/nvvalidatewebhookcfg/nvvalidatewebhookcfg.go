@@ -412,7 +412,6 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 			err = global.ORCH.DeleteResource(resource.RscTypeValidatingWebhookConfiguration, res)
 		}
 	} else if (op == K8sResOpCreate) || (op == K8sResOpUpdate) {
-		allApiGroups := []string{resource.K8sAllApiGroup}
 		v1b1b2ApiVersions := []string{resource.K8sApiVersionV1, resource.K8sApiVersionV1Beta1, resource.K8sApiVersionV1Beta2}
 		if k8sVersionMajor == 1 && k8sVersionMinor >= 22 {
 			// https://kubernetes.io/docs/reference/using-api/deprecation-guide/
@@ -426,7 +425,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 					// if controller doesn't have caBundle value, do not config k8s
 					return errors.New("empty caBundle")
 				}
-				var nvOpResources []resource.NvAdmRegRuleSetting
+				var nvOpResources []*resource.NvAdmRegRuleSetting
 				var sideEffects string = resource.SideEffectNone
 				var nsSelectorKey, nsSelectorOp, failurePolicy string
 
@@ -464,7 +463,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 					ro := &apiv1.RuleWithOperations{
 						Operations: opRes.Operations.ToStringSlice(),
 						Rule: &apiv1.Rule{
-							ApiGroups:   allApiGroups,
+							ApiGroups:   opRes.ApiGroups.ToStringSlice(),
 							ApiVersions: v1b1b2ApiVersions,
 							Resources:   opRes.Resources.ToStringSlice(),
 							Scope:       &opRes.Scope, // Scope is supported starting from K8s 1.14
@@ -518,7 +517,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 					// if controller doesn't have caBundle value, do not config k8s
 					return errors.New("empty caBundle")
 				}
-				var nvOpResources []resource.NvAdmRegRuleSetting
+				var nvOpResources []*resource.NvAdmRegRuleSetting
 				var sideEffects string = resource.SideEffectNone
 				var nsSelectorKey, nsSelectorOp, failurePolicy string
 
@@ -552,7 +551,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 					ro := &apiv1beta1.RuleWithOperations{
 						Operations: opRes.Operations.ToStringSlice(),
 						Rule: &apiv1beta1.Rule{
-							ApiGroups:   allApiGroups,
+							ApiGroups:   opRes.ApiGroups.ToStringSlice(),
 							ApiVersions: v1b1b2ApiVersions,
 							Resources:   opRes.Resources.ToStringSlice(),
 						},
