@@ -77,7 +77,6 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 		return fmt.Errorf("Invalid criteria options")
 	}
 
-	hasCustomCriteria := false
 	numOps := utils.NewSet(share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan)
 	for _, crt := range criteria {
 		var allowedOp, allowedValue bool
@@ -91,6 +90,10 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 		}
 
 		if crt.Type == "customPath" || crt.Type == "saBindRiskyRole" {
+			if ruleType != api.ValidatingDenyRuleType {
+				return fmt.Errorf("Unsupported criterion name: %s", crt.Name)
+			}
+
 			if !allowedOp {
 				return fmt.Errorf("Invalid criterion operator: %s", crt.Op)
 			}
@@ -156,15 +159,6 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 			}
 		} else {
 			return fmt.Errorf("Unsupported criterion name: %s", crt.Name)
-		}
-	}
-
-	// check for custom criteria
-	// need to check [RuleType], if rule contains custom criteria, the rule is only for deny
-	// but we don't have [RuleType] in the parameter... need to add it..
-	if hasCustomCriteria {
-		if ruleType != api.ValidatingDenyRuleType {
-			return fmt.Errorf("Unsupported rule type: %s", ruleType)
 		}
 	}
 
