@@ -586,11 +586,15 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 }
 
 func (p *Probe) isAgentNsOperation(proc *procInternal, id string) bool {
+	if id != p.selfID {
+		return false
+	}
+
 	if proc.ppath == "/usr/local/bin/nstools" {
 		// pathWalker can initiate nstools sessions, too.
 		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
 			//log.WithFields(log.Fields{"pproc": pproc}).Debug("PROC:")
-			if id == p.selfID  && pproc.ppath == "/usr/local/bin/pathWalker" {
+			if pproc.ppath == "/usr/local/bin/pathWalker" {
 				if c, ok := p.containerMap[p.selfID]; ok {
 					c.children.Add(proc.pgid)
 				}
@@ -598,7 +602,15 @@ func (p *Probe) isAgentNsOperation(proc *procInternal, id string) bool {
 			}
 		}
 	}
-	return global.SYS.IsToolProcess(proc.sid, proc.pgid)
+
+	if global.SYS.IsToolProcess(proc.sid, proc.pgid) {
+		return true
+	}
+
+	if _, ok := p.pidProcMap[proc.ppid]; !ok {
+		return true	// no parent process for reference
+	}
+	return false
 }
 
 func (p *Probe) isAgentProcess(sid int, id string) bool {
