@@ -1,8 +1,8 @@
 .PHONY: fleet
 
 STAGE_DIR = stage
-BASE_TAG = latest
-BUILD_BASE_TAG = latest
+BASE_IMAGE_TAG = latest
+BUILD_IMAGE_TAG = latest
 
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
@@ -102,27 +102,27 @@ stage_all: stage_init copy_ctrl copy_enf copy_mgr
 	cp neuvector/build/supervisord.all.conf ${STAGE_DIR}/etc/supervisor/conf.d/supervisord.conf
 
 pull_fleet_base:
-	docker pull neuvector/controller_base:${BASE_TAG}
-	docker pull neuvector/enforcer_base:${BASE_TAG}
+	docker pull neuvector/controller_base:${BASE_IMAGE_TAG}
+	docker pull neuvector/enforcer_base:${BASE_IMAGE_TAG}
 
 pull_all_base:
-	docker pull neuvector/all_base:${BASE_TAG}
+	docker pull neuvector/all_base:${BASE_IMAGE_TAG}
 
 
 api_image:
 	docker build -t neuvector/api -f neuvector/build/Dockerfile.api .
 
 ctrl_image: pull_fleet_base stage_ctrl
-	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BUILD_TAG=${BASE_TAG} -t neuvector/controller -f neuvector/build/Dockerfile.controller .
+	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/controller -f neuvector/build/Dockerfile.controller .
 
 enf_image: pull_fleet_base stage_enf
-	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BUILD_TAG=${BASE_TAG} -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
+	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
 
 all_image: pull_all_base stage_all
-	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BUILD_TAG=${BASE_TAG} -t neuvector/allinone -f neuvector/build/Dockerfile.all .
+	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/allinone -f neuvector/build/Dockerfile.all .
 
 fleet:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
-	@docker pull neuvector/build_fleet:${BUILD_BASE_TAG}
-	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet:${BUILD_BASE_TAG}
+	@docker pull neuvector/build_fleet:${BUILD_IMAGE_TAG}
+	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet:${BUILD_IMAGE_TAG}

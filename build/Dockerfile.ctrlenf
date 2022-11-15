@@ -1,5 +1,5 @@
-ARG BASE_TAG
-FROM neuvector/enforcer_base:${BASE_TAG}
+ARG BASE_IMAGE_TAG
+FROM neuvector/enforcer_base:${BASE_IMAGE_TAG}
 
 # Dockerfile to create controller+enforcer container image
 
