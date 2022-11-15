@@ -1985,10 +1985,8 @@ func startWorkerThread(ctx *Context) {
 // [2021-02-15] CRD-related resource changes do not call this function.
 //              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
-	enable := true
 	config := newConfig
 	if oldConfig != nil && newConfig == nil {
-		enable = false
 		config = oldConfig
 	}
 	if config == nil {
@@ -1999,51 +1997,7 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 		return
 	}
 
-	var expectedUri, expectedStatusUri, admClientMode, failurePolicy string
-	cacheMutexRLock()
-	admClientMode = admStateCache.AdmClientMode
-	if ctrlState, _ := admStateCache.CtrlStates[config.AdmType]; ctrlState != nil {
-		expectedUri = ctrlState.Uri
-		expectedStatusUri = ctrlState.NvStatusUri
-	}
-	if admStateCache.FailurePolicy == resource.FailLower {
-		failurePolicy = resource.Fail
-	} else {
-		failurePolicy = resource.Ignore
-	}
-	cacheMutexRUnlock()
-
-	k8sResInfo := admission.ValidatingWebhookConfigInfo{
-		Name: config.Name,
-		WebhooksInfo: []*admission.WebhookInfo{
-			&admission.WebhookInfo{
-				Name: resource.NvAdmValidatingWebhookName,
-				ClientConfig: admission.ClientConfig{
-					ClientMode:  admClientMode,
-					ServiceName: resource.NvAdmSvcName,
-					Path:        expectedUri,
-				},
-				FailurePolicy:  failurePolicy,
-				TimeoutSeconds: resource.DefTimeoutSeconds,
-			},
-			&admission.WebhookInfo{
-				Name: resource.NvStatusValidatingWebhookName,
-				ClientConfig: admission.ClientConfig{
-					ClientMode:  admClientMode,
-					ServiceName: resource.NvAdmSvcName,
-					Path:        expectedStatusUri,
-				},
-				FailurePolicy:  resource.Ignore,
-				TimeoutSeconds: resource.DefTimeoutSeconds,
-			},
-		},
-	}
-
-	isValidSetting := false
-	if !enable || (newConfig != nil && !admission.ValidateK8sSetting(k8sResInfo)) {
-		isValidSetting = true
-	}
-	if isLeader() && isValidSetting {
+	if isLeader() {
 		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name)
 		if skip && err == nil {
 			// meaning nv resource in k8s sync with nv's cluster status. do nothing
