@@ -480,9 +480,8 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"scanner", "/usr/local/bin/scanner"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
-		{"scannerTask", "/usr/local/bin/scannerTask"},
+		{"opa", "/usr/local/bin/opa"},
 
 		// tools
 		{"ethtool", "/usr/sbin/ethtool"}, // network hardware setting
@@ -542,7 +541,6 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"scanner", "/usr/local/bin/scanner"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
@@ -622,9 +620,8 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"scanner", "/usr/local/bin/scanner"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
-		{"scannerTask", "/usr/local/bin/scannerTask"},
+		{"opa", "/usr/local/bin/opa"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
 		// tools
