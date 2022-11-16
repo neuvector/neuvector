@@ -836,38 +836,36 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 		}
 
 		// if it's nv-required role, check whether its configuration meets nv's need
-		if n.domain == NvAdmSvcNamespace {
-			if roleInfo, ok := nvClusterRoles[n.name]; ok {
-				evtLog := false
-				for _, roleInfoRule := range roleInfo.rules {
-					found := false
-					for apiGroup, rtVerbs := range n.apiRtVerbs {
-						if apiGroup != "*" && apiGroup != roleInfoRule.apiGroup {
-							continue
-						}
-						foundResources := utils.NewSet()
-						for rt, verbs := range rtVerbs {
-							if verbs.IsSuperset(roleInfoRule.verbs) || verbs.Contains("*") {
-								foundResources.Add(rt)
-							}
-						}
-						if foundResources.IsSuperset(roleInfoRule.resources) || foundResources.Contains("*") {
-							found = true
-							break
+		if roleInfo, ok := nvClusterRoles[n.name]; ok {
+			evtLog := false
+			for _, roleInfoRule := range roleInfo.rules {
+				found := false
+				for apiGroup, rtVerbs := range n.apiRtVerbs {
+					if apiGroup != "*" && apiGroup != roleInfoRule.apiGroup {
+						continue
+					}
+					foundResources := utils.NewSet()
+					for rt, verbs := range rtVerbs {
+						if verbs.IsSuperset(roleInfoRule.verbs) || verbs.Contains("*") {
+							foundResources.Add(rt)
 						}
 					}
-					if !found {
-						evtLog = true
+					if foundResources.IsSuperset(roleInfoRule.resources) || foundResources.Contains("*") {
+						found = true
 						break
 					}
 				}
-				if evtLog {
-					if resources, verbs := collectRoleResVerbs(n.name); len(resources) > 0 && len(verbs) > 0 {
-						msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is required to grant %s permission(s) on %s resource(s).`,
-							n.name, strings.Join(verbs, ","), strings.Join(resources, ","))
-						log.Warn(msg)
-						cacheRbacEvent(d.flavor, msg, false)
-					}
+				if !found {
+					evtLog = true
+					break
+				}
+			}
+			if evtLog {
+				if resources, verbs := collectRoleResVerbs(n.name); len(resources) > 0 && len(verbs) > 0 {
+					msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is required to grant %s permission(s) on %s resource(s).`,
+						n.name, strings.Join(verbs, ","), strings.Join(resources, ","))
+					log.Warn(msg)
+					cacheRbacEvent(d.flavor, msg, false)
 				}
 			}
 		}
