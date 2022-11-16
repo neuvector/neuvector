@@ -693,7 +693,7 @@ func (e *Engine) InsertNeuvectorProcessProfilePolicy(group, role string) {
 	case "controller+enforcer+manager", "controller+enforcer", "allinone":
 		profile = buildAllinOneProfileList(group)
 	case "scanner":
-		buildScannerProfileList(group)
+		profile = buildScannerProfileList(group)
 	case "updater", "fetcher": // should not have protection, phase-out soon
 		profile = buildAllowAllProfile(group)
 	}
