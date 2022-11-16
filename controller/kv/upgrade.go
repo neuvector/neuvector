@@ -955,11 +955,13 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 	//return "9A4B940E" // for 4.0.1
 	//return "4E4F5633" // for 4.0.2 ~ 4.2.2
 	//return "65347e39" // for 4.2.3 ~ 4.3.1, multi-webhook support
-	return "E907B7AE" // for 4.3.2 ~
+	//return "E907B7AE" // for 4.3.2 ~ 5.0.x
+	return "28ea479c" // for 5.1
 }
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
-	return "E907B7AE" // for 5.0
+	// return "E907B7AE" // for 5.0
+	return "28ea479c" // for 5.1
 }
 
 func genFileAccessRule() {
