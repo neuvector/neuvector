@@ -874,6 +874,504 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete system webhook")
 }
 
+func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, caller, scope, platform string,
+	rconf *api.RESTSystemConfigConfigData) (bool, error) {
+
+	var rc *api.RESTSystemConfigConfig
+	if scope == share.ScopeLocal && rconf.Config != nil {
+		rc = rconf.Config
+		/*
+			if rc.NewServicePolicyMode != nil && *rc.NewServicePolicyMode == share.PolicyModeEnforce &&
+				licenseAllowEnforce() == false {
+				restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+				return
+			}
+		*/
+		if rc.WebhookUrl != nil {
+			*rc.WebhookUrl = strings.TrimSpace(*rc.WebhookUrl)
+		}
+
+		// Acquire lock if auth order or webhook is changing
+		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
+			lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
+			if err != nil {
+				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
+				return false, err
+			}
+			defer clusHelper.ReleaseLock(lock)
+		}
+	}
+
+	var nc *api.RESTSysNetConfigConfig
+	if scope == share.ScopeLocal && rconf.NetConfig != nil {
+		nc = rconf.NetConfig
+	}
+
+	retry := 0
+	kick := false
+	for retry < retryClusterMax {
+		var cconf *share.CLUSSystemConfig
+		var rev uint64
+		// Retrieve from the cluster
+		if scope == share.ScopeFed {
+			cconf, rev = clusHelper.GetFedSystemConfigRev(acc)
+		} else {
+			cconf, rev = clusHelper.GetSystemConfigRev(acc)
+		}
+		if cconf == nil {
+			restRespAccessDenied(w, login)
+			return kick, common.ErrObjectAccessDenied
+		}
+
+		if scope == share.ScopeLocal && nc != nil {
+			//global network service status
+			if nc.NetServiceStatus != nil {
+				cconf.NetServiceStatus = *nc.NetServiceStatus
+			}
+
+			// global network service policy mode
+			if nc.NetServicePolicyMode != nil {
+				/*
+					if *nc.NetServicePolicyMode == share.PolicyModeEnforce &&
+						licenseAllowEnforce() == false {
+						restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+						return
+					}
+				*/
+				switch *nc.NetServicePolicyMode {
+				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+					cconf.NetServicePolicyMode = *nc.NetServicePolicyMode
+				default:
+					e := "Invalid network service policy mode"
+					log.WithFields(log.Fields{"net_service_policy_mode": *nc.NetServicePolicyMode}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
+		}
+
+		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
+			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
+				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
+				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+			}
+
+			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
+				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
+				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
+			}
+		}
+
+		if scope == share.ScopeLocal && rc != nil {
+			// Cluster name is read-only if the cluster is in fed
+			if rc.ClusterName != nil {
+				var newName string
+				if *rc.ClusterName == "" {
+					newName = common.DefaultSystemConfig.ClusterName
+				} else {
+					newName = *rc.ClusterName
+				}
+				allowed := false
+				if caller == "configmap" {
+					allowed = true
+				} else {
+					if fedRole := cacher.GetFedMembershipRoleNoAuth(); newName == cconf.ClusterName || fedRole == api.FedRoleNone {
+						allowed = true
+					} else {
+						if newName != cconf.ClusterName && fedRole == api.FedRoleMaster {
+							if cacher.GetFedJoinedClusterCount() == 0 {
+								allowed = true
+							}
+						}
+					}
+				}
+				if !allowed {
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, "cluster name cannot be changed when in the federation")
+					return kick, common.ErrUnsupported
+				} else {
+					cconf.ClusterName = newName
+				}
+			}
+
+			// New policy mode
+			if rc.NewServicePolicyMode != nil {
+				switch *rc.NewServicePolicyMode {
+				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+					cconf.NewServicePolicyMode = *rc.NewServicePolicyMode
+				default:
+					e := "Invalid new service policy mode"
+					log.WithFields(log.Fields{"new_service_policy_mode": *rc.NewServicePolicyMode}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
+			// New baseline profile setting
+			if rc.NewServiceProfileBaseline != nil {
+				blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
+				switch blValue {
+				case share.ProfileBasic:
+					cconf.NewServiceProfileBaseline = share.ProfileBasic
+				case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
+					cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
+				default:
+					e := "Invalid new service profile baseline"
+					log.WithFields(log.Fields{"new_service_profile_baseline": *rc.NewServiceProfileBaseline}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
+
+			// Unused Group Aging
+			if rc.UnusedGroupAging != nil {
+				cconf.UnusedGroupAging = *rc.UnusedGroupAging
+				if cconf.UnusedGroupAging > share.UnusedGroupAgingMax {
+					e := "Invalid unused group aging time."
+					log.WithFields(log.Fields{"unused_group_aging": *rc.UnusedGroupAging}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
+
+			// Syslog
+			if rc.SyslogEnable != nil {
+				cconf.SyslogEnable = *rc.SyslogEnable
+			}
+
+			if rc.SyslogInJSON != nil {
+				cconf.SyslogInJSON = *rc.SyslogInJSON
+			}
+
+			if rc.SyslogCategories != nil {
+				for _, categories := range *rc.SyslogCategories {
+					if categories != api.CategoryEvent && categories != api.CategoryRuntime &&
+						categories != api.CategoryAudit {
+						e := "Invalid syslog Category"
+						log.WithFields(log.Fields{"category": categories}).Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					}
+				}
+				cconf.SyslogCategories = *rc.SyslogCategories
+			}
+
+			if rc.SyslogServer != nil {
+				// Both IP and name are kept in the cluster to support backward compatibility
+				if *rc.SyslogServer == "" {
+					cconf.SyslogServer = ""
+					cconf.SyslogIP = nil
+				} else if regIPLoose.MatchString(*rc.SyslogServer) {
+					if ip := net.ParseIP(*rc.SyslogServer); ip == nil {
+						e := "Invalid syslog IP"
+						log.WithFields(log.Fields{"ip": *rc.SyslogServer}).Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					} else {
+						cconf.SyslogIP = ip
+						cconf.SyslogServer = ""
+					}
+				} else {
+					cconf.SyslogServer = *rc.SyslogServer
+					cconf.SyslogIP = nil
+				}
+			}
+
+			if rc.SyslogIPProto != nil {
+				ipproto := *rc.SyslogIPProto
+				if ipproto == 0 {
+					cconf.SyslogIPProto = syscall.IPPROTO_UDP
+				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP {
+					e := "Invalid syslog protocol"
+					log.WithFields(log.Fields{"protocol": ipproto}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				} else {
+					cconf.SyslogIPProto = ipproto
+				}
+			}
+
+			if rc.SyslogPort != nil {
+				if *rc.SyslogPort == 0 {
+					cconf.SyslogPort = api.SyslogDefaultUDPPort
+				} else {
+					cconf.SyslogPort = *rc.SyslogPort
+				}
+			}
+
+			if rc.SyslogLevel != nil {
+				if *rc.SyslogLevel == "" {
+					cconf.SyslogLevel = api.LogLevelINFO
+				} else {
+					if _, ok := common.LevelToPrio(*rc.SyslogLevel); !ok {
+						e := "Invalid syslog level"
+						log.WithFields(log.Fields{"level": *rc.SyslogLevel}).Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					}
+					cconf.SyslogLevel = *rc.SyslogLevel
+				}
+			}
+
+			if cconf.SyslogEnable && cconf.SyslogIP == nil && cconf.SyslogServer == "" {
+				e := "Syslog address is not configured"
+				log.Error(e)
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+				return kick, errors.New(e)
+			}
+
+			if cconf.SyslogPort == 0 {
+				cconf.SyslogPort = api.SyslogDefaultUDPPort
+			}
+			if cconf.SyslogIPProto == 0 {
+				cconf.SyslogIPProto = syscall.IPPROTO_UDP
+			}
+			if cconf.SyslogLevel == "" {
+				cconf.SyslogLevel = api.LogLevelINFO
+			}
+
+			// SingleCVEPerSyslog
+			if rc.SingleCVEPerSyslog != nil {
+				cconf.SingleCVEPerSyslog = *rc.SingleCVEPerSyslog
+			}
+
+			// Auth order
+			if rc.AuthOrder != nil {
+				order := make([]string, 0)
+				for _, name := range *rc.AuthOrder {
+					if name != api.AuthServerLocal {
+						if cs, _, _ := clusHelper.GetServerRev(name, acc); cs == nil {
+							e := "Authentication server not found"
+							log.WithFields(log.Fields{"name": name}).Error(e)
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrObjectNotFound, e)
+							return kick, errors.New(e)
+						} else if !isPasswordAuthServer(cs) {
+							e := "Not a password authentication server"
+							log.WithFields(log.Fields{"name": name}).Error(e)
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+							return kick, errors.New(e)
+						}
+					}
+
+					order = append(order, name)
+				}
+
+				cconf.AuthOrder = order
+			}
+
+			if rc.AuthByPlatform != nil {
+				if cconf.AuthByPlatform && *rc.AuthByPlatform == false {
+					kick = true
+				}
+				cconf.AuthByPlatform = *rc.AuthByPlatform
+			}
+			if rc.RancherEP != nil {
+				if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
+					e := "Invalid endpoint URL"
+					log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				} else {
+					cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+				}
+			}
+
+			/*
+				if rc.InternalSubnets != nil {
+					for _, subnet := range *rc.InternalSubnets {
+						_, _, err := net.ParseCIDR(subnet)
+						if err != nil {
+							e := "Invalid internal subnets"
+							log.WithFields(log.Fields{"subnets": *rc.InternalSubnets}).Error(e)
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+							return
+						}
+					}
+					cconf.InternalSubnets = *rc.InternalSubnets
+				}
+			*/
+
+			// webhook
+			if (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
+				if webhooks, errCode, err := configWebhooks(rc.WebhookUrl, rc.Webhooks, cconf.Webhooks, share.UserCreated, acc); err != nil {
+					restRespErrorMessage(w, http.StatusBadRequest, errCode, err.Error())
+					return kick, err
+				} else {
+					cconf.Webhooks = webhooks
+				}
+			}
+
+			// Controller debug
+			if rc.ControllerDebug != nil {
+				cconf.ControllerDebug = *rc.ControllerDebug
+			}
+			// proxy mesh status
+			if rc.MonitorServiceMesh != nil {
+				cconf.TapProxymesh = *rc.MonitorServiceMesh
+			}
+
+			//xff status
+			if rc.XffEnabled != nil {
+				cconf.XffEnabled = *rc.XffEnabled
+			}
+
+			// registry proxy
+			if rc.RegistryHttpProxy != nil {
+				if rc.RegistryHttpProxy.URL != "" {
+					if _, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
+						return kick, err
+					}
+				}
+				cconf.RegistryHttpProxy.URL = rc.RegistryHttpProxy.URL
+				cconf.RegistryHttpProxy.Username = rc.RegistryHttpProxy.Username
+				cconf.RegistryHttpProxy.Password = rc.RegistryHttpProxy.Password
+			}
+			if rc.RegistryHttpsProxy != nil {
+				if rc.RegistryHttpsProxy.URL != "" {
+					if _, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTPS proxy setting")
+						return kick, err
+					}
+				}
+				cconf.RegistryHttpsProxy.URL = rc.RegistryHttpsProxy.URL
+				cconf.RegistryHttpsProxy.Username = rc.RegistryHttpsProxy.Username
+				cconf.RegistryHttpsProxy.Password = rc.RegistryHttpsProxy.Password
+			}
+			if rc.RegistryHttpProxyEnable != nil {
+				cconf.RegistryHttpProxy.Enable = *rc.RegistryHttpProxyEnable
+			}
+			if rc.RegistryHttpsProxyEnable != nil {
+				cconf.RegistryHttpsProxy.Enable = *rc.RegistryHttpsProxyEnable
+			}
+			if (cconf.RegistryHttpProxy.Enable && cconf.RegistryHttpProxy.URL == "") ||
+				(cconf.RegistryHttpsProxy.Enable && cconf.RegistryHttpsProxy.URL == "") {
+				e := "Empty proxy URL"
+				log.Error(e)
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+				return kick, errors.New(e)
+			}
+
+			// IBM SA Endpoint
+			if rc.IBMSAEpEnabled != nil {
+				if !*rc.IBMSAEpEnabled {
+					cconf.IBMSAConfig = share.CLUSIBMSAConfig{}
+					cconf.IBMSAOnboardData = share.CLUSIBMSAOnboardData{}
+					cconf.IBMSAConfigNV.EpConnectedAt = time.Time{}
+				}
+				cconf.IBMSAConfigNV.EpEnabled = *rc.IBMSAEpEnabled
+				if !cconf.IBMSAConfigNV.EpEnabled {
+					cconf.IBMSAConfigNV.EpStart = 0
+				}
+			}
+			if rc.IBMSAEpDashboardURL != nil {
+				if *rc.IBMSAEpDashboardURL == _invalidDashboardURL {
+					if cconf.IBMSAConfigNV.EpDashboardURL == "" {
+						cconf.IBMSAConfigNV.EpDashboardURL = _invalidDashboardURL
+					}
+				} else {
+					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
+				}
+			}
+
+			// scanner autoscale
+			if platform == share.PlatformKubernetes && rc.ScannerAutoscale != nil {
+				autoscale := *rc.ScannerAutoscale
+				if autoscale.Strategy != nil || autoscale.MinPods != nil || autoscale.MaxPods != nil {
+					invalidValue := false
+					strategy := cconf.ScannerAutoscale.Strategy
+					min := cconf.ScannerAutoscale.MinPods
+					max := cconf.ScannerAutoscale.MaxPods
+					if autoscale.MinPods != nil {
+						min = *autoscale.MinPods
+					}
+					if autoscale.MaxPods != nil {
+						max = *autoscale.MaxPods
+					}
+					if max > 128 || max < min || min == 0 {
+						if strategy == api.AutoScaleNone && min == 0 && max == 0 {
+							// allow this in fresh deployment
+						} else {
+							invalidValue = true
+						}
+					}
+					if !invalidValue && autoscale.Strategy != nil {
+						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
+							// someone tries to enable autoscaling
+							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, true, false); err != nil {
+								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
+								return kick, err
+							}
+							if min == 0 {
+								min = 3
+							}
+							if max == 0 {
+								max = 3
+							}
+						}
+						strategy = *autoscale.Strategy
+						allowed := utils.NewSet(api.AutoScaleNone, api.AutoScaleImmediate, api.AutoScaleDelayed)
+						if !allowed.Contains(strategy) {
+							invalidValue = true
+						}
+					}
+					if invalidValue {
+						e := "Invalid autoscale value"
+						log.Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					}
+					cconf.ScannerAutoscale.Strategy = strategy
+					cconf.ScannerAutoscale.MinPods = min
+					cconf.ScannerAutoscale.MaxPods = max
+				}
+			}
+
+			// telemetry report
+			if rc.NoTelemetryReport != nil {
+				cconf.NoTelemetryReport = *rc.NoTelemetryReport
+			}
+		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
+			// webhook for fed system config
+			if rconf.FedConfig.Webhooks != nil {
+				if webhooks, errCode, err := configWebhooks(nil, rconf.FedConfig.Webhooks, cconf.Webhooks, share.FederalCfg, acc); err != nil {
+					restRespErrorMessage(w, http.StatusBadRequest, errCode, err.Error())
+					return kick, err
+				} else {
+					cconf.Webhooks = webhooks
+				}
+			}
+		}
+		//---
+
+		if !acc.Authorize(cconf, nil) {
+			restRespAccessDenied(w, login)
+			return kick, common.ErrObjectAccessDenied
+		}
+
+		// Write to cluster
+		var err error
+		if scope == share.ScopeFed {
+			err = clusHelper.PutFedSystemConfigRev(cconf, rev)
+		} else {
+			err = clusHelper.PutSystemConfigRev(cconf, rev)
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev, "scope": scope}).Error()
+			retry++
+		} else {
+			break
+		}
+	}
+
+	if retry >= retryClusterMax {
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return kick, common.ErrClusterWriteFail
+	}
+
+	return kick, nil
+}
+
 func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -952,501 +1450,18 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var rc *api.RESTSystemConfigConfig
-	if scope == share.ScopeLocal && rconf.Config != nil {
-		rc = rconf.Config
-		if rc.NewServicePolicyMode != nil && *rc.NewServicePolicyMode == share.PolicyModeEnforce &&
-			licenseAllowEnforce() == false {
-			restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-			return
-		}
-
-		if rc.WebhookUrl != nil {
-			*rc.WebhookUrl = strings.TrimSpace(*rc.WebhookUrl)
-		}
-
-		// Acquire lock if auth order or webhook is changing
-		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
-			lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
-			if err != nil {
-				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
-				return
-			}
-			defer clusHelper.ReleaseLock(lock)
-		}
-	}
-
-	var nc *api.RESTSysNetConfigConfig
-	if scope == share.ScopeLocal && rconf.NetConfig != nil {
-		nc = rconf.NetConfig
-	}
-
-	retry := 0
-	kick := false
-	for retry < retryClusterMax {
-		var cconf *share.CLUSSystemConfig
-		var rev uint64
-		// Retrieve from the cluster
+	if kick, err := configSystemConfig(w, acc, login, "rest", scope, localDev.Host.Platform, &rconf); err == nil {
 		if scope == share.ScopeFed {
-			cconf, rev = clusHelper.GetFedSystemConfigRev(acc)
-		} else {
-			cconf, rev = clusHelper.GetSystemConfigRev(acc)
-		}
-		if cconf == nil {
-			restRespAccessDenied(w, login)
-			return
+			updateFedRulesRevision([]string{share.FedSystemConfigType}, acc, login)
 		}
 
-		if scope == share.ScopeLocal && nc != nil {
-			//global network service status
-			if nc.NetServiceStatus != nil {
-				cconf.NetServiceStatus = *nc.NetServiceStatus
-			}
-
-			// global network service policy mode
-			if nc.NetServicePolicyMode != nil {
-				if *nc.NetServicePolicyMode == share.PolicyModeEnforce &&
-					licenseAllowEnforce() == false {
-					restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-					return
-				}
-				switch *nc.NetServicePolicyMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NetServicePolicyMode = *nc.NetServicePolicyMode
-				default:
-					e := "Invalid network service policy mode"
-					log.WithFields(log.Fields{"net_service_policy_mode": *nc.NetServicePolicyMode}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				}
-			}
+		if kick {
+			server := global.ORCH.GetAuthServerAlias()
+			kickAllLoginSessionsByServer(server)
 		}
 
-		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
-			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
-				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
-				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
-			}
-
-			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
-				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
-				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
-			}
-		}
-
-		if scope == share.ScopeLocal && rc != nil {
-			// Cluster name is read-only if the cluster is in fed
-			if rc.ClusterName != nil {
-				var newName string
-				if *rc.ClusterName == "" {
-					newName = common.DefaultSystemConfig.ClusterName
-				} else {
-					newName = *rc.ClusterName
-				}
-				allowed := false
-				if fedRole := cacher.GetFedMembershipRoleNoAuth(); newName == cconf.ClusterName || fedRole == api.FedRoleNone {
-					allowed = true
-				} else {
-					if newName != cconf.ClusterName && fedRole == api.FedRoleMaster {
-						if cacher.GetFedJoinedClusterCount() == 0 {
-							allowed = true
-						}
-					}
-				}
-				if !allowed {
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, "cluster name cannot be changed when in the federation")
-					return
-				} else {
-					cconf.ClusterName = newName
-				}
-			}
-
-			// New policy mode
-			if rc.NewServicePolicyMode != nil {
-				switch *rc.NewServicePolicyMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NewServicePolicyMode = *rc.NewServicePolicyMode
-				default:
-					e := "Invalid new service policy mode"
-					log.WithFields(log.Fields{"new_service_policy_mode": *rc.NewServicePolicyMode}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				}
-			}
-			// New baseline profile setting
-			if rc.NewServiceProfileBaseline != nil {
-				blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
-				switch blValue {
-				case share.ProfileBasic:
-					cconf.NewServiceProfileBaseline = share.ProfileBasic
-				case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
-					cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
-				default:
-					e := "Invalid new service profile baseline"
-					log.WithFields(log.Fields{"new_service_profile_baseline": *rc.NewServiceProfileBaseline}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				}
-			}
-
-			// Unused Group Aging
-			if rc.UnusedGroupAging != nil {
-				cconf.UnusedGroupAging = *rc.UnusedGroupAging
-				if cconf.UnusedGroupAging > share.UnusedGroupAgingMax {
-					e := "Invalid unused group aging time."
-					log.WithFields(log.Fields{"unused_group_aging": *rc.UnusedGroupAging}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				}
-			}
-
-			// Syslog
-			if rc.SyslogEnable != nil {
-				cconf.SyslogEnable = *rc.SyslogEnable
-			}
-
-			if rc.SyslogInJSON != nil {
-				cconf.SyslogInJSON = *rc.SyslogInJSON
-			}
-
-			if rc.SyslogCategories != nil {
-				for _, categories := range *rc.SyslogCategories {
-					if categories != api.CategoryEvent && categories != api.CategoryRuntime &&
-						categories != api.CategoryAudit {
-						e := "Invalid syslog Category"
-						log.WithFields(log.Fields{"category": categories}).Error(e)
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return
-					}
-				}
-				cconf.SyslogCategories = *rc.SyslogCategories
-			}
-
-			if rc.SyslogServer != nil {
-				// Both IP and name are kept in the cluster to support backward compatibility
-				if *rc.SyslogServer == "" {
-					cconf.SyslogServer = ""
-					cconf.SyslogIP = nil
-				} else if regIPLoose.MatchString(*rc.SyslogServer) {
-					if ip := net.ParseIP(*rc.SyslogServer); ip == nil {
-						e := "Invalid syslog IP"
-						log.WithFields(log.Fields{"ip": *rc.SyslogServer}).Error(e)
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return
-					} else {
-						cconf.SyslogIP = ip
-						cconf.SyslogServer = ""
-					}
-				} else {
-					cconf.SyslogServer = *rc.SyslogServer
-					cconf.SyslogIP = nil
-				}
-			}
-
-			if rc.SyslogIPProto != nil {
-				ipproto := *rc.SyslogIPProto
-				if ipproto == 0 {
-					cconf.SyslogIPProto = syscall.IPPROTO_UDP
-				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP {
-					e := "Invalid syslog protocol"
-					log.WithFields(log.Fields{"protocol": ipproto}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				} else {
-					cconf.SyslogIPProto = ipproto
-				}
-			}
-
-			if rc.SyslogPort != nil {
-				if *rc.SyslogPort == 0 {
-					cconf.SyslogPort = api.SyslogDefaultUDPPort
-				} else {
-					cconf.SyslogPort = *rc.SyslogPort
-				}
-			}
-
-			if rc.SyslogLevel != nil {
-				if *rc.SyslogLevel == "" {
-					cconf.SyslogLevel = api.LogLevelINFO
-				} else {
-					if _, ok := common.LevelToPrio(*rc.SyslogLevel); !ok {
-						e := "Invalid syslog level"
-						log.WithFields(log.Fields{"level": *rc.SyslogLevel}).Error(e)
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return
-					}
-					cconf.SyslogLevel = *rc.SyslogLevel
-				}
-			}
-
-			if cconf.SyslogEnable && cconf.SyslogIP == nil && cconf.SyslogServer == "" {
-				e := "Syslog address is not configured"
-				log.Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-				return
-			}
-
-			if cconf.SyslogPort == 0 {
-				cconf.SyslogPort = api.SyslogDefaultUDPPort
-			}
-			if cconf.SyslogIPProto == 0 {
-				cconf.SyslogIPProto = syscall.IPPROTO_UDP
-			}
-			if cconf.SyslogLevel == "" {
-				cconf.SyslogLevel = api.LogLevelINFO
-			}
-
-			// SingleCVEPerSyslog
-			if rc.SingleCVEPerSyslog != nil {
-				cconf.SingleCVEPerSyslog = *rc.SingleCVEPerSyslog
-			}
-
-			// Auth order
-			if rc.AuthOrder != nil {
-				order := make([]string, 0)
-				for _, name := range *rc.AuthOrder {
-					if name != api.AuthServerLocal {
-						if cs, _, _ := clusHelper.GetServerRev(name, acc); cs == nil {
-							e := "Authentication server not found"
-							log.WithFields(log.Fields{"name": name}).Error(e)
-							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrObjectNotFound, e)
-							return
-						} else if !isPasswordAuthServer(cs) {
-							e := "Not a password authentication server"
-							log.WithFields(log.Fields{"name": name}).Error(e)
-							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-							return
-						}
-					}
-
-					order = append(order, name)
-				}
-
-				cconf.AuthOrder = order
-			}
-
-			if rc.AuthByPlatform != nil {
-				if cconf.AuthByPlatform && *rc.AuthByPlatform == false {
-					kick = true
-				}
-				cconf.AuthByPlatform = *rc.AuthByPlatform
-			}
-			if rc.RancherEP != nil {
-				if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
-					e := "Invalid endpoint URL"
-					log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return
-				} else {
-					cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-				}
-			}
-
-			/*
-				if rc.InternalSubnets != nil {
-					for _, subnet := range *rc.InternalSubnets {
-						_, _, err := net.ParseCIDR(subnet)
-						if err != nil {
-							e := "Invalid internal subnets"
-							log.WithFields(log.Fields{"subnets": *rc.InternalSubnets}).Error(e)
-							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-							return
-						}
-					}
-					cconf.InternalSubnets = *rc.InternalSubnets
-				}
-			*/
-
-			// webhook
-			if (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
-				if webhooks, errCode, err := configWebhooks(rc.WebhookUrl, rc.Webhooks, cconf.Webhooks, share.UserCreated, acc); err != nil {
-					restRespErrorMessage(w, http.StatusBadRequest, errCode, err.Error())
-					return
-				} else {
-					cconf.Webhooks = webhooks
-				}
-			}
-
-			// Controller debug
-			if rc.ControllerDebug != nil {
-				cconf.ControllerDebug = *rc.ControllerDebug
-			}
-			// proxy mesh status
-			if rc.MonitorServiceMesh != nil {
-				cconf.TapProxymesh = *rc.MonitorServiceMesh
-			}
-
-			//xff status
-			if rc.XffEnabled != nil {
-				cconf.XffEnabled = *rc.XffEnabled
-			}
-
-			// registry proxy
-			if rc.RegistryHttpProxy != nil {
-				if rc.RegistryHttpProxy.URL != "" {
-					if _, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
-						return
-					}
-				}
-				cconf.RegistryHttpProxy.URL = rc.RegistryHttpProxy.URL
-				cconf.RegistryHttpProxy.Username = rc.RegistryHttpProxy.Username
-				cconf.RegistryHttpProxy.Password = rc.RegistryHttpProxy.Password
-			}
-			if rc.RegistryHttpsProxy != nil {
-				if rc.RegistryHttpsProxy.URL != "" {
-					if _, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTPS proxy setting")
-						return
-					}
-				}
-				cconf.RegistryHttpsProxy.URL = rc.RegistryHttpsProxy.URL
-				cconf.RegistryHttpsProxy.Username = rc.RegistryHttpsProxy.Username
-				cconf.RegistryHttpsProxy.Password = rc.RegistryHttpsProxy.Password
-			}
-			if rc.RegistryHttpProxyEnable != nil {
-				cconf.RegistryHttpProxy.Enable = *rc.RegistryHttpProxyEnable
-			}
-			if rc.RegistryHttpsProxyEnable != nil {
-				cconf.RegistryHttpsProxy.Enable = *rc.RegistryHttpsProxyEnable
-			}
-			if (cconf.RegistryHttpProxy.Enable && cconf.RegistryHttpProxy.URL == "") ||
-				(cconf.RegistryHttpsProxy.Enable && cconf.RegistryHttpsProxy.URL == "") {
-				e := "Empty proxy URL"
-				log.Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-				return
-			}
-
-			// IBM SA Endpoint
-			if rc.IBMSAEpEnabled != nil {
-				if !*rc.IBMSAEpEnabled {
-					cconf.IBMSAConfig = share.CLUSIBMSAConfig{}
-					cconf.IBMSAOnboardData = share.CLUSIBMSAOnboardData{}
-					cconf.IBMSAConfigNV.EpConnectedAt = time.Time{}
-				}
-				cconf.IBMSAConfigNV.EpEnabled = *rc.IBMSAEpEnabled
-				if !cconf.IBMSAConfigNV.EpEnabled {
-					cconf.IBMSAConfigNV.EpStart = 0
-				}
-			}
-			if rc.IBMSAEpDashboardURL != nil {
-				if *rc.IBMSAEpDashboardURL == _invalidDashboardURL {
-					if cconf.IBMSAConfigNV.EpDashboardURL == "" {
-						cconf.IBMSAConfigNV.EpDashboardURL = _invalidDashboardURL
-					}
-				} else {
-					cconf.IBMSAConfigNV.EpDashboardURL = *rc.IBMSAEpDashboardURL
-				}
-			}
-
-			// scanner autoscale
-			if k8sPlatform && rc.ScannerAutoscale != nil {
-				autoscale := rc.ScannerAutoscale
-				if autoscale.Strategy != nil || autoscale.MinPods != nil || autoscale.MaxPods != nil {
-					invalidValue := false
-					strategy := cconf.ScannerAutoscale.Strategy
-					min := cconf.ScannerAutoscale.MinPods
-					max := cconf.ScannerAutoscale.MaxPods
-					if autoscale.MinPods != nil {
-						min = *autoscale.MinPods
-					}
-					if autoscale.MaxPods != nil {
-						max = *autoscale.MaxPods
-					}
-					if max > 128 || max < min || min == 0 {
-						if strategy == api.AutoScaleNone && min == 0 && max == 0 {
-							// allow this in fresh deployment
-						} else {
-							invalidValue = true
-						}
-					}
-					if !invalidValue && autoscale.Strategy != nil {
-						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
-							// someone tries to enable autoscaling
-							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, true, false); err != nil {
-								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
-								return
-							}
-							if min == 0 {
-								min = 3
-							}
-							if max == 0 {
-								max = 3
-							}
-						}
-						strategy = *autoscale.Strategy
-						allowed := utils.NewSet(api.AutoScaleNone, api.AutoScaleImmediate, api.AutoScaleDelayed)
-						if !allowed.Contains(strategy) {
-							invalidValue = true
-						}
-					}
-					if invalidValue {
-						e := "Invalid autoscale value"
-						log.Error(e)
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return
-					}
-					cconf.ScannerAutoscale.Strategy = strategy
-					cconf.ScannerAutoscale.MinPods = min
-					cconf.ScannerAutoscale.MaxPods = max
-				}
-			}
-
-			// telemetry report
-			if rc.NoTelemetryReport != nil {
-				cconf.NoTelemetryReport = *rc.NoTelemetryReport
-			}
-		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
-			// webhook for fed system config
-			if rconf.FedConfig.Webhooks != nil {
-				if webhooks, errCode, err := configWebhooks(nil, rconf.FedConfig.Webhooks, cconf.Webhooks, share.FederalCfg, acc); err != nil {
-					restRespErrorMessage(w, http.StatusBadRequest, errCode, err.Error())
-					return
-				} else {
-					cconf.Webhooks = webhooks
-				}
-			}
-		}
-		//---
-
-		if !acc.Authorize(cconf, nil) {
-			restRespAccessDenied(w, login)
-			return
-		}
-
-		// Write to cluster
-		var err error
-		if scope == share.ScopeFed {
-			err = clusHelper.PutFedSystemConfigRev(cconf, rev)
-		} else {
-			err = clusHelper.PutSystemConfigRev(cconf, rev)
-		}
-		if err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev, "scope": scope}).Error()
-			retry++
-		} else {
-			break
-		}
+		restRespSuccess(w, r, nil, acc, login, &rconf, "Configure system settings")
 	}
-
-	if retry >= retryClusterMax {
-		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return
-	}
-
-	if scope == share.ScopeFed {
-		updateFedRulesRevision([]string{share.FedSystemConfigType}, acc, login)
-	}
-
-	if kick {
-		server := global.ORCH.GetAuthServerAlias()
-		kickAllLoginSessionsByServer(server)
-	}
-
-	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure system settings")
 }
 
 func handlerSystemConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

@@ -547,7 +547,8 @@ func main() {
 		if !strings.HasPrefix(ver.CtrlVersion, "interim/") {
 			// it's official release image
 			if *teleNeuvectorEP == "" {
-				*teleNeuvectorEP = "" //-> "http://<neuvector-upgrader-responder-IP>:8314/v1/checkupgrade"
+				// use public neuvector-upgrade-responder if testing upgrade-responder url is not specified
+				*teleNeuvectorEP = "https://upgrades.neuvector-upgrade-responder.livestock.rancher.io/v1/checkupgrade"
 			}
 		}
 	}
@@ -630,6 +631,7 @@ func main() {
 		FedPort:          *fedPort,
 		PwdValidUnit:     *pwdValidUnit,
 		TeleNeuvectorURL: *teleNeuvectorEP,
+		TeleFreq:         *telemetryFreq,
 		TeleCurrentVer:   *teleCurrentVer,
 	}
 	rest.InitContext(&rctx)
@@ -649,7 +651,7 @@ func main() {
 	access.UpdateUserRoleForFedRoleChange(fedRole)
 
 	// start rest server
-	rest.LoadInitCfg(Ctrler.Leader) // Load config from ConfigMap
+	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	go rest.CrdQueueProc()
