@@ -131,6 +131,10 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		return nil, nil, 0, nil, 0, err
 	}
 
+	if info.Labels == nil {
+		info.Labels = make(map[string]string)
+	}
+
 	spec, err := c.Spec(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container spec")
