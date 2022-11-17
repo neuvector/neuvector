@@ -963,8 +963,6 @@ func LoadInitCfg(load bool) {
 			} else {
 				errMsg = fmt.Sprintf("    %s init configmap read error: %s ", configMap.Type, err.Error())
 			}
-		} else {
-			errMsg = fmt.Sprintf("    %s init configmap file error: %s ", configMap.Type, err.Error())
 		}
 		if errMsg != "" {
 			log.Error(errMsg)
