@@ -77,6 +77,7 @@ var ErrObjectAccessDenied error = errors.New("Access denied")
 var ErrObjectExists error = errors.New("Object exists")
 var ErrAtomicWriteFail error = errors.New("Atomic write failed")
 var ErrUnsupported error = errors.New("Unsupported action")
+var ErrClusterWriteFail error = errors.New("Failed to write cluster")
 
 var defaultWebhookCategory []string = []string{}
 var defaultSyslogCategory []string = []string{

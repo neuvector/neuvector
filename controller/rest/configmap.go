@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
-	"net/url"
 	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -36,6 +33,7 @@ const maxNameLength = 1024
 
 type configMapHandlerContext struct {
 	gotAllCustomRoles bool
+	platform          string
 	pwdProfile        *share.CLUSPwdProfile
 }
 
@@ -265,251 +263,54 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		return nil
 	}
 
+	rconf := api.RESTSystemConfigConfigData{
+		Config: &api.RESTSystemConfigConfig{
+			NewServicePolicyMode:      rc.NewServicePolicyMode,
+			NewServiceProfileBaseline: rc.NewServiceProfileBaseline,
+			UnusedGroupAging:          rc.UnusedGroupAging,
+			SyslogServer:              rc.SyslogServer,
+			SyslogIPProto:             rc.SyslogIPProto,
+			SyslogPort:                rc.SyslogPort,
+			SyslogLevel:               rc.SyslogLevel,
+			SyslogEnable:              rc.SyslogEnable,
+			SyslogCategories:          rc.SyslogCategories,
+			SyslogInJSON:              rc.SyslogInJSON,
+			SingleCVEPerSyslog:        rc.SingleCVEPerSyslog,
+			AuthOrder:                 rc.AuthOrder,
+			AuthByPlatform:            rc.AuthByPlatform,
+			RancherEP:                 rc.RancherEP,
+			WebhookEnable:             rc.WebhookEnable,
+			WebhookUrl:                rc.WebhookUrl,
+			Webhooks:                  rc.Webhooks,
+			ClusterName:               rc.ClusterName,
+			ControllerDebug:           rc.ControllerDebug,
+			MonitorServiceMesh:        rc.MonitorServiceMesh,
+			RegistryHttpProxyEnable:   rc.RegistryHttpProxyEnable,
+			RegistryHttpsProxyEnable:  rc.RegistryHttpsProxyEnable,
+			RegistryHttpProxy:         rc.RegistryHttpProxy,
+			RegistryHttpsProxy:        rc.RegistryHttpsProxy,
+			IBMSAEpEnabled:            rc.IBMSAEpEnabled,
+			IBMSAEpDashboardURL:       rc.IBMSAEpDashboardURL,
+			XffEnabled:                rc.XffEnabled,
+			ScannerAutoscale:          rc.ScannerAutoscale,
+			NoTelemetryReport:         rc.NoTelemetryReport,
+		},
+		NetConfig: &api.RESTSysNetConfigConfig{
+			NetServiceStatus:     rc.NetServiceStatus,
+			NetServicePolicyMode: rc.NetServicePolicyMode,
+		},
+		AtmoConfig: &api.RESTSysAtmoConfigConfig{
+			ModeAutoD2M:         rc.ModeAutoD2M,
+			ModeAutoD2MDuration: rc.ModeAutoD2MDuration,
+			ModeAutoM2P:         rc.ModeAutoM2P,
+			ModeAutoM2PDuration: rc.ModeAutoM2PDuration,
+		},
+	}
+
 	acc := access.NewAdminAccessControl()
+	_, err = configSystemConfig(nil, acc, nil, "configmap", share.ScopeLocal, context.platform, &rconf)
 
-	cconf, rev := clusHelper.GetSystemConfigRev(acc)
-	if cconf == nil {
-		return errors.New("Initial systemconfig fail: Can't find default system config")
-	}
-
-	if rc.NewServicePolicyMode != nil {
-		switch *rc.NewServicePolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-			cconf.NewServicePolicyMode = *rc.NewServicePolicyMode
-		default:
-			e := "Invalid new service policy mode"
-			log.WithFields(log.Fields{"new_service_policy_mode": *rc.NewServicePolicyMode}).Error(e)
-			return errors.New(e)
-		}
-	}
-
-	if rc.NewServiceProfileBaseline != nil {
-		blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
-		switch blValue {
-		case share.ProfileBasic:
-			cconf.NewServiceProfileBaseline = share.ProfileBasic
-		case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
-			cconf.NewServiceProfileBaseline = share.ProfileZeroDrift
-		default:
-			e := "Invalid new service profile baseline"
-			log.WithFields(log.Fields{"new_service_profile_baseline": *rc.NewServiceProfileBaseline}).Error(e)
-			return errors.New(e)
-		}
-	}
-
-	// Unused Group Aging
-	if rc.UnusedGroupAging != nil {
-		cconf.UnusedGroupAging = *rc.UnusedGroupAging
-		if cconf.UnusedGroupAging > share.UnusedGroupAgingMax {
-			e := "Invalid unused group aging time."
-			log.WithFields(log.Fields{"unused_group_aging": *rc.UnusedGroupAging}).Error(e)
-			return errors.New(e)
-		}
-	}
-
-	// Syslog
-	if rc.SyslogEnable != nil {
-		cconf.SyslogEnable = *rc.SyslogEnable
-	}
-	if rc.SyslogInJSON != nil {
-		cconf.SyslogInJSON = *rc.SyslogInJSON
-	}
-	if rc.SyslogCategories != nil {
-		for _, categories := range *rc.SyslogCategories {
-			if categories != api.CategoryEvent && categories != api.CategoryRuntime &&
-				categories != api.CategoryAudit {
-				e := "Invalid syslog Category"
-				log.WithFields(log.Fields{"category": *rc.SyslogCategories}).Error(e)
-				return errors.New(e)
-			}
-		}
-		cconf.SyslogCategories = *rc.SyslogCategories
-	}
-	if rc.SyslogServer != nil {
-		// Both IP and name are kept in the cluster to support backward compatibility
-		if *rc.SyslogServer == "" {
-			cconf.SyslogServer = ""
-			cconf.SyslogIP = nil
-		} else if regIPLoose.MatchString(*rc.SyslogServer) {
-			if ip := net.ParseIP(*rc.SyslogServer); ip == nil {
-				e := "Invalid syslog IP"
-				log.WithFields(log.Fields{"ip": *rc.SyslogServer}).Error(e)
-				return errors.New(e)
-			} else {
-				cconf.SyslogIP = ip
-				cconf.SyslogServer = ""
-			}
-		} else {
-			cconf.SyslogServer = *rc.SyslogServer
-			cconf.SyslogIP = nil
-		}
-	}
-
-	if rc.SyslogIPProto != nil {
-		ipproto := *rc.SyslogIPProto
-		if ipproto == 0 {
-			cconf.SyslogIPProto = syscall.IPPROTO_UDP
-		} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP {
-			e := "Invalid syslog protocol"
-			log.WithFields(log.Fields{"protocol": ipproto}).Error(e)
-			return errors.New(e)
-		} else {
-			cconf.SyslogIPProto = ipproto
-		}
-	}
-
-	if rc.SyslogPort != nil {
-		if *rc.SyslogPort == 0 {
-			cconf.SyslogPort = api.SyslogDefaultUDPPort
-		} else {
-			cconf.SyslogPort = *rc.SyslogPort
-		}
-	}
-
-	if rc.SyslogLevel != nil {
-		if *rc.SyslogLevel == "" {
-			cconf.SyslogLevel = api.LogLevelINFO
-		} else {
-			if _, ok := common.LevelToPrio(*rc.SyslogLevel); !ok {
-				e := "Invalid syslog level"
-				log.WithFields(log.Fields{"level": *rc.SyslogLevel}).Error(e)
-				return errors.New(e)
-			}
-			cconf.SyslogLevel = *rc.SyslogLevel
-		}
-	}
-
-	if cconf.SyslogEnable && cconf.SyslogIP == nil && cconf.SyslogServer == "" {
-		e := "Syslog address is not configured"
-		log.Error(e)
-		return errors.New(e)
-	}
-
-	if cconf.SyslogPort == 0 {
-		cconf.SyslogPort = api.SyslogDefaultUDPPort
-	}
-	if cconf.SyslogIPProto == 0 {
-		cconf.SyslogIPProto = syscall.IPPROTO_UDP
-	}
-	if cconf.SyslogLevel == "" {
-		cconf.SyslogLevel = api.LogLevelINFO
-	}
-
-	if rc.AuthByPlatform != nil {
-		cconf.AuthByPlatform = *rc.AuthByPlatform
-	}
-	if rc.RancherEP != nil {
-		if u, err := url.ParseRequestURI(*rc.RancherEP); err != nil {
-			err := fmt.Errorf("Invalid endpoint URL")
-			log.WithFields(log.Fields{"url": *rc.RancherEP}).Error(err)
-			return err
-		} else {
-			cconf.RancherEP = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-		}
-	}
-
-	// webhook
-	if webhooks, _, err := configWebhooks(rc.WebhookUrl, rc.Webhooks, cconf.Webhooks, share.UserCreated, acc); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Errors in webhook configurations")
-		return err
-	} else {
-		cconf.Webhooks = webhooks
-	}
-
-	// Cluster name
-	if rc.ClusterName != nil {
-		if *rc.ClusterName == "" {
-			cconf.ClusterName = common.DefaultSystemConfig.ClusterName
-		} else {
-			cconf.ClusterName = *rc.ClusterName
-		}
-	}
-
-	// Controller debug
-	if rc.ControllerDebug != nil {
-		cconf.ControllerDebug = *rc.ControllerDebug
-	}
-	// proxy mesh status
-	if rc.MonitorServiceMesh != nil {
-		cconf.TapProxymesh = *rc.MonitorServiceMesh
-	}
-	//xff status
-	if rc.XffEnabled != nil {
-		cconf.XffEnabled = *rc.XffEnabled
-	}
-
-	//global network service status
-	if rc.NetServiceStatus != nil {
-		cconf.NetServiceStatus = *rc.NetServiceStatus
-	}
-	// global network service policy mode
-	if rc.NetServicePolicyMode != nil {
-		if *rc.NetServicePolicyMode == share.PolicyModeEnforce &&
-			licenseAllowEnforce() == false {
-			return errors.New("Invalid network service license for protect mode")
-		}
-		switch *rc.NetServicePolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-			cconf.NetServicePolicyMode = *rc.NetServicePolicyMode
-		default:
-			log.WithFields(log.Fields{"net_service_policy_mode": *rc.NetServicePolicyMode}).Error("Invalid network service policy mode")
-			return errors.New("Invalid network service policy mode")
-		}
-	}
-
-	if rc.ModeAutoD2M != nil && rc.ModeAutoD2MDuration != nil {
-		cconf.ModeAutoD2M = *rc.ModeAutoD2M
-		cconf.ModeAutoD2MDuration = *rc.ModeAutoD2MDuration
-	}
-
-	if rc.ModeAutoM2P != nil && rc.ModeAutoM2PDuration != nil {
-		cconf.ModeAutoM2P = *rc.ModeAutoM2P
-		cconf.ModeAutoM2PDuration = *rc.ModeAutoM2PDuration
-	}
-
-	// registry proxy
-	if rc.RegistryHttpProxy != nil {
-		if rc.RegistryHttpProxy.URL != "" {
-			if _, err = url.Parse(rc.RegistryHttpProxy.URL); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
-				return errors.New("Invalid HTTP proxy setting")
-			}
-		}
-		cconf.RegistryHttpProxy.URL = rc.RegistryHttpProxy.URL
-		cconf.RegistryHttpProxy.Username = rc.RegistryHttpProxy.Username
-		cconf.RegistryHttpProxy.Password = rc.RegistryHttpProxy.Password
-	}
-	if rc.RegistryHttpsProxy != nil {
-		if rc.RegistryHttpsProxy.URL != "" {
-			if _, err = url.Parse(rc.RegistryHttpsProxy.URL); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
-				return errors.New("Invalid HTTPS proxy setting")
-			}
-		}
-		cconf.RegistryHttpsProxy.URL = rc.RegistryHttpsProxy.URL
-		cconf.RegistryHttpsProxy.Username = rc.RegistryHttpsProxy.Username
-		cconf.RegistryHttpsProxy.Password = rc.RegistryHttpsProxy.Password
-	}
-	if rc.RegistryHttpProxyEnable != nil {
-		cconf.RegistryHttpProxy.Enable = *rc.RegistryHttpProxyEnable
-	}
-	if rc.RegistryHttpsProxyEnable != nil {
-		cconf.RegistryHttpsProxy.Enable = *rc.RegistryHttpsProxyEnable
-	}
-	if (cconf.RegistryHttpProxy.Enable && cconf.RegistryHttpProxy.URL == "") ||
-		(cconf.RegistryHttpsProxy.Enable && cconf.RegistryHttpsProxy.URL == "") {
-		e := "Empty proxy URL"
-		log.Error(e)
-		return errors.New(e)
-	}
-
-	// Write to cluster
-	if err := clusHelper.PutSystemConfigRev(cconf, rev); err != nil {
-		log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func handlecustomrolecfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
@@ -919,7 +720,7 @@ func k8sResourceLog(ev share.TLogEvent, msg string, detail []string) {
 	evqueue.Append(&clog)
 }
 
-func LoadInitCfg(load bool) {
+func LoadInitCfg(load bool, platform string) {
 	log.WithFields(log.Fields{"load": load}).Info()
 	var loaded, failed []string
 	var skip bool
@@ -947,6 +748,7 @@ func LoadInitCfg(load bool) {
 
 	var context configMapHandlerContext
 
+	context.platform = platform
 	for _, configMap := range configMaps {
 		var errMsg string
 		if _, err := os.Stat(configMap.FileName); err == nil {
