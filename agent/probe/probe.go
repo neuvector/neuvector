@@ -371,6 +371,10 @@ func (p *Probe) processContainerAppPortChanges() {
 	for id, c := range p.containerMap {
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(id)
+			if id == p.selfID {
+				c.children.Add(c.rootPid)
+				c.children.Add(p.agentPid)
+			}
 		}
 
 		if id != "" && id != p.selfID && c.rootPid != 0 {

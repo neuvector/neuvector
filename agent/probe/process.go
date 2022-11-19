@@ -538,6 +538,10 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 		// retrive the rootPid
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(c.id)
+			if id == p.selfID {
+				c.children.Add(c.rootPid)
+				c.children.Add(p.agentPid)
+			}
 		}
 
 		if c.rootPid != 0 && c.rootPid == pid { // rootPid exited, remove this container
@@ -585,30 +589,52 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 	}
 }
 
-func (p *Probe) isAgentNsOperation(proc *procInternal, id string) bool {
-	if id != p.selfID {
-		return false
-	}
-
-	if proc.ppath == "/usr/local/bin/nstools" {
-		// pathWalker can initiate nstools sessions, too.
-		if pproc, ok := p.pidProcMap[proc.ppid]; ok {
-			//log.WithFields(log.Fields{"pproc": pproc}).Debug("PROC:")
-			if pproc.ppath == "/usr/local/bin/pathWalker" {
-				if c, ok := p.containerMap[p.selfID]; ok {
-					c.children.Add(proc.pgid)
-				}
-				return true
-			}
-		}
-	}
-
-	if global.SYS.IsToolProcess(proc.sid, proc.pgid) {
+func unexpectedAgentProcess(name string) bool {
+	if global.RT.IsRuntimeProcess(name, nil) {
 		return true
 	}
+	if _, ok := suspicProcMap[name]; ok {
+		return true
+	}
+	return false
+}
 
-	if _, ok := p.pidProcMap[proc.ppid]; !ok {
-		return true	// no parent process for reference
+func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
+	if id == p.selfID {
+		if c, ok := p.containerMap[id]; ok {
+			if isFamilyProcess(c.children, proc) {
+				return true
+			}
+
+			if global.SYS.IsToolProcess(proc.sid, proc.pgid) {
+				c.children.Add(proc.pid)
+				return true
+			}
+
+			// log.WithFields(log.Fields{"children": c.children.String(), "rootPid": c.rootPid, "oursider": c.outsider.String()}).Debug("PROC:")
+			ppid := proc.ppid
+			for i := 0; i < 5; i++ {	// lookup 5 ancestries
+				if pproc, ok := p.pidProcMap[ppid]; ok {
+					// log.WithFields(log.Fields{"pproc": pproc, "i": i}).Debug("PROC:")
+					if unexpectedAgentProcess(pproc.name){
+						return false
+					}
+
+					if isFamilyProcess(c.children, pproc) || pproc.pid == p.agentPid || pproc.pid == c.rootPid {
+						c.children.Add(proc.pid)
+						return true
+					}
+					ppid = pproc.ppid
+					continue
+				}
+
+				// give up lookup
+				if i == 0 {	// no parent process for reference
+					return true
+				}
+				break
+			}
+		}
 	}
 	return false
 }
@@ -661,7 +687,7 @@ func (p *Probe) printProcReport(id string, proc *procInternal) {
 		s = "[host]"
 		// return
 	} else if p.isAgentProcess(proc.sid, id) {
-		//	if p.isAgentNsOperation(proc) {
+		//	if p.isAgentChildren(proc, id) {
 		//		return
 		//	}
 		// s = "[self]"
@@ -1682,20 +1708,6 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 	return true, false
 }
 
-//
-func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
-	if id == p.selfID {
-		if p.agentSessionID == proc.sid {
-			return true
-		}
-
-		if c, ok := p.containerMap[p.selfID]; ok {
-			return isFamilyProcess(c.children, proc)
-		}
-	}
-	return false
-}
-
 // Application event handler: locked by calling functions
 func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bool) {
 	if proc.path == "" || proc.path == "/" {
@@ -1705,7 +1717,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	// only allowing the NS op from the agent's root session
-	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc, id) {
+	if p.isAgentChildren(proc, id) {
 		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
 		return
 	}
