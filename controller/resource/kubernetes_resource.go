@@ -1662,6 +1662,7 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 	if len(wh.Rules) != len(nvOpResources) || wh.FailurePolicy == nil || *wh.FailurePolicy != failurePolicy {
 		return false
 	}
+	isNvRulesFound := make([]bool, len(nvOpResources))
 	expectedApiVersions := utils.NewSet(K8sApiVersionV1, K8sApiVersionV1Beta1, K8sApiVersionV1Beta2)
 	for _, k8sWhRule := range wh.Rules {
 		foundRule := false
@@ -1675,11 +1676,17 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 				(nvOpResources[j].ApiGroups.IsSubset(k8sApiGroups) || k8sApiGroups.Contains("*")) {
 				if k8sWhRule.Rule.Scope != nil && *k8sWhRule.Rule.Scope == nvOpResources[j].Scope {
 					foundRule = true
+					isNvRulesFound[j] = true
 					break
 				}
 			}
 		}
 		if !foundRule {
+			return false
+		}
+	}
+	for _, found := range isNvRulesFound {
+		if !found {
 			return false
 		}
 	}
@@ -1846,7 +1853,6 @@ func getUpdaterCronJobSvcAccount() (string, error) {
 	name := "neuvector-updater-pod"
 	obj, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, name)
 	if err != nil {
-		log.WithFields(log.Fields{"name": name, "err": err}).Error("resource no found")
 		return "", err
 	} else {
 		sa := nvSA
