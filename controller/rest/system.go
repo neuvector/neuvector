@@ -111,6 +111,39 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	sort.Slice(all, func(i, j int) bool { return all[i].ReportedTS < all[j].ReportedTS })
 
 	resp := api.RESTSystemUsageReportData{Usage: all}
+
+	if cfg := cacher.GetSystemConfig(acc); cfg != nil && !cfg.NoTelemetryReport {
+		resp.TelemetryStatus = api.RESTTeleStatus{
+			TeleFreq:       _teleFreq,
+			TeleURL:        _teleNeuvectorURL,
+			CurrentVersion: nvAppFullVersion,
+		}
+
+		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
+		if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+			json.Unmarshal(value, &nvUpgradeInfo)
+			if nvUpgradeInfo.MinUpgradeVersion.Version != "" {
+				resp.TelemetryStatus.MinUpgradeVersion = api.RESTUpgradeVersionInfo{
+					Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
+					ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
+					Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
+				}
+			}
+			if nvUpgradeInfo.MaxUpgradeVersion.Version != "" {
+				resp.TelemetryStatus.MaxUpgradeVersion = api.RESTUpgradeVersionInfo{
+					Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
+					ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
+					Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
+				}
+			}
+			if !nvUpgradeInfo.LastUploadTime.IsZero() {
+				resp.TelemetryStatus.LastTeleUploadTime = api.RESTTimeString(nvUpgradeInfo.LastUploadTime)
+			}
+		}
+	} else {
+		resp.TelemetryStatus = api.RESTTeleStatus{}
+	}
+
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get system usage report")
 }
 
