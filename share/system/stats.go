@@ -1,12 +1,13 @@
 package system
 
 import (
-	"time"
-
 	"github.com/neuvector/neuvector/share"
+	"runtime"
+	"time"
 )
 
 func calculateCPU(prevCPU, prevCPUSystem uint64, cpu, cpuSystem uint64) float64 {
+	cpuNum := runtime.NumCPU()
 	var cDelta float64 = float64(cpu - prevCPU)
 	var sDelta float64 = float64(cpuSystem - prevCPUSystem)
 
@@ -14,7 +15,7 @@ func calculateCPU(prevCPU, prevCPUSystem uint64, cpu, cpuSystem uint64) float64 
 		if cDelta > sDelta {
 			return 1
 		} else {
-			return cDelta / sDelta
+			return cDelta / sDelta * float64(cpuNum)
 		}
 	}
 
