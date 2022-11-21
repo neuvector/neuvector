@@ -363,14 +363,15 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 
 	////////////////////////////////////
 	// start rego generation part 1A (for regular rbac data check)
+	regoPart := []string{}
 	functionName := convertCriteriaFunctionCall(idx, c, false)
 	rego = append(rego, "# [part 1A] for regular RBAC data check (clusterrolebindings)")
 	rego = append(rego, functionName)
 	rego = append(rego, "{")
-	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
-	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	regoPart = append(regoPart, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
+	regoPart = append(regoPart, "	ruleId := rulesToCheck[_]")
+	regoPart = append(regoPart, "	sa := get_serviceAccountName(request)")
 
 	line := `
 	# ==============================================
@@ -381,8 +382,9 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
-	rego = append(rego, line)
+	regoPart = append(regoPart, line)
 
 	line = `
 	# ==============================================
@@ -394,7 +396,15 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
 	roleName  == violationRoles[_]`
-	rego = append(rego, line)
+	regoPart = append(regoPart, line)
+
+	rego = append(rego, regoPart...)
+	rego = append(rego, "}\n")
+
+	// part 1A debug
+	rego = append(rego, `dbg_crb[msg]{ request := _get_input("get")`)
+	rego = append(rego, regoPart...)
+	rego = append(rego, `	msg := sprintf("ruleId=%v, sa=%v, namespace=%v, roleName=%v, crb_name=%v", [ruleId, sa, subject.namespace, roleName, crb_name])`)
 	rego = append(rego, "}\n")
 
 	////////////////////////////////////
@@ -405,7 +415,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
 	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	rego = append(rego, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -416,6 +426,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
 	rego = append(rego, line)
 
@@ -440,14 +451,16 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 
 	////////////////////////////////////
 	// start rego generation part 2A (for regular rbac data check)
+	regoPart2 := []string{}
 	functionName = convertCriteriaFunctionCall(idx, c, false)
 	rego = append(rego, "# [part 2A] for regular RBAC data check (rolebindings)")
 	rego = append(rego, functionName)
 	rego = append(rego, "{")
-	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
-	rego = append(rego, "	ruleId := rulesToCheck[_]")
 
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	regoPart2 = append(regoPart2, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
+	regoPart2 = append(regoPart2, "	ruleId := rulesToCheck[_]")
+
+	regoPart2 = append(regoPart2, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -458,8 +471,9 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
-	rego = append(rego, line)
+	regoPart2 = append(regoPart2, line)
 
 	line = `
 	# ==============================================
@@ -473,7 +487,14 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	violationRoles = get_risky_role_rule_data(roleRefKind, ruleId)
 	roleName  == violationRoles[_]`
 
-	rego = append(rego, line)
+	regoPart2 = append(regoPart2, line)
+	rego = append(rego, regoPart2...)
+	rego = append(rego, "}\n")
+
+	// part 2A debug
+	rego = append(rego, `dbg_rb[msg]{ request := _get_input("get")`)
+	rego = append(rego, regoPart2...)
+	rego = append(rego, `	msg := sprintf("ruleId=%v, sa=%v, namespace=%v, roleName=%v, rb_name=%v", [ruleId, sa, subject.namespace, roleName, crb_name])`)
 	rego = append(rego, "}\n")
 
 	////////////////////////////////////
@@ -483,7 +504,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
 	rego = append(rego, "{")
 	rego = append(rego, fmt.Sprintf("	rulesToCheck := [%s]	# any rule met", arrayToString(ruleIDs, ",")))
 	rego = append(rego, "	ruleId := rulesToCheck[_]")
-	rego = append(rego, "	sa := request.spec.serviceAccountName")
+	rego = append(rego, "	sa := get_serviceAccountName(request)")
 
 	line = `
 	# ==============================================
@@ -494,6 +515,7 @@ func convertRiskyRoleTagCriteria(idx int, c *share.CLUSAdmRuleCriterion) []strin
     subject := subjects[i]
 
 	subject.kind == "ServiceAccount"
+	subject.namespace == _get_namespace("get")
 	subject.name == sa`
 	rego = append(rego, line)
 
@@ -771,6 +793,16 @@ inSidecarContainerList(image){
     startswith(image, sidecarImages[_])
 }else = false{
 	true
+}
+
+get_serviceAccountName(request) := sa {
+    not has_key(request.spec, "serviceAccountName")
+    sa = "default"
+}
+
+get_serviceAccountName(request) := sa {
+    has_key(request.spec, "serviceAccountName")
+    sa = request.spec.serviceAccountName
 }
 
 	`
