@@ -254,7 +254,7 @@ func baselinePolicyViolations(c *nvsysadmission.AdmContainerInfo) []string {
 		{usesIllegalSELinuxOptions, "Uses disallowed SELinux options."},
 		{usesCustomProcMount, "Uses custom procMount."},
 		{usesIllegalSeccompProfile, "Uses disallowed seccomp profile."},
-		{usesIllegalSysctls, "Uses disallowed Linyx sysctls."},
+		{usesIllegalSysctls, "Uses disallowed Linux sysctls."},
 	}
 
 	return policyViolations(c, baselinePolicyConditions)
@@ -271,7 +271,7 @@ func restrictedPolicyViolations(c *nvsysadmission.AdmContainerInfo, imageRunsAsR
 	restrictedViolations := []PolicyCondition{
 		imageRunsAsRootCondition,
 		{usesIllegalVolumeTypes, "Uses illegal volume type."},
-		{allowsPrivelegeEscalation, "Allows privilege escalation."},
+		{allowsPrivelegeEscalation, "Allows privilege escalation and/or has SYS_ADMIN capability."},
 		{allowsRootUsers, "Allows running as root user."},
 		{doesNotSetLegalSeccompProfile, "Does not explicitly set allowed seccomp profile."},
 		{exceedsRestrictedCapabilities, "Exceeds restricted safe set of Linux capabilities."},
