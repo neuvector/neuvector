@@ -582,13 +582,6 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 		}
 	}
 
-	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-		return
-	}
-	defer clusHelper.ReleaseLock(lock)
-
 	// Remove all rules that use the group
 	dels := utils.NewSet()
 	keeps := make([]*share.CLUSRuleHead, 0)
@@ -623,6 +616,14 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 			return
 		}
 	}
+	//leave delete group related rule outside of lock
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
 
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
@@ -979,29 +980,44 @@ type groupRemovalEvent struct {
 
 func (p *groupRemovalEvent) Expire() {
 	cacheMutexLock()
-	defer cacheMutexUnlock()
 	if cache, ok := groupCacheMap[p.groupname]; ok {
 		if cache.members.Cardinality() != 0 {
+			//we need to set timerTask to empty string
+			//so that in future this group can be scheduled
+			//for auto-removal when condition allows
+			cache.timerTask = ""
+			cacheMutexUnlock()
 			return
 		}
-		deleteGroupFromCluster(p.groupname)
 		//to deal with leadership change
 		//always reset task whether group
 		//is really deleted or not
 		cache.timerTask = ""
+		deleted := deleteGroupFromCluster(p.groupname)
+		cacheMutexUnlock()
+
+		//leave delete policy by group outside any lock
+		//so that not to hold lock too long
+		if deleted {
+			kv.DeletePolicyByGroup(p.groupname)
+			kv.DeleteResponseRuleByGroup(p.groupname)
+			groupRemoveEvent(share.CLUSEvGroupAutoRemove, p.groupname)
+		}
+	} else {
+		cacheMutexUnlock()
 	}
 }
 
-func deleteGroupFromCluster(groupname string) {
+func deleteGroupFromCluster(groupname string) bool {
 	if isLeader() == false {
-		return
+		return false
 	}
 	log.WithFields(log.Fields{"group": groupname}).Info("")
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-		return
+		return false
 	}
 	defer clusHelper.ReleaseLock(lock)
 
@@ -1015,14 +1031,10 @@ func deleteGroupFromCluster(groupname string) {
 	} else {
 		if err := clusHelper.DeleteGroup(groupname); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
-			return
+			return false
 		}
 	}
-
-	kv.DeletePolicyByGroup(groupname)
-	kv.DeleteResponseRuleByGroup(groupname)
-
-	groupRemoveEvent(share.CLUSEvGroupAutoRemove, groupname)
+	return true
 }
 
 // Protected by cacheMutexLock
@@ -1077,6 +1089,11 @@ func scheduleGroupRemoval(cache *groupCache) {
 type groupPruneEvent struct{}
 
 func (p *groupPruneEvent) Expire() {
+	//by this time auto removal configuration
+	//could be changed
+	if cacher.GetUnusedGroupAging() == 0 {
+		return
+	}
 	cacheMutexLock()
 	for _, cache := range groupCacheMap {
 		if cache.members.Cardinality() == 0 {
