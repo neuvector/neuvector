@@ -1671,9 +1671,8 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 		k8sRuleOperations := utils.NewSetFromSliceKind(k8sWhRule.Operations)
 		k8sRuleResources := utils.NewSetFromSliceKind(k8sWhRule.Rule.Resources)
 		for j := 0; j < len(nvOpResources); j++ {
-			if nvOpResources[j].Resources.IsSubset(k8sRuleResources) && nvOpResources[j].Operations.IsSubset(k8sRuleOperations) &&
-				expectedApiVersions.IsSubset(k8sApiVersions) && (k8sWhRule.Rule.Scope != nil || *k8sWhRule.Rule.Scope == nvOpResources[j].Scope) &&
-				(nvOpResources[j].ApiGroups.IsSubset(k8sApiGroups) || k8sApiGroups.Contains("*")) {
+			if nvOpResources[j].Resources.Equal(k8sRuleResources) && nvOpResources[j].Operations.Equal(k8sRuleOperations) &&
+				expectedApiVersions.Equal(k8sApiVersions) && nvOpResources[j].ApiGroups.Equal(k8sApiGroups) {
 				if k8sWhRule.Rule.Scope != nil && *k8sWhRule.Rule.Scope == nvOpResources[j].Scope {
 					foundRule = true
 					isNvRulesFound[j] = true
