@@ -82,7 +82,17 @@ func reportTelemetryData(rawData common.TelemetryData) {
 	if data, _, _, err := sendRestRequest("telemetry", http.MethodPost, _teleNeuvectorURL, "", "", "", "", nil, bodyTo, logError, nil, nil); err == nil {
 		uploadTime := time.Now().UTC()
 		lastTeleErrorDay = -1
+		var nvVerMajor int
+		var nvVerMinor int
 		var resp tTelemetryResponse
+		if vers := strings.Split(nvMajorMinor, "."); len(vers) >= 2 {
+			intVar0, err0 := strconv.Atoi(vers[0])
+			intVar1, err1 := strconv.Atoi(vers[1])
+			if err0 == nil && err1 == nil {
+				nvVerMajor = intVar0
+				nvVerMinor = intVar1
+			}
+		}
 		if err := json.Unmarshal(data, &resp); err == nil {
 			var idx int
 			var upgradeInfo share.CLUSCheckUpgradeInfo // for the latest versions from upgrade-responder response
@@ -149,7 +159,18 @@ func reportTelemetryData(rawData common.TelemetryData) {
 					}
 				}
 
-				if verImageTag != "" && verImageTag != nvAppFullVersion && (idx == 0 || verMajorMinor == nvMajorMinor) {
+				var verMajor int
+				var verMinor int
+				if vers := strings.Split(verMajorMinor, "."); len(vers) >= 2 {
+					intVar0, err0 := strconv.Atoi(vers[0])
+					intVar1, err1 := strconv.Atoi(vers[1])
+					if err0 == nil && err1 == nil {
+						verMajor = intVar0
+						verMinor = intVar1
+					}
+				}
+				if verImageTag != "" && verImageTag != nvAppFullVersion &&
+					(idx == 0 || verMajorMinor == nvMajorMinor || (verMajor > nvVerMajor || (verMajor == nvVerMajor && verMinor > nvVerMinor))) {
 					upgradeVersion := share.CLUSCheckUpgradeVersion{
 						Version:     v.Name,
 						ReleaseDate: v.ReleaseDate,
