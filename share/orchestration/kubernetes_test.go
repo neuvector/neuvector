@@ -58,7 +58,7 @@ func TestKubeRancherImportService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "cattle-system" || svc.Name != "rancher-agent" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "cattle-system" || svc.Name != "rancher-agent" {
 		t.Errorf("Invalid service for Rancher agent container: %+v\n", svc)
 	}
 
@@ -97,7 +97,7 @@ func TestKubeRancherImportService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "cattle-system" || svc.Name != "core-services-metadata" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "cattle-system" || svc.Name != "core-services-metadata" {
 		t.Errorf("Invalid service for Rancher metadata container: %+v\n", svc)
 	}
 }
@@ -120,7 +120,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Name != "httpserver-pod-20" {
+	if svc := driver.GetService(&meta, ""); svc.Name != "httpserver-pod-20" {
 		t.Errorf("Invalid service name with matching hash: %+v\n", svc.Name)
 	}
 
@@ -139,7 +139,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Name != "httpserver-pod-20" {
+	if svc := driver.GetService(&meta, ""); svc.Name != "httpserver-pod-20" {
 		t.Errorf("Invalid service name with matching hash: %+v\n", svc.Name)
 	}
 
@@ -158,7 +158,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "default" || svc.Name != "httpserver-pod-20" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "default" || svc.Name != "httpserver-pod-20" {
 		t.Errorf("Invalid service name without matching hash: %+v\n", svc)
 	}
 
@@ -176,7 +176,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "default" || svc.Name != "calico-node" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "default" || svc.Name != "calico-node" {
 		t.Errorf("Invalid service name: %+v\n", svc)
 	}
 
@@ -207,7 +207,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "connectservices" || svc.Name != "update-traveler-service" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "connectservices" || svc.Name != "update-traveler-service" {
 		t.Errorf("Invalid service name: %+v\n", svc)
 	}
 
@@ -224,7 +224,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta); svc.Domain != "kube-system" || svc.Name != "ibm-kube-fluentd" {
+	if svc := driver.GetService(&meta, ""); svc.Domain != "kube-system" || svc.Name != "ibm-kube-fluentd" {
 		t.Errorf("Invalid service name: %+v\n", svc)
 	}
 }
@@ -345,5 +345,93 @@ fi
 	r = strings.TrimSpace(script.String())
 	if e != r {
 		t.Errorf("Error: \nexpect=\n%v\nactual=\n%v\n", e, r)
+	}
+}
+
+func TestKubeServiceName_nodename(t *testing.T) {
+	driver := &kubernetes{noop: noop{platform: share.PlatformKubernetes}}
+
+	// only review POD labels
+	pod_meta := container.ContainerMeta{
+		Labels: map[string]string{
+			"io.kubernetes.container.name": "POD",
+			"io.kubernetes.pod.name": "apiserver-watcher-qalongruncluster4oc4-kxq6x-master-2",
+			"io.kubernetes.pod.namespace": "kube-system",
+			"io.kubernetes.pod.uid": "64597f27342cf2be42d89a655c0999c6",
+		},
+	}
+
+	if svc := driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2"); svc.Name != "apiserver-watcher" {
+		t.Errorf("Invalid service name: %+v\n", svc.Name)
+	}
+}
+
+func TestKubeServiceName_batchnumber_nodename(t *testing.T) {
+	driver := &kubernetes{noop: noop{platform: share.PlatformKubernetes}}
+	// only review POD labels
+	pod_meta := container.ContainerMeta{
+		Labels: map[string]string{
+			"app": "installer",
+			"io.kubernetes.container.name": "POD",
+			"io.kubernetes.pod.name": "installer-5-qalongruncluster4oc4-kxq6x-master-2",
+			"io.kubernetes.pod.namespace": "openshift-kube-controller-manager",
+			"io.kubernetes.pod.uid": "fb1802db-5537-4a19-8dc4-ea0152d4c740",
+		},
+	}
+
+	if svc := driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2"); svc.Name != "installer" {
+		t.Errorf("Invalid service name: %+v\n", svc.Name)
+	}
+}
+
+
+func TestIbmClusterID(t *testing.T) {
+	driver := &kubernetes{noop: noop{platform: share.PlatformKubernetes}}
+
+	// only review POD labels
+	pod_meta := container.ContainerMeta{
+		Labels: map[string]string{
+			"razee.io/build-url": "https://travis.ibm.com/alchemy-containers/armada-bom-component-source/builds/47666062",
+			"io.cri-containerd.kind" : "sandbox",
+			"io.kubernetes.pod.name": "rbac-sync-operator-cdsi61j20equel7caka0-587b9d8b8f-rr6bw",
+			"io.kubernetes.pod.uid": "2acacc2a-d066-42bd-a414-12a81fead69e",
+			"clusterID": "cdsi61j20equel7caka0",
+			"io.cri-containerd.image": "managed",
+			"io.kubernetes.pod.namespace": "kubx-masters",
+			"pod-template-hash": "587b9d8b8f",
+			"app": "rbac-sync-operator-cdsi61j20equel7caka0",
+			"razee.io/source-url": "https://github.ibm.com/alchemy-containers/armada-bom-component-source/commit/f986b086198c1f6810e54317d54a1d33376ef748",
+		},
+	}
+
+	if svc := driver.GetService(&pod_meta, ""); svc.Name != "rbac-sync-operator" {
+		t.Errorf("Invalid service name: %+v\n", svc.Name)
+	}
+}
+
+func TestUUIDSuffix(t *testing.T) {
+	driver := &kubernetes{noop: noop{platform: share.PlatformKubernetes}}
+
+	// only review POD labels
+	pod_meta := container.ContainerMeta{
+		Labels: map[string]string{
+			"razee.io/build-url": "https://travis.ibm.com/alchemy-containers/armada-bom-component-source/builds/47666062",
+			"io.cri-containerd.kind": "sandbox",
+			"io.kubernetes.pod.name": "kubx-deployer-d8d18cf7-5c9d-40ac-9489-271b13871ba7-xskjt",
+			"io.kubernetes.pod.ui": "daf74aaf9-06bc-40b7-9b74-12b19977830a",
+			"image": "Tag1.24.8_1544",
+			"clusterID": "cdubb8320c9l6joom9kg",
+			"job-name": "kubx-deployer-d8d18cf7-5c9d-40ac-9489-271b13871ba7",
+			"operation": "deploy",
+			"controller-uid": "a2189e25-8221-40c3-b85d-e848be5a74d8",
+			"io.cri-containerd.image": "managed",
+			"io.kubernetes.pod.namespace": "kubx-deployer",
+			"requestID": "d8d18cf7-5c9d-40ac-9489-271b13871ba7",
+			"razee.io/source-url": "https://github.ibm.com/alchemy-containers/armada-bom-component-source/commit/f986b086198c1f6810e54317d54a1d33376ef748",
+		},
+	}
+
+	if svc := driver.GetService(&pod_meta, ""); svc.Name != "kubx-deployer" {
+		t.Errorf("Invalid service name: %+v\n", svc.Name)
 	}
 }

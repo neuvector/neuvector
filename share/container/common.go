@@ -97,6 +97,11 @@ const (
 )
 
 const (
+	IbmCloudProviderIP                   = "ibm-cloud-provider-ip"
+	IbmCloudClusterID                    = "clusterID"
+)
+
+const (
 	PlatformContainerNone                = ""
 	PlatformContainerNeuVector           = "NeuVector"
 	PlatformContainerDockerUCPCtrl       = "Docker-UCP-Controller"

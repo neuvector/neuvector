@@ -37,11 +37,11 @@ func (d *noop) GetServiceSubnet(envs []string) *net.IPNet {
 	return nil
 }
 
-func (d *noop) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+func (d *noop) GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service {
 	return nil
 }
 
-func (d *noop) GetService(meta *container.ContainerMeta) *Service {
+func (d *noop) GetService(meta *container.ContainerMeta, node string) *Service {
 	return nil
 }
 

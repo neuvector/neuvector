@@ -12,12 +12,12 @@ type unknown struct {
 	envParser *utils.EnvironParser
 }
 
-func (d *unknown) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+func (d *unknown) GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service {
 	return nil
 }
 
-func (d *unknown) GetService(meta *container.ContainerMeta) *Service {
-	return baseDriver.GetService(meta)
+func (d *unknown) GetService(meta *container.ContainerMeta, node string) *Service {
+	return baseDriver.GetService(meta, node)
 }
 
 func (d *unknown) GetDomain(labels map[string]string) string {
