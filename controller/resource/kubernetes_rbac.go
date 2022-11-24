@@ -1018,10 +1018,8 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 			}
 			if evtLog {
 				var msg string
-				_, ok1 := nvClusterRoles[role]
-				_, ok2 := k8sClusterRoles[role]
-				if !ok1 && !ok2 {
-					msg = fmt.Sprintf(`Kubernetes %s "%s" is required to grant clusterrole "%s" to service account %s:%s.`,
+				if _, ok := k8sClusterRoles[role]; ok {
+					msg = fmt.Sprintf(`Kubernetes %s "%s" is required to bind clusterrole "%s" to service account %s:%s.`,
 						rtName, n.name, role, NvAdmSvcNamespace, nvSA)
 				} else {
 					msg = fmt.Sprintf(`Kubernetes %s "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,

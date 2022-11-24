@@ -411,18 +411,16 @@ func handlerCustomCheckShow(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	oldConfig, _ := clusHelper.GetCustomCheckConfig(group)
-	if oldConfig == nil {
-		restRespNotFoundLogAccessDenied(w, login, fmt.Errorf("script config not found"))
-		return
-	}
 
 	config := api.RESTCustomChecks{Group: group}
-	for _, script := range oldConfig.Scripts {
-		scp := &api.RESTCustomCheck{
-			Name:   script.Name,
-			Script: script.Script,
+	if oldConfig != nil {
+		for _, script := range oldConfig.Scripts {
+			scp := &api.RESTCustomCheck{
+				Name:   script.Name,
+				Script: script.Script,
+			}
+			config.Scripts = append(config.Scripts, scp)
 		}
-		config.Scripts = append(config.Scripts, scp)
 	}
 	resp := api.RESTCustomCheckData{Config: &config}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get bench script config")
