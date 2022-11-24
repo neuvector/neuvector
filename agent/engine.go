@@ -1058,7 +1058,7 @@ func fillContainerProperties(c *containerData, parent *containerData,
 	// Not using write lock because all fields filled here are simple
 	c.svcSubnet = global.ORCH.GetServiceSubnet(info.Envs)
 	if parent == nil {
-		svc := global.ORCH.GetService(&info.ContainerMeta)
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 		c.service = utils.MakeServiceName(svc.Domain, svc.Name)
 		c.domain = svc.Domain
 		c.hostMode = hostMode
@@ -1370,7 +1370,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	// (1) native runtime env.: name of the image
 	// (2) k8s: namespace + name in the metadata section of its YAML
 	//          like controller =>  "neuvector (Domain/Namespace) + neuvector-controller-pod (Name)""
-	svc := global.ORCH.GetService(&info.ContainerMeta)
+	svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 	c.service = utils.MakeServiceName(svc.Domain, svc.Name)
 	c.domain = svc.Domain
 	group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
@@ -1650,7 +1650,7 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	if !info.Running {
 		// service is not reported until container is running; domain should be filled.
 		// it reports the exited container as well
-		svc := global.ORCH.GetService(&info.ContainerMeta)
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, domain: &svc.Domain}
 		ClusterEventChan <- &ev
 

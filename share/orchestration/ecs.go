@@ -22,11 +22,11 @@ func (d *ecs) isDeployedBy(meta *container.ContainerMeta) bool {
 	return false
 }
 
-func (d *ecs) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+func (d *ecs) GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service {
 	return nil
 }
 
-func (d *ecs) GetService(meta *container.ContainerMeta) *Service {
+func (d *ecs) GetService(meta *container.ContainerMeta, node string) *Service {
 	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok {
 		return &Service{Name: seviceName}
 	}
@@ -40,7 +40,7 @@ func (d *ecs) GetService(meta *container.ContainerMeta) *Service {
 		return &Service{Name: task + "." + container}
 	}
 
-	return baseDriver.GetService(meta)
+	return baseDriver.GetService(meta, node)
 }
 
 func (d *ecs) GetPlatformRole(m *container.ContainerMeta) (string, bool) {

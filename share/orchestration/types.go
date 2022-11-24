@@ -24,8 +24,8 @@ type Service struct {
 type Driver interface {
 	GetVersion(reGetK8sVersion, reGetOcVersion bool) (string, string)
 	SetIPAddrScope(ports map[string][]share.CLUSIPAddr, meta *container.ContainerMeta, nets map[string]*container.Network)
-	GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service
-	GetService(meta *container.ContainerMeta) *Service
+	GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service
+	GetService(meta *container.ContainerMeta, node string) *Service
 	GetPlatformRole(meta *container.ContainerMeta) (string, bool) // return platform type and if container should be secured
 	GetDomain(labels map[string]string) string
 	GetServiceSubnet(envs []string) *net.IPNet

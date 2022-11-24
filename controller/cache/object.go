@@ -1227,7 +1227,7 @@ func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 func addK8sPodEvent(pod resource.Pod) {
 	probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
 	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
-	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Labels); svc != nil {
+	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Node, pod.Labels); svc != nil {
 		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
 	}
 

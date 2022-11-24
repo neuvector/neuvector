@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/template"
@@ -318,7 +319,29 @@ var rancherPodNamePrefix = []string{
 	"core-services-network-manager-",
 }
 
-func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+// ibm-system / ibm-cloud-provider-ip-169-44-162-75-8649c8697d-hplzc / (ip) / ip-169-44-162-75
+// armada / armada-cluster-store-7f4684bb88-ldnn2 / (hash) / 7f4684bb88
+// kubx-etcd-04 / etcd-cdogojn20umpmuo8l540-m9wlr29r8w / (clusterID) / cdogojn20umpmuo8l540
+var hashLabels = []string {
+	container.IbmCloudProviderIP,
+	container.IbmCloudClusterID,
+	container.KubeKeyPodHash,	// last
+}
+
+const reStrUuid string = "-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" // + "-"
+var regexpUuid *regexp.Regexp
+func hasUUIDString(u string) int {
+	if regexpUuid == nil {
+		regexpUuid =regexp.MustCompile(reStrUuid)
+	}
+
+	if loc := regexpUuid.FindStringIndex(u); loc != nil {
+		return loc[0]
+	}
+	return -1
+}
+
+func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service {
 	if len(labels) == 0 {
 		return nil
 	}
@@ -347,9 +370,17 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[s
 		}
 	}
 
-	if hash, _ := labels[container.KubeKeyPodHash]; hash != "" {
-		if idx := strings.Index(pod, "-"+hash); idx != -1 {
-			return &Service{Domain: namespace, Name: pod[:idx]}
+	// remove uuid-like string
+	if index := hasUUIDString(pod); index > 0 {
+		return &Service{Domain: namespace, Name: pod[:index]}
+	}
+
+	// remove hash index
+	for _, labl := range hashLabels {
+		if hash, ok := labels[labl]; ok && hash != "" {
+			if index := strings.Index(pod, hash); index > 0 {
+				return &Service{Domain: namespace, Name: pod[:(index-1)]}
+			}
 		}
 	}
 
@@ -365,11 +396,18 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod string, labels map[s
 		}
 	}
 
-	// rke2: kube-system / kube-proxy-ubuntu2110-k8123master-auto
-	if namespace == container.KubeNamespaceSystem {
-		if component, ok := labels[container.KubeKeyComponent]; ok {
-			return &Service{Domain: namespace, Name: utils.Dns1123NameChg(strings.ToLower(component))}
+	// remove node's name
+	// "kube-system" / apiserver-watcher-qalongruncluster4oc4-kxq6x-master-2
+	// "openshift-kube-apiserver" / revision-pruner-10-qalongruncluster4oc4-kxq6x-master-2
+	// "openshift-kube-scheduler" / installer-7-qalongruncluster4oc4-kxq6x-master-2
+	if index := strings.Index(pod, node); index > 0 {
+		pod = pod[:(index-1)]
+		if dash := strings.LastIndex(pod, "-"); dash > 0 {
+			if _, err := strconv.Atoi(pod[(dash+1):]); err == nil {
+				pod = pod[:dash] // this batch number is from the configmap
+			}
 		}
+		return &Service{Domain: namespace, Name: pod}
 	}
 
 	// Remove the last tokens - not correct in some cases at all
@@ -391,7 +429,7 @@ pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
        |        "io.kubernetes.container.name": "php-redis"
        |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
 */
-func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
+func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Service {
 	namespace, _ := meta.Labels[container.KubeKeyPodNamespace]
 
 	if dc, _ := meta.Labels[container.KubeKeyDeployConfig]; dc != "" {
@@ -401,10 +439,10 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta) *Service {
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
 	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
-		return d.GetServiceFromPodLabels( namespace, pod, meta.Labels)
+		return d.GetServiceFromPodLabels( namespace, pod, node, meta.Labels)
 	}
 
-	return baseDriver.GetService(meta)
+	return baseDriver.GetService(meta, node)
 }
 
 func (d *kubernetes) GetPlatformRole(m *container.ContainerMeta) (string, bool) {
