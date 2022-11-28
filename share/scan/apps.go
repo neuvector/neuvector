@@ -59,6 +59,7 @@ const (
 var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
 var pyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\.]+)-([a-zA-Z0-9\.]+)[\-a-zA-Z0-9\.]*\.(egg-info\/PKG-INFO|dist-info\/WHEEL)$`)
 var rubyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\-]+)-([0-9\.]+)\.gemspec$`)
+var javaInvalidVendorIds = map[string]bool{"%providerName": true}
 
 type AppPackage struct {
 	AppName    string `json:"app_name"`
@@ -392,12 +393,13 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
 				}
 
+				title = strings.Split(title, ";")[0]
 				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
 					break
 				}
 			}
 
-			if len(vendorId) == 0 {
+			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
 				vendorId = "jar"
 			}
 
