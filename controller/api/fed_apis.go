@@ -235,6 +235,7 @@ type RESTPollFedScanDataReq struct {
 	RegConfigRev  uint64                       `json:"reg_config_rev"`            // revision of fed registry setting that the managed cluster remembers
 	UpToDateRegs  []string                     `json:"up_to_date_regs,omitempty"` // fed registry/repo whose images scan result in managed cluster is already up-to-date
 	ScanResultMD5 map[string]map[string]string `json:"scan_result_md5"`           // all scan result md5 of the scanned images in fed registry/repo that have different scan data revision from master (registry name : image id : scan result md5)
+	IgnoreRegs    []string                     `json:"ignore_regs,omitempty"`     // the other fed registry/repo that have different scan data revision from master
 }
 
 type RESTPollFedScanDataResp struct {
@@ -243,7 +244,7 @@ type RESTPollFedScanDataResp struct {
 	RegistryCfg        *share.CLUSFedRegistriesData `json:"registry_cfg,omitempty"` // all fed registry' settings if there is any change since last polling
 	ScanResultData     RESTFedScanResultData        `json:"scan_result_data"`       // (partial) updated/deleted scan result of the requested fed registry/repo
 	HasMoreScanResult  bool                         `json:"has_more_scan_reresult"` // (bandwidth consideration) true when master cluster returns partial scan result in ScanResultData for instructing managed clusters to keep polling.
-	ThrottleTime       uint32                       `json:"throttle_time"`          // in ms. decided by master cluster
+	ThrottleTime       int64                        `json:"throttle_time"`          // in ms. decided by master cluster
 	DeployRegScanData  bool                         `json:"deploy_reg_scan_data"`   // for informing whether master cluster deploys fed registry scan data to managed clusters
 	DeployRepoScanData bool                         `json:"deploy_repo_scan_data"`  // for informing whether master cluster deploys repo scan data to managed clusters
 }

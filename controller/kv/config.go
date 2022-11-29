@@ -346,6 +346,13 @@ func (c *configHelper) Restore() (string, error) {
 		log.Info("Config persistence disabled")
 		// backward-compatibile: update network/config as needed
 		clusHelper.RestoreNetworkKeys()
+
+		scanRevs, rev, err := clusHelper.GetFedScanRevisions()
+		if err == nil && scanRevs.Restoring {
+			scanRevs.Restoring = false
+			clusHelper.PutFedScanRevisions(&scanRevs, &rev)
+		}
+
 		return "", nil
 	}
 
@@ -379,8 +386,6 @@ func (c *configHelper) Restore() (string, error) {
 	if rc := restoreEPs(eps, ch, &importInfo); rc != nil {
 		err = rc
 	}
-
-	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
 
 	go restoreRegistry(ch, importInfo)
 

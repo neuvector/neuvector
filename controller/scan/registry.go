@@ -544,6 +544,21 @@ func CheckRegistry(name string) bool {
 	return smd.CheckRegistry(name)
 }
 
+func GetRegistryState(name string) string {
+	reg, ok := regMapLookup(name)
+
+	if ok {
+		var state string
+		reg.stateLock()
+		state = reg.state.Status
+		reg.stateUnlock()
+
+		return state
+	}
+
+	return api.RegistryStatusIdle
+}
+
 func isPublicRegistry(cfg *share.CLUSRegistryConfig) bool {
 	return strings.Contains(cfg.Registry, ".docker.com") || strings.Contains(cfg.Registry, ".docker.io") ||
 		cfg.Type == share.RegistryTypeRedhat

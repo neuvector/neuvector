@@ -2137,6 +2137,7 @@ type CLUSFedScanRevisions struct {
 	RegConfigRev   uint64            `json:"reg_config_rev"`   // fed registry revision
 	ScannedRegRevs map[string]uint64 `json:"scanned_reg_revs"` // increases whenever the scan result of any image in a fed registry is changed (registry name : revision)
 	ScannedRepoRev uint64            `json:"scanned_repo_rev"` // increases whenever there is any change in master cluster's repo scan data
+	Restoring      bool              `json:"restoring"`        // fed registry revision
 }
 
 //dlp rule
