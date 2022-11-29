@@ -1484,16 +1484,16 @@ func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	key := share.CLUSRegistryImageStateKey(name, id)
-	vSum, _ := json.Marshal(sum)
-	txn.Put(key, vSum)
-
-	key = share.CLUSRegistryImageDataKey(name, id)
+	key := share.CLUSRegistryImageDataKey(name, id)
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	enc.Encode(report)
 	zbRpt := utils.GzipBytes(buf.Bytes())
 	txn.PutBinary(key, zbRpt)
+
+	key = share.CLUSRegistryImageStateKey(name, id)
+	vSum, _ := json.Marshal(sum)
+	txn.Put(key, vSum)
 
 	if ok, err := txn.Apply(); err != nil {
 		return err

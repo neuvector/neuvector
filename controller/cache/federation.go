@@ -42,7 +42,7 @@ var fedScanDataRevsCache share.CLUSFedScanRevisions
 
 // On master cluster,   it stores the scan result md5 of the scanned images in fed registry/repo
 // On managed clusters, it stores the scan result md5 of the scanned images in fed registry/repo from the lastest polling
-var fedScanResultMD5 map[string]map[string]string // registry name : image id : scan result md5
+var fedScanResultMD5 map[string]map[string]string = make(map[string]map[string]string) // registry name : image id : scan result md5
 
 var cachedFedSettingsRev map[string]uint64 // contains only the revisions of the fed rules subset for the last polling managed cluster
 var cachedFedSettingBytes []byte           // contains only the fed rules subset for the last polling managed cluster
@@ -81,10 +81,6 @@ func fedInit() {
 			clusHelper.PutFedRulesRevision(nil, revCache)
 		}
 		fedRulesRevisionCache.Revisions = revCache.Revisions
-	}
-
-	if fedScanResultMD5 == nil {
-		fedScanResultMD5 = make(map[string]map[string]string)
 	}
 }
 
@@ -623,8 +619,8 @@ func collectUpdatedScanResult(regName, imageID, md5 string, updatedResults map[s
 // only called by master cluster. caller doesn't own cache lock
 // reqRegConfigRev/reqScanResultMD5: what the requesting managed cluster remembers from the last polling.
 // reqScanResultMD5: the images md5 for fed registry/repo that are remembered by managed clusters & have different scan data revision from what master cluster has.
-func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 map[string]map[string]string, reqUpToDateRegs []string, fedRegs utils.Set) (
-	api.RESTPollFedScanDataResp, bool) {
+func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 map[string]map[string]string,
+	reqIgnoreRegs, reqUpToDateRegs []string, fedRegs utils.Set) (api.RESTPollFedScanDataResp, bool) {
 
 	var getFedRegCfg bool
 	var throttled bool
@@ -755,10 +751,11 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 		}
 
 		if !throttled {
+			ignoreRegs := utils.NewSetFromSliceKind(reqIgnoreRegs)
 			upToDateRegs := utils.NewSetFromSliceKind(scanResultData.UpToDateRegs)
 			// 2. check whether there is new fed registry created on master cluster that managed cluster is unaware of
 			for regName, curImagesMD5 := range fedScanResultMD5 {
-				if upToDateRegs.Contains(regName) {
+				if ignoreRegs.Contains(regName) || upToDateRegs.Contains(regName) {
 					continue
 				}
 				isForRepoScan := false
@@ -803,7 +800,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 
 // called by master/managed clusters
 // it returns a copy of the cached fed registry/repo scan data revisions
-func (m CacheMethod) GetFedScanDataRevisions(getRegScanData, getRepoScanData bool) api.RESTFedScanDataRevs {
+func (m CacheMethod) GetFedScanDataRevisions(getRegScanData, getRepoScanData bool) (api.RESTFedScanDataRevs, bool) {
 	var scanDataRevs api.RESTFedScanDataRevs
 
 	fedScanDataCacheMutexRLock()
@@ -820,7 +817,7 @@ func (m CacheMethod) GetFedScanDataRevisions(getRegScanData, getRepoScanData boo
 		scanDataRevs.ScannedRepoRev = fedScanDataRevsCache.ScannedRepoRev
 	}
 
-	return scanDataRevs
+	return scanDataRevs, fedScanDataRevsCache.Restoring
 }
 
 // only called by managed cluster once in each polling session

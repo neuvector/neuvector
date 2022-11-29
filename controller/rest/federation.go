@@ -117,6 +117,8 @@ const restForInstantPing = time.Duration(8 * time.Second)
 
 const jsonContentType = "application/json"
 
+const _maxRegCollectCount int = 2
+
 const (
 	const_no_proxy = iota
 	const_https_proxy
@@ -2619,7 +2621,10 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 		defer atomic.StoreUint32(&_fedScanDataPollOngoing, 0)
 
 		upToDateRegs := utils.NewSet()
-		cachedScanDataRevs := cacher.GetFedScanDataRevisions(true, true)
+		cachedScanDataRevs, restoring := cacher.GetFedScanDataRevisions(true, true)
+		if restoring {
+			return
+		}
 		if forcePulling {
 			for regName, _ := range cachedScanDataRevs.ScannedRegRevs {
 				cachedScanDataRevs.ScannedRegRevs[regName] = 0
@@ -2639,8 +2644,8 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 				}
 			}
 		}
-		if (fedCfg.DeployRegScanData && (masterScanDataRevs.RegConfigRev != cachedScanDataRevs.RegConfigRev || masterScanDataRevs.ScannedRepoRev != cachedScanDataRevs.ScannedRepoRev)) ||
-			(fedCfg.DeployRepoScanData && !haveSameContent(masterScanDataRevs.ScannedRegRevs, cachedScanDataRevs.ScannedRegRevs)) {
+		if (fedCfg.DeployRegScanData && (masterScanDataRevs.RegConfigRev != cachedScanDataRevs.RegConfigRev || !haveSameContent(masterScanDataRevs.ScannedRegRevs, cachedScanDataRevs.ScannedRegRevs))) ||
+			(fedCfg.DeployRepoScanData && masterScanDataRevs.ScannedRepoRev != cachedScanDataRevs.ScannedRepoRev) {
 			// get scan result md5 of the images in fed registry/repo that have different scan data revision(per fed registry/repo) from what master cluster has
 			var cachedScanResultMD5 map[string]map[string]string
 			if forcePulling {
@@ -2657,12 +2662,15 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 			var updatedTemp uint32
 			var deletedTemp uint32
 			var delRegsTemp uint32
-			var throttleTime uint32 = 100
+			var throttleTime int64 = 100
 			var interrupt bool
 			for throttleTime != 0 && !interrupt {
 				// cachedScanDataRevs.RegConfigRev is updated in each pollFedScanData() if there is fed registry setting change on master cluster
 				// cachedScanResultMD5/upToDateRegs are updated in each pollFedScanData()/workFedScanData() as well
 				throttleTime, updatedTemp, deletedTemp, delRegsTemp, interrupt = pollFedScanData(&cachedScanDataRevs.RegConfigRev, cachedScanResultMD5, upToDateRegs, fedCfg, 1)
+				if throttleTime > 0 {
+					time.Sleep(time.Duration(throttleTime) * time.Millisecond)
+				}
 				updated += updatedTemp
 				deleted += deletedTemp
 				delRegs += delRegsTemp
@@ -2698,12 +2706,12 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 // in each pollFedScanData(), some scan results are returned & their image md5 entries in cachedScanResultMD5 are updated.
 //   upToDateRegs is updated as well when a fed registry/repo's scab result becomes up-to-date
 func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]map[string]string,
-	upToDateRegs utils.Set, fedCfg share.CLUSFedSettings, tryTimes int) (uint32, uint32, uint32, uint32, bool) {
+	upToDateRegs utils.Set, fedCfg share.CLUSFedSettings, tryTimes int) (int64, uint32, uint32, uint32, bool) {
 
 	var updated uint32
 	var deleted uint32
 	var delRegs uint32
-	var throttleTime uint32
+	var throttleTime int64
 
 	accReadAll := access.NewReaderAccessControl()
 	reqTo := api.RESTPollFedScanDataReq{
@@ -2718,11 +2726,24 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 		return 0, updated, deleted, delRegs, true
 	}
 
+	collectedRegs := 0
+	reqScanResultMD5 := make(map[string]map[string]string, _maxRegCollectCount)
+	ignoreRegs := make([]string, 0, len(cachedScanResultMD5))
+	for regName, reqImagesMD5 := range cachedScanResultMD5 {
+		if collectedRegs < _maxRegCollectCount {
+			reqScanResultMD5[regName] = reqImagesMD5
+		} else {
+			ignoreRegs = append(ignoreRegs, regName)
+		}
+		collectedRegs += 1
+	}
+
 	reqTo.ID = jointCluster.ID
 	reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 	reqTo.RegConfigRev = *cachedRegConfigRev
 	reqTo.UpToDateRegs = upToDateRegs.ToStringSlice()
-	reqTo.ScanResultMD5 = cachedScanResultMD5
+	reqTo.ScanResultMD5 = reqScanResultMD5
+	reqTo.IgnoreRegs = ignoreRegs
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -2851,7 +2872,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		} else {
 			if fedCfg.DeployRegScanData || fedCfg.DeployRepoScanData {
 				// return fed registry/repo scan data revisions to managed clusters
-				resp.ScanDataRevs = cacher.GetFedScanDataRevisions(fedCfg.DeployRegScanData, fedCfg.DeployRepoScanData)
+				resp.ScanDataRevs, _ = cacher.GetFedScanDataRevisions(fedCfg.DeployRegScanData, fedCfg.DeployRepoScanData)
 			}
 			resp.Settings, resp.Revisions, _ = cacher.GetFedRules(req.Revisions, accReadAll)
 			if len(resp.Revisions) > 0 {
@@ -2935,7 +2956,7 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 		} else {
 			var getFedRegCfg bool
 			_, fedRegs := scanner.GetFedRegistryCache(false, true)
-			resp, getFedRegCfg = cacher.GetFedScanResult(req.RegConfigRev, req.ScanResultMD5, req.UpToDateRegs, fedRegs)
+			resp, getFedRegCfg = cacher.GetFedScanResult(req.RegConfigRev, req.ScanResultMD5, req.IgnoreRegs, req.UpToDateRegs, fedRegs)
 			if getFedRegCfg && resp.RegistryCfg != nil {
 				resp.RegistryCfg.Registries, _ = scanner.GetFedRegistryCache(true, false)
 			}

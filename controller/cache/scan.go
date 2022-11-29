@@ -901,9 +901,6 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 	} else if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) {
 		fedRegName = name
 	}
-	if fedRegName != "" && fedScanResultMD5 == nil {
-		fedScanResultMD5 = make(map[string]map[string]string)
-	}
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -918,7 +915,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				if config, _, err := clusHelper.GetRegistry(name, access.NewFedAdminAccessControl()); config != nil {
 					var enc common.EncryptMarshaller
 					value, _ := enc.Marshal(config)
-					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, key, value)
+					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, share.CLUSRegistryConfigKey(name), value)
 				} else {
 					cctx.ScanLog.WithFields(log.Fields{"error": err, "name": name}).Error()
 				}
@@ -928,38 +925,40 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		alives, highs, meds := scan.RegistryImageStateUpdate(name, id, &sum, vpf)
 
-		var report *share.CLUSScanReport
-		key := share.CLUSRegistryImageDataKey(name, id)
-		report = clusHelper.GetScanReport(key)
-		if report != nil {
-			// for any scan report on master/standalone cluster & non-fed scan report on managed cluster
-			if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
-				if alives != nil {
-					clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
-					auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
+		if sum.Status == api.ScanStatusFinished && sum.Result == share.ScanErrorCode_ScanErrNone {
+			var report *share.CLUSScanReport
+			key := share.CLUSRegistryImageDataKey(name, id)
+			report = clusHelper.GetScanReport(key)
+			if report != nil {
+				// for any scan report on master/standalone cluster & non-fed scan report on managed cluster
+				if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
+					if alives != nil {
+						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
+						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
+					}
+
+					clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
+					benchUpdate(share.EventCompliance, clog)
 				}
 
-				clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
-				benchUpdate(share.EventCompliance, clog)
-			}
-
-			if fedRegName != "" {
-				scanResult := regImageSummaryReport{
-					Summary: value,
-					Report:  report,
-				}
-				fedScanDataCacheMutexLock()
-				currImagesMD5, ok := fedScanResultMD5[fedRegName]
-				if !ok {
-					fedScanResultMD5[fedRegName] = make(map[string]string, 1)
-					currImagesMD5, _ = fedScanResultMD5[fedRegName]
-				}
-				if currImagesMD5 != nil {
+				if fedRegName != "" {
+					scanResult := regImageSummaryReport{
+						Summary: value,
+						Report:  report,
+					}
+					fedScanDataCacheMutexLock()
+					currImagesMD5, ok := fedScanResultMD5[fedRegName]
+					if !ok || currImagesMD5 == nil {
+						currImagesMD5 = make(map[string]string, 1)
+					}
 					res, _ := json.Marshal(&scanResult)
 					md5Sum := md5.Sum(res)
 					currImagesMD5[id] = hex.EncodeToString(md5Sum[:])
+					fedScanResultMD5[fedRegName] = currImagesMD5
+					fedScanDataCacheMutexUnlock()
 				}
-				fedScanDataCacheMutexUnlock()
+			} else if fedRegName != "" {
+				log.WithFields(log.Fields{"name": fedRegName, "id": id}).Error("no scan report")
 			}
 		}
 
