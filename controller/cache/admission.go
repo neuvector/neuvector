@@ -90,7 +90,7 @@ var critDisplayName map[string]string = map[string]string{
 	share.CriteriaKeyPspCompliance:       "PSP best practice violation",
 	share.CriteriaKeyRequestLimit:        "resource limitation",
 	share.CriteriaKeyCustomPath:          "custom path violation",
-	share.CriteriaKeySaBindRiskyRole:     "service account bounds risky role violation",
+	share.CriteriaKeySaBindRiskyRole:     "service account bounds high risk role violation",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
@@ -1495,7 +1495,7 @@ func getOpDisplay(crt *share.CLUSAdmRuleCriterion) string {
 	case share.CriteriaOpNotExist:
 		return "does not exist"
 	case share.CriteriaOpContainsTagAny:
-		return "bounds to a risky role"
+		return "bounds to a high risk role"
 	default:
 		return "unknown"
 	}
@@ -1554,7 +1554,7 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 				case share.CriteriaOpExist, share.CriteriaOpNotExist:
 					str = fmt.Sprintf("(%s, path %s %s)", displayName, crt.Path, opDsiplay)
 				case share.CriteriaOpContainsTagAny:
-					str = fmt.Sprintf("(the service account is bound to one of risky role {%s})", formatRiskyRoleCriteriaMsg(crt.Value))
+					str = fmt.Sprintf("(the service account is bound to one of high risk role {%s})", formatRiskyRoleCriteriaMsg(crt.Value))
 				default:
 					if crt.Type == "customPath" {
 						str = fmt.Sprintf("(%s, value in %s %s %s)", displayName, crt.Path, opDsiplay, crt.Value)
