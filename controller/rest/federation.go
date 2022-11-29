@@ -2029,7 +2029,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	statusCode, proxyUsed, _ := pingJointCluster(_tagVerifyJointCluster, "v1/fed/joint_test_internal", jointCluster, nil, accReadAll)
 	if statusCode != http.StatusOK {
 		log.WithFields(log.Fields{"statusCode": statusCode, "rest": reqData.JointCluster.RestInfo}).Error("Managed cluster unreachable")
-		restRespError(w, http.StatusServiceUnavailable, api.RESTErrFedJointUnreachable)
+		restRespError(w, http.StatusBadRequest, api.RESTErrFedJointUnreachable)
 		return
 	}
 
@@ -2323,7 +2323,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 		if oneSuccess {
 			restRespSuccess(w, r, &resp, acc, login, nil, "Deploy fed rules to joint clusters")
 		} else {
-			restRespError(w, http.StatusServiceUnavailable, api.RESTErrFedJointUnreachable)
+			restRespError(w, http.StatusBadRequest, api.RESTErrFedJointUnreachable)
 		}
 	} else {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
