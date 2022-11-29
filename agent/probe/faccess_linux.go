@@ -36,6 +36,11 @@ type faProcGrpRef struct {
 	ppid int
 }
 
+type regWhiteRule struct {
+    decision int
+    path string
+}
+
 // whitelist per container
 type rootFd struct {
 	pid            int
@@ -43,6 +48,7 @@ type rootFd struct {
 	setting        string
 	group          string
 	whlst          map[string]int // not set: -1, deny: 0, allow: 1, ....
+	reglst         []regWhiteRule // wild card list, like whlist
 	dirMonitorList []string
 	allowProcList  []faProcGrpRef        // allowed process group
 	permitProcGrps map[int]*faProcGrpRef // permitted pgid and ppid
@@ -272,28 +278,22 @@ func (fa *FileAccessCtrl) Close() {
 
 /////
 func (fa *FileAccessCtrl) isRecursiveDirectoryList(root *rootFd, name, path string, bAllow, updateAlert bool) bool {
+	decision := fa.decision_maker(bAllow, updateAlert)
 	if name == "*" && strings.HasSuffix(path, "/*") {
-		dir := path
-		i := strings.LastIndex(dir, "/")
-		if i >= 0 {
-			dir = dir[0:i]
-		}
-
+		dir := filepath.Dir(path)
 		// log.WithFields(log.Fields{"dir": dir, "path": path, "allow": bAllow}).Debug("FA:")
 		for p, _ := range root.whlst {
 			if strings.HasPrefix(p, dir) && root.whlst[p] == rule_not_defined { // "" is an impossible entry here
-				if bAllow {
-					if updateAlert {
-						root.whlst[p] = rule_allowed_updateAlert
-					} else {
-						root.whlst[p] = rule_allowed_zdrift
-					}
-				} else {
-					root.whlst[path] = rule_denied
-				}
+				root.whlst[p] = decision
 				log.WithFields(log.Fields{"path": p, "allow": bAllow}).Debug("FA:")
 			}
 		}
+		return true
+	}
+
+	if index := strings.Index(path, "/*/"); index > -1 {
+		log.WithFields(log.Fields{"path": path}).Debug("FA:")
+		root.reglst = append( root.reglst, regWhiteRule{ path: path, decision: decision})
 		return true
 	}
 	return false
@@ -314,15 +314,7 @@ func (fa *FileAccessCtrl) isApplicationMatched(root *rootFd, name, path string, 
 			i := strings.LastIndex(p, "/")
 			n := p[i+1:]
 			if strings.HasPrefix(p, dir) && n == name && root.whlst[p] == rule_not_defined {
-				if bAllow {
-					if updateAlert {
-						root.whlst[p] = rule_allowed_updateAlert
-					} else {
-						root.whlst[p] = rule_allowed_zdrift
-					}
-				} else {
-					root.whlst[p] = rule_denied
-				}
+				root.whlst[p] = fa.decision_maker(bAllow, updateAlert)
 				log.WithFields(log.Fields{"path": p, "name": n, "allow": bAllow}).Debug("FA:")
 			}
 		}
@@ -344,15 +336,21 @@ func (fa *FileAccessCtrl) addToMonitorList(root *rootFd, path string, bAllow, up
 	}
 
 	//
+	root.whlst[path] = fa.decision_maker(bAllow, updateAlert)
+}
+
+func (fa *FileAccessCtrl) decision_maker(bAllow, updateAlert bool) int {
+	var decision int
 	if bAllow {
 		if updateAlert {
-			root.whlst[path] = rule_allowed_updateAlert
+			decision = rule_allowed_updateAlert
 		} else {
-			root.whlst[path] = rule_allowed_zdrift
+			decision = rule_allowed_zdrift
 		}
 	} else {
-		root.whlst[path] = rule_denied
+		decision = rule_denied
 	}
+	return decision
 }
 
 /////// Merge Monitor Lists
@@ -362,15 +360,7 @@ func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAll
 			// allow all applications
 			for p, _ := range root.whlst {
 				if root.whlst[p] == rule_not_defined {
-					if bAllow {
-						if updateAlert {
-							root.whlst[p] = rule_allowed_updateAlert
-						} else {
-							root.whlst[p] = rule_allowed_zdrift
-						}
-					} else {
-						root.whlst[p] = rule_denied
-					}
+					root.whlst[p] = fa.decision_maker(bAllow, updateAlert)
 				}
 			}
 			return
@@ -471,6 +461,8 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup
 			list = append(list, "*:*")
 		} else if proc.Path == "" || strings.HasSuffix(proc.Path, "*") || strings.HasSuffix(proc.Name, "/*") {
 			// recursive case + app matching
+			list = append(list, fmt.Sprintf("%s:%s", proc.Name, proc.Path))
+		} else if index := strings.Index(proc.Path, "/*/"); index > -1 {
 			list = append(list, fmt.Sprintf("%s:%s", proc.Name, proc.Path))
 		} else {
 			list = append(list, proc.Path)
@@ -662,7 +654,6 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	var svcGroup string
 	res := rule_allowed // allow
 	profileSetting := share.ProfileBasic
-
 	// check if the /proc/xxx/cgroup exists
 	id, _, _, found := global.SYS.GetContainerIDByPID(pid)
 	if id == fa.prober.selfID || !found  || !fa.bEnabled {
@@ -682,7 +673,16 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 		}
 
 		if rres, ok := cRoot.whlst[path]; ok {
-			// log.WithFields(log.Fields{"res": res}).Debug("FA: ")
+			// log.WithFields(log.Fields{"rres": rres}).Debug("FA: ")
+			if rres != rule_denied {
+				for _, regRule := range cRoot.reglst {
+					if index := strings.Index(regRule.path, "/*/"); index > -1 {
+						if strings.HasPrefix(path, regRule.path[:index]) && (filepath.Base(path) == filepath.Base(regRule.path)) {
+							return id, profileSetting, svcGroup, regRule.decision
+						}
+					}
+				}
+			}
 			return id, profileSetting, svcGroup, rres
 		} else {
 			//	log.Debug("FA: not in the whtlst")
