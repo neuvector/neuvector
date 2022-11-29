@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"errors"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -143,10 +144,12 @@ func MatchProfileProcess(entry *share.CLUSProcessProfileEntry, proc *share.CLUSP
 		} else { // on a spefific file
 			return proc.Path == entry.Path
 		}
-	} else { // recursive directory ( * and /bin/*)
+	} else { // recursive directory ( *, /bin/*, and /usr/*/nginx)
 		if strings.HasSuffix(entry.Path, "/*") {
 			path := entry.Path[:len(entry.Path)-2]
 			return strings.HasPrefix(dir, path) && (entry.Name == proc.Name)
+		} else if index := strings.Index(entry.Path, "/*/"); index > -1 {
+			return strings.HasPrefix(dir, entry.Path[:index]) && (entry.Name == proc.Name) && (bin == filepath.Base(entry.Path))
 		}
 	}
 
