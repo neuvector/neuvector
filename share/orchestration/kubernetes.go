@@ -400,14 +400,16 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 	// "kube-system" / apiserver-watcher-qalongruncluster4oc4-kxq6x-master-2
 	// "openshift-kube-apiserver" / revision-pruner-10-qalongruncluster4oc4-kxq6x-master-2
 	// "openshift-kube-scheduler" / installer-7-qalongruncluster4oc4-kxq6x-master-2
-	if index := strings.Index(pod, node); index > 0 {
-		pod = pod[:(index-1)]
-		if dash := strings.LastIndex(pod, "-"); dash > 0 {
-			if _, err := strconv.Atoi(pod[(dash+1):]); err == nil {
-				pod = pod[:dash] // this batch number is from the configmap
+	if len(node) > 3 {	// at least 4 characters
+		if index := strings.Index(pod, "-" + node); index > 0 {
+			pod = pod[:index]
+			if dash := strings.LastIndex(pod, "-"); dash > 0 {
+				if _, err := strconv.Atoi(pod[(dash+1):]); err == nil {
+					pod = pod[:dash] // this batch number is from the configmap
+				}
 			}
+			return &Service{Domain: namespace, Name: pod}
 		}
-		return &Service{Domain: namespace, Name: pod}
 	}
 
 	// Remove the last tokens - not correct in some cases at all
