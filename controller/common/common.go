@@ -6,6 +6,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -526,6 +527,8 @@ func compareProc(p1, p2 *share.CLUSProcessProfileEntry) int {
 	ret := compareProcField(p1.Name, p2.Name)
 	if ret == 0 {
 		ret = compareProcField(p1.Path, p2.Path)
+		dir1, base1 := filepath.Split(p1.Path)
+		dir2, base2 := filepath.Split(p2.Path)
 		if ret == 0 { // comparing cfgFlag: learned has the lowest priority
 			if p1.CfgType == share.GroundCfg || p2.CfgType == share.GroundCfg {
 				if p1.CfgType == p2.CfgType {
@@ -534,6 +537,42 @@ func compareProc(p1, p2 *share.CLUSProcessProfileEntry) int {
 					return 1
 				}
 				return -1
+			}
+		} else if base1 == base2 {
+			// same name, but different paths,
+			// We "heuristiccally" merge this two learned process rules
+			// for example:
+			//    server, /tmp/mypath/1/4/nginx
+			//    server, /tmp/myPath/2/4/nginx
+			// => server, /tmp/myPath/*/nginx
+			if p1.CfgType == share.Learned && p2.CfgType == share.Learned {
+				if tokens := strings.Split(p1.Path, "/*/"); len(tokens) > 1 {
+					if strings.HasPrefix(p1.Path, tokens[0]) {
+						p1.Path = p2.Path
+						ret = 0	// same path, will not update
+					}
+				}
+				t1 := strings.Split(p1.Path, "/")
+				t2 := strings.Split(p2.Path, "/")
+				if len(t1) == len(t2) {
+					// a neighborhood path?
+					// learned path will not be empty
+					if len(dir1) > 1 && len(dir2) > 1 {	// not at root-level "/"
+						merged := "/"
+						var i int
+						for i = 0; i < len(t1); i++ {
+							if t1[i] != t2[i] {
+								break
+							}
+							merged = filepath.Join(merged, t1[i])
+						}
+
+						if i > 1 { // matched at least one matched token
+							p1.Path = filepath.Join(merged, "*", base2)
+							ret = 0		// different path, forced update
+						}
+					}
+				}
 			}
 		}
 	}
@@ -593,6 +632,12 @@ func MergeProcess(list []*share.CLUSProcessProfileEntry, p *share.CLUSProcessPro
 		//		pp.Uid = p.Uid
 		//		changed = true
 		//	}
+
+		// heuristic merge
+		if pp.Path != p.Path {
+			pp.Path = p.Path
+			changed = true
+		}
 
 		if changed {
 			// update entry
