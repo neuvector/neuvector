@@ -444,9 +444,14 @@ func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
 		}
 	}
 
-	svc := global.ORCH.GetService(&info.ContainerMeta)
-	wl.Service = utils.MakeServiceName(svc.Domain, svc.Name)
-	wl.Domain = svc.Domain
+	if isChild, parent := getSharedContainer(info); isChild {
+		wl.Service = parent.service
+		wl.Domain = parent.domain
+	} else {
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
+		wl.Service = utils.MakeServiceName(svc.Domain, svc.Name)
+		wl.Domain = svc.Domain
+	}
 	return &wl
 }
 

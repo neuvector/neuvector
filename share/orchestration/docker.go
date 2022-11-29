@@ -28,15 +28,15 @@ type docker struct {
 	envParser *utils.EnvironParser
 }
 
-func (d *docker) GetService(meta *container.ContainerMeta) *Service {
-	return baseDriver.GetService(meta)
+func (d *docker) GetService(meta *container.ContainerMeta, node string) *Service {
+	return baseDriver.GetService(meta, node)
 }
 
 func (d *docker) GetPlatformRole(meta *container.ContainerMeta) (string, bool) {
 	role, secure := baseDriver.GetPlatformRole(meta)
 
 	if role == "" {
-		svc := d.GetService(meta)
+		svc := d.GetService(meta, "")
 		for _, r := range d.envParser.GetSystemGroups() {
 			if r.MatchString(svc.Name) {
 				return container.PlatformContainerDockerSystem, false
@@ -70,11 +70,11 @@ type base struct {
 	noop
 }
 
-func (d *base) GetServiceFromPodLabels(namespace, pod string, labels map[string]string) *Service {
+func (d *base) GetServiceFromPodLabels(namespace, pod, node string, labels map[string]string) *Service {
 	return nil
 }
 
-func (d *base) GetService(meta *container.ContainerMeta) *Service {
+func (d *base) GetService(meta *container.ContainerMeta, node string) *Service {
 	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok {
 		return &Service{Name: seviceName}
 	}

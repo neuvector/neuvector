@@ -16,7 +16,7 @@ func TestServiceName(t *testing.T) {
 	meta.Labels[container.DockerComposeProjectKey] = "Docker Trusted Registry 2.2.5 - (Replica 112dbe66163e)"
 	meta.Labels[container.DockerComposeServiceKey] = "notary-server"
 
-	svc := driver.GetService(&meta)
+	svc := driver.GetService(&meta, "")
 	expect := "Docker.Trusted.Registry.notary-server"
 	if svc.Name != expect {
 		t.Errorf("Error: expect=%v actual=%v\n", expect, svc)
@@ -25,7 +25,7 @@ func TestServiceName(t *testing.T) {
 	meta.Labels[container.DockerComposeProjectKey] = "Docker Universal Control Plane RN3B:GP34:KHVM:LLB6:5CRA:HRTW:SCPJ:3OHZ:3DXG:W2Z2:6S76:YBTI"
 	meta.Labels[container.DockerComposeServiceKey] = "ucp-auth-api"
 
-	svc = driver.GetService(&meta)
+	svc = driver.GetService(&meta, "")
 	expect = "Docker.UCP.ucp-auth-api"
 	if svc.Name != expect {
 		t.Errorf("Error: expect=%v actual=%v\n", expect, svc)

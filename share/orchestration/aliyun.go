@@ -9,8 +9,8 @@ type aliyun struct {
 	noop
 }
 
-func (d *aliyun) GetService(meta *container.ContainerMeta) *Service {
-	return baseDriver.GetService(meta)
+func (d *aliyun) GetService(meta *container.ContainerMeta, node string) *Service {
+	return baseDriver.GetService(meta, node)
 }
 
 func (d *aliyun) GetPlatformRole(m *container.ContainerMeta) (string, bool) {
