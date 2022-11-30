@@ -2066,8 +2066,8 @@ type CLUSFedMembership struct { // stored on each cluster (master & joint cluste
 	UseProxy         string                   `json:"use_proxy"` // http / https
 }
 
+// fed registry scan data is always deployed
 type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
-	DeployRegScanData  bool `json:"deploy_reg_scan_data"`  // whether fed registry scan data deployment is enabled
 	DeployRepoScanData bool `json:"deploy_repo_scan_data"` // whether fed repo scan data(for _repo_scan on master cluster) deployment is enabled
 }
 

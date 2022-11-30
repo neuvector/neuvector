@@ -632,7 +632,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 	fedSettings = fedSettingsCache
 	fedCacheMutexRUnlock()
 
-	resp.DeployRegScanData = fedSettings.DeployRegScanData
+	fedDeployRegScanData := true // always deploy fed registry scan data
 	resp.DeployRepoScanData = fedSettings.DeployRepoScanData
 
 	scanResultData := api.RESTFedScanResultData{
@@ -645,7 +645,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 	defer fedScanDataCacheMutexRUnlock()
 
 	// check whether any fed registry setting changes
-	if fedSettings.DeployRegScanData {
+	if fedDeployRegScanData {
 		if fedScanDataRevsCache.RegConfigRev != reqRegConfigRev {
 			// fed registry settings has been changed
 			resp.RegistryCfg = &share.CLUSFedRegistriesData{Revision: fedScanDataRevsCache.RegConfigRev}
@@ -657,7 +657,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 	}
 
 	// check whether any fed scan result needs to deploy to the requesting managed cluster
-	if fedSettings.DeployRegScanData || fedSettings.DeployRepoScanData {
+	if fedDeployRegScanData || fedSettings.DeployRepoScanData {
 		if fedSettings.DeployRepoScanData {
 			if curImagesMD5, ok := fedScanResultMD5[common.RegistryFedRepoScanName]; ok && len(curImagesMD5) > 0 {
 				fedRegs.Add(common.RegistryFedRepoScanName)
@@ -674,7 +674,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 					continue
 				}
 			} else {
-				if !fedSettings.DeployRegScanData {
+				if !fedDeployRegScanData {
 					// 1-1-2. master cluster doesn't deploy fed registry scan result anymore
 					scanResultData.DeletedScanResults[regName] = nil
 					continue
@@ -762,7 +762,7 @@ func (m CacheMethod) GetFedScanResult(reqRegConfigRev uint64, reqScanResultMD5 m
 				if regName == common.RegistryFedRepoScanName {
 					isForRepoScan = true
 				}
-				if (isForRepoScan && !fedSettings.DeployRepoScanData) || (!isForRepoScan && !fedSettings.DeployRegScanData) {
+				if (isForRepoScan && !fedSettings.DeployRepoScanData) || (!isForRepoScan && !fedDeployRegScanData) {
 					// master cluster doesn't deploy scan result of fed registry/repo scan anymore
 					continue
 				}
