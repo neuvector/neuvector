@@ -29,8 +29,11 @@ FED_SERVER_PORT
 ### Enforcer
 NV_PLATFORM_INFO
 > Allow user to special container port information
+> 
 > E.g. NV_PLATFORM_INFO=platform=tuniu;if-eth0=global
+> 
 > E.g. NV_PLATFORM_INFO=platform=Docker -- bypass the container-based platform detection
+> 
 > E.g. NV_PLATFORM_INFO=platform=Kubernetes:GKE -- specify platform and flavor at the same time
 
 CONTAINER_NET_TYPE
