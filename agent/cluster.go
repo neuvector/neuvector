@@ -444,10 +444,13 @@ func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
 		}
 	}
 
-	if isChild, parent := getSharedContainer(info); isChild {
+	if isChild, parent := getSharedContainer(info); isChild && parent != nil {
 		wl.Service = parent.service
 		wl.Domain = parent.domain
 	} else {
+		// k8s: container is not running. Then, the POD is not running, either.
+		//      In this isChild (true) but wl.Running (false) case,
+		//      the reported service name is not correct but acceptable.
 		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 		wl.Service = utils.MakeServiceName(svc.Domain, svc.Name)
 		wl.Domain = svc.Domain
