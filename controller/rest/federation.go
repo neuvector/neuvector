@@ -1294,7 +1294,6 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	fedCfg := cacher.GetFedSettings()
-	org.DeployRegScanData = fedCfg.DeployRegScanData
 	org.DeployRepoScanData = fedCfg.DeployRepoScanData
 
 	restRespSuccess(w, r, org, acc, login, nil, "Get federation config")
@@ -1331,7 +1330,7 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	if reqData.DeployRegScanData != nil || reqData.DeployRepoScanData != nil {
+	if reqData.DeployRepoScanData != nil {
 		if fedRole == api.FedRoleJoint {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed,
 				"Options for scan data deployment can only be configured on primary cluster")
@@ -1339,9 +1338,6 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 		fedCfg := clusHelper.GetFedSettings()
 		newCfg := fedCfg
-		if reqData.DeployRegScanData != nil {
-			newCfg.DeployRegScanData = *reqData.DeployRegScanData
-		}
 		if reqData.DeployRepoScanData != nil {
 			newCfg.DeployRepoScanData = *reqData.DeployRepoScanData
 		}
@@ -1534,9 +1530,6 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	kv.CreateDefaultFedGroups()
 
 	var cfg share.CLUSFedSettings
-	if reqData.DeployRegScanData != nil {
-		cfg.DeployRegScanData = *reqData.DeployRegScanData
-	}
 	if reqData.DeployRepoScanData != nil {
 		cfg.DeployRepoScanData = *reqData.DeployRepoScanData
 	}
@@ -1550,7 +1543,6 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 			RestInfo: m.MasterCluster.RestInfo,
 		},
 		UseProxy:           useProxy,
-		DeployRegScanData:  cfg.DeployRegScanData,
 		DeployRepoScanData: cfg.DeployRepoScanData,
 	}
 
@@ -2541,27 +2533,15 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					updateClusterState(masterCluster.ID, _fedClusterConnected, accReadAll)
 					status = _fedSuccess
 					fedCfg := cacher.GetFedSettings()
-					if respTo.DeployRegScanData != fedCfg.DeployRegScanData || respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
+					if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
 						// fed scan data deployment option is changed on master cluster.
 						scanRevs, _, err := clusHelper.GetFedScanRevisions()
-						if fedCfg.DeployRegScanData && !respTo.DeployRegScanData {
-							// delete fed registry & its scan result stored on managed cluster if fed registry scan data deployment is disabled on master cluster
-							for _, reg := range clusHelper.GetAllRegistry(share.ScopeFed) {
-								clusHelper.DeleteRegistryKeys(reg.Name)
-								clusHelper.DeleteRegistry(nil, reg.Name)
-							}
-							scanRevs.RegConfigRev = 0
-							scanRevs.ScannedRegRevs = make(map[string]uint64)
-						}
-						if fedCfg.DeployRepoScanData && !respTo.DeployRepoScanData {
-							// delete fed repo scan result stored on managed cluster if fed repo scan data deployment is disabled on master cluster
-							clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName)
-							scanRevs.ScannedRepoRev = 0
-						}
+						// delete fed repo scan result stored on managed cluster if fed repo scan data deployment is disabled on master cluster
+						clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName)
+						scanRevs.ScannedRepoRev = 0
 						if err == nil {
 							clusHelper.PutFedScanRevisions(&scanRevs, nil)
 						}
-						fedCfg.DeployRegScanData = respTo.DeployRegScanData
 						fedCfg.DeployRepoScanData = respTo.DeployRepoScanData
 						clusHelper.PutFedSettings(nil, fedCfg)
 					}
@@ -2578,9 +2558,9 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							}
 						}
 					}
-					if respTo.DeployRegScanData || respTo.DeployRepoScanData {
-						go getFedRegScanData(false, fedCfg, respTo.ScanDataRevs, 1)
-					}
+
+					go getFedRegScanData(false, fedCfg, respTo.ScanDataRevs, 1)
+
 					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
 				} else if respTo.Result == _fedMasterUpgradeRequired {
 					updateClusterState(jointCluster.ID, _fedJointVersionTooNew, accReadAll)
@@ -2631,11 +2611,10 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 			}
 			cachedScanDataRevs.ScannedRepoRev = 0
 		} else {
-			if fedCfg.DeployRegScanData {
-				for regName, rev1 := range masterScanDataRevs.ScannedRegRevs {
-					if rev2, ok := cachedScanDataRevs.ScannedRegRevs[regName]; ok && rev1 == rev2 {
-						upToDateRegs.Add(regName)
-					}
+			// fed registry scan data is always deployed
+			for regName, rev1 := range masterScanDataRevs.ScannedRegRevs {
+				if rev2, ok := cachedScanDataRevs.ScannedRegRevs[regName]; ok && rev1 == rev2 {
+					upToDateRegs.Add(regName)
 				}
 			}
 			if fedCfg.DeployRepoScanData {
@@ -2644,7 +2623,7 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 				}
 			}
 		}
-		if (fedCfg.DeployRegScanData && (masterScanDataRevs.RegConfigRev != cachedScanDataRevs.RegConfigRev || !haveSameContent(masterScanDataRevs.ScannedRegRevs, cachedScanDataRevs.ScannedRegRevs))) ||
+		if (masterScanDataRevs.RegConfigRev != cachedScanDataRevs.RegConfigRev || !haveSameContent(masterScanDataRevs.ScannedRegRevs, cachedScanDataRevs.ScannedRegRevs)) ||
 			(fedCfg.DeployRepoScanData && masterScanDataRevs.ScannedRepoRev != cachedScanDataRevs.ScannedRepoRev) {
 			// get scan result md5 of the images in fed registry/repo that have different scan data revision(per fed registry/repo) from what master cluster has
 			var cachedScanResultMD5 map[string]map[string]string
@@ -2769,7 +2748,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 		dec := gob.NewDecoder(buf)
 		if err := dec.Decode(&respTo); err == nil {
 			if respTo.Result == _fedSuccess { // success
-				if respTo.DeployRegScanData != fedCfg.DeployRegScanData || respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
+				if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
 					// fed scan data deployment option is changed on master cluster. Exit this polling session & let the next session do the sync
 					return 0, updated, deleted, delRegs, true
 				}
@@ -2842,7 +2821,6 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 	resp := api.RESTPollFedRulesResp{
 		Result:             _fedSuccess,
 		PollInterval:       atomic.LoadUint32(&_fedPollInterval),
-		DeployRegScanData:  fedCfg.DeployRegScanData,
 		DeployRepoScanData: fedCfg.DeployRepoScanData,
 	}
 	if kv.IsImporting() {
@@ -2870,10 +2848,8 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 			resp.Result = result
 			status = result
 		} else {
-			if fedCfg.DeployRegScanData || fedCfg.DeployRepoScanData {
-				// return fed registry/repo scan data revisions to managed clusters
-				resp.ScanDataRevs, _ = cacher.GetFedScanDataRevisions(fedCfg.DeployRegScanData, fedCfg.DeployRepoScanData)
-			}
+			// return fed registry/repo scan data revisions to managed clusters
+			resp.ScanDataRevs, _ = cacher.GetFedScanDataRevisions(true, fedCfg.DeployRepoScanData)
 			resp.Settings, resp.Revisions, _ = cacher.GetFedRules(req.Revisions, accReadAll)
 			if len(resp.Revisions) > 0 {
 				status = _fedClusterOutOfSync

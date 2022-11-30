@@ -64,7 +64,6 @@ type RESTFedMembereshipData struct { // including all clusters in the federation
 	MasterCluster      *RESTFedMasterClusterInfo  `json:"master_cluster,omitempty"` // master cluster
 	JointClusters      []*RESTFedJointClusterInfo `json:"joint_clusters"`           // all non-master clusters in the federation
 	UseProxy           string                     `json:"use_proxy"`                // http / https
-	DeployRegScanData  bool                       `json:"deploy_reg_scan_data"`     // whether fed registry scan data deployment is enabled
 	DeployRepoScanData bool                       `json:"deploy_repo_scan_data"`    // whether fed repo scan data deployment is enabled
 }
 
@@ -74,7 +73,6 @@ type RESTFedConfigData struct { // including all clusters in the federation
 	Name               *string                   `json:"name,omitempty"`          // cluster name
 	RestInfo           *share.CLUSRestServerInfo `json:"rest_info,omitempty"`
 	UseProxy           *string                   `json:"use_proxy,omitempty"`   // http / https
-	DeployRegScanData  *bool                     `json:"deploy_reg_scan_data"`  // whether fed registry scan data deployment is enabled
 	DeployRepoScanData *bool                     `json:"deploy_repo_scan_data"` // whether fed repo scan data deployment is enabled
 }
 
@@ -84,7 +82,6 @@ type RESTFedPromoteReqData struct {
 	PollInterval       uint32                    `json:"poll_interval"`              // in minute
 	MasterRestInfo     *share.CLUSRestServerInfo `json:"master_rest_info,omitempty"` // rest info about this master cluster
 	UseProxy           *string                   `json:"use_proxy,omitempty"`        // http / https
-	DeployRegScanData  *bool                     `json:"deploy_reg_scan_data"`       // whether fed registry scan data deployment is enabled
 	DeployRepoScanData *bool                     `json:"deploy_repo_scan_data"`      // whether fed repo scan data deployment is enabled
 }
 
@@ -92,7 +89,6 @@ type RESTFedPromoteRespData struct {
 	FedRole            string                   `json:"fed_role"`
 	MasterCluster      RESTFedMasterClusterInfo `json:"master_cluster"`        // info about this master cluster
 	UseProxy           string                   `json:"use_proxy,omitempty"`   // http / https
-	DeployRegScanData  bool                     `json:"deploy_reg_scan_data"`  // whether fed registry scan data deployment is enabled
 	DeployRepoScanData bool                     `json:"deploy_repo_scan_data"` // whether fed repo scan data deployment is enabled
 }
 
@@ -222,7 +218,6 @@ type RESTPollFedRulesResp struct {
 	Settings           []byte              `json:"settings,omitempty"`    // marshall of RESTFedRulesSettings, which contains only modified settings (for ~5.0.x)
 	Revisions          map[string]uint64   `json:"revisions"`             // key is fed rules type, value is the revision. It contains only revisions of modified settings
 	ScanDataRevs       RESTFedScanDataRevs `json:"scan_data_revs"`        // the latest revisions of all the fed registry/repo scan data on master cluster
-	DeployRegScanData  bool                `json:"deploy_reg_scan_data"`  // for informing whether master cluster deploys fed registry scan data to managed clusters
 	DeployRepoScanData bool                `json:"deploy_repo_scan_data"` // for informing whether master cluster deploys repo scan data to managed clusters
 }
 
@@ -245,7 +240,6 @@ type RESTPollFedScanDataResp struct {
 	ScanResultData     RESTFedScanResultData        `json:"scan_result_data"`       // (partial) updated/deleted scan result of the requested fed registry/repo
 	HasMoreScanResult  bool                         `json:"has_more_scan_reresult"` // (bandwidth consideration) true when master cluster returns partial scan result in ScanResultData for instructing managed clusters to keep polling.
 	ThrottleTime       int64                        `json:"throttle_time"`          // in ms. decided by master cluster
-	DeployRegScanData  bool                         `json:"deploy_reg_scan_data"`   // for informing whether master cluster deploys fed registry scan data to managed clusters
 	DeployRepoScanData bool                         `json:"deploy_repo_scan_data"`  // for informing whether master cluster deploys repo scan data to managed clusters
 }
 
