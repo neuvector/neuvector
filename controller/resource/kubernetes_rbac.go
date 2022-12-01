@@ -135,8 +135,8 @@ var nvSA string = "default"
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
 
 var k8sClusterRoles map[string]utils.Set = map[string]utils.Set{ // default k8s clusterrole -> superset of this default clusterrole
-	"view":  utils.NewSet("cluster-admin", "admin", "edit"),
-	"admin": utils.NewSet("cluster-admin"),
+	"view":  utils.NewSet("cluster-admin", "admin", "edit", "view"),
+	"admin": utils.NewSet("cluster-admin", "admin"),
 }
 
 var nvClusterRoles map[string]*k8sClusterRoleInfo = map[string]*k8sClusterRoleInfo{ // role -> role configuration
@@ -836,37 +836,10 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 		}
 
 		// if it's nv-required role, check whether its configuration meets nv's need
-		if roleInfo, ok := nvClusterRoles[n.name]; ok {
-			evtLog := false
-			for _, roleInfoRule := range roleInfo.rules {
-				found := false
-				for apiGroup, rtVerbs := range n.apiRtVerbs {
-					if apiGroup != "*" && apiGroup != roleInfoRule.apiGroup {
-						continue
-					}
-					foundResources := utils.NewSet()
-					for rt, verbs := range rtVerbs {
-						if verbs.IsSuperset(roleInfoRule.verbs) || verbs.Contains("*") {
-							foundResources.Add(rt)
-						}
-					}
-					if foundResources.IsSuperset(roleInfoRule.resources) || foundResources.Contains("*") {
-						found = true
-						break
-					}
-				}
-				if !found {
-					evtLog = true
-					break
-				}
-			}
-			if evtLog {
-				if resources, verbs := collectRoleResVerbs(n.name); len(resources) > 0 && len(verbs) > 0 {
-					msg := fmt.Sprintf(`Kubernetes clusterrole "%s" is required to grant %s permission(s) on %s resource(s).`,
-						n.name, strings.Join(verbs, ","), strings.Join(resources, ","))
-					log.Warn(msg)
-					cacheRbacEvent(d.flavor, msg, false)
-				}
+		if _, ok := nvClusterRoles[n.name]; ok {
+			if errs, _ := VerifyNvClusterRoles([]string{n.name}, false); len(errs) > 0 {
+				log.Warn(errs[0])
+				cacheRbacEvent(d.flavor, errs[0], false)
 			}
 		}
 	}
@@ -987,44 +960,20 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 		// 5. nv-required clusterrolebinding check
 		{
 			var ok bool
-			var role string
-			var rtName string
-			evtLog := true
-			if role, ok = nvClusterRoleBindings[n.name]; ok && n.domain == "" {
-				rtName = "clusterrolebinding"
-				if superRoles, _ := k8sClusterRoles[role]; role == n.role.name || (superRoles != nil && superRoles.Contains(n.role.name)) {
-					for _, sa := range n.svcAccounts {
-						if sa.name == nvSA && sa.domain == NvAdmSvcNamespace {
-							evtLog = false
-							break
-						}
-					}
+			var msg string
+			var evtLog bool
+			if _, ok = nvClusterRoleBindings[n.name]; ok && n.domain == "" {
+				if errs, _ := VerifyNvClusterRoleBindings([]string{n.name}, false); len(errs) > 0 {
+					evtLog = true
+					msg = errs[0]
 				}
-			} else if info, ok := nvRoleBindings[n.name]; ok && n.domain == NvAdmSvcNamespace {
-				rtName = "rolebinding"
-				role = info.roleName
-				if info.roleKind == n.roleKind {
-					if superRoles, _ := k8sClusterRoles[role]; role == n.role.name || (superRoles != nil && superRoles.Contains(n.role.name)) {
-						for _, sa := range n.svcAccounts {
-							if sa.name == nvSA && sa.domain == NvAdmSvcNamespace {
-								evtLog = false
-								break
-							}
-						}
-					}
+			} else if _, ok := nvRoleBindings[n.name]; ok && n.domain == NvAdmSvcNamespace {
+				if err := VerifyNvRoleBinding(n.name, NvAdmSvcNamespace, false, false); err != nil {
+					evtLog = true
+					msg = err.Error()
 				}
-			} else {
-				evtLog = false
 			}
 			if evtLog {
-				var msg string
-				if _, ok := k8sClusterRoles[role]; ok {
-					msg = fmt.Sprintf(`Kubernetes %s "%s" is required to bind clusterrole "%s" to service account %s:%s.`,
-						rtName, n.name, role, NvAdmSvcNamespace, nvSA)
-				} else {
-					msg = fmt.Sprintf(`Kubernetes %s "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,
-						rtName, n.name, role, NvAdmSvcNamespace, nvSA)
-				}
 				log.WithFields(log.Fields{"role": n.role.name}).Warn(msg)
 				cacheRbacEvent(d.flavor, msg, false)
 			}
@@ -1225,13 +1174,14 @@ func VerifyNvClusterRoleBindings(bindingNames []string, existOnly bool) ([]strin
 					}
 					if binding != nil {
 						ok = false
-						if binding.role.name == rolename {
-							ok = true
-						} else if superRoles, _ := k8sClusterRoles[rolename]; superRoles != nil {
+						if superRoles, _ := k8sClusterRoles[rolename]; superRoles != nil { // when rolename is k8s default role
 							k8sDefaultRole = true
 							if superRoles.Contains(binding.role.name) {
 								ok = true
 							}
+						}
+						if !k8sDefaultRole && (binding.role.name == rolename) {
+							ok = true
 						}
 						if ok {
 							for _, sa := range binding.svcAccounts {
@@ -1286,7 +1236,7 @@ func verifyNvRoleBinding(bindingName, namespace string, saNames utils.Set, exist
 		for saName := range saNames.Iter() {
 			temp := fmt.Sprintf("%s:%s", NvAdmSvcNamespace, saName)
 			if saNamesStr != "" {
-				saNamesStr += " & "
+				saNamesStr += " and "
 			}
 			saNamesStr += temp
 		}
@@ -1319,7 +1269,7 @@ func verifyNvRoleBinding(bindingName, namespace string, saNames utils.Set, exist
 								ok = true
 							}
 						}
-						if !ok && binding.role.name == bindingInfo.roleName {
+						if !k8sDefaultRole && (binding.role.name == bindingInfo.roleName) {
 							ok = true
 						}
 						if ok {
