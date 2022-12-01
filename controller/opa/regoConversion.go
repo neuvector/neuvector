@@ -103,8 +103,6 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 		return convertRiskyRoleRule(rule)
 	}
 
-	log.WithFields(log.Fields{"rule": rule}).Debug("ConvertToRego")
-
 	// has custom criteria
 	hasCusomCriteria := false
 	for _, c := range rule.Criteria {
@@ -119,6 +117,8 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	if !hasCusomCriteria {
 		return ""
 	}
+
+	log.WithFields(log.Fields{"rule": rule}).Debug("ConvertToRego")
 
 	// print header
 	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
@@ -150,6 +150,8 @@ violation[result]{
 
 	// handling type=1 (general) individual criteria conversion
 	for j, c := range rule.Criteria {
+		log.WithFields(log.Fields{"criteria": c}).Debug("ConvertToRego-Criteria")
+
 		if c.Type == "" {
 			// if it's predefined then the type is empty string, we don't need to handle it
 			continue
@@ -197,7 +199,7 @@ violationmsgs[msg]{
 
 	policyUrl := formatPolicyUrl(rule.ID)
 	success := AddPolicy(policyUrl, regoStr)
-	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success, "regoStr": regoStr}).Debug("Add Policy")
+	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success}).Debug("Add Policy")
 
 	if !success {
 		// unable to add the rego
