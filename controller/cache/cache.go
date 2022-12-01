@@ -1855,32 +1855,36 @@ func startWorkerThread(ctx *Context) {
 								QueryK8sVersion()
 							}
 						}
-						if n.SA != "" && n.ContainerID != "" {
+						if n.SA != "" && len(n.ContainerIDs) > 0 {
 							cacheMutexLock()
-							if wl, ok := wlCacheMap[n.ContainerID]; ok {
-								if wl.serviceAccount != n.SA {
-									wl.serviceAccount = n.SA
-									if wl.workload.ShareNetNS != "" {
-										if parent, ok := wlCacheMap[wl.workload.ShareNetNS]; ok {
-											parent.serviceAccount = n.SA
+							for _, containerID := range n.ContainerIDs {
+								if wl, ok := wlCacheMap[containerID]; ok {
+									if wl.serviceAccount != n.SA {
+										wl.serviceAccount = n.SA
+										if wl.workload.ShareNetNS != "" {
+											if parent, ok := wlCacheMap[wl.workload.ShareNetNS]; ok {
+												parent.serviceAccount = n.SA
+											}
 										}
 									}
+								} else {
+									var podSAMap map[string]string
+									if podSAMap, _ = nodePodSAMap[n.Node]; podSAMap == nil {
+										podSAMap = make(map[string]string, 1)
+										nodePodSAMap[n.Node] = podSAMap
+									}
+									podSAMap[containerID] = n.SA
 								}
-							} else {
-								var podSAMap map[string]string
-								if podSAMap, ok = nodePodSAMap[n.Node]; podSAMap == nil {
-									podSAMap = make(map[string]string, 1)
-									nodePodSAMap[n.Node] = podSAMap
-								}
-								podSAMap[n.ContainerID] = n.SA
 							}
 							cacheMutexUnlock()
 						}
 					} else if o != nil && n == nil { // delete
 						cacheMutexLock()
 						if podSAMap, ok := nodePodSAMap[o.Node]; podSAMap != nil {
-							if _, ok = podSAMap[o.ContainerID]; ok {
-								delete(podSAMap, o.ContainerID)
+							for _, containerID := range o.ContainerIDs {
+								if _, ok = podSAMap[containerID]; ok {
+									delete(podSAMap, containerID)
+								}
 							}
 						}
 						cacheMutexUnlock()

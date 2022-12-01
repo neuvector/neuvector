@@ -798,12 +798,13 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 			}
 
 			if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
-				if cs := o.Status.ContainerStatuses[0]; cs != nil {
-					containerID := cs.GetContainerID()
-					for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
-						if strings.HasPrefix(containerID, prefix) {
-							r.ContainerID = containerID[len(prefix):]
-							break
+				for _, cs := range o.Status.GetContainerStatuses() {
+					if cs != nil {
+						containerID := cs.GetContainerID()
+						for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
+							if strings.HasPrefix(containerID, prefix) {
+								r.ContainerIDs = append(r.ContainerIDs, containerID[len(prefix):])
+							}
 						}
 					}
 				}
