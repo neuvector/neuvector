@@ -114,8 +114,8 @@ type Pod struct {
 	OwnerType     string
 	LivenessCmds  [][]string
 	ReadinessCmds [][]string
-	SA            string // service account of this pod
-	ContainerID   string // workload id
+	SA            string   // service account of this pod
+	ContainerIDs  []string // all workload id
 	Labels        map[string]string
 }
 
