@@ -1524,7 +1524,7 @@ func (p *Probe) addContainerCandidate(proc *procInternal, scanMode bool) (*procC
 	id, containerInContainer, err, found := global.SYS.GetContainerIDByPID(proc.pid)
 	if !found {
 		if osutil.IsPidValid(proc.pid) {
-			log.WithFields(log.Fields{"error": err}).Error()
+			log.WithFields(log.Fields{"error": err}).Debug()
 		}
 		return nil, -1 // not ready
 	}
