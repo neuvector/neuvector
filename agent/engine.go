@@ -296,6 +296,8 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 		}
 
 		// POD for neuvector
+		gInfoRLock()
+		defer gInfoRUnlock()
 		if isChild, _ := getSharedContainer(info); !isChild {
 			//	log.WithFields(log.Fields{"labels": labels, "podname": podname}).Debug("PROC: POD")
 			return role, true
@@ -961,7 +963,9 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 	}
 
 	// Check if the container is the same running instance when event is scheduled.
+	gInfoRLock()
 	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
 	if !ok || (info != nil && c.pid != info.Pid) || !c.propertyFilled {
 		return
 	}
@@ -998,7 +1002,9 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 		}
 
 		if intfAdded || addrChanged {
+			gInfoRLock()
 			_, parent := getSharedContainer(info)
+			gInfoRUnlock()
 			notifyContainerChanges(c, parent, changeIntf)
 		}
 	}
@@ -1070,7 +1076,9 @@ func taskReexamProcContainer(id string, info *container.ContainerMetaExtra) {
 	info = c.info
 
 	// log.WithFields(log.Fields{"id": id}).Debug("")
+	gInfoRLock()
 	_, parent := getSharedContainer(info)
+	gInfoRUnlock()
 	appChanged := updateAppPorts(c, parent)
 	if appChanged {
 		notifyContainerChanges(c, parent, changeApp)
@@ -1764,7 +1772,9 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	//       service value must not be empty if parent has called taskInterceptContainer(). This shouldn't
 	//       create infinite loop if container exits quickly, above checks should prevent that.
 	//       ==> Need to reconsider this sequence logics.
+	gInfoRLock()
 	isChild, parent := getSharedContainer(info)
+	gInfoRUnlock()
 	if isChild && (parent == nil || parent.service == "") {
 		log.WithFields(log.Fields{"container": id}).Debug("Wait for parent")
 		if err := scheduleTask(id, info, TASK_INTERCEPT_CONTAINER, containerWaitParentPeriod); err != nil {

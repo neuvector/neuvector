@@ -443,7 +443,8 @@ func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
 			}
 		}
 	}
-
+	gInfoRLock()
+	defer gInfoRUnlock()
 	if isChild, parent := getSharedContainer(info); isChild && parent != nil {
 		wl.Service = parent.service
 		wl.Domain = parent.domain
