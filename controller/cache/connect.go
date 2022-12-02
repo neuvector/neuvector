@@ -1414,9 +1414,13 @@ func getNonWorkloadEndpoint(node string) *api.RESTConversationEndpoint {
 				if hostCache, ok := hostCacheMap[attr.hostID]; ok {
 					brief.Name = hostCache.host.Name
 					brief.ScanSummary = hostCache.scanBrief
+					brief.State = hostCache.state
 				}
-			} else if _, ok := ipHostMap[brief.Name]; ok {
+			} else if hd, ok := ipHostMap[brief.Name]; ok {
 				brief.ServiceGroup = api.AllHostGroup
+				if hd != nil && !hd.managed {
+					brief.State = api.StateUnmanaged
+				}
 			}
 		} else if attr.workload && !attr.managed {
 			kind = api.EndpointKindWorkloadIP
@@ -1438,7 +1442,9 @@ func getNonWorkloadEndpoint(node string) *api.RESTConversationEndpoint {
 			brief.DisplayName = attr.alias
 			brief.PodName = attr.alias
 		}
-		brief.State = api.StateOnline
+		if brief.State == "" {
+			brief.State = api.StateOnline
+		}
 
 		return &api.RESTConversationEndpoint{Kind: kind, RESTWorkloadBrief: brief}
 	}
