@@ -18,7 +18,6 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
-
 )
 
 type Event string
@@ -272,8 +271,8 @@ func getCriImageMeta(client *grpc.ClientConn, name string) (*ImageMeta, error) {
 			ImageSpec struct {
 				Author string `json:"author"`
 				Config struct {
-					Enrtrypoint []string `json:"Entrypoint"`
-					Labels map[string]string `json:"Labels"`
+					Enrtrypoint []string          `json:"Entrypoint"`
+					Labels      map[string]string `json:"Labels"`
 				} `json:"config"`
 			} `json:"imageSpec"`
 		} `json:"info"`
@@ -283,8 +282,8 @@ func getCriImageMeta(client *grpc.ClientConn, name string) (*ImageMeta, error) {
 	defer cancel()
 
 	cimg := criRT.NewImageServiceClient(client)
-	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}, Verbose: true,}
-	resp, err := cimg.ImageStatus(ctx, req);
+	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}, Verbose: true}
+	resp, err := cimg.ImageStatus(ctx, req)
 	if err == nil && resp != nil && resp.Image != nil {
 		meta := &ImageMeta{
 			ID:     resp.Image.Id,
@@ -314,6 +313,6 @@ func getCriImageMeta(client *grpc.ClientConn, name string) (*ImageMeta, error) {
 		return meta, nil
 	}
 
-	log.WithFields(log.Fields{"error": err, "name": name}).Error("Fail to get image")
-	return nil, err
+	log.WithFields(log.Fields{"error": err, "name": name}).Error("Failed to get image meta")
+	return nil, errors.New("Failed to get image meta")
 }
