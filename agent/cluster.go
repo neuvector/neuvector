@@ -8,13 +8,13 @@ import (
 	"net"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const clusterCheckInterval time.Duration = time.Second * 2
@@ -443,6 +443,10 @@ func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
 			}
 		}
 	}
+
+	// TODO: a temp fix to protect the READ of activeContainers map
+	gInfoRLock()
+	defer gInfoRUnlock()
 
 	if isChild, parent := getSharedContainer(info); isChild && parent != nil {
 		wl.Service = parent.service
