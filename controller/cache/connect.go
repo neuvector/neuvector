@@ -1621,6 +1621,11 @@ func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessCon
 		RESTConversation: &api.RESTConversation{From: from, To: to},
 		Entries:          make([]*api.RESTConversationEntry, 0),
 	}
+
+	if !acc.Authorize(conver.RESTConversation, nil) {
+		return nil, common.ErrObjectAccessDenied
+	}
+
 	return &conver, nil
 }
 

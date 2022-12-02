@@ -246,6 +246,9 @@ func handlerConverShow(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
+	} else if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
+		return
 	}
 
 	from := ps.ByName("from")
