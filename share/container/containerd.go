@@ -42,6 +42,11 @@ type containerdDriver struct {
 	snapshotter   string
 }
 
+// patch for the mismatched grpc versions
+func wrapIntoErrorString(err error) error {
+	return errors.New(err.Error())
+}
+
 func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	log.WithFields(log.Fields{"endpoint": endpoint}).Debug("Connecting to containerd")
 
@@ -49,8 +54,8 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		containerd.WithDefaultNamespace(k8sContainerdNamespace),
 		containerd.WithTimeout(clientConnectTimeout))
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-		return nil, err
+		log.WithFields(log.Fields{"error": err.Error()}).Error("")
+		return nil, wrapIntoErrorString(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -79,7 +84,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 
 	ver, err := client.Version(ctx)
 	if err != nil {
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
@@ -128,7 +133,7 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 	info, err := c.Info(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
-		return nil, nil, 0, nil, 0, err
+		return nil, nil, 0, nil, 0, wrapIntoErrorString(err)
 	}
 
 	if info.Labels == nil {
@@ -138,7 +143,7 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 	spec, err := c.Spec(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container spec")
-		return nil, nil, 0, nil, 0, err
+		return nil, nil, 0, nil, 0, wrapIntoErrorString(err)
 	}
 
 	// if image name is a digest identifier
@@ -291,7 +296,7 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 	defer cancel()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to list containers")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	metas := make([]*ContainerMeta, 0, len(containers))
@@ -319,13 +324,13 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 	c, err := d.client.LoadContainer(ctx, id)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to get container")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	info, spec, pid, status, attempt, err := d.getSpecs(ctx, c)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	bSandBox := false
@@ -467,7 +472,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 				if ev.Event != nil {
 					v, err := typeurl.UnmarshalAny(ev.Event)
 					if err != nil {
-						log.WithFields(log.Fields{"error": err, "event": v}).Error("Unmarshal containderd event error")
+						log.WithFields(log.Fields{"error": err.Error(), "event": v}).Error("Unmarshal containderd event error")
 						break
 					}
 					switch event := v.(type) {
@@ -489,7 +494,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 				}
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
-					log.WithFields(log.Fields{"error": err}).Error("Containderd event monitor error")
+					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
 				}
 				break Loop
 			case <-ctx.Done():
@@ -609,7 +614,7 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
 		if err2 != nil || cs.Status == nil || cs.Info == nil {
 			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
-			return nil, 0, 0, err
+			return nil, 0, 0, err2
 		}
 
 		meta = &ContainerMetaExtra{
