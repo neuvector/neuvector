@@ -7,6 +7,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+var baselinePolicyConditions []PolicyCondition = []PolicyCondition{
+	{sharesHostNamespace, "Sets HostNetwork, HostPID, or HostIPC to true."},
+	{allowsPrivelegedContainers, "Allows privileged container(s)."},
+	{exceedsBaselineCapabilites, "Exceeds baseline safe set of Linux capabilities."},
+	{hasHostPathVolumes, "Uses hostpath volume(s)."},
+	{usesHostPorts, "Uses hostPort(s)."},
+	{usesIllegalAppArmorProfile, "Uses disallowed AppArmor profile."},
+	{usesIllegalSELinuxOptions, "Uses disallowed SELinux options."},
+	{usesCustomProcMount, "Uses custom procMount."},
+	{usesIllegalSeccompProfile, "Uses disallowed seccomp profile."},
+	{usesIllegalSysctls, "Uses disallowed Linux sysctls."},
+}
+
+var restrictedConditions []PolicyCondition = []PolicyCondition{
+	{usesIllegalVolumeTypes, "Uses illegal volume type."},
+	{allowsPrivelegeEscalation, "Allows privilege escalation and/or has SYS_ADMIN capability."},
+	{allowsRootUsers, "Allows running as root user."},
+	{doesNotSetLegalSeccompProfile, "Does not explicitly set allowed seccomp profile."},
+	{exceedsRestrictedCapabilities, "Exceeds restricted safe set of Linux capabilities."},
+}
+
 // The following functions are meant to represent the policy controls as listed
 // in the Kubernetes Policy Security Standards
 // https://kubernetes.io/docs/concepts/security/pod-security-standards/
@@ -244,19 +265,6 @@ func policyViolations(c *nvsysadmission.AdmContainerInfo, policyConditions []Pol
 }
 
 func baselinePolicyViolations(c *nvsysadmission.AdmContainerInfo) []string {
-	baselinePolicyConditions := []PolicyCondition{
-		{sharesHostNamespace, "Sets HostNetwork, HostPID, or HostIPC to true."},
-		{allowsPrivelegedContainers, "Allows privileged container(s)."},
-		{exceedsBaselineCapabilites, "Exceeds baseline safe set of Linux capabilities."},
-		{hasHostPathVolumes, "Uses hostpath volume(s)."},
-		{usesHostPorts, "Uses hostPort(s)."},
-		{usesIllegalAppArmorProfile, "Uses disallowed AppArmor profile."},
-		{usesIllegalSELinuxOptions, "Uses disallowed SELinux options."},
-		{usesCustomProcMount, "Uses custom procMount."},
-		{usesIllegalSeccompProfile, "Uses disallowed seccomp profile."},
-		{usesIllegalSysctls, "Uses disallowed Linux sysctls."},
-	}
-
 	return policyViolations(c, baselinePolicyConditions)
 }
 
@@ -268,14 +276,9 @@ func restrictedPolicyViolations(c *nvsysadmission.AdmContainerInfo, imageRunsAsR
 		ViolationReason: "Image flagged to run as root.",
 	}
 
-	restrictedViolations := []PolicyCondition{
-		imageRunsAsRootCondition,
-		{usesIllegalVolumeTypes, "Uses illegal volume type."},
-		{allowsPrivelegeEscalation, "Allows privilege escalation and/or has SYS_ADMIN capability."},
-		{allowsRootUsers, "Allows running as root user."},
-		{doesNotSetLegalSeccompProfile, "Does not explicitly set allowed seccomp profile."},
-		{exceedsRestrictedCapabilities, "Exceeds restricted safe set of Linux capabilities."},
-	}
+	conditions := make([]PolicyCondition, 0, len(restrictedConditions)+1)
+	conditions = append(conditions, imageRunsAsRootCondition)
+	conditions = append(conditions, restrictedConditions...)
 
-	return append(baselinePolicyViolations(c), policyViolations(c, restrictedViolations)...)
+	return append(baselinePolicyViolations(c), policyViolations(c, conditions)...)
 }

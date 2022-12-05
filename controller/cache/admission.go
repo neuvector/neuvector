@@ -2216,6 +2216,23 @@ func (m CacheMethod) GetAdmissionStats(acc *access.AccessControl) (*api.RESTAdmi
 	return stats, nil
 }
 
+func (m CacheMethod) GetAdmissionPssDesc() map[string][]string {
+	baselineDesc := make([]string, len(baselinePolicyConditions))
+	for idx, cond := range baselinePolicyConditions {
+		baselineDesc[idx] = cond.ViolationReason
+	}
+	restrictedDesc := make([]string, len(restrictedConditions))
+	for idx, cond := range restrictedConditions {
+		restrictedDesc[idx] = cond.ViolationReason
+	}
+	desc := map[string][]string{
+		share.PssPolicyBaseline:   baselineDesc,
+		share.PssPolicyRestricted: restrictedDesc,
+	}
+
+	return desc
+}
+
 func fillDenyMessageFromRule(c *nvsysadmission.AdmContainerInfo, rule *share.CLUSAdmissionRule, scannedImage *nvsysadmission.ScannedImageSummary) string {
 	var message string
 
