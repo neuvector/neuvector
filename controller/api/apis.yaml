@@ -5084,6 +5084,16 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTAdmRuleCriterion'
+      pss_collections:
+        type: object
+        properties:
+          key:
+            type: string
+            example: restricted
+          value:
+            type: array
+            items:
+              type: string
   RESTAdmissionState:
     type: object
     properties:
