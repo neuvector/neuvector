@@ -291,7 +291,7 @@ func (b *Bench) BenchLoop() {
 				if c, ok := gInfo.activeContainers[id]; ok {
 					// skip kubernetes pod
 					if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-						wls = append(wls, createWorkload(c.info))
+						wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 						if agentEnv.scanSecrets {
 							group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
 							b.taskScanner.addScanTask(c.pid, name, id, group)
@@ -308,7 +308,7 @@ func (b *Bench) BenchLoop() {
 			for _, c := range gInfo.activeContainers {
 				// skip kubernetes pod
 				if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-					wls = append(wls, createWorkload(c.info))
+					wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 				}
 			}
 			gInfoRUnlock()
