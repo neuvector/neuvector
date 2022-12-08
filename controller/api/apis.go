@@ -3085,6 +3085,7 @@ type RESTAdmRuleTypeOptions struct {
 	DenyOptions      *RESTAdmCatOptions      `json:"deny_options"`
 	ExceptionOptions *RESTAdmCatOptions      `json:"exception_options"`
 	PspCollection    []*RESTAdmRuleCriterion `json:"psp_collection,omitempty"`
+	PssCollections   map[string][]string     `json:"pss_collections,omitempty"`
 }
 
 type RESTAdmissionState struct {

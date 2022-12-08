@@ -177,6 +177,7 @@ type CacheInterface interface {
 	GetFedAdmissionRulesCache(admType, ruleType string) (*share.CLUSAdmissionRules, error)
 	GetAdmissionState(acc *access.AccessControl) (*api.RESTAdmissionState, error)
 	GetAdmissionStats(acc *access.AccessControl) (*api.RESTAdmissionStats, error)
+	GetAdmissionPssDesc() map[string][]string
 
 	// Multi-Clusters (Federation) - UI
 	GetFedMembershipRole(acc *access.AccessControl) (string, error)

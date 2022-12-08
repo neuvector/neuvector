@@ -595,6 +595,7 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 		pspCollection = append(pspCollection, crit)
 	}
 	resp.Options.PspCollection = pspCollection
+	resp.Options.PssCollections = cacher.GetAdmissionPssDesc()
 	restRespSuccess(w, r, resp, acc, login, nil, "Get admission control rule options")
 }
 

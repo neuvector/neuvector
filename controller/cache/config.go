@@ -391,9 +391,11 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		//shedule policy calculation
 		if cfg.NetServiceStatus != systemConfigCache.NetServiceStatus {
 			scheduleIPPolicyCalculation(true)
+			scheduleDlpRuleCalculation(true)
 		} else if systemConfigCache.NetServiceStatus &&
 			cfg.NetServicePolicyMode != systemConfigCache.NetServicePolicyMode {
 			scheduleIPPolicyCalculation(true)
+			scheduleDlpRuleCalculation(true)
 		}
 		automodeConfigUpdate(cfg, systemConfigCache)
 	case cluster.ClusterNotifyDelete:

@@ -8,13 +8,13 @@ import (
 	"net"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 const clusterCheckInterval time.Duration = time.Second * 2
@@ -396,7 +396,7 @@ func putContainerForStop(info *container.ContainerMetaExtra, wl *share.CLUSWorkl
 	putWorkload(wl)
 }
 
-func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
+func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *share.CLUSWorkload {
 	wl := share.CLUSWorkload{
 		ID:           info.ID,
 		Name:         info.Name,
@@ -444,16 +444,9 @@ func createWorkload(info *container.ContainerMetaExtra) *share.CLUSWorkload {
 		}
 	}
 
-	if isChild, parent := getSharedContainer(info); isChild && parent != nil {
-		wl.Service = parent.service
-		wl.Domain = parent.domain
-	} else {
-		// k8s: container is not running. Then, the POD is not running, either.
-		//      In this isChild (true) but wl.Running (false) case,
-		//      the reported service name is not correct but acceptable.
-		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
-		wl.Service = utils.MakeServiceName(svc.Domain, svc.Name)
-		wl.Domain = svc.Domain
+	if svc != nil && domain != nil {
+		wl.Service = utils.MakeServiceName(*domain, *svc)
+		wl.Domain = *domain
 	}
 	return &wl
 }
@@ -543,7 +536,7 @@ func clusterAddContainer(ev *ClusterEvent) {
 	log.WithFields(log.Fields{"container": ev.id}).Debug("")
 
 	if cache, ok := wlCacheMap[ev.id]; !ok || cache.wl.Running != ev.info.Running {
-		wl := createWorkload(ev.info)
+		wl := createWorkload(ev.info, ev.service, ev.domain)
 		if ev.role != nil {
 			wl.PlatformRole = *ev.role
 		}
@@ -579,7 +572,7 @@ func clusterStopContainer(ev *ClusterEvent) {
 		// This should not happen with the new code change - 03/02/2017
 		log.WithFields(log.Fields{"id": ev.id}).Error("Miss add event!")
 		// Container might not be intercepted and reported yet.
-		wl := createWorkload(ev.info)
+		wl := createWorkload(ev.info, ev.service, ev.domain)
 		putWorkload(wl)
 		wlCacheMap[ev.id] = &workloadInfo{wl: wl}
 
