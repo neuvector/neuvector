@@ -782,6 +782,11 @@ func (p *Probe) evalNewRunningApp(pid int) {
 
 	// last chance to update fields
 	if c.id != "" { // container processes only, skip host processes
+
+		// NVSHAS-7054
+		// The effective user was incorrect as it was grabbing the parent's euid instead of the pid's actual euid
+		proc.user =  p.getUserName(proc.pid, proc.euid)
+
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
 			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
 			if cmds != nil && cmds[0] != "" {
