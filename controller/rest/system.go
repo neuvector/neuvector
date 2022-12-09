@@ -384,6 +384,25 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 		}
 	}
 
+	if rc.BaselineProfile != nil {
+		blValue := strings.ToLower(*rc.BaselineProfile)
+		switch blValue {
+		case share.ProfileBasic:
+			*rc.BaselineProfile = share.ProfileBasic
+		case share.ProfileDefault_UNUSED, share.ProfileShield_UNUSED, share.ProfileZeroDrift:
+			*rc.BaselineProfile = share.ProfileZeroDrift
+		default:
+			log.WithFields(log.Fields{"baseline": *rc.BaselineProfile}).Error("Invalid profile baseline")
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		if err := setServiceProcessBaslineAll(*rc.BaselineProfile, acc); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Fail to set process basline option")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+			return
+		}
+	}
+
 	if rc.Unquar != nil {
 		var wls []*api.RESTWorkloadBrief
 		if rc.Unquar.Group != "" {
