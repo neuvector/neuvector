@@ -846,8 +846,25 @@ func handlerGroupDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	cg, _, _ := clusHelper.GetGroup(name, acc)
 	if cg == nil {
 		log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
-		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return
+		//NVSHAS-7386, Empty group deletion return errs "Object not found"
+		//normally group should exist in consul when it is listed in cache
+		//but in some corner cases, group is listed but not found in kv
+		//and user want delete group to relearn, so we will delete group
+		//from cache, but limit practice to learned group(nv.x.x)
+		if utils.IsGroupLearned(name) && !strings.HasPrefix(name, api.LearnedSvcGroupPrefix) && !utils.IsGroupNodes(name){
+			err1 :=cacher.DeleteGroupCache(name, acc)
+			if err1 != nil {
+				restRespAccessDenied(w, login)
+			} else {
+				kv.DeletePolicyByGroup(name)
+				kv.DeleteResponseRuleByGroup(name)
+				restRespSuccess(w, r, nil, acc, login, nil, "Delete group")
+			}
+			return
+		} else {
+			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+			return
+		}
 	}
 
 	/*

@@ -1643,6 +1643,32 @@ func (m CacheMethod) GetGroupCache(name string, acc *access.AccessControl) (*sha
 	return nil, common.ErrObjectNotFound
 }
 
+func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) error {
+	var cache *groupCache
+	var ok bool
+
+	cacheMutexLock()
+	if cache, ok = groupCacheMap[name]; ok {
+		if err := authorizeGroup(cache, acc); err != nil {
+			cacheMutexUnlock()
+			return err
+		}
+		delete(groupCacheMap, name)
+	}
+	cacheMutexUnlock()
+	//delete group related policy
+	clusHelper.DeleteProcessProfile(name)
+	clusHelper.DeleteFileMonitor(name)
+	if cache != nil && cache.group != nil {
+		if cache.group.Kind == share.GroupKindContainer {
+			clusHelper.DeleteDlpGroup(name)
+			clusHelper.DeleteWafGroup(name)
+		}
+	}
+	clusHelper.DeleteCustomCheckConfig(name)
+	return nil
+}
+
 func (m CacheMethod) GetFedGroupNames(acc *access.AccessControl) utils.Set {
 	groups := utils.NewSet()
 
