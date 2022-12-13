@@ -296,6 +296,7 @@ type ContainerInfo struct {
 		NetworkID   string `json:"NetworkID,omitempty" yaml:"NetworkID,omitempty"`
 		EndpointID  string `json:"EndpointID,omitempty" yaml:"EndpointID,omitempty"`
 		SandboxKey  string `json:"SandboxKey,omitempty" yaml:"SandboxKey,omitempty"`
+		SandboxID   string `json:"SandboxID"`
 	}
 	SysInitPath    string
 	ResolvConfPath string
