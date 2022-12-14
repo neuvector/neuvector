@@ -358,7 +358,7 @@ func (fn *FaNotify) addSingleFile(r *rootFd, path string, mask uint64) bool {
 	}
 
 	if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil {
-		log.WithFields(log.Fields{"path": path, "error": err}).Error("FMON:")
+		log.WithFields(log.Fields{"path": path, "error": err}).Debug("FMON:")
 		return false
 	}
 
@@ -394,7 +394,7 @@ func (fn *FaNotify) StartMonitor(rootPid int) bool {
 
 	r, ok := fn.roots[rootPid]
 	if !ok {
-		log.WithFields(log.Fields{"rootPid": rootPid}).Error("FMON: not found")
+		log.WithFields(log.Fields{"rootPid": rootPid}).Debug("FMON: not found")
 		return false
 	}
 
@@ -410,7 +410,7 @@ func (fn *FaNotify) StartMonitor(rootPid int) bool {
 	for dir, mask := range r.dirMonitorMap {
 		path := ppath + dir
 		if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil {
-			log.WithFields(log.Fields{"path": path, "error": err}).Error("FMON:")
+			log.WithFields(log.Fields{"path": path, "error": err}).Debug("FMON:")
 		} else {
 			mLog.WithFields(log.Fields{"path": path, "mask": fmt.Sprintf("0x%08x", mask)}).Debug("FMON:")
 		}
