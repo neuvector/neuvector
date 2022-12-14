@@ -604,7 +604,7 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 	// log.WithFields(log.Fields{"Access": conf.Rule}).Debug("FMON:")
 	//// no access rules for neuvector and host
 	if !osutil.IsPidValid(rootPid) {
-		log.WithFields(log.Fields{"id": id, "Pid": rootPid}).Error("FMON: invalid Pid")
+		log.WithFields(log.Fields{"id": id, "Pid": rootPid}).Debug("FMON: invalid Pid")
 		return
 	}
 

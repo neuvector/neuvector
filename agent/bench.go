@@ -888,7 +888,7 @@ func (b *Bench) doContainerCustomCheck(wls []*share.CLUSWorkload) {
 		}
 	}
 
-	log.Info("Running benchmark checks done")
+	log.Debug("Running benchmark checks done")
 }
 
 func (b *Bench) doHostCustomCheck() {
