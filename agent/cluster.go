@@ -399,7 +399,6 @@ func putContainerForStop(info *container.ContainerMetaExtra, wl *share.CLUSWorkl
 func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *share.CLUSWorkload {
 	wl := share.CLUSWorkload{
 		ID:           info.ID,
-		ShareNetNS:   info.Sandbox,
 		Name:         info.Name,
 		SelfHostname: info.Hostname,
 		AgentID:      Agent.ID,
