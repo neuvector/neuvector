@@ -2837,7 +2837,8 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
+		// the container was exited before we investigate into it
+		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("SHD: Unknown ID")
 		return true
 	}
 

@@ -254,6 +254,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
 			rconf.ScannerAutoscale.Strategy = api.AutoScaleNA
 		}
+		if rconf.ScannerAutoscale.MinPods == 0 {
+			rconf.ScannerAutoscale.MinPods = 1
+		}
+		if rconf.ScannerAutoscale.MaxPods == 0 {
+			rconf.ScannerAutoscale.MaxPods = 1
+		}
 	}
 
 	resp := &api.RESTSystemConfigData{}
