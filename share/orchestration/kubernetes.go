@@ -40,6 +40,7 @@ const (
 
 const reStrPodNameSvc1 string = "^.*-[a-f0-9]{6,10}-[a-z0-9]{5}$"
 const reStrPodNameSvc2 string = "^.*-[0-9]{1,5}-[a-z0-9]{5}$"
+const reStrJobPoNameKubxEtcdBackup string = "^kubx-etcd-backup-[a-z0-9]{20}-.*"
 
 type k8sVersion struct {
 	Major        string `json:"major"`
@@ -101,6 +102,7 @@ type clusterOperator struct {
 
 var rePodNameSvc1 *regexp.Regexp
 var rePodNameSvc2 *regexp.Regexp
+var reJobPodNameKubxEtcdBackup *regexp.Regexp
 
 // https://github.com/openshift/openshift-sdn/blob/master/plugins/osdn/bin/openshift-sdn-ovs
 // del_ovs_flows() and del_ovs_port()
@@ -373,6 +375,16 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 	// remove uuid-like string
 	if index := hasUUIDString(pod); index > 0 {
 		return &Service{Domain: namespace, Name: pod[:index]}
+	}
+
+	if jobName, ok := labels[container.KubeKeyJobName]; ok {
+		if reJobPodNameKubxEtcdBackup == nil {
+			reJobPodNameKubxEtcdBackup = regexp.MustCompile(reStrJobPoNameKubxEtcdBackup)
+		}
+		if reJobPodNameKubxEtcdBackup.MatchString(jobName) {
+			// make a service package
+			return &Service{Domain: namespace, Name: "kubx-etcd-backup"}
+		}
 	}
 
 	// remove hash index
