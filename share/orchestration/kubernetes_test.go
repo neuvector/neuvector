@@ -435,3 +435,29 @@ func TestUUIDSuffix(t *testing.T) {
 		t.Errorf("Invalid service name: %+v\n", svc.Name)
 	}
 }
+
+
+func TestKubxEtcdBackupApp(t *testing.T) {
+	driver := &kubernetes{noop: noop{platform: share.PlatformKubernetes}}
+
+	// only review POD labels
+	pod_meta := container.ContainerMeta{
+		Labels: map[string]string{
+			"app": "kubx-etcd-backup-update",
+			"controller-uid": "cc0f0c00-7ad7-4cac-b3f6-e5373ff0d4f1",
+			"io.cri-containerd.image": "managed",
+			"io.cri-containerd.kind": "sandbox",
+			"io.kubernetes.pod.name": "kubx-etcd-backup-cdsm1j9200g7nufcakcg-update-79444",
+			"io.kubernetes.pod.namespace": "kubx-etcd-04",
+			"io.kubernetes.pod.uid": "e0302e7f-50e3-45bd-9707-1d39b041f3d4",
+			"job-name": "kubx-etcd-backup-cdsm1j9200g7nufcakcg-update",
+			"name": "kubx-etcd-backup-cdsm1j9200g7nufcakcg-update",
+			"razee.io/build-url": "https://travis.ibm.com/alchemy-containers/armada-bom-component-source/builds/47666062",
+			"razee.io/source-url": "https://github.ibm.com/alchemy-containers/armada-bom-component-source/commit/f986b086198c1f6810e54317d54a1d33376ef748",
+		},
+	}
+
+	if svc := driver.GetService(&pod_meta, ""); svc.Name != "kubx-etcd-backup" {
+		t.Errorf("Invalid service name: %+v\n", svc.Name)
+	}
+}
