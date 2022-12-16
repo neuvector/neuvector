@@ -156,7 +156,6 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			Envs:     info.Config.Env,
 			PidMode:  info.HostConfig.PidMode,
 			NetMode:  info.HostConfig.NetworkMode,
-			Sandbox:  info.NetworkSettings.SandboxID,
 		},
 		ImageID:     TrimImageID(info.Image),
 		Privileged:  info.HostConfig.Privileged,
@@ -170,13 +169,6 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		Networks:    utils.NewSet(),
 		LogPath:     info.LogPath,
 	}
-
-	if meta.Sandbox == "" && meta.Labels != nil {
-		if sandbox, ok := meta.Labels["io.kubernetes.sandbox.id"]; ok {
-			meta.Sandbox = sandbox
-		}
-	}
-
 
 	if info, err := d.client.InspectImage(meta.ImageID); err == nil {
 		meta.Author = info.Author
