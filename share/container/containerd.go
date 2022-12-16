@@ -146,10 +146,6 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		return nil, nil, 0, nil, 0, wrapIntoErrorString(err)
 	}
 
-	if spec.Annotations == nil {
-		spec.Annotations = make(map[string]string)
-	}
-
 	// if image name is a digest identifier
 	if strings.HasPrefix(info.Image, "sha256:") {
 		if imageName := d.reverseImageNameFromDigestName(info.Image); imageName != "" {
@@ -157,7 +153,7 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		}
 	}
 
-	if meta, pid, sandboxID, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil {
+	if meta, pid, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil {
 		// log.WithFields(log.Fields{"meta": meta}).Info("CRI")
 		state := containerd.Stopped
 		if meta.Running {
@@ -167,10 +163,6 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 			Status:     state,
 			ExitStatus: uint32(meta.ExitCode),
 			ExitTime:   meta.FinishedAt,
-		}
-
-		if sandboxID != "" {
-			spec.Annotations["io.kubernetes.cri.sandbox-id"] = sandboxID
 		}
 		return &info, spec, pid, status, int(attempt), nil
 	}
@@ -222,10 +214,6 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, p
 				meta.Labels[k] = v
 			}
 		}
-	}
-
-	if sandbox, ok := spec.Annotations["io.kubernetes.cri.sandbox-id"]; ok {
-		meta.Sandbox = sandbox
 	}
 
 	if spec.Process != nil {
@@ -594,15 +582,14 @@ func (d *containerdDriver) decodeExtension_attempt(extData []byte) (int, error) 
 	return attempt, nil
 }
 
-func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaExtra, int, string, uint32, error) {
+func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaExtra, int, uint32, error) {
 	if d.criClient == nil {
-		return nil, 0, "", 0, nil
+		return nil, 0, 0, nil
 	}
 
 	var meta *ContainerMetaExtra
 	var attempt uint32
 	var pid int
-	var sandboxID string
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -612,7 +599,7 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
 			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
-			return nil, 0, "", 0, err
+			return nil, 0, 0, err
 		}
 
 		// a POD
@@ -621,13 +608,13 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
 		}
 		attempt = pod.Status.Metadata.Attempt
-		pid, _, _ = d.getContainerPid_CRI(pod.GetInfo())
+		pid, _ = d.getContainerPid_CRI(pod.GetInfo())
 	} else {
 		// an APP container
 		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
 		if err2 != nil || cs.Status == nil || cs.Info == nil {
 			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
-			return nil, 0, "", 0, err2
+			return nil, 0, 0, err2
 		}
 
 		meta = &ContainerMetaExtra{
@@ -638,15 +625,14 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 		}
 		attempt = cs.Status.Metadata.Attempt
-		pid, sandboxID, _ = d.getContainerPid_CRI(cs.GetInfo())
+		pid, _ = d.getContainerPid_CRI(cs.GetInfo())
 	}
-	return meta, pid, sandboxID, attempt, nil
+	return meta, pid, attempt, nil
 }
 
 ///////
 type criContainerInfoRes struct {
 	Info struct {
-		SandboxID string `json:"sandBoxID"`
 		Pid    int `json:"pid"`
 		Config struct {
 			MetaData struct {
@@ -712,16 +698,16 @@ func (d *containerdDriver) isPrivilegedPod_CRI(id string) bool {
 	return false
 }
 
-func (d *containerdDriver) getContainerPid_CRI(infoMap map[string]string) (int, string, error) {
+func (d *containerdDriver) getContainerPid_CRI(infoMap map[string]string) (int, error) {
 	// Info is extra information of the Runtime. The key could be arbitrary string, and
 	// value should be in json format.
 	var res criContainerInfoRes
 
 	jsonInfo := buildJsonFromMap(infoMap) // from map[string]string
 	if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
-		return 0, "", err
+		return 0, err
 	}
-	return res.Info.Pid, res.Info.SandboxID, nil
+	return res.Info.Pid, nil
 }
 
 func decodeSnapshotter(info map[string]string) (string, error) {
