@@ -1239,13 +1239,7 @@ func connectAgentAdd(id string, param interface{}) {
 	connectDeviceAdd(&agent.CLUSDevice)
 }
 
-func connectWorkloadAdd(id string, param interface{}) {
-	wl := param.(*workloadCache).workload
-
-	log.WithFields(log.Fields{"id": id, "name": wl.Name}).Debug()
-
-	graphMutexLock()
-	defer graphMutexUnlock()
+func _connectWorkloadAdd(wl *share.CLUSWorkload) {
 	for _, addrs := range wl.Ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {
@@ -1266,9 +1260,22 @@ func connectWorkloadAdd(id string, param interface{}) {
 	}
 }
 
-func connectWorkloadDelete(id string, param interface{}) {
+func connectWorkloadAdd(id string, param interface{}) {
+	wl := param.(*workloadCache).workload
+
+	log.WithFields(log.Fields{"id": id, "name": wl.Name}).Debug()
+
 	graphMutexLock()
 	defer graphMutexUnlock()
+	_connectWorkloadAdd(wl)
+}
+
+func connectWorkloadDelete(id string, param interface{}) {
+	wl := param.(*workloadCache).workload
+	graphMutexLock()
+	defer graphMutexUnlock()
+	//delete Workload:IP/Host:IP node from graph if it is there.
+	_connectWorkloadAdd(wl)
 	if wlGraph.DeleteNode(id) != "" {
 		log.WithFields(log.Fields{"node": id}).Debug("Delete node")
 	}
