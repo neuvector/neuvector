@@ -1448,9 +1448,12 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		// Because IP can change in workload update event, these have to be called every time.
 		if wl.Running {
 			addrWorkloadAdd(wl.ID, wlCache)
+		}
+		//NVSHAS-7433, it is possible newly added short-lived workload is not running
+		//so we need to delete Workload:IP and its related policy 
+		if wl.Running || newWorkload {
 			connectWorkloadAdd(wl.ID, wlCache)
 		}
-
 		// workload cache change are synchronized in ObjectUpdateHandler(), so
 		// reading wlCache doesn't have to be protected by cacheMutex
 		if started {
