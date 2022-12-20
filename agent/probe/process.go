@@ -749,6 +749,38 @@ func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcI
 	return info, ok
 }
 
+
+/* patchRuntimeUser - Patches the process' username on the following condition:
+	* If the process' parent is the container daemon, this will update the process' username
+
+The reasoning is:
+1. Fixes the bug found in NVSHAS-7054
+	* We get a violation report but the effective user reported is the host machine's username
+		and not the one in the container.
+2. We're trying to avoid always patching the username because getUserName() will access
+		/etc/passwd and we're trying to reduce file accesses.
+ */
+func (p *Probe) patchRuntimeUser(proc *procInternal) {
+	/*
+	Don't use the `proc.ppid` because it probably already exited by the time I'm checking.
+	We're going to use `proc.pname` instead to check that is from the container daemon.
+	Note that `IsRuntimeProcess` only checks the name of the process and not the path, so it might
+	still be possible to spoof.
+
+	When i run pstree - i get the actual parent which is containrd-shim which is a RuntimeProcess.
+	```
+	$ pstree -s -p -a 860138
+	systemd,1 splash
+	  └─containerd-shim,680237 -namespace moby -idd0c005eb42a045efc1
+	      └─top,860138
+	```
+	 */
+		if 	global.RT.IsRuntimeProcess(proc.pname, nil) {
+			proc.user = p.getUserName(proc.pid, proc.euid)
+			mLog.WithFields(log.Fields{"name": proc.name, "parent name": proc.pname, "parent pid": proc.ppid, "uid": proc.euid, "proc user": proc.user,}).Debug("Patching process' username because it came from containerd exec")
+		}
+}
+
 // TODO, improved it with snapshot, passing by reference for all structures
 func (p *Probe) evalNewRunningApp(pid int) {
 	p.lockProcMux() // minimum section lock
@@ -782,6 +814,16 @@ func (p *Probe) evalNewRunningApp(pid int) {
 
 	// last chance to update fields
 	if c.id != "" { // container processes only, skip host processes
+
+		// NVSHAS-7054
+		// If an admin did `docker exec` or `kubectl exec` - the child process inherits
+		// the parent's /etc/passwd which resides on the host. Since we are in the container
+		// (we're doing a check above) - we need to make sure we point to the right /etc/passwd.
+		// If we don't point it to the correct one, the alert payload will include the wrong
+		// username because we point to the wrong passwd file.
+		p.patchRuntimeUser(proc)
+
+
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
 			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
 			if cmds != nil && cmds[0] != "" {
@@ -1758,6 +1800,15 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 			proc.cmds[0] = proc.name
 		}
 	}
+
+	// NVSHAS-7054
+	// If an admin did `docker exec` or `kubectl exec` - the child process inherits
+	// the parent's /etc/passwd which resides on the host. Since we are in the container
+	// (we're doing a check above) - we need to make sure we point to the right /etc/passwd.
+	// If we don't point it to the correct one, the alert payload will include the wrong
+	// username because we point to the wrong passwd file.
+	p.patchRuntimeUser(proc)
+
 
 	var action string
 	var bSkipReport, ok, bSkipEval bool
