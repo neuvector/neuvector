@@ -750,22 +750,17 @@ func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcI
 }
 
 
+/* patchRuntimeUser - Patches the process' username on the following condition:
+	* If the process' parent is the container daemon, this will update the process' username
+
+The reasoning is:
+1. Fixes the bug found in NVSHAS-7054
+	* We get a violation report but the effective user reported is the host machine's username
+		and not the one in the container.
+2. We're trying to avoid always patching the username because getUserName() will access
+		/etc/passwd and we're trying to reduce file accesses.
+ */
 func (p *Probe) patchRuntimeUser(proc *procInternal) {
-	//if proc.name != "top" {
-	//	return
-	//}
-	//mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path,
-	//	"ppid": proc.ppid, "ppath": proc.ppath, "user": proc.user}).Info("JAYU checking container 2")
-
-	parentcontainer, _ := p.pidContainerMap[proc.ppid]
-	// Unlikely that we're checking a process not in a container but still do it just in case
-	// Most calls to this method are only in container context
-	if parentcontainer == nil {
-		//mLog.WithFields(log.Fields{"name": proc.name, "parentcontainer": parentcontainer.rootPid,"parent container name": parentcontainer.id, "child": parentcontainer.children.ToStringSlice() }).Error("JAYU parent is in container")
-		return
-	}
-	//mLog.WithFields(log.Fields{"name": proc.name,}).Error("JAYU parent is not in container, skipping")
-
 	/*
 	Don't use the `proc.ppid` because it probably already exited by the time I'm checking.
 	We're going to use `proc.pname` instead to check that is from the container daemon.
@@ -782,9 +777,8 @@ func (p *Probe) patchRuntimeUser(proc *procInternal) {
 	 */
 		if 	global.RT.IsRuntimeProcess(proc.pname, nil) {
 			proc.user = p.getUserName(proc.pid, proc.euid)
-			mLog.WithFields(log.Fields{"name": proc.name, "parent name": proc.pname, "parent pid": proc.ppid, "uid": proc.euid, "proc user": proc.user,}).Info("Patching process' username because it came from containerd exec")
+			mLog.WithFields(log.Fields{"name": proc.name, "parent name": proc.pname, "parent pid": proc.ppid, "uid": proc.euid, "proc user": proc.user,}).Debug("Patching process' username because it came from containerd exec")
 		}
-
 }
 
 // TODO, improved it with snapshot, passing by reference for all structures
