@@ -749,6 +749,44 @@ func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcI
 	return info, ok
 }
 
+
+func (p *Probe) patchRuntimeUser(proc *procInternal) {
+	//if proc.name != "top" {
+	//	return
+	//}
+	//mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path,
+	//	"ppid": proc.ppid, "ppath": proc.ppath, "user": proc.user}).Info("JAYU checking container 2")
+
+	parentcontainer, _ := p.pidContainerMap[proc.ppid]
+	// Unlikely that we're checking a process not in a container but still do it just in case
+	// Most calls to this method are only in container context
+	if parentcontainer == nil {
+		//mLog.WithFields(log.Fields{"name": proc.name, "parentcontainer": parentcontainer.rootPid,"parent container name": parentcontainer.id, "child": parentcontainer.children.ToStringSlice() }).Error("JAYU parent is in container")
+		return
+	}
+	//mLog.WithFields(log.Fields{"name": proc.name,}).Error("JAYU parent is not in container, skipping")
+
+	/*
+	Don't use the `proc.ppid` because it probably already exited by the time I'm checking.
+	We're going to use `proc.pname` instead to check that is from the container daemon.
+	Note that `IsRuntimeProcess` only checks the name of the process and not the path, so it might
+	still be possible to spoof.
+
+	When i run pstree - i get the actual parent which is containrd-shim which is a RuntimeProcess.
+	```
+	$ pstree -s -p -a 860138
+	systemd,1 splash
+	  └─containerd-shim,680237 -namespace moby -idd0c005eb42a045efc1
+	      └─top,860138
+	```
+	 */
+		if 	global.RT.IsRuntimeProcess(proc.pname, nil) {
+			proc.user = p.getUserName(proc.pid, proc.euid)
+			mLog.WithFields(log.Fields{"name": proc.name, "parent name": proc.pname, "parent pid": proc.ppid, "uid": proc.euid, "proc user": proc.user,}).Info("Patching process' username because it came from containerd exec")
+		}
+
+}
+
 // TODO, improved it with snapshot, passing by reference for all structures
 func (p *Probe) evalNewRunningApp(pid int) {
 	p.lockProcMux() // minimum section lock
@@ -784,8 +822,13 @@ func (p *Probe) evalNewRunningApp(pid int) {
 	if c.id != "" { // container processes only, skip host processes
 
 		// NVSHAS-7054
-		// The effective user was incorrect as it was grabbing the parent's euid instead of the pid's actual euid
-		proc.user =  p.getUserName(proc.pid, proc.euid)
+		// If an admin did `docker exec` or `kubectl exec` - the child process inherits
+		// the parent's /etc/passwd which resides on the host. Since we are in the container
+		// (we're doing a check above) - we need to make sure we point to the right /etc/passwd.
+		// If we don't point it to the correct one, the alert payload will include the wrong
+		// username because we point to the wrong passwd file.
+		p.patchRuntimeUser(proc)
+
 
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
 			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
@@ -1765,8 +1808,13 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	// NVSHAS-7054
-	// The effective user was incorrect as it was grabbing the parent's euid instead of the pid's actual euid
-	proc.user =  p.getUserName(proc.pid, proc.euid)
+	// If an admin did `docker exec` or `kubectl exec` - the child process inherits
+	// the parent's /etc/passwd which resides on the host. Since we are in the container
+	// (we're doing a check above) - we need to make sure we point to the right /etc/passwd.
+	// If we don't point it to the correct one, the alert payload will include the wrong
+	// username because we point to the wrong passwd file.
+	p.patchRuntimeUser(proc)
+
 
 	var action string
 	var bSkipReport, ok, bSkipEval bool
