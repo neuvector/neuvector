@@ -758,7 +758,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"168EE3FA", resetRegistryCfgType},
 
-	{"28ea479c", nil},
+	{"28ea479c", initFedScanRevKey},
+
+	{"FCAB0BF2", nil},
 }
 
 func latestKVVersion() string {
@@ -1584,4 +1586,52 @@ func addFmonRpmPackageDB() {
 
 func resetRegistryCfgType() {
 	clusHelper.GetAllRegistry(share.ScopeLocal)
+}
+
+func initFedScanRevKey() {
+	if m := clusHelper.GetFedMembership(); m != nil && (m.FedRole == api.FedRoleMaster || m.FedRole == api.FedRoleJoint) {
+		if _, _, err := clusHelper.GetFedScanRevisions(); err == cluster.ErrKeyNotFound {
+			var currName string
+			var currRev uint64
+			var regConfigRev uint64
+			var scannedRepoRev uint64
+			scannedRegRevs := make(map[string]uint64)
+			keys, _ := cluster.GetStoreKeys(share.CLUSScanDataStore)
+			for _, key := range keys {
+				regName := share.CLUSKeyNthToken(key, 3)
+				if !strings.HasPrefix(regName, api.FederalGroupPrefix) {
+					continue
+				} else if currName == "" {
+					currName = regName
+					if currName != common.RegistryFedRepoScanName {
+						regConfigRev += 1
+					}
+				} else if regName != currName {
+					if currName == common.RegistryFedRepoScanName {
+						scannedRepoRev = currRev
+					} else {
+						scannedRegRevs[currName] = currRev
+						regConfigRev += 1
+					}
+					currName = regName
+					currRev = 0
+				}
+				currRev += 1
+			}
+			if currName != "" {
+				if currName == common.RegistryFedRepoScanName {
+					scannedRepoRev = currRev
+				} else {
+					scannedRegRevs[currName] = currRev
+				}
+			}
+			clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
+				RegConfigRev:   regConfigRev,
+				ScannedRegRevs: scannedRegRevs,
+				ScannedRepoRev: scannedRepoRev,
+			}, nil)
+		} else if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
+		}
+	}
 }
