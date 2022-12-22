@@ -821,8 +821,9 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		// (we're doing a check above) - we need to make sure we point to the right /etc/passwd.
 		// If we don't point it to the correct one, the alert payload will include the wrong
 		// username because we point to the wrong passwd file.
+		p.lockProcMux() // minimum section lock
 		p.patchRuntimeUser(proc)
-
+		p.unlockProcMux() // minimum section lock
 
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
 			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
