@@ -206,6 +206,7 @@ type DPPolicyIPRule struct {
 	Action  uint8          `json:"action"`
 	Ingress bool           `json:"ingress"`
 	Fqdn    string         `json:"fqdn,omitempty"`
+	Vhost	bool           `json:"vhost,omitempty"`
 	Apps    []*DPPolicyApp `json:"apps,omitempty"`
 }
 
@@ -242,6 +243,7 @@ type DPFqdnDeleteReq struct {
 type DPFqdnIps struct {
 	FqdnName string    `json:"fqdn_name"`
 	FqdnIps   []net.IP  `json:"fqdn_ips"`
+	Vhost    *bool  	`json:"vhost,omitempty"`
 }
 
 type DPFqdnIpSetReq struct {

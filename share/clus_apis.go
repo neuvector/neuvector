@@ -995,6 +995,7 @@ type CLUSCriteriaEntry struct {
 type CLUSFqdnIp struct {
 	FqdnName string   `json:"fqdn_name"`
 	FqdnIP   []net.IP `json:"fqdn_ip"`
+	Vhost	 bool	  `json:"vhost,omitempty"`
 }
 
 type TCfgType int
@@ -1091,6 +1092,7 @@ var CLUSWLModeGroup string = "nv.mode_group"
 var CLUSWLAddressGroup string = "nv.address_group"
 var CLUSHostAddrGroup string = "nv.hostaddr_group" //used as wlid for "nodes" in policy calculation
 var CLUSWLFqdnPrefix string = "fqdn:"
+var CLUSWLFqdnVhPrefix string = "vh:"
 var CLUSLearnedHostPrefix string = "Host:"
 var CLUSLearnedWorkloadPrefix string = "Workload:"
 var CLUSEndpointIngress string = "ingress"
