@@ -33,6 +33,7 @@ type procDelayExit struct {
 }
 
 type Probe struct {
+	bProfileEnable       bool	// default: true
 	agentPid             int
 	agentMntNsId         uint64
 	dpTaskCallback       dp.DPTaskCallback
@@ -371,6 +372,10 @@ func (p *Probe) processContainerAppPortChanges() {
 	for id, c := range p.containerMap {
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(id)
+			if id == p.selfID {
+				c.children.Add(c.rootPid)
+				c.children.Add(p.agentPid)
+			}
 		}
 
 		if id != "" && id != p.selfID && c.rootPid != 0 {
@@ -457,6 +462,7 @@ func (p *Probe) delayProcReportService() {
 func New(pc *ProbeConfig) (*Probe, error) {
 	log.Info()
 	p := &Probe{
+		bProfileEnable:       pc.ProfileEnable,
 		agentPid:             pc.Pid,
 		dpTaskCallback:       pc.DpTaskCallback,
 		notifyTaskChan:       pc.NotifyTaskChan,
@@ -503,6 +509,10 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		mLog.SetLevel(log.DebugLevel)
 	}
 
+	if !p.bProfileEnable {
+		log.Info("Process profiler is disabled")
+	}
+
 	// p.pidNetlink = false // for test scan mode
 	if err := global.SYS.CallNetNamespaceFunc(1, p.cbOpenNetlinkSockets, nil); err != nil {
 		return nil, err
@@ -512,7 +522,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 	bAufsDriver := global.RT.GetStorageDriver() == "aufs"
 	if bAufsDriver {
 		log.WithFields(log.Fields{"runtime": global.RT.String(), "storage driver": global.RT.GetStorageDriver()}).Info("PROC: ")
-	} else {
+	} else if p.bProfileEnable {
 		var ok bool
 		if p.fAccessCtl, ok = NewFileAccessCtrl(p); !ok {
 			log.Info("PROC: Process control is not supported")
@@ -524,9 +534,11 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		p.FaEndChan <- true
 	}
 
-	var ok bool
-	if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
-		log.Error("FSN: failed")
+	if p.bProfileEnable {
+		var ok bool
+		if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
+			log.Error("FSN: failed")
+		}
 	}
 
 	p.selfID, _, _ = global.SYS.GetSelfContainerID()
@@ -554,11 +566,13 @@ func New(pc *ProbeConfig) (*Probe, error) {
 func (p *Probe) Close() {
 	log.Info()
 
-	if p.fAccessCtl != nil {
-		p.fAccessCtl.Close()
+	if p.bProfileEnable {
+		if p.fAccessCtl != nil {
+			p.fAccessCtl.Close()
+		}
+		p.fsnCtr.Close()
 	}
 
-	p.fsnCtr.Close()
 	p.nsInet.Close()
 
 	if p.pidNetlink {

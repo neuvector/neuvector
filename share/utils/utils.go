@@ -1195,3 +1195,30 @@ func DisplayBytes(num int64) string {
 	}
 	return fmt.Sprintf("%d Bytes", num)
 }
+
+////
+var regCrdName *regexp.Regexp = regexp.MustCompile(`^([0-9a-z])([0-9a-z-.])*([0-9a-z])$`)
+var regDns1122 *regexp.Regexp = regexp.MustCompile(`^[a-z0-9.-]{1}$`)
+var regDns1122start *regexp.Regexp = regexp.MustCompile(`^[a-z0-9]{1}$`)
+
+func replaceAtIndex(in string, r rune, i int) string {
+	out := []rune(in)
+	out[i] = r
+	return string(out)
+}
+
+func Dns1123NameChg(name string) string {
+	if !regCrdName.MatchString(name) {
+		length := len(name)
+		fmt.Println("string:", name, "failed regex with len ", length)
+		for i, char := range name {
+			if (i == 0 || i == length-1) && !regDns1122start.MatchString(string(char)) {
+				name = replaceAtIndex(name, '0', i)
+			} else if !regDns1122.MatchString(string(char)) {
+				fmt.Println("char:", string(char), "failed regex")
+				name = strings.Replace(name, string(char), "-", -1)
+			}
+		}
+	}
+	return name
+}

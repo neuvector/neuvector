@@ -538,6 +538,10 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 		// retrive the rootPid
 		if c.rootPid == 0 {
 			c.rootPid = p.getContainerPid(c.id)
+			if id == p.selfID {
+				c.children.Add(c.rootPid)
+				c.children.Add(p.agentPid)
+			}
 		}
 
 		if c.rootPid != 0 && c.rootPid == pid { // rootPid exited, remove this container
@@ -585,8 +589,54 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 	}
 }
 
-func (p *Probe) isAgentNsOperation(proc *procInternal) bool {
-	return global.SYS.IsToolProcess(proc.sid, proc.pgid)
+func unexpectedAgentProcess(name string) bool {
+	if global.RT.IsRuntimeProcess(name, nil) {
+		return true
+	}
+	if _, ok := suspicProcMap[name]; ok {
+		return true
+	}
+	return false
+}
+
+func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
+	if id == p.selfID {
+		if c, ok := p.containerMap[id]; ok {
+			if isFamilyProcess(c.children, proc) {
+				return true
+			}
+
+			if global.SYS.IsToolProcess(proc.sid, proc.pgid) {
+				c.children.Add(proc.pid)
+				return true
+			}
+
+			// log.WithFields(log.Fields{"children": c.children.String(), "rootPid": c.rootPid, "oursider": c.outsider.String()}).Debug("PROC:")
+			ppid := proc.ppid
+			for i := 0; i < 5; i++ {	// lookup 5 ancestries
+				if pproc, ok := p.pidProcMap[ppid]; ok {
+					// log.WithFields(log.Fields{"pproc": pproc, "i": i}).Debug("PROC:")
+					if unexpectedAgentProcess(pproc.name){
+						return false
+					}
+
+					if isFamilyProcess(c.children, pproc) || pproc.pid == p.agentPid || pproc.pid == c.rootPid {
+						c.children.Add(proc.pid)
+						return true
+					}
+					ppid = pproc.ppid
+					continue
+				}
+
+				// give up lookup
+				if i == 0 {	// no parent process for reference
+					return true
+				}
+				break
+			}
+		}
+	}
+	return false
 }
 
 func (p *Probe) isAgentProcess(sid int, id string) bool {
@@ -637,7 +687,7 @@ func (p *Probe) printProcReport(id string, proc *procInternal) {
 		s = "[host]"
 		// return
 	} else if p.isAgentProcess(proc.sid, id) {
-		//	if p.isAgentNsOperation(proc) {
+		//	if p.isAgentChildren(proc, id) {
 		//		return
 		//	}
 		// s = "[self]"
@@ -1658,22 +1708,12 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 	return true, false
 }
 
-//
-func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
-	if id == p.selfID {
-		if p.agentSessionID == proc.sid {
-			return true
-		}
-
-		if c, ok := p.containerMap[p.selfID]; ok {
-			return isFamilyProcess(c.children, proc)
-		}
-	}
-	return false
-}
-
 // Application event handler: locked by calling functions
 func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bool) {
+	if !p.bProfileEnable {
+		return
+	}
+
 	if proc.path == "" || proc.path == "/" {
 		// path is required, it can not be either "" or "/".
 		// log.WithFields(log.Fields{"proc": proc}).Debug("PROC: ignored, no path")
@@ -1681,7 +1721,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	// only allowing the NS op from the agent's root session
-	if p.isAgentChildren(proc, id) || p.isAgentNsOperation(proc) {
+	if p.isAgentChildren(proc, id) {
 		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
 		return
 	}
@@ -2644,8 +2684,10 @@ func (p *Probe) applyProcessBlockingPolicy(id string, pid int, pg *share.CLUSPro
 
 //////
 func (p *Probe) HandleProcessPolicyChange(id string, pid int, pg *share.CLUSProcessProfile, bAddContainer, bBlocking bool) {
-	p.processProfileReeval(id, pg, bAddContainer)
-	p.applyProcessBlockingPolicy(id, pid, pg, bBlocking)
+	if p.bProfileEnable {
+		p.processProfileReeval(id, pg, bAddContainer)
+		p.applyProcessBlockingPolicy(id, pid, pg, bBlocking)
+	}
 }
 
 func (p *Probe) SetMonitorTrace(bEnable bool) {
@@ -2770,6 +2812,9 @@ func negativeResByMode(mode string) string {
 
 func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInternal, ppe *share.CLUSProcessProfileEntry, bFromPmon bool) bool {
 	var bPass, bImageFile, bModified bool
+	if !p.bProfileEnable {
+		return true
+	}
 
 	if id == "" { // nodes
 		return true
@@ -2783,7 +2828,8 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Error("SHD: Unknown ID")
+		// the container was exited before we investigate into it
+		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("SHD: Unknown ID")
 		return true
 	}
 
@@ -2967,6 +3013,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
+	if !p.bProfileEnable {
+		return
+	}
 
 	p.lockProcMux()
 	defer p.unlockProcMux()
@@ -3040,6 +3089,9 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 }
 
 func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int) {
+	if !p.bProfileEnable {
+		return
+	}
 	if bAdd {
 		if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
 			log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
@@ -3071,6 +3123,10 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 }
 
 func (p *Probe) UpdateFromAllowRule(id, path string) {
+	if !p.bProfileEnable {
+		return
+	}
+
 	p.lockProcMux()
 	if c, ok := p.containerMap[id]; ok {
 		if _, ok = c.fInfo[path]; ok {

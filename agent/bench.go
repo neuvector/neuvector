@@ -198,9 +198,13 @@ func (b *Bench) BenchLoop() {
 	for {
 		select {
 		case <-b.hostTimer.C:
-			b.doDockerHostBench()
-
+			if agentEnv.autoBenchmark {
+				b.doDockerHostBench()
+			}
 		case <-b.kubeTimer.C:
+			if !agentEnv.autoBenchmark {
+				continue
+			}
 			// Check version whenever the benchmark is rerun
 			k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 			if masterScript == "" {
@@ -272,10 +276,12 @@ func (b *Bench) BenchLoop() {
 			b.doKubeBench(masterScript, workerScript, remediation)
 		case <-b.conTimer.C:
 			containers := b.cloneAllNewContainers()
-			if Host.CapDockerBench {
-				b.doDockerContainerBench(containers)
-			} else {
-				b.putBenchReport(Host.ID, share.BenchDockerContainer, nil, share.BenchStatusFinished)
+			if agentEnv.autoBenchmark {
+				if Host.CapDockerBench {
+					b.doDockerContainerBench(containers)
+				} else {
+					b.putBenchReport(Host.ID, share.BenchDockerContainer, nil, share.BenchStatusFinished)
+				}
 			}
 
 			// Run custom checks
@@ -285,7 +291,7 @@ func (b *Bench) BenchLoop() {
 				if c, ok := gInfo.activeContainers[id]; ok {
 					// skip kubernetes pod
 					if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-						wls = append(wls, createWorkload(c.info))
+						wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 						if agentEnv.scanSecrets {
 							group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
 							b.taskScanner.addScanTask(c.pid, name, id, group)
@@ -302,7 +308,7 @@ func (b *Bench) BenchLoop() {
 			for _, c := range gInfo.activeContainers {
 				// skip kubernetes pod
 				if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-					wls = append(wls, createWorkload(c.info))
+					wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 				}
 			}
 			gInfoRUnlock()
@@ -464,12 +470,16 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 }
 
 func (b *Bench) ResetDockerStatus() {
-	b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusIdle)
+	if agentEnv.autoBenchmark {
+		b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusIdle)
+	}
 }
 
 func (b *Bench) ResetKubeStatus() {
-	b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
-	b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusIdle)
+	if agentEnv.autoBenchmark {
+		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
+		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusIdle)
+	}
 }
 
 func (b *Bench) cloneAllNewContainers() map[string]string {
@@ -767,10 +777,6 @@ func (b *Bench) runDockerHostBench() ([]byte, error) {
 }
 
 func (b *Bench) doDockerHostBench() error {
-	if !agentEnv.autoBenchmark {
-		return nil
-	}
-
 	log.Debug()
 
 	b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusRunning)
@@ -795,10 +801,6 @@ func (b *Bench) doDockerHostBench() error {
 }
 
 func (b *Bench) doDockerContainerBench(containers map[string]string) error {
-	if !agentEnv.autoBenchmark {
-		return nil
-	}
-
 	b.putBenchReport(Host.ID, share.BenchDockerContainer, nil, share.BenchStatusRunning)
 	if out, err := b.runDockerContainerBench(containers); err != nil {
 		b.logBenchFailure(benchPlatDocker, share.BenchStatusDockerContainerFail)
@@ -886,7 +888,7 @@ func (b *Bench) doContainerCustomCheck(wls []*share.CLUSWorkload) {
 		}
 	}
 
-	log.Info("Running benchmark checks done")
+	log.Debug("Running benchmark checks done")
 }
 
 func (b *Bench) doHostCustomCheck() {

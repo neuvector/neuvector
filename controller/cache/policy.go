@@ -427,7 +427,7 @@ func getWorkloadEffectivePolicyMode(wlCache *workloadCache) (string, string) {
 		if cache, ok := groupCacheMap[wlCache.learnedGroupName]; ok {
 			return cache.group.PolicyMode, cache.group.ProfileMode
 		} else {
-			return api.WorkloadStateDiscover, api.WorkloadStateDiscover
+			return share.PolicyModeLearn, share.PolicyModeLearn
 		}
 	}
 }

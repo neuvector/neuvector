@@ -114,6 +114,7 @@ type groupInfo struct {
 
 type FileWatch struct {
 	mux        sync.Mutex
+	bEnable    bool		// profile function is enabled, default: true
 	aufs       bool
 	fanotifier *FaNotify
 	inotifier  *Inotify
@@ -188,6 +189,7 @@ type FsmonConfig struct {
 }
 
 type FileMonitorConfig struct {
+	ProfileEnable  bool
 	IsAufs         bool
 	EnableTrace    bool
 	EndChan        chan bool
@@ -207,11 +209,29 @@ func NewFileWatcher(config *FileMonitorConfig) (*FileWatch, error) {
 		mLog.SetLevel(log.DebugLevel)
 	}
 
+	fw := &FileWatch{
+		bEnable:    config.ProfileEnable,
+		aufs:       config.IsAufs,
+		fileEvents: make(map[string]*fileMod),
+		groups:     make(map[int]*groupInfo),
+		sendrpt:    config.SendReport,
+		sendRule:   config.SendAccessRule,
+		estRuleSrc: config.EstRule,
+		walkerTask: config.WalkerTask,
+	}
+
+	if !fw.bEnable {
+		log.Info("File monitor is disabled")
+		config.EndChan <- true
+		return fw, nil
+	}
+
 	n, err := NewFaNotify(config.EndChan, config.PidLookup, global.SYS)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Open fanotify fail")
 		return nil, err
 	}
+
 	ni, err := NewInotify()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Open inotify fail")
@@ -221,17 +241,9 @@ func NewFileWatcher(config *FileMonitorConfig) (*FileWatch, error) {
 	go n.MonitorFileEvents()
 	go ni.MonitorFileEvents()
 
-	fw := &FileWatch{
-		aufs:       config.IsAufs,
-		fanotifier: n,
-		inotifier:  ni,
-		fileEvents: make(map[string]*fileMod),
-		groups:     make(map[int]*groupInfo),
-		sendrpt:    config.SendReport,
-		sendRule:   config.SendAccessRule,
-		estRuleSrc: config.EstRule,
-		walkerTask: config.WalkerTask,
-	}
+	fw.fanotifier = n
+	fw.inotifier= ni
+
 	go fw.loop()
 	return fw, nil
 }
@@ -399,6 +411,10 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, eve
 }
 
 func (w *FileWatch) UpdateAccessRules(name string, rootPid int, conf *share.CLUSFileAccessRule) {
+	if !w.bEnable {
+		return
+	}
+
 	// log.WithFields(log.Fields{"name": name}).Debug("FMON:")
 	w.mux.Lock()
 
@@ -425,6 +441,9 @@ func (w *FileWatch) UpdateAccessRules(name string, rootPid int, conf *share.CLUS
 
 func (w *FileWatch) Close() {
 	log.Info()
+	if !w.bEnable {
+		return
+	}
 
 	if w.fanotifier != nil {
 		w.fanotifier.Close()
@@ -576,12 +595,16 @@ func (w *FileWatch) addCoreFile(cid string, dirList map[string]*osutil.FileInfoE
 }
 
 func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlock, bNeuvectorSvc bool) {
+	if !w.bEnable {
+		return
+	}
+
 	log.WithFields(log.Fields{"id": id, "group": conf.Profile.Group, "Pid": rootPid, "mode": conf.Profile.Mode}).Debug("FMON:")
 	// log.WithFields(log.Fields{"File": conf.Profile}).Debug("FMON:")
 	// log.WithFields(log.Fields{"Access": conf.Rule}).Debug("FMON:")
 	//// no access rules for neuvector and host
 	if !osutil.IsPidValid(rootPid) {
-		log.WithFields(log.Fields{"id": id, "Pid": rootPid}).Error("FMON: invalid Pid")
+		log.WithFields(log.Fields{"id": id, "Pid": rootPid}).Debug("FMON: invalid Pid")
 		return
 	}
 
@@ -629,15 +652,6 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 
 	if conf.Rule != nil {
 		w.UpdateAccessRules(conf.Profile.Group, rootPid, conf.Rule)
-	}
-}
-
-func (w *FileWatch) AddProcessFile(id string, rootPid int, pid int) {
-	if files := osutil.GetFileInfoExtFromPid(rootPid, pid); files != nil {
-		for _, finfo := range files {
-			finfo.ContainerId = id
-			w.addFile(finfo)
-		}
 	}
 }
 
@@ -749,6 +763,9 @@ func (w *FileWatch) handleFileEvents(fmod *fileMod, info os.FileInfo, fullPath s
 }
 
 func (w *FileWatch) ContainerCleanup(rootPid int) {
+	if !w.bEnable {
+		return
+	}
 	w.fanotifier.ContainerCleanup(rootPid)
 	w.inotifier.ContainerCleanup(rootPid)
 	w.mux.Lock()
@@ -757,16 +774,25 @@ func (w *FileWatch) ContainerCleanup(rootPid int) {
 }
 
 func (w *FileWatch) GetWatchFileList(rootPid int) []*share.CLUSFileMonitorFile {
+	if !w.bEnable {
+		return nil
+	}
 	return w.fanotifier.GetWatchFileList(rootPid)
 }
 
 func (w *FileWatch) GetAllFileMonitorFile() []*share.CLUSFileMonitorFile {
+	if !w.bEnable {
+		return nil
+	}
 	return w.fanotifier.GetWatches()
 }
 
 ////////
 func (w *FileWatch) GetProbeData() *FmonProbeData {
 	var probeData FmonProbeData
+	if !w.bEnable {
+		return nil
+	}
 
 	w.mux.Lock()
 	probeData.NFileEvents = len(w.fileEvents)

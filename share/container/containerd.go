@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"time"
 
@@ -43,6 +42,11 @@ type containerdDriver struct {
 	snapshotter   string
 }
 
+// patch for the mismatched grpc versions
+func wrapIntoErrorString(err error) error {
+	return errors.New(err.Error())
+}
+
 func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	log.WithFields(log.Fields{"endpoint": endpoint}).Debug("Connecting to containerd")
 
@@ -50,8 +54,8 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		containerd.WithDefaultNamespace(k8sContainerdNamespace),
 		containerd.WithTimeout(clientConnectTimeout))
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-		return nil, err
+		log.WithFields(log.Fields{"error": err.Error()}).Error("")
+		return nil, wrapIntoErrorString(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,7 +84,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 
 	ver, err := client.Version(ctx)
 	if err != nil {
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
@@ -125,56 +129,21 @@ func (d *containerdDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMe
 }
 
 // When a container task is killed, 'task' can still be retrieved; but when it is deleted, task will be nil
-func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container) (*containers.Container, *oci.Spec, containerd.Task, *containerd.Status, int, error) {
+func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container) (*containers.Container, *oci.Spec, int, *containerd.Status, int, error) {
 	info, err := c.Info(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
-		return nil, nil, nil, nil, 0, err
+		return nil, nil, 0, nil, 0, wrapIntoErrorString(err)
+	}
+
+	if info.Labels == nil {
+		info.Labels = make(map[string]string)
 	}
 
 	spec, err := c.Spec(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container spec")
-		return nil, nil, nil, nil, 0, err
-	}
-
-	task, err := c.Task(ctx, nil)
-	if err != nil {
-		meta, _ := d.GetContainerCriSupplement(c.ID())
-		if meta != nil {
-			// log.WithFields(log.Fields{"meta": meta}).Info("CRI")
-			status := &containerd.Status{
-				Status:     containerd.Stopped,
-				ExitStatus: uint32(meta.ExitCode),
-				ExitTime:   meta.FinishedAt,
-			}
-			return &info, spec, nil, status, 0, nil
-		}
-
-		status := &containerd.Status{	// unknown
-			Status:     containerd.Stopped,
-			ExitStatus: 0,
-			ExitTime:   time.Time{},
-		}
-		log.WithFields(log.Fields{"id": c.ID(), "error": err}).Debug("Failed to get container task")
-		return &info, spec, nil, status, 0, nil
-	}
-	status, err := task.Status(ctx)
-	if err != nil {
-		log.WithFields(log.Fields{"id": c.ID(), "error": err}).Info("Failed to get container task status")
-		return &info, spec, nil, nil, 0, nil
-	}
-
-	attempt := 0
-	ext, err := c.Extensions(ctx)
-	if err == nil {
-		if pdata, ok := ext["io.cri-containerd.sandbox.metadata"]; ok {
-			attempt, err = d.decodeExtension_attempt(pdata.GetValue())
-			//	log.WithFields(log.Fields{"id": c.ID(), "attempt": attempt}).Debug("CTR: sandbox")
-		} else if pdata, ok := ext["io.cri-containerd.container.metadata"]; ok {
-			attempt, err = d.decodeExtension_attempt(pdata.GetValue())
-			//	log.WithFields(log.Fields{"id": c.ID(),"attempt": attempt}).Debug("CTR: container")
-		}
+		return nil, nil, 0, nil, 0, wrapIntoErrorString(err)
 	}
 
 	// if image name is a digest identifier
@@ -184,18 +153,61 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		}
 	}
 
-	return &info, spec, task, &status, attempt, nil
+	if meta, pid, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil {
+		// log.WithFields(log.Fields{"meta": meta}).Info("CRI")
+		state := containerd.Stopped
+		if meta.Running {
+			state = containerd.Running
+		}
+		status := &containerd.Status{
+			Status:     state,
+			ExitStatus: uint32(meta.ExitCode),
+			ExitTime:   meta.FinishedAt,
+		}
+		return &info, spec, pid, status, int(attempt), nil
+	}
+
+	// 2nd try on the ctr task
+	rootpid := 0
+	attempts := 0
+	if task, err := c.Task(ctx, nil); err == nil {
+		rootpid = int(task.Pid())
+		if ext, err := c.Extensions(ctx); err == nil {
+			if pdata, ok := ext["io.cri-containerd.sandbox.metadata"]; ok {
+				attempts, err = d.decodeExtension_attempt(pdata.GetValue())
+				//	log.WithFields(log.Fields{"id": c.ID(), "attempt": attempt}).Debug("CTR: sandbox")
+			} else if pdata, ok := ext["io.cri-containerd.container.metadata"]; ok {
+				attempts, err = d.decodeExtension_attempt(pdata.GetValue())
+				//	log.WithFields(log.Fields{"id": c.ID(),"attempt": attempt}).Debug("CTR: container")
+			}
+		}
+
+		if status, err := task.Status(ctx); err == nil {
+			return &info, spec, rootpid, &status, attempts, nil
+		}
+	}
+
+	status := &containerd.Status{	// unknown
+		Status:     containerd.Stopped,
+		ExitStatus: 0,
+		ExitTime:   time.Time{},
+	}
+	return &info, spec, rootpid, status, attempts, nil
 }
 
-func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, task containerd.Task, attempt int) *ContainerMeta {
+func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, pid int, attempt int) (*ContainerMeta, string) {
+	var author string
+
 	meta := &ContainerMeta{
 		ID:       info.ID,
 		Name:     info.ID,
 		Image:    info.Image,
 		Labels:   info.Labels,
 		Hostname: spec.Hostname,
+		Pid:      pid,
 	}
 	if image, err := d.GetImage(info.Image); err == nil {
+		author = image.Author
 		for k, v := range image.Labels {
 			// Not to overwrite container labels when merging
 			if _, ok := meta.Labels[k]; !ok {
@@ -204,9 +216,6 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, t
 		}
 	}
 
-	if task != nil {
-		meta.Pid = int(task.Pid())
-	}
 	if spec.Process != nil {
 		meta.Envs = spec.Process.Env
 	}
@@ -258,7 +267,7 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, t
 			meta.NetMode = "host"
 		}
 	}
-	return meta
+	return meta, author
 }
 
 func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string, bSandBox bool) bool {
@@ -287,12 +296,12 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 	defer cancel()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to list containers")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	metas := make([]*ContainerMeta, 0, len(containers))
 	for _, c := range containers {
-		info, spec, task, status, attempt, err := d.getSpecs(ctx, c)
+		info, spec, pid, status, attempt, err := d.getSpecs(ctx, c)
 		if err != nil {
 			log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
 			continue
@@ -302,7 +311,8 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 			continue
 		}
 
-		metas = append(metas, d.getMeta(info, spec, task, attempt))
+		meta, _ := d.getMeta(info, spec, pid, attempt)
+		metas = append(metas, meta)
 	}
 
 	return metas, nil
@@ -314,13 +324,13 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 	c, err := d.client.LoadContainer(ctx, id)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to get container")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
-	info, spec, task, status, attempt, err := d.getSpecs(ctx, c)
+	info, spec, pid, status, attempt, err := d.getSpecs(ctx, c)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
-		return nil, err
+		return nil, wrapIntoErrorString(err)
 	}
 
 	bSandBox := false
@@ -328,13 +338,16 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 		bSandBox = true
 	}
 
+	cmeta, author := d.getMeta(info, spec, pid, attempt)
 	meta := &ContainerMetaExtra{
-		ContainerMeta: *d.getMeta(info, spec, task, attempt),
+		ContainerMeta: *cmeta,
+		Author:        author,
 		Privileged:    d.isPrivileged(spec, c.ID(), bSandBox),
 		CreatedAt:     info.CreatedAt,
 		StartedAt:     info.CreatedAt,
 		Networks:      utils.NewSet(),
 	}
+
 	if status != nil {
 		meta.Running = (status.Status == containerd.Running)
 		meta.ExitCode = int(status.ExitStatus)
@@ -369,21 +382,7 @@ func (d *containerdDriver) GetImageHistory(name string) ([]*ImageHistory, error)
 }
 
 func (d *containerdDriver) GetImage(name string) (*ImageMeta, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if image, err := d.client.GetImage(ctx, name); err == nil {
-		target := image.Target()
-		meta := &ImageMeta{
-			ID:     target.Digest.String(),
-			Digest: target.Digest.String(),
-			Size:   target.Size,
-			Labels: image.Labels(),
-		}
-		return meta, nil
-	} else {
-		return nil, err
-	}
+	return getCriImageMeta(d.criClient, name)
 }
 
 func (d *containerdDriver) GetImageFile(id string) (io.ReadCloser, error) {
@@ -473,7 +472,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 				if ev.Event != nil {
 					v, err := typeurl.UnmarshalAny(ev.Event)
 					if err != nil {
-						log.WithFields(log.Fields{"error": err, "event": v}).Error("Unmarshal containderd event error")
+						log.WithFields(log.Fields{"error": err.Error(), "event": v}).Error("Unmarshal containderd event error")
 						break
 					}
 					switch event := v.(type) {
@@ -495,7 +494,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 				}
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
-					log.WithFields(log.Fields{"error": err}).Error("Containderd event monitor error")
+					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
 				}
 				break Loop
 			case <-ctx.Done():
@@ -583,25 +582,52 @@ func (d *containerdDriver) decodeExtension_attempt(extData []byte) (int, error) 
 	return attempt, nil
 }
 
-func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaExtra, error) {
+func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaExtra, int, uint32, error) {
 	if d.criClient == nil {
-		return nil, nil
+		return nil, 0, 0, nil
 	}
+
+	var meta *ContainerMetaExtra
+	var attempt uint32
+	var pid int
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	cs, err := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
-	if err != nil || cs.Status == nil {
-		return nil, err
-	}
+	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
+	if err == nil && pod != nil {
+		if pod.Status == nil || pod.Info == nil {
+			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
+			return nil, 0, 0, err
+		}
 
-	meta := &ContainerMetaExtra{
-		FinishedAt: time.Unix(0, cs.Status.FinishedAt),
-		ExitCode:   int(cs.Status.ExitCode),
+		// a POD
+		meta = &ContainerMetaExtra{
+			CreatedAt:     time.Unix(0, pod.Status.CreatedAt),
+			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
+		}
+		attempt = pod.Status.Metadata.Attempt
+		pid, _ = d.getContainerPid_CRI(pod.GetInfo())
+	} else {
+		// an APP container
+		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
+		if err2 != nil || cs.Status == nil || cs.Info == nil {
+			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
+			return nil, 0, 0, err2
+		}
+
+		meta = &ContainerMetaExtra{
+			CreatedAt:     time.Unix(0, cs.Status.CreatedAt),
+			StartedAt:     time.Unix(0, cs.Status.StartedAt),
+			FinishedAt:    time.Unix(0, cs.Status.FinishedAt),
+			ExitCode:      int(cs.Status.ExitCode),
+			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
+		}
+		attempt = cs.Status.Metadata.Attempt
+		pid, _ = d.getContainerPid_CRI(cs.GetInfo())
 	}
-	return meta, nil
+	return meta, pid, attempt, nil
 }
 
 ///////
@@ -672,29 +698,16 @@ func (d *containerdDriver) isPrivilegedPod_CRI(id string) bool {
 	return false
 }
 
-//// construct a json string from map[]
-func buildJsonFromMap(info map[string]string) string {
-	// sort all keys
-	keys := []string{}
-	for k := range info {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+func (d *containerdDriver) getContainerPid_CRI(infoMap map[string]string) (int, error) {
+	// Info is extra information of the Runtime. The key could be arbitrary string, and
+	// value should be in json format.
+	var res criContainerInfoRes
 
-	jsonInfo := "{"
-	for _, k := range keys {
-		var res interface{}
-		// We attempt to convert key into JSON if possible else use it directly
-		if err := json.Unmarshal([]byte(info[k]), &res); err != nil {
-			jsonInfo += "\"" + k + "\"" + ":" + "\"" + info[k] + "\","
-		} else {
-			jsonInfo += "\"" + k + "\"" + ":" + info[k] + ","
-		}
+	jsonInfo := buildJsonFromMap(infoMap) // from map[string]string
+	if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
+		return 0, err
 	}
-	jsonInfo = jsonInfo[:len(jsonInfo)-1]
-	jsonInfo += "}"
-	// log.WithFields(log.Fields{"info": jsonInfo}).Debug()
-	return jsonInfo
+	return res.Info.Pid, nil
 }
 
 func decodeSnapshotter(info map[string]string) (string, error) {

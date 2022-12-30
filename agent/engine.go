@@ -230,7 +230,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	case "controller+enforcer+manager", "allinone":
 		entryPtSig = "/usr/bin/supervisord" // a python app
 	case "updater":
-		entryPtSig = "/usr/local/bin/upgrader"
+		entryPtSig = "sleep" 				// 4.4: "/usr/local/bin/upgrader"
 	case "fetcher":
 		entryPtSig = "/usr/local/bin/fetcher"
 	default:
@@ -241,7 +241,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	// passed the 1st screening
 
 	// 2nd screening: handle the exited child container at the last part
-	if rootPid == 0 {
+	if !osutil.IsPidValid(rootPid) {
 		// log.Debug("invalid root pid")
 		return true // skipped the test
 	}
@@ -267,16 +267,7 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 		return "", false
 	}
 
-	//  only for docker runtime engine
-	//  not present for controller, updater releases
-	//	if vendor, ok := labels["vendor"]; !ok || vendor != "NeuVector Inc." {
-	//		log.WithFields(log.Fields{"labels": labels}).Debug("PROC")
-	//		return "", false
-	//	}
-
-	//  only for docker runtime engine (inc docker native)
 	if role, ok := labels[share.NeuVectorLabelRole]; ok {
-		//	log.WithFields(log.Fields{"labels": labels}).Debug("PROC")
 		if isNeuvectorFunctionRole(role, info.Pid) {
 			return role, true
 		}
@@ -1067,7 +1058,7 @@ func fillContainerProperties(c *containerData, parent *containerData,
 	// Not using write lock because all fields filled here are simple
 	c.svcSubnet = global.ORCH.GetServiceSubnet(info.Envs)
 	if parent == nil {
-		svc := global.ORCH.GetService(&info.ContainerMeta)
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 		c.service = utils.MakeServiceName(svc.Domain, svc.Name)
 		c.domain = svc.Domain
 		c.hostMode = hostMode
@@ -1379,7 +1370,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	// (1) native runtime env.: name of the image
 	// (2) k8s: namespace + name in the metadata section of its YAML
 	//          like controller =>  "neuvector (Domain/Namespace) + neuvector-controller-pod (Name)""
-	svc := global.ORCH.GetService(&info.ContainerMeta)
+	svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
 	c.service = utils.MakeServiceName(svc.Domain, svc.Name)
 	c.domain = svc.Domain
 	group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
@@ -1513,7 +1504,6 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	c.info = info      // update
 	c.pid = c.info.Pid // update
 	log.WithFields(log.Fields{"container": id, "rootPid": c.info.Pid}).Debug("")
-
 	// The order to call this function for parent and child container is not guaranteed, wait for the parent
 	// if the child comes first
 	// TODO: Why check parent.service? The order is not guaranteed even when parent exists, because it is added
@@ -1660,8 +1650,8 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	if !info.Running {
 		// service is not reported until container is running; domain should be filled.
 		// it reports the exited container as well
-		svc := global.ORCH.GetService(&info.ContainerMeta)
-		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, domain: &svc.Domain}
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
+		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &svc.Name, domain: &svc.Domain}
 		ClusterEventChan <- &ev
 
 		log.Debug("Container not running")

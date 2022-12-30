@@ -1227,7 +1227,7 @@ func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 func addK8sPodEvent(pod resource.Pod) {
 	probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
 	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
-	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Labels); svc != nil {
+	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Node, pod.Labels); svc != nil {
 		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
 	}
 
@@ -1448,9 +1448,12 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		// Because IP can change in workload update event, these have to be called every time.
 		if wl.Running {
 			addrWorkloadAdd(wl.ID, wlCache)
+		}
+		//NVSHAS-7433, it is possible newly added short-lived workload is not running
+		//so we need to delete Workload:IP and its related policy 
+		if wl.Running || newWorkload {
 			connectWorkloadAdd(wl.ID, wlCache)
 		}
-
 		// workload cache change are synchronized in ObjectUpdateHandler(), so
 		// reading wlCache doesn't have to be protected by cacheMutex
 		if started {
