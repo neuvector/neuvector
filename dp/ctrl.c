@@ -2280,8 +2280,13 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_keep_alive(msg);
             continue;
         }
+        char *data = json_dumps(msg, JSON_ENSURE_ASCII);
 
-        DEBUG_CTRL("\"%s\":%s\n", key, json_dumps(msg, JSON_ENSURE_ASCII));
+        if (data != NULL) {
+            DEBUG_CTRL("\"%s\":%s\n", key, data);
+        }
+        //data needs to be freed otherwise there is memory leak
+        free(data);
 
         if (strcmp(key, "ctrl_add_srvc_port") == 0) {
             ret = dp_ctrl_add_srvc_port(msg);
