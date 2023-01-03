@@ -2272,11 +2272,8 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_keep_alive(msg);
             continue;
         }
-        char *data = json_dumps(msg, JSON_ENSURE_ASCII);
-
-        if (data != NULL) {
-            DEBUG_CTRL("\"%s\":%s\n", key, data);
-        }
+        char *data = NULL;
+        DEBUG_CTRL("\"%s\":%s\n", key, data=json_dumps(msg, JSON_ENSURE_ASCII));
         //data needs to be freed otherwise there is memory leak
         free(data);
 
