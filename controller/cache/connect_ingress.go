@@ -331,17 +331,11 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 		ca.workload = true
 		ca.managed = true
 
-		if strings.Contains(conn.Network, share.NetworkProxyMesh) {
+		if strings.Contains(conn.Network, share.NetworkProxyMesh) && !conn.MeshToSvr {
 			conn.ServerWL = conn.ClientWL
 			sa.external = false
 			sa.workload = true
 			sa.managed = true
-			if conn.MeshToSvr {
-				if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
-					conn.ServerWL = ep
-					sa.addrgrp = true
-				}
-			}
 			return &ca, &sa, &stip, true
 		} else if isDeviceIP(net.IP(conn.ServerIP)) {
 			cctx.ConnLog.WithFields(log.Fields{
