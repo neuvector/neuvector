@@ -1002,7 +1002,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 	if (parent.ruid-c.userns.root) >= c.userns.uidMin && // valid user range
 		proc.ruid == c.userns.root { // user at root privilege level
 		p.updateProcess(parent) // obtain latest parent data
-		if _, _, notAuth := p.checkUserGroup_uidChange(parent, c); notAuth {
+
+
+		p.lockProcMux() // minimum section lock
+		_, _, notAuth := p.checkUserGroup_uidChange(parent, c)
+		p.unlockProcMux() // minimum section lock
+
+		if notAuth {
 			if len(parent.cmds) == 0 {
 				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
 			}
