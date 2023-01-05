@@ -372,12 +372,16 @@ func putWorkload(wl *share.CLUSWorkload) {
 }
 
 func putContainerForStop(info *container.ContainerMetaExtra, wl *share.CLUSWorkload) {
-	log.WithFields(log.Fields{"container": info.ID}).Debug("")
-
-	wl.FinishedAt = info.FinishedAt
-	wl.Running = info.Running
-	wl.ExitCode = info.ExitCode
-	wl.Pid = info.Pid
+	if info != nil {
+		log.WithFields(log.Fields{"container": info.ID}).Debug("")
+		wl.FinishedAt = info.FinishedAt
+		wl.Running = info.Running
+		wl.ExitCode = info.ExitCode
+		wl.Pid = info.Pid
+	} else {
+		wl.FinishedAt = time.Now().UTC()
+		wl.Running = false
+	}
 
 	// !!! Keep interface IP so controller could easily use the IP to remove ip-workload map entries
 	// !!! when it figured the container is not running
