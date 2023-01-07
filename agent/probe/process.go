@@ -2003,11 +2003,16 @@ func (p *Probe) CheckDNSTunneling(ids []string, clientPort share.CLUSProtoPort, 
 }
 
 func (p *Probe) GetProbeSummary() *share.CLUSProbeSummary {
+	var summary *share.CLUSProbeSummary
+	if !p.bProfileEnable {
+		return summary
+	}
+
 	p.lockProcMux()
 	defer p.unlockProcMux()
 
 	// general information
-	summary := &share.CLUSProbeSummary{
+	summary = &share.CLUSProbeSummary{
 		ContainerMap:      uint32(len(p.containerMap)),
 		PidContainerMap:   uint32(len(p.pidContainerMap)),
 		PidProcMap:        uint32(len(p.pidProcMap)),
