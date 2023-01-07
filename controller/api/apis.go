@@ -1739,7 +1739,8 @@ type RESTUnquarReq struct {
 }
 
 type RESTSystemRequest struct {
-	PolicyMode *string        `json:"policy_mode,omitempty"`
+	PolicyMode      *string   `json:"policy_mode,omitempty"`
+	BaselineProfile *string   `json:"baseline_profile,omitempty"`
 	Unquar     *RESTUnquarReq `json:"unquarantine,omitempty"`
 }
 

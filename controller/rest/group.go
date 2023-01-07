@@ -1161,6 +1161,52 @@ func setServicePolicyModeAll(mode string, acc *access.AccessControl) error {
 	return nil
 }
 
+func setServiceProcessBaslineAll(option string, acc *access.AccessControl) error {
+	log.WithFields(log.Fields{"option": option}).Debug()
+
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		return err
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	var changed bool
+	grps := clusHelper.GetAllGroups(share.ScopeLocal, acc)
+	for name, grp := range grps {
+		if isManagedByCRD(name, acc) {
+			continue
+		}
+		if !utils.HasGroupProfiles(grp.Name) {
+			continue
+		}
+
+		changed = false
+		if grp.BaselineProfile != option {
+			changed = true
+			if utils.IsGroupNodes(name) {
+				grp.BaselineProfile = share.ProfileBasic //	always
+			} else {
+				grp.BaselineProfile = option
+			}
+		}
+		if changed {
+			if pp := clusHelper.GetProcessProfile(grp.Name); pp != nil {
+				pp.Baseline = grp.BaselineProfile
+				if err := clusHelper.PutProcessProfile(grp.Name, pp); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error()
+					return err
+				}
+			}
+
+			if err := clusHelper.PutGroup(grp, false); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func handlerServiceList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
