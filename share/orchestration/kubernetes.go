@@ -3,6 +3,7 @@ package orchestration
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -129,7 +130,7 @@ type kubernetes struct {
 	sys           *system.SystemTools
 }
 
-func getVersion(tag string, verToGet int, useToken bool) string {
+func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 	var url string
 
 	switch verToGet {
@@ -140,7 +141,7 @@ func getVersion(tag string, verToGet int, useToken bool) string {
 	case OC_VER_V4:
 		url = "https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/openshift-apiserver"
 	default:
-		return ""
+		return "", nil
 	}
 
 	client := &http.Client{
@@ -156,30 +157,26 @@ func getVersion(tag string, verToGet int, useToken bool) string {
 	var resp *http.Response
 
 	if req, err = http.NewRequest("GET", url, nil); err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("New Request fail")
-		return ""
+		return "", fmt.Errorf("New Request fail - error=%s", err)
 	}
 	if useToken {
 		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
-			log.WithFields(log.Fields{"error": err}).Debug("Read File fail")
-			return ""
+			return "", fmt.Errorf("Read File fail - tag=%s, error=%s", tag, err)
 		} else {
 			req.Header.Set("Authorization", "Bearer "+string(data))
 		}
 	}
 	if resp, err = client.Do(req); err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Get Version fail")
-		return ""
+		return "", fmt.Errorf("Get Version fail - error=%s", err)
 	} else if resp != nil && resp.StatusCode != http.StatusOK {
-		log.WithFields(log.Fields{"tag": tag, "code": resp.StatusCode}).Error()
+		return "", fmt.Errorf("getVersion fail - code=%d, tag=%s, useToken=%v", resp.StatusCode, tag, useToken)
 	}
 	defer resp.Body.Close()
 
 	var data []byte
 	data, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Read data fail")
-		return ""
+		return "", fmt.Errorf("Read data fail - error=%s", err)
 	}
 
 	var version string
@@ -208,35 +205,39 @@ func getVersion(tag string, verToGet int, useToken bool) string {
 			}
 		}
 	}
-	if version != "" {
-		return version
-	}
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Unmarshal fail")
-	}
 
-	return ""
+	return version, err
 }
 
 func GetK8sVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
 	var k8sVer string
 	var ocVer string
+	var version string
+	var err error
 
 	if reGetK8sVersion {
-		if version := getVersion("k8s", K8S_VER, false); version != "" {
-			k8sVer = version
-		} else {
-			k8sVer = getVersion("k8s", K8S_VER, true)
+		for _, useToken := range []bool{false, true} {
+			if version, err = getVersion("k8s", K8S_VER, useToken); version != "" {
+				k8sVer = version
+				break
+			}
 		}
+		if k8sVer == "" && err != nil {
+			log.Error(err.Error())
+		}
+		err = nil
 	}
 
 	if reGetOcVersion {
 		useToken := []bool{false, true}
 		for idx, verToGet := range []int{OC_VER_V3, OC_VER_V4} {
-			if version := getVersion("oc", verToGet, useToken[idx]); version != "" {
+			if version, err = getVersion("oc", verToGet, useToken[idx]); version != "" {
 				ocVer = version
 				break
 			}
+		}
+		if ocVer == "" && err != nil {
+			log.Error(err.Error())
 		}
 	}
 
@@ -324,17 +325,18 @@ var rancherPodNamePrefix = []string{
 // ibm-system / ibm-cloud-provider-ip-169-44-162-75-8649c8697d-hplzc / (ip) / ip-169-44-162-75
 // armada / armada-cluster-store-7f4684bb88-ldnn2 / (hash) / 7f4684bb88
 // kubx-etcd-04 / etcd-cdogojn20umpmuo8l540-m9wlr29r8w / (clusterID) / cdogojn20umpmuo8l540
-var hashLabels = []string {
+var hashLabels = []string{
 	container.IbmCloudProviderIP,
 	container.IbmCloudClusterID,
-	container.KubeKeyPodHash,	// last
+	container.KubeKeyPodHash, // last
 }
 
 const reStrUuid string = "-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" // + "-"
 var regexpUuid *regexp.Regexp
+
 func hasUUIDString(u string) int {
 	if regexpUuid == nil {
-		regexpUuid =regexp.MustCompile(reStrUuid)
+		regexpUuid = regexp.MustCompile(reStrUuid)
 	}
 
 	if loc := regexpUuid.FindStringIndex(u); loc != nil {
@@ -391,7 +393,7 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 	for _, labl := range hashLabels {
 		if hash, ok := labels[labl]; ok && hash != "" {
 			if index := strings.Index(pod, hash); index > 0 {
-				return &Service{Domain: namespace, Name: pod[:(index-1)]}
+				return &Service{Domain: namespace, Name: pod[:(index - 1)]}
 			}
 		}
 	}
@@ -412,11 +414,11 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 	// "kube-system" / apiserver-watcher-qalongruncluster4oc4-kxq6x-master-2
 	// "openshift-kube-apiserver" / revision-pruner-10-qalongruncluster4oc4-kxq6x-master-2
 	// "openshift-kube-scheduler" / installer-7-qalongruncluster4oc4-kxq6x-master-2
-	if len(node) > 3 {	// at least 4 characters
-		if index := strings.Index(pod, "-" + node); index > 0 {
+	if len(node) > 3 { // at least 4 characters
+		if index := strings.Index(pod, "-"+node); index > 0 {
 			pod = pod[:index]
 			if dash := strings.LastIndex(pod, "-"); dash > 0 {
-				if _, err := strconv.Atoi(pod[(dash+1):]); err == nil {
+				if _, err := strconv.Atoi(pod[(dash + 1):]); err == nil {
 					pod = pod[:dash] // this batch number is from the configmap
 				}
 			}
@@ -453,7 +455,7 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Ser
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
 	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
-		return d.GetServiceFromPodLabels( namespace, pod, node, meta.Labels)
+		return d.GetServiceFromPodLabels(namespace, pod, node, meta.Labels)
 	}
 
 	return baseDriver.GetService(meta, node)
@@ -551,7 +553,7 @@ func (d *kubernetes) GetHostTunnelIP(links map[string]sk.NetIface) []net.IPNet {
 			if link.Type == "veth" {
 				ones, bits := addr.IPNet.Mask.Size()
 				//cilium_host i/f scope is RT_SCOPE_LINK
-				if ones == bits && ones == 32 && (addr.Scope == syscall.RT_SCOPE_UNIVERSE || addr.Scope == syscall.RT_SCOPE_LINK){
+				if ones == bits && ones == 32 && (addr.Scope == syscall.RT_SCOPE_UNIVERSE || addr.Scope == syscall.RT_SCOPE_LINK) {
 					//log.WithFields(log.Fields{"ones": ones, "bits":bits, "scope":addr.Scope}).Debug("")
 					ret = append(ret, addr.IPNet)
 				}
