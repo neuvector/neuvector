@@ -1848,7 +1848,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 				risky = false
 			}
 		}
-		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action}).Debug("PROC: Result")
+		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 	}
 
 	// it has not been reported as a profile/risky event
@@ -1874,6 +1874,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 			}()
 		}
 	}
+
 }
 
 func (p *Probe) checkReversedShellProcess(id string, proc *procInternal) bool {
@@ -2404,7 +2405,11 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	}
 
 	//	proc.action = pp.Action
-	if (proc.reported & profileReported) == 0 {
+	// NVSHAS-7501 - Adding check for our mode.
+	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
+	// We don't need to report the violations more often, but we should make sure that if we
+	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
+	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce{
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
@@ -2439,7 +2444,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
+				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied and killed")
 			}
 		}
 	}
@@ -2699,7 +2704,12 @@ func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
 				}
 
 				// No need to inhert parent's action. Done at the evalNewRunningApp()
-				p.evaluateApplication(proc, idn, true)
+				// NVSHAS-7501 - I think we have to assume false on keep alive.
+				// If its in Monitor mode, the keep alive doesn't affect the rule but it won't kill the process.
+				// But when we transition to Protect mode, this defaulting of keep alive means
+				// that existing processes that are running will be allowed to continue to run.
+				// By defaulting to default, we are making sure existing processes that violate policies can be killed.
+				p.evaluateApplication(proc, idn, false)
 			}
 		}
 	}
