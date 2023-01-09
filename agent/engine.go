@@ -474,6 +474,29 @@ func updatePods(c *containerData, quarReason *string) {
 				}
 			}
 		}
+	} else if c.parentNS != "" {
+		p, ok := gInfo.activeContainers[c.parentNS]
+		if ok {//parent exist
+			p.inline = c.inline
+			p.quar = c.quar
+			ClusterEventChan <- &ClusterEvent{
+				event: EV_UPDATE_CONTAINER, id: p.id, inline: &p.inline, quar: &p.quar,
+				quarReason: quarReason,
+			}
+			for podID := range p.pods.Iter() {
+				podid := podID.(string)
+				if podid != c.id {
+					if ch, ok1 := gInfo.activeContainers[podid]; ok1 {
+						ch.inline = c.inline
+						ch.quar = c.quar
+						ClusterEventChan <- &ClusterEvent{
+							event: EV_UPDATE_CONTAINER, id: ch.id, inline: &ch.inline, quar: &ch.quar,
+							quarReason: quarReason,
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -781,7 +804,7 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 			event: EV_ADD_CONTAINER, id: c.id, info: c.info,
 			service: &c.service, domain: &c.domain, role: &c.role,
 			inline: &c.inline, quar: &c.quar, shareNetNS: &c.parentNS,
-			capIntcp: &c.capIntcp, capSniff: &capSniff,
+			capIntcp: &c.capIntcp, capSniff: &capSniff, hasDatapath: &c.hasDatapath,
 		}
 	} else {
 		ev = ClusterEvent{
@@ -838,6 +861,7 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 				info:  parent.info,
 				apps:  translateAppMap(parent.appMap),
 				ports: translateMappedPort(parent.portMap),
+				hasDatapath: &parent.hasDatapath,
 			}
 			ClusterEventChan <- &parentEv
 		} else if change == changeIntf {
@@ -1796,12 +1820,34 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		if info.Sidecar {
 			parent.info.ProxyMesh = true
 			if gInfo.tapProxymesh {
-				programProxyMeshDP(parent, false, false)
+				if parent.pid != 0 {
+					programProxyMeshDP(parent, false, false)
+				} else if c.hasDatapath {//child that has datapath
+					programProxyMeshDP(c, false, false)
+				} else {//find child that has datapath
+					for podID := range parent.pods.Iter() {
+						if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
+							programProxyMeshDP(ch, false, false)
+							break
+						}
+					}
+				}
 			}
 		}
 		gInfoLock()
 		if info.Sidecar && gInfo.tapProxymesh {
-			updateProxyMeshMac(parent, true)
+			if parent.pid != 0 {
+				updateProxyMeshMac(parent, true)
+			} else if c.hasDatapath {//child that has datapath
+				updateProxyMeshMac(c, true)
+			} else {//find child that has datapath
+				for podID := range parent.pods.Iter() {
+					if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
+						updateProxyMeshMac(ch, true)
+						break
+					}
+				}
+			}
 		}
 		c.intcpPairs = parent.intcpPairs
 		parent.pods.Add(id)
