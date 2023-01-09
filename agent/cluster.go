@@ -493,6 +493,9 @@ func updateContainer(ev *ClusterEvent, wl *share.CLUSWorkload) {
 	if ev.capSniff != nil {
 		wl.CapSniff = *ev.capSniff
 	}
+	if ev.hasDatapath != nil {
+		wl.HasDatapath = *ev.hasDatapath
+	}
 	if ev.inline != nil {
 		wl.Inline = *ev.inline
 	}
