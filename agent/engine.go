@@ -739,7 +739,7 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 			event: EV_ADD_CONTAINER, id: c.id, info: c.info,
 			service: &c.service, domain: &c.domain, role: &c.role,
 			inline: &c.inline, quar: &c.quar, shareNetNS: &c.parentNS,
-			capIntcp: &c.capIntcp, capSniff: &capSniff,
+			capIntcp: &c.capIntcp, capSniff: &capSniff, hasDatapath: &c.hasDatapath,
 		}
 	} else {
 		ev = ClusterEvent{
@@ -796,6 +796,7 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 				info:  parent.info,
 				apps:  translateAppMap(parent.appMap),
 				ports: translateMappedPort(parent.portMap),
+				hasDatapath: &parent.hasDatapath,
 			}
 			ClusterEventChan <- &parentEv
 		}

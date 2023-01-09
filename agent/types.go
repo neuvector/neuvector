@@ -59,6 +59,7 @@ type ClusterEvent struct {
 	quarReason *string
 	capIntcp   *bool
 	capSniff   *bool
+	hasDatapath *bool
 }
 
 const (
