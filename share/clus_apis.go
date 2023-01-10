@@ -963,6 +963,7 @@ type CLUSWorkload struct {
 	Running      bool                      `json:"running"`
 	CapIntcp     bool                      `json:"cap_intcp"`
 	CapSniff     bool                      `json:"cap_sniff"`
+	HasDatapath  bool                      `json:"has_datapath"`
 	Inline       bool                      `json:"inline"`
 	Quarantine   bool                      `json:"quarantine"`
 	SecuredAt    time.Time                 `json:"secured_at"`

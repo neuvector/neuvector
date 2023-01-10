@@ -727,6 +727,9 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			//set PolicyMode here to avoid 'Missing policy mode'
 			//errror at the adjustAction().
 			if wlCache1, ok1 := wlCacheMap[m.(string)]; ok1 {
+				if wlCache1.workload.HasDatapath == false {
+					continue
+				}
 				wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache1)
 			}
 			if isDst {
@@ -751,8 +754,8 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			}
 		}
 
-		svcips := make([]net.IP, 0)
 		if !policyApplyIngress && isDst { //openshift
+			svcips := make([]net.IP, 0)
 			if svcipset, ok1 := grpSvcIpByDomainMap[cache.group.Name]; ok1 {
 				for sipgrp := range svcipset.Iter() {
 					if sigc, ok2 := groupCacheMap[sipgrp.(string)]; ok2 {
@@ -762,11 +765,10 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 					}
 				}
 			}
-		}
-
-		//include nv.ip.xxx in openshift
-		if svcips != nil && len(svcips) > 0 {
-			ipList = append(ipList, svcips...)
+			//include nv.ip.xxx in openshift
+			if svcips != nil && len(svcips) > 0 {
+				ipList = append(ipList, svcips...)
+			}
 		}
 
 		if len(ipList) > 0 {
@@ -889,6 +891,13 @@ func getDefaultGroupPolicy() share.CLUSGroupIPPolicy {
 		 * is in groupcache so that we can get correct mode information
 		 */
 		if _, ok := groupCacheMap[cache.learnedGroupName]; !ok {
+			continue
+		}
+		//we only push container that has datapath, normally it is parent, but since oc4.9+
+		//parent pid could be 0, so it is also possible this is child
+		//we only want to carry one member of POD family to reduce policy recalculate size
+		//this can save cpu, memory and internal network bandwidth
+		if cache.workload.HasDatapath == false {
 			continue
 		}
 		addr := getWorkloadAddress(cache)
@@ -1180,6 +1189,11 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 		policy := getMixedGroupPolicy()
 		groupIPPolicies = append(groupIPPolicies, policy...)
 	}
+	//release memory
+	wlLearnList = nil
+	wlEvalList = nil
+	wlEnforceList = nil
+
 	return groupIPPolicies
 }
 
@@ -1201,10 +1215,36 @@ func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 
 //each slot's max size after zip is 500k
 const maxPolicySlots = 512
+//based on cluster size start from different base
+const beginSlotSmall = 16
+const beginSlotMedium = 32
+const beginSlotLarge = 64
+const beginSlotSuper = 128
+const clusterSmall = 3000
+const clusterMedium = 6000
+const clusterLarge = 9000
 
 func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, error) {
+	//total number of workloads
+	wlen := len(rules[0].From)
+	//start from different base to save cpu
+	beginSlot := 0
+	if wlen < clusterSmall {
+		beginSlot = beginSlotSmall
+	} else if wlen < clusterMedium {
+		beginSlot = beginSlotMedium
+	} else if wlen < clusterLarge {
+		beginSlot = clusterLarge
+	} else {
+		beginSlot = beginSlotSuper
+	}
+	log.WithFields(log.Fields{
+			"wlen":           wlen,
+			"beginSlot":      beginSlot,
+			"maxPolicySlots": maxPolicySlots,
+	}).Debug("begin slots")
 	// deal with case that compressed rule size is > max kv value size (512K)
-	for slots := 16; slots <= maxPolicySlots; slots *= 2 {
+	for slots := beginSlot; slots <= maxPolicySlots; slots *= 2 {
 		//first rule has address info for all workloads in cluster
 		//the size can be very big so we need to split this rule into
 		//small rules

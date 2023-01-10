@@ -64,6 +64,7 @@ type CacheInterface interface {
 	GetGroupCount(scope string, acc *access.AccessControl) int
 	GetFedGroupsCache() []*share.CLUSGroup
 	GetGroupCache(name string, acc *access.AccessControl) (*share.CLUSGroup, error)
+	DeleteGroupCache(name string, acc *access.AccessControl) error
 	GetFedGroupNames(acc *access.AccessControl) utils.Set
 	GetServiceCount(acc *access.AccessControl) int
 	IsGroupPolicyModeChangeable(name string) bool

@@ -1002,7 +1002,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 	if (parent.ruid-c.userns.root) >= c.userns.uidMin && // valid user range
 		proc.ruid == c.userns.root { // user at root privilege level
 		p.updateProcess(parent) // obtain latest parent data
-		if _, _, notAuth := p.checkUserGroup_uidChange(parent, c); notAuth {
+
+
+		p.lockProcMux() // minimum section lock
+		_, _, notAuth := p.checkUserGroup_uidChange(parent, c)
+		p.unlockProcMux() // minimum section lock
+
+		if notAuth {
 			if len(parent.cmds) == 0 {
 				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
 			}
@@ -2055,11 +2061,16 @@ func (p *Probe) CheckDNSTunneling(ids []string, clientPort share.CLUSProtoPort, 
 }
 
 func (p *Probe) GetProbeSummary() *share.CLUSProbeSummary {
+	var summary *share.CLUSProbeSummary
+	if !p.bProfileEnable {
+		return summary
+	}
+
 	p.lockProcMux()
 	defer p.unlockProcMux()
 
 	// general information
-	summary := &share.CLUSProbeSummary{
+	summary = &share.CLUSProbeSummary{
 		ContainerMap:      uint32(len(p.containerMap)),
 		PidContainerMap:   uint32(len(p.pidContainerMap)),
 		PidProcMap:        uint32(len(p.pidProcMap)),
