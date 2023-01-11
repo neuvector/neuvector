@@ -2418,6 +2418,15 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				default:
 					pp.Action = share.PolicyActionAllow
 				}
+			} else {
+				// NVSHAS-7501 - I think we have to assume false on keep alive.
+				// If its in Monitor mode, the keep alive doesn't affect the rule and it won't kill the process.
+				// But when we transition to Protect mode and zero drift and the keep alive is set to true...
+				// existing processes that are running will be allowed to continue to run even tho they should not.
+				// By forcing to false, we are making sure existing processes that violate policies can be killed.
+				// Otherwise, the bug was that we would see
+				//"violation" incidents but the processes would continue to run
+				bKeepAlive = false
 			}
 		}
 
@@ -2704,12 +2713,7 @@ func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
 				}
 
 				// No need to inhert parent's action. Done at the evalNewRunningApp()
-				// NVSHAS-7501 - I think we have to assume false on keep alive.
-				// If its in Monitor mode, the keep alive doesn't affect the rule but it won't kill the process.
-				// But when we transition to Protect mode, this defaulting of keep alive means
-				// that existing processes that are running will be allowed to continue to run.
-				// By defaulting to default, we are making sure existing processes that violate policies can be killed.
-				p.evaluateApplication(proc, idn, false)
+				p.evaluateApplication(proc, idn, true)
 			}
 		}
 	}
