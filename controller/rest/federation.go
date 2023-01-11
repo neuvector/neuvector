@@ -3092,7 +3092,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				}
 			}
 			if method == http.MethodPost && (request == "/v1/file/config" || request == "/v1/file/group/config" ||
-				request == "/v1/file/admission/config" || request == "/v1/file/waf/config") {
+				request == "/v1/file/admission/config" || request == "/v1/file/waf/config" || request == "/v1/file/dlp/config") {
 				txnID = r.Header.Get("X-Transaction-ID")
 			}
 			if txnID == "" && (method == http.MethodPost || method == http.MethodDelete) && strings.HasPrefix(request, "/v1/scan/registry/") {
