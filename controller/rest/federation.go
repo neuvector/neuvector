@@ -3030,13 +3030,9 @@ func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter
 
 var forbiddenFwUrl = map[string][]string{
 	"/v1/fed_auth": []string{http.MethodPost, http.MethodDelete},
-	"/v1/user":     []string{http.MethodPost},
-	"/v1/role":     []string{http.MethodPost},
 }
 var forbiddenFwUrlPrefix = map[string][]string{
 	"/v1/auth/": []string{http.MethodPost, http.MethodDelete},
-	"/v1/user/": []string{http.MethodPatch, http.MethodDelete},
-	"/v1/role/": []string{http.MethodPatch, http.MethodDelete},
 }
 
 func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprouter.Params, method string) {
@@ -3174,7 +3170,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					}
 				}
 			} else if method == http.MethodPost {
-				if request == "/v1/file/admission" || request == "/v1/file/waf" {
+				if request == "/v1/file/admission" || request == "/v1/file/waf" || request == "/v1/file/dlp" {
 					remoteExport = true
 				}
 			}
