@@ -451,7 +451,7 @@ func notifyDPContainerApps(c *containerData) {
 	for i, pair := range c.intcpPairs {
 		macs[i] = pair.MAC.String()
 	}
-	if gInfo.tapProxymesh && (c.info.ProxyMesh || c.hasDatapath) {
+	if gInfo.tapProxymesh && isProxyMesh(c) {
 		lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 		macs = append(macs, lomac_str)
 	}
