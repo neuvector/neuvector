@@ -30,6 +30,7 @@ type DispatcherHelper interface {
 	NodeLeave(node string, bLeader bool)
 	CustomGroupUpdate(group string, serviceGrps utils.Set, bLeader bool)
 	CustomGroupDelete(group string, bLeader bool)
+	LearnGroupDelete(group string, bLeader bool)
 	PutProfile(group, subkey string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error
 	IsGroupAdded(group string) bool
 }
@@ -414,6 +415,33 @@ func (dpt *kvDispatcher) CustomGroupDelete(group string, bLeader bool) {
 		removes = nodes.Clone()
 		dpt.refreshCustomGroups(group, nil, true)
 	}
+	// dpt.dump()
+
+	if bLeader {
+		// delete it in all assigned nodes
+		txn := cluster.Transact()
+		for n := range removes.Iter() {
+			dpt.removeProfileKeys(n.(string), group, txn)
+		}
+
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err, "group": group}).Error("delete failed")
+		}
+		txn.Close()
+	}
+}
+
+// from event trigger
+func (dpt *kvDispatcher) LearnGroupDelete(group string, bLeader bool) {
+	//log.WithFields(log.Fields{"group": group}).Debug("DPT:")
+	dpt.lock()
+	defer dpt.unlock()
+
+	removes := utils.NewSet()
+	if nodes, ok := dpt.group2nodes[group]; ok {
+		removes = nodes.Clone()
+	}
+	delete(dpt.group2nodes, group)
 	// dpt.dump()
 
 	if bLeader {

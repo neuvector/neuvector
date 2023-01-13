@@ -2125,3 +2125,9 @@ func (m CacheMethod) GetConfigKvData(key string) ([]byte, bool) {
 	}
 	return nil, false
 }
+
+func learnedGroupDelete(group string, param interface{}) {
+	if utils.DoesGroupHavePolicyMode(group) && group != api.AllHostGroup {
+		dispatchHelper.LearnGroupDelete(group, isLeader())
+	}
+}

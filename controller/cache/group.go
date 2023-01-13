@@ -1666,6 +1666,10 @@ func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) er
 		}
 	}
 	clusHelper.DeleteCustomCheckConfig(name)
+
+	// remove dispatcher entry
+	customGroupDelete(name, nil)
+	learnedGroupDelete(name, nil)
 	return nil
 }
 

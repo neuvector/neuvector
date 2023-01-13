@@ -1461,7 +1461,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			addrWorkloadAdd(wl.ID, wlCache)
 		}
 		//NVSHAS-7433, it is possible newly added short-lived workload is not running
-		//so we need to delete Workload:IP and its related policy 
+		//so we need to delete Workload:IP and its related policy
 		if wl.Running || newWorkload {
 			connectWorkloadAdd(wl.ID, wlCache)
 		}
@@ -1725,6 +1725,7 @@ func registerEventHandlers() {
 	evhdls.Register(EV_GROUP_DELETE, []eventHandlerFunc{
 		connectGroupDelete,
 		customGroupDelete,
+		learnedGroupDelete,
 		automodeGroupDelete,
 	})
 	evhdls.Register(EV_WORKLOAD_AGENT_CHANGE, []eventHandlerFunc{
