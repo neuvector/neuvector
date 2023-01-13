@@ -184,6 +184,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
+		wr.SetSendTimeout(syslogTimeout)
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}
