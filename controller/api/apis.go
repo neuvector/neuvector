@@ -121,6 +121,7 @@ const AllContainerGroup string = "containers"
 const LearnedHostPrefix string = "Host:"
 const LearnedWorkloadPrefix string = "Workload:"
 const WorkloadTunnelIF string = "Workload:ingress"
+const AddrGrpValVhPrefix string = "vh:"
 
 const PolicyDomainNameMaxLen int = 256
 const DlpSensorNameMaxLen int = 256

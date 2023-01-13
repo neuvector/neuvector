@@ -19,7 +19,7 @@ dpi_fqdn_hdl_t *g_fqdn_hdl = NULL;
 extern bool cmp_mac_prefix(void *m1, void *prefix);
 
 static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dpi_policy_hdl_t *hdl, dpi_rule_key_t *key,
-                                     int is_ingress, dpi_policy_desc_t *desc2);
+                                     int is_ingress, dpi_policy_desc_t *desc2, dpi_packet_t *p);
 static bool _dpi_policy_implicit_default(dpi_policy_hdl_t *hdl, dpi_policy_desc_t *desc);
 static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                                     uint8_t iptype, dpi_policy_desc_t **pol_desc);
@@ -102,7 +102,7 @@ static void update_unknown_ip_cache(dpi_unknown_ip_cache_t *cache)
  */
 static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                              uint16_t dport, uint16_t proto, uint32_t app,
-                             int is_ingress, dpi_policy_desc_t *desc);
+                             int is_ingress, dpi_policy_desc_t *desc, dpi_packet_t *p);
 static int dpi_rule_add(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l, dpi_rule_key_t *key_h,
                  int app_num, dpi_policy_app_rule_t *app_rules,
                  int dir, dpi_policy_desc_t *desc);
@@ -404,7 +404,7 @@ static int dpi_rule_add_one(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l,
         dpi_policy_lookup_by_key(hdl, key_l->sip, key_l->dip,
                                  key_l->dport, key_l->proto, key_l->app,
                                  dir == POLICY_RULE_DIR_INGRESS?1:0,
-                                 exist_desc);
+                                 exist_desc, NULL);
         if (exist_desc->id != 0) {
             DEBUG_POLICY("key_l " DP_RULE_STR
                        "old:"DP_POLICY_DESC_STR "new:" DP_POLICY_DESC_STR"- same key!\n",
@@ -616,7 +616,7 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
     is_ingress = to_server?p->flags & DPI_PKT_FLAG_INGRESS:!(p->flags & DPI_PKT_FLAG_INGRESS);
     DEBUG_POLICY("hdl:%p proto:%u client:"DBG_IPV4_FORMAT" server:"DBG_IPV4_FORMAT":%u app:%u ingress:%d to_server:%d\n",
                  hdl, proto, DBG_IPV4_TUPLE(sip), DBG_IPV4_TUPLE(dip), dport, app, is_ingress, to_server);
-    dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc);
+    dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc, p);
 
     if ((desc->flags & POLICY_DESC_INTERNAL) && _dpi_policy_implicit_default(hdl, desc)) {
         if (is_ingress) {
@@ -780,7 +780,7 @@ exit:
 
 static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                                     uint16_t dport, uint16_t proto, uint32_t app,
-                                    int is_ingress, dpi_policy_desc_t *desc)
+                                    int is_ingress, dpi_policy_desc_t *desc, dpi_packet_t *p)
 {
     dpi_rule_key_t key;
 
@@ -845,7 +845,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                  * to do policy match for all these cases and merge
                  * final match results.
                  */
-                rt = policy_match_ipv4_fqdn_code(g_fqdn_hdl, sip, hdl, &key, is_ingress, &desc2);
+                rt = policy_match_ipv4_fqdn_code(g_fqdn_hdl, sip, hdl, &key, is_ingress, &desc2, p);
                 if (rt > 0) {
                     policy_desc_merge(desc, &desc2);
                 }
@@ -901,7 +901,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                  * to do policy match for all these cases and merge
                  * final match results(dpi_policy_desc_t)
                  */
-                rt = policy_match_ipv4_fqdn_code(g_fqdn_hdl, dip, hdl, &key, is_ingress, &desc2);
+                rt = policy_match_ipv4_fqdn_code(g_fqdn_hdl, dip, hdl, &key, is_ingress, &desc2, p);
                 if (rt > 0) {
                     policy_desc_merge(desc, &desc2);
                 }
@@ -967,6 +967,12 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
 
     if (unlikely((s->policy_desc.hdl_ver != p->ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_CHECK_VER))) {
+        dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
+        policy_eval = 1;
+    }
+
+    if (unlikely((s->policy_desc.action == DP_POLICY_ACTION_CHECK_VH) &&
+        FLAGS_TEST(s->flags, DPI_SESS_FLAG_POLICY_APP_READY))) {
         dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
         policy_eval = 1;
     }
@@ -1135,7 +1141,7 @@ int dpi_sess_policy_reeval(dpi_session_t *s)
     if (unlikely((s->policy_desc.hdl_ver != ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_CHECK_VER))) {
         dpi_policy_lookup_by_key(hdl, sip, dip, dport,
-                                 proto, 0, is_ingress, &s->policy_desc);
+                                 proto, 0, is_ingress, &s->policy_desc, NULL);
         policy_eval = 1;
     }
 
@@ -1144,7 +1150,7 @@ int dpi_sess_policy_reeval(dpi_session_t *s)
         app = s->app?s->app:(s->base_app?s->base_app:DP_POLICY_APP_UNKNOWN);
         //use 0xffffffff to indicate app cannot be identified
         dpi_policy_lookup_by_key(hdl, sip, dip, dport,
-                                 proto, app, is_ingress, &s->policy_desc);
+                                 proto, app, is_ingress, &s->policy_desc, NULL);
         policy_eval = 1;
     }
 
@@ -1267,7 +1273,7 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *p, int flag)
                if (p->rule_list[i].ingress) {
                    rcu_read_lock();
                    code = config_fqdn_ipv4_mapping(g_fqdn_hdl,
-                            p->rule_list[i].fqdn, p->rule_list[i].sip);
+                            p->rule_list[i].fqdn, p->rule_list[i].sip, p->rule_list[i].vh);
                    rcu_read_unlock();
                    if (code == -1) {
                        continue;
@@ -1277,7 +1283,7 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *p, int flag)
                } else {
                    rcu_read_lock();
                    code = config_fqdn_ipv4_mapping(g_fqdn_hdl,
-                            p->rule_list[i].fqdn, p->rule_list[i].dip);
+                            p->rule_list[i].fqdn, p->rule_list[i].dip, p->rule_list[i].vh);
                    rcu_read_unlock();
                    if (code == -1) {
                        continue;
@@ -1544,7 +1550,7 @@ static int config_record_ip_list(fqdn_ipv4_entry_t *entry, fqdn_record_t *r)
 }
 
 // Called by policy config (ctrl)
-uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip)
+uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, bool vh)
 {
     fqdn_name_entry_t *name_entry;
     fqdn_ipv4_entry_t *ipv4_entry;
@@ -1572,21 +1578,23 @@ uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip)
             free(r);
             return -1;
         }
+        r->vh = vh;
         if (is_fqdn_name_wildcard(r->name)) {
             r->flag = FQDN_RECORD_WILDCARD;
         }
         entry->r = r;
         rcu_map_add(&hdl->fqdn_name_map, entry, name);
         th_counter.domains++;
-        DEBUG_POLICY("create record name:%s code %x flag 0x%08x\n", r->name, r->code, r->flag);
+        DEBUG_POLICY("create record name:%s code %x flag 0x%08x vh(%d)\n", r->name, r->code, r->flag, r->vh);
     } else {
         r = name_entry->r;
+        r->vh = vh;
         if (r->flag & FQDN_RECORD_WILDCARD) {
             r->flag = FQDN_RECORD_WILDCARD;
         } else {
             r->flag = 0;
         }
-        DEBUG_POLICY("existing record name:%s code %x flag 0x%08x\n", r->name, r->code, r->flag);
+        DEBUG_POLICY("existing record name:%s code %x flag 0x%08x vh(%d)\n", r->name, r->code, r->flag, r->vh);
     }
 
     if (ip == 0) {
@@ -1617,10 +1625,32 @@ uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip)
     return r->code;
 }
 
+static bool match_fqdn_wildcard_name(char *vhost, char *fqdname)
+{
+    char dname[MAX_FQDN_LEN];
+    int i, j;
+
+    strlcpy(dname, vhost, MAX_FQDN_LEN);
+    for (j = strlen(dname)-2; j > 0;  j--) {
+        if (dname[j] == '.') {
+            break;
+        }
+    }
+    for (i = 0; i < j-1; i++) {
+        if (dname[i+1] == '.') {
+            dname[i] = '*';
+            if (strcasecmp(fqdname, &dname[i]) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 // Called by policy lookup
 static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dpi_policy_hdl_t *hdl, dpi_rule_key_t *key,
-                                     int is_ingress, dpi_policy_desc_t *desc2)
+                                     int is_ingress, dpi_policy_desc_t *desc2, dpi_packet_t *p)
 {
+    dpi_session_t *s = NULL;
     fqdn_ipv4_entry_t *ipv4_entry;
     ipv4_entry = rcu_map_lookup(&fqdn_hdl->fqdn_ipv4_map, &ip);
     if (!ipv4_entry) {
@@ -1630,10 +1660,17 @@ static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dp
         if(ipv4_entry->rlist.prev==NULL && ipv4_entry->rlist.next==NULL) {
             CDS_INIT_LIST_HEAD(&ipv4_entry->rlist);
         }
+        //ctrl path does not reach here, only dp does.
+        //For safety we still check whether p is NULL.
+        if (p) {
+            s = p->session;
+        }
         fqdn_record_item_t *r_itr, *r_next;
         int i = 0;
         cds_list_for_each_entry_safe(r_itr, r_next, &ipv4_entry->rlist, node) {
+            //multiple FQDN can map to same IP
             dpi_policy_desc_t desc3;
+            bool wildmatch = false;
             if (r_itr->r->code != 0) {
                 if (is_ingress) {
                     key->sip = r_itr->r->code;
@@ -1641,6 +1678,33 @@ static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dp
                     key->dip = r_itr->r->code;
                 }
                 _dpi_policy_lookup_by_key(hdl, key, is_ingress, &desc3);
+                if (r_itr->r->vh) {
+                    //vhost based FQDN group, we need to match vhost in the session
+                    if (s && FLAGS_TEST(s->flags, DPI_SESS_FLAG_POLICY_APP_READY)) {
+                        if (desc3.id > 0) {//not implicit
+                            if (r_itr->r->flag & FQDN_RECORD_WILDCARD) {
+                                wildmatch = match_fqdn_wildcard_name((char *)s->vhost, r_itr->r->name);
+                            }
+                            //if we cannot match vhost in session with name in fqdn record
+                            //it means no match, set to implicit default
+                            if (s->vhlen == 0 || (strcasecmp(r_itr->r->name,(char *)s->vhost) != 0 && !wildmatch)) {
+                                desc3.id = 0;
+                                desc3.action = hdl->def_action;
+                                //desc3->flags = POLICY_DESC_CHECK_VER;
+                                desc3.order = 0xffffffff;
+                                desc3.hdl_ver = 0;
+                            }
+                        }
+                    } else {
+                        //we need vhost in session to do exact match
+                        //if action is check_app we do not change to check_vh
+                        //because check_app will also reevaluate, by the time
+                        //app is ready, vhost should also be ready
+                        if (desc3.id > 0 && desc3.action != DP_POLICY_ACTION_CHECK_APP) {
+                            desc3.action = DP_POLICY_ACTION_CHECK_VH;
+                        }
+                    }
+                }
                 if (i == 0) {
                     policy_desc_cpy(desc2, &desc3);
                 } else {

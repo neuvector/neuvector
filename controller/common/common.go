@@ -147,6 +147,8 @@ func PolicyActionString(action uint8) string {
 		return share.PolicyActionViolate
 	case C.DP_POLICY_ACTION_CHECK_APP:
 		return share.PolicyActionCheckApp
+	case C.DP_POLICY_ACTION_CHECK_VH:
+		return share.PolicyActionCheckVh
 	default:
 		return share.PolicyActionAllow
 	}
@@ -166,6 +168,8 @@ func PolicyActionRESTString(action uint8) string {
 		return share.PolicyActionViolate
 	case C.DP_POLICY_ACTION_CHECK_APP:
 		return share.PolicyActionCheckApp
+	case C.DP_POLICY_ACTION_CHECK_VH:
+		return share.PolicyActionCheckVh
 	default:
 		return share.PolicyActionAllow
 	}
