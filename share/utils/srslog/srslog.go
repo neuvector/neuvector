@@ -8,12 +8,13 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 // This interface allows us to work with both local and network connections,
 // and enables Solaris support (see syslog_unix.go).
 type serverConn interface {
-	writeString(framer Framer, formatter Formatter, p Priority, hostname, tag, s string) error
+	writeString(framer Framer, formatter Formatter, tmo time.Duration, p Priority, hostname, tag, s string) error
 	close() error
 }
 

@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	syslog "github.com/RackSec/srslog"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -22,6 +21,7 @@ import (
 	"github.com/neuvector/neuvector/share/fsmon"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
+	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
 const DefaultIdleTimeout uint32 = 300
@@ -549,7 +549,7 @@ func compareProc(p1, p2 *share.CLUSProcessProfileEntry) int {
 				if tokens := strings.Split(p1.Path, "/*/"); len(tokens) > 1 {
 					if strings.HasPrefix(p1.Path, tokens[0]) {
 						p1.Path = p2.Path
-						ret = 0	// same path, will not update
+						ret = 0 // same path, will not update
 					}
 				}
 				t1 := strings.Split(p1.Path, "/")
@@ -557,7 +557,7 @@ func compareProc(p1, p2 *share.CLUSProcessProfileEntry) int {
 				if len(t1) == len(t2) {
 					// a neighborhood path?
 					// learned path will not be empty
-					if len(dir1) > 1 && len(dir2) > 1 {	// not at root-level "/"
+					if len(dir1) > 1 && len(dir2) > 1 { // not at root-level "/"
 						merged := "/"
 						var i int
 						for i = 0; i < len(t1); i++ {
@@ -569,7 +569,7 @@ func compareProc(p1, p2 *share.CLUSProcessProfileEntry) int {
 
 						if i > 1 { // matched at least one matched token
 							p1.Path = filepath.Join(merged, "*", base2)
-							ret = 0		// different path, forced update
+							ret = 0 // different path, forced update
 						}
 					}
 				}

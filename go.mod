@@ -43,7 +43,6 @@ replace (
 )
 
 require (
-	github.com/RackSec/srslog v0.0.0-20180709174129-a4725f04ec91
 	github.com/aws/aws-sdk-go v1.42.22
 	github.com/beevik/etree v1.1.0
 	github.com/cenk/hub v1.0.1 // indirect

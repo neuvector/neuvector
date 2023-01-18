@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"strings"
 	"sync"
+	"time"
 )
 
 // A Writer is a connection to a syslog server.
@@ -18,7 +19,8 @@ type Writer struct {
 	formatter Formatter
 
 	//non-nil if custom dialer set, used in getDialer
-	customDial DialFunc
+	customDial  DialFunc
+	sendTimeout time.Duration
 
 	mu   sync.RWMutex // guards conn
 	conn serverConn
@@ -62,6 +64,11 @@ func (w *Writer) connect() (serverConn, error) {
 	} else {
 		return nil, err
 	}
+}
+
+// SetSendTimeout changes the sendTimeout for subsequent messages.
+func (w *Writer) SetSendTimeout(t time.Duration) {
+	w.sendTimeout = t
 }
 
 // SetFormatter changes the formatter function for subsequent messages.
@@ -190,7 +197,7 @@ func (w *Writer) write(conn serverConn, p Priority, msg string) (int, error) {
 		msg += "\n"
 	}
 
-	err := conn.writeString(w.framer, w.formatter, p, w.hostname, w.tag, msg)
+	err := conn.writeString(w.framer, w.formatter, w.sendTimeout, p, w.hostname, w.tag, msg)
 	if err != nil {
 		return 0, err
 	}

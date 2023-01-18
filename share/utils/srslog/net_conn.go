@@ -2,6 +2,7 @@ package srslog
 
 import (
 	"net"
+	"time"
 )
 
 // netConn has an internal net.Conn and adheres to the serverConn interface,
@@ -12,7 +13,10 @@ type netConn struct {
 
 // writeString formats syslog messages using time.RFC3339 and includes the
 // hostname, and sends the message to the connection.
-func (n *netConn) writeString(framer Framer, formatter Formatter, p Priority, hostname, tag, msg string) error {
+func (n *netConn) writeString(framer Framer, formatter Formatter, tmo time.Duration, p Priority, hostname, tag, msg string) error {
+	if tmo != 0 {
+		n.conn.SetWriteDeadline(time.Now().Add(tmo))
+	}
 	if framer == nil {
 		framer = DefaultFramer
 	}
