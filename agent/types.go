@@ -21,6 +21,7 @@ type AgentEnvInfo struct {
 	scanSecrets          bool
 	autoBenchmark        bool
 	systemProfiles       bool
+	netPolicyPuller      int
 }
 
 const (

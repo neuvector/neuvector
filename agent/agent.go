@@ -293,6 +293,7 @@ func main() {
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
 	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
 	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
+	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	flag.Parse()
 
 	if *debug {
@@ -322,6 +323,11 @@ func main() {
 	if *disable_system_protection {
 		log.Info("System protection is disabled (process/file profiles)")
 		agentEnv.systemProfiles = false
+	}
+
+	agentEnv.netPolicyPuller = *policy_puller
+	if *policy_puller != 0 {
+		log.WithFields(log.Fields{"period": *policy_puller}).Info("policy pull regulator")
 	}
 
 	if *join != "" {

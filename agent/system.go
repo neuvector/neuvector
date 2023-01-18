@@ -181,51 +181,65 @@ func mergeWlPolicyConfig(rules []share.CLUSGroupIPPolicy, ruleslen, wlslots, wle
 	return newGroupIPPolicy
 }
 
-func systemConfigPolicyVersion(nType cluster.ClusterNotifyType, key string, value []byte) []share.CLUSGroupIPPolicy {
-	var s share.CLUSGroupIPPolicyVer
+func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
 	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
 
-	if err := json.Unmarshal(value, &s); err == nil {
-		//check whether key "recalculate/groupIPRules" exist, if not
-		//use old key "network/groupIPRules" for rolling upgrade case
-		var rule_key, newRuleKey string
-		rule_key = fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-		if cluster.Exist(rule_key) {
-			// indicate network policy version change.
-			newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
-		} else {
-			rule_key = fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-			if !cluster.Exist(rule_key) {
-				return groupIPPolicy
-			}
-			// indicate network policy version change.
-			newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
+	//check whether key "recalculate/groupIPRules" exist, if not
+	//use old key "network/groupIPRules" for rolling upgrade case
+	var rule_key, newRuleKey string
+	rule_key = fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
+	if cluster.Exist(rule_key) {
+		// indicate network policy version change.
+		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
+	} else {
+		rule_key = fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
+		if !cluster.Exist(rule_key) {
+			return groupIPPolicy
 		}
-
-		//combine group ip rules from separate slots
-		groupIPPolicy = getPolicyConfig(newRuleKey, s.SlotNo, s.RulesLen)
-
-		if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
-			groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
-		}
-		//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
+		// indicate network policy version change.
+		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
 	}
+
+	//combine group ip rules from separate slots
+	groupIPPolicy = getPolicyConfig(newRuleKey, s.SlotNo, s.RulesLen)
+
+	if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
+		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
+	}
+	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
 	return groupIPPolicy
 }
 
+// parent goroutine: containerTaskWorker()
 func systemConfigPolicy(nType cluster.ClusterNotifyType, key string, value []byte) {
-	//get group ip rules from cluster
-	groupIPPolicy := systemConfigPolicyVersion(nType, key, value)
-
-	if len(groupIPPolicy) == 0 && pe.NetworkPolicy == nil {
-		log.Error("Empty policy")
-		return
-	}
-
 	if nType == cluster.ClusterNotifyDelete {
 		// This should not happen
 		log.Error("Policy key delete not supported!")
 		return
+	}
+
+	//get group ip rules from cluster
+	var s share.CLUSGroupIPPolicyVer
+	if err := json.Unmarshal(value, &s); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return
+	}
+
+	if agentEnv.netPolicyPuller == 0 {
+		systemUpdatePolicy(s) // inline
+	} else {
+		nextNetworkPolicyVer = &s // regulator
+	}
+}
+
+func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
+	// log.WithFields(log.Fields{"ver": s.PolicyIPRulesVersion}).Debug()
+	groupIPPolicy := systemConfigPolicyVersion(s)
+	if len(groupIPPolicy) == 0 {
+		if pe.NetworkPolicy == nil {
+			log.Error("Empty policy")
+		}
+		return false
 	}
 
 	wm := initWorkloadPolicyMap()
@@ -272,6 +286,7 @@ func systemConfigPolicy(nType cluster.ClusterNotifyType, key string, value []byt
 			prober.StartMonitorConnection()
 		}
 	}
+	return true
 }
 
 func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
@@ -934,7 +949,7 @@ func (p *systemConfigTask) handler() {
 }
 
 func systemUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	// log.WithFields(log.Fields{"nType": nType, "key": key}).Debug("")
+	// log.WithFields(log.Fields{"nType": nType, "key": key}).Debug()
 	configTask := &systemConfigTask{
 		nType: nType,
 		key:   key,
