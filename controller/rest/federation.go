@@ -1939,7 +1939,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	bodyTo, _ := json.Marshal(&reqTo)
 	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login)
 
-	status, code := removeFromFederation(&joinedCluster) // remove the joint cluster's entry from master cluster
+	status, code := removeFromFederation(&joinedCluster, acc) // remove the joint cluster's entry from master cluster
 	if status != http.StatusOK {
 		restRespErrorMessage(w, status, code, "Fail to dismiss managed cluster")
 	} else {
@@ -2129,7 +2129,7 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	if joinedCluster.ID == req.ID {
 		// Validate token
 		if err := jwtValidateFedJoinTicket(req.JointTicket, joinedCluster.Secret); err == nil {
-			if status, code = removeFromFederation(&joinedCluster); status == http.StatusOK {
+			if status, code = removeFromFederation(&joinedCluster, accReadAll); status == http.StatusOK {
 				msg := fmt.Sprintf("Cluster %s(%s) leaves federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
 				cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles)
 				restRespSuccess(w, r, nil, nil, nil, nil, "Leave federation by managed cluster's request")
@@ -2219,7 +2219,7 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 // share.CLUSLockFedKey lock is owned by caller
-func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo) (int, int) { // (status, code)
+func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *access.AccessControl) (int, int) { // (status, code)
 	if joinedCluster == nil || joinedCluster.ID == "" {
 		return http.StatusBadRequest, api.RESTErrInvalidRequest
 	}
@@ -2237,6 +2237,13 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo) (int, in
 					os.Remove(clientKeyPath)
 					os.Remove(clientCertPath)
 					_setFedJointPrivateKey(joinedCluster.ID, nil)
+					for j := 0; j < 3; j++ {
+						if c := cacher.GetFedJoinedCluster(joinedCluster.ID, acc); c.ID == joinedCluster.ID {
+							time.Sleep(time.Second)
+						} else {
+							break
+						}
+					}
 					return http.StatusOK, 0
 				}
 			}
