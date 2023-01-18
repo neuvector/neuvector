@@ -2065,6 +2065,13 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 		}
 	}
 
+	if reviewType == share.ReviewTypeImportAdmCtrl {
+		if name != share.ScopeLocal {
+			errMsg := fmt.Sprintf("%s file format error: invalid metadata name \"%s\"", reviewTypeDisplay, name)
+			return nil, 1, errMsg, ""
+		}
+	}
+
 	var buffer bytes.Buffer
 
 	errCount := 0
