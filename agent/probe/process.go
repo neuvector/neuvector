@@ -2414,7 +2414,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
 	// We don't need to report the violations more often, but we should make sure that if we
 	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
-	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce{
+	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce {
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
@@ -2443,6 +2443,11 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				}
 				if p.isProcessException(proc, svcGroup, id, bParentHostProc, bZeroDrift) {
 					pp.Action = share.PolicyActionAllow // can not be learned
+				} else {
+					// NVSHAS-7534 - if process is not an exception, we should kill it
+					// Previously, if an application was arleady running and then entered Protect,
+					// we wouldn't kill the process due to the keep alive (its defaulted enabled)
+					bKeepAlive = false
 				}
 			}
 		}
