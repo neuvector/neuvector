@@ -44,6 +44,7 @@
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
 #define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
 #define ENV_NO_SYSTEM_PROTECT  "ENF_NO_SYSTEM_PROFILES"
+#define ENV_POLICY_PULLER      "ENF_NETPOLICY_PULL_INTERVAL"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
@@ -204,7 +205,7 @@ static pid_t fork_exec(int i)
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level;
+    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq;
     int a;
 
@@ -471,10 +472,14 @@ static pid_t fork_exec(int i)
         if (getenv(ENV_NO_SYSTEM_PROTECT)) {
             args[a ++] = "-no_sys_protect";
         }
+        if ((policy_pull_period = getenv(ENV_POLICY_PULLER)) != NULL) {
+            args[a ++] = "-policy_puller";
+            args[a ++] = policy_pull_period;
+        }
 
         args[a] = NULL;
         break;
-    
+
     case PROC_CTRL_OPA:
         args[0] = g_procs[i].path;
         a = 1;

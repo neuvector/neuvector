@@ -11,16 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	syslog "github.com/RackSec/srslog"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
 const syslogFacility = syslog.LOG_LOCAL0
 const notificationHeader = "notification"
+const syslogTimeout = time.Second * 8
 
 type Syslogger struct {
 	writer *syslog.Writer
@@ -183,6 +184,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
+		wr.SetSendTimeout(syslogTimeout)
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}

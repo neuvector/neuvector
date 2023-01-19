@@ -451,7 +451,7 @@ func notifyDPContainerApps(c *containerData) {
 	for i, pair := range c.intcpPairs {
 		macs[i] = pair.MAC.String()
 	}
-	if gInfo.tapProxymesh && (c.info.ProxyMesh || c.hasDatapath) {
+	if gInfo.tapProxymesh && isProxyMesh(c) {
 		lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 		macs = append(macs, lomac_str)
 	}
@@ -2155,10 +2155,25 @@ func taskDPConnect() {
 	dp.DPCtrlSetSysConf(&xffenabled)
 }
 
+var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer  // incoming network ploicy version
 // gInfo write should only be done in this thread; and gInfo read doesn't need to be locked
 // in this thread.
 func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsmon.MonitorMessage, dpStatusChan chan bool) {
 	log.Debug()
+	var pnpTargetTick, ticks int
+	nPolicyPullPeriod := agentEnv.netPolicyPuller
+	calculationTicker := time.NewTicker(time.Second * 2)
+	if nPolicyPullPeriod > 0 {
+		log.WithFields(log.Fields{"netPolicyPuller": nPolicyPullPeriod}).Info()
+		pnpTargetTick = 1			// minimum break
+		if nPolicyPullPeriod > 0 {	// valid period
+			if nPolicyPullPeriod > 1 {
+				pnpTargetTick = nPolicyPullPeriod/2	// maximum, per 2 seconds
+			}
+		}
+	} else {
+		calculationTicker.Stop()	// no timer
+	}
 
 	for {
 		if shouldExit() {
@@ -2167,6 +2182,17 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 		}
 
 		select {
+		case <-calculationTicker.C:
+			ticks++
+			if ticks > pnpTargetTick {
+				ticks = 0
+				if nextNetworkPolicyVer != nil {
+					if !systemUpdatePolicy(*nextNetworkPolicyVer) {
+						ticks = pnpTargetTick  // version changed? trigger a quick cycle
+					}
+				}
+				nextNetworkPolicyVer = nil
+			}
 		case task := <-ContainerTaskChan:
 			taskName := ContainerTaskName[task.task]
 			log.WithFields(log.Fields{"task": taskName, "id": task.id}).Debug("Task received")
