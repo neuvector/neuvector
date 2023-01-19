@@ -1831,10 +1831,42 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		}
 	}
 
+	// NVSHAS-7505
+	// Check if the process is on the white list
+	// If it is, we can skip the checks.
+	// The original issue we saw was when we whitelist a process/binary (in zero drift protect)...
+	// The existing logic only checks if the process already exists on the image. If the binary is not new to the image
+	// and on the whitelist, then it is allowed to run.
+	// But if you ADD a new binary to the image and whitelist it, then the logic would block it.
+	// It didn't even check the whitelist so it didn't know that the binary was allowed.
+	// Note that there was a work-around but it was not sustainable; you could install new binaries
+	// and then restart the container. At start up, the binary would be considered "pre-existing" and
+	// then allowed to run.
+	if p.fAccessCtl != nil {
+		id, _, _, res := p.fAccessCtl.whiteListCheck(proc.path, proc.pid)
+		mLog.WithFields(log.Fields{"id": id,
+			"res": res,
+		"path": proc.path,
+			"action": proc.action,
+		"pid": proc.pid}).Debug("JAYU Whitelist checking the proc...")
+
+		if res > rule_allowed {
+			proc.action = share.PolicyActionAllow
+			mLog.WithFields(log.Fields{"id": id,
+				"res": res,
+				"path": proc.path,
+				"action": proc.action,
+				"pid": proc.pid}).Debug("JAYU Whitelist allowing the proc!")
+
+		}
+	}
+
 	risky := proc.action == share.PolicyActionCheckApp
 	if proc.name != "ps" {
-		if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
-			return // policy is not ready
+		if proc.action != share.PolicyActionAllow {
+			if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
+				return // policy is not ready
+			}
 		}
 
 		// the very first parent, update a decision (allow or checkApp),
@@ -2414,7 +2446,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
 	// We don't need to report the violations more often, but we should make sure that if we
 	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
-	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce{
+	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce {
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
@@ -2435,17 +2467,38 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			}
 		}
 
+		mLog.WithFields(log.Fields{"name": proc.name,
+			"action": pp,
+		"bKeepAlive": bKeepAlive,
+		"proc.reported & profileReported": (proc.reported & profileReported),
+		"mode": mode,
+		}).Debug("JAYU What are doing...")
+
 		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) {
 		   if pp.Uuid != share.CLUSReservedUuidAnchorMode {
 				var bParentHostProc bool
 				if c, ok := p.pidContainerMap[proc.ppid]; ok{
 					bParentHostProc = c.id == ""
 				}
-				if p.isProcessException(proc, svcGroup, id, bParentHostProc, bZeroDrift) {
+
+			   mLog.WithFields(log.Fields{"name": proc.name,
+				   "action": pp,
+				   "bKeepAlive": bKeepAlive,
+				   "proc.reported & profileReported": (proc.reported & profileReported),
+				   "mode": mode,
+			   }).Debug("JAYU checking exception...")
+
+			   if p.isProcessException(proc, svcGroup, id, bParentHostProc, bZeroDrift) {
 					pp.Action = share.PolicyActionAllow // can not be learned
 				}
 			}
 		}
+		mLog.WithFields(log.Fields{"name": proc.name,
+			"action": pp,
+			"bKeepAlive": bKeepAlive,
+			"proc.reported & profileReported": (proc.reported & profileReported),
+			"mode": mode,
+		}).Debug("JAYU do we kill or report or noting")
 
 		switch pp.Action {
 		case share.PolicyActionViolate:
@@ -2935,15 +2988,24 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			return true
 		}
 	} else {
+		for p, v := range ppe.Path {
+			mLog.WithFields(log.Fields{
+				"path key": p,
+				"path val": v,
+				"name": ppe.Name}).Debug("JAYU Dumpingupper file list")
+		}
+
 		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
 			bImageFile = false
+			mLog.WithFields(log.Fields{"name": proc.name}).Debug("JAYU file is not ")
+
 			if fi, ok := c.fInfo[ppe.Path]; ok {
 				bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
 				if ppe.Action == share.PolicyActionAllow && fi.fileType == file_not_exist { // not from image
 					bNotImageButNewlyAdded = true
 					c.fInfo[ppe.Path] = finfo // updated
 				}
-				mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD:")
+				mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD: allowed")
 			} else {
 				mLog.WithFields(log.Fields{"file": ppe.Path, "finfo": finfo}).Debug("SHD: new file")
 				bModified = true

@@ -329,7 +329,7 @@ func (fa *FileAccessCtrl) addToMonitorList(root *rootFd, path string, bAllow, up
 		if state != rule_not_defined {
 			return // existing and set
 		}
-		log.WithFields(log.Fields{"path": path, "allow": bAllow}).Debug("FA: ")
+		log.WithFields(log.Fields{"path": path, "allow": bAllow, "state": state,}).Debug("FA: ")
 	} else {
 		log.WithFields(log.Fields{"path": path, "allow": bAllow}).Debug("FA: user-defined")
 		root.dirMonitorList = appendDirPath(root.dirMonitorList, path)
@@ -337,6 +337,10 @@ func (fa *FileAccessCtrl) addToMonitorList(root *rootFd, path string, bAllow, up
 
 	//
 	root.whlst[path] = fa.decision_maker(bAllow, updateAlert)
+
+	for name, val := range root.whlst {
+		mLog.WithFields(log.Fields{"name": name, "val": val}).Debug("root.whlst")
+	}
 }
 
 func (fa *FileAccessCtrl) decision_maker(bAllow, updateAlert bool) int {
@@ -663,8 +667,17 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 
 	fa.lockMux()
 	defer fa.unlockMux()
+
 	// log.WithFields(log.Fields{"id": id, "found": found, "path": path}).Debug("FA: ")
 	if cRoot, ok := fa.roots[id]; ok {
+
+		for name, val := range cRoot.whlst {
+			mLog.WithFields(log.Fields{
+				"name": name,
+				"val": val,
+			}).Debug("Dumping whitelist")
+		}
+
 		profileSetting = cRoot.setting
 		svcGroup = cRoot.group
 		if ok, pname, ppath, pgid := fa.isAllowedByParentApp(cRoot, pid); ok {
@@ -716,24 +729,88 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 			}
 
 			var id, profileSetting, svcGroup, rule_uuid string
+			mLog.WithFields(log.Fields{
+				"path": path,
+				"ppid": ppid,
+				"pid": ev.Pid,
+				"filename": ev.File.Name(),
+			}).Debug("JAYU CHECKING ON whitelist")
 			id, profileSetting, svcGroup, res = fa.whiteListCheck(path, ppid)
+			mLog.WithFields(log.Fields{
+				"id": id,
+				"profileSetting": profileSetting,
+				"svcGroup": svcGroup,
+				"ppid": ppid,
+				"res": res,
+			}).Debug("JAYU whilist restult")
 			// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
 			if profileSetting == share.ProfileZeroDrift {
+				mLog.WithFields(log.Fields{
+					"path": path,
+					"ppid": ppid,
+					"pid": ev.Pid,
+					"res": res,
+					"profileSetting": profileSetting,
+				}).Debug("JAYU we're in zero dfit")
 				switch res {
-				case rule_denied, rule_allowed:	// matched a rule or bypass
+				case rule_denied, rule_allowed, rule_allowed_updateAlert:	// matched a rule or bypass
 				default:
+					mLog.WithFields(log.Fields{
+						"id": id,
+						"name": name,
+						"path": path,
+						"svcGroup": svcGroup,
+						"ppid": ppid,
+						"res": res,
+					}).Debug("JAYU checking")
 					if rule_uuid = fa.checkAllowedShieldProcess(id, name, path, svcGroup, ppid, res); rule_uuid == "" {
 						res = rule_allowed_zdrift
 						log.WithFields(log.Fields{"id": id, "rule_uuid": rule_uuid}).Debug("SHD: allowed")
+
+						mLog.WithFields(log.Fields{
+							"id": id,
+							"name": name,
+							"path": path,
+							"svcGroup": svcGroup,
+							"ppid": ppid,
+							"res": res,
+						}).Debug("JAYU allowed")
 					} else {
 						res = rule_not_defined // reject it
+
+						mLog.WithFields(log.Fields{
+							"id": id,
+							"name": name,
+							"path": path,
+							"svcGroup": svcGroup,
+							"ppid": ppid,
+							"res": res,
+						}).Debug("JAYU denying")
 					}
 				}
 			} else {	// basic
 				if res >= rule_allowed {
 					res = rule_allowed
+					mLog.WithFields(log.Fields{
+						"id": id,
+						"name": name,
+						"path": path,
+						"svcGroup": svcGroup,
+						"ppid": ppid,
+						"res": res,
+					}).Debug("JAYU default allowed")
 				}
 			}
+
+
+			mLog.WithFields(log.Fields{
+				"id": id,
+				"name": name,
+				"path": path,
+				"svcGroup": svcGroup,
+				"ppid": ppid,
+				"res": res,
+			}).Debug("JAYU are we allowed?")
 
 			if res < rule_allowed {
 				// the same event with the same pid will come into the routine twice
@@ -760,6 +837,16 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 								Group: svcGroup,
 								RuleID: rule_uuid,
 						}
+
+
+						mLog.WithFields(log.Fields{
+							"id": id,
+							"name": name,
+							"path": path,
+							"svcGroup": svcGroup,
+							"ppid": ppid,
+							"res": res,
+						}).Debug("JAYU probe report denied")
 
 						if fa.prober != nil {
 							if pmsg.RuleID == "" {
