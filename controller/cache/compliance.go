@@ -220,22 +220,22 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		}
 		switch g.PolicyMode {
 		case share.PolicyModeLearn:
-			s.DiscoverGroups++
+			s.Groups.DiscoverGroups++
 			if g.BaselineProfile == share.ProfileZeroDrift {
-				s.DiscoverGroupsZD++
+				s.Groups.DiscoverGroupsZD++
 			}
 		case share.PolicyModeEvaluate:
-			s.MonitorGroups++
+			s.Groups.MonitorGroups++
 			if g.BaselineProfile == share.ProfileZeroDrift {
-				s.MonitorGroupsZD++
+				s.Groups.MonitorGroupsZD++
 			}
 		case share.PolicyModeEnforce:
-			s.ProtectGroups++
+			s.Groups.ProtectGroups++
 			if g.BaselineProfile == share.ProfileZeroDrift {
-				s.ProtectGroupsZD++
+				s.Groups.ProtectGroupsZD++
 			}
 		}
-		s.Groups++
+		s.Groups.Groups++
 	}
 
 	// get all running pod
@@ -270,10 +270,10 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		} else {
 			// Only counts app containers, not pod
 			if wl.Privileged {
-				s.PrivilegedWLs++
+				s.WLs.PrivilegedWLs++
 			}
 			if wl.RunAsRoot {
-				s.RootWLs++
+				s.WLs.RootWLs++
 			}
 
 			// workload cve
@@ -281,11 +281,11 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				cve := cache.scanBrief.HighVuls + cache.scanBrief.MedVuls
 				switch mode {
 				case share.PolicyModeLearn:
-					s.DiscoverCVEs += cve
+					s.CVEs.DiscoverCVEs += cve
 				case share.PolicyModeEvaluate:
-					s.MonitorCVEs += cve
+					s.CVEs.MonitorCVEs += cve
 				case share.PolicyModeEnforce:
-					s.ProtectCVEs += cve
+					s.CVEs.ProtectCVEs += cve
 				}
 			}
 		}
@@ -301,7 +301,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 			continue
 		}
 		if cache.scanBrief != nil && scoreHost {
-			s.HostCVEs += cache.scanBrief.HighVuls + cache.scanBrief.MedVuls
+			s.CVEs.HostCVEs += cache.scanBrief.HighVuls + cache.scanBrief.MedVuls
 		}
 		s.Hosts++
 	}
@@ -314,7 +314,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 	scanMutexRLock()
 	if acc.Authorize(&share.CLUSHost{}, nil) {
 		if info, ok := scanMap[common.ScanPlatformID]; ok && info.brief != nil {
-			s.PlatformCVEs = info.brief.HighVuls + info.brief.MedVuls
+			s.CVEs.PlatformCVEs = info.brief.HighVuls + info.brief.MedVuls
 		}
 	}
 	scanMutexRUnlock()
@@ -322,7 +322,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 	ingress := make(map[string]*api.RESTConversationReport)
 	egress := make(map[string]*api.RESTConversationReport)
 
-	s.RunningPods = len(epMap)
+	s.WLs.RunningPods = len(epMap)
 
 	// count external exposure to score
 	graphMutexRLock()
@@ -373,17 +373,17 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		if external {
 			switch wl.mode {
 			case share.PolicyModeLearn:
-				s.DiscoverExtEPs++
+				s.WLs.DiscoverExtEPs++
 			case share.PolicyModeEvaluate:
-				s.MonitorExtEPs++
+				s.WLs.MonitorExtEPs++
 			case share.PolicyModeEnforce:
-				s.ProtectExtEPs++
+				s.WLs.ProtectExtEPs++
 			}
 			if violate {
-				s.VioExtEPs++
+				s.WLs.VioExtEPs++
 			}
 			if threat {
-				s.ThrtExtEPs++
+				s.WLs.ThrtExtEPs++
 			}
 		}
 	}
