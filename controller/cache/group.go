@@ -1219,7 +1219,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// Join and create learned group.
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
-			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
+			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
@@ -1921,5 +1921,32 @@ func domainChange(domain share.CLUSDomain) {
 			}
 		}
 		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
+	}
+}
+
+// leader's job: once per controller
+var bDoneRefreshGroupMembers bool
+func refreshGroupMembers() {
+	if bDoneRefreshGroupMembers {
+		return
+	}
+	bDoneRefreshGroupMembers = true
+
+	//
+	var notGroupedPods []*workloadCache
+	cacheMutexRLock()
+	for _, wlc := range wlCacheMap {
+		if !utils.HasGroupProfiles(wlc.learnedGroupName) || wlc.learnedGroupName == "" {
+			continue
+		}
+
+		if _, ok := groupCacheMap[wlc.learnedGroupName]; !ok {
+			notGroupedPods = append(notGroupedPods, wlc)
+		}
+	}
+	cacheMutexRUnlock()
+
+	for _, wlc := range notGroupedPods {
+		groupWorkloadJoin(wlc.workload.ID, wlc)
 	}
 }

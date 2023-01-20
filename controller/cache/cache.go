@@ -276,6 +276,9 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 		return
 	}
 
+	//
+	refreshGroupMembers()
+
 	// When lead change, synchonize states in case operation was missed
 	syncLeftNVObjectsToCluster()
 	//NVSHAS-5914, During rolling upgrade remove the unmanaged workload
