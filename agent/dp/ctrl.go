@@ -100,7 +100,7 @@ func dpSendMsgExSilent(msg []byte, timeout int, cb DPCallback, param interface{}
 }
 
 func dpSendMsgEx(msg []byte, timeout int, cb DPCallback, param interface{}) int {
-	log.WithFields(log.Fields{"msg": string(msg), "size": len(msg)}).Debug("")
+	//log.WithFields(log.Fields{"msg": string(msg), "size": len(msg)}).Debug("")
 
 	// The cb call is inside the dp lock, so be careful if you need to grab
 	// another lock in cb
