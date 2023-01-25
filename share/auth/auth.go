@@ -156,11 +156,11 @@ func (a *remoteAuth) OIDCDiscover(issuer string) (string, string, string, string
 
 func (a *remoteAuth) generateState() string {
 	s := fmt.Sprintf("%d", time.Now().Unix())
-	return utils.EncryptPasswordForURL(s)
+	return utils.EncryptPasswordRaw(s)
 }
 
 func (a *remoteAuth) verifyState(state string) error {
-	if tsStr := utils.DecryptPasswordForURL(state); tsStr == "" {
+	if tsStr := utils.DecryptPasswordRaw(state); tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")
 	} else if ts, err := strconv.ParseInt(tsStr, 10, 64); err != nil {
 		return errors.New("Invalid state: wrong format")

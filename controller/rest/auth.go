@@ -1167,9 +1167,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var publicKey *rsa.PublicKey
 
 	if secret == "" {
-		tokenString = utils.DecryptPasswordForURL(encryptedToken)
+		tokenString = utils.DecryptPasswordRaw(encryptedToken)
 	} else {
-		tokenString = utils.DecryptSensitiveForURL(encryptedToken, []byte(secret))
+		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
 	if tokenString == "" {
 		return nil, fmt.Errorf("unrecognized token")
@@ -1217,7 +1217,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data := utils.DecryptSensitiveForURL(encryptedData, []byte(secret))
+	data := utils.DecryptSensitive(encryptedData, []byte(secret))
 	if data != "" {
 		var c joinTicket
 		if err := json.Unmarshal([]byte(data), &c); err == nil {
@@ -1275,7 +1275,7 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, _ := token.SignedString(jwtPrivateKey)
-	return id, utils.EncryptPasswordForURL(tokenString), &c
+	return id, utils.EncryptPasswordRaw(tokenString), &c
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
@@ -1296,7 +1296,7 @@ func jwtGenFedTicket(secret string, duration time.Duration) string {
 		ExpiresAt: now.Add(duration).Unix(),
 	}
 	tokenBytes, _ := json.Marshal(&c)
-	return utils.EncryptSensitiveForURL(string(tokenBytes), []byte(secret))
+	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
 }
 
 func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) string {
@@ -1317,7 +1317,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 	}
 	if privateKey != nil {
 		tokenString, _ := token.SignedString(privateKey)
-		return utils.EncryptSensitiveForURL(tokenString, []byte(secret))
+		return utils.EncryptSensitive(tokenString, []byte(secret))
 	} else {
 		log.WithFields(log.Fields{"id": clusterID}).Error("empty private key")
 	}
