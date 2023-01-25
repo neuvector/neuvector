@@ -1347,6 +1347,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if wlCache, ok = wlCacheMap[wl.ID]; ok && !isDummyWorkloadCache(wlCache) {
 			oldRunning := wlCache.workload.Running
 			oldQuar := wlCache.workload.Quarantine
+			oldSvc := wlCache.workload.Service
 
 			if reflect.DeepEqual(wlCache.workload.Ifaces, wl.Ifaces) != true ||
 				reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) != true {
@@ -1373,7 +1374,8 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			}
 
 			if wl.Running {
-				if !oldRunning {
+				// If service name is changed, it must be that the enforcer has been replaced, we need create the new learned group.
+				if !oldRunning || oldSvc != wl.Service {
 					wlCache.serviceName = utils.NormalizeForURL(wl.Service)
 					wlCache.learnedGroupName = makeLearnedGroupName(wlCache.serviceName)
 
@@ -1461,7 +1463,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			addrWorkloadAdd(wl.ID, wlCache)
 		}
 		//NVSHAS-7433, it is possible newly added short-lived workload is not running
-		//so we need to delete Workload:IP and its related policy 
+		//so we need to delete Workload:IP and its related policy
 		if wl.Running || newWorkload {
 			connectWorkloadAdd(wl.ID, wlCache)
 		}
