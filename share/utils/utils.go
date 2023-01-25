@@ -865,16 +865,16 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 	}
 }
 
-func EncryptForURL(key, text []byte) (string, error) {
+func EncryptToRawBase64(key, text []byte) (string, error) {
 	if ciphertext, err := Encrypt(key, text); err == nil {
-		return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+		return base64.RawStdEncoding.EncodeToString(ciphertext), nil
 	} else {
 		return "", err
 	}
 }
 
-func DecryptForURL(key []byte, b64 string) (string, error) {
-	text, err := base64.RawURLEncoding.DecodeString(b64)
+func DecryptFromRawBase64(key []byte, b64 string) (string, error) {
+	text, err := base64.RawStdEncoding.DecodeString(b64)
 	if err != nil {
 		return "", err
 	}
@@ -918,7 +918,7 @@ func EncryptPassword(password string) string {
 	return encrypted
 }
 
-func DecryptSensitiveForURL(encrypted string, key []byte) string {
+func DecryptSensitive(encrypted string, key []byte) string {
 	if encrypted == "" {
 		return ""
 	}
@@ -927,7 +927,7 @@ func DecryptSensitiveForURL(encrypted string, key []byte) string {
 	return data
 }
 
-func EncryptSensitiveForURL(data string, key []byte) string {
+func EncryptSensitive(data string, key []byte) string {
 	if data == "" {
 		return ""
 	}
@@ -936,21 +936,21 @@ func EncryptSensitiveForURL(data string, key []byte) string {
 	return encrypted
 }
 
-func DecryptPasswordForURL(encrypted string) string {
+func DecryptPasswordRaw(encrypted string) string {
 	if encrypted == "" {
 		return ""
 	}
 
-	password, _ := DecryptForURL(getPasswordSymKey(), encrypted)
+	password, _ := DecryptFromRawBase64(getPasswordSymKey(), encrypted)
 	return password
 }
 
-func EncryptPasswordForURL(password string) string {
+func EncryptPasswordRaw(password string) string {
 	if password == "" {
 		return ""
 	}
 
-	encrypted, _ := EncryptForURL(getPasswordSymKey(), []byte(password))
+	encrypted, _ := EncryptToRawBase64(getPasswordSymKey(), []byte(password))
 	return encrypted
 }
 
