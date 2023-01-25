@@ -23,8 +23,8 @@ import (
 
 // const consulUIDir string = "/usr/local/bin/ui"
 const consulExe string = "/usr/local/bin/consul"
-const consulConf string = "/tmp/consul.json"
 const consulDataDir string = "/tmp/neuvector"
+const consulConf string = consulDataDir + "/consul.json"
 const consulPeers string = consulDataDir + "/raft/peers.json"
 
 const defaultRPCPort = 18300
