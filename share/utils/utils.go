@@ -867,14 +867,14 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 
 func EncryptForURL(key, text []byte) (string, error) {
 	if ciphertext, err := Encrypt(key, text); err == nil {
-		return base64.URLEncoding.EncodeToString(ciphertext), nil
+		return base64.RawURLEncoding.EncodeToString(ciphertext), nil
 	} else {
 		return "", err
 	}
 }
 
 func DecryptForURL(key []byte, b64 string) (string, error) {
-	text, err := base64.URLEncoding.DecodeString(b64)
+	text, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
 		return "", err
 	}
