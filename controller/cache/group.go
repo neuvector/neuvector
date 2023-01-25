@@ -1395,12 +1395,7 @@ func refreshLearnedGroupMembership() {
 	cacheMutexRUnlock()
 
 	for _, wlc := range notGroupedPods {
-		cacheMutexRLock()
-		createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
-		if localDev.Host.Platform == share.PlatformKubernetes {
-			updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
-		}
-		cacheMutexRUnlock()
+		groupWorkloadJoin(wlc.workload.ID, wlc)
 	}
 }
 
