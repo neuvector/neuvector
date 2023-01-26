@@ -132,6 +132,7 @@ func createConfigFile(cc *ClusterConfig) error {
 		lanPort = defaultLANPort
 	}
 
+	os.MkdirAll(consulDataDir, os.ModePerm)
 	f, err := os.Create(consulConf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create consul config file")
