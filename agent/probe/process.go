@@ -1310,6 +1310,9 @@ func (p *Probe) handleProcExit(pid int) *procInternal {
 
 // after FORK event but before EXEC
 func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
+	if !p.bProfileEnable {
+		return
+	}
 	if proc, ok := p.pidProcMap[pid]; ok {
 		if (proc.reported & escalatReported) > 0 {
 			return
