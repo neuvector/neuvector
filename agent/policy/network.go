@@ -547,20 +547,135 @@ func fillWorkloadAddress(addr *share.CLUSWorkloadAddr, addrMap map[string]*share
 	}
 }
 
+func getPortsForApplicationAg(appMap map[share.CLUSProtoPort]*share.CLUSApp, application uint32) string {
+	var ports string = ""
+	for protoPort, app := range appMap {
+		if app.Application == application || app.Proto == application {
+			if ports == "" {
+				ports = fmt.Sprintf("%d", protoPort.Port)
+			} else {
+				ports = fmt.Sprintf("%s,%d", ports, protoPort.Port)
+			}
+		}
+	}
+	return ports
+}
+
+func getMappedPortAg(portMap map[share.CLUSProtoPort]*share.CLUSMappedPort, ports string) string {
+	var pp string = ""
+	portList := strings.Split(ports, ",")
+	for _, ap := range portList {
+		proto, pl, ph, err := utils.ParsePortRangeLink(ap)
+		if err != nil {
+			// log.WithFields(log.Fields{"port": ap}).Error("Fail to parse")
+			continue
+		}
+		for _, mp := range portMap {
+			// seems the mapping is not ip specific, so ip is ignored in mapping search
+			if (mp.IPProto == proto || proto == 0) && (mp.Port >= pl && mp.Port <= ph) {
+				if pp == "" {
+					pp = utils.GetPortLink(mp.IPProto, mp.HostPort)
+				} else {
+					pp = fmt.Sprintf("%s,%s", pp, utils.GetPortLink(mp.IPProto, mp.HostPort))
+				}
+			}
+		}
+	}
+	return pp
+}
+
+func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.CLUSPortApp, pInfo *WorkloadIPPolicyInfo) {
+	var pp string
+
+	//log.WithFields(log.Fields{"pInfo": pInfo, "apps": apps}).Debug("")
+	if apps != nil && len(apps) != 0 {
+		wlAddr.LocalPortApp = make([]share.CLUSPortApp, 0)
+		wlAddr.NatPortApp = make([]share.CLUSPortApp, 0)
+		for _, app := range apps {
+			if app.Ports == "" {
+				pp = "any"
+			} else {
+				pp = app.Ports
+			}
+			wlAddr.LocalPortApp = append(wlAddr.LocalPortApp,
+				share.CLUSPortApp{
+					Ports:       pp,
+					Application: app.Application,
+					CheckApp:    app.CheckApp,
+				})
+			mapp := getMappedPortAg(pInfo.PortMap, pp)
+			if mapp != "" {
+				wlAddr.NatPortApp = append(wlAddr.NatPortApp,
+					share.CLUSPortApp{
+						Ports:       mapp,
+						Application: app.Application,
+						CheckApp:    app.CheckApp,
+					})
+			}
+
+			// For some app, we may not always reliablely identify them.
+			// So we utilize the recognized ports. If the app
+			// is not identified on these ports, we handle them the same as
+			// the specified app
+			if app.CheckApp && app.Application >= C.DPI_APP_PROTO_MARK {
+				appPorts := getPortsForApplicationAg(pInfo.AppMap, app.Application)
+				if app.Ports == "" {
+					pp = appPorts
+				} else {
+					pp = utils.GetCommonPorts(appPorts, app.Ports)
+				}
+				if pp != "" {
+					wlAddr.LocalPortApp = append(wlAddr.LocalPortApp,
+						share.CLUSPortApp{
+							Ports:       pp,
+							Application: C.DP_POLICY_APP_UNKNOWN,
+							CheckApp:    true,
+						})
+
+					mapp := getMappedPortAg(pInfo.PortMap, pp)
+					if mapp != "" {
+						wlAddr.NatPortApp = append(wlAddr.NatPortApp,
+							share.CLUSPortApp{
+								Ports:       mapp,
+								Application: C.DP_POLICY_APP_UNKNOWN,
+								CheckApp:    true,
+							})
+					}
+				}
+			}
+		}
+	}
+}
+
 func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
-	pMap map[string]*WorkloadIPPolicyInfo) ([]*share.CLUSWorkloadAddr, []*WorkloadIPPolicyInfo) {
+	pMap map[string]*WorkloadIPPolicyInfo, isto bool) ([]*share.CLUSWorkloadAddr, []*WorkloadIPPolicyInfo) {
 
 	wlList := make([]*share.CLUSWorkloadAddr, 0)
 	pInfoList := make([]*WorkloadIPPolicyInfo, 0)
 	for _, addr := range addrs {
 		if addr.WlID == share.CLUSWLModeGroup {
-			for id, pInfo := range pMap {
-				mode := pInfo.Policy.Mode
-				if strings.Contains(addr.PolicyMode, mode) {
-					wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
-						LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
-					pInfoList = append(pInfoList, pInfo)
+			if (polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 && !isto) ||
+				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && isto) {
+				for id, pInfo := range pMap {
+					mode := pInfo.Policy.Mode
+					if strings.Contains(addr.PolicyMode, mode) {
+						wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
+							LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
+						pInfoList = append(pInfoList, pInfo)
+					}
 				}
+			}
+		} else if addr.WlID == share.CLUSWLAllContainer {
+			for id, pInfo := range pMap {
+				wlAddr := share.CLUSWorkloadAddr{
+					WlID: id,
+					PolicyMode: pInfo.Policy.Mode,
+				}
+				if isto {
+					fillPortsForWorkloadAddressAg(&wlAddr, addr.LocalPortApp, pInfo)
+				}
+				wlList = append(wlList, &wlAddr)
+				pInfoList = append(pInfoList, pInfo)
 			}
 		} else {
 			if pInfo, ok := pMap[addr.WlID]; ok {
@@ -573,20 +688,34 @@ func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
 }
 
 func getWorkload(addrs []*share.CLUSWorkloadAddr,
-	wlMap map[string]*share.CLUSWorkloadAddr) []*share.CLUSWorkloadAddr {
+	wlMap map[string]*share.CLUSWorkloadAddr, isto bool) []*share.CLUSWorkloadAddr {
 
 	wlList := make([]*share.CLUSWorkloadAddr, 0)
 	for _, addr := range addrs {
 		if addr.WlID == share.CLUSWLModeGroup {
-			for id, wl := range wlMap {
-				if strings.Contains(addr.PolicyMode, wl.PolicyMode) {
-					if addr.NatPortApp == nil  || len(addr.NatPortApp) <= 0 {//PAI
-						wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
-								LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
-					} else {
-						wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
-								LocalPortApp: addr.LocalPortApp, NatPortApp: wl.NatPortApp})
+			if (polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 && isto) ||
+				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
+				for id, wl := range wlMap {
+					if strings.Contains(addr.PolicyMode, wl.PolicyMode) {
+						if addr.NatPortApp == nil  || len(addr.NatPortApp) <= 0 {//PAI
+							wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
+									LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
+						} else {
+							wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
+									LocalPortApp: addr.LocalPortApp, NatPortApp: wl.NatPortApp})
+						}
 					}
+				}
+			}
+		} else if addr.WlID == share.CLUSWLAllContainer {
+			if (polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 && isto) ||
+				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
+				for id, wl := range wlMap {
+					wlAddr := share.CLUSWorkloadAddr{
+						WlID: id,
+						PolicyMode: wl.PolicyMode,
+					}
+					wlList = append(wlList, &wlAddr)
 				}
 			}
 		} else {
@@ -660,8 +789,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 		}
 
 		/* create egress rules */
-		wlList, pInfoList := getRelevantWorkload(pp.From, workloadPolicyMap)
-		wlToList := getWorkload(pp.To, addrMap)
+		wlList, pInfoList := getRelevantWorkload(pp.From, workloadPolicyMap, false)
+		wlToList := getWorkload(pp.To, addrMap, true)
 		for i, from := range wlList {
 			pInfo := pInfoList[i]
 			for _, to := range wlToList {
@@ -702,8 +831,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 		}
 
 		/* create ingress rules */
-		wlList, pInfoList = getRelevantWorkload(pp.To, workloadPolicyMap)
-		wlFromList := getWorkload(pp.From, addrMap)
+		wlList, pInfoList = getRelevantWorkload(pp.To, workloadPolicyMap, true)
+		wlFromList := getWorkload(pp.From, addrMap, false)
 		for i, to := range wlList {
 			pInfo := pInfoList[i]
 			for _, from := range wlFromList {

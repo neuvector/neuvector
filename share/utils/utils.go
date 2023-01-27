@@ -475,6 +475,60 @@ func GetPortRangeLink(ipproto uint8, port uint16, portR uint16) string {
 	}
 }
 
+func GetCommonPorts(ports1 string, ports2 string) string {
+	var p, pp string = "", ""
+	var low, high uint16
+	var proto uint8
+
+	p1 := strings.Split(ports1, ",")
+	p2 := strings.Split(ports2, ",")
+	for _, pp1 := range p1 {
+		proto1, low1, high1, err := ParsePortRangeLink(pp1)
+		if err != nil {
+			// log.WithFields(log.Fields{"port": ports1}).Error("Fail to parse")
+			continue
+		}
+		for _, pp2 := range p2 {
+			proto2, low2, high2, err := ParsePortRangeLink(pp2)
+			if err != nil {
+				// log.WithFields(log.Fields{"port": ports2}).Error("Fail to parse")
+				continue
+			}
+
+			if proto1 == 0 {
+				proto = proto2
+			} else if proto2 == 0 {
+				proto = proto1
+			} else if proto1 == proto2 {
+				proto = proto1
+			} else {
+				continue
+			}
+			if high1 < low2 || high2 < low1 {
+				continue
+			}
+			if low1 > low2 {
+				low = low1
+			} else {
+				low = low2
+			}
+			if high1 > high2 {
+				high = high2
+			} else {
+				high = high1
+			}
+			pp = GetPortRangeLink(proto, low, high)
+			if p == "" {
+				p = pp
+			} else {
+				p = fmt.Sprintf("%s,%s", p, pp)
+			}
+		}
+	}
+	//log.WithFields(log.Fields{"ports1": ports1, "ports2": ports2, "common": p}).Debug()
+	return p
+}
+
 func InterpretIP(ip, ipR net.IP) string {
 	str := ip.String()
 	if ipR != nil {
