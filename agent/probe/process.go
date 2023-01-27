@@ -1418,6 +1418,10 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		return
 	}
 
+	p.lockProcMux()
+	effective_user := p.getUserName(proc.pid, proc.euid)
+	p.unlockProcMux()
+
 	e := &ProbeEscalation{
 		ID:       id,
 		Pid:      proc.pid,
@@ -1427,7 +1431,7 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		RUid:     proc.ruid,
 		EUid:     proc.euid,
 		RealUser: proc.user,
-		EffUser:  p.getUserName(proc.pid, proc.euid),
+		EffUser:  effective_user,
 
 		// parent info
 		ParentPid:  parent.pid,
