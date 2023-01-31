@@ -1353,6 +1353,9 @@ func (p *Probe) handleProcExit(pid int) *procInternal {
 
 // after FORK event but before EXEC
 func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
+	if !p.bProfileEnable {
+		return
+	}
 	if proc, ok := p.pidProcMap[pid]; ok {
 		if (proc.reported & escalatReported) > 0 {
 			return
@@ -1458,6 +1461,10 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		return
 	}
 
+	p.lockProcMux()
+	effective_user := p.getUserName(proc.pid, proc.euid)
+	p.unlockProcMux()
+
 	e := &ProbeEscalation{
 		ID:       id,
 		Pid:      proc.pid,
@@ -1467,7 +1474,7 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		RUid:     proc.ruid,
 		EUid:     proc.euid,
 		RealUser: proc.user,
-		EffUser:  p.getUserName(proc.pid, proc.euid),
+		EffUser:  effective_user,
 
 		// parent info
 		ParentPid:  parent.pid,

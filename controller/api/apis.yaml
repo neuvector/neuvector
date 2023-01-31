@@ -4488,6 +4488,11 @@ definitions:
       platform_version:
         type: string
         example: ""
+      packages:
+        type: array
+        items:
+          type: string
+          example: ""
   Event:
     type: object
     required:
