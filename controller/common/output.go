@@ -136,12 +136,12 @@ func struct2Text(elog interface{}) string {
 				emt := f.Type().Field(j)
 				emf := f.Field(j)
 
-				if tag := emt.Tag.Get("json"); tag != "" {
+				if tag := emt.Tag.Get("json"); tag != "" && tag != "-" {
 					logText = appendLogField(logText, tag, emf)
 				}
 			}
 		} else {
-			if tag := t.Tag.Get("json"); tag != "" {
+			if tag := t.Tag.Get("json"); tag != "" && tag != "-" {
 				logText = appendLogField(logText, tag, f)
 			}
 		}
