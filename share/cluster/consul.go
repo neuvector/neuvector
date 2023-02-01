@@ -23,8 +23,8 @@ import (
 
 // const consulUIDir string = "/usr/local/bin/ui"
 const consulExe string = "/usr/local/bin/consul"
-const consulConf string = "/tmp/consul.json"
 const consulDataDir string = "/tmp/neuvector"
+const consulConf string = consulDataDir + "/consul.json"
 const consulPeers string = consulDataDir + "/raft/peers.json"
 
 const defaultRPCPort = 18300
@@ -132,6 +132,7 @@ func createConfigFile(cc *ClusterConfig) error {
 		lanPort = defaultLANPort
 	}
 
+	os.MkdirAll(consulDataDir, os.ModePerm)
 	f, err := os.Create(consulConf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create consul config file")

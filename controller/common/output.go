@@ -11,16 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	syslog "github.com/RackSec/srslog"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
 const syslogFacility = syslog.LOG_LOCAL0
 const notificationHeader = "notification"
+const syslogTimeout = time.Second * 8
 
 type Syslogger struct {
 	writer *syslog.Writer
@@ -135,12 +136,12 @@ func struct2Text(elog interface{}) string {
 				emt := f.Type().Field(j)
 				emf := f.Field(j)
 
-				if tag := emt.Tag.Get("json"); tag != "" {
+				if tag := emt.Tag.Get("json"); tag != "" && tag != "-" {
 					logText = appendLogField(logText, tag, emf)
 				}
 			}
 		} else {
-			if tag := t.Tag.Get("json"); tag != "" {
+			if tag := t.Tag.Get("json"); tag != "" && tag != "-" {
 				logText = appendLogField(logText, tag, f)
 			}
 		}
@@ -183,6 +184,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
+		wr.SetSendTimeout(syslogTimeout)
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}

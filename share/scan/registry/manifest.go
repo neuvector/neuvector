@@ -16,6 +16,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	MediaTypeOCIManifest = "application/vnd.oci.image.manifest.v1+json"
+)
+
 type ManifestInfo struct {
 	SignedManifest *manifestV1.SignedManifest
 	Digest         string
@@ -43,10 +47,12 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 		}
 		switch schema {
 		case 1:
-			req.Header.Set("Accept", manifestV1.MediaTypeManifest)
-			req.Header.Set("Accept", manifestV1.MediaTypeSignedManifest)
+			req.Header.Add("Accept", manifestV1.MediaTypeManifest)
+			req.Header.Add("Accept", manifestV1.MediaTypeSignedManifest)
+			req.Header.Add("Accept", MediaTypeOCIManifest)
 		case 2:
-			req.Header.Set("Accept", manifestV2.MediaTypeManifest)
+			req.Header.Add("Accept", manifestV2.MediaTypeManifest)
+			req.Header.Add("Accept", MediaTypeOCIManifest)
 		default:
 			return "", nil, errors.New("Unsupported manifest schema version")
 		}

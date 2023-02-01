@@ -276,6 +276,18 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 		return
 	}
 
+	// NVSHAS-7485: Here we are dealing a case that container's learned group cannot be created in version<=5.1.0
+	// In pre-5.0 versions, the enforcer cannot derive some pods' learned group name correctly.
+	// Although it is fixed in 5.0, during upgrade, the learned group with the correct name is not created.
+	// Even we reboot the enforcer again, the correct learned group still fails to be created.
+	// The reason being the controller regards the pod as running during enforcer upgrade, so when it is
+	// reported to the controller by the new enforcer, the controller won't create new group. Even we fix
+	// this login in the controller, because only the lead create learned group and the lead can be
+	// the old controller, the group still cannot be created.
+	// ==> Here we give the new controller a chance to refresh pods' learned group membership when it becomes
+	// the lead.
+	refreshLearnedGroupMembership()
+
 	// When lead change, synchonize states in case operation was missed
 	syncLeftNVObjectsToCluster()
 	//NVSHAS-5914, During rolling upgrade remove the unmanaged workload

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"time"
 )
 
 // unixSyslog opens a connection to the syslog daemon running on the
@@ -37,7 +38,7 @@ type localConn struct {
 
 // writeString formats syslog messages using time.Stamp instead of time.RFC3339,
 // and omits the hostname (because it is expected to be used locally).
-func (n *localConn) writeString(framer Framer, formatter Formatter, p Priority, hostname, tag, msg string) error {
+func (n *localConn) writeString(framer Framer, formatter Formatter, tmo time.Duration, p Priority, hostname, tag, msg string) error {
 	if framer == nil {
 		framer = DefaultFramer
 	}

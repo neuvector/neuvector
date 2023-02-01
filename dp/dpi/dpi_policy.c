@@ -990,7 +990,6 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
             iph->daddr == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(iph->daddr)) ||
             iph->saddr == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(iph->saddr))) {
         } else {
-            uint32_t app = s->app?s->app:(s->base_app?s->base_app:DP_POLICY_APP_UNKNOWN);
             bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
             dpi_policy_hdl_t *phdl;
             if (isproxymesh && p->ep) {
@@ -998,8 +997,12 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
                 DEBUG_POLICY("MESH_TO_SVR switch policy hdl(%p) to proxymesh parent hdl(%p)\n",hdl, phdl);
                 hdl = phdl;
                 dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
-                if (unlikely((s->policy_desc.action == DP_POLICY_ACTION_CHECK_APP))) {
-                    dpi_policy_lookup(p, hdl, app, to_server, xff, &s->policy_desc, 0);
+                if (unlikely((s->policy_desc.action == DP_POLICY_ACTION_CHECK_APP) &&
+                    FLAGS_TEST(s->flags, DPI_SESS_FLAG_POLICY_APP_READY))) {
+                    uint32_t app = s->app?s->app:(s->base_app?s->base_app:DP_POLICY_APP_UNKNOWN);
+                    if (app != DP_POLICY_APP_UNKNOWN || !FLAGS_TEST(s->flags, DPI_SESS_FLAG_MID_STREAM)) {
+                        dpi_policy_lookup(p, hdl, app, to_server, xff, &s->policy_desc, 0);
+                    }
                 }
                 s->policy_desc.flags &= ~(POLICY_DESC_CHECK_VER);
                 s->policy_desc.flags |= POLICY_DESC_MESH_TO_SVR;

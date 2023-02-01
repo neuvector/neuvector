@@ -624,7 +624,6 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
 		clusHelper.DeleteGroup(gname)
@@ -1219,7 +1218,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// Join and create learned group.
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
-			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
+			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
@@ -1374,6 +1373,29 @@ func refreshGroupMember(cache *groupCache) {
 
 	if bHasCustomGroupProfile {
 		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
+	}
+}
+
+// This function is used to mitigate the case when old enforcer cannot derive the correct pod service group,
+// and the old controller cannot create the correct group when the new enforcer joins.
+// See the caller for more info.
+func refreshLearnedGroupMembership() {
+	var notGroupedPods []*workloadCache
+
+	cacheMutexRLock()
+	for _, wlc := range wlCacheMap {
+		if wlc.learnedGroupName == "" {
+			continue
+		}
+
+		if _, ok := groupCacheMap[wlc.learnedGroupName]; !ok {
+			notGroupedPods = append(notGroupedPods, wlc)
+		}
+	}
+	cacheMutexRUnlock()
+
+	for _, wlc := range notGroupedPods {
+		groupWorkloadJoin(wlc.workload.ID, wlc)
 	}
 }
 
@@ -1906,7 +1928,7 @@ func domainChange(domain share.CLUSDomain) {
 	// For every workload, re-calculate its membership
 	dptLearnedGrpAdds := utils.NewSet()
 	for _, cache := range groups {
-		cache.members.Clear()	// reset
+		cache.members.Clear() // reset
 		for _, wlc := range wlCacheMap {
 			if !wlc.workload.Running {
 				continue

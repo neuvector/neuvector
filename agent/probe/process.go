@@ -1353,6 +1353,9 @@ func (p *Probe) handleProcExit(pid int) *procInternal {
 
 // after FORK event but before EXEC
 func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
+	if !p.bProfileEnable {
+		return
+	}
 	if proc, ok := p.pidProcMap[pid]; ok {
 		if (proc.reported & escalatReported) > 0 {
 			return
@@ -1458,6 +1461,10 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		return
 	}
 
+	p.lockProcMux()
+	effective_user := p.getUserName(proc.pid, proc.euid)
+	p.unlockProcMux()
+
 	e := &ProbeEscalation{
 		ID:       id,
 		Pid:      proc.pid,
@@ -1467,7 +1474,7 @@ func (p *Probe) reportEscalation(id string, proc, parent *procInternal) {
 		RUid:     proc.ruid,
 		EUid:     proc.euid,
 		RealUser: proc.user,
-		EffUser:  p.getUserName(proc.pid, proc.euid),
+		EffUser:  effective_user,
 
 		// parent info
 		ParentPid:  parent.pid,
@@ -1848,7 +1855,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 				risky = false
 			}
 		}
-		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action}).Debug("PROC: Result")
+		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 	}
 
 	// it has not been reported as a profile/risky event
@@ -1874,6 +1881,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 			}()
 		}
 	}
+
 }
 
 func (p *Probe) checkReversedShellProcess(id string, proc *procInternal) bool {
@@ -2409,7 +2417,11 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	}
 
 	//	proc.action = pp.Action
-	if (proc.reported & profileReported) == 0 {
+	// NVSHAS-7501 - Adding check for our mode.
+	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
+	// We don't need to report the violations more often, but we should make sure that if we
+	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
+	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce{
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
@@ -2418,6 +2430,15 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				default:
 					pp.Action = share.PolicyActionAllow
 				}
+			} else {
+				// NVSHAS-7501 - I think we have to assume false on keep alive.
+				// If its in Monitor mode, the keep alive doesn't affect the rule and it won't kill the process.
+				// But when we transition to Protect mode and zero drift and the keep alive is set to true...
+				// existing processes that are running will be allowed to continue to run even tho they should not.
+				// By forcing to false, we are making sure existing processes that violate policies can be killed.
+				// Otherwise, the bug was that we would see
+				//"violation" incidents but the processes would continue to run
+				bKeepAlive = false
 			}
 		}
 
@@ -2444,7 +2465,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			if !bKeepAlive {	// bKeepAlive action : keep its original decision for existing process
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
-				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied")
+				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied and killed")
 			}
 		}
 	}

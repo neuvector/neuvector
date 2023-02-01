@@ -1939,7 +1939,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	bodyTo, _ := json.Marshal(&reqTo)
 	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login)
 
-	status, code := removeFromFederation(&joinedCluster) // remove the joint cluster's entry from master cluster
+	status, code := removeFromFederation(&joinedCluster, acc) // remove the joint cluster's entry from master cluster
 	if status != http.StatusOK {
 		restRespErrorMessage(w, status, code, "Fail to dismiss managed cluster")
 	} else {
@@ -2129,7 +2129,7 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	if joinedCluster.ID == req.ID {
 		// Validate token
 		if err := jwtValidateFedJoinTicket(req.JointTicket, joinedCluster.Secret); err == nil {
-			if status, code = removeFromFederation(&joinedCluster); status == http.StatusOK {
+			if status, code = removeFromFederation(&joinedCluster, accReadAll); status == http.StatusOK {
 				msg := fmt.Sprintf("Cluster %s(%s) leaves federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
 				cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles)
 				restRespSuccess(w, r, nil, nil, nil, nil, "Leave federation by managed cluster's request")
@@ -2219,7 +2219,7 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 // share.CLUSLockFedKey lock is owned by caller
-func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo) (int, int) { // (status, code)
+func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *access.AccessControl) (int, int) { // (status, code)
 	if joinedCluster == nil || joinedCluster.ID == "" {
 		return http.StatusBadRequest, api.RESTErrInvalidRequest
 	}
@@ -2237,6 +2237,13 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo) (int, in
 					os.Remove(clientKeyPath)
 					os.Remove(clientCertPath)
 					_setFedJointPrivateKey(joinedCluster.ID, nil)
+					for j := 0; j < 3; j++ {
+						if c := cacher.GetFedJoinedCluster(joinedCluster.ID, acc); c.ID == joinedCluster.ID {
+							time.Sleep(time.Second)
+						} else {
+							break
+						}
+					}
 					return http.StatusOK, 0
 				}
 			}
@@ -3030,13 +3037,9 @@ func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter
 
 var forbiddenFwUrl = map[string][]string{
 	"/v1/fed_auth": []string{http.MethodPost, http.MethodDelete},
-	"/v1/user":     []string{http.MethodPost},
-	"/v1/role":     []string{http.MethodPost},
 }
 var forbiddenFwUrlPrefix = map[string][]string{
 	"/v1/auth/": []string{http.MethodPost, http.MethodDelete},
-	"/v1/user/": []string{http.MethodPatch, http.MethodDelete},
-	"/v1/role/": []string{http.MethodPatch, http.MethodDelete},
 }
 
 func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprouter.Params, method string) {
@@ -3096,7 +3099,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				}
 			}
 			if method == http.MethodPost && (request == "/v1/file/config" || request == "/v1/file/group/config" ||
-				request == "/v1/file/admission/config" || request == "/v1/file/waf/config") {
+				request == "/v1/file/admission/config" || request == "/v1/file/waf/config" || request == "/v1/file/dlp/config") {
 				txnID = r.Header.Get("X-Transaction-ID")
 			}
 			if txnID == "" && (method == http.MethodPost || method == http.MethodDelete) && strings.HasPrefix(request, "/v1/scan/registry/") {
@@ -3174,7 +3177,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					}
 				}
 			} else if method == http.MethodPost {
-				if request == "/v1/file/admission" || request == "/v1/file/waf" {
+				if request == "/v1/file/admission" || request == "/v1/file/waf" || request == "/v1/file/dlp" {
 					remoteExport = true
 				}
 			}

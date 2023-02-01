@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 5.1.0
+  version: 5.1.1
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -4488,6 +4488,11 @@ definitions:
       platform_version:
         type: string
         example: ""
+      packages:
+        type: array
+        items:
+          type: string
+          example: ""
   Event:
     type: object
     required:
@@ -7788,6 +7793,137 @@ definitions:
       password:
         type: string
         example: password
+  RESTSystemConfigAutoscale:
+    type: object
+    required:
+      - strategy
+      - min_pods
+      - max_pods
+    properties:
+      strategy:
+        type: string
+        example: "delayed"
+      min_pods:
+        type: integer
+        format: uint32
+        example: 1
+      max_pods:
+        type: integer
+        format: uint32
+        example: 3
+  RESTSystemConfigAutoscaleConfig:
+    type: object
+    properties:
+      strategy:
+        type: string
+        example: "delayed"
+      min_pods:
+        type: integer
+        format: uint32
+        example: 1
+      max_pods:
+        type: integer
+        format: uint32
+        example: 3
+  RESTSystemConfigSvcCfgV2:
+    type: object
+    properties:
+      new_service_policy_mode:
+        type: string
+        example: "Discover"
+      new_service_profile_baseline:
+        type: string
+        example: "zero-drift"
+  RESTSystemConfigSyslogCfgV2:
+    type: object
+    properties:
+      syslog_ip:
+        type: string
+        example: ""
+      syslog_ip_proto:
+        type: integer
+        format: uint8
+        example: 6
+      syslog_port:
+        type: integer
+        format: uint16
+        example: 514
+      syslog_level:
+        type: string
+        example: "INFO"
+      syslog_status:
+        type: boolean
+        example: true
+      syslog_categories:
+        type: array
+        items:
+          type: string
+          example: ["event", "violation", "threat", "incident"]
+      syslog_in_json:
+        type: boolean
+        example: true
+      single_cve_per_syslog:
+        type: boolean
+        example: true
+  RESTSystemConfigAuthCfgV2:
+    type: object
+    properties:
+      auth_order:
+        type: array
+        items:
+          type: string
+          example: ["local", "ldap"]
+      auth_by_platform:
+        type: boolean
+        example: true
+      rancher_ep:
+        type: string
+        example: "https://my-rancher.test:30000"
+  RESTSystemConfigProxyCfgV2:
+    type: object
+    properties:
+      registry_http_proxy_status:
+        type: boolean
+        example: true
+      registry_https_proxy_status:
+        type: boolean
+        example: false
+      registry_http_proxy:
+        $ref: '#/definitions/RESTProxy'
+      registry_https_proxy:
+        $ref: '#/definitions/RESTProxy'
+  RESTSystemConfigIBMSAVCfg2:
+    type: object
+    properties:
+      ibmsa_ep_enabled:
+        type: boolean
+        example: false
+      ibmsa_ep_dashboard_url:
+        type: string
+  RESTSystemConfigMiscCfgV2:
+    type: object
+    properties:
+      unused_group_aging:
+        type: integer
+        format: uint8
+        example: 30
+      cluster_name:
+        type: string
+        example: "cluster1"
+      controller_debug:
+        type: array
+        items:
+          type: string
+          example: "{\"all\"}"
+      monitor_service_mesh:
+        type: boolean
+        example: true
+      xff_enabled:
+        type: boolean
+        example: false
+      no_telemetry_report:
+        type: string
+        example: false
   RESTPwdProfile:
     type: object
     required:
@@ -9883,6 +10019,11 @@ definitions:
         type: integer
         format: int64
         example: 1505755716
+      scanner_autoscale:
+        $ref: '#/definitions/RESTSystemConfigAutoscale'
+      no_telemetry_report:
+        type: boolean
+        example: false
   RESTSystemConfigAuthV2:
     type: object
     required:
@@ -9952,6 +10093,9 @@ definitions:
         type: boolean
         example: true
       xff_enabled:
+        type: boolean
+        example: false
+      no_telemetry_report:
         type: boolean
         example: false
   RESTSystemConfigModeAutoV2:
@@ -10091,6 +10235,8 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigNetSvcV2'
       mode_auto:
         $ref: '#/definitions/RESTSystemConfigModeAutoV2'
+      scanner_autoscale:
+        $ref: '#/definitions/RESTSystemConfigAutoscale'
   RESTSystemConfigData:
     type: object
     required:
@@ -10202,6 +10348,34 @@ definitions:
       xff_enabled:
         type: boolean
         example: false
+      scanner_autoscale:
+        $ref: '#/definitions/RESTSystemConfigAutoscale'
+      no_telemetry_report:
+        type: boolean
+        example: false
+  RESTSystemConfigConfigV2:
+    type: object
+    required:
+      - single_cve_per_syslog
+    properties:
+      svc_cfg:
+        $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
+      svslog_cfg:
+        $ref: '#/definitions/RESTSystemConfigSyslogCfgV2'
+      auth_cfg:
+        $ref: '#/definitions/RESTSystemConfigAuthCfgV2'
+      proxy_cfg:
+        $ref: '#/definitions/RESTSystemConfigProxyCfgV2'
+      webhooks:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWebhook'
+      ibmsa_cfg:
+        $ref: '#/definitions/RESTSystemConfigIBMSAVCfg2'
+      scanner_autoscale_cfg:
+        $ref: '#/definitions/RESTSystemConfigAutoscaleConfig'
+      misc_cfg:
+        $ref: '#/definitions/RESTSystemConfigMiscCfgV2'
   RESTSystemConfigConfigCfgMap:
     type: object
     required:
@@ -10331,6 +10505,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
+      config_v2:
+        $ref: '#/definitions/RESTSystemConfigConfigV2'
       fed_config:
         $ref: '#/definitions/RESTSystemConfigConfig'
       net_config:
