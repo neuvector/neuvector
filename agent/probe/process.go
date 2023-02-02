@@ -510,6 +510,8 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 	} else {
 		c.children.Add(pid) // nodes only has a pool
 	}
+	log.WithFields(log.Fields{"pid": pid, "container": c.id}).Debug("PROC: New container Process")
+
 }
 
 func (p *Probe) cleanupProcessInContainer(id string) {

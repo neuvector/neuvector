@@ -326,7 +326,9 @@ func recordEvent(rlog *api.Event) {
 }
 
 func recordIncident(rlog *api.Incident) {
-	log.WithFields(log.Fields{"name": rlog.Name}).Debug("")
+	log.WithFields(log.Fields{
+		"incident": rlog,
+	}).Debug("Incident Information")
 
 	if curIncidentIndex == logCacheSize {
 		_, incidentCache = incidentCache[0], incidentCache[1:]
