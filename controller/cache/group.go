@@ -1210,11 +1210,27 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	cacheMutexLock()
 
+	// This is set when the workload joins with a different learned group name
+	if wlc.svcChanged != "" {
+		if cache, ok := groupCacheMap[wlc.svcChanged]; ok {
+			wlc.groups.Remove(wlc.svcChanged)
+			cache.members.Remove(wl.ID)
+
+			log.WithFields(log.Fields{"group": cache.group.Name}).Debug("Leave learned group")
+			if cache.members.Cardinality() == 0 && cacher.GetUnusedGroupAging() != 0 {
+				scheduleGroupRemoval(cache)
+			}
+		}
+
+		// Not calling ip policy and dlp recalculation because it WILL be done in the next section.
+		// Dispatcher will refresh its cache in WorkloadJoin in the next section
+		wlc.svcChanged = ""
+	}
+
 	// TODO: multi-controller
 	// Normally, we are first notified with the new workload, create group then handle group
 	// creation; in multi-controller case, when the new controller joins the cluster, the
 	// order of cluster watch update for workload and group is not guaranteed.
-	// Would it cause issue?
 	// Join and create learned group.
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
