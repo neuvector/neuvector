@@ -1167,7 +1167,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var publicKey *rsa.PublicKey
 
 	if secret == "" {
-		tokenString = utils.DecryptPasswordRaw(encryptedToken)
+		tokenString = utils.DecryptUserToken(encryptedToken)
 	} else {
 		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
@@ -1275,7 +1275,7 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, _ := token.SignedString(jwtPrivateKey)
-	return id, utils.EncryptPasswordRaw(tokenString), &c
+	return id, utils.EncryptUserToken(tokenString), &c
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
