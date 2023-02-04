@@ -184,6 +184,15 @@ func TestPlatformEnv(t *testing.T) {
 	}
 }
 
+func TestBase64Encrypt(t *testing.T) {
+	token := "123456"
+	encrypt := EncryptUserToken(token)
+	decrypt := DecryptUserToken(encrypt)
+	if decrypt != token {
+		t.Errorf("Token encrypt error: token=%v decrypt=%v\n", token, decrypt)
+	}
+}
+
 func TestPasswordEncrypt(t *testing.T) {
 	password := "123456"
 	encrypt := EncryptPassword(password)
@@ -242,7 +251,7 @@ func TestBytesDisplay(t *testing.T) {
 	}
 
 	num = 44356
-	if str := DisplayBytes(num); str !=  "43 KB" {
+	if str := DisplayBytes(num); str != "43 KB" {
 		t.Errorf("(%v) and (%v) is not equal\n", num, str)
 	}
 
