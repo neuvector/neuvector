@@ -1374,10 +1374,18 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			}
 
 			if wl.Running {
-				// If service name is changed, it must be that the enforcer has been replaced, we need create the new learned group.
-				if !oldRunning || oldSvc != wl.Service {
+				if !oldRunning {
 					wlCache.serviceName = utils.NormalizeForURL(wl.Service)
 					wlCache.learnedGroupName = makeLearnedGroupName(wlCache.serviceName)
+
+					started = true
+				} else if oldSvc != wl.Service {
+					// If service name is changed, it must be that the enforcer has been replaced,
+					// we need create the new learned group.
+					wlCache.serviceName = utils.NormalizeForURL(wl.Service)
+					wlCache.learnedGroupName = makeLearnedGroupName(wlCache.serviceName)
+					oldSvcName := utils.NormalizeForURL(oldSvc)
+					wlCache.svcChanged = makeLearnedGroupName(oldSvcName)
 
 					started = true
 				}

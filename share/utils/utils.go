@@ -865,7 +865,7 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 	}
 }
 
-func EncryptToRawBase64(key, text []byte) (string, error) {
+func EncryptToRawStdBase64(key, text []byte) (string, error) {
 	if ciphertext, err := Encrypt(key, text); err == nil {
 		return base64.RawStdEncoding.EncodeToString(ciphertext), nil
 	} else {
@@ -873,8 +873,29 @@ func EncryptToRawBase64(key, text []byte) (string, error) {
 	}
 }
 
-func DecryptFromRawBase64(key []byte, b64 string) (string, error) {
+func DecryptFromRawStdBase64(key []byte, b64 string) (string, error) {
 	text, err := base64.RawStdEncoding.DecodeString(b64)
+	if err != nil {
+		return "", err
+	}
+
+	if text, err = Decrypt(key, text); err == nil {
+		return string(text), nil
+	} else {
+		return "", err
+	}
+}
+
+func EncryptToRawURLBase64(key, text []byte) (string, error) {
+	if ciphertext, err := Encrypt(key, text); err == nil {
+		return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+	} else {
+		return "", err
+	}
+}
+
+func DecryptFromRawURLBase64(key []byte, b64 string) (string, error) {
+	text, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
 		return "", err
 	}
@@ -936,21 +957,44 @@ func EncryptSensitive(data string, key []byte) string {
 	return encrypted
 }
 
-func DecryptPasswordRaw(encrypted string) string {
+func DecryptUserToken(encrypted string) string {
 	if encrypted == "" {
 		return ""
 	}
 
-	password, _ := DecryptFromRawBase64(getPasswordSymKey(), encrypted)
+	encrypted = strings.ReplaceAll(encrypted, "_", "/")
+	token, _ := DecryptFromRawStdBase64(getPasswordSymKey(), encrypted)
+	return token
+}
+
+// User token cannot have / in it and cannot have - as the first char.
+func EncryptUserToken(token string) string {
+	if token == "" {
+		return ""
+	}
+
+	// Std base64 encoding has + and /, instead of - and _ (url encoding)
+	// token can be part of kv key, so we replace / with _
+	encrypted, _ := EncryptToRawStdBase64(getPasswordSymKey(), []byte(token))
+	encrypted = strings.ReplaceAll(encrypted, "/", "_")
+	return encrypted
+}
+
+func DecryptURLSafe(encrypted string) string {
+	if encrypted == "" {
+		return ""
+	}
+
+	password, _ := DecryptFromRawURLBase64(getPasswordSymKey(), encrypted)
 	return password
 }
 
-func EncryptPasswordRaw(password string) string {
+func EncryptURLSafe(password string) string {
 	if password == "" {
 		return ""
 	}
 
-	encrypted, _ := EncryptToRawBase64(getPasswordSymKey(), []byte(password))
+	encrypted, _ := EncryptToRawURLBase64(getPasswordSymKey(), []byte(password))
 	return encrypted
 }
 
