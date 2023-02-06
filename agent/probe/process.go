@@ -1839,24 +1839,22 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	risky := proc.action == share.PolicyActionCheckApp
-	if proc.name != "ps" {
-		if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
-			return // policy is not ready
-		}
-
-		// the very first parent, update a decision (allow or checkApp),
-		// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
-		// (2) "checkApp" (including children) will not enter the "learned" process group.
-		// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
-		if risky && !proc.riskyChild {
-			if action == share.PolicyActionAllow { // default is checkApp
-				proc.action = action
-				proc.riskType = ""
-				risky = false
-			}
-		}
-		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
+	if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
+		return // policy is not ready
 	}
+
+	// the very first parent, update a decision (allow or checkApp),
+	// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
+	// (2) "checkApp" (including children) will not enter the "learned" process group.
+	// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
+	if risky && !proc.riskyChild {
+		if action == share.PolicyActionAllow { // default is checkApp
+			proc.action = action
+			proc.riskType = ""
+			risky = false
+		}
+	}
+	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
