@@ -101,6 +101,7 @@ type workloadCache struct {
 	platformRole     string
 	displayName      string
 	podName          string
+	svcChanged       string // old learned group name
 	serviceAccount   string
 	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
 	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.

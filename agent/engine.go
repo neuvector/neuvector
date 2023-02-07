@@ -235,7 +235,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	case "controller+enforcer+manager", "allinone":
 		entryPtSig = "/usr/bin/supervisord" // a python app
 	case "updater":
-		entryPtSig = "sleep" 				// 4.4: "/usr/local/bin/upgrader"
+		entryPtSig = "sleep" // 4.4: "/usr/local/bin/upgrader"
 	case "fetcher":
 		entryPtSig = "/usr/local/bin/fetcher"
 	default:
@@ -476,7 +476,7 @@ func updatePods(c *containerData, quarReason *string) {
 		}
 	} else if c.parentNS != "" {
 		p, ok := gInfo.activeContainers[c.parentNS]
-		if ok {//parent exist
+		if ok { //parent exist
 			p.inline = c.inline
 			p.quar = c.quar
 			ClusterEventChan <- &ClusterEvent{
@@ -541,10 +541,10 @@ func isProxyMesh(c *containerData) bool {
 	}
 	//in case parent's pid is zero we need to use child's pid,
 	//but we need to make sure to exclude non-mesh case.
-	if c.parentNS != "" && c.hasDatapath && c.pid != 0 {//has parent
+	if c.parentNS != "" && c.hasDatapath && c.pid != 0 { //has parent
 		p, ok := gInfo.activeContainers[c.parentNS]
-		if ok {//parent exist
-			if p.info.ProxyMesh == true && p.pid == 0 {//parent is mesh and pid=0
+		if ok { //parent exist
+			if p.info.ProxyMesh == true && p.pid == 0 { //parent is mesh and pid=0
 				return true
 			}
 		}
@@ -856,11 +856,11 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 		if change == changeInit || change == changeApp {
 			// App map already populated to parent, send update to cluster channel.
 			parentEv := ClusterEvent{
-				event: EV_UPDATE_CONTAINER,
-				id:    parent.id,
-				info:  parent.info,
-				apps:  translateAppMap(parent.appMap),
-				ports: translateMappedPort(parent.portMap),
+				event:       EV_UPDATE_CONTAINER,
+				id:          parent.id,
+				info:        parent.info,
+				apps:        translateAppMap(parent.appMap),
+				ports:       translateMappedPort(parent.portMap),
 				hasDatapath: &parent.hasDatapath,
 			}
 			ClusterEventChan <- &parentEv
@@ -868,9 +868,9 @@ func notifyContainerChanges(c *containerData, parent *containerData, change int)
 			if c.examIntface { // only if POD's pid is 0
 				// Notify the children/POD for interface change
 				parent.intcpPairs = c.intcpPairs
-				ClusterEventChan <- &ClusterEvent{ event: EV_UPDATE_CONTAINER, id: parent.id, ifaces: ifaces,}
+				ClusterEventChan <- &ClusterEvent{event: EV_UPDATE_CONTAINER, id: parent.id, ifaces: ifaces}
 				for podID := range parent.pods.Iter() {
-					ClusterEventChan <- &ClusterEvent{ event: EV_UPDATE_CONTAINER, id: podID.(string), ifaces: ifaces,}
+					ClusterEventChan <- &ClusterEvent{event: EV_UPDATE_CONTAINER, id: podID.(string), ifaces: ifaces}
 				}
 			}
 		}
@@ -1358,7 +1358,7 @@ func programBridge(c *containerData) {
 
 func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
 	if c.hostMode || !c.hasDatapath {
-	   return
+		return
 	}
 
 	log.WithFields(log.Fields{"container": c.id}).Debug("")
@@ -1367,7 +1367,7 @@ func programNfqDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe
 
 	macs := make([]string, len(c.intcpPairs))
 	for i, pair := range c.intcpPairs {
-	   macs[i] = pair.MAC.String()
+		macs[i] = pair.MAC.String()
 	}
 
 	var oldMAC, pMAC net.HardwareAddr
@@ -1809,7 +1809,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 	} else {
 		if !hostMode && parent.pid == 0 {
 			if parent.examIntface == false {
-				parent.examIntface = true	// only monitor one child container
+				parent.examIntface = true // only monitor one child container
 				if examNetworkInterface(c) {
 					notifyContainerChanges(c, parent, changeIntf)
 				}
@@ -1822,9 +1822,9 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 			if gInfo.tapProxymesh {
 				if parent.pid != 0 {
 					programProxyMeshDP(parent, false, false)
-				} else if c.hasDatapath {//child that has datapath
+				} else if c.hasDatapath { //child that has datapath
 					programProxyMeshDP(c, false, false)
-				} else {//find child that has datapath
+				} else { //find child that has datapath
 					for podID := range parent.pods.Iter() {
 						if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
 							programProxyMeshDP(ch, false, false)
@@ -1838,9 +1838,9 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		if info.Sidecar && gInfo.tapProxymesh {
 			if parent.pid != 0 {
 				updateProxyMeshMac(parent, true)
-			} else if c.hasDatapath {//child that has datapath
+			} else if c.hasDatapath { //child that has datapath
 				updateProxyMeshMac(c, true)
-			} else {//find child that has datapath
+			} else { //find child that has datapath
 				for podID := range parent.pods.Iter() {
 					if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
 						updateProxyMeshMac(ch, true)
@@ -2155,7 +2155,7 @@ func taskDPConnect() {
 	dp.DPCtrlSetSysConf(&xffenabled)
 }
 
-var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer  // incoming network ploicy version
+var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version
 // gInfo write should only be done in this thread; and gInfo read doesn't need to be locked
 // in this thread.
 func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsmon.MonitorMessage, dpStatusChan chan bool) {
@@ -2165,14 +2165,14 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 	calculationTicker := time.NewTicker(time.Second * 2)
 	if nPolicyPullPeriod > 0 {
 		log.WithFields(log.Fields{"netPolicyPuller": nPolicyPullPeriod}).Info()
-		pnpTargetTick = 1			// minimum break
-		if nPolicyPullPeriod > 0 {	// valid period
+		pnpTargetTick = 1          // minimum break
+		if nPolicyPullPeriod > 0 { // valid period
 			if nPolicyPullPeriod > 1 {
-				pnpTargetTick = nPolicyPullPeriod/2	// maximum, per 2 seconds
+				pnpTargetTick = nPolicyPullPeriod / 2 // maximum, per 2 seconds
 			}
 		}
 	} else {
-		calculationTicker.Stop()	// no timer
+		calculationTicker.Stop() // no timer
 	}
 
 	for {
@@ -2188,7 +2188,7 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 				ticks = 0
 				if nextNetworkPolicyVer != nil {
 					if !systemUpdatePolicy(*nextNetworkPolicyVer) {
-						ticks = pnpTargetTick  // version changed? trigger a quick cycle
+						ticks = pnpTargetTick // version changed? trigger a quick cycle
 					}
 				}
 				nextNetworkPolicyVer = nil

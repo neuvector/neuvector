@@ -10593,6 +10593,9 @@ definitions:
   RESTSystemRequest:
     type: object
     properties:
+      baseline_profile:
+        type: string
+        example: "Zero-Drift"
       policy_mode:
         type: string
         example: Discover
