@@ -1274,7 +1274,7 @@ func InitContext(ctx *Context) {
 		if strings.HasPrefix(ver.CtrlVersion, "interim/") {
 			// it's daily dev build image
 			if ctx.TeleCurrentVer == "" {
-				nvAppFullVersion = "5.1.1"
+				nvAppFullVersion = "5.1.0"
 			} else {
 				nvAppFullVersion = ctx.TeleCurrentVer
 			}
