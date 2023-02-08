@@ -783,7 +783,7 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 	return nil
 }
 
-func (h *nvCrdHandler) crdHandlePolicyMode(policyModeCfg *api.RESTServiceConfig, profile_mode string) {
+func (h *nvCrdHandler) crdHandlePolicyMode(policyModeCfg *api.RESTServiceConfig, profile_mode, baseline string) {
 	if policyModeCfg != nil {
 		grp, _, _ := clusHelper.GetGroup(policyModeCfg.Name, h.acc)
 		if grp == nil {
@@ -802,6 +802,13 @@ func (h *nvCrdHandler) crdHandlePolicyMode(policyModeCfg *api.RESTServiceConfig,
 		if policyModeCfg.PolicyMode != nil {
 			if grp.PolicyMode != *policyModeCfg.PolicyMode {
 				grp.PolicyMode = *policyModeCfg.PolicyMode
+				changed = true
+			}
+		}
+
+		if baseline != "" {
+			if grp.BaselineProfile != baseline {
+				grp.BaselineProfile = baseline
 				changed = true
 			}
 		}
@@ -1920,16 +1927,18 @@ targetpass:
 		if gfwrule.Spec.Target.PolicyMode != nil {
 			mode = *gfwrule.Spec.Target.PolicyMode
 		}
-		baseline := share.ProfileZeroDrift
+		baseline := ""
 		if utils.DoesGroupHavePolicyMode(gfwrule.Spec.Target.Selector.Name) {
+			baseline = share.ProfileZeroDrift
 			if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
 				blValue := *gfwrule.Spec.ProcessProfile.Baseline
 				if blValue == share.ProfileBasic {
 					baseline = share.ProfileBasic
-				} else if blValue != share.ProfileDefault_UNUSED && blValue != share.ProfileShield_UNUSED && blValue != share.ProfileZeroDrift {
-					errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s", reviewTypeDisplay, blValue)
+				} else if (blValue != share.ProfileDefault_UNUSED && blValue != share.ProfileShield_UNUSED && blValue != share.ProfileZeroDrift) ||
+					(blValue != share.ProfileBasic && utils.IsGroupNodes(gfwrule.Spec.Target.Selector.Name)) {
+					errMsg = fmt.Sprintf("%s Rule format error:   invalid baseline %s for group %s", reviewTypeDisplay, blValue, gfwrule.Spec.Target.Selector.Name)
 					buffer.WriteString(errMsg)
-					errCount += errNo
+					errCount++
 				}
 			}
 		}
@@ -1968,7 +1977,7 @@ targetpass:
 			if len(gfwrule.Spec.FileRule) > 0 {
 				errMsg = fmt.Sprintf("  %s Rule file format error:  profile is not supported for \"nodes\"", reviewTypeDisplay)
 				buffer.WriteString(errMsg)
-				errCount += errNo
+				errCount++
 			}
 		} else {
 			for _, ff := range gfwrule.Spec.FileRule {
@@ -2325,6 +2334,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 
 	log.WithFields(log.Fields{"name": recordName, "target": crdCfgRet.TargetName, "targetDlpWAF": targetGroupDlpWAF}).Debug()
 	var profile_mode string
+	var baseline string
 	if crdCfgRet.ProcessProfileCfg != nil {
 		// nodes, containers, service or user-defined groups
 		profile_mode = crdCfgRet.ProcessProfileCfg.Mode
@@ -2351,9 +2361,9 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	}
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
 	if crdRecord.ProfileName != "" {
-		profile_mode = h.crdRebuildGroupProfiles(crdRecord.ProfileName, nil, share.ReviewTypeCRD)
+		profile_mode, baseline = h.crdRebuildGroupProfiles(crdRecord.ProfileName, nil, share.ReviewTypeCRD)
 	}
-	h.crdHandlePolicyMode(crdCfgRet.PolicyModeCfg, profile_mode)
+	h.crdHandlePolicyMode(crdCfgRet.PolicyModeCfg, profile_mode, baseline)
 }
 
 // Process the admission control rule list get from the crd. caller must own CLUSLockAdmCtrlKey lock
@@ -2773,10 +2783,10 @@ func (h *nvCrdHandler) crdDeleteRecordEx(kind, recordName, profileName string) {
 	if profileName == "" {
 		return
 	}
-	mode := h.crdRebuildGroupProfiles(profileName, nil, share.ReviewTypeCRD)
+	mode, baseline := h.crdRebuildGroupProfiles(profileName, nil, share.ReviewTypeCRD)
 	if utils.DoesGroupHavePolicyMode(profileName) && mode != "" {
 		policy_mode := &api.RESTServiceConfig{Name: profileName, PolicyMode: &mode}
-		h.crdHandlePolicyMode(policy_mode, mode)
+		h.crdHandlePolicyMode(policy_mode, mode, baseline)
 	}
 }
 
@@ -2999,10 +3009,10 @@ func (h *nvCrdHandler) crdGetProfileSecurityLevel(profileName string, records ma
 }
 
 // rebuild group process and file profiles from CRD records
-func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[string]*share.CLUSCrdSecurityRule, reviewType share.TReviewType) string {
+func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[string]*share.CLUSCrdSecurityRule, reviewType share.TReviewType) (string, string) {
 	if grp, _, err := clusHelper.GetGroup(groupName, h.acc); grp == nil || err != nil {
 		log.WithFields(log.Fields{"groupName": groupName}).Debug("not existed")
-		return ""
+		return "", ""
 	}
 
 	if records == nil {
@@ -3087,7 +3097,7 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, records map[str
 
 	// update file rules
 	h.crdHandleFileProfile(groupName, mode, fprofile, reviewType)
-	return mode
+	return mode, baseline
 }
 
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
