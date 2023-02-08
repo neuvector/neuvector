@@ -289,7 +289,7 @@ func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 		total_len := 0
 		for _, pt := range rule.Patterns {
 			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
-				if len(pt.Value) > api.DlpRulePatternMaxLen || len(pt.Value) <= 0 {
+				if len(pt.Value) > api.DlpRulePatternMaxLen {
 					log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
 					return fmt.Errorf("dlp rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
 				}

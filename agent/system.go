@@ -855,6 +855,10 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 				ID:   cdre.ID,
 			}
 			for _, pc := range cdre.Patterns {
+				//ignore empty pattern rule
+				if pc.Value == "" {
+					continue
+				}
 				pat := ""
 				if pc.Op == share.CriteriaOpNotRegex {
 					pat = fmt.Sprintf("!")
