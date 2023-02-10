@@ -171,6 +171,9 @@ func createConfigFile(cc *ClusterConfig) error {
 	sa = append(sa, fmt.Sprintf("        \"server\": %d,\n", rpcPort))
 	sa = append(sa, fmt.Sprintf("        \"serf_lan\": %d,\n", lanPort))
 	sa = append(sa, fmt.Sprintf("        \"serf_wan\": %d\n", -1))
+	sa = append(sa, fmt.Sprintf("    },\n"))
+	sa = append(sa, fmt.Sprintf("    \"performance\": {\n"))
+	sa = append(sa, fmt.Sprintf("        \"rpc_hold_timeout\": \"%ds\"\n", 300))
 	sa = append(sa, fmt.Sprintf("    }\n"))
 	sa = append(sa, fmt.Sprintf("}\n"))
 

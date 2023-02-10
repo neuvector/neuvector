@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	consulapi "github.com/neuvector/neuvector/share/cluster/api"
@@ -171,12 +172,16 @@ OUTER:
 				}
 			}
 			retry := 3 * time.Second
-			log.WithFields(log.Fields{"type": p.Type, "error": err, "retry": retry, "fails": failures, "report": reportFail}).Error("consul watch")
+			if strings.Contains(err.Error(), "Unexpected response code: 500") { // timeouted
+				failures = 0
+			} else {
+				log.WithFields(log.Fields{"type": p.Type, "error": err, "retry": retry, "fails": failures, "report": reportFail}).Error("consul watch")
+			}
 
 			select {
 			case <-time.After(retry):
-				// reduce query wait time so that a failure request can quickly return
-				p.waitTime = 2 * time.Second
+				// reset
+				p.waitTime = queryWaitTime
 				continue OUTER
 			case <-p.stopCh:
 				return nil

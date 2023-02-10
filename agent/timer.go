@@ -54,8 +54,8 @@ var nextConnectReportTick uint32 = reportInterval
 
 ///
 const memoryRecyclePeriod uint32 = 10                       // minutes
-const memEnforcerMediumPeak uint64 = 256 * 1024 * 1024      // 256 MB
-const memEnforcerTopPeak uint64 = 8 * memEnforcerMediumPeak // 2 GB
+const memEnforcerMediumPeak uint64 = 3 * 512 * 1024 * 1024  // 1.5 GB
+const memEnforcerTopPeak uint64 = 2 * memEnforcerMediumPeak // 3.0 GB
 const memSafeGap uint64 = 64 * 1024 * 1024                  // 64 MB
 var memStatsEnforcerResetMark uint64 = memEnforcerTopPeak - memSafeGap
 
