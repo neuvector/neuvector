@@ -60,9 +60,9 @@ var timerWheel *utils.TimerWheel
 
 const statsInterval uint32 = 5
 const controllerStartGapThreshold = time.Duration(time.Minute * 2)
-const memoryRecyclePeriod uint32 = 10                     // minutes
-const memControllerTopPeak uint64 = 4 * 512 * 1024 * 1024 // 2 GB (inc. allinone case)
-const memSafeGap uint64 = 64 * 1024 * 1024                // 64 MB
+const memoryRecyclePeriod uint32 = 10                     	// minutes
+const memControllerTopPeak uint64 = 4 * 1024 * 1024 * 1024 	// 4 GB (inc. allinone case)
+const memSafeGap uint64 = 64 * 1024 * 1024                	// 64 MB
 
 // Unlike in enforcer, only read host IPs in host mode, so no need to enter host network namespace
 func getHostModeHostIPs() {

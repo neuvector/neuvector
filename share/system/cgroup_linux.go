@@ -719,7 +719,7 @@ func (s *SystemTools) CGroupMemoryStatReset(threshold uint64) bool {
 			log.WithFields(log.Fields{"usage": usage, "threshold": threshold}).Info()
 			go func() {
 				if err := s.setMemoryForceEmpty(); err != nil && err != errUnsupported {
-					log.WithFields(log.Fields{"err": err}).Error()
+					log.WithFields(log.Fields{"err": err}).Debug()
 				}
 			}()
 			return true
