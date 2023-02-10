@@ -517,7 +517,7 @@ func parseArgs(info *share.CLUSSnifferRequest, keyname string) (string, []string
 		filter = strings.Split(info.Filter, " ")
 	}
 
-	tcpdumpCmd := []string{"-i", "any", "-U", "-C"}
+	tcpdumpCmd := []string{"-i", "any", "-Z", "root", "-U", "-C"}
 	cmdStr = append(tcpdumpCmd, filesize, "-w", filename, "-W", filenumber)
 	if filter != nil {
 		cmdStr = append(cmdStr, filter...)

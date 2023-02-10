@@ -500,60 +500,6 @@ func getIPList(ipList string) []net.IP {
 	return ret
 }
 
-func getCommonPorts(ports1 string, ports2 string) string {
-	var p, pp string = "", ""
-	var low, high uint16
-	var proto uint8
-
-	p1 := strings.Split(ports1, ",")
-	p2 := strings.Split(ports2, ",")
-	for _, pp1 := range p1 {
-		proto1, low1, high1, err := utils.ParsePortRangeLink(pp1)
-		if err != nil {
-			// log.WithFields(log.Fields{"port": ports1}).Error("Fail to parse")
-			continue
-		}
-		for _, pp2 := range p2 {
-			proto2, low2, high2, err := utils.ParsePortRangeLink(pp2)
-			if err != nil {
-				// log.WithFields(log.Fields{"port": ports2}).Error("Fail to parse")
-				continue
-			}
-
-			if proto1 == 0 {
-				proto = proto2
-			} else if proto2 == 0 {
-				proto = proto1
-			} else if proto1 == proto2 {
-				proto = proto1
-			} else {
-				continue
-			}
-			if high1 < low2 || high2 < low1 {
-				continue
-			}
-			if low1 > low2 {
-				low = low1
-			} else {
-				low = low2
-			}
-			if high1 > high2 {
-				high = high2
-			} else {
-				high = high1
-			}
-			pp = utils.GetPortRangeLink(proto, low, high)
-			if p == "" {
-				p = pp
-			} else {
-				p = fmt.Sprintf("%s,%s", p, pp)
-			}
-		}
-	}
-	//log.WithFields(log.Fields{"ports1": ports1, "ports2": ports2, "common": p}).Debug()
-	return p
-}
-
 func getMappedPort(wl *share.CLUSWorkload, ports string) string {
 	var pp string = ""
 	portList := strings.Split(ports, ",")
@@ -624,7 +570,7 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 				if ports == "" {
 					pp = appPorts
 				} else {
-					pp = getCommonPorts(appPorts, ports)
+					pp = utils.GetCommonPorts(appPorts, ports)
 				}
 				if pp != "" {
 					wlAddr.LocalPortApp = append(wlAddr.LocalPortApp,
@@ -717,6 +663,17 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			// No effect for non-host-mode container.
 			groupAddrs[0].NatIP = append(groupAddrs[0].NatIP, []net.IP{utils.IPv4Loopback, nil}...)
 		}
+		return groupAddrs
+	} else if isAllContainerGrp(name) && (policyApplyIngress || !isDst) {
+		groupAddrs := []*share.CLUSWorkloadAddr{
+			&share.CLUSWorkloadAddr{
+				WlID:       share.CLUSWLAllContainer,
+			},
+		}
+		if isDst {
+			groupAddrs[0].LocalPortApp = getPortApp(ports, apps)
+		}
+
 		return groupAddrs
 	} else if cache, ok := groupCacheMap[name]; ok {
 		groupAddrs := make([]*share.CLUSWorkloadAddr, 0, cache.members.Cardinality())
@@ -1134,6 +1091,31 @@ func adjustPolicyRuleHeads() []*share.CLUSRuleHead {
 	return adjRuleHeads
 }
 
+func isAllContainerGrp(name string) bool {
+	if name == api.AllContainerGroup || name == api.FederalGroupPrefix + api.AllContainerGroup {
+		return true
+	}
+	return false
+}
+
+func isAllC2cAnyRule(rule *share.CLUSPolicyRule) bool {
+	if isAllContainerGrp(rule.From) && isAllContainerGrp(rule.To) &&
+		(rule.Applications == nil || len(rule.Applications) == 0) &&
+		(rule.Ports == "" || rule.Ports == "any") {
+		return true
+	}
+	return false
+}
+
+func isC2cRule(rule *share.CLUSPolicyRule) bool {
+	if fgc, ok := groupCacheMap[rule.From]; ok && fgc.group.Kind == share.GroupKindContainer {
+		if tgc, ok1 := groupCacheMap[rule.To]; ok1 && tgc.group.Kind == share.GroupKindContainer {
+			return true
+		}
+	}
+	return false
+}
+
 func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 	log.Debug("")
 
@@ -1151,10 +1133,18 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 	 */
 	adjustRuleHeads := adjustPolicyRuleHeads()
 
+	c2cAny := false
 	for _, head := range adjustRuleHeads {
 		if rule, ok := policyCache.ruleMap[head.ID]; !ok {
 			log.WithFields(log.Fields{"ID": head.ID}).Debug()
 		} else if !rule.Disable {
+			if c2cAny && isC2cRule(rule) {
+				continue
+			}
+			if !c2cAny && isAllC2cAnyRule(rule) {
+				c2cAny = true
+			}
+
 			policy := share.CLUSGroupIPPolicy{
 				ID:     head.ID,
 				Action: C.DP_POLICY_ACTION_ALLOW,
@@ -1166,7 +1156,7 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 			// assume the from/to contains only one group
 			/*
 				log.WithFields(log.Fields{
-					"from": rule.From, "to": rule.To, "ports": rule.Ports, "app": rule.Applications,
+					"c2cAny": c2cAny, "from": rule.From, "to": rule.To, "ports": rule.Ports, "app": rule.Applications,
 				}).Debug("Calculate rule")
 			*/
 
@@ -1182,12 +1172,14 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 			printOneGroupIPPolicy(&policy)
 		}
 	}
-	if policyApplyIngress {
-		policy := getMixedGroupPolicyForIngress()
-		groupIPPolicies = append(groupIPPolicies, policy...)
-	} else {
-		policy := getMixedGroupPolicy()
-		groupIPPolicies = append(groupIPPolicies, policy...)
+	if !c2cAny {
+		if policyApplyIngress {
+			policy := getMixedGroupPolicyForIngress()
+			groupIPPolicies = append(groupIPPolicies, policy...)
+		} else {
+			policy := getMixedGroupPolicy()
+			groupIPPolicies = append(groupIPPolicies, policy...)
+		}
 	}
 	//release memory
 	wlLearnList = nil

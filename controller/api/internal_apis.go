@@ -135,33 +135,45 @@ type RESTProfilingData struct {
 	Profiling *RESTProfiling `json:"profiling"`
 }
 
+type RESTRiskScoreMetricsWL struct {
+	RunningPods    int `json:"running_pods"`
+	PrivilegedWLs  int `json:"privileged_wls"`
+	RootWLs        int `json:"root_wls"`
+	DiscoverExtEPs int `json:"discover_ext_eps"`
+	MonitorExtEPs  int `json:"monitor_ext_eps"`
+	ProtectExtEPs  int `json:"protect_ext_eps"`
+	ThrtExtEPs     int `json:"threat_ext_eps"`
+	VioExtEPs      int `json:"violate_ext_eps"`
+}
+
+type RESTRiskScoreMetricsGroup struct {
+	Groups           int `json:"groups"`
+	DiscoverGroups   int `json:"discover_groups"`
+	MonitorGroups    int `json:"monitor_groups"`
+	ProtectGroups    int `json:"protect_groups"`
+	DiscoverGroupsZD int `json:"discover_groups_zero_drift"`
+	MonitorGroupsZD  int `json:"monitor_groups_zero_drift"`
+	ProtectGroupsZD  int `json:"protect_groups_zero_drift"`
+}
+
+type RESTRiskScoreMetricsCVE struct {
+	DiscoverCVEs int `json:"discover_cves"`
+	MonitorCVEs  int `json:"monitor_cves"`
+	ProtectCVEs  int `json:"protect_cves"`
+	PlatformCVEs int `json:"platform_cves"`
+	HostCVEs     int `json:"host_cves"`
+}
+
 type RESTRiskScoreMetrics struct {
-	Platform         string `json:"platform"`
-	K8sVersion       string `json:"kube_version"`
-	OCVersion        string `json:"openshift_version"`
-	NewServiceMode   string `json:"new_service_policy_mode"`
-	DiscoverGroups   int    `json:"discover_groups"`
-	MonitorGroups    int    `json:"monitor_groups"`
-	ProtectGroups    int    `json:"protect_groups"`
-	DiscoverGroupsZD int    `json:"discover_groups_zero_drift"`
-	MonitorGroupsZD  int    `json:"monitor_groups_zero_drift"`
-	ProtectGroupsZD  int    `json:"protect_groups_zero_drift"`
-	Groups           int    `json:"groups"`
-	RunningPods      int    `json:"running_pods"`
-	PrivilegedWLs    int    `json:"privileged_wls"`
-	RootWLs          int    `json:"root_wls"`
-	DenyAdmCtrlRules int    `json:"deny_adm_ctrl_rules"`
-	DiscoverCVEs     int    `json:"discover_cves"`
-	MonitorCVEs      int    `json:"monitor_cves"`
-	ProtectCVEs      int    `json:"protect_cves"`
-	PlatformCVEs     int    `json:"platform_cves"`
-	HostCVEs         int    `json:"host_cves"`
-	Hosts            int    `json:"hosts"`
-	DiscoverExtEPs   int    `json:"discover_ext_eps"`
-	MonitorExtEPs    int    `json:"monitor_ext_eps"`
-	ProtectExtEPs    int    `json:"protect_ext_eps"`
-	ThrtExtEPs       int    `json:"threat_ext_eps"`
-	VioExtEPs        int    `json:"violate_ext_eps"`
+	Platform         string                    `json:"platform"`
+	K8sVersion       string                    `json:"kube_version"`
+	OCVersion        string                    `json:"openshift_version"`
+	NewServiceMode   string                    `json:"new_service_policy_mode"`
+	DenyAdmCtrlRules int                       `json:"deny_adm_ctrl_rules"`
+	Hosts            int                       `json:"hosts"`
+	WLs              RESTRiskScoreMetricsWL    `json:"workloads"`
+	Groups           RESTRiskScoreMetricsGroup `json:"groups"`
+	CVEs             RESTRiskScoreMetricsCVE   `json:"cves"`
 }
 
 type RESTExposedEndpoint struct {

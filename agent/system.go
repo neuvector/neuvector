@@ -48,7 +48,7 @@ func policyInit() {
 	} else {
 		policyApplyDir = C.DP_POLICY_APPLY_EGRESS
 	}
-	pe.Init(Host.ID, gInfo.hostIPs, Host.TunnelIP, ObtainGroupProcessPolicy)
+	pe.Init(Host.ID, gInfo.hostIPs, Host.TunnelIP, ObtainGroupProcessPolicy, policyApplyDir)
 }
 
 func updateContainerPolicyMode(id, policyMode string) {
@@ -145,8 +145,15 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
 	for wlID, c := range gInfo.activeContainers {
+		//container that has no datapath needs not be
+		//in workloadPolicyMap to save memory and cpu
+		if !c.hasDatapath {
+			continue
+		}
 		pInfo := policy.WorkloadIPPolicyInfo{
 			RuleMap: make(map[string]*dp.DPPolicyIPRule),
+			AppMap: c.appMap,
+			PortMap: c.portMap,
 			Policy: dp.DPWorkloadIPPolicy{
 				WlID:        wlID,
 				WorkloadMac: nil,

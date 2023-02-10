@@ -283,7 +283,7 @@ func assocWafWl2PolicyIds(grp string, senset utils.Set, outside_wl2sensor map[st
 	if grpcache, ok := groupCacheMap[grp]; ok {
 		for _, m := range grpcache.members.ToSlice() {
 			wlid := m.(string)
-			if wlcache, ok := wlCacheMap[wlid]; ok {
+			if wlcache, ok := wlCacheMap[wlid]; ok && wlcache.workload.HasDatapath {
 				inside_grps = inside_grps.Union(wlcache.groups)
 			}
 		}
@@ -321,6 +321,10 @@ func assocWafWl2PolicyIds(grp string, senset utils.Set, outside_wl2sensor map[st
 	if grpcache, ok := groupCacheMap[grp]; ok {
 		for _, m := range grpcache.members.ToSlice() {
 			wlid := m.(string)
+			//only include wl that has datapath to save memory and cpu
+			if wlcache, exist := wlCacheMap[wlid]; exist && !wlcache.workload.HasDatapath {
+				continue
+			}
 			if rids, ok := wl2policies[wlid]; !ok {
 				wl2policies[wlid] = inside_ruleids
 			} else {
@@ -334,6 +338,10 @@ func assocWafWl2PolicyIds(grp string, senset utils.Set, outside_wl2sensor map[st
 		if ogrpcache, ok := groupCacheMap[ogrp]; ok {
 			for _, om := range ogrpcache.members.ToSlice() {
 				owlid := om.(string)
+				//only include wl that has datapath to save memory and cpu
+				if wlcache, exist := wlCacheMap[owlid]; exist && !wlcache.workload.HasDatapath {
+					continue
+				}
 				if orids, ok := outside_wl2policies[owlid]; !ok {
 					outside_wl2policies[owlid] = outside_ruleids
 				} else {
@@ -374,6 +382,10 @@ func assocWafWl2Sensors(grp string, senset utils.Set, wl2sensors map[string]map[
 		}
 		for _, m := range grpcache.members.ToSlice() {
 			wlid := m.(string)
+			//only include wl that has datapath to save memory and cpu
+			if wlcache, exist := wlCacheMap[wlid]; exist && !wlcache.workload.HasDatapath {
+				continue
+			}
 			if sam, ok := wl2sensors[wlid]; !ok {
 				if wl2sensors[wlid] == nil {
 					wl2sensors[wlid] = make(map[string]string)
