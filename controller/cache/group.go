@@ -1412,6 +1412,7 @@ func refreshLearnedGroupMembership() {
 
 	for _, wlc := range notGroupedPods {
 		groupWorkloadJoin(wlc.workload.ID, wlc)
+		connectWorkloadDelete(wlc.workload.ID, wlc)
 	}
 }
 
