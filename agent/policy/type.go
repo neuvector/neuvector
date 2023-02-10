@@ -9,10 +9,14 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+var polAppDir int
+
 type GroupProcPolicyCallback func(id string) (*share.CLUSProcessProfile, bool)
 
 type WorkloadIPPolicyInfo struct {
 	RuleMap    map[string]*dp.DPPolicyIPRule
+	AppMap     map[share.CLUSProtoPort]*share.CLUSApp
+	PortMap    map[share.CLUSProtoPort]*share.CLUSMappedPort
 	Policy     dp.DPWorkloadIPPolicy
 	Configured bool
 	SkipPush   bool
@@ -39,7 +43,7 @@ type Engine struct {
 	PolicyAddrMap  map[string]share.CLUSSubnet
 }
 
-func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb GroupProcPolicyCallback) {
+func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb GroupProcPolicyCallback, pad int) {
 	e.HostID = HostID
 	e.HostIPs = HostIPs
 	e.TunnelIP = TunnelIP
@@ -51,4 +55,5 @@ func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb
 	}
 	e.getGroupRule = cb
 	e.PolicyAddrMap = make(map[string]share.CLUSSubnet)
+	polAppDir = pad
 }
