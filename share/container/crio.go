@@ -19,7 +19,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	// criRT "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	// criRTv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/neuvector/neuvector/share"
@@ -87,7 +87,7 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 }
 
 func getPauseImageRepoDigests() (string, error) {
-	config_files := []string {
+	config_files := []string{
 		"/proc/1/root/etc/crio/crio.conf",
 		"/proc/1/root/etc/crio/crio.conf.d/00-default.conf",
 		"/proc/1/root/etc/crio/crio.conf.d/00-default",
@@ -303,14 +303,14 @@ func (d *crioDriver) getContainerMeta(id string, cs *criRT.ContainerStatusRespon
 		fmt.Sprintf("%d", cs.Status.Metadata.Attempt)
 
 	meta := &ContainerMeta{
-		ID:         id,
-		Name:       name,
-		Pid:        info.Info.Pid,
-		Sandbox:    info.Info.SandboxID,
-		Labels:     cs.Status.Labels,
-		Hostname:   "",
-		Envs:       make([]string, 0),
-		isChild:    true,
+		ID:       id,
+		Name:     name,
+		Pid:      info.Info.Pid,
+		Sandbox:  info.Info.SandboxID,
+		Labels:   cs.Status.Labels,
+		Hostname: "",
+		Envs:     make([]string, 0),
+		isChild:  true,
 	}
 
 	if cs.Status.Image != nil {
@@ -392,13 +392,13 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
-			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
+			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
 			return nil, err
 		}
 
 		podInfo, err2 := d.getContainerInfo(pod.Info)
 		if err2 != nil {
-			log.WithFields(log.Fields{"id":id, "info": pod.Info}).Error("Fail to get pod info")
+			log.WithFields(log.Fields{"id": id, "info": pod.Info}).Error("Fail to get pod info")
 			return nil, err
 		}
 
@@ -573,8 +573,8 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 		case criRT.ContainerState_CONTAINER_EXITED:
 			stops.Add(c.Id)
 			ids.Add(c.Id)
-		case criRT.ContainerState_CONTAINER_UNKNOWN:// do nothing
-		default:	// criRT.ContainerState_CONTAINER_RUNNING, criRT.ContainerState_CONTAINER_CREATED
+		case criRT.ContainerState_CONTAINER_UNKNOWN: // do nothing
+		default: // criRT.ContainerState_CONTAINER_RUNNING, criRT.ContainerState_CONTAINER_CREATED
 			ids.Add(c.Id)
 		}
 	}
