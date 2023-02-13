@@ -106,6 +106,7 @@ typedef struct dp_bld_dlp_context_ {
 typedef struct dp_thread_data_ {
     int epoll_fd;
     struct cds_hlist_head ctx_list;
+    struct cds_hlist_head notc_nfq_ctx_list;
     timer_queue_t ctx_free_list;
     struct dp_context_ *ctx_inline;
     pthread_mutex_t ctrl_dp_lock;
