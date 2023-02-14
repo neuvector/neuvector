@@ -53,7 +53,7 @@ var fedJoinedClusterStatusCache = make(map[string]int)         // key is cluster
 var fedSettingsCache share.CLUSFedSettings                     // general fed settings
 var fedCacheMutex sync.RWMutex                                 // for accessing fedMembershipCache/fedJoinedClustersCache/fedJoinedClusterStatusCache
 
-func fedInit() {
+func fedInit(restoredFedRole string) {
 	m := clusHelper.GetFedMembership()
 	if m == nil {
 		m = &share.CLUSFedMembership{}
@@ -69,18 +69,28 @@ func fedInit() {
 	if revCache == nil || len(revCache.Revisions) == 0 {
 		clusHelper.UpdateFedRulesRevision(nil)
 	} else {
-		wrt := false
-		empty := share.CLUSEmptyFedRulesRevision()
-		for ruleType, rev := range empty.Revisions {
-			if _, ok := revCache.Revisions[ruleType]; !ok {
-				revCache.Revisions[ruleType] = rev
-				wrt = true
+		if restoredFedRole == api.FedRoleMaster {
+			// now on master cluster
+			// 1. restore to kv is done
+			// 2. kv watchers are not registered yet
+			// when pv is used, later after kv watchers are registered, it may take long time to update master's cache for all fed-related group/policy keys.
+			// do not init fedRulesRevisionCache with the latest object/config/federation/rules_revision value before the fed groups/policies are updated in master's cache
+			empty := share.CLUSEmptyFedRulesRevision()
+			fedRulesRevisionCache.Revisions = empty.Revisions
+		} else {
+			wrt := false
+			empty := share.CLUSEmptyFedRulesRevision()
+			for ruleType, rev := range empty.Revisions {
+				if _, ok := revCache.Revisions[ruleType]; !ok {
+					revCache.Revisions[ruleType] = rev
+					wrt = true
+				}
 			}
+			if wrt {
+				clusHelper.PutFedRulesRevision(nil, revCache)
+			}
+			fedRulesRevisionCache.Revisions = revCache.Revisions
 		}
-		if wrt {
-			clusHelper.PutFedRulesRevision(nil, revCache)
-		}
-		fedRulesRevisionCache.Revisions = revCache.Revisions
 	}
 }
 
@@ -157,9 +167,8 @@ func purgeFiles(fileNamePrefix string) {
 }
 
 func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.Debug()
-
 	cfgType := share.CLUSFedKey2CfgKey(key)
+	log.WithFields(log.Fields{"cfgType": cfgType}).Debug()
 	fedCacheMutexLock()
 	defer fedCacheMutexUnlock()
 
