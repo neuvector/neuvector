@@ -280,7 +280,10 @@ func _deleteSessionToken(s *loginSession) {
 	}
 
 	key := share.CLUSExpiredTokenKey(s.token)
-	jwtLastExpiredTokenSession.Associate(key)
+	err := jwtLastExpiredTokenSession.Associate(key)
+	if err != nil {
+		log.WithFields(log.Fields{"id": s.id, "err": err}).Error()
+	}
 }
 
 // with userMutex locked when calling this
