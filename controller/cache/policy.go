@@ -664,7 +664,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			groupAddrs[0].NatIP = append(groupAddrs[0].NatIP, []net.IP{utils.IPv4Loopback, nil}...)
 		}
 		return groupAddrs
-	} else if isAllContainerGrp(name) && (policyApplyIngress || !isDst) {
+	} else if isAllContainerGrp(name) && !isDst {
 		groupAddrs := []*share.CLUSWorkloadAddr{
 			&share.CLUSWorkloadAddr{
 				WlID:       share.CLUSWLAllContainer,
