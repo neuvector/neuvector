@@ -531,6 +531,10 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 	if wlCache, ok = wlCacheMap[wlAddr.WlID]; !ok {
 		log.WithFields(log.Fields{"workload": wlAddr.WlID}).Error("Cannot find workload")
 		return
+	} else if wlCache.workload.ShareNetNS != "" {
+		if wlCache1, ok1 := wlCacheMap[wlCache.workload.ShareNetNS]; ok1 {
+			wlCache = wlCache1
+		}
 	}
 
 	//log.WithFields(log.Fields{"port": ports, "apps": apps}).Debug("")
