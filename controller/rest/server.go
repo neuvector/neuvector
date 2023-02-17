@@ -1055,7 +1055,7 @@ func configSAMLServer(name string, saml *api.RESTServerSAMLConfig, acc *access.A
 
 		for ok := true; ok; ok = false {
 			if err = updateSAMLServer(cs, saml, acc, login); err == nil {
-				if err := validateSAMLServer(cs); err == nil {
+				if err = validateSAMLServer(cs); err == nil {
 					break
 				}
 			}

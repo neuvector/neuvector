@@ -155,7 +155,7 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 		if !acc.Authorize(cache.domain, nil) {
 			continue
 		}
-		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags}
+		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags, Labels: cache.domain.Labels}
 	}
 
 	domainMutex.RUnlock()

@@ -6251,6 +6251,7 @@ definitions:
       - running_pods
       - services
       - tags
+      - labels
     properties:
       name:
         type: string
@@ -6272,6 +6273,15 @@ definitions:
         items:
           type: string
           example: [""]
+      labels:
+        type: object
+        properties:
+          key:
+            type: string
+            example: "ns.env-1"
+          value:
+            type: string
+            example: "production"
   RESTDomainConfig:
     type: object
     properties:

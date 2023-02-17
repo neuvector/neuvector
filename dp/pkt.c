@@ -43,13 +43,14 @@ extern dp_mnt_shm_t *g_shm;
 
 dp_thread_data_t g_dp_thread_data[MAX_DP_THREADS];
 
-#define th_epoll_fd(thr_id)      (g_dp_thread_data[thr_id].epoll_fd)
-#define th_ctx_list(thr_id)      (g_dp_thread_data[thr_id].ctx_list)
-#define th_ctx_free_list(thr_id) (g_dp_thread_data[thr_id].ctx_free_list)
-#define th_ctx_inline(thr_id)    (g_dp_thread_data[thr_id].ctx_inline)
-#define th_ctrl_dp_lock(thr_id)  (g_dp_thread_data[thr_id].ctrl_dp_lock)
-#define th_ctrl_req_evfd(thr_id) (g_dp_thread_data[thr_id].ctrl_req_evfd)
-#define th_ctrl_req(thr_id)      (g_dp_thread_data[thr_id].ctrl_req)
+#define th_epoll_fd(thr_id)          (g_dp_thread_data[thr_id].epoll_fd)
+#define th_ctx_list(thr_id)          (g_dp_thread_data[thr_id].ctx_list)
+#define th_notc_nfq_ctx_list(thr_id) (g_dp_thread_data[thr_id].notc_nfq_ctx_list)
+#define th_ctx_free_list(thr_id)     (g_dp_thread_data[thr_id].ctx_free_list)
+#define th_ctx_inline(thr_id)        (g_dp_thread_data[thr_id].ctx_inline)
+#define th_ctrl_dp_lock(thr_id)      (g_dp_thread_data[thr_id].ctrl_dp_lock)
+#define th_ctrl_req_evfd(thr_id)     (g_dp_thread_data[thr_id].ctrl_req_evfd)
+#define th_ctrl_req(thr_id)          (g_dp_thread_data[thr_id].ctrl_req)
 
 int bld_dlp_epoll_fd;
 int bld_dlp_ctrl_req_evfd;
@@ -83,14 +84,24 @@ int dp_read_ring_stats(dp_stats_t *s, int thr_id)
 {
     dp_context_t *ctx;
     struct cds_hlist_node *itr;
-    struct cds_hlist_head *list;
+    struct cds_hlist_head *list, *list1;
 
     thr_id = thr_id % MAX_DP_THREADS;
     list = &th_ctx_list(thr_id);
+    list1 = &th_notc_nfq_ctx_list(thr_id);
 
     pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
 
     cds_hlist_for_each_entry_rcu(ctx, itr, list, link) {
+        dp_get_stats(ctx);
+
+        s->rx += ctx->stats.rx;
+        s->rx_drops += ctx->stats.rx_drops;
+        s->tx += ctx->stats.tx;
+        s->tx_drops += ctx->stats.tx_drops;
+    }
+
+    cds_hlist_for_each_entry_rcu(ctx, itr, list1, link) {
         dp_get_stats(ctx);
 
         s->rx += ctx->stats.rx;
@@ -402,7 +413,7 @@ int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *
     do {
         char name[CTX_NAME_LEN];
         get_nfq_name(name, netns, iface);
-        ctx = dp_lookup_context(&th_ctx_list(thr_id), name);
+        ctx = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), name);
         if (ctx != NULL) {
             // handle mac address change
             ether_aton_r(ep_mac, &ctx->ep_mac);
@@ -426,7 +437,7 @@ int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *
 
         ether_aton_r(ep_mac, &ctx->ep_mac);
         strlcpy(ctx->name, name, sizeof(ctx->name));
-        cds_hlist_add_head_rcu(&ctx->link, &th_ctx_list(thr_id));
+        cds_hlist_add_head_rcu(&ctx->link, &th_notc_nfq_ctx_list(thr_id));
 
         DEBUG_CTRL("nfq added netns=%s iface=%s fd=%d\n", netns, iface, ctx->fd);
     } while (false);
@@ -449,7 +460,7 @@ int dp_data_del_nfq(const char *netns, const char *iface, int thr_id)
 
     char name[CTX_NAME_LEN];
     get_nfq_name(name, netns, iface);
-    ctx = dp_lookup_context(&th_ctx_list(thr_id), name);
+    ctx = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), name);
     if (ctx != NULL) {
         // When switch mode, nfq is not immediately closed.
         // ctx is set to released.
@@ -546,7 +557,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
 
     // if context already exist, just use it. On error release all alloc resource
-    ctx_in = dp_lookup_context(&th_ctx_list(thr_id), vin_iface);
+    ctx_in = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), vin_iface);
     if (ctx_in == NULL) {
         new_in = true;
         ctx_in = dp_alloc_context(vin_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
@@ -560,7 +571,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     } 
     ctx_in->quar = quar;
     
-    ctx_ex = dp_lookup_context(&th_ctx_list(thr_id), vex_iface);
+    ctx_ex = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), vex_iface);
     if (ctx_ex == NULL) {
         new_ex = true;
         ctx_ex = dp_alloc_context(vex_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
@@ -581,7 +592,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
             DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_in for %s\n",vin_iface);
             goto error;
         }
-        cds_hlist_add_head_rcu(&ctx_in->link, &th_ctx_list(thr_id));
+        cds_hlist_add_head_rcu(&ctx_in->link, &th_notc_nfq_ctx_list(thr_id));
     }
     if (new_ex) {
         ctx_ex->peer_ctx = ctx_in;
@@ -589,7 +600,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
             DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_ex for %s\n",vex_iface);
             goto error;
         }
-        cds_hlist_add_head_rcu(&ctx_ex->link, &th_ctx_list(thr_id));
+        cds_hlist_add_head_rcu(&ctx_ex->link, &th_notc_nfq_ctx_list(thr_id));
     }
 
     DEBUG_CTRL("dp_data_add_port_pair added iface=%s fd=%d quar=%d new_in=%d\n", vin_iface, ctx_in->fd, ctx_in->quar, new_in);
@@ -619,7 +630,7 @@ int dp_data_del_port_pair(const char *vin_iface, const char *vex_iface, int thr_
 
     pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
     // the ctx since the vex intf move back to container, so the dp thread may already do the release
-    ctx = dp_lookup_context(&th_ctx_list(thr_id), vin_iface);
+    ctx = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), vin_iface);
     if (ctx != NULL) {
         dp_release_context(ctx, false);
         DEBUG_CTRL("removed iface=%s\n",vin_iface);
@@ -628,7 +639,7 @@ int dp_data_del_port_pair(const char *vin_iface, const char *vex_iface, int thr_
         DEBUG_CTRL("iface cannot be found, iface=%s thr_id=%d\n", vin_iface, thr_id);
     }
     
-    ctx = dp_lookup_context(&th_ctx_list(thr_id), vex_iface);
+    ctx = dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), vex_iface);
     if (ctx != NULL) {
         dp_release_context(ctx, false);
         DEBUG_CTRL("removed iface=%s\n",vex_iface);
@@ -873,6 +884,7 @@ void *dp_data_thr(void *args)
 
     pthread_mutex_init(&th_ctrl_dp_lock(thr_id), NULL);
     CDS_INIT_HLIST_HEAD(&th_ctx_list(thr_id));
+    CDS_INIT_HLIST_HEAD(&th_notc_nfq_ctx_list(thr_id));
     timer_queue_init(&th_ctx_free_list(thr_id), RELEASED_CTX_TIMEOUT);
 
     // Per-thread init
@@ -908,6 +920,13 @@ void *dp_data_thr(void *args)
                 }
             }
         }
+        struct cds_hlist_node *titr, *tnext;
+        dp_context_t *notc_nfq_ctx;
+        pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
+        cds_hlist_for_each_entry_safe(notc_nfq_ctx, titr, tnext, &th_notc_nfq_ctx_list(thr_id), link) {
+            dp_rx(notc_nfq_ctx, g_seconds);
+        }
+        pthread_mutex_unlock(&th_ctrl_dp_lock(thr_id));
 
         int i, evs;
         evs = epoll_wait(th_epoll_fd(thr_id), epoll_evs, MAX_EPOLL_EVENTS, tmo);
@@ -924,6 +943,9 @@ void *dp_data_thr(void *args)
                     if (ctx != polling_ctx) {
                         pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
                         if (dp_lookup_context(&th_ctx_list(thr_id), ctx->name)) {
+                            dp_release_context(ctx, false);
+                        }
+                        if (dp_lookup_context(&th_notc_nfq_ctx_list(thr_id), ctx->name)) {
                             dp_release_context(ctx, false);
                         }
                         pthread_mutex_unlock(&th_ctrl_dp_lock(thr_id));
@@ -969,6 +991,7 @@ void *dp_data_thr(void *args)
             if (++ stats_tick >= DP_STATS_FREQ) {
                 pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
                 dp_refresh_stats(&th_ctx_list(thr_id));
+                dp_refresh_stats(&th_notc_nfq_ctx_list(thr_id));
                 pthread_mutex_unlock(&th_ctrl_dp_lock(thr_id));
                 stats_tick = 0;
             }
@@ -991,6 +1014,9 @@ void *dp_data_thr(void *args)
     dp_context_t *ctx;
     pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
     cds_hlist_for_each_entry_safe(ctx, itr, next, &th_ctx_list(thr_id), link) {
+        dp_release_context(ctx, true);
+    }
+    cds_hlist_for_each_entry_safe(ctx, itr, next, &th_notc_nfq_ctx_list(thr_id), link) {
         dp_release_context(ctx, true);
     }
     pthread_mutex_unlock(&th_ctrl_dp_lock(thr_id));
