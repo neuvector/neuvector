@@ -531,6 +531,10 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 	if wlCache, ok = wlCacheMap[wlAddr.WlID]; !ok {
 		log.WithFields(log.Fields{"workload": wlAddr.WlID}).Error("Cannot find workload")
 		return
+	} else if wlCache.workload.ShareNetNS != "" {
+		if wlCache1, ok1 := wlCacheMap[wlCache.workload.ShareNetNS]; ok1 {
+			wlCache = wlCache1
+		}
 	}
 
 	//log.WithFields(log.Fields{"port": ports, "apps": apps}).Debug("")
@@ -664,7 +668,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			groupAddrs[0].NatIP = append(groupAddrs[0].NatIP, []net.IP{utils.IPv4Loopback, nil}...)
 		}
 		return groupAddrs
-	} else if isAllContainerGrp(name) && (policyApplyIngress || !isDst) {
+	} else if isAllContainerGrp(name) && !isDst {
 		groupAddrs := []*share.CLUSWorkloadAddr{
 			&share.CLUSWorkloadAddr{
 				WlID:       share.CLUSWLAllContainer,

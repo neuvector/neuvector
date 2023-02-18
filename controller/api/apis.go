@@ -788,6 +788,7 @@ type RESTDomain struct {
 	RunningPods      int      `json:"running_pods"`
 	Services         int      `json:"services"`
 	Tags             []string `json:"tags"`
+	Labels           map[string]string `json:"labels"`
 }
 
 type RESTDomainsData struct {

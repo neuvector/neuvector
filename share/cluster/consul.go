@@ -554,7 +554,7 @@ func (s *sessionMethod) Associate(key string) error {
 	kv := s.c.KV()
 	pair := &api.KVPair{Key: key, Value: []byte(s.id), Session: s.id}
 	if ok, _, err := kv.Acquire(pair, nil); err != nil {
-		return nil
+		return fmt.Errorf("Failed to hold, err=%s", err.Error())
 	} else if !ok {
 		return fmt.Errorf("Failed to hold")
 	} else {

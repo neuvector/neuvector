@@ -406,6 +406,16 @@ func processDlpGroupPolicy(wl2sensors, outside_wl2sensor map[string]map[string]s
 	}
 }
 
+func IsAllPatternEmpty(dre *share.CLUSDlpRule) bool {
+	for _, cpt := range dre.Patterns {
+		if cpt.Value != "" {
+			return false
+		}
+	}
+
+	return true
+}
+
 func assocWl2RuleNames(wl2sensors, wl2rules map[string]map[string]string) {
 	log.Debug("")
 	for wlid, sens := range wl2sensors {
@@ -414,6 +424,11 @@ func assocWl2RuleNames(wl2sensors, wl2rules map[string]map[string]string) {
 				if cdr.Name == share.CLUSDlpDefaultSensor {
 					//user created rule
 					for _, cdre := range cdr.RuleList {
+						//ignore all pattern empty rule
+						if IsAllPatternEmpty(cdre) {
+							continue
+						}
+
 						if ram, ok := wl2rules[wlid]; !ok {
 							if wl2rules[wlid] == nil {
 								wl2rules[wlid] = make(map[string]string)
@@ -448,6 +463,11 @@ func assocWl2RuleNames(wl2sensors, wl2rules map[string]map[string]string) {
 					}
 				} else {
 					for _, cdrename := range cdr.RuleListNames {
+						//ignore all pattern empty rule
+						cdre := getDlpRuleFromDefaultSensor(cdrename)
+						if IsAllPatternEmpty(cdre) {
+							continue
+						}
 						if ram, ok := wl2rules[wlid]; !ok {
 							if wl2rules[wlid] == nil {
 								wl2rules[wlid] = make(map[string]string)
@@ -625,6 +645,11 @@ func calculateGroupDlpRulesFromCache() share.CLUSWorkloadDlpRules {
 
 	for _, drelist := range dlprulemap {
 		for _, dre := range drelist {
+			//ignore empty pattern rule to be calculated for DlpRuleList
+			if IsAllPatternEmpty(dre) {
+				continue
+			}
+
 			cgdrs.DlpRuleList = append(cgdrs.DlpRuleList, dre)
 		}
 	}
