@@ -88,6 +88,8 @@ func getHostIPs() {
 
 func taskReexamHostIntf() {
 	log.Debug()
+	gInfoLock()
+	defer gInfoUnlock()
 	oldIfaces := Host.Ifaces
 	oldTunnelIP := Host.TunnelIP
 	getHostIPs()
