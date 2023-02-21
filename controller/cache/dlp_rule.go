@@ -407,9 +407,11 @@ func processDlpGroupPolicy(wl2sensors, outside_wl2sensor map[string]map[string]s
 }
 
 func IsAllPatternEmpty(dre *share.CLUSDlpRule) bool {
-	for _, cpt := range dre.Patterns {
-		if cpt.Value != "" {
-			return false
+	if dre != nil {
+		for _, cpt := range dre.Patterns {
+			if cpt.Value != "" {
+				return false
+			}
 		}
 	}
 
