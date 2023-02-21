@@ -39,6 +39,7 @@
 #define ENV_PERSIST_CONFIG     "CTRL_PERSIST_CONFIG"
 #define ENV_ADMISSION_PORT     "CTRL_ADMISSION_PORT"
 #define ENV_SKIP_NV_PROTECT    "ENFORCER_SKIP_NV_PROTECT"
+#define ENV_NV_DATAPATH_NFQ    "ENFORCER_NV_DATAPATH_NFQ"
 #define ENV_SHOW_MONITOR_TRACE "ENF_MONITOR_TRACE"
 #define ENV_NO_KV_CONGEST_CTL  "ENF_NO_KV_CONGESTCTL"
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
@@ -457,6 +458,11 @@ static pid_t fork_exec(int i)
         if (getenv(ENV_SKIP_NV_PROTECT)) {
             args[a ++] = "-s";
         }
+
+        if (getenv(ENV_NV_DATAPATH_NFQ)) {
+            args[a ++] = "-nfq";
+        }
+
         if (getenv(ENV_SHOW_MONITOR_TRACE)) {
             args[a ++] = "-m";      // show process monitor messages
         }
