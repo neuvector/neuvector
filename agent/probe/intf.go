@@ -15,6 +15,7 @@ var intfMonitorPollTimeoutShort = syscall.Timeval{0, 500000}
 
 type intfMonitorInterface interface {
 	WaitAddrChange(*syscall.Timeval) (bool, error)
+	WaitHostAddrChange(*syscall.Timeval) (bool, error)
 	Close()
 }
 
@@ -100,14 +101,14 @@ func (p *Probe) intfHostMonitorLoop(hid string, m intfMonitorInterface, stopCh c
 			return
 		default:
 			// Aggregate addr/route change notification.
-			changed, err := m.WaitAddrChange(&pollTimeout)
+			changed, err := m.WaitHostAddrChange(&pollTimeout)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err}).Debug("Receive error")
 			} else if changed {
 				toNotify = true
 				pollTimeout = intfMonitorPollTimeoutShort
 			} else if toNotify {
-				log.WithFields(log.Fields{"hostid": hid}).Debug("Notify host addr or route changed")
+				log.WithFields(log.Fields{"hostid": hid}).Debug("Notify host addr changes")
 				toNotify = false
 				msg := ProbeMessage{Type: PROBE_HOST_NEW_IP}
 				p.notifyTaskChan <- &msg
