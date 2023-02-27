@@ -300,7 +300,7 @@ func (t *Transformer) advanceString(s string) (n int, ok bool) {
 	var e bidi.Properties
 	var sz int
 	for n < len(s) {
-		if s[n] < utf8.RuneSelf {
+		if s[n] < utf8.RuneSelf && s[n] < 128 {
 			e, sz = asciiTable[s[n]], 1
 		} else {
 			e, sz = bidi.LookupString(s[n:])

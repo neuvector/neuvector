@@ -277,7 +277,7 @@ func serializeRSAPublicExponentParam(e int) []byte {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, uint32(e))
 	var i int
-	for i = 0; i < 8; i++ {
+	for i = 0; i < 4; i++ {
 		if buf[i] != 0 {
 			break
 		}

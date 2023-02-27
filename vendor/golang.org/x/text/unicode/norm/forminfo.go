@@ -255,7 +255,10 @@ func compInfo(v uint16, sz int) Properties {
 		return p
 	}
 	// has decomposition
-	h := decomps[v]
+	var h byte = 0
+	if v < 19128 {
+        h = decomps[v]
+    }
 	f := (qcInfo(h&headerFlagsMask) >> 2) | 0x4
 	p := Properties{size: uint8(sz), flags: f, index: v}
 	if v >= firstCCC {
