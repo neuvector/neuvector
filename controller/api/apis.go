@@ -409,6 +409,7 @@ type RESTServerSAMLConfig struct {
 	DefaultRole      *string                    `json:"default_role,omitempty"`
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+	X509CertExtra    *[]string `json:"x509_cert_extra,cloak,omitempty"`
 }
 
 type RESTServerSAMLConfigCfgMap struct {

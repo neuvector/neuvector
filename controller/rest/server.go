@@ -649,22 +649,33 @@ func validateSAMLServer(cs *share.CLUSServer) error {
 		return errors.New("Invalid SAML Single-sign-on URL format")
 	}
 
-	// certificate
-	block, _ := pem.Decode([]byte(csaml.X509Cert))
-	if block == nil {
-		return errors.New("Invalid SAML X509 certificate")
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return errors.New("Invalid SAML X509 certificate")
-	}
-	if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
-		return errors.New("SAML X509 certificate doesn't contain a public key")
+	var certs []string
+	certs = append(certs, csaml.X509Cert)
+	certs = append(certs, csaml.X509CertExtra1)
+	certs = append(certs, csaml.X509CertExtra2)
+	certs = append(certs, csaml.X509CertExtra3)
+
+	for _, c := range certs{
+		if len(c) > 0 {
+			// certificate
+			block, _ := pem.Decode([]byte(c))
+			if block == nil {
+				return errors.New("Invalid SAML X509 certificate")
+			}
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return errors.New("Invalid SAML X509 certificate")
+			}
+			if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+				return errors.New("SAML X509 certificate doesn't contain a public key")
+			}
+
+			if err := validateAuthServer(&csaml.CLUSServerAuth); err != nil {
+				return err
+			}
+		}
 	}
 
-	if err := validateAuthServer(&csaml.CLUSServerAuth); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -698,6 +709,20 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	if saml.DefaultRole != nil {
 		csaml.DefaultRole = *saml.DefaultRole
 	}
+	if saml.X509CertExtra != nil {
+		for i, c := range *saml.X509CertExtra {
+			if i == 0 {
+				csaml.X509CertExtra1 = c
+			}
+			if i == 1 {
+				csaml.X509CertExtra2 = c
+			}
+			if i == 2 {
+				csaml.X509CertExtra3 = c
+			}
+		}
+	}
+
 	var err error
 	var groupRoleMappings []*share.GroupRoleMapping
 	if saml.GroupMappedRoles != nil {

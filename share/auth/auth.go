@@ -131,19 +131,36 @@ func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *ap
 }
 
 func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (map[string][]string, error) {
-	sp := saml.ServiceProvider{
-		IDPSSOURL:           csaml.SSOURL,
-		IDPSSODescriptorURL: csaml.Issuer,
-		IDPPublicCert:       csaml.X509Cert,
+	var certs []string
+	certs = append(certs, csaml.X509Cert)
+	certs = append(certs, csaml.X509CertExtra1)
+	certs = append(certs, csaml.X509CertExtra2)
+	certs = append(certs, csaml.X509CertExtra3)
+
+	r, err := saml.ParseSAMLResponse(tokenData.Token)
+	if err != nil {
+		return nil, err
 	}
 
-	if r, err := saml.ParseSAMLResponse(tokenData.Token); err != nil {
-		return nil, err
-	} else if err = r.Validate(&sp, true); err != nil {
-		return nil, err
-	} else {
-		return r.GetAttributes(), nil
+	for i,c := range certs {
+		if len(c) > 0 {
+			sp := saml.ServiceProvider{
+				IDPSSOURL:           csaml.SSOURL,
+				IDPSSODescriptorURL: csaml.Issuer,
+				IDPPublicCert:       c,
+			}
+
+			err = r.Validate(&sp, true)
+			if err != nil{
+				log.WithFields(log.Fields{"samlCertIndex": i, "error": err}).Debug("saml cert failed")
+			} else {
+				log.WithFields(log.Fields{"samlCertIndex": i}).Debug("saml cert succeed")
+				return r.GetAttributes(), nil
+			}
+		}
 	}
+
+	return nil, err		// err will be the last r.Validate() result
 }
 
 func (a *remoteAuth) OIDCDiscover(issuer string) (string, string, string, string, error) {

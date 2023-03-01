@@ -811,6 +811,9 @@ type CLUSServerSAML struct {
 	Issuer     string `json:"issuer"`
 	X509Cert   string `json:"x509_cert,cloak"`
 	GroupClaim string `json:"group_claim"`
+	X509CertExtra1 string `json:"x509_cert_extra1,cloak"`
+	X509CertExtra2 string `json:"x509_cert_extra2,cloak"`
+	X509CertExtra3 string `json:"x509_cert_extra3,cloak"`
 }
 
 type CLUSServerOIDC struct {

@@ -9559,6 +9559,11 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/GroupRoleMapping'
+      x509_cert_extra:
+        type: array
+        items:
+          type: string
+          example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
   RESTServerConfig:
     type: object
     required:
