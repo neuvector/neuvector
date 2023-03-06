@@ -457,6 +457,7 @@ func main() {
 
 	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster, "noDefAdmin": *noDefAdmin}).Info()
 
+	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
 	if Ctrler.Leader {
 		// See [NVSHAS-5490]:
@@ -482,11 +483,11 @@ func main() {
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
 		// assuming the PV should have the latest config.
-		fedRole, _ := kv.GetConfigHelper().Restore()
-		if fedRole == api.FedRoleJoint {
+		restoredFedRole, _ = kv.GetConfigHelper().Restore()
+		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
 			// 	we need to clean up fed rules & revisions in kv
-			// if not using persist storage, the returned fedRole is always empty string
+			// if not using persist storage, the returned restoredFedRole is always empty string
 			purgeFedRulesOnJoint = true
 		}
 
@@ -576,7 +577,7 @@ func main() {
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
 	}
-	cacher = cache.Init(&cctx, Ctrler.Leader, lead)
+	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
 
 	var fedRole string

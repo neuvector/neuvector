@@ -2032,7 +2032,7 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 	}
 }
 
-func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
+func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInterface {
 	log.WithFields(log.Fields{"isLeader": leader, "leadAddr": leadAddr}).Info()
 
 	cctx = ctx
@@ -2066,7 +2066,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	scanInit()
 
 	crdInit()
-	fedInit()
+	fedInit(restoredFedRole)
 	// Keep license update at last. Data structure preparation should be done before this point,
 	// license update will update the limit and could trigger actions
 	licenseInit()
