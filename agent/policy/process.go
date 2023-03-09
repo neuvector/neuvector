@@ -190,6 +190,7 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 				proc.Action = p.Action
 				proc.AllowFileUpdate = p.AllowFileUpdate
 				proc.ProbeCmds = p.ProbeCmds
+				proc.CfgType = p.CfgType
 				break
 			}
 		}
