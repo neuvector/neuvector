@@ -269,7 +269,6 @@ func main() {
 	pipeType := flag.String("p", "", "Pipe driver")
 	cnet_type := flag.String("n", "", "Container Network type")
 	skip_nvProtect := flag.Bool("s", false, "Skip NV Protect")
-	dp_nfq := flag.Bool("nfq", false, "Select nfq datapath")
 	show_monitor_trace := flag.Bool("m", false, "Show process/file monitor traces")
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
@@ -483,20 +482,14 @@ func main() {
 	if *pipeType == "ovs" {
 		driver = pipe.PIPE_OVS
 	} else if *pipeType == "no_tc" {
-		driver = pipe.PIPE_NOTC
-		if gInfo.ciliumCNI {
-			driver = pipe.PIPE_CLM
-		}
+		driver = pipe.PIPE_CLM
 	} else {
 		driver = pipe.PIPE_TC
 		if gInfo.ciliumCNI {
 			driver = pipe.PIPE_CLM
 		}
 	}
-	if (*dp_nfq) {
-		driver = pipe.PIPE_CLM
-	}
-	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU, "ciliumCNI": gInfo.ciliumCNI, "dp_nfq": *dp_nfq}).Info("")
+	log.WithFields(log.Fields{"pipeType": driver, "jumboframe": gInfo.jumboFrameMTU, "ciliumCNI": gInfo.ciliumCNI}).Info("")
 	if nvSvcPort, nvSvcBrPort, err = pipe.Open(driver, cnet_type, Agent.Pid, gInfo.jumboFrameMTU); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to open pipe driver")
 		os.Exit(-2)

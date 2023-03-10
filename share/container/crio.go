@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,9 +15,7 @@ import (
 	"github.com/cri-o/cri-o/types"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-
-	// criRTv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
@@ -48,42 +43,6 @@ type crioDriver struct {
 type imageInfo struct {
 	repoTag string
 	digest  string
-}
-
-// --
-const (
-	// unixProtocol is the network protocol of unix socket.
-	unixProtocol = "unix"
-)
-
-// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
-	if err != nil {
-		return "", nil, err
-	}
-	if protocol != unixProtocol {
-		return "", nil, fmt.Errorf("only support unix socket endpoint")
-	}
-
-	return addr, dial, nil
-}
-
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout(unixProtocol, addr, timeout)
-}
-
-func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
-	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
-		fallbackEndpoint := fallbackProtocol + "://" + endpoint
-		log.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
-		protocol, addr, err = parseEndpoint(fallbackEndpoint)
-		if err == nil {
-			log.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
-		}
-	}
-	log.Warningf("no error %v %v.", protocol, addr)
-	return
 }
 
 func getPauseImageRepoDigests() (string, error) {
@@ -114,64 +73,15 @@ func getPauseImageRepoDigests() (string, error) {
 	return "", fmt.Errorf("no found")
 }
 
-func parseEndpoint(endpoint string) (string, string, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", "", err
-	}
-
-	switch u.Scheme {
-	case "tcp":
-		return "tcp", u.Host, nil
-
-	case "unix":
-		return "unix", u.Path, nil
-
-	case "":
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
-
-	default:
-		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
-	}
-}
-
-// LocalEndpoint returns the full path to a unix socket at the given endpoint
-func LocalEndpoint(path, file string) string {
-	u := url.URL{
-		Scheme: unixProtocol,
-		Path:   path,
-	}
-	return filepath.Join(u.String(), file+".sock")
-}
-
-// --
-func newCriClient(sock string) (*grpc.ClientConn, error) {
-	addr, dialer, err := GetAddressAndDialer("unix://" + sock)
-	if err != nil {
-		return nil, err
-	}
-
-	log.WithFields(log.Fields{"addr": addr}).Debug()
-
-	conn, err := grpc.Dial(addr, grpc.WithInsecure() /*grpc.WithBlock(), */, grpc.WithTimeout(4*time.Second), grpc.WithDialer(dialer))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect, make sure you are running as root and the runtime has been started: %v", err)
-	}
-	return conn, nil
-}
-
 func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	log.WithFields(log.Fields{"endpoint": endpoint}).Debug("Connecting to crio")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	crio, err := crioAPI.New(endpoint)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to create crio client")
-		return nil, err
-	}
-
-	cri, err := newCriClient(endpoint)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to create cri client")
 		return nil, err
 	}
 
@@ -181,13 +91,9 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	crt := criRT.NewRuntimeServiceClient(cri)
-	req := &criRT.VersionRequest{}
-	ver, err := crt.Version(ctx, req)
+	cri, ver, err := newCriClient(endpoint, ctx)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to get crio version")
+		log.WithFields(log.Fields{"error": err}).Error("Fail to create cri client")
 		return nil, err
 	}
 
@@ -339,26 +245,25 @@ func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	crt := criRT.NewRuntimeServiceClient(d.criClient)
-	resp_container, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
+	resp_containers, err := criListContainers(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return nil, err
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return nil, err
 	}
 
-	metas := make([]*ContainerMeta, 0, len(resp_container.Containers)+len(resp_sandboxes.Items))
+	metas := make([]*ContainerMeta, 0, len(resp_containers.Containers)+len(resp_sandboxes.Items))
 	for _, pod := range resp_sandboxes.Items {
 		if runningOnly && pod.State != criRT.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 
-		m, err := d.GetContainer(pod.Id)
+		m, err := d.getContainer(pod.Id, ctx)
 		if err != nil {
 			log.WithFields(log.Fields{"sandbox": pod.Id, "error": err}).Error("Fail: sandbox")
 			continue
@@ -369,8 +274,8 @@ func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) 
 		metas = append(metas, &m.ContainerMeta)
 	}
 
-	for _, c := range resp_container.Containers {
-		m, err := d.GetContainer(c.Id)
+	for _, c := range resp_containers.Containers {
+		m, err := d.getContainer(c.Id, ctx)
 		if err != nil {
 			log.WithFields(log.Fields{"container": c.Id, "error": err}).Error("Fail: container")
 			continue
@@ -386,10 +291,12 @@ func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) 
 func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	return d.getContainer(id, ctx)
+}
 
-	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
+func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMetaExtra, error) {
 	var meta *ContainerMetaExtra
-	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
+	pod, err := criPodSandboxStatus(d.criClient, ctx, id)
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
 			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
@@ -430,7 +337,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		}
 	} else {
 		// an APP container
-		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
+		cs, err2 := criContainerStatus(d.criClient, ctx, id)
 		if err2 != nil || cs.Status == nil || cs.Info == nil {
 			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
 			return nil, err
@@ -442,7 +349,7 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			return nil, err
 		}
 
-		pod, err = crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: csInfo.Info.SandboxID, Verbose: true})
+		pod, err = criPodSandboxStatus(d.criClient, ctx, csInfo.Info.SandboxID)
 		if err2 != nil {
 			log.WithFields(log.Fields{"id": id, "csInfo": csInfo, "error": err}).Error("Fail to get its pod")
 			return nil, err
@@ -541,7 +448,9 @@ func (d *crioDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 }
 
 func (d *crioDriver) GetImage(name string) (*ImageMeta, error) {
-	return getCriImageMeta(d.criClient, name)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	return criGetImageMeta(d.criClient, ctx, name)
 }
 
 func (d *crioDriver) GetImageFile(id string) (io.ReadCloser, error) {
@@ -554,14 +463,13 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	crt := criRT.NewRuntimeServiceClient(d.criClient)
-	resp_containers, err := crt.ListContainers(ctx, &criRT.ListContainersRequest{})
+	resp_containers, err := criListContainers(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 		return ids, nil
 	}
 
-	resp_sandboxes, err := crt.ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
+	resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
 		return ids, nil
@@ -649,8 +557,7 @@ func (d *crioDriver) setPodImageInfo() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cimg := criRT.NewImageServiceClient(d.criClient)
-	if list, err := cimg.ListImages(ctx, &criRT.ListImagesRequest{}); err == nil {
+	if list, err := criListImages(d.criClient, ctx); err == nil {
 		for _, img := range list.Images {
 			// log.WithFields(log.Fields{"image": img}).Debug("CRIO")
 			for _, repoDig := range img.RepoDigests {

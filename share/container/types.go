@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,8 +11,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
@@ -263,56 +260,4 @@ func buildJsonFromMap(info map[string]string) string {
 	jsonInfo += "}"
 	// log.WithFields(log.Fields{"info": jsonInfo}).Debug()
 	return jsonInfo
-}
-
-func getCriImageMeta(client *grpc.ClientConn, name string) (*ImageMeta, error) {
-	type criImageInfo struct {
-		Info struct {
-			ImageSpec struct {
-				Author string `json:"author"`
-				Config struct {
-					Enrtrypoint []string          `json:"Entrypoint"`
-					Labels      map[string]string `json:"Labels"`
-				} `json:"config"`
-			} `json:"imageSpec"`
-		} `json:"info"`
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cimg := criRT.NewImageServiceClient(client)
-	req := &criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}, Verbose: true}
-	resp, err := cimg.ImageStatus(ctx, req)
-	if err == nil && resp != nil && resp.Image != nil {
-		meta := &ImageMeta{
-			ID:     resp.Image.Id,
-			Size:   int64(resp.Image.Size_),
-			Labels: make(map[string]string),
-		}
-
-		for _, tag := range resp.Image.RepoTags {
-			meta.RepoTags = append(meta.RepoTags, tag)
-		}
-
-		if len(resp.Image.RepoDigests) > 0 {
-			meta.Digest = resp.Image.RepoDigests[0]
-		}
-
-		jsonInfo := buildJsonFromMap(resp.GetInfo())
-		var res criImageInfo
-		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
-			// log.WithFields(log.Fields{"error": err, "json": jsonInfo}).Error()
-			return nil, err
-		}
-
-		meta.Author = res.Info.ImageSpec.Author
-		if res.Info.ImageSpec.Config.Labels != nil {
-			meta.Labels = res.Info.ImageSpec.Config.Labels
-		}
-		return meta, nil
-	}
-
-	log.WithFields(log.Fields{"error": err, "name": name}).Error("Failed to get image meta")
-	return nil, errors.New("Failed to get image meta")
 }
