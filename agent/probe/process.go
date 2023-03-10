@@ -1839,24 +1839,24 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	risky := proc.action == share.PolicyActionCheckApp
-	if proc.name != "ps" {
-		if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
-			return // policy is not ready
-		}
-
-		// the very first parent, update a decision (allow or checkApp),
-		// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
-		// (2) "checkApp" (including children) will not enter the "learned" process group.
-		// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
-		if risky && !proc.riskyChild {
-			if action == share.PolicyActionAllow { // default is checkApp
-				proc.action = action
-				proc.riskType = ""
-				risky = false
-			}
-		}
-		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
+	//if proc.name != "ps" {
+	if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
+		return // policy is not ready
 	}
+
+	// the very first parent, update a decision (allow or checkApp),
+	// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
+	// (2) "checkApp" (including children) will not enter the "learned" process group.
+	// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
+	if risky && !proc.riskyChild {
+		if action == share.PolicyActionAllow { // default is checkApp
+			proc.action = action
+			proc.riskType = ""
+			risky = false
+		}
+	}
+	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
+	//}
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
@@ -2278,6 +2278,13 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
 
+	if proc.name == "ps" {
+		mLog.WithFields(log.Fields{"name": proc.name,
+			"group": group,
+			"bRtProc":bRtProc,
+			"bParentHostProc": bParentHostProc,
+			"bRtProcP": bRtProcP}).Error("JAYU!! LOOK HERE @@@@@@@@ ")
+	}
 	// parent: matching only from binary
 	pname := filepath.Base(proc.ppath)
 	if p.bKubePlatform {
@@ -2315,7 +2322,26 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		switch proc.name {
 		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
-		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
+		case "ps":
+
+			daemon := global.RT.IsDaemonProcess(proc.name, nil)
+			daemonP := global.RT.IsDaemonProcess(proc.pname, nil)
+			mLog.WithFields(log.Fields{"name": proc.name,
+				"parent runtime process":bRtProcP,
+				"runtime process":bRtProc,
+				"bParentHostProc": bParentHostProc,
+				" daemon": daemon,
+				"Parent daemon": daemonP,
+				"proc.ppath": proc.ppath}).Error("JAYU: PS excepted!")
+
+			if parentProc, ok := p.pidProcMap[proc.ppid]; ok {
+			mLog.WithFields(log.Fields{"name": *parentProc }).Debug("JAYU Dumping parent")
+			}
+			if bRtProcP {
+				return true
+			}
+			return false
+		case "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
 		default:
 			if p.isAllowRuncInitCommand(proc.path, proc.cmds) {
@@ -2367,7 +2393,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 		// hidden: relaxing the restrictions for future implementation
 		if p.isParentAllowed(id, proc) {
-			// log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC")
+			log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC: Parent is allowed, relaxing")
 			return true
 		}
 	}

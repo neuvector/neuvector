@@ -411,6 +411,7 @@ func (d *dockerDriver) IsDaemonProcess(proc string, cmds []string) bool {
 }
 
 func (d *dockerDriver) IsRuntimeProcess(proc string, cmds []string) bool {
+	//log.WithField("rtProcMap", d.rtProcMap).Debug("JAYU DUMPING PROCMAP")
 	return d.rtProcMap.Contains(proc)
 }
 
