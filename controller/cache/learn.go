@@ -509,7 +509,7 @@ func node2Group(node string) (string, bool) {
 		// Any user-created group, including ip-address group, will not be part of the learned policy.
 		return node, false
 	}
-	log.WithFields(log.Fields{"node": node}).Error("Cannot find group!")
+	log.WithFields(log.Fields{"node": node}).Debug("Cannot find group!")
 	return "", false
 }
 
@@ -520,7 +520,7 @@ func getLearnedPolicyRuleKey(fromNode, toNode string, app *uint32, port *string)
 		log.WithFields(log.Fields{
 			"from": fromNode, "to": toNode,
 			"fromGroup": fromGroup, "toGroup": toGroup,
-		}).Error("cannot find group!")
+		}).Debug("cannot find group!")
 		return nil
 	}
 
@@ -528,7 +528,7 @@ func getLearnedPolicyRuleKey(fromNode, toNode string, app *uint32, port *string)
 	if !fromContainer && !toContainer {
 		log.WithFields(log.Fields{
 			"from": fromNode, "to": toNode,
-		}).Error("Invalid from-to pair for policy learning")
+		}).Debug("Invalid from-to pair for policy learning")
 		return nil
 	}
 

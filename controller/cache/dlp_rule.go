@@ -407,9 +407,11 @@ func processDlpGroupPolicy(wl2sensors, outside_wl2sensor map[string]map[string]s
 }
 
 func IsAllPatternEmpty(dre *share.CLUSDlpRule) bool {
-	for _, cpt := range dre.Patterns {
-		if cpt.Value != "" {
-			return false
+	if dre != nil {
+		for _, cpt := range dre.Patterns {
+			if cpt.Value != "" {
+				return false
+			}
 		}
 	}
 
@@ -463,10 +465,14 @@ func assocWl2RuleNames(wl2sensors, wl2rules map[string]map[string]string) {
 					}
 				} else {
 					for _, cdrename := range cdr.RuleListNames {
-						//ignore all pattern empty rule
-						cdre := getDlpRuleFromDefaultSensor(cdrename)
-						if IsAllPatternEmpty(cdre) {
-							continue
+						cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
+						//only non-predefined rule check for empty pattern
+						if cdrelist == nil {
+							//ignore all pattern empty rule
+							cdre := getDlpRuleFromDefaultSensor(cdrename)
+							if IsAllPatternEmpty(cdre) {
+								continue
+							}
 						}
 						if ram, ok := wl2rules[wlid]; !ok {
 							if wl2rules[wlid] == nil {

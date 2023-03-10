@@ -147,11 +147,17 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 }
 
 func (a *remoteAuth) OIDCDiscover(issuer string) (string, string, string, string, error) {
-	if eps, err := oidc.Discover(context.Background(), issuer); err != nil {
-		return "", "", "", "", err
-	} else {
-		return eps.AuthURL, eps.TokenURL, eps.JWKSURL, eps.UserInfoURL, nil
+	var lastError error
+	for i := 0; i < 3; i++ {
+		if eps, err := oidc.Discover(context.Background(), issuer); err != nil {
+			lastError = err
+			log.WithFields(log.Fields{"error": err}).Debug("oidc discover failed")
+		} else {
+			return eps.AuthURL, eps.TokenURL, eps.JWKSURL, eps.UserInfoURL, nil
+		}
+		time.Sleep(1 * time.Second)
 	}
+	return "", "", "", "", lastError
 }
 
 func (a *remoteAuth) generateState() string {

@@ -88,6 +88,8 @@ func getHostIPs() {
 
 func taskReexamHostIntf() {
 	log.Debug()
+	gInfoLock()
+	defer gInfoUnlock()
 	oldIfaces := Host.Ifaces
 	oldTunnelIP := Host.TunnelIP
 	getHostIPs()
@@ -480,10 +482,7 @@ func main() {
 	if *pipeType == "ovs" {
 		driver = pipe.PIPE_OVS
 	} else if *pipeType == "no_tc" {
-		driver = pipe.PIPE_NOTC
-		if gInfo.ciliumCNI {
-			driver = pipe.PIPE_CLM
-		}
+		driver = pipe.PIPE_CLM
 	} else {
 		driver = pipe.PIPE_TC
 		if gInfo.ciliumCNI {
