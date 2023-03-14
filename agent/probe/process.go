@@ -2374,7 +2374,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 		// hidden: relaxing the restrictions for future implementation
 		if p.isParentAllowed(id, proc) {
-			log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC: Parent is allowed, relaxing")
+			//log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC: Parent is allowed, relaxing")
 			return true
 		}
 	}
