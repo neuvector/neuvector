@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
+	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -309,6 +310,11 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 
 	acc := access.NewAdminAccessControl()
 	_, err = configSystemConfig(nil, acc, nil, "configmap", share.ScopeLocal, context.platform, &rconf)
+	if err == nil && rc.ScanConfig != nil && rc.ScanConfig.AutoScan != nil {
+		cconf := &share.CLUSScanConfig{AutoScan: *rc.ScanConfig.AutoScan}
+		value, _ := json.Marshal(cconf)
+		err = cluster.Put(share.CLUSConfigScanKey, value)
+	}
 
 	return err
 }
