@@ -1137,7 +1137,7 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 		foundSameReg := false
 		if o, ok := oldRegs[n.Name]; ok {
 			// found same-name fed registry in existing kv keys
-			if ((o.AwsKey == nil && n.AwsKey == nil) || (*o.AwsKey == *n.AwsKey)) && len(o.Filters) == len(n.Filters) {
+			if ((o.AwsKey == nil && n.AwsKey == nil) || (o.AwsKey != nil && n.AwsKey != nil && *o.AwsKey == *n.AwsKey)) && len(o.Filters) == len(n.Filters) {
 				oldFilters := utils.NewSetFromSliceKind(o.Filters)
 				newFilters := utils.NewSetFromSliceKind(n.Filters)
 				if diff := oldFilters.SymmetricDifference(newFilters); diff.Cardinality() == 0 {
