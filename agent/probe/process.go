@@ -1839,7 +1839,6 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	risky := proc.action == share.PolicyActionCheckApp
-	//if proc.name != "ps" {
 	if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
 		return // policy is not ready
 	}
