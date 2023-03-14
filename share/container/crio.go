@@ -161,10 +161,13 @@ func (d *crioDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtr
 
 type criContainerInfo struct {
 	Info struct {
-		SandboxID  string `json:"sandboxID"`
-		Pid        int    `json:"pid"`
-		Image      string `json:"image"`
-		Privileged bool   `json:"privileged"`
+		SandboxID   string `json:"sandboxID"`
+		Pid         int    `json:"pid"`
+		Image       string `json:"image"`
+		Privileged  bool   `json:"privileged"`
+		RuntimeSpec struct {
+			Annotations map[string]string   `json:"annotations"`
+		} `json:"runtimeSpec"`
 	} `json:"info"`
 }
 
@@ -197,6 +200,12 @@ func (d *crioDriver) getPodMeta(id string, pod *criRT.PodSandboxStatusResponse, 
 		Envs:     make([]string, 0),
 		Sandbox:  id,
 		isChild:  false,
+	}
+
+	if meta.Image == "" {
+		if img, ok := info.Info.RuntimeSpec.Annotations["io.kubernetes.cri-o.ImageName"]; ok {
+			meta.Image = img
+		}
 	}
 	return meta
 }
