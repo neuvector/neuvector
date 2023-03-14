@@ -1314,6 +1314,9 @@ func (m CacheMethod) GetAllWorkloadsRisk(acc *access.AccessControl) []*common.Wo
 		if common.OEMIgnoreWorkload(cache.workload) {
 			continue
 		}
+		if !cache.workload.Running {
+			continue
+		}
 
 		if cache.workload.ShareNetNS == "" {
 			wl := workload2Risk(cache)
