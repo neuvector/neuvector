@@ -2278,13 +2278,6 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
 
-	if proc.name == "ps" {
-		mLog.WithFields(log.Fields{"name": proc.name,
-			"group": group,
-			"bRtProc":bRtProc,
-			"bParentHostProc": bParentHostProc,
-			"bRtProcP": bRtProcP}).Error("JAYU!! LOOK HERE @@@@@@@@ ")
-	}
 	// parent: matching only from binary
 	pname := filepath.Base(proc.ppath)
 	if p.bKubePlatform {
@@ -2323,20 +2316,8 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
 		case "ps":
-
-			daemon := global.RT.IsDaemonProcess(proc.name, nil)
-			daemonP := global.RT.IsDaemonProcess(proc.pname, nil)
-			mLog.WithFields(log.Fields{"name": proc.name,
-				"parent runtime process":bRtProcP,
-				"runtime process":bRtProc,
-				"bParentHostProc": bParentHostProc,
-				" daemon": daemon,
-				"Parent daemon": daemonP,
-				"proc.ppath": proc.ppath}).Error("JAYU: PS excepted!")
-
-			if parentProc, ok := p.pidProcMap[proc.ppid]; ok {
-			mLog.WithFields(log.Fields{"name": *parentProc }).Debug("JAYU Dumping parent")
-			}
+			// Exception for process where the parent is a runtime process.
+			// Some CNI daemons will call `ps` and we will get false positives without the exception.
 			if bRtProcP {
 				return true
 			}
