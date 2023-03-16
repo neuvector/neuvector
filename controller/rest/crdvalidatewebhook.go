@@ -11,6 +11,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -27,6 +28,25 @@ func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
 		h.crdGFwRuleHandler(req)
 	}
 	return
+}
+
+func writeCrdFailedLog(req *admissionv1beta1.AdmissionRequest, errMsg string) {
+	if req != nil {
+		reqName := req.Name
+		var err error = common.ErrUnsupported
+		var secRulePartial resource.NvSecurityRulePartial
+		switch req.Operation {
+		case "DELETE":
+			err = json.Unmarshal(req.OldObject.Raw, &secRulePartial)
+		case "CREATE", "UPDATE":
+			err = json.Unmarshal(req.Object.Raw, &secRulePartial)
+		}
+		if err == nil && reqName == "" && secRulePartial.Metadata != nil {
+			reqName = secRulePartial.Metadata.GetName()
+		}
+		e := fmt.Sprintf("CRD request(%s %s %s) Failed", req.Operation, req.Kind.Kind, reqName)
+		k8sResourceLog(share.CLUSEvCrdErrDetected, e, []string{errMsg})
+	}
 }
 
 func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
@@ -48,6 +68,7 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	// This lock is shared between goroutines handle this queue only, so it is ok to wait long
 	lock, err := clusHelper.AcquireLock(share.CLUSLockCrdQueueKey, time.Minute*5)
 	if err != nil {
+		writeCrdFailedLog(ar.Request, err.Error())
 		log.WithFields(log.Fields{"error": err}).Error("Crd enqueue Acquire crd lock error")
 		return err
 	}
@@ -56,6 +77,7 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	var crdQueue share.CLUSCrdRecord
 	crdQueue.CrdRecord = ar
 	if err := clusHelper.PutCrdRecord(&crdQueue, name); err != nil {
+		writeCrdFailedLog(ar.Request, err.Error())
 		log.WithFields(log.Fields{"Enqueu crd put error": err}).Error()
 		return err
 	}
@@ -67,6 +89,8 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	}
 	crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
 	if err := clusHelper.PutCrdEventQueue(crdEventQueue); err != nil {
+		clusHelper.DeleteCrdRecord(name)
+		writeCrdFailedLog(ar.Request, err.Error())
 		log.WithFields(log.Fields{"Enqueu crd event put error": err}).Error()
 		return err
 	}
