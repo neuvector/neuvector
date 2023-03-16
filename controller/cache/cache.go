@@ -1639,6 +1639,7 @@ func getIPAddrScope(ip net.IP) string {
 // give enough time for all agent to settle
 const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
+const pruneKVPeriod = time.Duration(time.Minute * 30)
 
 var unManagedWlTimer *time.Timer
 var uwlUpdated bool
@@ -1648,6 +1649,10 @@ func startWorkerThread(ctx *Context) {
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+
+	wlSuspected := utils.NewSet()	// supicious workload ids
+	pruneKvTicker := time.NewTicker(pruneKVPeriod)
+	pruneWorkloadKV(wlSuspected)  // the first scan
 
 	noTelemetry := false
 	telemetryFreq := ctx.TelemetryFreq
@@ -1694,6 +1699,8 @@ func startWorkerThread(ctx *Context) {
 					refreshInternalIPNet()
 				}
 				cacheMutexUnlock()
+			case <-pruneKvTicker.C:
+				pruneWorkloadKV(wlSuspected)
 			case <-scannerTicker.C:
 				if isScanner() {
 					// Remove stalled scanner
@@ -2140,4 +2147,84 @@ func (m CacheMethod) GetConfigKvData(key string) ([]byte, bool) {
 		return backupKvStores.GetBackupKvStore(key)
 	}
 	return nil, false
+}
+
+func lookupPurgeWorkloadEntries(keys []string, nIndex int, curr, suspected, confirm, updated utils.Set) []string {
+	var removed []string
+	for _, key := range keys {
+		id := share.CLUSKeyNthToken(key, nIndex)
+		if !strings.Contains(id, ":") {	// filter out non-id case, like "nodeID"
+			if !updated.Contains(id) {	// allow one updated missing per round
+				if !curr.Contains(id) {
+					if suspected.Contains(id) {
+						confirm.Add(id)		// confirmed
+						removed = append(removed, key)
+					} else {
+						suspected.Add(id)
+						updated.Add(id) // mark this as missed and updated
+					}
+				}
+			}
+		}
+	}
+	return removed
+}
+
+func pruneWorkloadKV(suspected utils.Set) {
+	ids := utils.NewSet()
+	confirmed := utils.NewSet()
+	updated := utils.NewSet()	// allow one update per round
+
+	cacheMutexRLock()
+	for id, _ := range wlCacheMap {
+		ids.Add(id)
+		suspected.Remove(id)	// remove the missing id
+	}
+	cacheMutexRUnlock()
+
+	// Those keys are written at enforcers so they are not synchronized with the cacher
+	// It is a slow process, it need a flag to mark the missing id(s)
+	// Implement: continuous 2-strikes out method
+	// When it is confirmed by next cycle, it relative keys are deleted
+
+	// (1) bench reports: bench/<id>/report/<BenchType>
+	keys, _ := cluster.GetKeys(share.CLUSBenchStore, "/") // middle element
+	removed := lookupPurgeWorkloadEntries(keys, 1, ids, suspected, confirmed, updated)
+	// log.WithFields(log.Fields{"keys": keys, "suspected": suspected}).Debug("bench reports")
+
+	// (2) bench scan state: scan/state/bench/workload/<id>
+	keys, _ = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ")  // last element
+	removed  = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("bench wl state")
+
+	// (3) auto scan reports: scan/data/report/workload/<id>
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ")  // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("auto scan reports")
+
+	// (4) scan state records: scan/state/report/workload/<id>
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ")  // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+
+	// remove confirmed ids from the missing ids and pass into the next round
+	for id := range suspected.Iter() {
+		if !updated.Contains(id) || confirmed.Contains(id) {
+			// disappeared or need to be removed
+			suspected.Remove(id)
+		}
+	}
+
+	if isLeader() {
+		// log.WithFields(log.Fields{"confirmed": confirmed, "suspected": suspected}).Debug()
+		if len(removed) > 0 {
+			// delete kv entries: transact is faster
+			txn := cluster.Transact()
+			for _, key := range removed {
+				txn.DeleteTree(key)
+			}
+			txn.Apply()
+			txn.Close()
+			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
+		}
+	}
 }

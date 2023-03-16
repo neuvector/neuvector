@@ -631,6 +631,21 @@ func (m *consulMethod) Exist(key string) bool {
 	return false
 }
 
+func (m *consulMethod) GetKeys(prefix, separater string) ([]string, error) {
+	c, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	keys, _, err := c.KV().Keys(prefix, separater, m.defaultQueryOption())
+	if err != nil {
+		return nil, err
+	} else if keys == nil {
+		return nil, ErrEmptyStore
+	}
+	return keys, nil
+}
+
 func (m *consulMethod) GetRev(key string) ([]byte, uint64, error) {
 	c, err := m.getClient()
 	if err != nil {
@@ -764,6 +779,8 @@ func (m *consulMethod) Transact(entries []transactEntry) (bool, error) {
 			ops = append(ops, &api.KVTxnOp{Verb: api.KVDeleteCAS, Key: e.key, Index: e.rev})
 		case clusterTransactCheckRev:
 			ops = append(ops, &api.KVTxnOp{Verb: api.KVCheckIndex, Key: e.key, Index: e.rev})
+		case clusterTransactDeleteTree:
+			ops = append(ops, &api.KVTxnOp{Verb: api.KVDeleteTree, Key: e.key})
 		default:
 			return false, errors.New("Unsupported verb")
 		}
