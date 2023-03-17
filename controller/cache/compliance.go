@@ -30,7 +30,8 @@ func filterComplianceLog(audit *api.Audit) *api.Audit {
 	cache, ok := cpCacheMap[share.DefaultComplianceProfileName]
 	cpMutex.RUnlock()
 	if !ok {
-		log.WithFields(log.Fields{"profile": share.DefaultComplianceProfileName}).Error("Compliance profile not found")
+		// Disable excessive logging
+		// log.WithFields(log.Fields{"profile": share.DefaultComplianceProfileName}).Error("Compliance profile not found")
 		return audit
 	}
 
