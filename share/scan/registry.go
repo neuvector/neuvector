@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -70,7 +71,8 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 
 		// check if response is manifest list
 		var ml manifestList.DeserializedManifestList
-		if err = ml.UnmarshalJSON(body); err == nil && ml.MediaType == manifestList.MediaTypeManifestList && len(ml.Manifests) > 0 {
+		if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
+			(ml.MediaType == manifestList.MediaTypeManifestList || ml.MediaType == registry.MediaTypeOCIIndex) {
 			// prefer to scan linux/amd64 image
 			sort.Slice(ml.Manifests, func(i, j int) bool {
 				if ml.Manifests[i].Platform.OS == "linux" && ml.Manifests[i].Platform.Architecture == "amd64" {
@@ -94,11 +96,13 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 
 	// get schema v2 first
 	if err == nil {
-		var manV2 manifestV2.DeserializedManifest
-		if err = manV2.UnmarshalJSON(body); err == nil && manV2.SchemaVersion == 2 {
+		// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
+
+		var manV2 manifestV2.Manifest
+		if err = json.Unmarshal(body, &manV2); err == nil && manV2.SchemaVersion == 2 {
 			log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg}).Debug("v2 manifest request")
 			// use v2 config.Digest as repo id
-			imageInfo.ID = string(manV2.Manifest.Config.Digest)
+			imageInfo.ID = string(manV2.Config.Digest)
 			imageInfo.Digest = dg
 			if len(manV2.Layers) > 0 {
 				layerLen := len(manV2.Layers)
