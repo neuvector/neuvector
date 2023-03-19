@@ -782,12 +782,12 @@ type RESTControllerData struct {
 }
 
 type RESTDomain struct {
-	Name             string            `json:"name"`
-	Workloads        int               `json:"workloads"`
-	RunningWorkloads int               `json:"running_workloads"`
-	RunningPods      int               `json:"running_pods"`
-	Services         int               `json:"services"`
-	Tags             []string          `json:"tags"`
+	Name             string   `json:"name"`
+	Workloads        int      `json:"workloads"`
+	RunningWorkloads int      `json:"running_workloads"`
+	RunningPods      int      `json:"running_pods"`
+	Services         int      `json:"services"`
+	Tags             []string `json:"tags"`
 	Labels           map[string]string `json:"labels"`
 }
 
@@ -1741,9 +1741,9 @@ type RESTUnquarReq struct {
 }
 
 type RESTSystemRequest struct {
-	PolicyMode      *string        `json:"policy_mode,omitempty"`
-	BaselineProfile *string        `json:"baseline_profile,omitempty"`
-	Unquar          *RESTUnquarReq `json:"unquarantine,omitempty"`
+	PolicyMode      *string   `json:"policy_mode,omitempty"`
+	BaselineProfile *string   `json:"baseline_profile,omitempty"`
+	Unquar     *RESTUnquarReq `json:"unquarantine,omitempty"`
 }
 
 type RESTSystemRequestData struct {

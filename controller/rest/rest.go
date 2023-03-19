@@ -124,7 +124,7 @@ var restErrMessage = []string{
 	api.RESTErrFailRegistryScan:      "Fail to scan registry",
 	api.RESTErrFailKubernetesApi:     "Kubernetes API error",
 	api.RESTErrAdmCtrlUnSupported:    "Admission control is not supported on non-Kubernetes environment",
-	api.RESTErrK8sNvRBAC:             "Kubernetes clusterrole/clusterrolebinding required for NeuVector is not configured correctly",
+	api.RESTErrK8sNvRBAC:             "Kubernetes RBAC settings required for NeuVector is not configured correctly",
 	api.RESTErrWebhookSvcForAdmCtrl:  "The neuvector-svc-admission-webhook service required for NeuVector Admission Control is not configured correctly",
 	api.RESTErrNoUpdatePermission:    "NeuVector controller doesn't have UPDATE permission for service resource",
 	api.RESTErrK8sApiSrvToWebhook:    "Failed to receive a request from Kube-apiserver. Please try different client mode",
