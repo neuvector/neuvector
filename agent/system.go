@@ -446,8 +446,8 @@ func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byt
 		systemConfigInternalSubnet(nType, key, value)
 	case share.SpecialIPNetDefaultName:
 		systemConfigSpecialSubnet(nType, key, value)
-	case share.DlpRulesDefaultName:
-		dlpConfigRule(nType, key, value)
+	case share.DlpRulesVersionID:
+		dlpConfigRuleVersion(nType, key, value)
 	case share.CFGEndpointSystem:
 		systemConfigProc(nType, key, value)
 	default:
@@ -926,20 +926,11 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 	return updated, macUpdated
 }
 
-func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
-	var dlprules share.CLUSWorkloadDlpRules
+
+func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	var dlprulenames map[string]string = make(map[string]string)
 	var wlmacs utils.Set = utils.NewSet()
 	var dlprnid map[string]uint32 = make(map[string]uint32)
-
-	uzb := utils.GunzipBytes(value)
-	if uzb == nil {
-		log.Error("Failed to unzip data")
-		return
-	}
-	json.Unmarshal(uzb, &dlprules)
-
-	//log.WithFields(log.Fields{"value": string(uzb)}).Debug("")
 
 	//no dlp rules to build detection tree
 	if len(dlprules.DlpRuleList) == 0 &&
@@ -958,12 +949,6 @@ func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
 		return
 	}
 
-	if nType == cluster.ClusterNotifyDelete {
-		// This should not happen
-		log.Error("Dlp rule/sensor delete not supported!")
-		return
-	}
-
 	for _, cdr := range dlprules.DlpRuleList {
 		dlprnid[cdr.Name] = cdr.ID
 	}
@@ -978,6 +963,87 @@ func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
 	if detectUpdated || macUpdated {
 		log.WithFields(log.Fields{"detectUpdated": detectUpdated, "macUpdated": macUpdated}).Debug("rebuild detect tree")
 	}
+}
+
+func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUSWorkloadDlpRules {
+	dlprules := share.CLUSWorkloadDlpRules{
+		DlpRuleList: make([]*share.CLUSDlpRule, ruleslen),
+		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, wlen),
+	}
+	//log.WithFields(log.Fields{"newRuleKey": newRuleKey, "slots": slots, "ruleslen": ruleslen, "wlen": wlen}).Debug("")
+	for i := 0; i < slots; i++ {
+		key := fmt.Sprintf("%s%v", newRuleKey, i)
+		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
+		if value, _ := cluster.Get(key); value != nil {
+			dlprule := share.CLUSWorkloadDlpRules{
+				DlpRuleList: make([]*share.CLUSDlpRule, 0),
+				DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
+			}
+			uzb := utils.GunzipBytes(value)
+			if uzb == nil {
+				log.Error("Failed to unzip data")
+				continue
+			}
+			err := json.Unmarshal(uzb, &dlprule)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Cannot decode dlprule")
+				continue
+			}
+			//log.WithFields(log.Fields{"value": string(uzb)}).Debug("dlp per rule key")
+
+			//to keep the original rules order
+			for idx, plc := range dlprule.DlpRuleList {
+				tidx := slots*idx + i
+				if tidx < ruleslen {
+					dlprules.DlpRuleList[tidx] = plc
+				}
+			}
+			for idx, plc := range dlprule.DlpWlRules {
+				tidx := slots*idx + i
+				if tidx < wlen {
+					dlprules.DlpWlRules[tidx] = plc
+				}
+			}
+		}
+	}
+	return dlprules
+}
+
+func dlpUpdateRuleVersion(s share.CLUSDlpRuleVer) share.CLUSWorkloadDlpRules {
+	dlprules := share.CLUSWorkloadDlpRules{
+		DlpRuleList: make([]*share.CLUSDlpRule, 0),
+		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
+	}
+
+	//check whether key "recalculate/DlpWorkloadRules" exist
+	var rule_key, newRuleKey string
+	rule_key = fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
+	if cluster.Exist(rule_key) {
+		// indicate network policy version change.
+		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.DlpRulesVersion)
+		//log.WithFields(log.Fields{"newRuleKey": newRuleKey}).Debug("")
+
+		//combine dlp rules from separate slots
+		dlprules = getDlpRulesVersion(newRuleKey, s.SlotNo, s.RulesLen, s.WorkloadLen)
+	}
+	return dlprules
+}
+
+func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []byte) {
+	if nType == cluster.ClusterNotifyDelete {
+		// This should not happen
+		log.Error("Dlp key delete not supported!")
+		return
+	}
+
+	//get dlp rules from cluster
+	var s share.CLUSDlpRuleVer
+	if err := json.Unmarshal(value, &s); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return
+	}
+	dlprules := dlpUpdateRuleVersion(s)
+	dlpConfigRule(dlprules)
 }
 
 func systemUpdateProc(nType cluster.ClusterNotifyType, key string, value []byte) {
