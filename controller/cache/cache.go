@@ -1821,6 +1821,9 @@ func startWorkerThread(ctx *Context) {
 						// ignore neuvector domain
 						if n.Name != localDev.Ctrler.Domain {
 							domainAdd(n.Name, n.Labels)
+						} else {
+							// for the upgrade cas
+							domainDelete(n.Name)
 						}
 					} else if o != nil {
 						domainDelete(o.Name)
