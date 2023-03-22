@@ -1369,6 +1369,7 @@ static int dp_ctrl_cfg_policy(json_t *msg)
         policy.rule_list[i].proto = json_integer_value(json_object_get(rule_obj, "proto"));
         policy.rule_list[i].action = json_integer_value(json_object_get(rule_obj, "action"));
         policy.rule_list[i].ingress = json_boolean_value(json_object_get(rule_obj, "ingress"));
+        policy.rule_list[i].vh = json_boolean_value(json_object_get(rule_obj, "vhost"));
         fqdn_obj = json_object_get(rule_obj,"fqdn");
         if (fqdn_obj != NULL) {
             strlcpy(policy.rule_list[i].fqdn, json_string_value(fqdn_obj), MAX_FQDN_LEN);
@@ -1414,6 +1415,13 @@ static int dp_ctrl_set_fqdn(json_t *msg)
     char fqdname[MAX_FQDN_LEN];
     json_t *obj;
     uint32_t fqdnip;
+    json_t *vhost_obj;
+    bool vhost = false;
+
+    vhost_obj = json_object_get(msg, "vhost");
+    if (vhost_obj != NULL) {
+        vhost = json_boolean_value(vhost_obj);
+    }
 
     strlcpy(fqdname, json_string_value(json_object_get(msg, "fqdn_name")), MAX_FQDN_LEN);
     obj = json_object_get(msg, "fqdn_ips");
@@ -1422,8 +1430,8 @@ static int dp_ctrl_set_fqdn(json_t *msg)
     rcu_read_lock();
     for (i = 0; i < count; i++) {
         fqdnip = inet_addr(json_string_value(json_array_get(obj, i)));
-        //DEBUG_CTRL("fqdn(%s) => "DBG_IPV4_FORMAT"\n", fqdname, DBG_IPV4_TUPLE(fqdnip));
-        config_fqdn_ipv4_mapping(g_fqdn_hdl, fqdname, fqdnip);
+        //DEBUG_CTRL("fqdn(%s) vhost(%d) => "DBG_IPV4_FORMAT"\n", fqdname, vhost, DBG_IPV4_TUPLE(fqdnip));
+        config_fqdn_ipv4_mapping(g_fqdn_hdl, fqdname, fqdnip, vhost);
     }
     rcu_read_unlock();
 
@@ -2738,7 +2746,9 @@ static void dp_ctrl_update_fqdn_ip(void)
 
         hdr->Kind = DP_KIND_FQDN_UPDATE;
         strlcpy(fh->FqdnName, name_entry->r->name, DP_POLICY_FQDN_NAME_MAX_LEN);
-
+        if (name_entry->r->vh) {
+            FLAGS_SET(fh->Flags, DPFQDN_IP_FLAG_VH);
+        }
         // Iterate through all ips
         fqdn_ipv4_item_t *ipv4_itr, *ipv4_next;
         cds_list_for_each_entry_safe(ipv4_itr, ipv4_next, &(name_entry->r->iplist), node) {
@@ -2757,7 +2767,7 @@ static void dp_ctrl_update_fqdn_ip(void)
             DEBUG_CTRL("Not all ips are sent. ipcnt=%u sent=%u\n", name_entry->r->ip_cnt, ipcnt);
         }
 
-        DEBUG_CTRL("name: %s ipcnt=%d, len=%u\n", fh->FqdnName, ipcnt, len);
+        //DEBUG_CTRL("name: %s flags=0x%02x ipcnt=%d, len=%u\n", fh->FqdnName, fh->Flags, ipcnt, len);
 
         dp_ctrl_notify_ctrl(g_notify_msg, len);
     }
