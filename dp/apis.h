@@ -259,6 +259,7 @@ typedef struct dpi_policy_rule_ {
     uint16_t proto;
     uint8_t action;
     bool ingress;
+    bool vh;
     char fqdn[MAX_FQDN_LEN];
     uint32_t num_apps;
     dpi_policy_app_rule_t *app_rules;
@@ -293,6 +294,7 @@ typedef struct fqdn_record_ {
     uint32_t ip_cnt;
     uint32_t record_updated;//used for wildcard fqdn
     struct cds_list_head iplist;//FQDN->IP(s) mapping
+    bool vh;
 } fqdn_record_t;
 
 typedef struct fqdn_record_item_ {
@@ -335,7 +337,7 @@ typedef struct fqdn_iter_ctx_ {
     bool more;
 } fqdn_iter_ctx_t;
 
-uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip);
+uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, bool vh);
 
 //dlp
 #define MAX_DLP_RULE_NAME_LEN DP_DLP_RULE_NAME_MAX_LEN
