@@ -128,6 +128,8 @@ typedef struct dpi_session_ {
     uint32_t xff_client_ip;
     uint16_t xff_app;
     uint16_t xff_port;
+    uint8_t vhost[256];
+    uint16_t vhlen;
 } dpi_session_t;
 
 static inline uint32_t dpi_wing_length(const dpi_wing_t *wing)

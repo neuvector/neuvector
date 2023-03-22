@@ -287,13 +287,16 @@ func validateAddressRange(ipRange string) error {
 var regIPLoose *regexp.Regexp = regexp.MustCompile("^[0-9.]+$")
 var regIPRangeLoose *regexp.Regexp = regexp.MustCompile("^[0-9-./]+$")
 var regDomain *regexp.Regexp = regexp.MustCompile(`^([0-9a-zA-Z])+([0-9a-zA-Z-_])*(\.[0-9a-zA-Z]+([0-9a-zA-Z-_])*)*$`)
+var regVhDomain *regexp.Regexp = regexp.MustCompile(`^vh:([0-9a-zA-Z])+([0-9a-zA-Z-_])*(\.[0-9a-zA-Z]+([0-9a-zA-Z-_])*)*$`)
 var regSubDomain *regexp.Regexp = regexp.MustCompile(`^(\*)(\.[0-9a-zA-Z]+([0-9a-zA-Z-_])*){2,}$`)
+var regVhSubDomain *regexp.Regexp = regexp.MustCompile(`^vh:(\*)(\.[0-9a-zA-Z]+([0-9a-zA-Z-_])*){2,}$`)
 
 func validateDomainName(name string) bool {
 	if regIPRangeLoose.MatchString(name) {
 		return false
 	}
-	return (len(name) < api.PolicyDomainNameMaxLen) && (regDomain.MatchString(name) || regSubDomain.MatchString(name))
+	return (((len(name) < api.PolicyDomainNameMaxLen) && (regDomain.MatchString(name) || regSubDomain.MatchString(name))) ||
+		((len(name) < api.PolicyDomainNameMaxLen+len(api.AddrGrpValVhPrefix)) && (regVhDomain.MatchString(name) || regVhSubDomain.MatchString(name))))
 }
 
 // check for non-fed groups only
