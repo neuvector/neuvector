@@ -200,9 +200,10 @@ typedef struct {
 #define DP_POLICY_ACTION_OPEN          0
 #define DP_POLICY_ACTION_LEARN         1
 #define DP_POLICY_ACTION_ALLOW         2
-#define DP_POLICY_ACTION_CHECK_APP     3
-#define DP_POLICY_ACTION_VIOLATE       4
-#define DP_POLICY_ACTION_DENY          5
+#define DP_POLICY_ACTION_CHECK_VH      3
+#define DP_POLICY_ACTION_CHECK_APP     4
+#define DP_POLICY_ACTION_VIOLATE       5
+#define DP_POLICY_ACTION_DENY          6
 
 #define DP_POLICY_APP_ANY      0
 #define DP_POLICY_APP_UNKNOWN  0xffffffff
@@ -434,10 +435,12 @@ typedef struct {
     uint8_t  FqdnIP[16];
 } DPMsgFqdnIp;
 
+#define DPFQDN_IP_FLAG_VH       0x01
 typedef struct {
     char  FqdnName[DP_POLICY_FQDN_NAME_MAX_LEN];
     uint16_t IpCnt;
     uint16_t Reserved;
+    uint8_t Flags;
 } DPMsgFqdnIpHdr;
 
 #endif
