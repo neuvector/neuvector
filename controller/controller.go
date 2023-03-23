@@ -238,6 +238,7 @@ func main() {
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
+	rmNsGrps := flag.Bool("rm_nsgroups", false, "Remove groups when namespace was deleted")
 	flag.Parse()
 
 	if *debug {
@@ -283,6 +284,7 @@ func main() {
 	}
 
 	ocImageRegistered := false
+	enableRmNsGrps := false
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -298,6 +300,11 @@ func main() {
 			}
 		}
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
+
+		if *rmNsGrps {
+			log.Info("Remove groups when namespace was deleted")
+			enableRmNsGrps = true
+		}
 	}
 
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
@@ -571,6 +578,7 @@ func main() {
 		OrchChan:                 orchObjChan,
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
+		EnableRmNsGroups:         enableRmNsGrps,
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
