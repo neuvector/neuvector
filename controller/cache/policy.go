@@ -1230,7 +1230,7 @@ func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, er
 	} else if wlen < clusterMedium {
 		beginSlot = beginSlotMedium
 	} else if wlen < clusterLarge {
-		beginSlot = clusterLarge
+		beginSlot = beginSlotLarge
 	} else {
 		beginSlot = beginSlotSuper
 	}

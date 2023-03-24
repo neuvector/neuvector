@@ -624,6 +624,36 @@ static void http_header_xforwarded_for(http_ctx_t *ctx, uint8_t *ptr, int len)
     consume_tokens(ptr, len, http_header_xforwarded_for_token, ctx);
 }
 
+static int http_header_host_token(void *param, uint8_t *ptr, int len, int token_idx)
+{
+    http_ctx_t *ctx = param;
+    dpi_packet_t *p = ctx->p;
+    dpi_session_t *s = p->session;
+    uint16_t host_str_len;
+    register uint8_t *l = ptr, *end = ptr + len;
+
+    while (l < end) {
+        if (unlikely(*l == ':')) {
+            break;
+        }
+        l ++;
+    }
+    host_str_len = l-ptr+1;
+
+    strlcpy((char *)s->vhost, (char *)ptr, host_str_len);
+    s->vhlen = host_str_len - 1;
+    DEBUG_LOG(DBG_PARSER, p, "vhostname(%s) vhlen(%hu)\n", (char *)s->vhost, s->vhlen);
+
+    return CONSUME_TOKEN_SKIP_LINE;
+}
+
+static void http_header_host(http_ctx_t *ctx, uint8_t *ptr, int len)
+{
+    DEBUG_LOG_FUNC_ENTRY(DBG_PARSER, ctx->p);
+
+    consume_tokens(ptr, len, http_header_host_token, ctx);
+}
+
 static int http_header_server_token(void *param, uint8_t *ptr, int len, int token_idx)
 {
     http_ctx_t *ctx = param;
@@ -690,6 +720,9 @@ static int http_parse_header(http_ctx_t *ctx, uint8_t *ptr, int len, bool *done)
         } else
         if (shift > 11 && strncasecmp((char *)ptr, "Connection:", 11) == 0) {
             http_header_connection(ctx, ptr + 11, shift - eols - 11);
+        } else
+        if (shift > 5 && strncasecmp((char *)ptr, "Host:", 5) == 0) {
+            http_header_host(ctx, ptr + 5, shift - eols - 5);
         } else
         if (shift > 18 && strncasecmp((char *)ptr, "Transfer-Encoding:", 18) == 0) {
             http_header_xfr_encoding(ctx, ptr + 18, shift - eols - 18);

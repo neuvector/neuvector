@@ -29,9 +29,14 @@ func isWorkloadFqdn(wl string) bool {
 	return strings.HasPrefix(wl, share.CLUSWLFqdnPrefix)
 }
 
-func getFqdnName(wl string) string {
+func getFqdnName(wl string) (string, bool) {
 	//fqdn domain name should be case insensitive
-	return strings.ToLower(wl[len(share.CLUSWLFqdnPrefix):])
+	fqdname := strings.ToLower(wl[len(share.CLUSWLFqdnPrefix):])
+	if strings.HasPrefix(fqdname, share.CLUSWLFqdnVhPrefix) {
+		return fqdname[len(share.CLUSWLFqdnVhPrefix):], true
+	} else {
+		return fqdname, false
+	}
 }
 
 func getFqdnIP(name string) []net.IP {
@@ -142,6 +147,7 @@ type ruleContext struct {
 	ingress bool
 	id      uint32
 	fqdn    string
+	vhost	bool
 }
 
 func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, action uint8,
@@ -152,7 +158,7 @@ func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, act
 	/*
 		log.WithFields(log.Fields{
 			"id": id, "from": from, "to": to, "fromR": fromR, "toR": toR,
-			"portApps": portApps, "action": action, "domain": ctx.fqdn,
+			"portApps": portApps, "action": action, "domain": ctx.fqdn, "vhost": ctx.vhost,
 		}).Debug("")
 	*/
 	if portApps == nil {
@@ -227,6 +233,7 @@ func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, act
 				Action:  action,
 				Ingress: ctx.ingress,
 				Fqdn:    ctx.fqdn,
+				Vhost:	 ctx.vhost,
 			}
 
 			// For host mode container, only check ports, not applications.
@@ -314,9 +321,9 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 
 	ctx := &ruleContext{ingress: ingress, id: policy.ID}
 	if ingress == false && isWorkloadFqdn(to.WlID) {
-		ctx.fqdn = getFqdnName(to.WlID)
+		ctx.fqdn, ctx.vhost = getFqdnName(to.WlID)
 	} else if ingress == true && isWorkloadFqdn(from.WlID) {
-		ctx.fqdn = getFqdnName(from.WlID)
+		ctx.fqdn, ctx.vhost = getFqdnName(from.WlID)
 	}
 
 	if ingress == false {
@@ -543,7 +550,8 @@ func fillWorkloadAddress(addr *share.CLUSWorkloadAddr, addrMap map[string]*share
 		addr.GlobalIP = a.GlobalIP
 		addr.NatIP = a.NatIP
 	} else if isWorkloadFqdn(addr.WlID) {
-		addr.NatIP = getFqdnIP(getFqdnName(addr.WlID))
+		fqdname, _ := getFqdnName(addr.WlID)
+		addr.NatIP = getFqdnIP(fqdname)
 	}
 }
 

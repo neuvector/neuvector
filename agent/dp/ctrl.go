@@ -499,10 +499,12 @@ func DPCtrlSetFqdnIp(fqdnip *share.CLUSFqdnIp) int {
 		}
 		fips = append(fips, fip)
 	}
+	Vhost := fqdnip.Vhost
 	data := DPFqdnIpSetReq {
 		Fqdns: &DPFqdnIps{
 			FqdnName:    fqdnip.FqdnName,
 			FqdnIps:     fips,
+			Vhost:		 &Vhost,
 		},
 	}
 	msg, _ := json.Marshal(data)

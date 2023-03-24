@@ -240,6 +240,58 @@ int ssl_parse_handshake_v3(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, ssl_rec
     return FORMAT_MATCH;
 }
 
+void ssl_get_sni_v3(dpi_packet_t *p, uint8_t *ptr, ssl_record_t *rec)
+{
+    uint8_t *tptr = ptr;
+    uint8_t *end = tptr + rec->len;
+    dpi_session_t *s = p->session;
+
+    uint16_t len = 0;
+    tptr += 6;//handshake type(1) + length(3) + version(2)
+    tptr += 32;//random(32)
+    len = (uint16_t)(*(uint8_t *)(tptr));//session id
+    //DEBUG_LOG(DBG_PARSER, p, "session id length %hu\n", len);
+    tptr += 1;
+    tptr += len;
+    len = GET_BIG_INT16(tptr);//cipher suite
+    //DEBUG_LOG(DBG_PARSER, p, "cipher suite length %hu\n", len);
+    tptr += 2;
+    tptr += len;
+    len = (uint16_t)(*(uint8_t *)(tptr));//compression method
+    //DEBUG_LOG(DBG_PARSER, p, "compression method length %hu\n", len);
+    tptr += 1;
+    tptr += len;
+    len = GET_BIG_INT16(tptr);//extension length
+    //DEBUG_LOG(DBG_PARSER, p, "extension length %hu\n", len);
+    tptr += 2;
+    if ((tptr + len) != end) {
+        DEBUG_LOG(DBG_PARSER, p, "Mismatch length!\n");
+        return;
+    }
+    uint16_t ext_type = 1;
+    uint16_t ext_len;
+    while (tptr < end) {
+        ext_type = GET_BIG_INT16(tptr);
+        tptr += 2;
+        ext_len = GET_BIG_INT16(tptr);
+        tptr += 2;
+        if(ext_type == 0)
+        {
+            tptr += 3;
+            uint16_t namelen = GET_BIG_INT16(tptr);
+            tptr += 2;
+            //DEBUG_LOG(DBG_PARSER, p, "ssl: snilen(%hu), sniname(%s)\n", namelen,(char *)tptr);
+            strlcpy((char *)s->vhost, (char *)tptr, namelen+1);
+            s->vhlen = namelen;
+            tptr += namelen;
+            break;
+        } else {
+            tptr += ext_len;
+        }
+    }
+    DEBUG_LOG(DBG_PARSER, p, "sniname(%s) vhlen(%hu)\n", (char *)s->vhost, s->vhlen);
+}
+
 int ssl_parse_v3(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, ssl_record_t *rec)
 {
     int ret = FORMAT_MATCH;
@@ -261,6 +313,7 @@ int ssl_parse_v3(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, ssl_record_t *rec
                 return FORMAT_WRONG;
             }
             rec->ver = GET_BIG_INT16(ptr + 4);
+            ssl_get_sni_v3(p, ptr, rec);
         } else if (handshake_type == SSL3_HS_SERVER_HELLO) {
             if (dpi_is_client_pkt(p)) {
                 return FORMAT_WRONG;
