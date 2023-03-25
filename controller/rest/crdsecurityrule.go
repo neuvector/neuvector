@@ -2507,6 +2507,12 @@ func (h *nvCrdHandler) crdGFwRuleHandler(req *admissionv1beta1.AdmissionRequest)
 				ruleNs = req.Namespace
 			}
 		}
+		if req.Name == "" {
+			var secRulePartial resource.NvSecurityRulePartial
+			if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
+				req.Name = secRulePartial.Metadata.GetName()
+			}
+		}
 		recordName = fmt.Sprintf("%s-%s-%s", req.Kind.Kind, ruleNs, req.Name)
 		crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 		if crdRecord != nil {

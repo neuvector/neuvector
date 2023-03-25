@@ -192,6 +192,7 @@ type Context struct {
 	OrchChan                 chan *resource.Event
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
+	EnableRmNsGroups         bool
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
@@ -229,6 +230,7 @@ type CacheMethod struct {
 	leaderElectedAt time.Time
 	disablePCAP     bool
 	k8sPodEvents    map[string]*k8sPodEvent
+	rmNsGrps        bool
 }
 
 var cacher CacheMethod
@@ -1640,6 +1642,7 @@ func getIPAddrScope(ip net.IP) string {
 const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
+const pruneGroupPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 var uwlUpdated bool
@@ -1649,6 +1652,10 @@ func startWorkerThread(ctx *Context) {
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+	pruneTicker := time.NewTicker(pruneGroupPeriod)
+	if !cacher.rmNsGrps {
+		pruneTicker.Stop()
+	}
 
 	wlSuspected := utils.NewSet()	// supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1687,6 +1694,8 @@ func startWorkerThread(ctx *Context) {
 						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
 				}
+			case <-pruneTicker.C:
+				pruneGroupsByNamespace()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
 				uwlUpdated = true
@@ -1824,12 +1833,16 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Namespace)
 					}
-					if n == nil {
-						if o != nil {
-							domainDelete(o.Name)
+					if n != nil {
+						// ignore neuvector domain
+						if n.Name != localDev.Ctrler.Domain {
+							domainAdd(n.Name, n.Labels)
+						} else {
+							// for the upgrade cas
+							domainDelete(n.Name)
 						}
-					} else {
-						domainAdd(n.Name, n.Labels)
+					} else if o != nil {
+						domainDelete(o.Name)
 					}
 					if n != nil {
 						if skip := atomic.LoadUint32(&nvDeployDeleted); skip == 0 && isLeader() && admission.IsNsSelectorSupported() {
@@ -2051,7 +2064,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
 	cacher.k8sPodEvents = make(map[string]*k8sPodEvent)
-
+	cacher.rmNsGrps = ctx.EnableRmNsGroups
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 	dispatchHelper = kv.GetDispatchHelper()

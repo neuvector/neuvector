@@ -164,7 +164,7 @@ func createConfigFile(cc *ClusterConfig) error {
 	if cc.Debug {
 		sa = append(sa, fmt.Sprintf("    \"log_level\": \"DEBUG\",\n"))
 	} else {
-		sa = append(sa, fmt.Sprintf("    \"log_level\": \"INFO\",\n"))
+		sa = append(sa, fmt.Sprintf("    \"log_level\": \"ERROR\",\n"))
 	}
 	sa = append(sa, fmt.Sprintf("    \"ports\": {\n"))
 	sa = append(sa, fmt.Sprintf("        \"dns\": %d,\n", -1))
