@@ -192,6 +192,7 @@ type Context struct {
 	OrchChan                 chan *resource.Event
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
+	EnableRmNsGroups         bool
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
@@ -229,6 +230,7 @@ type CacheMethod struct {
 	leaderElectedAt time.Time
 	disablePCAP     bool
 	k8sPodEvents    map[string]*k8sPodEvent
+	rmNsGrps        bool
 }
 
 var cacher CacheMethod
@@ -1639,6 +1641,7 @@ func getIPAddrScope(ip net.IP) string {
 // give enough time for all agent to settle
 const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
+const pruneGroupPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 var uwlUpdated bool
@@ -1648,6 +1651,10 @@ func startWorkerThread(ctx *Context) {
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+	pruneTicker := time.NewTicker(pruneGroupPeriod)
+	if !cacher.rmNsGrps {
+		pruneTicker.Stop()
+	}
 
 	noTelemetry := false
 	telemetryFreq := ctx.TelemetryFreq
@@ -1682,6 +1689,8 @@ func startWorkerThread(ctx *Context) {
 						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
 				}
+			case <-pruneTicker.C:
+				pruneGroupsByNamespace()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
 				uwlUpdated = true
@@ -2048,7 +2057,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
 	cacher.k8sPodEvents = make(map[string]*k8sPodEvent)
-
+	cacher.rmNsGrps = ctx.EnableRmNsGroups
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 	dispatchHelper = kv.GetDispatchHelper()
