@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -13,6 +14,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/controller/kv"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -616,6 +618,9 @@ func printDefaultDlpRules(cgdrs *share.CLUSWorkloadDlpRules) {
 	}
 	for _, dl := range cgdrs.DlpWlRules {
 		log.WithFields(log.Fields{"dl": *dl}).Debug("DlpWlRules")
+		for _, lrn := range dl.RuleListNames {
+			log.WithFields(log.Fields{"listrulename": *lrn}).Debug("DlpWlRules")
+		}
 	}
 }
 
@@ -669,6 +674,130 @@ func calculateGroupDlpRulesFromCache() share.CLUSWorkloadDlpRules {
 	return cgdrs
 }
 
+//each slot's max size after zip is 500k
+const maxDlpSlots = 512
+
+func prepareDlpSlots(rules share.CLUSWorkloadDlpRules) ([][]byte, int, int, error) {
+	// deal with case that compressed rule size is > max kv value size (512K)
+	for slots := 16; slots <= maxDlpSlots; slots *= 2 {
+		r_lens := len(rules.DlpRuleList)
+		wl_lens := len(rules.DlpWlRules)
+		rwl_len := wl_lens
+		if r_lens > wl_lens {
+			rwl_len = r_lens
+		}
+		enlarge := false
+		final_slots := slots
+		if rwl_len < slots {
+			final_slots = rwl_len
+		}
+		log.WithFields(log.Fields{
+			"r_lens":        r_lens,
+			"wl_lens":        wl_lens,
+			"slots":          slots,
+			"final_slots":    final_slots,
+			"maxDlpSlots": maxDlpSlots,
+		}).Debug("segregate dlpwlrules to slots")
+
+		//put dlpwlrules to slots evenly
+		plcs := make([]share.CLUSWorkloadDlpRules, final_slots)
+		for idx, rlt := range rules.DlpRuleList {
+			if plcs[idx%final_slots].DlpRuleList == nil {
+				plcs[idx%final_slots].DlpRuleList = make([]*share.CLUSDlpRule, 0)
+			}
+			plcs[idx%final_slots].DlpRuleList = append(plcs[idx%final_slots].DlpRuleList, rlt)
+			//log.WithFields(log.Fields{"slot_idx": idx%final_slots, "rulelist_idx": idx, }).Debug("assign dlprulelist to slots")
+		}
+		for idx, rl := range rules.DlpWlRules {
+			if plcs[idx%final_slots].DlpWlRules == nil {
+				plcs[idx%final_slots].DlpWlRules = make([]*share.CLUSDlpWorkloadRule, 0)
+			}
+			plcs[idx%final_slots].DlpWlRules = append(plcs[idx%final_slots].DlpWlRules, rl)
+			//log.WithFields(log.Fields{"slot_idx": idx%final_slots, "rule_idx": idx, }).Debug("assign dlpwlrules to slots")
+		}
+
+		//zip each slots
+		zbs := make([][]byte, final_slots)
+		for i, plc := range plcs {
+			//printDefaultDlpRules(&plc)
+			value, _ := json.Marshal(plc)
+			zb := utils.GzipBytes(value)
+			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip dlpwlrules")
+			if len(zb) >= cluster.KVValueSizeMax {
+				log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip dlpwlrules too large")
+				enlarge = true
+				break
+			}
+			zbs[i] = zb
+		}
+
+		//log.WithFields(log.Fields{"enlarge": enlarge}).Debug("")
+		if !enlarge {
+			return zbs, r_lens, wl_lens, nil
+		}
+	}
+
+	return nil, 0, 0, errors.New("Dlpwlrules are too large")
+}
+
+func dlpRulesCleanup(ruleKeys []string) {
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	// Remove keys that have been written
+	for _, key := range ruleKeys {
+		txn.Delete(key)
+	}
+	//Ignore failure, missed keys will be removed the next update.
+	txn.Apply()
+}
+
+func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
+	//DlpWorkloadRules is not directly watched by consul, to improve performance
+	//change key from "network/DlpWorkloadRules/" to "recalculate/dlp/DlpWorkloadRules/"
+	rule_key := fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
+	oldKeys, _ := cluster.GetStoreKeys(rule_key)
+
+	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
+	newRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
+
+	// separate all rules into slots
+	zbs, rlen, wlens, err := prepareDlpSlots(rules)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return
+	}
+
+	//put rules to cluster in separate slot
+	for i, zb := range zbs {
+		key := fmt.Sprintf("%s%d", newRuleKey, i)
+		if err = cluster.PutBinary(key, zb); err != nil {
+			log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
+			newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+			dlpRulesCleanup(newKeys)
+			return
+		}
+	}
+	//new kv to indicate rule change
+	dlpVer := share.CLUSDlpRuleVer{
+		Key:             share.DlpRulesVersionID,
+		DlpRulesVersion: verstr,
+		SlotNo:          len(zbs),
+		RulesLen:        rlen,
+		WorkloadLen:     wlens,
+	}
+	log.WithFields(log.Fields{"DlpRules": newRuleKey, "dlpVer": dlpVer}).Debug("New dlp rules written")
+
+	clusHelper := kv.GetClusterHelper()
+	if err = clusHelper.PutDlpVer(&dlpVer); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to write dlp rules to the cluster")
+		newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+		dlpRulesCleanup(newKeys)
+		return
+	}
+	dlpRulesCleanup(oldKeys)
+}
+
 //network/DlpWorkloadRules is listened by enforcers
 func putDlpWorkloadRulesToCluster(rules share.CLUSWorkloadDlpRules) {
 	key := share.CLUSDlpWorkloadRulesKey(share.DlpRulesDefaultName)
@@ -690,7 +819,7 @@ func updateDlpRuleNetwork() {
 	newWlDlpRules.DlpRuleList = append(newWlDlpRules.DlpRuleList, newWlWafRules.DlpRuleList...)
 	newWlDlpRules.DlpWlRules = append(newWlDlpRules.DlpWlRules, newWlWafRules.DlpWlRules...)
 	cacheMutexRUnlock()
-	putDlpWorkloadRulesToCluster(newWlDlpRules)
+	putDlpWorkloadRulesToClusterScale(newWlDlpRules)
 }
 
 func scheduleDlpRuleCalculation(fast bool) {

@@ -79,6 +79,7 @@ type ClusterHelper interface {
 	DeletePolicyRule(id uint32) error
 	DeletePolicyRuleTxn(txn *cluster.ClusterTransact, id uint32) error
 	PutPolicyVer(s *share.CLUSGroupIPPolicyVer) error
+	PutDlpVer(s *share.CLUSDlpRuleVer) error
 
 	GetResponseRuleList(policyName string) []*share.CLUSRuleHead
 	PutResponseRuleList(policyName string, crhs []*share.CLUSRuleHead) error
@@ -874,6 +875,11 @@ func (m clusterHelper) PutPolicyVer(s *share.CLUSGroupIPPolicyVer) error {
 	return cluster.Put(key, value)
 }
 
+func (m clusterHelper) PutDlpVer(s *share.CLUSDlpRuleVer) error {
+	key := share.CLUSDlpWorkloadRulesKey(s.Key)
+	value, _ := enc.Marshal(s)
+	return cluster.Put(key, value)
+}
 // event policy
 
 func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleHead {
