@@ -608,6 +608,9 @@ func printDefaultWafRules(cgdrs *share.CLUSWorkloadDlpRules) {
 	}
 	for _, dl := range cgdrs.DlpWlRules {
 		log.WithFields(log.Fields{"dl": *dl}).Debug("WafWlRules")
+		for _, lrn := range dl.RuleListNames {
+			log.WithFields(log.Fields{"listrulename": *lrn}).Debug("WafWlRules")
+		}
 	}
 }
 

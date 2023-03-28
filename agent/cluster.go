@@ -126,6 +126,9 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) error {
 	admitted = true
 	selfAddr = cluster.GetSelfAddress()
 
+	// Remove host relative data: let enforcer report them again
+	// workload: object/workload/<host-id>
+	cluster.DeleteTree(fmt.Sprintf("%s%s", share.CLUSWorkloadStore, Host.ID))
 	return nil
 }
 
@@ -358,7 +361,7 @@ func deleteAgentInfo() {
 	}
 }
 
-// PUT-KEY: /object/workload/<host_id>/<id>
+// PUT-KEY: object/networkep/<host_id>/<id>
 func putNetworkEP(nep *share.CLUSNetworkEP) {
 	value, _ := json.Marshal(nep)
 	key := share.CLUSNetworkEPKey(Host.ID, nep.ID)
@@ -372,7 +375,7 @@ func deleteNetworkEP(nepID string) {
 	cluster.Delete(key)
 }
 
-// PUT-KEY: /object/workload/<host_id>/<uuid>
+// PUT-KEY: object/workload/<host_id>/<id>
 func putWorkload(wl *share.CLUSWorkload) {
 	value, _ := json.Marshal(wl)
 	key := share.CLUSWorkloadKey(Host.ID, wl.ID)

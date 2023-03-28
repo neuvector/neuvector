@@ -123,6 +123,7 @@ const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
 const PolicyIPRulesVersionID string = "NeuVectorPolicyVersion" // used for indicate policy version changed
+const DlpRulesVersionID string = "NeuVectorDlpVersion" // used for indicate dlp version changed
 const DlpRulesDefaultName string = "DlpWorkloadRules"
 const DlpRuleName string = "dlprule"
 const DlpRuleStore string = CLUSNetworkStore + DlpRuleName + "/"
@@ -201,6 +202,7 @@ const CLUSScannerDBStore string = CLUSScanStore + "database/"
 
 //recalculate
 const CLUSRecalPolicyStore string = CLUSRecalculateStore + "policy/" //not to be watched by consul
+const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/" //not to be watched by consul
 
 func CLUSPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSNetworkStore, name)
@@ -208,6 +210,10 @@ func CLUSPolicyIPRulesKey(name string) string {
 
 func CLUSRecalPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSRecalPolicyStore, name)
+}
+
+func CLUSRecalDlpWlRulesKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSRecalDlpStore, name)
 }
 
 //fqdn
@@ -1146,6 +1152,14 @@ type CLUSGroupIPPolicyVer struct {
 	RulesLen             int    `json:"rules_len"`
 	WorkloadSlot         int    `json:"workload_slot,omitempty"`
 	WorkloadLen          int    `json:"workload_len,omitempty"`
+}
+
+type CLUSDlpRuleVer struct {
+	Key                  string `json:"key"`
+	DlpRulesVersion      string `json:"dlp_version"`
+	SlotNo               int    `json:"slot_no"`
+	RulesLen             int    `json:"rules_len"`
+	WorkloadLen          int    `json:"workload_len"`
 }
 
 type CLUSSubnet struct {
