@@ -6,6 +6,8 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 )
 
+const constApiGroupNV = "neuvector.com"
+
 const NvSecurityRuleName = "nvsecurityrules.neuvector.com"
 const NvSecurityRuleVersion = "v1"
 const NvSecurityRulePlural = "nvsecurityrules"
