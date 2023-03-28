@@ -863,7 +863,7 @@ func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) boo
 	// parent: matching only from binary
 	pname := filepath.Base(ppath)
 	if name == "ps" {
-		if global.RT.IsRuntimeProcess(pname, nil) && global.RT.IsRuntimeProcess(name, nil) {
+		if global.RT.IsRuntimeProcess(pname, nil) {
 			return true
 		}
 		return false // common service call
