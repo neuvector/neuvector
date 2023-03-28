@@ -411,6 +411,7 @@ type ClusterDriver interface {
 
 	// KV
 	Exist(key string) bool
+	GetKeys(prefix, separater string) ([]string, error)
 	Get(key string) ([]byte, error)
 	GetRev(key string) ([]byte, uint64, error)
 	GetStoreKeys(store string) ([]string, error)
@@ -450,6 +451,10 @@ func NewSession(name string, ttl time.Duration) (SessionInterface, error) {
 
 func Exist(key string) bool {
 	return driver.Exist(key)
+}
+
+func GetKeys(prefix, separater string) ([]string, error) {
+	return driver.GetKeys(prefix, separater)
 }
 
 func Get(key string) ([]byte, error) {
@@ -681,6 +686,7 @@ const (
 	clusterTransactDelete
 	clusterTransactDeleteRev
 	clusterTransactCheckRev
+	clusterTransactDeleteTree
 )
 
 type clusterTransactVerb int
@@ -770,6 +776,14 @@ func (t *ClusterTransact) Delete(key string) {
 	})
 }
 
+func (t *ClusterTransact) DeleteTree(key string) {
+	log.WithFields(log.Fields{"key": key}).Debug("Transact")
+
+	t.entries = append(t.entries, transactEntry{
+		verb: clusterTransactDeleteTree, key: key,
+	})
+}
+
 func (t *ClusterTransact) DeleteRev(key string, rev uint64) {
 	log.WithFields(log.Fields{"key": key, "rev": rev}).Debug("Transact")
 
@@ -829,6 +843,11 @@ func (t *ClusterTransact) Apply() (bool, error) {
 					case clusterTransactPut:
 						if err := Put(entry.key, entry.value); err != nil {
 							log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("put")
+							errFinal = err
+						}
+					case clusterTransactDeleteTree:
+						if err := DeleteTree(entry.key); err != nil {
+							log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("delete tree")
 							errFinal = err
 						}
 					}
