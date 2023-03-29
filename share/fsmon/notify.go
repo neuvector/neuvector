@@ -10,6 +10,7 @@ type NotifyCallback func(path string, mask uint32, params interface{}, pInfo *Pr
 type filterRegex struct {
 	path  string
 	regex *regexp.Regexp
+	recursive bool
 }
 
 type IFile struct {
