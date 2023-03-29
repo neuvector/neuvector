@@ -783,12 +783,12 @@ type RESTControllerData struct {
 }
 
 type RESTDomain struct {
-	Name             string   `json:"name"`
-	Workloads        int      `json:"workloads"`
-	RunningWorkloads int      `json:"running_workloads"`
-	RunningPods      int      `json:"running_pods"`
-	Services         int      `json:"services"`
-	Tags             []string `json:"tags"`
+	Name             string            `json:"name"`
+	Workloads        int               `json:"workloads"`
+	RunningWorkloads int               `json:"running_workloads"`
+	RunningPods      int               `json:"running_pods"`
+	Services         int               `json:"services"`
+	Tags             []string          `json:"tags"`
 	Labels           map[string]string `json:"labels"`
 }
 
@@ -1742,9 +1742,9 @@ type RESTUnquarReq struct {
 }
 
 type RESTSystemRequest struct {
-	PolicyMode      *string   `json:"policy_mode,omitempty"`
-	BaselineProfile *string   `json:"baseline_profile,omitempty"`
-	Unquar     *RESTUnquarReq `json:"unquarantine,omitempty"`
+	PolicyMode      *string        `json:"policy_mode,omitempty"`
+	BaselineProfile *string        `json:"baseline_profile,omitempty"`
+	Unquar          *RESTUnquarReq `json:"unquarantine,omitempty"`
 }
 
 type RESTSystemRequestData struct {
@@ -3143,6 +3143,7 @@ type RESTAdmissionRule struct { // see type CLUSAdmissionRule
 	Critical bool                    `json:"critical"`
 	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode string                  `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 }
 
 type RESTAdmissionRuleData struct {
@@ -3161,8 +3162,9 @@ type RESTAdmissionRuleConfig struct {
 	Criteria []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
 	Disable  *bool                   `json:"disable,omitempty"`
 	Actions  *[]string               `json:"actions,omitempty"`
-	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	CfgType  string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 }
 
 type RESTAdmissionRuleConfigData struct {

@@ -913,8 +913,11 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	ruleCfg := confData.Config
 	cfgType, _ := cfgTypeMapping[ruleCfg.CfgType]
+	modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 	if (cfgType != share.UserCreated && cfgType != share.FederalCfg) ||
-		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) {
+		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||
+		(ruleCfg.RuleType == api.ValidatingExceptRuleType && ruleCfg.RuleMode != nil) ||
+		(ruleCfg.RuleType == api.ValidatingDenyRuleType && ruleCfg.RuleMode != nil && !modes.Contains(*ruleCfg.RuleMode)) {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
@@ -983,6 +986,9 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	if ruleCfg.Disable != nil {
 		clusConf.Disable = *ruleCfg.Disable
 	}
+	if ruleCfg.RuleMode != nil {
+		clusConf.RuleMode = *ruleCfg.RuleMode
+	}
 	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(ruleCfg.RuleType)
 	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, ruleCfg.RuleType); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Admission rule validation failed")
@@ -1019,6 +1025,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 			Critical: clusConf.Critical,
 			CfgType:  ruleCfg.CfgType,
 			RuleType: clusConf.RuleType,
+			RuleMode: clusConf.RuleMode,
 		},
 	}
 	if ruleCfg.Criteria != nil {
@@ -1045,14 +1052,18 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	var confData api.RESTAdmissionRuleConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 	err := json.Unmarshal(body, &confData)
+	ruleCfg := confData.Config
 	if err != nil || confData.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		code = api.RESTErrInvalidRequest
 	} else {
-		if (confData.Config.ID <= api.AdmCtrlCrdRuleIDMax) && (confData.Config.ID >= api.AdmCtrlCrdRuleIDBase) {
+		modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
+		if (ruleCfg.ID <= api.AdmCtrlCrdRuleIDMax) && (ruleCfg.ID >= api.AdmCtrlCrdRuleIDBase) {
 			code = api.RESTErrOpNotAllowed
-		} else if (confData.Config.CfgType != api.CfgTypeUserCreated && confData.Config.CfgType != api.CfgTypeFederal) ||
-			confData.Config.RuleType != api.ValidatingExceptRuleType && confData.Config.RuleType != api.ValidatingDenyRuleType {
+		} else if (ruleCfg.CfgType != api.CfgTypeUserCreated && ruleCfg.CfgType != api.CfgTypeFederal) ||
+			(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||
+			(ruleCfg.RuleType == api.ValidatingExceptRuleType && ruleCfg.RuleMode != nil) ||
+			(ruleCfg.RuleType == api.ValidatingDenyRuleType && ruleCfg.RuleMode != nil && !modes.Contains(*ruleCfg.RuleMode)) {
 			code = api.RESTErrInvalidRequest
 		}
 	}
@@ -1062,17 +1073,16 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var ruleTypeKey string // "exception", "deny", "fed_admctrl_exception" or "fed_admctrl_deny"
-	if confData.Config.CfgType == api.CfgTypeFederal {
-		if confData.Config.RuleType == api.ValidatingExceptRuleType {
+	if ruleCfg.CfgType == api.CfgTypeFederal {
+		if ruleCfg.RuleType == api.ValidatingExceptRuleType {
 			ruleTypeKey = share.FedAdmCtrlExceptRulesType
-		} else if confData.Config.RuleType == api.ValidatingDenyRuleType {
+		} else if ruleCfg.RuleType == api.ValidatingDenyRuleType {
 			ruleTypeKey = share.FedAdmCtrlDenyRulesType
 		}
 	} else {
-		ruleTypeKey = confData.Config.RuleType
+		ruleTypeKey = ruleCfg.RuleType
 	}
-	id := confData.Config.ID
-	if currRule, err := cacher.GetAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, id, acc); err != nil {
+	if currRule, err := cacher.GetAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, ruleCfg.ID, acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	} else if currRule.CfgType == api.CfgTypeGround {
@@ -1086,8 +1096,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	ruleCfg := confData.Config
-	clusConf := clusHelper.GetAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, id)
+	clusConf := clusHelper.GetAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, ruleCfg.ID)
 	if clusConf == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
@@ -1110,9 +1119,12 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	if ruleCfg.Disable != nil {
 		clusConf.Disable = *ruleCfg.Disable
 	}
+	if ruleCfg.RuleMode != nil {
+		clusConf.RuleMode = *ruleCfg.RuleMode
+	}
 
-	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(confData.Config.RuleType)
-	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, confData.Config.RuleType); err != nil {
+	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(ruleCfg.RuleType)
+	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, ruleCfg.RuleType); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Admission rule validation failed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
@@ -1123,7 +1135,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	if confData.Config.CfgType == api.CfgTypeFederal {
+	if ruleCfg.CfgType == api.CfgTypeFederal {
 		updateFedRulesRevision([]string{ruleTypeKey}, acc, login)
 	}
 
@@ -1344,6 +1356,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 				ruleItem.ID = &rule.ID
 				ruleItem.Disabled = &rule.Disable
 			}
+			ruleItem.RuleMode = &rule.RuleMode
 			if rule.Comment != "" {
 				ruleItem.Comment = &rule.Comment
 			}

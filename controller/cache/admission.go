@@ -287,6 +287,7 @@ func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 		Disable:  rule.Disable,
 		Critical: rule.Critical,
 		RuleType: rule.RuleType,
+		RuleMode: rule.RuleMode,
 	}
 	r.CfgType, _ = cfgTypeMapping[rule.CfgType]
 	if rule.CfgType == share.FederalCfg {
@@ -319,6 +320,7 @@ func copyAdmissionRule(rule *share.CLUSAdmissionRule) *share.CLUSAdmissionRule {
 		Critical: rule.Critical,
 		CfgType:  rule.CfgType,
 		RuleType: rule.RuleType,
+		RuleMode: rule.RuleMode,
 	}
 
 	return &r
@@ -1643,6 +1645,9 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 							//populateAdmResult(c, result, scannedImage, rule, ruleType, dataSource)
 							result.RuleID = rule.ID
 							result.RuleCfgType = rule.CfgType
+							if (ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType) && rule.RuleMode != "" {
+								result.RuleMode = rule.RuleMode
+							}
 							result.AdmRule = ruleToString(rule)
 							result.Image = c.Image
 							result.MatchedSource = matchedSource

@@ -143,6 +143,7 @@ type AdmResult struct { // AdmResult is per-image
 	MatchFedRule    bool
 	RuleID          uint32
 	RuleCategory    string
+	RuleMode        string
 	RuleCfgType     share.TCfgType
 	User            string
 	AdmRule         string

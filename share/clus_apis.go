@@ -123,7 +123,7 @@ const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
 const PolicyIPRulesVersionID string = "NeuVectorPolicyVersion" // used for indicate policy version changed
-const DlpRulesVersionID string = "NeuVectorDlpVersion" // used for indicate dlp version changed
+const DlpRulesVersionID string = "NeuVectorDlpVersion"         // used for indicate dlp version changed
 const DlpRulesDefaultName string = "DlpWorkloadRules"
 const DlpRuleName string = "dlprule"
 const DlpRuleStore string = CLUSNetworkStore + DlpRuleName + "/"
@@ -202,7 +202,7 @@ const CLUSScannerDBStore string = CLUSScanStore + "database/"
 
 //recalculate
 const CLUSRecalPolicyStore string = CLUSRecalculateStore + "policy/" //not to be watched by consul
-const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/" //not to be watched by consul
+const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/"       //not to be watched by consul
 
 func CLUSPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSNetworkStore, name)
@@ -1002,7 +1002,7 @@ type CLUSCriteriaEntry struct {
 type CLUSFqdnIp struct {
 	FqdnName string   `json:"fqdn_name"`
 	FqdnIP   []net.IP `json:"fqdn_ip"`
-	Vhost	 bool	  `json:"vhost,omitempty"`
+	Vhost    bool     `json:"vhost,omitempty"`
 }
 
 type TCfgType int
@@ -1155,11 +1155,11 @@ type CLUSGroupIPPolicyVer struct {
 }
 
 type CLUSDlpRuleVer struct {
-	Key                  string `json:"key"`
-	DlpRulesVersion      string `json:"dlp_version"`
-	SlotNo               int    `json:"slot_no"`
-	RulesLen             int    `json:"rules_len"`
-	WorkloadLen          int    `json:"workload_len"`
+	Key             string `json:"key"`
+	DlpRulesVersion string `json:"dlp_version"`
+	SlotNo          int    `json:"slot_no"`
+	RulesLen        int    `json:"rules_len"`
+	WorkloadLen     int    `json:"workload_len"`
 }
 
 type CLUSSubnet struct {
@@ -1798,6 +1798,7 @@ type CLUSAdmissionRule struct { // see type RESTAdmissionRule
 	CfgType           TCfgType                `json:"cfg_type"`
 	RuleType          string                  `json:"rule_type"` // "exception", "deny"
 	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
+	RuleMode          string                  `json:"rule_mode"` // "", "monitor", "protect"
 }
 
 type CLUSAdmissionRules struct {
