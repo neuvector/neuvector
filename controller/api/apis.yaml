@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 5.1.1
+  version: 5.2
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -4908,6 +4908,7 @@ definitions:
       - critical
       - cfg_type
       - rule_type
+      - rule_mode
     properties:
       id:
         type: integer
@@ -4934,7 +4935,10 @@ definitions:
         example: "ground"
       rule_type:
         type: string
-        example: "exception"
+        enum: [exception, deny]
+      rule_mode:
+        type: string
+        enum: ["", monitor, protect]
   RESTAdmissionRuleConfig:
     type: object
     required:
@@ -4970,7 +4974,10 @@ definitions:
         example: "ground"
       rule_type:
         type: string
-        example: "exception"
+        enum: [exception, deny]
+      rule_mode:
+        type: string
+        enum: ["", monitor, protect]
   RESTAdmissionRuleConfigData:
     type: object
     required:

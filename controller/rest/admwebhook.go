@@ -1127,10 +1127,18 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 			if admResult.MatchDeny {
 				msg := admResult.Msg
+				var modeStr string
 				// matches deny rule
+				if admResult.RuleMode != "" {
+					// a deny rule's "rule mode"(if specified) takes precedence over global mode
+					mode = admResult.RuleMode
+					modeStr = "per-rule " + mode
+				} else {
+					modeStr = mode
+				}
 				if mode == share.AdmCtrlModeMonitor {
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in monitor mode%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, subMsg)
+					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
+						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr, subMsg)
 					eventID = share.CLUSAuditAdmCtrlK8sReqViolation
 				} else {
 					allowed = false
@@ -1140,8 +1148,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 					}
 					statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
 					admResult.FinalDeny = true
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied because of %sdeny rule id %d with criteria: %s%s%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
+					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
+						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
 					eventID = share.CLUSAuditAdmCtrlK8sReqDenied
 				}
 
