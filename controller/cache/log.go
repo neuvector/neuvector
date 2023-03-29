@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,8 +28,10 @@ import (
 )
 
 const logCacheSize int = 4096
+const maxSyslogMsg int32 = 256
 
 var syslogMutex sync.RWMutex
+var syslogMsgCount int32
 
 func syslogMutexLock() {
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Acquire ...")
@@ -479,6 +482,17 @@ func webhookAudit(act *actionDesc, arg interface{}) {
 }
 
 func sendSyslog(elog interface{}, level, cat, header string) {
+	// In the case syslog server is not configured correctly, send() call could take long time
+	// to timeout. A lot of goroutines wait to grab the lock and consume large amount of memory.
+	// Set a limit to prevent this situation.
+	c := atomic.AddInt32(&syslogMsgCount, 1)
+	defer atomic.AddInt32(&syslogMsgCount, -1)
+
+	if c >= maxSyslogMsg {
+		log.Error("Maximum concurrent syslog message reached. Check syslog server settings.")
+		return
+	}
+
 	syslogMutexLock()
 	defer syslogMutexUnlock()
 
