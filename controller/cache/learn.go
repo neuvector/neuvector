@@ -1244,6 +1244,10 @@ func startPolicyThread() {
 			case <-dlpCalculatingTimer.C:
 				updateDlpRuleNetwork()
 			case <-policyCalculatingTimer.C:
+				//check whether network policy is disabled
+				if getDisableNetPolicyStatus() {
+					continue
+				}
 				if isLeader() == false {
 					policyCalculated = false
 					continue

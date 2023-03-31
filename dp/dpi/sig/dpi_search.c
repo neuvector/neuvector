@@ -756,6 +756,11 @@ bool dpi_waf_ep_policy_check (dpi_packet_t *p) {
         return false;
     }
 
+    //if network policy is disabled, go through detection.
+    if (th_disable_net_policy) {
+        return true;
+    }
+
     if (!ep->waf_inside) {
         io_dlp_ruleid_t *waf_rid = rcu_map_lookup(&ep->waf_rid_map, &key);
         //only detect traffic that match network policy id for outside wl
@@ -816,6 +821,11 @@ bool dpi_dlp_ep_policy_check (dpi_packet_t *p) {
     if (app == DPI_APP_SSL || app == DPI_APP_SSH) {
         //DEBUG_DLP("No dlp inspection for SSL/SSH protocol, app(%u)!\n", app);
         return false;
+    }
+
+    //if network policy is disabled, go through detection.
+    if (th_disable_net_policy) {
+        return true;
     }
 
     if (!ep->dlp_inside) {

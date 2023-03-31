@@ -138,6 +138,14 @@ type DPSysConfReq struct {
 	Sysconf *DPSysConf `json:"ctrl_sys_conf"`
 }
 
+type DPDisableNetPolicy struct {
+	DisableNetPolicy	*bool  `json:"disable_net_policy"`
+}
+
+type DPDisableNetPolicyReq struct {
+	DisableNetPolicyConf *DPDisableNetPolicy `json:"ctrl_disable_net_policy"`
+}
+
 type DPStatsMACReq struct {
 	Stats *DPMACArray `json:"ctrl_stats_macs"`
 }

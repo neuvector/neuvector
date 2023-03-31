@@ -949,6 +949,14 @@ func EnforceXffEnabledSetting() {
 	}
 }
 
+func EnforceDisableNetPolicy() {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	if cfg.DisableNetPolicy {
+		clusHelper.PutSystemConfigRev(cfg, rev)
+	}
+}
+
 func createDefaultNetServiceSetting() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
