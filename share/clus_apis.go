@@ -813,10 +813,11 @@ type CLUSServerLDAP struct {
 
 type CLUSServerSAML struct {
 	CLUSServerAuth
-	SSOURL     string `json:"sso_url"`
-	Issuer     string `json:"issuer"`
-	X509Cert   string `json:"x509_cert,cloak"`
-	GroupClaim string `json:"group_claim"`
+	SSOURL        string   `json:"sso_url"`
+	Issuer        string   `json:"issuer"`
+	X509Cert      string   `json:"x509_cert,cloak"`
+	GroupClaim    string   `json:"group_claim"`
+	X509CertExtra []string `json:"x509_cert_extra"`
 }
 
 type CLUSServerOIDC struct {
