@@ -126,6 +126,9 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) error {
 	admitted = true
 	selfAddr = cluster.GetSelfAddress()
 
+	// Remove host relative data: let enforcer report them again
+	// workload: object/workload/<host-id>
+	cluster.DeleteTree(fmt.Sprintf("%s%s", share.CLUSWorkloadStore, Host.ID))
 	return nil
 }
 
@@ -358,7 +361,7 @@ func deleteAgentInfo() {
 	}
 }
 
-// PUT-KEY: /object/workload/<host_id>/<id>
+// PUT-KEY: object/networkep/<host_id>/<id>
 func putNetworkEP(nep *share.CLUSNetworkEP) {
 	value, _ := json.Marshal(nep)
 	key := share.CLUSNetworkEPKey(Host.ID, nep.ID)
@@ -372,7 +375,7 @@ func deleteNetworkEP(nepID string) {
 	cluster.Delete(key)
 }
 
-// PUT-KEY: /object/workload/<host_id>/<uuid>
+// PUT-KEY: object/workload/<host_id>/<id>
 func putWorkload(wl *share.CLUSWorkload) {
 	value, _ := json.Marshal(wl)
 	key := share.CLUSWorkloadKey(Host.ID, wl.ID)
@@ -591,26 +594,10 @@ func clusterStopContainer(ev *ClusterEvent) {
 func clusterDelContainer(id string) {
 	log.WithFields(log.Fields{"container": id}).Debug("")
 
-	key := share.CLUSWorkloadKey(Host.ID, id)
-	if err := cluster.Delete(key); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-	}
-	key = share.CLUSBenchReportKey(id, share.BenchContainer)
-	if err := cluster.Delete(key); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-	}
-	key = share.CLUSBenchReportKey(id, share.BenchCustomContainer)
-	if err := cluster.Delete(key); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-	}
-	key = share.CLUSBenchReportKey(id, share.BenchContainerSecret)
-	if err := cluster.Delete(key); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-	}
-	key = share.CLUSBenchReportKey(id, share.BenchContainerSetID)
-	if err := cluster.Delete(key); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
-	}
+	cluster.Delete(share.CLUSWorkloadKey(Host.ID, id))
+	cluster.DeleteTree(share.CLUSBenchKey(id))
+	cluster.Delete(share.CLUSBenchStateWorkloadKey(id))
+	// Scan keys are deleted by the controller
 	if cache, ok := wlCacheMap[id]; ok {
 		logWorkload(share.CLUSEvWorkloadRemove, cache.wl, nil)
 		delete(wlCacheMap, id)

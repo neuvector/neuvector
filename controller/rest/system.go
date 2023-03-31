@@ -1360,9 +1360,16 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 					if !invalidValue && autoscale.Strategy != nil {
 						if strategy == api.AutoScaleNone && *autoscale.Strategy != strategy {
 							// someone tries to enable autoscaling
-							if err := resource.VerifyNvRoleBinding(resource.NvAdminRoleBinding, resource.NvAdmSvcNamespace, true, false); err != nil {
-								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, err.Error())
-								return kick, err
+							errs, _ := resource.VerifyNvRbacRoleBindings([]string{resource.NvAdminRoleBinding}, false, true)
+							if len(errs) > 0 {
+								errs, _ = resource.VerifyNvRbacRoleBindings([]string{resource.NvScannerRoleBinding}, false, true)
+								errs2, _ := resource.VerifyNvRbacRoles([]string{resource.NvScannerRole}, false)
+								errs = append(errs, errs2...)
+							}
+							if len(errs) > 0 {
+								msg := strings.Join(errs, "<p>")
+								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
+								return kick, fmt.Errorf("%s", msg)
 							}
 							if min == 0 {
 								min = 3
@@ -1814,12 +1821,13 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
 		ClusterRoleErrors:        emptySlice,
 		ClusterRoleBindingErrors: emptySlice,
+		RoleErrors:               emptySlice,
 		RoleBindingErrors:        emptySlice,
 		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
 	}
 	if k8sPlatform {
-		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleBindingErrors =
-			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, false)
+		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleErrors, resp.RoleBindingErrors =
+			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
 	}
 
 	var nvUpgradeInfo share.CLUSCheckUpgradeInfo

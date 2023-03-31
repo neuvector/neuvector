@@ -40,18 +40,24 @@ const (
 	RscTypeRbacClusterRolebindings        = "clusterrolebindings"
 	RscTypeDeployment                     = "deployment"
 	RscTypeCronJob                        = "cronjob"
+	RscTypeDaemonSet                      = "daemonset"
 )
 
 const (
 	RscNamespaces                          = "namespaces"
 	RscServices                            = "services"
 	RscDeployments                         = "deployments"
+	RscConfigMaps                          = "configmaps"
 	RscNameMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"   // case sensitive!
 	RscNameValidatingWebhookConfigurations = "validatingwebhookconfigurations" // case sensitive!
 	RscNameCustomResourceDefinitions       = "customresourcedefinitions"       // case sensitive!
 
 	RscKindMutatingWebhookConfiguration   = "MutatingWebhookConfiguration"   // case sensitive!
 	RscKindValidatingWebhookConfiguration = "ValidatingWebhookConfiguration" // case sensitive!
+)
+
+const (
+	RscTypeCrdNvUsage = "neuvectorusages" // case sensitive & must be plural!
 )
 
 // ValidatingWebhookConfiguration resource instance (neuvector-validating-admission-webhook) contains 2 webhooks:
@@ -126,10 +132,18 @@ type Deployment struct {
 	Replicas int32
 }
 
+type DaemonSet struct {
+	UID    string
+	Name   string
+	Domain string
+	SA     string
+}
+
 type CronJob struct {
 	UID    string
 	Name   string
 	Domain string
+	SA     string
 }
 
 type ImageTag struct {

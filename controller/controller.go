@@ -238,6 +238,7 @@ func main() {
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
+	rmNsGrps := flag.Bool("rm_nsgroups", false, "Remove groups when namespace was deleted")
 	flag.Parse()
 
 	if *debug {
@@ -283,6 +284,7 @@ func main() {
 	}
 
 	ocImageRegistered := false
+	enableRmNsGrps := false
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -298,6 +300,11 @@ func main() {
 			}
 		}
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
+
+		if *rmNsGrps {
+			log.Info("Remove groups when namespace was deleted")
+			enableRmNsGrps = true
+		}
 	}
 
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
@@ -356,7 +363,7 @@ func main() {
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs)
+		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs, "")
 	}
 
 	// Assign controller interface/IP scope
@@ -571,6 +578,7 @@ func main() {
 		OrchChan:                 orchObjChan,
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
+		EnableRmNsGroups:         enableRmNsGrps,
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
@@ -598,13 +606,14 @@ func main() {
 
 	if platform == share.PlatformKubernetes {
 		// k8s rbac watcher won't know anything about non-existing resources
-		resource.GetNvServiceAccount(cache.CacheEvent)
+		resource.GetNvCtrlerServiceAccount(cache.CacheEvent)
 		resource.SetLeader(Ctrler.Leader)
 
-		clusterRoleErrors, clusterRoleBindingErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, true)
-		if len(clusterRoleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {
+		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, "", true)
+		if len(clusterRoleErrors) > 0 || len(roleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {
 			msgs := clusterRoleErrors
 			msgs = append(msgs, clusterRoleBindingErrors...)
+			msgs = append(msgs, roleErrors...)
 			msgs = append(msgs, roleBindingErrors...)
 			cache.CacheEvent(share.CLUSEvK8sNvRBAC, strings.Join(msgs, "\n"))
 		}

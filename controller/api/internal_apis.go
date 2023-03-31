@@ -199,6 +199,7 @@ type RESTInternalSystemData struct {
 type RESTK8sNvRbacStatus struct {
 	ClusterRoleErrors        []string              `json:"clusterrole_errors"`
 	ClusterRoleBindingErrors []string              `json:"clusterrolebinding_errors"`
+	RoleErrors               []string              `json:"role_errors"`
 	RoleBindingErrors        []string              `json:"rolebinding_errors"`
 	NvUpgradeInfo            *RESTCheckUpgradeInfo `json:"neuvector_upgrade_info"`
 }

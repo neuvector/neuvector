@@ -318,8 +318,8 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 	if k8sPlatform {
 		var errs []string
 		k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-		if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
-			errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
+		if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+			errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 		}
 		if len(errs) > 0 {
 			msg := strings.Join(errs, "<p>")
@@ -391,8 +391,8 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 
 	var errs []string
 	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-	if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
-		errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
+	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+		errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 	}
 	if len(errs) > 0 {
 		msg := strings.Join(errs, "<p>")
@@ -1232,8 +1232,8 @@ func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprout
 
 	var errs []string
 	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-	if errs, _ = resource.VerifyNvClusterRoles(k8sClusterRoles, false); len(errs) == 0 {
-		errs, _ = resource.VerifyNvClusterRoleBindings(k8sClusterRoles, false)
+	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+		errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 	}
 	if len(errs) > 0 {
 		msg := strings.Join(errs, "<p>")

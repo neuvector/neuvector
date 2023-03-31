@@ -3081,7 +3081,12 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			ppe.Uuid = share.CLUSReservedUuidShieldMode
 		case share.PolicyActionAllow:
 			bPass = true
-			if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
+			if ppe.CfgType == share.Learned { // user needs to allow the process manually
+				// TODO: how about the learned rule's translation from GroundCfg-CRD?
+				bPass = false
+				ppe.Action = negativeResByMode(mode)
+				ppe.Uuid = share.CLUSReservedUuidShieldMode
+			} else if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
 				if bModified {
 					bPass = false
 					ppe.Action = negativeResByMode(mode)
