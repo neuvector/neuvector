@@ -299,6 +299,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		NetConfig: &api.RESTSysNetConfigConfig{
 			NetServiceStatus:     rc.NetServiceStatus,
 			NetServicePolicyMode: rc.NetServicePolicyMode,
+			DisableNetPolicy:     rc.DisableNetPolicy,
 		},
 		AtmoConfig: &api.RESTSysAtmoConfigConfig{
 			ModeAutoD2M:         rc.ModeAutoD2M,

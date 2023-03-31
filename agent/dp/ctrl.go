@@ -212,6 +212,18 @@ func DPCtrlSetSysConf(xffenabled *bool) {
 	dpSendMsg(msg)
 }
 
+func DPCtrlSetDisableNetPolicy(disableNetPolicy *bool) {
+	log.WithFields(log.Fields{"disableNetPolicy": *disableNetPolicy}).Debug("")
+
+	data := DPDisableNetPolicyReq{
+		DisableNetPolicyConf: &DPDisableNetPolicy{
+			DisableNetPolicy: disableNetPolicy,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
 func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr, pips []net.IP) {
 	log.WithFields(log.Fields{"mac": mac, "iface": iface}).Debug("")
 

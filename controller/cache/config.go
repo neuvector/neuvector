@@ -184,6 +184,10 @@ func getNetServicePolicyMode() string {
 	return systemConfigCache.NetServicePolicyMode
 }
 
+func getDisableNetPolicyStatus() bool {
+	return systemConfigCache.DisableNetPolicy
+}
+
 func getNewServiceProfileBaseline() string {
 	return systemConfigCache.NewServiceProfileBaseline
 }
@@ -198,6 +202,10 @@ func (m CacheMethod) GetNetServiceStatus() bool {
 
 func (m CacheMethod) GetNetServicePolicyMode() string {
 	return getNetServicePolicyMode()
+}
+
+func (m CacheMethod) GetDisableNetPolicyStatus() bool {
+	return getDisableNetPolicyStatus()
 }
 
 func (m CacheMethod) GetNewServiceProfileBaseline() string {
@@ -261,6 +269,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		XffEnabled:                systemConfigCache.XffEnabled,
 		NetServiceStatus:          systemConfigCache.NetServiceStatus,
 		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
+		DisableNetPolicy:          systemConfigCache.DisableNetPolicy,
 		ModeAutoD2M:               systemConfigCache.ModeAutoD2M,
 		ModeAutoD2MDuration:       systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
@@ -394,6 +403,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleDlpRuleCalculation(true)
 		} else if systemConfigCache.NetServiceStatus &&
 			cfg.NetServicePolicyMode != systemConfigCache.NetServicePolicyMode {
+			scheduleIPPolicyCalculation(true)
+			scheduleDlpRuleCalculation(true)
+		}
+		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && cfg.DisableNetPolicy == false {
 			scheduleIPPolicyCalculation(true)
 			scheduleDlpRuleCalculation(true)
 		}

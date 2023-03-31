@@ -125,6 +125,16 @@ func systemConfigXff(xffenabled bool) {
 	dp.DPCtrlSetSysConf(&xff)
 }
 
+func systemConfigNetPolicy(disableNetPolicy bool) {
+	if gInfo.disableNetPolicy == disableNetPolicy {
+		return
+	}
+	gInfo.disableNetPolicy = disableNetPolicy
+	//set disableNetPolicy to dp
+	dnp := gInfo.disableNetPolicy
+	dp.DPCtrlSetDisableNetPolicy(&dnp)
+}
+
 func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -135,10 +145,12 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigPolicyMode(conf.NewServicePolicyMode)
 		systemConfigTapProxymesh(conf.TapProxymesh)
 		systemConfigXff(conf.XffEnabled)
+		systemConfigNetPolicy(conf.DisableNetPolicy)
 	case cluster.ClusterNotifyDelete:
 		systemConfigPolicyMode(defaultPolicyMode)
 		systemConfigTapProxymesh(defaultTapProxymesh)
 		systemConfigXff(defaultXffEnabled)
+		systemConfigNetPolicy(defaultDisableNetPolicy)
 	}
 }
 
@@ -334,6 +346,10 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 }
 
 func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
+	if gInfo.disableNetPolicy {
+		return 0, C.DP_POLICY_ACTION_OPEN, false
+	}
+
 	gInfoRLock()
 
 	// Use parent's policy if the connection is reported on child
@@ -1052,6 +1068,12 @@ func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []b
 	}
 	dlprules := dlpUpdateRuleVersion(s)
 	dlpConfigRule(dlprules)
+	//when network policy is disabled, change workload's datapath via dlp
+	if gInfo.disableNetPolicy {
+		for wlid, dlpInfo := range pe.GetNetworkDlpWorkloadRulesInfo() {
+			updateContainerPolicyMode(wlid, dlpInfo.Mode)
+		}
+	}
 }
 
 func systemUpdateProc(nType cluster.ClusterNotifyType, key string, value []byte) {

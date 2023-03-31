@@ -1661,6 +1661,7 @@ type RESTSystemConfigConfig struct {
 type RESTSysNetConfigConfig struct {
 	NetServiceStatus     *bool   `json:"net_service_status,omitempty"`
 	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
+	DisableNetPolicy     *bool   `json:"disable_net_policy,omitempty"`
 }
 
 type RESTSysAtmoConfigConfig struct {
@@ -1792,6 +1793,7 @@ type RESTSystemConfig struct {
 	XffEnabled                bool                      `json:"xff_enabled"`
 	NetServiceStatus          bool                      `json:"net_service_status"`
 	NetServicePolicyMode      string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy          bool                      `json:"disable_net_policy"`
 	ModeAutoD2M               bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration       int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P               bool                      `json:"mode_auto_m2p"`
@@ -1867,6 +1869,7 @@ type RESTSystemConfigIBMSAV2 struct {
 type RESTSystemConfigNetSvcV2 struct {
 	NetServiceStatus     bool   `json:"net_service_status"`
 	NetServicePolicyMode string `json:"net_service_policy_mode"`
+	DisableNetPolicy     bool   `json:"disable_net_policy"`
 }
 
 type RESTSystemConfigModeAutoV2 struct {

@@ -316,6 +316,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					NetSvc: api.RESTSystemConfigNetSvcV2{
 						NetServiceStatus:     rconf.NetServiceStatus,
 						NetServicePolicyMode: rconf.NetServicePolicyMode,
+						DisableNetPolicy:     rconf.DisableNetPolicy,
 					},
 					ModeAuto: api.RESTSystemConfigModeAutoV2{
 						ModeAutoD2M:         rconf.ModeAutoD2M,
@@ -1005,6 +1006,9 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 					return kick, errors.New(e)
 				}
+			}
+			if nc.DisableNetPolicy != nil {
+				cconf.DisableNetPolicy = *nc.DisableNetPolicy
 			}
 		}
 
