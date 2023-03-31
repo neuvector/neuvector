@@ -9431,6 +9431,10 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/GroupRoleMapping'
+      x509_certs:
+        type: array
+        items:
+          $ref: '#/definitions/RESTX509CertInfo'
   RESTServer:
     type: object
     required:
@@ -9559,6 +9563,11 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/GroupRoleMapping'
+      x509_cert_extra:
+        type: array
+        items:
+          type: string
+          example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
   RESTServerConfig:
     type: object
     required:
@@ -12752,3 +12761,19 @@ definitions:
       rawjson:
         type: string
         example: "{\"key\": \"value\"}"
+  RESTX509CertInfo:
+    type: object
+    properties:
+      x509_cert:
+        type: string
+        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
+      issuer_cn:
+        type: string
+        example: "dev-11563853"
+      subject_cn:
+        type: string
+        example: "dev-11563853"
+      subject_notafter:
+        type: integer
+        format: uint64
+        example: 1988147822

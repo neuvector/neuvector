@@ -327,11 +327,19 @@ type RESTServerLDAP struct {
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 }
 
+type RESTX509CertInfo struct {
+	X509Cert          string `json:"x509_cert"`
+	IssuerCommonName  string `json:"issuer_cn"`
+	SubjectCommonName string `json:"subject_cn"`
+	ValidityNotAfter  uint64 `json:"subject_notafter"`
+}
+
 type RESTServerSAML struct {
 	SSOURL     string `json:"sso_url"`
 	Issuer     string `json:"issuer"`
 	X509Cert   string `json:"x509_cert,cloak"`
 	GroupClaim string `json:"group_claim"`
+	X509Certs  []RESTX509CertInfo `json:"x509_certs"`
 
 	Enable           bool                      `json:"enable"`
 	DefaultRole      string                    `json:"default_role"`
@@ -410,6 +418,7 @@ type RESTServerSAMLConfig struct {
 	DefaultRole      *string                    `json:"default_role,omitempty"`
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+	X509CertExtra    *[]string                  `json:"x509_cert_extra,omitempty"`
 }
 
 type RESTServerSAMLConfigCfgMap struct {
