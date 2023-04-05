@@ -710,6 +710,9 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 	workloadDlpRulesMap := make(map[string]*dp.DPWorkloadDlpRule)
 
 	for _, dre := range DlpWlRules {
+		if dre == nil {
+			continue
+		}
 		if c, ok := gInfo.activeContainers[dre.WorkloadId]; ok {
 			if c.hasDatapath {
 				dlpWlRule := dp.DPWorkloadDlpRule{
@@ -856,6 +859,9 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 
 	//update rules
 	for _, cdre := range drlist {
+		if cdre == nil {
+			continue
+		}
 		if _, ok := dlprulenames[cdre.Name]; ok {
 			dpdlpre := dp.DPDlpRuleEntry{
 				Name: cdre.Name,
@@ -950,7 +956,9 @@ func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	}
 
 	for _, cdr := range dlprules.DlpRuleList {
-		dlprnid[cdr.Name] = cdr.ID
+		if cdr != nil {
+			dlprnid[cdr.Name] = cdr.ID
+		}
 	}
 
 	configUpdated := updateWorkloadDlpRuleConfig(dlprules.DlpWlRules, dlprulenames, wlmacs, dlprnid)
