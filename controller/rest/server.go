@@ -738,6 +738,7 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 		csaml.DefaultRole = *saml.DefaultRole
 	}
 	if saml.X509CertExtra != nil {
+		csaml.X509CertExtra = nil
 		for _, c := range *saml.X509CertExtra {
 			csaml.X509CertExtra = append(csaml.X509CertExtra, c)
 		}
