@@ -273,13 +273,13 @@ func handlerDlpGroupShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 var regPattern *regexp.Regexp = regexp.MustCompile(`^\.*\*$`)
 
 func wildCardToRegexp(pattern string) string {
-	/* Match one or many simple wildcard character "?" or one "*" with
-	   previous token is letter, number, white space or start of the pattern.
-	   Don't expect user input 2 continous "*" in the pattern. */
+	/* Match one or many simple wildcard characters "?" or one "*" with
+	   previous token being a letter, number, whitespace or the start of the pattern.
+	   Do not expect user's input with 2 continuous "*" characters in the pattern. */
 	re := regexp.MustCompile(`(^|\pL|\pN|\s)(\?+|\*)`)
 	return re.ReplaceAllStringFunc(pattern, func(match string) string {
 		if len(match) == 1 {
-			// Convert pattern start with a single "?" or "*"
+			// Convert pattern starts with single "?" or "*" character.
 			if match[0] == '*' {
 				return ".*"
 			} else if match[0] == '?' {
@@ -288,12 +288,12 @@ func wildCardToRegexp(pattern string) string {
 				return match
 			}
 		} else if len(match) == 2 {
-			// Don't expect user input 2 continous "*"
+			// Do not expect user's input with 2 continuous "*" characters in the pattern.
 			if match[1] == '*' {
 				return string(match[0]) + ".*"
 			} else if match[1] == '?' {
-				/* Pattern start with 2 continous "?" is possible, convert to ".*"
-				   Convert single "?" in string to "." */
+				/* If the pattern starts with 2 continuous "?" characters, convert them to ".*". 
+				   Additionally, single "?" character will be converted to ".". */
 				if match[0] == '?' {
 					return ".*"
 				} else {
@@ -303,7 +303,8 @@ func wildCardToRegexp(pattern string) string {
 				return match
 			}
 		} else {
-			// Pattern start with many continous "?" is possible, convert to ".*"
+			/* If the pattern starts with multiple continuous "?" characters, convert them to ".*".
+ 			   Additionally, convert multiple continuous "?" characters to ".*". */
 			if match[1] == '?' {
 				if match[0] == '?' {
 					return ".*"
