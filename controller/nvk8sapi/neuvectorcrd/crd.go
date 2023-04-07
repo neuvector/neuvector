@@ -34,7 +34,7 @@ func (b *nvCrdSchmaBuilder) Init() {
 	b.schemaTypeObject = "object"
 	b.schemaTypeString = "string"
 	enums := []string{
-		share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect,
+		share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect, "",
 		share.AdmClientModeSvc, share.AdmClientModeUrl,
 		share.AdmCtrlActionAllow, share.AdmCtrlActionDeny,
 		share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce, share.PolicyModeUnavailable,
@@ -550,6 +550,14 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSc
 									"disabled": &apiextv1.JSONSchemaProps{
 										Type: &b.schemaTypeBoolean,
 									},
+									"rule_mode": &apiextv1.JSONSchemaProps{
+										Type: &b.schemaTypeString,
+										Enum: []*apiextv1.JSON{
+											&apiextv1.JSON{Raw: b.enumMap[""]},
+											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+										},
+									},
 									"criteria": &apiextv1.JSONSchemaProps{
 										Type: &b.schemaTypeArray,
 										Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -667,6 +675,14 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 									},
 									"disabled": &apiextv1b1.JSONSchemaProps{
 										Type: &b.schemaTypeBoolean,
+									},
+									"rule_mode": &apiextv1b1.JSONSchemaProps{
+										Type: &b.schemaTypeString,
+										Enum: []*apiextv1b1.JSON{
+											&apiextv1b1.JSON{Raw: b.enumMap[""]},
+											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+										},
 									},
 									"criteria": &apiextv1b1.JSONSchemaProps{
 										Type: &b.schemaTypeArray,
@@ -1029,6 +1045,11 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 											}
 										}
 									}
+									if crdSchemaExpected {
+										if _, ok := rules.Items.Schema.Properties["rule_mode"]; !ok {
+											crdSchemaExpected = false
+										}
+									}
 								}
 							}
 						}
@@ -1051,6 +1072,11 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 												}
 											}
 										}
+									}
+								}
+								if crdSchemaExpected {
+									if _, ok := rules.Items.Schema.Properties["rule_mode"]; !ok {
+										crdSchemaExpected = false
 									}
 								}
 							}

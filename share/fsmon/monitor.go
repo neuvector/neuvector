@@ -126,6 +126,7 @@ type fileMod struct {
 }
 
 type groupInfo struct {
+	bNeuvector bool
 	profile    *share.CLUSFileMonitorProfile
 	mode       string
 	applyRules map[string]utils.Set
@@ -480,7 +481,7 @@ func (w *FileWatch) cbNotify(filePath string, mask uint32, params interface{}, p
 	}
 }
 
-func (w *FileWatch) addFile(finfo *osutil.FileInfoExt) {
+func (w *FileWatch) addFile(bIncInotify bool, finfo *osutil.FileInfoExt) {
 	if !w.bEnable {
 		return
 	}
@@ -488,7 +489,7 @@ func (w *FileWatch) addFile(finfo *osutil.FileInfoExt) {
 	w.fanotifier.AddMonitorFile(finfo.Path, finfo.Filter, finfo.Protect, finfo.UserAdded, w.cbNotify, finfo)
 	//if _, path := global.SYS.ParseContainerFilePath(finfo.Path); packageFile.Contains(path) {
 	flt := finfo.Filter.(*filterRegex)
-	if !strings.HasSuffix(flt.path, "/.*")	{ // this wildcard has established its directory for all
+	if bIncInotify && !strings.HasSuffix(flt.path, "/.*")	{ // this wildcard has established its directory for all
 		w.inotifier.AddMonitorFile(finfo.Path, w.cbNotify, finfo)
 	}
 }
@@ -498,7 +499,7 @@ func (w *FileWatch) removeFile(fullpath string) {
 	w.inotifier.RemoveMonitorFile(fullpath)
 }
 
-func (w *FileWatch) addDir(finfo *osutil.FileInfoExt, files map[string]*osutil.FileInfoExt) {
+func (w *FileWatch) addDir(bIncInotify bool, finfo *osutil.FileInfoExt, files map[string]*osutil.FileInfoExt) {
 	if !w.bEnable {
 		return
 	}
@@ -509,7 +510,9 @@ func (w *FileWatch) addDir(finfo *osutil.FileInfoExt, files map[string]*osutil.F
 	}
 
 	w.fanotifier.AddMonitorDirFile(finfo.Path, finfo.Filter, finfo.Protect, finfo.UserAdded, ff, w.cbNotify, finfo)
-	w.inotifier.AddMonitorDirFile(finfo.Path, nil, w.cbNotify, finfo)
+	if bIncInotify {
+		w.inotifier.AddMonitorDirFile(finfo.Path, nil, w.cbNotify, finfo)
+	}
 }
 
 func (w *FileWatch) getDirAndFileList(pid int, path, regx, cid string, filter *filterRegex, recur, protect, userAdded bool,
@@ -574,7 +577,7 @@ func isRunTimeAddedFile(path string) bool {
 		strings.HasSuffix(path, "/root/etc/resolv.conf")
 }
 
-func (w *FileWatch) addCoreFile(cid string, dirList map[string]*osutil.FileInfoExt, singleFiles []*osutil.FileInfoExt) {
+func (w *FileWatch) addCoreFile(bIncINotify bool, cid string, dirList map[string]*osutil.FileInfoExt, singleFiles []*osutil.FileInfoExt) {
 	// add files
 	for _, finfo := range singleFiles {
 		// need to move the cross link files to dirs
@@ -584,7 +587,7 @@ func (w *FileWatch) addCoreFile(cid string, dirList map[string]*osutil.FileInfoE
 			di.Children = append(di.Children, finfo)
 		} else  {
 			finfo.ContainerId = cid
-			w.addFile(finfo)
+			w.addFile(bIncINotify, finfo)
 		}
 	}
 
@@ -602,7 +605,7 @@ func (w *FileWatch) addCoreFile(cid string, dirList map[string]*osutil.FileInfoE
 			files[filepath.Base(file.Path)] = file
 		}
 		dir.ContainerId = cid
-		w.addDir(dir, files)
+		w.addDir(bIncINotify, dir, files)
 	}
 }
 
@@ -640,7 +643,7 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 
 	w.fanotifier.SetMode(rootPid, access, perm, capBlock, bNeuvectorSvc)
 
-	w.addCoreFile(id, dirs, files)
+	w.addCoreFile(!bNeuvectorSvc, id, dirs, files)
 
 	w.fanotifier.StartMonitor(rootPid)
 
@@ -648,6 +651,7 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 	grp, ok := w.groups[rootPid]
 	if !ok {
 		grp = &groupInfo{
+			bNeuvector: bNeuvectorSvc,
 			learnRules: make(map[string]utils.Set),
 			applyRules: make(map[string]utils.Set),
 		}
@@ -756,7 +760,7 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 					dirFiles[filepath.Base(path)] = file
 				}
 			}
-			w.addDir(fmod.finfo, dirFiles)
+			w.addDir(true, fmod.finfo, dirFiles)
 		} else if (fmod.mask & syscall.IN_ATTRIB) > 0 {
 			if bIsDir {
 				event = fileEventDirAttr
@@ -806,7 +810,7 @@ func (w *FileWatch) handleFileEvents(fmod *fileMod, info os.FileInfo, fullPath s
 		if (fmod.mask & inodeMovedMask) > 0 {
 			log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo}).Debug()
 			event = fileEventMovedTo
-			w.addFile(fmod.finfo) // follow up ?
+			w.addFile(true, fmod.finfo) // follow up ?
 		} else if (fmod.mask & syscall.IN_ATTRIB) > 0 {
 			//attribute is changed
 			event = fileEventAttr
