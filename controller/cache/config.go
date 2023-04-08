@@ -381,7 +381,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
 	var cfg share.CLUSSystemConfig
-
+	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		json.Unmarshal(value, &cfg)
@@ -407,7 +407,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleDlpRuleCalculation(true)
 		}
 		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && cfg.DisableNetPolicy == false {
-			scheduleIPPolicyCalculation(true)
+			bSchedulePolicy = true
 			scheduleDlpRuleCalculation(true)
 		}
 		automodeConfigUpdate(cfg, systemConfigCache)
@@ -431,6 +431,9 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	putInternalIPNetToCluseter(true)
 	cacheMutexUnlock()
 
+	if bSchedulePolicy {
+		scheduleIPPolicyCalculation(true)
+	}
 	httpsProxy := cfg.RegistryHttpsProxy
 	httpProxy := cfg.RegistryHttpProxy
 	var param1 interface{} = &httpsProxy
