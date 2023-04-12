@@ -157,6 +157,7 @@ func leadChangeHandler(newLead, oldLead string) {
 			cache.PutInternalIPNetToCluseterUpgrade()
 			//make sure xff_enabled=true is updated in enforcer
 			kv.EnforceXffEnabledSetting()
+			kv.EnforceDisableNetPolicy()
 		}
 	}
 }
