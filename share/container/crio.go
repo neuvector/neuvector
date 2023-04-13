@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,6 +30,8 @@ const defaultCriOSock = "/var/run/crio/crio.sock"
 type crioDriver struct {
 	sys          *system.SystemTools
 	sysInfo      *sysinfo.SysInfo
+	endpoint     string
+	endpointHost string
 	nodeHostname string
 	criClient    *grpc.ClientConn
 	version      *criRT.VersionResponse
@@ -38,6 +42,8 @@ type crioDriver struct {
 	podImgDigest     string
 	podImgID         string
 	pidHost          bool
+	failedQueryCnt   int
+	eventCallback    EventCallback
 }
 
 type imageInfo struct {
@@ -97,10 +103,15 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
-	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("crio connected")
+	sockPath := endpoint
+	if id, _, err := sys.GetSelfContainerID(); err == nil {
+		sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver}).Info("crio connected")
 
 	driver := crioDriver{
-		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod",
+		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod", endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon,
 	}
@@ -128,6 +139,48 @@ func imageRef2Digest(ref string) string {
 	} else {
 		return ref
 	}
+}
+
+func (d *crioDriver) reConnect() error {
+	if !d.pidHost {
+		return errors.New("Not pidHost")
+	}
+	// the original socket has been recreated and its mounted path was also lost.
+	endpoint := d.endpoint
+	if d.endpointHost != "" {	// use the host
+		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	crio, err := crioAPI.New(endpoint)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Fail to create crio client")
+		return err
+	}
+
+	daemon, err := crio.DaemonInfo()
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Fail to get daemon info")
+		return err
+	}
+
+	cri, ver, err := newCriClient(endpoint, ctx)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Fail to create cri client")
+		return err
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("cri-o connected")
+
+	// update records
+	d.daemonInfo = daemon
+	d.criClient = cri
+	d.version = ver
+	return nil
 }
 
 func (d *crioDriver) String() string {
@@ -475,9 +528,23 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	resp_containers, err := criListContainers(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
-		return ids, nil
+
+		// lost connection, wait for 5 second try reconnect
+		time.Sleep(time.Second * 5)
+		if err := d.reConnect(); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
+			d.failedQueryCnt++	// the query is coming every 20-seconds
+			if d.failedQueryCnt > 5 {	// 100 seconds
+				// notify parent to exit container
+				if d.eventCallback != nil {
+					d.eventCallback(EventSocketError, "", 0)
+				}
+			}
+			return ids, nil
+		}
 	}
 
+	d.failedQueryCnt = 0	// reset
 	resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
@@ -546,6 +613,7 @@ func (d *crioDriver) StopMonitorEvent() {
 
 func (d *crioDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 	// crio api doesn't support this
+	d.eventCallback = cb
 	return ErrMethodNotSupported
 }
 

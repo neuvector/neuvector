@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,6 +35,8 @@ const k8sContainerdNamespace = "k8s.io"
 type containerdDriver struct {
 	sys           *system.SystemTools
 	sysInfo       *sysinfo.SysInfo
+	endpoint      string
+	endpointHost  string
 	nodeHostname  string
 	client        *containerd.Client
 	criClient     *grpc.ClientConn
@@ -40,6 +44,7 @@ type containerdDriver struct {
 	cancelMonitor context.CancelFunc
 	rtProcMap     utils.Set
 	snapshotter   string
+	pidHost		  bool
 }
 
 // patch for the mismatched grpc versions
@@ -58,6 +63,8 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		return nil, wrapIntoErrorString(err)
 	}
 
+	sockPath := endpoint
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -74,6 +81,10 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		} else {
 			log.WithFields(log.Fields{"error": err}).Error("cri info")
 		}
+
+		if id, _, err := sys.GetSelfContainerID(); err == nil {
+			sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
+		}
 	}
 
 	ver, err := client.Version(ctx)
@@ -81,17 +92,66 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		return nil, wrapIntoErrorString(err)
 	}
 
-	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
+	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver}).Info("containerd connected")
 
 	driver := containerdDriver{
-		sys: sys, client: client, version: &ver, criClient: cri,
+		sys: sys, client: client, version: &ver, criClient: cri, endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), snapshotter: snapshotter,
 	}
 
 	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim", "containerd-shim-runc-v1", "containerd-shim-runc-v2")
+
+	name, _ := os.Readlink("/proc/1/exe")
+	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
+		driver.pidHost = false
+	} else {
+		driver.pidHost = true
+	}
 	return &driver, nil
 }
+
+func (d *containerdDriver) reConnect() error {
+	if !d.pidHost {
+		return errors.New("Not pidHost")
+	}
+	// the original socket has been recreated and its mounted path was also lost.
+	endpoint := d.endpoint
+	if d.endpointHost != "" {	// use the host
+		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
+
+	client, err := containerd.New(endpoint,
+		containerd.WithDefaultNamespace(k8sContainerdNamespace),
+		containerd.WithTimeout(clientConnectTimeout))
+	if err != nil {
+		return wrapIntoErrorString(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ver, err := client.Version(ctx)
+	if err != nil {
+		return wrapIntoErrorString(err)
+	}
+	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
+
+	// optional: cri connection
+	cri, criVer, err := newCriClient(endpoint, ctx)
+	if err == nil {
+		log.WithFields(log.Fields{"version": criVer}).Info("cri")
+	}
+
+	// update records
+	d.client = client
+	d.criClient = cri
+	d.version = &ver
+	return nil
+}
+
 
 func (d *containerdDriver) String() string {
 	return RuntimeContainerd
@@ -457,6 +517,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 		return ErrMethodNotSupported
 	}
 
+	var connectErrorCnt int
 	for {
 		ctx, cancel := context.WithCancel(context.Background())
 		d.cancelMonitor = cancel
@@ -492,10 +553,23 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 					default:
 						log.WithFields(log.Fields{"event": v}).Debug("Unknown containderd event")
 					}
+					connectErrorCnt = 0		// reset
 				}
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
 					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
+					if strings.Contains( err.Error(), "rpc error: code = Unavailable"){
+						// lost connection, wait for 10 second try reconnect
+						time.Sleep(time.Second * 10)
+						if err := d.reConnect(); err != nil {
+							log.WithFields(log.Fields{"err": err}).Error()
+							break
+						}
+					}
+					connectErrorCnt++
+					if connectErrorCnt >= 12 {	// restart enforcer
+						cb(EventSocketError, "", 0)
+					}
 				}
 				break Loop
 			case <-ctx.Done():
