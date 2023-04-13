@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -207,4 +208,19 @@ func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*
 
 	log.WithFields(log.Fields{"error": err, "name": name}).Error("Failed to get image meta")
 	return nil, errors.New("Failed to get image meta")
+}
+
+func criGetContainerSocketPath(conn *grpc.ClientConn, ctx context.Context, id, endpoint string) (string, error) {
+	resp, err := criContainerStatus(conn, ctx, id)
+	if err == nil {
+		endpoint = strings.TrimPrefix(endpoint, "unix://")
+		status := resp.GetStatus()
+		for _, m := range status.Mounts {
+			if m.ContainerPath == endpoint {
+				return m.HostPath, nil
+			}
+		}
+	}
+	log.WithFields(log.Fields{"error": err, "id": id, "endpoint": endpoint}).Error("Failed to get mounting container socket")
+	return "", err
 }
