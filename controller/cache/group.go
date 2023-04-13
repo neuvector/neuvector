@@ -1224,7 +1224,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// Join and create learned group.
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
-			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
+			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
