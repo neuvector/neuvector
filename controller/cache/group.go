@@ -1037,6 +1037,8 @@ func deleteGroupFromCluster(groupname string) bool {
 	return true
 }
 
+const groupsRemovalAdditionalDelay = time.Duration(time.Second * 10)
+
 // Protected by cacheMutexLock
 func scheduleGroupRemoval(cache *groupCache) {
 	//Reserved group and CRD group cannot be deleted
@@ -1069,7 +1071,10 @@ func scheduleGroupRemoval(cache *groupCache) {
 	}
 
 	unusedGrpAge := time.Duration(cacher.GetUnusedGroupAging())
-	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge)
+	//NVSHAS-7791, because our timer-wheel’s one round duration is 1 hour
+	//task may not be scheduled into current slot which cause it to wait
+	//for 1 more hour to expire. Add additional 10sec to avoid this.
+	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge) + groupsRemovalAdditionalDelay
 
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
