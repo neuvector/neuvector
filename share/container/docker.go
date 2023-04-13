@@ -1,9 +1,12 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -21,13 +24,15 @@ import (
 const defaultDockerSocket string = "unix:///var/run/docker.sock"
 
 type dockerDriver struct {
-	sys        *system.SystemTools
-	endpoint   string
-	evCallback EventCallback
-	client     *dockerclient.DockerClient
-	version    *dockerclient.Version
-	info       *dockerclient.Info
-	rtProcMap  utils.Set
+	sys          *system.SystemTools
+	endpoint     string
+	endpointHost string
+	evCallback   EventCallback
+	client       *dockerclient.DockerClient
+	version      *dockerclient.Version
+	info         *dockerclient.Info
+	rtProcMap    utils.Set
+	pidHost      bool
 }
 
 func _connect(endpoint string) (*dockerclient.DockerClient, *dockerclient.Version, *dockerclient.Info, error) {
@@ -62,15 +67,79 @@ func _connect(endpoint string) (*dockerclient.DockerClient, *dockerclient.Versio
 	return client, ver, info, nil
 }
 
+func getContainerSocketPath(client *dockerclient.DockerClient, id, endpoint string) (string, error) {
+	info, err := client.InspectContainer(id)
+	if err == nil {
+		endpoint = strings.TrimPrefix(endpoint, "unix://")
+		log.WithFields(log.Fields{"endpoint": endpoint}).Info("JW:")
+		for _, m := range info.Mounts {
+			log.WithFields(log.Fields{"m": m}).Info("JW:")
+			if m.Destination == endpoint {
+				return m.Source, nil
+			}
+		}
+	}
+	log.WithFields(log.Fields{"error": err, "id": id, "endpoint": endpoint}).Error("Failed to get mounting container socket")
+	return "", err
+}
+
 func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	client, ver, info, err := _connect(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	driver := dockerDriver{sys: sys, endpoint: endpoint, client: client, version: ver, info: info}
+	sockPath := endpoint
+	if id, _, err := sys.GetSelfContainerID(); err == nil {
+		sockPath, err = getContainerSocketPath(client, id, endpoint)
+		log.WithFields(log.Fields{"sockPath": sockPath}).Info("JW:")
+	}
+
+	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client, version: ver, info: info}
 	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current", "docker-containerd-shim-current", "containerd", "containerd-shim")
+
+	name, _ := os.Readlink("/proc/1/exe")
+	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
+		driver.pidHost = false
+	} else {
+		driver.pidHost = true
+	}
+
 	return &driver, nil
+}
+
+func  (d *dockerDriver) reConnect() error {
+	if !d.pidHost {
+		return errors.New("Not pidHost")
+	}
+
+	// the original socket has been recreated and its mounted path was also lost.
+	endpoint := d.endpoint
+	if d.endpointHost != "" {	// use the host
+		endpoint = "unix://" + filepath.Join("/proc/1/root", d.endpointHost)
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
+
+	client, err := dockerclient.NewDockerClientTimeout(
+		endpoint, nil, clientConnectTimeout, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to create client")
+		return err
+	}
+
+	ver, err := client.Version()
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to get version")
+		return err
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("docker connected")
+
+	// update records
+	d.client = client
+	d.version = ver
+	return nil
 }
 
 func (d *dockerDriver) String() string {
@@ -468,9 +537,7 @@ func (d *dockerDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 			// More than 10 errors within a second
 			if count > 10 {
 				count = 0
-
-				client, ver, info, err := _connect(d.endpoint)
-				if err != nil {
+				if err := d.reConnect(); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("Failed to reconnect to docker")
 
 					sendErr++
@@ -483,9 +550,6 @@ func (d *dockerDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 					time.Sleep(5 * time.Second)
 				} else {
 					sendErr = 0
-					d.client = client
-					d.version = ver
-					d.info = info
 				}
 			}
 		}
