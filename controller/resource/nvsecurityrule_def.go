@@ -48,6 +48,7 @@ const NvWafSecurityRuleSingular = "nvwafsecurityrule"
 type NvCrdAdmCtrlRule struct {
 	ID       uint32                      `json:"id"`        // only set for default rules
 	RuleType string                      `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode string                      `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 	Comment  string                      `json:"comment"`
 	Criteria []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
 	Disabled bool                        `json:"disabled"`
@@ -199,7 +200,8 @@ type NvSecurityAdmCtrlConfig struct {
 
 type NvSecurityAdmCtrlRule struct {
 	ID       *uint32                     `json:"id,omitempty"`
-	Action   *string                     `json:"action,omitempty"` // api.ValidatingAllowRuleType / api.ValidatingDenyRuleType
+	Action   *string                     `json:"action,omitempty"`    // api.ValidatingAllowRuleType / api.ValidatingDenyRuleType
+	RuleMode *string                     `json:"rule_mode,omitempty"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 	Comment  *string                     `json:"comment,omitempty"`
 	Disabled *bool                       `json:"disabled,omitempty"`
 	Criteria []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`

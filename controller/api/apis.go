@@ -327,11 +327,19 @@ type RESTServerLDAP struct {
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 }
 
+type RESTX509CertInfo struct {
+	X509Cert          string `json:"x509_cert"`
+	IssuerCommonName  string `json:"issuer_cn"`
+	SubjectCommonName string `json:"subject_cn"`
+	ValidityNotAfter  uint64 `json:"subject_notafter"`
+}
+
 type RESTServerSAML struct {
 	SSOURL     string `json:"sso_url"`
 	Issuer     string `json:"issuer"`
 	X509Cert   string `json:"x509_cert,cloak"`
 	GroupClaim string `json:"group_claim"`
+	X509Certs  []RESTX509CertInfo `json:"x509_certs"`
 
 	Enable           bool                      `json:"enable"`
 	DefaultRole      string                    `json:"default_role"`
@@ -410,6 +418,7 @@ type RESTServerSAMLConfig struct {
 	DefaultRole      *string                    `json:"default_role,omitempty"`
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+	X509CertExtra    *[]string                  `json:"x509_cert_extra,omitempty"`
 }
 
 type RESTServerSAMLConfigCfgMap struct {
@@ -783,12 +792,12 @@ type RESTControllerData struct {
 }
 
 type RESTDomain struct {
-	Name             string   `json:"name"`
-	Workloads        int      `json:"workloads"`
-	RunningWorkloads int      `json:"running_workloads"`
-	RunningPods      int      `json:"running_pods"`
-	Services         int      `json:"services"`
-	Tags             []string `json:"tags"`
+	Name             string            `json:"name"`
+	Workloads        int               `json:"workloads"`
+	RunningWorkloads int               `json:"running_workloads"`
+	RunningPods      int               `json:"running_pods"`
+	Services         int               `json:"services"`
+	Tags             []string          `json:"tags"`
 	Labels           map[string]string `json:"labels"`
 }
 
@@ -1652,6 +1661,7 @@ type RESTSystemConfigConfig struct {
 type RESTSysNetConfigConfig struct {
 	NetServiceStatus     *bool   `json:"net_service_status,omitempty"`
 	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
+	DisableNetPolicy     *bool   `json:"disable_net_policy,omitempty"`
 }
 
 type RESTSysAtmoConfigConfig struct {
@@ -1742,9 +1752,9 @@ type RESTUnquarReq struct {
 }
 
 type RESTSystemRequest struct {
-	PolicyMode      *string   `json:"policy_mode,omitempty"`
-	BaselineProfile *string   `json:"baseline_profile,omitempty"`
-	Unquar     *RESTUnquarReq `json:"unquarantine,omitempty"`
+	PolicyMode      *string        `json:"policy_mode,omitempty"`
+	BaselineProfile *string        `json:"baseline_profile,omitempty"`
+	Unquar          *RESTUnquarReq `json:"unquarantine,omitempty"`
 }
 
 type RESTSystemRequestData struct {
@@ -1783,6 +1793,7 @@ type RESTSystemConfig struct {
 	XffEnabled                bool                      `json:"xff_enabled"`
 	NetServiceStatus          bool                      `json:"net_service_status"`
 	NetServicePolicyMode      string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy          bool                      `json:"disable_net_policy"`
 	ModeAutoD2M               bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration       int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P               bool                      `json:"mode_auto_m2p"`
@@ -1858,6 +1869,7 @@ type RESTSystemConfigIBMSAV2 struct {
 type RESTSystemConfigNetSvcV2 struct {
 	NetServiceStatus     bool   `json:"net_service_status"`
 	NetServicePolicyMode string `json:"net_service_policy_mode"`
+	DisableNetPolicy     bool   `json:"disable_net_policy"`
 }
 
 type RESTSystemConfigModeAutoV2 struct {
@@ -3143,6 +3155,7 @@ type RESTAdmissionRule struct { // see type CLUSAdmissionRule
 	Critical bool                    `json:"critical"`
 	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode string                  `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 }
 
 type RESTAdmissionRuleData struct {
@@ -3161,8 +3174,9 @@ type RESTAdmissionRuleConfig struct {
 	Criteria []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
 	Disable  *bool                   `json:"disable,omitempty"`
 	Actions  *[]string               `json:"actions,omitempty"`
-	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	CfgType  string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
 }
 
 type RESTAdmissionRuleConfigData struct {

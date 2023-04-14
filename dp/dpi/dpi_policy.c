@@ -784,7 +784,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
 {
     dpi_rule_key_t key;
 
-    if (unlikely(!hdl)) {
+    if (unlikely(!hdl || th_disable_net_policy)) {
         // workload just created, allow traffic pass until policy being configured
         desc->id = 0;
         desc->action = DP_POLICY_ACTION_OPEN;

@@ -1053,6 +1053,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 					cr.Criteria, _ = cache.AdmCriteria2CLUS(ruleConf.Criteria)
 					cr.Comment = ruleConf.Comment
 				}
+				cr.RuleMode = ruleConf.RuleMode
 				cr.CfgType = cfgType
 				clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr)
 				newRules[ruleName] = ruleID
@@ -2114,10 +2115,14 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 
 		// Get the admission control rules
 		acc := access.NewAdminAccessControl()
+		modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 		for idx, crdRule := range admCtrlSecRule.Spec.Rules {
 			var errMsg string
-			if (crdRule.Action == nil || (*crdRule.Action != api.ValidatingAllowRuleType && *crdRule.Action != api.ValidatingDenyRuleType)) ||
-				len(crdRule.Criteria) == 0 {
+			if crdRule.Action == nil ||
+				(*crdRule.Action != api.ValidatingAllowRuleType && *crdRule.Action != api.ValidatingDenyRuleType) ||
+				len(crdRule.Criteria) == 0 ||
+				(*crdRule.Action == api.ValidatingAllowRuleType && crdRule.RuleMode != nil) ||
+				(*crdRule.Action == api.ValidatingDenyRuleType && crdRule.RuleMode != nil && !modes.Contains(*crdRule.RuleMode)) {
 				errMsg := fmt.Sprintf("%s file format error:  validation error in %s", reviewTypeDisplay, name)
 				return nil, 1, errMsg, recordName
 			}
@@ -2158,6 +2163,9 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 					}
 					if crdRule.Disabled != nil {
 						ruleCfg.Disabled = *crdRule.Disabled
+					}
+					if crdRule.RuleMode != nil {
+						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
 					rulesCfg, _ := admRulesCfg[crdRuleType]
 					admRulesCfg[crdRuleType] = append(rulesCfg, ruleCfg)

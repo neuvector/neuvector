@@ -41,6 +41,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var defaultAction int = nvsysadmission.AdmCtrlActionAllow
+	var mode string = share.AdmCtrlModeProtect
 	if k8sPlatform {
 		var ctrlState *share.CLUSAdmCtrlState
 		state, _ := clusHelper.GetAdmissionStateRev(resource.NvAdmSvcName)
@@ -53,7 +54,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err)
 			return
 		}
-		_, _, defaultAction, _, _ = cacher.IsAdmControlEnabled(&ctrlState.Uri)
+		_, mode, defaultAction, _, _ = cacher.IsAdmControlEnabled(&ctrlState.Uri)
 	}
 
 	var resp api.RESTAdmCtrlRulesTestResults
@@ -174,7 +175,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 						},
 					}
 					stamps.Start = time.Now()
-					if response, reqIgnored := whsvr.validate(&ar, share.AdmCtrlModeProtect, defaultAction, &stamps, true); response == nil {
+					if response, reqIgnored := whsvr.validate(&ar, mode, defaultAction, &stamps, true); response == nil {
 						msg = "Could not get response"
 					} else if reqIgnored {
 						msg = "Request is ignored"

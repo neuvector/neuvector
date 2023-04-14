@@ -447,6 +447,9 @@ func updateConnectionMap(conn *dp.Connection, EPMAC net.HardwareAddr, id string)
 }
 
 func updateHostConnection(conns []*dp.ConnectionData) {
+	if gInfo.disableNetPolicy {
+		return
+	}
 	for _, data := range conns {
 		conn := data.Conn
 
