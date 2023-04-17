@@ -815,7 +815,7 @@ func (w *FileWatch) handleFileEvents(fmod *fileMod, info os.FileInfo, fullPath s
 			//attribute is changed
 			event = fileEventAttr
 			fmod.finfo.FileMode = info.Mode()
-		} else if (fmod.mask & syscall.IN_ACCESS) > 0 {
+		} else if (fmod.mask & (syscall.IN_ACCESS|syscall.IN_CLOSE_WRITE)) > 0 {
 			// check the hash existing and match
 			event = fileEventAccessed
 			if hash, err := osutil.GetFileHash(fullPath); err == nil {
