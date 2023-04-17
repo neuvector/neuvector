@@ -621,6 +621,13 @@ func initTest() {
 	router.GET("/v1/partner/ibm_sa/:id/setup/:info", handlerGetIBMSAEpInfo)                         // Skip API document, called by IBM SA
 	router.POST("/v1/partner/ibm_sa/:id/setup/:action", handlerPostIBMSAEpSetup)                    // Skip API document, called by IBM SA
 	router.DELETE("/v1/partner/ibm_sa/:id/setup/:accountID/:providerID", handlerDeleteIBMSAEpSetup) // for simulating IBM SA IBM SA to delete the integration.
+
+	// api key
+	router.GET("/v1/api_key", handlerApikeyList)
+	router.GET("/v1/api_key/:accesskey", handlerApikeyShow)
+	router.POST("/v1/api_key", handlerApikeyCreate)
+	router.DELETE("/v1/api_key/:accesskey", handlerApikeyDelete)
+	router.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
 }
 
 func postTest() {

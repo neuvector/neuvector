@@ -740,6 +740,9 @@ func CompileUriPermitsMapping() {
 				"v1/user",
 				"v1/user/*",
 				"v1/selfuser", // Any user is allowed to use the login token to retrieve his/her own user info. temporarily given PERM_AUTHORIZATION for retrieving caller's user info
+				"v1/api_key",
+				"v1/api_key/*",
+				"v1/selfapikey",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile",
@@ -836,6 +839,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_AUTHORIZATION: []string{
 				"v1/user_role",
 				"v1/user",
+				"v1/api_key",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile",
@@ -981,6 +985,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_AUTHORIZATION: []string{
 				"v1/user_role/*",
 				"v1/user/*",
+				"v1/api_key/*",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile/*",

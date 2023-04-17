@@ -318,6 +318,11 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 	if acc == nil {
 		return nil, nil
 	} else {
+		if login.loginType == 1 {
+			// skip apikey handling for fed specific operation
+			return nil, nil
+		}
+		
 		var ok bool
 		switch roleRequired {
 		case _fedAdminRequired:

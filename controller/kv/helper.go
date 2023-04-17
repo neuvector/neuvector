@@ -105,6 +105,11 @@ type ClusterHelper interface {
 	CreateUser(user *share.CLUSUser) error
 	DeleteUser(fullname string) error
 
+	GetApikeyRev(accesskey string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error)
+	CreateApikey(apikey *share.CLUSApikey) error
+	GetAllApikeysNoAuth() map[string]*share.CLUSApikey
+	DeleteApikey(accesskey string) error
+
 	GetProcessProfile(group string) *share.CLUSProcessProfile
 	PutProcessProfile(group string, pg *share.CLUSProcessProfile) error
 	PutProcessProfileTxn(txn *cluster.ClusterTransact, group string, pg *share.CLUSProcessProfile) error
@@ -2864,4 +2869,43 @@ func (m clusterHelper) PutImportTask(importTask *share.CLUSImportTask) error {
 	key := share.CLUSImportOpKey(share.CLUSImportStatusSubKey)
 	value, _ := json.Marshal(importTask)
 	return cluster.Put(key, value)
+}
+
+func (m clusterHelper) GetApikeyRev(accesskey string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error) {
+    key := share.CLUSApikeyKey(url.QueryEscape(accesskey))
+    if value, rev, _ := m.get(key); value != nil {
+        var apikey share.CLUSApikey
+        json.Unmarshal(value, &apikey)
+        if !acc.Authorize(&apikey, nil) {    
+            return nil, 0, common.ErrObjectAccessDenied
+        }
+        return &apikey, rev, nil
+    }
+    return nil, 0, common.ErrObjectNotFound
+}
+
+func (m clusterHelper) CreateApikey(apikey *share.CLUSApikey) error {
+    key := share.CLUSApikeyKey(url.QueryEscape(apikey.AccessKey))
+    value, _ := json.Marshal(apikey)
+    // secret_key is already hashed
+    return cluster.PutIfNotExist(key, value, false)
+}
+
+// caller needs to decide whether to authorize accessing each returned apikey object
+func (m clusterHelper) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
+    apikeys := make(map[string]*share.CLUSApikey)
+    keys, _ := cluster.GetStoreKeys(share.CLUSConfigApikeyStore)
+    for _, key := range keys {
+        if value, _, _ := m.get(key); value != nil {
+            var apikey share.CLUSApikey
+            json.Unmarshal(value, &apikey)
+            apikeys[apikey.AccessKey] = &apikey
+        }
+    }
+    return apikeys
+}
+
+func (m clusterHelper) DeleteApikey(accesskey string) error {
+	key := share.CLUSApikeyKey(url.QueryEscape(accesskey))
+	return cluster.Delete(key)
 }

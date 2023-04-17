@@ -45,6 +45,7 @@ type loginSession struct {
 	eolAt           time.Time // end of life
 	timer           *time.Timer
 	domainRoles     access.DomainRole // map: domain -> role
+	loginType       int       // 0=user (default), 1=apikey
 
 	nvPage string // could change in every request even in the same login session
 }
@@ -538,6 +539,52 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 	token, ok := r.Header[api.RESTTokenHeader]
 	if !ok || len(token) != 1 {
+		// "X-Auth-Token" header not exist, check apikey "X-Auth-Apikey" 
+		apikey, ok2 := r.Header[api.RESTAPIKeyHeader]
+		if !ok2 || len(apikey) != 1 {
+			return nil, userInvalidRequest, rsessToken
+		} else {
+			parts := strings.Split(apikey[0], ":")
+			if len(parts) == 2 {
+				apikeyAccount, _, _ := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+
+				if apikeyAccount == nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check password
+				hash := utils.HashPassword(parts[1])
+				if hash != apikeyAccount.SecretKeyHash {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check timeout
+				now := time.Now()
+				if now.UTC().Unix() >= apikeyAccount.ExpirationTimestamp  {
+					return nil, userTimeout, rsessToken
+				}
+
+				roles := make(map[string]string)
+				for role, domains := range apikeyAccount.RoleDomains {
+					for _, d := range domains {
+						roles[d] = role
+					}
+				}
+				roles[access.AccessDomainGlobal] = apikeyAccount.Role
+
+				s := &loginSession{
+					id:          utils.GetRandomID(idLength, ""),
+					fullname:    apikeyAccount.AccessKey,
+					remote:      r.RemoteAddr,
+					domainRoles: roles,
+					loginType:   1,
+					// server:      claims.Server,
+				}
+
+				return s, userOK, rsessToken
+			}
+		}
+
 		return nil, userInvalidRequest, rsessToken
 	}
 

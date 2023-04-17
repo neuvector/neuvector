@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"math"
+	"regexp"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -1058,4 +1060,321 @@ out:
 	}
 
 	return err
+}
+
+func normalizeApikeyRoles(user *share.CLUSApikey) error {
+	if user.Role == api.UserRoleFedAdmin || user.Role == api.UserRoleAdmin || user.RoleDomains == nil {
+		// If the user is fed admin or cluster admin, then it is the admin of all namespaces
+		user.RoleDomains = make(map[string][]string)
+	} else {
+		// With a user's global role, it doesn't need to have the same role in its RoleDomains
+		delete(user.RoleDomains, user.Role)
+
+		domainRole := make(map[string]string, 0)
+		for role, domains := range user.RoleDomains {
+			domainsFound := utils.NewSet()
+			for _, d := range domains {
+				if r, ok := domainRole[d]; ok {
+					if r == role { // same domain shows up multiple times for a role. avoid duplicate domain entry
+						continue
+					}
+					return fmt.Errorf("Multiple roles(%s, %s) for a domain(%s) is not allowed", role, r, d)
+				} else {
+					domainRole[d] = role
+					domainsFound.Add(d)
+				}
+			}
+			user.RoleDomains[role] = domainsFound.ToStringSlice()
+		}
+	}
+
+	return nil
+}
+
+
+func handlerApikeyList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// Retrieve all apikeys
+	var resp api.RESTApikeysData
+	resp.Apikeys = make([]*api.RESTApikey, 0)
+
+	apikeys := clusHelper.GetAllApikeysNoAuth()
+	for _, apikey := range apikeys {
+		if login.fullname != apikey.AccessKey { // a user can always see himself/herself
+			if !acc.Authorize(apikey, nil) {
+				continue
+			}
+		}
+
+		apikeyRest := apikey2REST(apikey)
+		resp.Apikeys = append(resp.Apikeys, apikeyRest)
+	}
+
+	resp.GlobalRoles = access.GetValidRoles(access.CONST_VISIBLE_USER_ROLE)
+	resp.DomainRoles = access.GetValidRoles(access.CONST_VISIBLE_DOMAIN_ROLE)
+	sort.Slice(resp.Apikeys, func(i, j int) bool { return resp.Apikeys[i].AccessKey < resp.Apikeys[j].AccessKey })
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get apikey list")
+}
+
+func handlerApikeyShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	accesskey := ps.ByName("accesskey")
+	accesskey, _ = url.PathUnescape(accesskey)
+
+	// Retrieve apikey from the cluster
+	apikey, _, err := clusHelper.GetApikeyRev(accesskey, acc)
+	if apikey == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	resp := api.RESTApikeyData{Apikey: apikey2REST(apikey)}
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get apikey detail")
+}
+
+func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// Read body
+	body, _ := ioutil.ReadAll(r.Body)
+
+	if len(body) == 0 {
+		if !acc.Authorize(&share.CLUSApikey{}, nil) {
+			log.WithFields(log.Fields{"login": login.fullname}).Error(common.ErrObjectAccessDenied.Error())
+			restRespAccessDenied(w, login)
+			return
+		}
+
+		// if it's empty request body, returns a pre-created apikey
+		tmpGuid, _ := utils.GetGuid()
+
+		var resp api.RESTApikeyData
+		resp.Apikey = &api.RESTApikey{
+			AccessKey: fmt.Sprintf("token-%s", utils.RandomString(5)),
+			SecretKey: utils.EncryptPassword(tmpGuid),
+		}
+		restRespSuccess(w, r, &resp, nil, nil, nil, "Create Apikey")
+		return
+	}
+
+	var rconf api.RESTApikeyData
+	err := json.Unmarshal(body, &rconf)
+	if err != nil || rconf.Apikey == nil {
+		e := "Request error"
+		log.WithFields(log.Fields{"error": err}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
+
+	rapikey := rconf.Apikey
+	accesskey := rapikey.AccessKey
+	if accesskey[0] == '~' {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	// only english characters, numbers and -,_ allowed 
+	if !isApiAccessKeyFormatValid(accesskey) {
+		e := "Invalid characters in accesskey"
+		log.WithFields(log.Fields{"login": login.fullname, "create": rapikey.AccessKey}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
+		return
+	}
+
+	if e := isValidRoleDomains(rapikey.AccessKey, rapikey.Role, rapikey.RoleDomains, true); e != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
+		return
+	}
+
+	// 1. Only fedAdmin can create users with fedAdmin/fedReader role (on master cluster)
+	// 2. For every domain that a namespace user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
+	apikey := share.CLUSApikey{
+		ExpirationType:    rapikey.ExpirationType,
+		ExpirationHours:   rapikey.ExpirationHours,
+		AccessKey:         rapikey.AccessKey,
+		Description:       rapikey.Description,
+		Role:              rapikey.Role,
+		RoleDomains:       rapikey.RoleDomains,
+		Locale:            rapikey.Locale,
+		CreatedTimestamp:  time.Now().UTC().Unix(),
+		CreatedByEntity:   login.fullname,
+	}
+	if !acc.AuthorizeOwn(&apikey, nil) {
+		log.WithFields(log.Fields{"login": login.fullname, "apikey": rapikey.AccessKey}).Error(common.ErrObjectAccessDenied.Error())
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	if apikey.Locale == "" {
+		apikey.Locale = common.OEMDefaultUserLocale
+	}
+
+	// calculate expiration time
+	now := time.Now()
+	switch rapikey.ExpirationType {
+	case api.ApikeyExpireNever:
+		apikey.ExpirationTimestamp = math.MaxInt64 
+	case api.ApikeyExpireOneDay:
+		apikey.ExpirationTimestamp = now.AddDate(0, 0, 1).UTC().Unix()
+	case api.ApikeyExpireOneMonth:
+		apikey.ExpirationTimestamp = now.AddDate(0, 1, 0).UTC().Unix()
+	case api.ApikeyExpireOneYear:
+		apikey.ExpirationTimestamp = now.AddDate(1, 0, 0).UTC().Unix()
+	case api.ApikeyExpireCustomHour:
+		apikey.ExpirationTimestamp = now.Add(time.Duration(rapikey.ExpirationHours) * time.Hour).UTC().Unix()
+	default:
+		e := "invalid expiration type"
+		log.WithFields(log.Fields{"AccessKey": rapikey.AccessKey, "ExpirationType": rapikey.ExpirationType}).Error(e)	
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
+
+	var lock cluster.LockInterface
+	if lock, err = lockClusKey(w, share.CLUSLockApikeyKey); err != nil {
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	// Check if apikey already exists
+	if apikeyExisting, _, _ := clusHelper.GetApikeyRev(rapikey.AccessKey, acc); apikeyExisting != nil {
+		e := "apikey AccessKey already exists"
+		log.WithFields(log.Fields{"AccessKey": login.fullname, "create": rapikey.AccessKey}).Error(e)	
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
+		return
+	}
+
+	// Check if this password is generated by us... try to decrypt it...
+	decrypt := utils.DecryptPassword(rapikey.SecretKey)
+	if len(decrypt) != 32 {
+		e := "apikey SecretKey is invalid"
+		log.WithFields(log.Fields{"AccessKey": login.fullname, "create": rapikey.AccessKey})
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
+
+	apikey.SecretKeyHash = utils.HashPassword(rapikey.SecretKey)
+
+	if e := normalizeApikeyRoles(&apikey); e != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
+		return
+	}
+
+	if err := clusHelper.CreateApikey(&apikey); err != nil {
+		e := "Failed to write to the cluster"
+		log.WithFields(log.Fields{"error": err}).Error(e)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)
+		return
+	}
+
+	restRespSuccess(w, r, nil, acc, login, &rconf, "Create apikey")
+}
+
+func handlerApikeyDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	accesskey := ps.ByName("accesskey")
+	accesskey, _ = url.PathUnescape(accesskey)
+
+	// Retrieve user from the cluster
+	apikey, _, err := clusHelper.GetApikeyRev(accesskey, acc)
+	if apikey == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	// 1. Users with fedAdmin/fedReader role can only be deleted by fedAdmins (on master cluster)
+	// 2. For every domain that a namespace user is in, the deleter must have PERM_AUTHORIZATION(modify) permission in the domain
+	if !acc.AuthorizeOwn(apikey, nil) {
+		log.WithFields(log.Fields{"login": login.fullname, "apikey.AccessKey": apikey.AccessKey}).Error(common.ErrObjectAccessDenied.Error())
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	if err := clusHelper.DeleteApikey(accesskey); err != nil {
+		e := "Failed to write to delete the apikey"
+		log.WithFields(log.Fields{"error": err, "apikey.AccessKey": accesskey}).Error(e)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)
+		return
+	}
+
+	restRespSuccess(w, r, nil, acc, login, nil, "Delete apikey")
+}
+
+// API used to get the apikey from token.
+func handlerSelfApikeyShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if login.fullname == "" {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	// Retrieve apikey from the cluster
+	apikey, _, err := clusHelper.GetApikeyRev(login.fullname, access.NewReaderAccessControl())
+	if apikey == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	resp := api.RESTSelfApikeyData{Apikey: apikey2REST(apikey)}
+
+	resp.GlobalPermits, resp.DomainPermits, _ = access.GetDomainPermissions(apikey.Role, apikey.RoleDomains)
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get self apikey detail")
+}
+
+func apikey2REST(apikey *share.CLUSApikey) *api.RESTApikey {
+	return &api.RESTApikey{
+		ExpirationType:      apikey.ExpirationType,
+		ExpirationHours:     apikey.ExpirationHours,
+		AccessKey:           apikey.AccessKey,
+		Description:         apikey.Description,
+		Locale:              apikey.Locale,
+		Role:                apikey.Role,
+		RoleDomains:         apikey.RoleDomains,
+		ExpirationTimestamp: apikey.ExpirationTimestamp,
+		CreatedTimestamp:    apikey.CreatedTimestamp,
+		CreatedByEntity:     apikey.CreatedByEntity,
+	}
+}
+
+func isApiAccessKeyFormatValid(name string) bool {
+	if !isObjectNameWithSpaceValid(name) {
+		return false
+	}
+
+	valid, _ := regexp.MatchString("^[a-zA-Z0-9_-]+$", name)
+	return valid
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -382,6 +383,23 @@ func handlerRoleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 						}
 					}
 				}
+			}
+		}
+	}
+
+	// Check if the role is referenced by any apikey
+	now := time.Now()
+	apikeys := clusHelper.GetAllApikeysNoAuth()
+	for _, apikey := range apikeys {
+		if now.UTC().Unix() >= apikey.ExpirationTimestamp  {
+			continue
+		}
+
+		if apikey.Role == name {
+			recordRoleInUse(roleRefInfo, "Apikey", apikey.AccessKey)
+		} else {
+			if domains, ok := apikey.RoleDomains[name]; ok && len(domains) > 0 {
+				recordRoleInUse(roleRefInfo, "Apikey", apikey.AccessKey)
 			}
 		}
 	}
