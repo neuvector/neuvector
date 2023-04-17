@@ -113,20 +113,46 @@ func criGetStatus(conn *grpc.ClientConn, ctx context.Context) (*criRT.StatusResp
 	return criRT.NewRuntimeServiceClient(conn).Status(ctx, &criRT.StatusRequest{Verbose: true})
 }
 
-func criListContainers(conn *grpc.ClientConn, ctx context.Context) (*criRT.ListContainersResponse, error) {
+func criListContainers(conn *grpc.ClientConn, ctx context.Context, bRunning bool) (*criRT.ListContainersResponse, error) {
 	if bCriApiV1Alpha2 {
-		resp_containers, err := pb.NewRuntimeServiceClient(conn).ListContainers(ctx, &pb.ListContainersRequest{})
+		flt := &pb.ContainerFilter{}
+		if bRunning {
+			flt.State = &pb.ContainerStateValue{ State: pb.ContainerState_CONTAINER_RUNNING}
+		} else {
+			flt.State = &pb.ContainerStateValue{ State: pb.ContainerState_CONTAINER_EXITED}
+		}
+		resp_containers, err := pb.NewRuntimeServiceClient(conn).ListContainers(ctx, &pb.ListContainersRequest{Filter: flt})
 		return (*criRT.ListContainersResponse)(unsafe.Pointer(resp_containers)), err
 	}
-	return criRT.NewRuntimeServiceClient(conn).ListContainers(ctx, &criRT.ListContainersRequest{})
+
+	flt := &criRT.ContainerFilter{}
+	if bRunning {
+		flt.State = &criRT.ContainerStateValue{ State: criRT.ContainerState_CONTAINER_RUNNING}
+	} else {
+		flt.State = &criRT.ContainerStateValue{ State: criRT.ContainerState_CONTAINER_EXITED}
+	}
+	return criRT.NewRuntimeServiceClient(conn).ListContainers(ctx, &criRT.ListContainersRequest{Filter: flt})
 }
 
-func criListPodSandboxes(conn *grpc.ClientConn, ctx context.Context) (*criRT.ListPodSandboxResponse, error) {
+func criListPodSandboxes(conn *grpc.ClientConn, ctx context.Context, bReady bool) (*criRT.ListPodSandboxResponse, error) {
 	if bCriApiV1Alpha2 {
-		resp_sandboxes, err := pb.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &pb.ListPodSandboxRequest{})
+		flt := &pb.PodSandboxFilter{}
+		if bReady {
+			flt.State = &pb.PodSandboxStateValue{ State: pb.PodSandboxState_SANDBOX_READY}
+		} else {
+			flt.State = &pb.PodSandboxStateValue{ State: pb.PodSandboxState_SANDBOX_NOTREADY}
+		}
+		resp_sandboxes, err := pb.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &pb.ListPodSandboxRequest{Filter: flt})
 		return (*criRT.ListPodSandboxResponse)(unsafe.Pointer(resp_sandboxes)), err
 	}
-	return criRT.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{})
+
+	flt := &criRT.PodSandboxFilter{}
+	if bReady {
+		flt.State = &criRT.PodSandboxStateValue{ State: criRT.PodSandboxState_SANDBOX_READY}
+	} else {
+		flt.State = &criRT.PodSandboxStateValue{ State: criRT.PodSandboxState_SANDBOX_NOTREADY}
+	}
+	return criRT.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{Filter: flt})
 }
 
 func criPodSandboxStatus(conn *grpc.ClientConn, ctx context.Context, id string) (*criRT.PodSandboxStatusResponse, error) {
