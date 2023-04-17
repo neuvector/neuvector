@@ -304,48 +304,55 @@ func (d *crioDriver) isPrivileged(pod *criRT.PodSandboxStatus, cinfo *criContain
 // the crio API with specific container ID, we can retrieve the pod container info. The
 // later is usually triggered by process monitoring
 func (d *crioDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
+	var metas []*ContainerMeta
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	resp_containers, err := criListContainers(d.criClient, ctx)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
-		return nil, err
+	if resp_containers, err := criListContainers(d.criClient, ctx, true); err == nil && resp_containers != nil {
+		for _, c := range resp_containers.Containers {
+			m, err := d.getContainer(c.Id, ctx)
+			if err != nil {
+				log.WithFields(log.Fields{"container": c.Id, "error": err}).Error("Fail: container")
+				continue
+			}
+			metas = append(metas, &m.ContainerMeta)
+		}
 	}
 
-	resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
-		return nil, err
+	if resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx, true); err == nil && resp_sandboxes != nil {
+		for _, pod := range resp_sandboxes.Items {
+			m, err := d.getContainer(pod.Id, ctx)
+			if err != nil {
+				log.WithFields(log.Fields{"sandbox": pod.Id, "error": err}).Error("Fail: sandbox")
+				continue
+			}
+			metas = append(metas, &m.ContainerMeta)
+		}
 	}
 
-	metas := make([]*ContainerMeta, 0, len(resp_containers.Containers)+len(resp_sandboxes.Items))
-	for _, pod := range resp_sandboxes.Items {
-		if runningOnly && pod.State != criRT.PodSandboxState_SANDBOX_READY {
-			continue
+	if !runningOnly {
+		if exited_containers, err := criListContainers(d.criClient, ctx, false); err == nil && exited_containers != nil {
+			for _, c := range exited_containers.Containers {
+				m, err := d.getContainer(c.Id, ctx)
+				if err != nil {
+					log.WithFields(log.Fields{"container": c.Id, "error": err}).Error("Fail: exited container")
+					continue
+				}
+				metas = append(metas, &m.ContainerMeta)
+			}
 		}
 
-		m, err := d.getContainer(pod.Id, ctx)
-		if err != nil {
-			log.WithFields(log.Fields{"sandbox": pod.Id, "error": err}).Error("Fail: sandbox")
-			continue
+		if exited_sandboxes, err := criListPodSandboxes(d.criClient, ctx, false); err == nil && exited_sandboxes != nil {
+			for _, pod := range exited_sandboxes.Items {
+				m, err := d.getContainer(pod.Id, ctx)
+				if err != nil {
+					log.WithFields(log.Fields{"sandbox": pod.Id, "error": err}).Error("Fail: exited sandbox")
+					continue
+				}
+				metas = append(metas, &m.ContainerMeta)
+			}
 		}
-		if runningOnly && !m.Running {
-			continue
-		}
-		metas = append(metas, &m.ContainerMeta)
-	}
-
-	for _, c := range resp_containers.Containers {
-		m, err := d.getContainer(c.Id, ctx)
-		if err != nil {
-			log.WithFields(log.Fields{"container": c.Id, "error": err}).Error("Fail: container")
-			continue
-		}
-		if runningOnly && !m.Running {
-			continue
-		}
-		metas = append(metas, &m.ContainerMeta)
 	}
 	return metas, nil
 }
@@ -525,7 +532,7 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	resp_containers, err := criListContainers(d.criClient, ctx)
+	resp_containers, err := criListContainers(d.criClient, ctx, true)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to list containers")
 
@@ -542,37 +549,33 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 			}
 			return ids, nil
 		}
-	}
-
-	d.failedQueryCnt = 0	// reset
-	resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to list sandboxes")
-		return ids, nil
-	}
-
-	// log.WithFields(log.Fields{"sandbox": resp_sandboxes, "containers": resp_containers}).Debug("")
-	for _, c := range resp_containers.Containers {
-		switch c.GetState() {
-		case criRT.ContainerState_CONTAINER_EXITED:
-			stops.Add(c.Id)
-			ids.Add(c.Id)
-		case criRT.ContainerState_CONTAINER_UNKNOWN: // do nothing
-		default: // criRT.ContainerState_CONTAINER_RUNNING, criRT.ContainerState_CONTAINER_CREATED
+	} else if resp_containers != nil {
+		for _, c := range resp_containers.Containers {
 			ids.Add(c.Id)
 		}
 	}
 
-	///
-	for _, pod := range resp_sandboxes.Items {
-		switch pod.GetState() {
-		case criRT.PodSandboxState_SANDBOX_READY:
+	if exited_containers, err := criListContainers(d.criClient, ctx, false); err == nil && exited_containers != nil {
+		for _, c := range exited_containers.Containers {
+			stops.Add(c.Id)
+			ids.Add(c.Id)
+		}
+	}
+
+	d.failedQueryCnt = 0	// reset
+	if resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx, true); err == nil && resp_sandboxes != nil {
+		for _, pod := range resp_sandboxes.Items {
 			ids.Add(pod.Id)
-		case criRT.PodSandboxState_SANDBOX_NOTREADY:
+		}
+	}
+
+	if exited_sandboxes, err := criListPodSandboxes(d.criClient, ctx, true); err == nil && exited_sandboxes != nil {
+		for _, pod := range exited_sandboxes.Items {
 			stops.Add(pod.Id)
 			ids.Add(pod.Id)
 		}
 	}
+
 	return ids, stops
 }
 
