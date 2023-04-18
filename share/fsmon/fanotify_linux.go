@@ -500,7 +500,7 @@ func (fn *FaNotify) addFile(path string, filter interface{}, protect, isDir, use
 			learnt:  r.accessMonitor, // discover mode
 			userAdd: userAdded,
 		}
-
+// JAYU NOTE
 		r.paths[rPath] = file
 	}
 
@@ -705,7 +705,11 @@ func (fn *FaNotify) lookupFile(r *rootFd, linkPath string, pInfo *ProcInfo) (*IF
 		ifile.userAdd = dir.userAdd
 		if fi, ok := dir.files[filename]; ok {
 			ifile.params = fi
-		} else if dir.filter != nil && dir.filter.regex != nil && dir.filter.regex.MatchString(linkPath) {
+			// If statement below always fails!
+		} else if dir.filter != nil && dir.filter.regex != nil && dir.filter.regex.MatchString(path.Dir(linkPath)) {
+
+			log.WithFields(log.Fields{"file": linkPath,
+				"regex": dir.filter.regex.String()}).Debug("JAYU FMON: new file")
 			ifile.params = dir.params
 			mask = syscall.IN_CREATE
 			if fn.isFileException(r.bNeuVectorSvc, linkPath, nil, mask) {

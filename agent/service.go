@@ -550,6 +550,7 @@ func cbContainerStats(buf []byte, param interface{}) bool {
 	var stats C.DPMsgStats
 	binary.Read(r, binary.BigEndian, &stats)
 
+	log.WithFields(log.Fields{"trafficstats": stats, "data": data.String()}).Debug("JAYU POPULATING TRAFFIC STATS")
 	populateTrafficStats(data, &stats)
 
 	return true
@@ -582,6 +583,7 @@ func cbAgentStats(buf []byte, param interface{}) bool {
 
 	var stats C.DPMsgStats
 	binary.Read(r, binary.BigEndian, &stats)
+	log.WithFields(log.Fields{"trafficstats": stats, "data": data.String()}).Debug("JAYU POPULATING TRAFFIC STATS")
 
 	populateTrafficStats(data, &stats)
 
@@ -608,6 +610,7 @@ func (rs *RPCService) GetStats(ctx context.Context, f *share.CLUSFilter) (*share
 			gInfoRUnlock()
 
 			dp.DPCtrlStatsMAC(macs, cbContainerStats, &stats)
+			log.WithFields(log.Fields{"trafficstats": stats,}).Debug("JAYU POPULATING TRAFFIC STATS")
 
 			gInfoRLock()
 			system.PopulateSystemStats(&stats, &c.stats)
@@ -616,6 +619,8 @@ func (rs *RPCService) GetStats(ctx context.Context, f *share.CLUSFilter) (*share
 			gInfoRUnlock()
 		}
 	} else {
+		log.WithFields(log.Fields{"cbAgentStats": stats,}).Debug("JAYU POPULATING cbAgentStats STATS")
+
 		dp.DPCtrlStatsAgent(cbAgentStats, &stats)
 
 		if agentEnv.runInContainer {

@@ -528,6 +528,7 @@ func (cs *ControllerService) GetStats(ctx context.Context, v *share.RPCVoid) (*s
 		Span12:   &share.CLUSMetry{},
 		Span60:   &share.CLUSMetry{},
 	}
+	log.WithFields(log.Fields{"stats": gInfo.stats}).Debug("JAYU populate stats")
 
 	gInfo.mutex.Lock()
 	system.PopulateSystemStats(&stats, &gInfo.stats)

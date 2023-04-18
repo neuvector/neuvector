@@ -272,6 +272,7 @@ func GetControllerStat(ip string, port uint16) (*share.CLUSStats, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
 	defer cancel()
+	log.Debug("JAYU controller stats")
 
 	return client.GetStats(ctx, &share.RPCVoid{})
 }

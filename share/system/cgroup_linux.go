@@ -294,6 +294,8 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
+		// JAYU
+		// we don't need to do this for cgroup v2...
 		if len(tokens) > 2 {
 			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
 			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
@@ -308,23 +310,33 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 // cgroup v2 is collected inside an unified file folder
 func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	var path string
+	path = "/proc/self/cgroup"
 	if pid == 0 { // self
 		path = "/proc/self/cgroup"
 	} else {
 		path = filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
 	}
+	log.WithFields(log.Fields{"path": path}).Info("JAYU attempting to check cgroup path")
 
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
-	}
+		log.WithFields(log.Fields{"path": path, "err": err}).Error("JAYU cpath is not found... reverting path	")
 
+		return path, err
+	}
+	defer 	f.Close()
+
+	// jayu
+	log.WithFields(log.Fields{"path": path}).Info("JAYU getting the real cpath...")
 	cpath := getCgroupPathReaderV2(f)
-	f.Close()
 
-	if pid != 0 {
-		cpath = filepath.Join("/proc", strconv.Itoa(pid), "root", cpath)
-	}
+
+	// This might be an issue
+	//if pid != 0 {
+	//	cpath = filepath.Join("/proc", strconv.Itoa(pid), "root", cpath)
+	//}
+	log.WithFields(log.Fields{"path": cpath, "pid": pid}).Info("JAYU got cgroup path")
+
 	return cpath, nil
 
 }
@@ -337,10 +349,14 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		}
 	*/
 
+	log.WithFields(log.Fields{"pid": pid, "subsyste": subsystem, "cgroupversion": s.cgroupVersion}).Info("JAYU checking path with cgroup version")
+
 	// Alternative: it might not be necessary to obtain cgroup path as before
 	var path string
 	switch s.cgroupVersion {
 	case cgroup_v1:
+		log.WithFields(log.Fields{"path": path, "pid": pid, "subsystem": subsystem, "cgroupversion": s.cgroupVersion}).Info("JAYU conatiner is v1 container cgroup")
+
 		// It is a well-known path: /proc/<pid>/root/sys/fs/cgroup/<subsystem>
 		if pid == 0 { // self
 			path = filepath.Join("/sys/fs/cgroup", subsystem)
@@ -348,14 +364,20 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
 		}
 		if _, err := os.Stat(path); err == nil {
+			log.WithFields(log.Fields{"path": path, "pid": pid, "subsystem": subsystem, "cgroupversion": s.cgroupVersion}).Info("JAYU return cgroup v1 path")
 			return path, nil
 		}
 	case cgroup_v2:
 		// unified file structure
+		pth, err :=  getCgroupPath_cgroup_v2(pid)
+			log.WithFields(log.Fields{"path": pth, "pid": pid, "subsystem": subsystem, "cgroupversion": s.cgroupVersion, "err": err}).Info("JAYU container cgroup v2 path")
+		//}
 		return getCgroupPath_cgroup_v2(pid)
 	}
+	log.WithFields(log.Fields{"path": path, "pid": pid, "subsystem": subsystem, "cgroupversion": s.cgroupVersion}).Info("JAYU got container cgroup path - handling")
 
 	// However, the k8s POD does not have those subsystem folders
+	// containerd should have these folders. cgroups are part of the kernel not the container runtime afaik
 	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
 	f, err := os.Open(path)
 	if err != nil {
@@ -519,6 +541,7 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("JAYU Could not find file")
 			return nil
 		}
 		return err
@@ -587,6 +610,8 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		}
 	}
 	mStats.WorkingSet = workingSet
+	log.WithFields(log.Fields{"path": path, "fullpath": filePath, "mStats": *mStats}).Debug("JAYU Logging memory metrics")
+
 	return nil
 }
 
@@ -597,6 +622,8 @@ func (s *SystemTools) statCpu(path string, stats *CpuStats) error {
 		return err
 	}
 	defer f.Close()
+
+	//log.WithFields(log.Fields{"path": path, "fullpath": f}).Debug("JAYU Logging cpu metrics path")
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
@@ -619,6 +646,8 @@ func (s *SystemTools) statCpu(path string, stats *CpuStats) error {
 			stats.ThrottlingData.ThrottledTime = v * 1000
 		}
 	}
+	log.WithFields(log.Fields{"path": path, "fullpath": f, "stats": *stats}).Debug("JAYU Logging cpu metrics")
+
 	return nil
 }
 
