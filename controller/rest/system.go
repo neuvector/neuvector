@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -1812,10 +1813,18 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		ClusterRoleBindingErrors: emptySlice,
 		RoleBindingErrors:        emptySlice,
 		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
+		NvCrdSchemaErrors:        emptySlice,
 	}
 	if k8sPlatform {
 		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, false)
+		if checkCrdSchemaFunc != nil {
+			var leader bool
+			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
+				leader = true
+			}
+			resp.NvCrdSchemaErrors = checkCrdSchemaFunc(leader, false)
+		}
 	}
 
 	var nvUpgradeInfo share.CLUSCheckUpgradeInfo

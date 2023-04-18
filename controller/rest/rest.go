@@ -94,6 +94,8 @@ var restErrWorkloadNotFound error = errors.New("Container is not found")
 var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
+var checkCrdSchemaFunc func(lead, create bool) []string
+
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
 	api.RESTErrMethodNotAllowed:      "Method not allowed",
@@ -1228,18 +1230,19 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev         *common.LocalDevice
-	EvQueue          cluster.ObjectQueueInterface
-	AuditQueue       cluster.ObjectQueueInterface
-	Messenger        cluster.MessengerInterface
-	Cacher           cache.CacheInterface
-	Scanner          scan.ScanInterface
-	FedPort          uint
-	RESTPort         uint
-	PwdValidUnit     uint
-	TeleNeuvectorURL string
-	TeleCurrentVer   string
-	TeleFreq         uint
+	LocalDev           *common.LocalDevice
+	EvQueue            cluster.ObjectQueueInterface
+	AuditQueue         cluster.ObjectQueueInterface
+	Messenger          cluster.MessengerInterface
+	Cacher             cache.CacheInterface
+	Scanner            scan.ScanInterface
+	FedPort            uint
+	RESTPort           uint
+	PwdValidUnit       uint
+	TeleNeuvectorURL   string
+	TeleCurrentVer     string
+	TeleFreq           uint
+	CheckCrdSchemaFunc func(leader, create bool) []string
 }
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
@@ -1259,6 +1262,7 @@ func InitContext(ctx *Context) {
 	_fedPort = ctx.FedPort
 	_fedServerChan = make(chan bool, 1)
 	crdEventProcTicker = time.NewTicker(crdEventProcPeriod)
+	checkCrdSchemaFunc = ctx.CheckCrdSchemaFunc
 
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
 		_pwdValidUnit = time.Duration(ctx.PwdValidUnit)
