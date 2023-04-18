@@ -135,6 +135,16 @@ func systemConfigNetPolicy(disableNetPolicy bool) {
 	dp.DPCtrlSetDisableNetPolicy(&dnp)
 }
 
+func systemConfigUnmanagedWl(detectUnmanagedWl bool) {
+	if gInfo.detectUnmanagedWl == detectUnmanagedWl {
+		return
+	}
+	gInfo.detectUnmanagedWl = detectUnmanagedWl
+	//set detectUnmanagedWl to dp
+	duw := gInfo.detectUnmanagedWl
+	dp.DPCtrlSetDetectUnmanagedWl(&duw)
+}
+
 func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -146,11 +156,13 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigTapProxymesh(conf.TapProxymesh)
 		systemConfigXff(conf.XffEnabled)
 		systemConfigNetPolicy(conf.DisableNetPolicy)
+		systemConfigUnmanagedWl(conf.DetectUnmanagedWl)
 	case cluster.ClusterNotifyDelete:
 		systemConfigPolicyMode(defaultPolicyMode)
 		systemConfigTapProxymesh(defaultTapProxymesh)
 		systemConfigXff(defaultXffEnabled)
 		systemConfigNetPolicy(defaultDisableNetPolicy)
+		systemConfigUnmanagedWl(defaultDetectUnmanagedWl)
 	}
 }
 

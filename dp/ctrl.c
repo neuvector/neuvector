@@ -2270,6 +2270,24 @@ static int dp_ctrl_disable_net_policy(json_t *msg)
     return 0;
 }
 
+uint8_t g_detect_unmanaged_wl = 0;
+
+static int dp_ctrl_detect_unmanaged_wl(json_t *msg)
+{
+    json_t *detect_unmanaged_wl_obj;
+    bool detect_unmanaged_wl = false;
+
+    detect_unmanaged_wl_obj = json_object_get(msg, "detect_unmanaged_wl");
+    if (detect_unmanaged_wl_obj != NULL) {
+        detect_unmanaged_wl = json_boolean_value(detect_unmanaged_wl_obj);
+    }
+    g_detect_unmanaged_wl = detect_unmanaged_wl ? 1 : 0;
+
+    DEBUG_CTRL("g_detect_unmanaged_wl=%u\n", g_detect_unmanaged_wl);
+
+    return 0;
+}
+
 #define BUF_SIZE 8192
 char ctrl_msg_buf[BUF_SIZE];
 static int dp_ctrl_handler(int fd)
@@ -2369,6 +2387,8 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_sys_conf(msg);
         } else if (strcmp(key, "ctrl_disable_net_policy") == 0) {
             ret = dp_ctrl_disable_net_policy(msg);
+        } else if (strcmp(key, "ctrl_detect_unmanaged_wl") == 0) {
+            ret = dp_ctrl_detect_unmanaged_wl(msg);
         }
         DEBUG_CTRL("\"%s\" done\n", key);
     }
