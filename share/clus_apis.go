@@ -2690,6 +2690,4 @@ type CLUSApikey struct {
 	ExpirationTimestamp int64               `json:"expiration_timestamp"`
 	CreatedTimestamp    int64               `json:"created_timestamp"`
 	CreatedByEntity     string              `json:"created_by_entity"`	 // it could be username or apikey (access key)
-	FailedAccessCount   uint32              `json:"failed_access_count"` // failed consecutive access failure. reset to 0 after a successful access
-	BlockAccessSince    time.Time           `json:"block_access_since"`  // reset to 0 after a successful access
 }

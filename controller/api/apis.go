@@ -3427,6 +3427,15 @@ type RESTApikey struct {
 	CreatedByEntity       string              `json:"created_by_entity"`	  // it could be username or apikey (access key)
 }
 
+type RESTApikeyPreGeneratedData struct {
+	Apikey *RESTApikeyPreGenerated `json:"apikey"`
+}
+
+type RESTApikeyPreGenerated struct {
+	Name       string  `json:"apikey_name"`
+	SecretKey  string  `json:"apikey_secret"`
+}
+
 type RESTApikeysData struct {
 	Apikeys     []*RESTApikey `json:"apikeys"`
 	GlobalRoles []string      `json:"global_roles"`

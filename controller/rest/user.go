@@ -1170,8 +1170,8 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		// if it's empty request body, returns a pre-created apikey
 		tmpGuid, _ := utils.GetGuid()
 
-		var resp api.RESTApikeyData
-		resp.Apikey = &api.RESTApikey{
+		var resp api.RESTApikeyPreGeneratedData
+		resp.Apikey = &api.RESTApikeyPreGenerated{
 			Name: fmt.Sprintf("token-%s", utils.RandomString(5)),
 			SecretKey: utils.EncryptPassword(tmpGuid),
 		}

@@ -579,7 +579,7 @@ func TestApikeyCreateDelete(t *testing.T) {
 	data := api.RESTApikeyData{Apikey: &api.RESTApikey{
 		ExpirationType: "never",
 		Description: "unit-test",
-		AccessKey: "token-12345", 
+		Name: "token-12345", 
 		SecretKey: "0u+tVOWNPRfpCK7p9qznEpnzr/K+a3rYqYBNgz3GVgqIh7n+66OEJf9gTdnmFDgq", 
 		Role: api.UserRoleReader,
 	}}
@@ -595,7 +595,7 @@ func TestApikeyCreateDelete(t *testing.T) {
 	if apikey == nil {
 		t.Fatalf("Failed to locate apikey in cluster")
 	}
-	if apikey.AccessKey != "token-12345" || apikey.Role != api.UserRoleReader {
+	if apikey.Name != "token-12345" || apikey.Role != api.UserRoleReader {
 		t.Errorf("Incorrect apikey in cluster: user=%v", apikey)
 	}
 
@@ -611,7 +611,7 @@ func TestApikeyCreateDelete(t *testing.T) {
 		t.Errorf("Incorrect apikey count in rest: count=%v expect=1", len(resp.Apikeys))
 	}
 	user := resp.Apikeys[0]
-	if user.AccessKey != "token-12345" || user.Role != api.UserRoleReader {
+	if user.Name != "token-12345" || user.Role != api.UserRoleReader {
 		t.Errorf("Incorrect apikey in rest: user=%v", *user)
 	}
 
