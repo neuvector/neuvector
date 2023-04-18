@@ -997,7 +997,6 @@ func (w *FileWatch) getDirFileList(pid int, base, regexStr, cid string, flt inte
 				continue
 			}
 
-			//JAYU NOTE
 			if regx.MatchString(path) {
 				// log.WithFields(log.Fields{"path": path, "fstr": fstr}).Debug()
 				if files := osutil.GetFileInfoExtFromPath(pid, path, flt, protect, userAdded); files != nil {
@@ -1065,7 +1064,6 @@ func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
 		log.WithFields(log.Fields{"path": startDir, "error": err}).Error()
 	}
 
-	// JAYU NOTE
 	for _, d := range res.Dirs {
 		path := filepath.Join(realPath, d.Dir)
 		if regxDir.MatchString(path) {

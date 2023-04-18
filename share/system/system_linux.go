@@ -101,23 +101,14 @@ func NewSystemTools() *SystemTools {
 		// update cgroup v2 path
 		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
 			s.cgroupMemoryDir = path
-			log.WithField("path", path).Info("JAYU cgroup v2 path")
 		} else {
 			s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
-			log.WithField("path", path).Info("JAYU cgroup v2 hardline")
 		}
 	} else {
 		log.Info("cgroup v1")
 		s.cgroupVersion = cgroup_v1
 		s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
-		log.Info("JAYU cgroup v1 path")
-
 	}
-
-	log.WithFields(log.Fields{"path": s.cgroupDir,
-		"version": s.cgroupVersion,
-	"mem": s.cgroupMemoryDir,}).Info("JAYU cgroup is")
-
 	return s
 }
 
