@@ -587,7 +587,6 @@ func handlerWorkloadStats(w http.ResponseWriter, r *http.Request, ps httprouter.
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrClusterRPCError, "Fail to make the RPC call")
 		return
 	}
-	log.WithFields(log.Fields{"stats": stats.String()}).Error("JAYU GETTING WORKLOAD STATS")
 
 	var resp api.RESTWorkloadStatsData
 	resp.ID = id

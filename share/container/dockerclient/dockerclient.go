@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -596,7 +595,6 @@ func (client *DockerClient) getStats(id string, cb StatCallback, ec chan error, 
 		return
 	}
 	defer resp.Body.Close()
-	log.WithFields(log.Fields{"uri": uri}).Debug("JAYU populate docker stats")
 
 	dec := json.NewDecoder(resp.Body)
 	for atomic.LoadInt32(&client.monitorStats) > 0 {

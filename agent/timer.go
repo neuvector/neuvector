@@ -80,18 +80,15 @@ func statsLoop(bPassiveContainerDetect bool) {
 	}
 	runStateTicker := time.Tick(time.Second * time.Duration(stateTimerInterval))
 
-	log.WithFields(log.Fields{"stateTimerInterval": stateTimerInterval, "tick": time.Second.String()}).Info("JAYU STarting the ticket select loop")
 	for {
 		select {
 		case <-statsTicker:
-			log.Error("JAYU statsTicker TICKEr IS FIRING @@@")
 			system, _ := global.SYS.GetHostCPUUsage()
 			gInfoRLock()
 			updateAgentStats(system)
 			updateContainerStats(system)
 			gInfoRUnlock()
 		case <-runStateTicker:
-			log.Error("JAYU runStateTicker TICKEr IS FIRING @@@")
 			// Check container periodically in case container removal event is missed.
 			existing, stops := global.RT.ListContainerIDs()
 			gInfoRLock()
@@ -122,8 +119,6 @@ func statsLoop(bPassiveContainerDetect bool) {
 			creates.Clear()
 			gone, creates = nil, nil
 		case <-memStatsTicker.C:
-			log.Error("JAYU memStatsTicker TICKEr IS FIRING @@@")
-
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
 			agentMem := m.TotalAlloc
@@ -196,16 +191,6 @@ func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 		mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
 		cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-		log.WithFields(log.Fields{"Container.name": c.name,
-			"container.id": c.id,
-			"container.pods": c.pods,
-			"container.pid": c.pid,
-			"container.cgroupMemory": c.cgroupMemory,
-			"container.cgroupCPUAcct": c.cgroupCPUAcct,
-			"container.service": c.service,
-			"mem": mem,
-			"cpu": cpu,
-		}).Debug("JAYU Dumping out the container we're updating!")
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
 }

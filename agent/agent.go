@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -348,7 +348,7 @@ func main() {
 	// Set global objects at the very first
 	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err, "container_socket": *rtSock}).Error("Failed to initialize container runtime")
+		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
 		if err == global.ErrEmptyContainerList {
 			// Temporary get container list error
 			// => exit the process but the container doesn't need to be restarted
@@ -637,7 +637,6 @@ func main() {
 	clusterLoop(existing)
 	existing = nil
 
-	log.Error("JAYU STARTING THE STATS TIMER LOOP")
 	go statsLoop(bPassiveContainerDetect)
 	go timerLoop()
 
