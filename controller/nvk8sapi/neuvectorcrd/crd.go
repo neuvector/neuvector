@@ -8,6 +8,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
@@ -924,226 +927,276 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 	return v1
 }
 
-func configK8sCrdSchema(op, verRead string, crdInfo *resource.NvCrdInfo) error {
+// create the CustomResourceDefinition resource(schema) that is listed by "kubectl get CustomResourceDefinition"
+func createK8sCrdSchema(crdInfo *resource.NvCrdInfo) error {
 	var err error
+	var verRead string
+	var builder nvCrdSchmaBuilder
+
 	k8sVersionMajor, k8sVersionMinor := resource.GetK8sVersion()
-	if op == resource.Delete {
-		if k8sVersionMajor == 1 && k8sVersionMinor < 19 {
-			res := &apiextv1b1.CustomResourceDefinition{
-				Metadata: &metav1.ObjectMeta{
-					Name: &crdInfo.MetaName,
+	builder.Init()
+	if k8sVersionMajor == 1 && k8sVersionMinor < 19 {
+		res := &apiextv1b1.CustomResourceDefinition{
+			Metadata: &metav1.ObjectMeta{
+				Name:            &crdInfo.MetaName,
+				ResourceVersion: &verRead,
+			},
+			Spec: &apiextv1b1.CustomResourceDefinitionSpec{
+				Group:   &crdInfo.SpecGroup,
+				Version: &crdInfo.SpecVersion,
+				Names: &apiextv1b1.CustomResourceDefinitionNames{
+					Plural:   &crdInfo.SpecNamesPlural,
+					Kind:     &crdInfo.SpecNamesKind,
+					Singular: &crdInfo.SpecNamesSingular,
+					ListKind: &crdInfo.SpecNamesListKind,
 				},
-			}
-			err = global.ORCH.DeleteResource(resource.RscTypeCrd, res)
-		} else {
-			res := &apiextv1.CustomResourceDefinition{
-				Metadata: &metav1.ObjectMeta{
-					Name: &crdInfo.MetaName,
-				},
-			}
-			err = global.ORCH.DeleteResource(resource.RscTypeCrd, res)
+				Scope: &crdInfo.SpecScope,
+			},
 		}
+		v := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion)
+		res.Spec.Validation = v.Schema
+		err = global.ORCH.AddResource(resource.RscTypeCrd, res)
 	} else {
-		var builder nvCrdSchmaBuilder
-		builder.Init()
-		if k8sVersionMajor == 1 && k8sVersionMinor < 19 {
-			res := &apiextv1b1.CustomResourceDefinition{
-				Metadata: &metav1.ObjectMeta{
-					Name:            &crdInfo.MetaName,
-					ResourceVersion: &verRead,
+		res := &apiextv1.CustomResourceDefinition{
+			Metadata: &metav1.ObjectMeta{
+				Name:            &crdInfo.MetaName,
+				ResourceVersion: &verRead,
+			},
+			Spec: &apiextv1.CustomResourceDefinitionSpec{
+				Group: &crdInfo.SpecGroup,
+				//Version: &version, // Deprecated: specify `Versions`
+				Names: &apiextv1.CustomResourceDefinitionNames{
+					Plural:   &crdInfo.SpecNamesPlural,
+					Kind:     &crdInfo.SpecNamesKind,
+					Singular: &crdInfo.SpecNamesSingular,
+					ListKind: &crdInfo.SpecNamesListKind,
 				},
-				Spec: &apiextv1b1.CustomResourceDefinitionSpec{
-					Group:   &crdInfo.SpecGroup,
-					Version: &crdInfo.SpecVersion,
-					Names: &apiextv1b1.CustomResourceDefinitionNames{
-						Plural:   &crdInfo.SpecNamesPlural,
-						Kind:     &crdInfo.SpecNamesKind,
-						Singular: &crdInfo.SpecNamesSingular,
-						ListKind: &crdInfo.SpecNamesListKind,
-					},
-					Scope: &crdInfo.SpecScope,
-				},
-			}
-			v := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion)
-			res.Spec.Validation = v.Schema
-			if op == resource.Create {
-				err = global.ORCH.AddResource(resource.RscTypeCrd, res)
-			} else if op == resource.Update {
-				err = global.ORCH.UpdateResource(resource.RscTypeCrd, res)
-			}
-		} else {
-			res := &apiextv1.CustomResourceDefinition{
-				Metadata: &metav1.ObjectMeta{
-					Name:            &crdInfo.MetaName,
-					ResourceVersion: &verRead,
-				},
-				Spec: &apiextv1.CustomResourceDefinitionSpec{
-					Group: &crdInfo.SpecGroup,
-					//Version: &version, // Deprecated: specify `Versions`
-					Names: &apiextv1.CustomResourceDefinitionNames{
-						Plural:   &crdInfo.SpecNamesPlural,
-						Kind:     &crdInfo.SpecNamesKind,
-						Singular: &crdInfo.SpecNamesSingular,
-						ListKind: &crdInfo.SpecNamesListKind,
-					},
-					Scope: &crdInfo.SpecScope,
-				},
-			}
-			v := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion)
-			res.Spec.Versions = append(res.Spec.Versions, v)
-			if op == resource.Create {
-				err = global.ORCH.AddResource(resource.RscTypeCrd, res)
-			} else if op == resource.Update {
-				err = global.ORCH.UpdateResource(resource.RscTypeCrd, res)
-			}
+				Scope: &crdInfo.SpecScope,
+			},
 		}
+		v := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion)
+		res.Spec.Versions = append(res.Spec.Versions, v)
+		err = global.ORCH.AddResource(resource.RscTypeCrd, res)
 	}
+
 	return err
 }
 
-// create the CustomResourceDefinition resource(schema) that is listed by "kubectl get CustomResourceDefinition"
-func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share.CLUSAdmCtrlState) (bool, error) {
-	crdSchemaConfigured := false // crd schema is configured or not
-	crdSchemaExpected := false   // whether the configured crd schema is up-to-date
+func (b *nvCrdSchmaBuilder) compJSONSchemaV1(srcSchema, destSchema *apiextv1.JSONSchemaProps) bool {
+	if srcSchema == nil && destSchema == nil {
+		return true
+	}
+	if srcSchema == nil || destSchema == nil || srcSchema.GetType() != destSchema.GetType() ||
+		len(srcSchema.GetRequired()) != len(destSchema.GetRequired()) ||
+		len(srcSchema.GetEnum()) != len(destSchema.GetEnum()) ||
+		len(srcSchema.GetProperties()) != len(destSchema.GetProperties()) {
+		return false
+	}
 
-	var verRead string
-	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
-	if err == nil {
-		crdSchemaConfigured = true
-		if crdInfo.MetaName == resource.NvAdmCtrlSecurityRuleName {
-			if res, ok := obj.(*apiextv1.CustomResourceDefinition); ok && res.Spec != nil {
-				verRead = *res.Metadata.ResourceVersion
-
-				if len(res.Spec.Versions) > 0 {
-					schema := res.Spec.Versions[0].Schema
-					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if rules, ok := spec.Properties["rules"]; ok {
-								if crit, ok := rules.Items.Schema.Properties["criteria"]; ok {
-									if _, ok := crit.Items.Schema.Properties["template_kind"]; ok {
-										if _, ok := crit.Items.Schema.Properties["type"]; ok {
-											if _, ok := crit.Items.Schema.Properties["value"]; ok {
-												if _, ok := crit.Items.Schema.Properties["value_type"]; ok {
-													crdSchemaExpected = true
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			} else if res, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && res.Spec != nil {
-				verRead = *res.Metadata.ResourceVersion
-
-				if len(res.Spec.Versions) > 0 {
-					schema := res.Spec.Versions[0].Schema
-					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if rules, ok := spec.Properties["rules"]; ok {
-								if crit, ok := rules.Items.Schema.Properties["criteria"]; ok {
-									if _, ok := crit.Items.Schema.Properties["template_kind"]; ok {
-										if _, ok := crit.Items.Schema.Properties["type"]; ok {
-											if _, ok := crit.Items.Schema.Properties["value"]; ok {
-												if _, ok := crit.Items.Schema.Properties["value_type"]; ok {
-													crdSchemaExpected = true
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+	if srcSchema.GetType() == b.schemaTypeArray {
+		srcItems := srcSchema.GetItems()
+		destItems := destSchema.GetItems()
+		if !b.compJSONSchemaV1(srcItems.Schema, destItems.Schema) || len(srcItems.JSONSchemas) != len(destItems.JSONSchemas) {
+			return false
+		}
+		for _, srcItem := range srcItems.JSONSchemas {
+			found := false
+			for _, destItem := range destItems.JSONSchemas {
+				if b.compJSONSchemaV1(srcItem, destItem) {
+					found = true
+					break
 				}
 			}
+			if !found {
+				return false
+			}
+		}
 
-			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "verRead": verRead, "crdSchemaExpected": crdSchemaExpected}).Info("initK8sCrdSchema NvAdmCtrlSecurityRuleName")
-		} else if crdInfo.MetaName == resource.NvDlpSecurityRuleName || crdInfo.MetaName == resource.NvWafSecurityRuleName {
-			crdSchemaExpected = true
+		return true
+	}
+
+	srcRequired := srcSchema.GetRequired()
+	destRequired := destSchema.GetRequired()
+	sort.Strings(srcRequired)
+	sort.Strings(destRequired)
+	for i, r := range srcRequired {
+		if r != destRequired[i] {
+			return false
+		}
+	}
+
+	for _, srcEnum := range srcSchema.GetEnum() {
+		found := false
+		for _, destEnum := range destSchema.GetEnum() {
+			if srcEnum == nil && destEnum == nil {
+				found = true
+				break
+			} else if srcEnum == nil || destEnum == nil {
+				continue
+			} else if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	srcProps := srcSchema.GetProperties()
+	destProps := destSchema.GetProperties()
+	for srcName, srcProp := range srcProps {
+		if destProp, ok := destProps[srcName]; !ok || destProp == nil {
+			return false
 		} else {
-			if res, ok := obj.(*apiextv1.CustomResourceDefinition); ok && res.Spec != nil {
-				verRead = *res.Metadata.ResourceVersion
-				if len(res.Spec.Versions) > 0 {
-					schema := res.Spec.Versions[0].Schema
-					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if pp, ok := spec.Properties["process_profile"]; ok {
-								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
-									if _, ok := spec.Properties["waf"]; ok {
-										if _, ok := spec.Properties["dlp"]; ok {
-											crdSchemaExpected = true
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			} else if res, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && res.Spec != nil {
-				verRead = *res.Metadata.ResourceVersion
-				if len(res.Spec.Versions) > 0 {
-					schema := res.Spec.Versions[0].Schema
-					if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-						if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
-							if pp, ok := spec.Properties["process_profile"]; ok {
-								if bl, ok := pp.Properties["baseline"]; ok && len(bl.Enum) == 4 {
-									if _, ok := spec.Properties["waf"]; ok {
-										if _, ok := spec.Properties["dlp"]; ok {
-											crdSchemaExpected = true
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+			if same := b.compJSONSchemaV1(srcProp, destProp); !same {
+				return false
 			}
 		}
-		if leader {
-			rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
-		}
 	}
 
-	if !crdSchemaConfigured && !ctrlState.Enable {
-		return true, err
-	} else if crdSchemaConfigured && crdSchemaExpected && ctrlState.Enable {
-		log.WithFields(log.Fields{"enable": ctrlState.Enable, "crdSchemaConfigured": crdSchemaConfigured, "crd": crdInfo.MetaName}).
-			Debug("skip because crd schema is already defined")
-		return true, err
-	}
-
-	var op string
-	if !ctrlState.Enable {
-		op = resource.Delete
-	} else {
-		if !crdSchemaConfigured {
-			op = resource.Create
-		} else if !crdSchemaExpected {
-			op = resource.Update
-		}
-	}
-	retry := 0
-	for retry < 3 {
-		if err = configK8sCrdSchema(op, verRead, crdInfo); err == nil {
-			log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName}).Info("configured crd schema in k8s")
-			return false, nil
-		}
-		retry++
-	}
-	log.WithFields(log.Fields{"op": op, "crd": crdInfo.MetaName, "error": err}).Error("failed to configure crd schema in k8s")
-
-	return true, err
+	return true
 }
 
-func Init(leader bool) {
-	var crdconf *share.CLUSAdmissionState
-	clusHelper := kv.GetClusterHelper()
-	crdconf, _ = clusHelper.GetAdmissionStateRev(resource.NvCrdSvcName)
-	if crdconf == nil {
-		return
+func (b *nvCrdSchmaBuilder) compJSONSchemaV1B1(srcSchema, destSchema *apiextv1b1.JSONSchemaProps) bool {
+	if srcSchema == nil && destSchema == nil {
+		return true
 	}
+	if srcSchema == nil || destSchema == nil || srcSchema.GetType() != destSchema.GetType() ||
+		len(srcSchema.GetRequired()) != len(destSchema.GetRequired()) ||
+		len(srcSchema.GetEnum()) != len(destSchema.GetEnum()) ||
+		len(srcSchema.GetProperties()) != len(destSchema.GetProperties()) {
+		return false
+	}
+
+	if srcSchema.GetType() == b.schemaTypeArray {
+		srcItems := srcSchema.GetItems()
+		destItems := destSchema.GetItems()
+		if !b.compJSONSchemaV1B1(srcItems.Schema, destItems.Schema) || len(srcItems.JSONSchemas) != len(destItems.JSONSchemas) {
+			return false
+		}
+		for _, srcItem := range srcItems.JSONSchemas {
+			found := false
+			for _, destItem := range destItems.JSONSchemas {
+				if b.compJSONSchemaV1B1(srcItem, destItem) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	srcRequired := srcSchema.GetRequired()
+	destRequired := destSchema.GetRequired()
+	sort.Strings(srcRequired)
+	sort.Strings(destRequired)
+	for i, r := range srcRequired {
+		if r != destRequired[i] {
+			return false
+		}
+	}
+
+	for _, srcEnum := range srcSchema.GetEnum() {
+		found := false
+		for _, destEnum := range destSchema.GetEnum() {
+			if srcEnum == nil && destEnum == nil {
+				found = true
+				break
+			} else if srcEnum == nil || destEnum == nil {
+				continue
+			} else if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	srcProps := srcSchema.GetProperties()
+	destProps := destSchema.GetProperties()
+	for srcName, srcProp := range srcProps {
+		if destProp, ok := destProps[srcName]; !ok || destProp == nil {
+			return false
+		} else {
+			if same := b.compJSONSchemaV1B1(srcProp, destProp); !same {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error) {
+	crdConfigured := false // crd schema is configured or not
+	crdUpToDate := false   // whether the configured crd schema is up-to-date
+
+	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
+	if err == nil {
+		crdConfigured = true
+		if crdRes, ok := obj.(*apiextv1.CustomResourceDefinition); ok && crdRes.Metadata != nil && crdRes.Spec != nil {
+			crdSpec := crdRes.Spec
+			if crdRes.Metadata.GetName() == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
+				if crdSpec.GetGroup() == crdInfo.SpecGroup && crdSpec.GetScope() == crdInfo.SpecScope && crdSpec.Names != nil {
+					if crdSpec.Names.GetPlural() == crdInfo.SpecNamesPlural &&
+						crdSpec.Names.GetSingular() == crdInfo.SpecNamesSingular &&
+						crdSpec.Names.GetKind() == crdInfo.SpecNamesKind &&
+						crdSpec.Names.GetListKind() == crdInfo.SpecNamesListKind {
+						v0 := crdSpec.Versions[0]
+						schema := v0.Schema
+						if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
+							if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+								var builder nvCrdSchmaBuilder
+								builder.Init()
+								if expected := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
+									if v0.GetServed() == expected.GetServed() && v0.GetStorage() == expected.GetStorage() && v0.GetName() == expected.GetName() {
+										crdUpToDate = builder.compJSONSchemaV1(expected.Schema.OpenAPIV3Schema, schema.OpenAPIV3Schema)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		} else if crdRes, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && crdRes.Metadata != nil && crdRes.Spec != nil && len(crdRes.Spec.Versions) > 0 {
+			crdSpec := crdRes.Spec
+			if crdRes.Metadata.GetName() == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
+				if crdSpec.GetGroup() == crdInfo.SpecGroup && crdSpec.GetScope() == crdInfo.SpecScope && crdSpec.Names != nil {
+					if crdSpec.Names.GetPlural() == crdInfo.SpecNamesPlural &&
+						crdSpec.Names.GetSingular() == crdInfo.SpecNamesSingular &&
+						crdSpec.Names.GetKind() == crdInfo.SpecNamesKind &&
+						crdSpec.Names.GetListKind() == crdInfo.SpecNamesListKind {
+						v0 := crdSpec.Versions[0]
+						if v0.Served != nil && *v0.Served && v0.Storage != nil && *v0.Storage {
+							schema := crdRes.Spec.Versions[0].Schema
+							if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
+								if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+									var builder nvCrdSchmaBuilder
+									builder.Init()
+									if expected := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
+										crdUpToDate = builder.compJSONSchemaV1B1(expected.Schema.OpenAPIV3Schema, schema.OpenAPIV3Schema)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return crdConfigured, crdUpToDate, err
+}
+
+// do not update CustomResourceDefinition resource(schema) anymore
+func CheckCrdSchema(leader, create bool) []string {
 
 	nvCrdInfo := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
@@ -1212,10 +1265,55 @@ func Init(leader bool) {
 			KvCrdKind:         resource.NvWafSecurityRuleKind,
 		},
 	}
-	crdconf.CtrlStates[admission.NvAdmValidateType].Enable = true // always enable NV CRD feature
+
+	crdOutOfDate := make([]string, 0, len(nvCrdInfo))
+	errors := make([]string, 0, len(nvCrdInfo))
 	for _, crdInfo := range nvCrdInfo {
-		initK8sCrdSchema(leader, crdInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
+		// [2023/04] no more crd schema upgrade.
+		crdConfigured, crdUpToDate, err := isCrdUpToDate(leader, crdInfo)
+		if crdConfigured {
+			if leader && create {
+				rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
+			}
+			if !crdUpToDate {
+				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)
+				continue
+			}
+		} else if create {
+			for retry := 0; retry < 3; retry++ {
+				if err = createK8sCrdSchema(crdInfo); err == nil {
+					log.WithFields(log.Fields{"crd": crdInfo.MetaName}).Info("configured crd schema in k8s")
+					break
+				}
+			}
+			if err != nil {
+				errors = append(errors, err.Error())
+				log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "error": err}).Error()
+			}
+		} else if err != nil {
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "err": err}).Error("crd schema")
+			errors = append(errors, err.Error())
+		}
 	}
+	if len(crdOutOfDate) > 0 {
+		err := fmt.Errorf("CRD schema of %s is out of date.", strings.Join(crdOutOfDate, ", "))
+		log.WithFields(log.Fields{"err": err}).Warning("crd schema")
+		errors = append(errors, err.Error())
+	}
+
+	return errors
+}
+
+func Init(leader bool) {
+	var crdconf *share.CLUSAdmissionState
+	clusHelper := kv.GetClusterHelper()
+	crdconf, _ = clusHelper.GetAdmissionStateRev(resource.NvCrdSvcName)
+	if crdconf == nil {
+		return
+	}
+	crdconf.CtrlStates[admission.NvAdmValidateType].Enable = true // always enable NV CRD feature
+
+	CheckCrdSchema(leader, true)
 
 	// register crd admission control(ValidatingWebhookConfiguration neuvector-validating-crd-webhook) to k8s
 	k8sResInfo := admission.ValidatingWebhookConfigInfo{
