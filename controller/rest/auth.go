@@ -574,11 +574,10 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 				s := &loginSession{
 					id:          utils.GetRandomID(idLength, ""),
-					fullname:    apikeyAccount.AccessKey,
+					fullname:    apikeyAccount.Name,
 					remote:      r.RemoteAddr,
 					domainRoles: roles,
 					loginType:   1,
-					// server:      claims.Server,
 				}
 
 				return s, userOK, rsessToken

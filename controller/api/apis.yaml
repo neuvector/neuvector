@@ -12864,9 +12864,8 @@ definitions:
     type: object
     required:
       - expiration_type
-      - apikey_access_key
+      - name
       - role
-      - locale
     properties:
       expiration_type:
         type: string
@@ -12875,7 +12874,7 @@ definitions:
         type: integer
         format: uint32
         example: 1
-      apikey_access_key:
+      name:
         type: string
         example: token-cicd-scan
       apikey_secret:
@@ -12887,9 +12886,6 @@ definitions:
       role:
         type: string
         example: admin
-      locale:
-        type: string
-        example: en
       role_domains:
         type: object
         properties:

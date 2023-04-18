@@ -453,8 +453,8 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 	return fmt.Sprintf("%s%s", ProfileFileAccessStore, name)
 }
 
-func CLUSApikeyKey(accesskey string) string {
-    return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, accesskey)
+func CLUSApikeyKey(name string) string {
+    return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
 }
 
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
@@ -2681,7 +2681,7 @@ type CLUSThrottledEvents struct {
 type CLUSApikey struct {
 	ExpirationType      string              `json:"expiration_type"`
 	ExpirationHours     uint32              `json:"expiration_hours"`
-	AccessKey           string              `json:"access_key"`
+	Name                string              `json:"name"`
 	SecretKeyHash       string              `json:"secret_key_hash"`
 	Description         string              `json:"description"`
 	Locale              string              `json:"locale"`

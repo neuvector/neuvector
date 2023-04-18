@@ -396,10 +396,10 @@ func handlerRoleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		}
 
 		if apikey.Role == name {
-			recordRoleInUse(roleRefInfo, "Apikey", apikey.AccessKey)
+			recordRoleInUse(roleRefInfo, "Apikey", apikey.Name)
 		} else {
 			if domains, ok := apikey.RoleDomains[name]; ok && len(domains) > 0 {
-				recordRoleInUse(roleRefInfo, "Apikey", apikey.AccessKey)
+				recordRoleInUse(roleRefInfo, "Apikey", apikey.Name)
 			}
 		}
 	}

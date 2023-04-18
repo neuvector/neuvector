@@ -624,9 +624,9 @@ func initTest() {
 
 	// api key
 	router.GET("/v1/api_key", handlerApikeyList)
-	router.GET("/v1/api_key/:accesskey", handlerApikeyShow)
+	router.GET("/v1/api_key/:name", handlerApikeyShow)
 	router.POST("/v1/api_key", handlerApikeyCreate)
-	router.DELETE("/v1/api_key/:accesskey", handlerApikeyDelete)
+	router.DELETE("/v1/api_key/:name", handlerApikeyDelete)
 	router.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
 }
 

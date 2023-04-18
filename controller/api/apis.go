@@ -3417,10 +3417,9 @@ type RESTApikeyData struct {
 type RESTApikey struct {
 	ExpirationType        string              `json:"expiration_type"`
 	ExpirationHours       uint32              `json:"expiration_hours"`
-	AccessKey             string              `json:"apikey_access_key"`
+	Name                  string              `json:"apikey_name"`
 	SecretKey             string              `json:"apikey_secret,cloak"`
 	Description           string              `json:"description"`
-	Locale                string              `json:"locale"`
 	Role                  string              `json:"role"`
 	RoleDomains           map[string][]string `json:"role_domains,omitempty"` // role -> domains
 	ExpirationTimestamp   int64               `json:"expiration_timestamp"`   // used in GET

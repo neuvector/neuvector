@@ -1622,9 +1622,9 @@ func StartRESTServer() {
 
 	// api key
 	r.GET("/v1/api_key", handlerApikeyList)
-	r.GET("/v1/api_key/:accesskey", handlerApikeyShow)
+	r.GET("/v1/api_key/:name", handlerApikeyShow)
 	r.POST("/v1/api_key", handlerApikeyCreate)
-	r.DELETE("/v1/api_key/:accesskey", handlerApikeyDelete)
+	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
 	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
 
 	access.CompileUriPermitsMapping()

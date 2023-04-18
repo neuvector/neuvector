@@ -548,13 +548,13 @@ func (m *MockCluster) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
 
 func (m *MockCluster) CreateApikey(apikey *share.CLUSApikey) error {
 	clone := *apikey
-	m.apikeysCluster[apikey.AccessKey] = &clone
+	m.apikeysCluster[apikey.Name] = &clone
 	return nil
 }
 
-func (m *MockCluster) DeleteApikey(accessKey string) error {
-	if _, ok := m.apikeysCluster[accessKey]; ok {
-		delete(m.apikeysCluster, accessKey)
+func (m *MockCluster) DeleteApikey(name string) error {
+	if _, ok := m.apikeysCluster[name]; ok {
+		delete(m.apikeysCluster, name)
 		return nil
 	} else {
 		return common.ErrObjectNotFound
