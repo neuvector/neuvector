@@ -645,6 +645,11 @@ func MergeProcess(list []*share.CLUSProcessProfileEntry, p *share.CLUSProcessPro
 			changed = true
 		}
 
+		if p.CfgType != share.Learned {
+			pp.CfgType = p.CfgType
+			changed = true
+		}
+
 		if changed {
 			// update entry
 			pp.UpdatedAt = time.Now().UTC()
