@@ -313,7 +313,6 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 // cgroup v2 is collected inside an unified file folder
 func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	var path string
-	path = "/proc/self/cgroup"
 	if pid == 0 { // self
 		path = "/proc/self/cgroup"
 	} else {
@@ -359,7 +358,6 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 	}
 
 	// However, the k8s POD does not have those subsystem folders
-	// containerd should have these folders. cgroups are part of the kernel not the container runtime afaik
 	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
 	f, err := os.Open(path)
 	if err != nil {
@@ -592,7 +590,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		}
 	}
 	mStats.WorkingSet = workingSet
-
 	return nil
 }
 
