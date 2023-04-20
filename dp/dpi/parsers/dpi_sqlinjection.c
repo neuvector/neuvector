@@ -75,6 +75,7 @@ static sql_injection_t sql_injections[] ={
 {injection_0, NULL, 0, "(?:waitfor|WAITFOR)\\s*(?:delay|DELAY).*(?:=\"|=\'|--|#|\\/\\*)"},                    // ;waitfor delay '0:0:__TIME__'--
 {injection_0, NULL, 0, "(?:1|\"|\')\\s*(?:union|UNION).*(?:=\"|=\'|--|#|\\/\\*)"},                            // ' union (select @@version) --'
 {injection_0, NULL, 0, "(?:exec|EXEC).*(?:=\"|=\'|--|#|\\/\\*)"},                                             // exec master..xp_cmdshell <attacker command> --
+{injection_0, NULL, 0, "(?:or|OR)\\s1.*(?:=\"|=\'|--|#|\\/\\*)"},                                             // -1" or 1 order by id desc --
 };
 
 void sql_injection_init()
