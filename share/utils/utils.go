@@ -1055,12 +1055,22 @@ func EncryptURLSafe(password string) string {
 // Determine if a directory is a mountpoint, by comparing the device for the directory
 // with the device for it's parent.  If they are the same, it's not a mountpoint, if they're
 // different, it is.
+var reProcessRootPath = regexp.MustCompile("/proc/\\d+/root/")
 func IsMountPoint(path string) bool {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return false
 	}
-	rootStat, err := os.Lstat(path + "/..")
+
+	var rootPath string
+	rpath := path + "/"
+	if indexes := reProcessRootPath.FindStringIndex(rpath); len(indexes) > 1 {
+		// take the first matched
+		rootPath = rpath[0:indexes[1]] // container scope
+	} else {
+		rootPath = rpath + ".."  // relative: compare its upper folder
+	}
+	rootStat, err := os.Lstat(rootPath)
 	if err != nil {
 		return false
 	}
