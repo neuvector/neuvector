@@ -71,9 +71,7 @@ func getContainerSocketPath(client *dockerclient.DockerClient, id, endpoint stri
 	info, err := client.InspectContainer(id)
 	if err == nil {
 		endpoint = strings.TrimPrefix(endpoint, "unix://")
-		log.WithFields(log.Fields{"endpoint": endpoint}).Info("JW:")
 		for _, m := range info.Mounts {
-			log.WithFields(log.Fields{"m": m}).Info("JW:")
 			if m.Destination == endpoint {
 				return m.Source, nil
 			}

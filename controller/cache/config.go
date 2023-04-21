@@ -270,6 +270,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		NetServiceStatus:          systemConfigCache.NetServiceStatus,
 		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
 		DisableNetPolicy:          systemConfigCache.DisableNetPolicy,
+		DetectUnmanagedWl:         systemConfigCache.DetectUnmanagedWl,
 		ModeAutoD2M:               systemConfigCache.ModeAutoD2M,
 		ModeAutoD2MDuration:       systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,

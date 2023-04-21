@@ -941,18 +941,10 @@ func createDefaultXffSetting() {
 	}
 }
 
-func EnforceXffEnabledSetting() {
+func EnforceNetSysConfig() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
-	if cfg.XffEnabled {
-		clusHelper.PutSystemConfigRev(cfg, rev)
-	}
-}
-
-func EnforceDisableNetPolicy() {
-	acc := access.NewReaderAccessControl()
-	cfg, rev := clusHelper.GetSystemConfigRev(acc)
-	if cfg.DisableNetPolicy {
+	if cfg.XffEnabled || cfg.DisableNetPolicy || cfg.DetectUnmanagedWl {
 		clusHelper.PutSystemConfigRev(cfg, rev)
 	}
 }

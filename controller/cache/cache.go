@@ -1645,7 +1645,6 @@ const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
-var uwlUpdated bool
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
@@ -1698,13 +1697,12 @@ func startWorkerThread(ctx *Context) {
 				pruneGroupsByNamespace()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
-				uwlUpdated = true
 				refreshInternalIPNet()
 				cacheMutexRUnlock()
 			case <-ephemeralTicker.C:
 				cacheMutexLock()
 				refreshuwl := timeoutEphemeralWorkload()
-				if refreshuwl && uwlUpdated {
+				if refreshuwl {
 					refreshInternalIPNet()
 				}
 				cacheMutexUnlock()

@@ -33,6 +33,7 @@ const CLUSLockScannerKey string = CLUSLockStore + "scanner"
 const CLUSLockCrdQueueKey string = CLUSLockStore + "crd_queue"
 const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
+const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -69,6 +70,7 @@ const (
 	CFGEndpointVulnerability    = "vulnerability"
 	CFGEndpointUserRole         = "user_role"
 	CFGEndpointPwdProfile       = "pwd_profile"
+	CFGEndpointApikey           = "apikey"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -98,6 +100,7 @@ const CLUSConfigVulnerabilityStore string = CLUSConfigStore + CFGEndpointVulnera
 const CLUSConfigDomainStore string = CLUSConfigStore + CFGEndpointDomain + "/"
 const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "/"
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
+const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -450,6 +453,10 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 	return fmt.Sprintf("%s%s", ProfileFileAccessStore, name)
 }
 
+func CLUSApikeyKey(name string) string {
+    return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
+}
+
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
 // quickly. Without it, we have to loop through all workload keys; using agent ID is
 // also problematic, as a new agent has no idea of the agent ID when the workload
@@ -749,6 +756,7 @@ type CLUSSystemConfig struct {
 	NetServiceStatus     bool                      `json:"net_service_status"`
 	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
 	DisableNetPolicy     bool                      `json:"disable_net_policy"`
+	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
 	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
@@ -2669,4 +2677,18 @@ type CLUSCheckUpgradeInfo struct {
 // throttled events/logs
 type CLUSThrottledEvents struct {
 	LastReportTime map[TLogEvent]int64 `json:"last_report_at"` // key is event id, value is time.Unix()
+}
+
+type CLUSApikey struct {
+	ExpirationType      string              `json:"expiration_type"`
+	ExpirationHours     uint32              `json:"expiration_hours"`
+	Name                string              `json:"name"`
+	SecretKeyHash       string              `json:"secret_key_hash"`
+	Description         string              `json:"description"`
+	Locale              string              `json:"locale"`
+	Role                string              `json:"role"`
+	RoleDomains         map[string][]string `json:"role_domains"`
+	ExpirationTimestamp int64               `json:"expiration_timestamp"`
+	CreatedTimestamp    int64               `json:"created_timestamp"`
+	CreatedByEntity     string              `json:"created_by_entity"`	 // it could be username or apikey (access key)
 }

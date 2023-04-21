@@ -224,6 +224,17 @@ func DPCtrlSetDisableNetPolicy(disableNetPolicy *bool) {
 	dpSendMsg(msg)
 }
 
+func DPCtrlSetDetectUnmanagedWl(detectUnmanagedWl *bool) {
+
+	data := DPDetectUnmanagedWlReq{
+		DetectUnmanagedWlConf: &DPDetectUnmanagedWl{
+			DetectUnmanagedWl: detectUnmanagedWl,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
 func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr, pips []net.IP) {
 	log.WithFields(log.Fields{"mac": mac, "iface": iface}).Debug("")
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -76,7 +76,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 
 	// first pass: put RBAC resources into OPA
 	// note the format and length of this guid is important, rego code rely on this signature
-	sessionGuid := fmt.Sprintf("%s_config_assessment_", randomString(5))
+	sessionGuid := fmt.Sprintf("%s_config_assessment_", utils.RandomString(5))
 	opaKeys := []string{}
 	for _, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -199,17 +199,4 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Test admission control rules")
-}
-
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz"
-
-	var seededRand *rand.Rand = rand.New(
-		rand.NewSource(time.Now().UnixNano()))
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
 }

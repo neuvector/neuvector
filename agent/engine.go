@@ -114,6 +114,7 @@ type localSystemInfo struct {
 	xffEnabled      bool
 	ciliumCNI       bool
 	disableNetPolicy bool
+	detectUnmanagedWl bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -122,6 +123,7 @@ var defaultTapProxymesh bool = true
 //to avoid false positive implicit violation on dp during upgrade, set XFF default to disabled
 var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
+var defaultDetectUnmanagedWl bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
@@ -2160,6 +2162,9 @@ func taskDPConnect() {
 	//set disableNetPolicy
 	dnp := gInfo.disableNetPolicy
 	dp.DPCtrlSetDisableNetPolicy(&dnp)
+	//set detectUnmanagedWl
+	duw := gInfo.detectUnmanagedWl
+	dp.DPCtrlSetDetectUnmanagedWl(&duw)
 }
 
 var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version

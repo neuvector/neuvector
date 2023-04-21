@@ -1839,24 +1839,23 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 
 	risky := proc.action == share.PolicyActionCheckApp
-	if proc.name != "ps" {
-		if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
-			return // policy is not ready
-		}
-
-		// the very first parent, update a decision (allow or checkApp),
-		// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
-		// (2) "checkApp" (including children) will not enter the "learned" process group.
-		// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
-		if risky && !proc.riskyChild {
-			if action == share.PolicyActionAllow { // default is checkApp
-				proc.action = action
-				proc.riskType = ""
-				risky = false
-			}
-		}
-		mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
+	if action, ok = p.procProfileEval(id, proc, bKeepAlive); !ok {
+		return // policy is not ready
 	}
+
+	// the very first parent, update a decision (allow or checkApp),
+	// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
+	// (2) "checkApp" (including children) will not enter the "learned" process group.
+	// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
+	if risky && !proc.riskyChild {
+		if action == share.PolicyActionAllow { // default is checkApp
+			proc.action = action
+			proc.riskType = ""
+			risky = false
+		}
+	}
+	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
+	//}
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
@@ -2315,7 +2314,14 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		switch proc.name {
 		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
-		case "ps", "mount", "lsof", "getent", "adduser", "useradd": // from AWS
+		case "ps":
+			// Exception for process where the parent is a runtime process.
+			// Some CNI daemons will call `ps` and we will get false positives without the exception.
+			if bRtProcP {
+				return true
+			}
+			return false
+		case "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
 		default:
 			if p.isAllowRuncInitCommand(proc.path, proc.cmds) {
@@ -2367,7 +2373,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 		// hidden: relaxing the restrictions for future implementation
 		if p.isParentAllowed(id, proc) {
-			// log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC")
+			//log.WithFields(log.Fields{"group": group, "name": proc.name, "pname": proc.pname, "cmds" : proc.cmds}).Debug("PROC: Parent is allowed, relaxing")
 			return true
 		}
 	}
@@ -2924,11 +2930,13 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	bNotImageButNewlyAdded := false
 	bImageFile = true
-	if global.SYS.IsNotContainerFile(c.rootPid, ppe.Path) {
+	if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, ppe.Path); yes || mounted {
 		// We will not monitor files under the mounted folder
 		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
 		if c.bPrivileged {
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+		} else if mounted {
+			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
 		} else {
 			// this file is not existed
 			bImageFile = false
