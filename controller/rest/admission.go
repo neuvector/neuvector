@@ -1356,7 +1356,9 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 				ruleItem.ID = &rule.ID
 				ruleItem.Disabled = &rule.Disable
 			}
-			ruleItem.RuleMode = &rule.RuleMode
+			if *ruleItem.Action == actionDeny {
+				ruleItem.RuleMode = &rule.RuleMode
+			}
 			if rule.Comment != "" {
 				ruleItem.Comment = &rule.Comment
 			}
