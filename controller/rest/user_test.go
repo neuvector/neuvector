@@ -565,3 +565,77 @@ func TestUserRoleSelf(t *testing.T) {
 
 	postTest()
 }
+
+func TestApikeyCreateDelete(t *testing.T) {
+	preTest()
+
+	accAdmin := access.NewAdminAccessControl()
+
+	var mockCluster kv.MockCluster
+	mockCluster.Init(nil, nil)
+	clusHelper = &mockCluster
+	cacher = &mockCache{}
+
+	data := api.RESTApikeyData{Apikey: &api.RESTApikey{
+		ExpirationType: "never",
+		Description: "unit-test",
+		Name: "token-12345", 
+		SecretKey: "0u+tVOWNPRfpCK7p9qznEpnzr/K+a3rYqYBNgz3GVgqIh7n+66OEJf9gTdnmFDgq", 
+		Role: api.UserRoleReader,
+	}}
+
+	body, _ := json.Marshal(data)
+	w := restCall("POST", "/v1/api_key", body, api.UserRoleAdmin)
+	if w.status != http.StatusOK {
+		t.Fatalf("Failed to create apikey: status=%v.", w.status)
+	}
+
+	// Check apikey in cluster
+	apikey, _, _ := clusHelper.GetApikeyRev("token-12345", accAdmin)
+	if apikey == nil {
+		t.Fatalf("Failed to locate apikey in cluster")
+	}
+	if apikey.Name != "token-12345" || apikey.Role != api.UserRoleReader {
+		t.Errorf("Incorrect apikey in cluster: user=%v", apikey)
+	}
+
+	// Check get users by REST
+	// var resp api.RESTUsersData
+	var resp api.RESTApikeysData
+	w = restCall("GET", "/v1/api_key", nil, api.UserRoleAdmin)
+	if w.status != http.StatusOK {
+		t.Fatalf("Failed to get apikey: status=%v.", w.status)
+	}
+	json.Unmarshal(w.body, &resp)
+	if len(resp.Apikeys) != 1 {
+		t.Errorf("Incorrect apikey count in rest: count=%v expect=1", len(resp.Apikeys))
+	}
+	user := resp.Apikeys[0]
+	if user.Name != "token-12345" || user.Role != api.UserRoleReader {
+		t.Errorf("Incorrect apikey in rest: user=%v", *user)
+	}
+
+	// Delete user
+	w = restCall("DELETE", "/v1/api_key/token-12345", nil, api.UserRoleAdmin)
+	if w.status != http.StatusOK {
+		t.Fatalf("Failed to delete apikey: status=%v.", w.status)
+	}
+
+	// Check user in cluster
+	apikey, _, _ = clusHelper.GetApikeyRev("token-12345", accAdmin)
+	if apikey != nil {
+		t.Errorf("User is not deleted in cluster")
+	}
+
+	// Check get users by REST
+	w = restCall("GET", "/v1/api_key", nil, api.UserRoleAdmin)
+	if w.status != http.StatusOK {
+		t.Fatalf("Failed to get user: status=%v.", w.status)
+	}
+	json.Unmarshal(w.body, &resp)
+	if len(resp.Apikeys) != 0 {
+		t.Errorf("Incorrect apikey count in rest: count=%v expect=0", len(resp.Apikeys))
+	}
+
+	postTest()
+}

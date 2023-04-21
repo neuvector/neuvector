@@ -915,14 +915,14 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 				if nRtVerbs, ok1 := n.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok1 {
 					if nVerbs, ok1 := nRtVerbs[RscNameCustomResourceDefinitions]; ok1 {
 						if old == nil {
-							nvCrdInitFunc(isLeader)
+							nvCrdInitFunc(isLeader, cspType)
 						} else {
 							if o = old.(*k8sRole); o.apiRtVerbs != nil {
 								if oRtVerbs, ok2 := o.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok2 {
 									if oVerbs, ok2 := oRtVerbs[RscNameCustomResourceDefinitions]; ok2 {
 										if (nVerbs.Contains("update") || nVerbs.Contains("*")) &&
 											(!oVerbs.Contains("update") && !oVerbs.Contains("*")) {
-											nvCrdInitFunc(isLeader)
+											nvCrdInitFunc(isLeader, cspType)
 										}
 									}
 								}

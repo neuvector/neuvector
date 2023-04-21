@@ -105,8 +105,8 @@ const (
 )
 
 const (
-	nvUsageRole        = "neuvector-binding-csp-setting" // read/write in cluster CR
-	nvUsageRoleBinding = nvUsageRole
+	nvCspUsageRole        = "neuvector-binding-csp-usages"
+	nvCspUsageRoleBinding = nvCspUsageRole
 )
 
 const (
@@ -210,7 +210,7 @@ type NvAdmRegRuleSetting struct {
 	Scope      string
 }
 
-type NvCrdInitFunc func(leader bool)
+type NvCrdInitFunc func(leader bool, cspType share.TCspType)
 
 type NvQueryK8sVerFunc func()
 
@@ -270,7 +270,8 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 	},
 }
 
-var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule)
+var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule,
+	RscTypeCrdWafSecurityRule, RscTypeCrdNvCspUsage)
 var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 	&NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
@@ -308,6 +309,7 @@ var nvQueryK8sVerFunc NvQueryK8sVerFunc
 var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
 var isLeader bool
 var CtrlPlaneOpInWhExpr string
+var cspType share.TCspType
 
 var watchFailedFlag int32
 
@@ -571,8 +573,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 			},
 		},
 	},
-
-	/*[2019/Apr.] do not enable ConfigMap support for env vars yet
+	RscTypeCrdNvCspUsage: k8sResource{
+		apiGroup: constApiGroupNV,
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(NvCspUsage) },
+				func() k8s.ResourceList { return new(NvCspUsageList) },
+				xlateCrdCspUsage,
+				nil,
+			},
+		},
+	},
 	RscTypeConfigMap: k8sResource{
 		apiGroup: "",
 		makers: []*resourceMaker{
@@ -583,9 +595,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				xlateConfigMap,
 				nil,
 			},
-			},
 		},
-	},*/
+	},
 	/*RscTypeMutatingWebhookConfiguration: k8sResource{
 			apiGroup: k8sAdmApiGroup,
 			makers: []*resourceMaker{
@@ -1061,7 +1072,22 @@ func xlateCrdWafSecurityRule(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-/* [2019/Apr.] do not enable ConfigMap support for env vars yet
+func xlateCrdCspUsage(obj k8s.Resource) (string, interface{}) {
+	if o, ok := obj.(*NvCspUsage); ok {
+		if o.Metadata == nil {
+			return "", nil
+		}
+		meta := o.Metadata
+		r := &CRD{
+			UID:  meta.GetUid(),
+			Name: meta.GetName(),
+		}
+		return r.UID, o
+	}
+
+	return "", nil
+}
+
 func xlateConfigMap(obj k8s.Resource) (string, interface{}) {
 	if o, ok := obj.(*corev1.ConfigMap); ok {
 		if o.Metadata == nil {
@@ -1072,12 +1098,13 @@ func xlateConfigMap(obj k8s.Resource) (string, interface{}) {
 			UID:    meta.GetUid(),
 			Name:   meta.GetName(),
 			Domain: meta.GetNamespace(),
+			Data:   o.Data,
 		}
 		return r.UID, r
 	}
 
 	return "", nil
-}*/
+}
 
 func xlateMutatingWebhookConfiguration(obj k8s.Resource) (string, interface{}) {
 	var meta *metav1.ObjectMeta
@@ -1237,6 +1264,13 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		d.lock.Lock()
 		k8s.Register("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRule{})
 		k8s.RegisterList("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRuleList{})
+		d.lock.Unlock()
+
+		_, err = d.discoverResource(rt)
+	case RscTypeCrdNvCspUsage:
+		d.lock.Lock()
+		k8s.Register("neuvector.com", "v1", NvCspUsagePlural, false, &NvCspUsage{})
+		k8s.RegisterList("neuvector.com", "v1", NvCspUsagePlural, false, &NvCspUsageList{})
 		d.lock.Unlock()
 
 		_, err = d.discoverResource(rt)
@@ -1530,7 +1564,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeCrdNvUsage:
+		RscTypeDeployment, RscTypeCrdNvCspUsage:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -1572,7 +1606,7 @@ func (d *kubernetes) getResource(rt, namespace, name string) (interface{}, error
 func (d *kubernetes) AddResource(rt string, res interface{}) error {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
-	case RscTypeValidatingWebhookConfiguration, RscTypeCrd:
+	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdNvCspUsage:
 		return d.addResource(rt, res)
 	}
 	return ErrResourceNotSupported
@@ -1622,7 +1656,7 @@ func (d *kubernetes) UpdateResource(rt string, res interface{}) error {
 			return d.updateResource(rt, res)
 		}
 	//case RscTypeMutatingWebhookConfiguration:
-	case RscTypeValidatingWebhookConfiguration, RscTypeCrd:
+	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdNvCspUsage:
 		return d.updateResource(rt, res)
 	}
 	return ErrResourceNotSupported
@@ -1659,7 +1693,7 @@ func (d *kubernetes) DeleteResource(rt string, res interface{}) error {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule,
-		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule:
+		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule, RscTypeCrdNvCspUsage:
 		return d.deleteResource(rt, res)
 	}
 	return ErrResourceNotSupported
@@ -1815,31 +1849,33 @@ func AdjustAdmResForOC() {
 	}
 }
 
-func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc, csp string) {
+func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
 	nvCrdInitFunc = f1
 	nvQueryK8sVerFunc = f2
 	nvVerifyK8sNsFunc = f3
+	cspType = cspType_
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
 	NvCrdValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvCrdValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-crd-webhook.neuvector.svc
 	NvStatusValidatingWebhookName = fmt.Sprintf("%s.%s.svc", nvStatusValidatingName, NvAdmSvcNamespace) // ex: neuvector-validating-status-webhook.neuvector.svc
 	GetK8sVersion()
 
-	if csp == "aws" {
-		// extra rbac settings required by nv on csp(AWS)
-		rbacRolesWanted[nvUsageRole] = &k8sRbacRoleInfo{
-			name: nvUsageRole,
+	if cspType != share.CSP_NONE {
+		// extra rbac settings required by nv on csp
+		rbacRolesWanted[nvCspUsageRole] = &k8sRbacRoleInfo{
+			name: nvCspUsageRole,
 			rules: []*k8sRbacRoleRuleInfo{
 				&k8sRbacRoleRuleInfo{
 					apiGroup:  constApiGroupNV,
-					resources: utils.NewSet(RscTypeCrdNvUsage),
+					resources: utils.NewSet(RscTypeCrdNvCspUsage),
 					verbs:     utils.NewSet("get", "create", "update", "delete"),
 				},
 			},
 		}
-		rbacRoleBindingsWanted[nvUsageRoleBinding] = &k8sRbacBindingInfo{
-			subject:  &ctrlerSubjectWanted,
-			rbacRole: rbacRolesWanted[nvUsageRole],
+		rbacRoleBindingsWanted[nvCspUsageRoleBinding] = &k8sRbacBindingInfo{
+			namespace: NvAdmSvcNamespace,
+			subject:   &ctrlerSubjectWanted,
+			rbacRole:  rbacRolesWanted[nvCspUsageRole],
 		}
 	}
 
@@ -1980,7 +2016,7 @@ func getNeuvectorSvcAccount(objName string) error {
 				   				}
 				*/
 			default:
-				return common.ErrUnsupported
+				return ErrResourceNotSupported
 			}
 			if *info.sa != sa {
 				*info.sa = sa
