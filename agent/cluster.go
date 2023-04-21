@@ -578,6 +578,9 @@ func clusterStopContainer(ev *ClusterEvent) {
 	} else {
 		// This should not happen with the new code change - 03/02/2017
 		log.WithFields(log.Fields{"id": ev.id}).Error("Miss add event!")
+		if ev.info == nil {
+			return
+		}
 		// Container might not be intercepted and reported yet.
 		wl := createWorkload(ev.info, ev.service, ev.domain)
 		putWorkload(wl)
