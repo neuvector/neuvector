@@ -1511,16 +1511,15 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	// rolebinding neuvector-admin is majorly for backward compatibility
 	if _, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, "neuvector-updater-pod"); err == nil {
 		// updater cronjob is found
-		if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, existOnly, false); k8sRbac403 {
-			// access denied for reading rolebinding resources
-			roleBindingErrors = errs
-		} else if len(errs) > 0 {
-			// rolebinding neuvector-admin is not found or it's incorrectly configured
-			if errs, _ = VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); len(errs) > 0 {
+		if errs, _ := VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, existOnly, false); len(errs) > 0 {
+			// access denied for reading rolebinding resources, rolebinding neuvector-admin is not found or it's incorrectly configured
+			if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); !k8sRbac403 && len(errs) > 0 {
 				// rolebinding neuvector-binding-scanner is not found or it's incorrectly configured
-				roleBindingErrors = errs
+				roleBindingErrors = append(roleBindingErrors, errs...)
 			}
-			roleErrors, _ = VerifyNvRbacRoles([]string{NvScannerRole}, existOnly)
+			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly); !k8sRbac403 && len(errs) > 0 {
+				roleErrors = append(roleErrors, errs...)
+			}
 		}
 	}
 
