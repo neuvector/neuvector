@@ -1240,10 +1240,15 @@ type Context struct {
 	TeleNeuvectorURL string
 	TeleCurrentVer   string
 	TeleFreq         uint
+	CspType          share.TCspType
+	CspPauseInterval uint // in minutes
 }
+
+var cctx *Context
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
 func InitContext(ctx *Context) {
+	cctx = ctx
 	localDev = ctx.LocalDev
 	cacher = ctx.Cacher
 	scanner = ctx.Scanner
@@ -1627,6 +1632,9 @@ func StartRESTServer() {
 	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
 	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
 
+    // csp billing adapter integration
+	r.POST("/v1/csp/file/support", handlerCspSupportExport) // Skip API document. For downloading the tar ball that can be submitted to support portal
+
 	access.CompileUriPermitsMapping()
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
@@ -1678,6 +1686,7 @@ func startFedRestServer(fedPingInterval uint32) {
 	r.POST("/v1/fed/poll_internal", handlerPollFedRulesInternal)         // Skip API document, called from joint cluster to master cluster
 	r.POST("/v1/fed/scan_data_internal", handlerPollFedScanDataInternal) // Skip API document, called from joint cluster to master cluster
 	r.POST("/v1/fed/leave_internal", handlerLeaveFedInternal)            // Skip API document, called from joint cluster to master cluster
+	r.POST("/v1/fed/csp_support_internal", handlerCspSupportInternal)    // Skip API document, called from joint cluster to master cluster for collecting support config
 	r.GET("/v1/fed/healthcheck", handlerFedHealthCheck)                  // for fed master REST server health-check. no token required
 
 	config := &tls.Config{MinVersion: tls.VersionTLS11}

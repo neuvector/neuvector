@@ -185,6 +185,7 @@ type Context struct {
 	RancherSSO               bool   // from yaml/helm chart
 	TelemetryFreq            uint   // from yaml
 	CheckDefAdminFreq        uint   // from yaml, in minutes
+	CspPauseInterval         uint   // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -196,6 +197,8 @@ type Context struct {
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
+	CspType                  share.TCspType
+	CtrlerVersion            string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
 }
@@ -1692,6 +1695,9 @@ func startWorkerThread(ctx *Context) {
 					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
 						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
+
+					masterCluster := cacher.GetFedMasterCluster(access.NewReaderAccessControl())
+					ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
@@ -1780,6 +1786,7 @@ func startWorkerThread(ctx *Context) {
 					if n != nil {
 						if o == nil {
 							addrOrchHostAdd(n.IPNets)
+							clusterUsage.nodes += 1
 						} else {
 							if ((o.IPNets == nil || len(o.IPNets) == 0) &&
 								(n.IPNets != nil && len(n.IPNets) > 0)) ||
@@ -1793,6 +1800,9 @@ func startWorkerThread(ctx *Context) {
 						//new is nil and old is not nil
 						addrOrchHostDelete(o.IPNets)
 						connectOrchHostDelete(o.IPNets)
+						if clusterUsage.nodes > 1 {
+							clusterUsage.nodes -= 1
+						}
 					}
 					if n != nil {
 						cacheMutexLock()
@@ -1973,9 +1983,17 @@ func startWorkerThread(ctx *Context) {
 						if n.Domain == resource.NvAdmSvcNamespace && n.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, uint32(n.Replicas))
 						}
+
+						if o == nil && n.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": n.Name, "domain": n.Domain}).Info("detected")
+						}
 					} else if o != nil { // delete
 						if o.Domain == resource.NvAdmSvcNamespace && o.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, 0)
+						}
+
+						if o.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": o.Name, "domain": o.Domain}).Info("deleted")
 						}
 					}
 				/*

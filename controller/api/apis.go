@@ -1840,6 +1840,7 @@ type RESTSystemConfigMiscV2 struct {
 	MonitorServiceMesh bool     `json:"monitor_service_mesh"`
 	XffEnabled         bool     `json:"xff_enabled"`
 	NoTelemetryReport  bool     `json:"no_telemetry_report"`
+	CspType            string   `json:"csp_type"`
 }
 
 // for scanner autoscaling

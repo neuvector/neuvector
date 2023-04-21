@@ -9,6 +9,8 @@ import (
 
 	"encoding/json"
 
+	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -824,6 +826,22 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSch
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvCspUsageV1Schema() *apiextv1.JSONSchemaProps {
+	schema := &apiextv1.JSONSchemaProps{
+		Type:     &b.schemaTypeObject,
+		Required: []string{"managed_node_count", "reporting_time"},
+		Properties: map[string]*apiextv1.JSONSchemaProps{
+			"reporting_time": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
+			},
+			"managed_node_count": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeInteger,
+			},
+		},
+	}
+	return schema
+}
+
 // for k8a 1.18(-)
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
@@ -902,6 +920,22 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSO
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvCspUsageV1B1Schema() *apiextv1b1.JSONSchemaProps {
+	schema := &apiextv1b1.JSONSchemaProps{
+		Type:     &b.schemaTypeObject,
+		Required: []string{"managed_node_count", "reporting_time"},
+		Properties: map[string]*apiextv1b1.JSONSchemaProps{
+			"reporting_time": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
+			},
+			"managed_node_count": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeInteger,
+			},
+		},
+	}
+	return schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, version *string) *apiextv1.CustomResourceDefinitionVersion {
 
 	v1 := &apiextv1.CustomResourceDefinitionVersion{
@@ -917,6 +951,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1Schema()
+	case resource.NvCspUsageName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1Schema()
 	}
 	return v1
 }
@@ -936,6 +972,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1B1Schema()
+	case resource.NvCspUsageName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1B1Schema()
 	}
 	return v1
 }
@@ -980,6 +1018,9 @@ func configK8sCrdSchema(op, verRead string, crdInfo *resource.NvCrdInfo) error {
 					Scope: &crdInfo.SpecScope,
 				},
 			}
+			if crdInfo.MetaName == resource.NvCspUsageName {
+				res.Spec.Names.ShortNames = []string{"nur"}
+			}
 			v := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion)
 			res.Spec.Validation = v.Schema
 			if op == resource.Create {
@@ -1004,6 +1045,9 @@ func configK8sCrdSchema(op, verRead string, crdInfo *resource.NvCrdInfo) error {
 					},
 					Scope: &crdInfo.SpecScope,
 				},
+			}
+			if crdInfo.MetaName == resource.NvCspUsageName {
+				res.Spec.Names.ShortNames = []string{"nur"}
 			}
 			v := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion)
 			res.Spec.Versions = append(res.Spec.Versions, v)
@@ -1127,7 +1171,7 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 				}
 			}
 		}
-		if leader {
+		if leader && crdInfo.MetaName != resource.NvCspUsageName {
 			rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
 		}
 	}
@@ -1163,7 +1207,7 @@ func initK8sCrdSchema(leader bool, crdInfo *resource.NvCrdInfo, ctrlState *share
 	return true, err
 }
 
-func Init(leader bool) {
+func Init(leader bool, cspType share.TCspType) {
 	var crdconf *share.CLUSAdmissionState
 	clusHelper := kv.GetClusterHelper()
 	crdconf, _ = clusHelper.GetAdmissionStateRev(resource.NvCrdSvcName)
@@ -1241,6 +1285,34 @@ func Init(leader bool) {
 	crdconf.CtrlStates[admission.NvAdmValidateType].Enable = true // always enable NV CRD feature
 	for _, crdInfo := range nvCrdInfo {
 		initK8sCrdSchema(leader, crdInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
+	}
+
+	if cspType != share.CSP_NONE {
+		crdInfo := &resource.NvCrdInfo{
+			RscType:           resource.RscTypeCrdNvCspUsage,
+			MetaName:          resource.NvCspUsageName,
+			SpecScope:         resource.NvClusterSecurityRuleScope,
+			SpecGroup:         common.OEMClusterSecurityRuleGroup,
+			SpecVersion:       resource.NvCrdV1,
+			SpecNamesPlural:   resource.NvCspUsagePlural,
+			SpecNamesKind:     resource.NvCspUsageKind,
+			SpecNamesSingular: resource.NvCspUsageSingular,
+			SpecNamesListKind: resource.NvCspUsageListKind,
+			LockKey:           "",
+			KvCrdKind:         resource.NvCspUsageKind,
+		}
+		initK8sCrdSchema(leader, crdInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
+
+		if leader {
+			clusHelper := kv.GetClusterHelper()
+			var fedRole string = api.FedRoleNone
+			var masterClusterID string
+			if m := clusHelper.GetFedMembership(); m != nil {
+				fedRole = m.FedRole
+				masterClusterID = m.MasterCluster.ID
+			}
+			cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
+		}
 	}
 
 	// register crd admission control(ValidatingWebhookConfiguration neuvector-validating-crd-webhook) to k8s

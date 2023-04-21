@@ -4342,6 +4342,19 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/csp/file/support:
+    post:
+      tags:
+        - File
+      summary: Export support config tarball in gz format
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success. Get a tarball gz file.
   /v1/fed/healthcheck:
     get:
       tags:
