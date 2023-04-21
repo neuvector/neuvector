@@ -4350,6 +4350,82 @@ paths:
       responses:
         '200':
           description: Success
+ /v1/api_key:
+    get:
+      tags:
+        - Apikey
+      summary: Gets a list of apikeys
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTApikeysData'
+    post:
+      tags:
+        - Apikey
+      summary: Creates an apikey
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Apikey information
+          required: true
+          schema:
+            $ref: '#/definitions/RESTApikeyData'
+      responses:
+        '200':
+          description: Success
+  /v1/api_key/{accesskey}:
+    get:
+      tags:
+        - Apikey
+      summary: Gets an apikey
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: accesskey
+          description: Apikey access key
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTApikeyData'
+    delete:
+      tags:
+        - Apikey
+      summary: Delete apikey
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: accesskey
+          description: Apikey access key
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
 
 ################################################################################
 #                                 Definitions                                  #
@@ -12784,3 +12860,79 @@ definitions:
         type: integer
         format: uint64
         example: 1988147822
+  RESTApikey:
+    type: object
+    required:
+      - expiration_type
+      - name
+      - role
+    properties:
+      expiration_type:
+        type: string
+        example: never
+      expiration_hours:
+        type: integer
+        format: uint32
+        example: 1
+      name:
+        type: string
+        example: token-cicd-scan
+      apikey_secret:
+        type: string
+        example: 0u+tVOWNPRfpCK7p9qz
+      description:
+        type: string
+        example: cicd image scanning
+      role:
+        type: string
+        example: admin
+      role_domains:
+        type: object
+        properties:
+          role:
+            type: string
+            example: admin
+          domains:
+            type: array
+            items:
+              type: string
+              example: ["domain1", "domain2"]
+      expiration_timestamp:
+        type: integer
+        format: int64
+        example: 11515020888
+      created_timestamp:
+        type: integer
+        format: int64
+        example: 11515020888
+      created_by_entity:
+        type: string
+        example: admin
+  RESTApikeyData:
+    type: object
+    required:
+      - apikey
+    properties:
+      apikey:
+        $ref: '#/definitions/RESTApikey'
+  RESTApikeysData:
+    type: object
+    required:
+      - apikeys
+      - global_roles
+      - domain_roles
+    properties:
+      apikeys:
+        type: array
+        items:
+          $ref: '#/definitions/RESTApikey'
+      global_roles:
+        type: array
+        items:
+          type: string
+          example: ["admin", "reader"]
+      domain_roles:
+        type: array
+        items:
+          type: string
+          example: ["role1", "role2"]

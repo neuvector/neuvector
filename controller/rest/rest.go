@@ -1620,6 +1620,13 @@ func StartRESTServer() {
 	r.PATCH("/v1/user_role/:name", handlerRoleConfig)
 	r.DELETE("/v1/user_role/:name", handlerRoleDelete)
 
+	// api key
+	r.GET("/v1/api_key", handlerApikeyList)
+	r.GET("/v1/api_key/:name", handlerApikeyShow)
+	r.POST("/v1/api_key", handlerApikeyCreate)
+	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
+	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
+
 	access.CompileUriPermitsMapping()
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")

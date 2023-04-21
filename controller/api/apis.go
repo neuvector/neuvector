@@ -10,6 +10,7 @@ const RESTTokenHeader string = "X-Auth-Token"
 const RESTNvPageHeader string = "X-Nv-Page"
 const RESTRancherTokenHeader string = "X-R-Sess"
 const RESTMaskedValue string = "The value is masked"
+const RESTAPIKeyHeader string = "X-Auth-Apikey"
 
 const RESTNvPageDashboard string = "dashboard"
 
@@ -3402,4 +3403,50 @@ type RESTAdminCustomCriteriaOptions struct {
 type RESTAdminCriteriaTemplate struct {
 	Kind    string `json:"kind"`
 	RawJson string `json:"rawjson"`
+}
+
+const (
+	ApikeyExpireNever       string = "never"
+	ApikeyExpireOneDay      string = "oneday"
+	ApikeyExpireOneMonth    string = "onemonth"
+	ApikeyExpireOneYear     string = "oneyear"
+	ApikeyExpireCustomHour  string = "hours"
+)
+
+type RESTApikeyData struct {
+	Apikey *RESTApikey `json:"apikey"`
+}
+
+type RESTApikey struct {
+	ExpirationType        string              `json:"expiration_type"`
+	ExpirationHours       uint32              `json:"expiration_hours"`
+	Name                  string              `json:"apikey_name"`
+	SecretKey             string              `json:"apikey_secret,cloak"`
+	Description           string              `json:"description"`
+	Role                  string              `json:"role"`
+	RoleDomains           map[string][]string `json:"role_domains,omitempty"` // role -> domains
+	ExpirationTimestamp   int64               `json:"expiration_timestamp"`   // used in GET
+	CreatedTimestamp      int64               `json:"created_timestamp"`      // used in GET
+	CreatedByEntity       string              `json:"created_by_entity"`	  // it could be username or apikey (access key)
+}
+
+type RESTApikeyPreGeneratedData struct {
+	Apikey *RESTApikeyPreGenerated `json:"apikey"`
+}
+
+type RESTApikeyPreGenerated struct {
+	Name       string  `json:"apikey_name"`
+	SecretKey  string  `json:"apikey_secret"`
+}
+
+type RESTApikeysData struct {
+	Apikeys     []*RESTApikey `json:"apikeys"`
+	GlobalRoles []string      `json:"global_roles"`
+	DomainRoles []string      `json:"domain_roles"`
+}
+
+type RESTSelfApikeyData struct {
+	Apikey              *RESTApikey                      `json:"apikey"`
+	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }

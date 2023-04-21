@@ -35,6 +35,7 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+	mathrand "math/rand"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/simpleuuid"
@@ -1315,4 +1316,17 @@ func Dns1123NameChg(name string) string {
 		}
 	}
 	return name
+}
+
+func RandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz"
+
+	var seededRand *mathrand.Rand = mathrand.New(
+		mathrand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
