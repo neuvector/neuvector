@@ -328,6 +328,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
+			if scope == share.ScopeLocal || scope == share.ScopeAll {
+				_, strCspType := common.GetMappedCspType(nil, &cctx.CspType)
+				respV2.Config.Misc.CspType = strCspType
+			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
 		} else {

@@ -926,3 +926,26 @@ func GetWafRuleID(wafsensor *share.CLUSWafSensor) uint32 {
 		return 0
 	}
 }
+
+func GetMappedCspType(strCspType *string, cspType *share.TCspType) (share.TCspType, string) {
+	cspMapping := map[string]share.TCspType{
+		"":       share.CSP_NONE,
+		"aws":    share.CSP_EKS,
+		"gcloud": share.CSP_GKE,
+		"azure":  share.CSP_AKS,
+		"ibm":    share.CSP_IBM,
+	}
+	if strCspType != nil {
+		if cspType, ok := cspMapping[*strCspType]; ok {
+			return cspType, *strCspType
+		}
+	} else if cspType != nil {
+		for k, v := range cspMapping {
+			if v == *cspType {
+				return v, k
+			}
+		}
+	}
+
+	return share.CSP_NONE, ""
+}

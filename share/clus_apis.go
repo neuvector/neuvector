@@ -2101,11 +2101,29 @@ type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
 }
 
 type CLUSFedClusterStatus struct {
-	Status int `json:"status"` // status of a joint cluster
+	Status            int       `json:"status"` // status of a joint cluster
+	CspType           TCspType  `json:"csp_type"`
+	Nodes             int       `json:"nodes"`               // total nodes count in this cluster
+	LastConnectedTime time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
 }
 
 type CLUSFedJoinedClusterList struct { // only available on master cluster
 	IDs []string `json:"ids,omitempty"` // all non-master clusters' id in the federation
+}
+
+type TCspType int
+
+const (
+	CSP_NONE = iota
+	CSP_EKS
+	CSP_GKE
+	CSP_AKS
+	CSP_IBM
+)
+
+type CLUSClusterCspUsage struct {
+	CspType TCspType `json:"csp_type"`
+	Nodes   int      `json:"nodes"` // total nodes count in this cluster
 }
 
 // fed ruleTypes' revision data. stored under object/config/federation/rules_revision

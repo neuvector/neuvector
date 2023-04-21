@@ -580,6 +580,7 @@ func CompileUriPermitsMapping() {
 				"v1/token_auth_server",
 				"v1/token_auth_server/*",
 				"v1/eula",
+				"v1/fed/healthcheck",
 			},
 			CONST_API_DEBUG: []string{
 				"v1/fed/member",
@@ -789,6 +790,7 @@ func CompileUriPermitsMapping() {
 				"v1/controller/*/profiling",
 				"v1/enforcer/*/profiling",
 				"v1/file/config",
+				"v1/csp/file/support",
 			},
 			CONST_API_RT_SCAN: []string{
 				"v1/scan/workload/*",

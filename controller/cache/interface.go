@@ -191,7 +191,7 @@ type CacheInterface interface {
 	GetFedJoinedClusterIdMap(acc *access.AccessControl) map[string]bool // key: cluster id, value: cluster is disabled or not
 	GetFedJoinedClusterNameList(acc *access.AccessControl) []string
 	GetFedJoinedCluster(id string, acc *access.AccessControl) share.CLUSFedJointClusterInfo
-	GetFedJoinedClusterStatus(id string, acc *access.AccessControl) int
+	GetFedJoinedClusterStatus(id string, acc *access.AccessControl) share.CLUSFedClusterStatus
 	// non-UI
 	GetFedMembershipRoleNoAuth() string
 	SetFedJoinedClusterToken(id, mainSessionID, token string)
@@ -240,4 +240,7 @@ type CacheInterface interface {
 	// password profile
 	GetPwdProfile(name string) (share.CLUSPwdProfile, error)
 	GetAllPwdProfiles() (string, map[string]share.CLUSPwdProfile)
+
+	// csp billing integration
+	GetNvUsage(fedRole string) api.RESTNvUsage
 }

@@ -34,6 +34,7 @@ const (
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
 	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
+	RscTypeCrdNvCspUsage                  = "neuvectorusagerecords" // case sensitive
 	RscTypeRbacRoles                      = "roles"
 	RscTypeRbacClusterRoles               = "clusterroles"
 	RscTypeRbacRolebindings               = "rolebindings"
@@ -56,9 +57,7 @@ const (
 	RscKindValidatingWebhookConfiguration = "ValidatingWebhookConfiguration" // case sensitive!
 )
 
-const (
-	RscTypeCrdNvUsage = "neuvectorusages" // case sensitive & must be plural!
-)
+const RscCspUsageName = "neuvector-usage"
 
 // ValidatingWebhookConfiguration resource instance (neuvector-validating-admission-webhook) contains 2 webhooks:
 // 	1. neuvector-validating-admission-webhook.neuvector.svc
@@ -176,6 +175,7 @@ type ConfigMap struct {
 	UID    string
 	Name   string
 	Domain string
+	Data   map[string]string
 }
 
 type AdmissionWebhookConfiguration struct {
