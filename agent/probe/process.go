@@ -2930,11 +2930,13 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	bNotImageButNewlyAdded := false
 	bImageFile = true
-	if global.SYS.IsNotContainerFile(c.rootPid, ppe.Path) {
+	if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, ppe.Path); yes || mounted {
 		// We will not monitor files under the mounted folder
 		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
 		if c.bPrivileged {
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+		} else if mounted {
+			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
 		} else {
 			// this file is not existed
 			bImageFile = false
