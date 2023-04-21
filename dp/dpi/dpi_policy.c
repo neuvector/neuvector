@@ -832,6 +832,14 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                 desc->flags |= POLICY_DESC_HOSTIP;
             }
         } else {
+            if (iptype == DP_IPTYPE_UWLIP && !th_detect_unmanaged_wl) {
+                // traffic from unmanaged workload is not enforced,
+                // therefore  east-west ingress traffic is allowed
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = is_internal ? POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
+                goto exit;
+            }
             dpi_policy_desc_t desc2;
             _dpi_policy_lookup_by_key(hdl, &key, is_ingress, desc);
 
@@ -890,6 +898,14 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
             desc->action = DP_POLICY_ACTION_OPEN;
             desc->flags = POLICY_DESC_INTERNAL;
         } else {
+            if (iptype == DP_IPTYPE_UWLIP && !th_detect_unmanaged_wl) {
+                // traffic to unmanaged workload is not enforced,
+                // therefore  east-west egress traffic is allowed
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = is_internal ? POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
+                goto exit;
+            }
             dpi_policy_desc_t desc2;
             _dpi_policy_lookup_by_key(hdl, &key, is_ingress, desc);
 
