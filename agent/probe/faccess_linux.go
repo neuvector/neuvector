@@ -858,12 +858,17 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 //     crio uses "docker-runc-current", but docker-native uses "docker"
 func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) bool {
 	// mlog.WithFields(log.Fields{"ppath": ppath, "path": path}).Debug("FA:")
-	if name == "ps" {
-		return true // common service call
-	}
+
 
 	// parent: matching only from binary
 	pname := filepath.Base(ppath)
+	if name == "ps" {
+		if global.RT.IsRuntimeProcess(pname, nil) {
+			return true
+		}
+		return false // common service call
+	}
+
 	if fa.bKubePlatform {
 		switch pname {
 		case "pod", "kubelet":
