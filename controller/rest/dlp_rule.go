@@ -13,11 +13,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"

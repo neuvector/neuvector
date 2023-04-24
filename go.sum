@@ -1341,14 +1341,9 @@ honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 k8s.io/api v0.19.0 h1:XyrFIJqTYZJ2DU7FBE/bSPz7b1HvbVBuBf07oeo6eTc=
 k8s.io/api v0.19.0/go.mod h1:I1K45XlvTrDjmj5LoM5LuP/KYrhWbjUKT/SoPG0qTjw=
-k8s.io/api v0.20.15 h1:7PoPWNuE/pFFhMIQCuto88+63TIjSlCviXknxWCHLVs=
-k8s.io/api v0.20.15/go.mod h1:X3JDf1BiTRQQ6xNAxTuhgi6yL2dHc6fSr9LGzE+Z3YU=
 k8s.io/apiextensions-apiserver v0.19.0/go.mod h1:znfQxNpjqz/ZehvbfMg5N6fvBJW5Lqu5HVLTJQdP4Fs=
-k8s.io/apiextensions-apiserver v0.20.15/go.mod h1:8vnD+tSG+1Fv3RDrLyqobmHoFkp8xIfHYFxRAz59wfU=
 k8s.io/apimachinery v0.17.17 h1:HMpFl9yqNI5G2+2WllKOe2XYLkCyaWzfXvk7SosyVko=
 k8s.io/apimachinery v0.17.17/go.mod h1:T54ZSpncArE25c5r2PbUPsLeTpkPWY/ivafigSX6+xk=
-k8s.io/apimachinery v0.20.15 h1:tZW9jhDILQJq0fYXq7/t0xulj+73HzxLVBUGLCNg9uM=
-k8s.io/apimachinery v0.20.15/go.mod h1:4KFiDSxCoGviCiRk9kTXIROsIf4VSGkVYjVJjJln3pg=
 k8s.io/apiserver v0.20.15/go.mod h1:B0kPHF2TLyZHZkhyKbOG9dxxd1DNfrymN0UENcDRHxQ=
 k8s.io/cli-runtime v0.20.15/go.mod h1:VFx6VfsOSy0wJmtwssg9eslqALIN42CO2YHMrEbPhPs=
 k8s.io/client-go v0.20.15/go.mod h1:q/vywQFfGT3jw+lXQGA9sEJDH0QEX7XUT2PwrQ2qm/I=
@@ -1549,4 +1544,6 @@ sigs.k8s.io/structured-merge-diff/v4 v4.1.2/go.mod h1:j/nl6xW8vLS49O8YvXW1ocPhZa
 sigs.k8s.io/yaml v1.1.0/go.mod h1:UJmg0vDUVViEyp3mgSv9WPwZCDxu4rQW1olrI1uml+o=
 sigs.k8s.io/yaml v1.2.0 h1:kr/MCeFWJWTwyaHoR9c8EjH9OumOmoF9YGiZd7lFm/Q=
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
+sigs.k8s.io/yaml v1.3.0 h1:a2VclLzOGrwOHDiV8EfBGhvjHvP46CtW5j6POvhYGGo=
+sigs.k8s.io/yaml v1.3.0/go.mod h1:GeOyir5tyXNByN85N/dRIT9es5UQNerPYEKK56eTBm8=
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=

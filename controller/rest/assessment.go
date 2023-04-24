@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
