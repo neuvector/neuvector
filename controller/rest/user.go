@@ -290,6 +290,9 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	} else if login.fullname == "" {
 		restRespAccessDenied(w, login)
 		return
+	} else if login.loginType == 1 {
+		restRespAccessDenied(w, login)
+		return
 	}
 
 	// Retrieve user from the cluster
@@ -1161,7 +1164,8 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	body, _ := ioutil.ReadAll(r.Body)
 
 	if len(body) == 0 {
-		if !acc.Authorize(&share.CLUSApikey{}, nil) {
+		if !acc.Authorize(&share.CLUSApikey{
+			RoleDomains:  acc.GetRoleDomains()}, nil) {
 			log.WithFields(log.Fields{"login": login.fullname}).Error(common.ErrObjectAccessDenied.Error())
 			restRespAccessDenied(w, login)
 			return
@@ -1175,7 +1179,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			Name: fmt.Sprintf("token-%s", utils.RandomString(5)),
 			SecretKey: utils.EncryptPassword(tmpGuid),
 		}
-		restRespSuccess(w, r, &resp, nil, nil, nil, "Create Apikey")
+		restRespSuccess(w, r, &resp, nil, nil, nil, "Create API key")
 		return
 	}
 
@@ -1203,8 +1207,24 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
+	if len(name) >= 32 {
+		e := "Exceed maximum name length limitation (32 characters)"
+		log.WithFields(log.Fields{"login": login.fullname, "create": rapikey.Name}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
+		return
+	}
+
 	if e := isValidRoleDomains(rapikey.Name, rapikey.Role, rapikey.RoleDomains, true); e != nil {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
+		msg := e.Error()
+		if strings.HasPrefix(msg, "User") {
+			msg = fmt.Sprintf("API key %s", msg[5:])
+		}
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
+		return
+	}
+
+	if access.ContainsNonSupportRole(rapikey.Role) {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "API key cannot bind to nonsupport roles")
 		return
 	}
 

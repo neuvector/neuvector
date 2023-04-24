@@ -2,10 +2,11 @@ package rest
 
 import (
 	"encoding/json"
-	"github.com/ghodss/yaml"
+	"testing"
+
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
-	"testing"
+	"sigs.k8s.io/yaml"
 )
 
 func TestParseCrdSecurityRule(t *testing.T) {
