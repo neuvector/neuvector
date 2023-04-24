@@ -572,6 +572,11 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 				}
 				roles[access.AccessDomainGlobal] = apikeyAccount.Role
 
+				_, _, err := access.GetDomainPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains)
+				if err != nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
 				s := &loginSession{
 					id:          utils.GetRandomID(idLength, ""),
 					fullname:    apikeyAccount.Name,
