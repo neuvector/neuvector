@@ -403,6 +403,13 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				xlateCronJob,
 				nil,
 			},
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(CronJobV1) },
+				func() k8s.ResourceList { return new(CronJobListV1) },
+				xlateCronJob,
+				nil,
+			},
 		},
 	},
 	RscTypeImage: k8sResource{
@@ -919,6 +926,22 @@ func xlateCronJob(obj k8s.Resource) (string, interface{}) {
 			} else if spec.ServiceAccount != nil && *spec.ServiceAccount != "" {
 				r.SA = *spec.ServiceAccount
 			}
+		}
+		return r.UID, r
+	} else if o, ok := obj.(*CronJobV1); ok && o != nil {
+		meta := o.GetMetadata()
+		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-updater-pod" {
+			return "", nil
+		}
+		r := &CronJob{
+			UID:    meta.GetUid(),
+			Name:   meta.GetName(),
+			Domain: meta.GetNamespace(),
+			SA:     "default",
+		}
+		spec := &o.Spec.JobTemplate.Spec.Template.Spec
+		if spec.ServiceAccountName != "" {
+			r.SA = spec.ServiceAccountName
 		}
 		return r.UID, r
 	}

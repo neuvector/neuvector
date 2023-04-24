@@ -192,6 +192,8 @@ github.com/fsnotify/fsnotify
 # github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 ## explicit
 github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre
+# github.com/go-logr/logr v1.2.0
+github.com/go-logr/logr
 # github.com/gogo/googleapis v1.4.1
 ## explicit
 github.com/gogo/googleapis/google/rpc
@@ -464,7 +466,7 @@ gopkg.in/square/go-jose.v2/json
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
-# k8s.io/api v0.22.5 => k8s.io/api v0.19.0
+# k8s.io/api v0.22.5 => k8s.io/api v0.21.14
 ## explicit
 k8s.io/api/admission/v1beta1
 k8s.io/api/apps/v1
@@ -472,7 +474,7 @@ k8s.io/api/authentication/v1
 k8s.io/api/batch/v1
 k8s.io/api/batch/v1beta1
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.25.2 => k8s.io/apimachinery v0.17.17
+# k8s.io/apimachinery v0.25.2 => k8s.io/apimachinery v0.19.0
 ## explicit
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/apis/meta/v1
@@ -507,8 +509,8 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 ## explicit
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
-# k8s.io/klog v1.0.0
-k8s.io/klog
+# k8s.io/klog/v2 v2.30.0
+k8s.io/klog/v2
 # lukechampine.com/uint128 v1.1.1
 lukechampine.com/uint128
 # modernc.org/cc/v3 v3.35.22
@@ -555,6 +557,8 @@ modernc.org/sqlite/lib
 modernc.org/strutil
 # modernc.org/token v1.0.0
 modernc.org/token
+# sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit
 sigs.k8s.io/yaml
@@ -569,9 +573,9 @@ sigs.k8s.io/yaml
 # golang.org/x/net => golang.org/x/net v0.0.0-20200822124328-c89045814202
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 # google.golang.org/grpc => google.golang.org/grpc v1.30.1
-# k8s.io/api => k8s.io/api v0.19.0
-# k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
-# k8s.io/apimachinery => k8s.io/apimachinery v0.17.17
+# k8s.io/api => k8s.io/api v0.21.14
+# k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.14
+# k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
 # k8s.io/apiserver => k8s.io/apiserver v0.20.15
 # k8s.io/cli-runtime => k8s.io/cli-runtime v0.20.15
 # k8s.io/client-go => k8s.io/client-go v0.20.15
