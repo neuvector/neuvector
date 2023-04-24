@@ -24,9 +24,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"

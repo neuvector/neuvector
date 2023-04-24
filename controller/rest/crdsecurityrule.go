@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -35,6 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spaolacci/murmur3"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"sigs.k8s.io/yaml"
 )
 
 type nvCrdHandler struct {
