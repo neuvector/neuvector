@@ -161,6 +161,7 @@ type NvCrdInfo struct {
 	SpecNamesListKind string
 	LockKey           string
 	KvCrdKind         string
+	ShortNames        []string
 }
 
 //--- for generic types in admissionregistration v1/vebeta1
@@ -1896,8 +1897,8 @@ func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8s
 			},
 		}
 		rbacRoleBindingsWanted[nvCspUsageRoleBinding] = &k8sRbacBindingInfo{
-			subject:   &ctrlerSubjectWanted,
-			rbacRole:  rbacRolesWanted[nvCspUsageRole],
+			subject:  &ctrlerSubjectWanted,
+			rbacRole: rbacRolesWanted[nvCspUsageRole],
 		}
 	}
 

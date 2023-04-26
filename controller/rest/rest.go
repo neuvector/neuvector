@@ -94,6 +94,8 @@ var restErrWorkloadNotFound error = errors.New("Container is not found")
 var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
+var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
+
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
 	api.RESTErrMethodNotAllowed:      "Method not allowed",
@@ -1228,20 +1230,21 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev         *common.LocalDevice
-	EvQueue          cluster.ObjectQueueInterface
-	AuditQueue       cluster.ObjectQueueInterface
-	Messenger        cluster.MessengerInterface
-	Cacher           cache.CacheInterface
-	Scanner          scan.ScanInterface
-	FedPort          uint
-	RESTPort         uint
-	PwdValidUnit     uint
-	TeleNeuvectorURL string
-	TeleCurrentVer   string
-	TeleFreq         uint
-	CspType          share.TCspType
-	CspPauseInterval uint // in minutes
+	LocalDev           *common.LocalDevice
+	EvQueue            cluster.ObjectQueueInterface
+	AuditQueue         cluster.ObjectQueueInterface
+	Messenger          cluster.MessengerInterface
+	Cacher             cache.CacheInterface
+	Scanner            scan.ScanInterface
+	FedPort            uint
+	RESTPort           uint
+	PwdValidUnit       uint
+	TeleNeuvectorURL   string
+	TeleCurrentVer     string
+	TeleFreq           uint
+	CspType            share.TCspType
+	CspPauseInterval   uint // in minutes
+	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
 }
 
 var cctx *Context
@@ -1264,6 +1267,7 @@ func InitContext(ctx *Context) {
 	_fedPort = ctx.FedPort
 	_fedServerChan = make(chan bool, 1)
 	crdEventProcTicker = time.NewTicker(crdEventProcPeriod)
+	checkCrdSchemaFunc = ctx.CheckCrdSchemaFunc
 
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
 		_pwdValidUnit = time.Duration(ctx.PwdValidUnit)
@@ -1632,7 +1636,7 @@ func StartRESTServer() {
 	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
 	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
 
-    // csp billing adapter integration
+	// csp billing adapter integration
 	r.POST("/v1/csp/file/support", handlerCspSupportExport) // Skip API document. For downloading the tar ball that can be submitted to support portal
 
 	access.CompileUriPermitsMapping()

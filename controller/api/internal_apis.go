@@ -202,6 +202,7 @@ type RESTK8sNvRbacStatus struct {
 	RoleErrors               []string              `json:"role_errors"`
 	RoleBindingErrors        []string              `json:"rolebinding_errors"`
 	NvUpgradeInfo            *RESTCheckUpgradeInfo `json:"neuvector_upgrade_info"`
+	NvCrdSchemaErrors        []string              `json:"neuvector_crd_errors"`
 }
 
 // telemetry
