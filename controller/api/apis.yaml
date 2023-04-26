@@ -4363,7 +4363,7 @@ paths:
       responses:
         '200':
           description: Success
- /v1/api_key:
+  /v1/api_key:
     get:
       tags:
         - Apikey
@@ -7971,6 +7971,9 @@ definitions:
       single_cve_per_syslog:
         type: boolean
         example: true
+      syslog_server_cert:
+        type: string
+        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
   RESTSystemConfigAuthCfgV2:
     type: object
     properties:
@@ -10057,6 +10060,9 @@ definitions:
       single_cve_per_syslog:
         type: boolean
         example: false
+      syslog_server_cert:
+        type: string
+        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
       auth_order:
         type: array
         items:
@@ -10317,6 +10323,9 @@ definitions:
       single_cve_per_syslog:
         type: boolean
         example: false
+      syslog_server_cert:
+        type: string
+        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
   RESTSystemConfigV2:
     type: object
     required:
@@ -10468,6 +10477,9 @@ definitions:
       no_telemetry_report:
         type: boolean
         example: false
+      syslog_server_cert:
+        type: string
+        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
   RESTSystemConfigConfigV2:
     type: object
     required:
