@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -104,10 +105,12 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 	tarw := tar.NewWriter(gzw)
 	defer tarw.Close()
 
+	now := time.Now()
 	hdr := &tar.Header{
 		Name:     "neuvector/",
 		Mode:     int64(0744),
 		Typeflag: tar.TypeDir,
+		ModTime:  now,
 	}
 	if err = tarw.WriteHeader(hdr); err == nil {
 		for _, f := range fileContent {
@@ -116,6 +119,7 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 				Mode:     int64(0644),
 				Size:     int64(len(f.data)),
 				Typeflag: tar.TypeReg,
+				ModTime:  now,
 			}
 			if err = tarw.WriteHeader(hdr); err == nil {
 				_, err = tarw.Write(f.data)

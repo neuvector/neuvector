@@ -6,7 +6,10 @@ import "C"
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -21,11 +24,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
-	"encoding/pem"
-	"crypto/rsa"
-	"crypto/x509"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -1849,10 +1850,18 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		RoleErrors:               emptySlice,
 		RoleBindingErrors:        emptySlice,
 		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
+		NvCrdSchemaErrors:        emptySlice,
 	}
 	if k8sPlatform {
 		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleErrors, resp.RoleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
+		if checkCrdSchemaFunc != nil {
+			var leader bool
+			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
+				leader = true
+			}
+			resp.NvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
+		}
 	}
 
 	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
