@@ -30,6 +30,7 @@ type Syslogger struct {
 	catSet utils.Set
 	prio   syslog.Priority
 	inJSON bool
+	serverCert string
 }
 
 func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
@@ -41,6 +42,8 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 	}
 	if cfg.SyslogIPProto == syscall.IPPROTO_TCP {
 		proto = "tcp"
+	} else if cfg.SyslogIPProto == api.SyslogProtocolTCPTLS {
+		proto = "tcp+tls"
 	} else {
 		proto = "udp"
 	}
@@ -61,6 +64,7 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 		catSet: catSet,
 		prio:   prio,
 		inJSON: cfg.SyslogInJSON,
+		serverCert: cfg.SyslogServerCert,
 	}
 }
 
@@ -180,7 +184,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 
 		s.Close()
 	}
-	if wr, err := syslog.Dial(s.proto, s.addr, syslogFacility|prio, "neuvector"); err != nil {
+	if wr, err := s.makeDial(prio); err != nil {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
@@ -188,6 +192,14 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}
+}
+
+func (s *Syslogger) makeDial(prio syslog.Priority) (*syslog.Writer, error) {
+	if s.proto == "tcp+tls" {
+		return syslog.DialWithTLSCert("tcp+tls", s.addr, syslogFacility|prio, "neuvector", []byte(s.serverCert))
+	}
+
+	return syslog.Dial(s.proto, s.addr, syslogFacility|prio, "neuvector")
 }
 
 // --

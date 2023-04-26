@@ -667,6 +667,7 @@ type CLUSSyslogConfig struct {
 	SyslogEnable     bool     `json:"syslog_enable"`
 	SyslogCategories []string `json:"syslog_categories"`
 	SyslogInJSON     bool     `json:"syslog_in_json"`
+	SyslogServerCert string   `json:"syslog_server_cert"`
 }
 
 type CLUSSystemUsageReport struct {
