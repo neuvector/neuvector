@@ -103,6 +103,7 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 		SyslogEnable:     false,
 		SyslogCategories: defaultSyslogCategory,
 		SyslogInJSON:     false,
+		SyslogServerCert: "",
 	},
 	AuthOrder:            []string{},
 	ClusterName:          defaultClusterName,

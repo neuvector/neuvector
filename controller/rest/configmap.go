@@ -277,6 +277,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			SyslogCategories:          rc.SyslogCategories,
 			SyslogInJSON:              rc.SyslogInJSON,
 			SingleCVEPerSyslog:        rc.SingleCVEPerSyslog,
+			SyslogServerCert:          rc.SyslogServerCert,
 			AuthOrder:                 rc.AuthOrder,
 			AuthByPlatform:            rc.AuthByPlatform,
 			RancherEP:                 rc.RancherEP,
