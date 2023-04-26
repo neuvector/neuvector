@@ -53,6 +53,8 @@
 #define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
 #define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
+#define ENV_CSP_ENV            "CSP_ENV"
+#define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -207,7 +209,7 @@ static pid_t fork_exec(int i)
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period;
-    char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq;
+    char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     int a;
 
     switch (i) {
@@ -402,6 +404,14 @@ static pid_t fork_exec(int i)
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-no_rm_nsgroups";
             }
+        }
+        if ((csp_env = getenv(ENV_CSP_ENV)) != NULL) {
+            args[a++] = "-csp_env";
+            args[a++] = csp_env;
+        }
+        if ((csp_pause_interval = getenv(ENV_CSP_PAUSE_INTERVAL)) != NULL) {
+            args[a++] = "-csp_pause_interval";
+            args[a++] = csp_pause_interval;
         }
         args[a] = NULL;
         break;

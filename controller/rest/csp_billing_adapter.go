@@ -66,15 +66,13 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 		} else {
 			// master cluster is unreachable from this joint cluster
-			resp = resource.GetCspConfig()
+			resp = resource.GetCspConfig(nvSemanticVersion)
 		}
 	} else {
-		resp = resource.GetCspConfig()
-	}
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error()
+		resp = resource.GetCspConfig(nvSemanticVersion)
 	}
 	if err != nil || resp.CspConfigData == "" || resp.CspConfigData == "{}" {
+		log.WithFields(log.Fields{"error": err, "cspConfig": resp.CspConfigData}).Error("no data")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, notSupported)
 		return
 	} else {
@@ -108,7 +106,7 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 
 	hdr := &tar.Header{
 		Name:     "neuvector/",
-		Mode:     int64(0644),
+		Mode:     int64(0744),
 		Typeflag: tar.TypeDir,
 	}
 	if err = tarw.WriteHeader(hdr); err == nil {
