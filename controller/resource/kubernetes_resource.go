@@ -1896,7 +1896,6 @@ func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8s
 			},
 		}
 		rbacRoleBindingsWanted[nvCspUsageRoleBinding] = &k8sRbacBindingInfo{
-			namespace: NvAdmSvcNamespace,
 			subject:   &ctrlerSubjectWanted,
 			rbacRole:  rbacRolesWanted[nvCspUsageRole],
 		}

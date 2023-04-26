@@ -1374,8 +1374,7 @@ func VerifyNvRbacRoleBindings(bindingNames []string, existOnly, logging bool) ([
 								if roleWanted.k8sReserved {
 									// this (cluster) role binding binds to k8s reserved cluster role
 									if !roleWanted.supersetRoles.Contains(binding.role.name) {
-										err = fmt.Errorf(`Kubernetes %s "%s" is required to bind %s "%s" to service account %s:%s.`,
-											rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+										wrongBinding = true
 									}
 								} else if binding.role.name != roleWanted.name || binding.role.domain != roleWanted.namespace {
 									wrongBinding = true
@@ -1395,8 +1394,13 @@ func VerifyNvRbacRoleBindings(bindingNames []string, existOnly, logging bool) ([
 							}
 						}
 						if err == nil && (!foundSA || wrongBinding) {
-							err = fmt.Errorf(`Kubernetes %s "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.`,
-								rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+							if roleWanted, ok := rbacRolesWanted[bindingWanted.rbacRole.name]; ok && roleWanted.k8sReserved {
+								err = fmt.Errorf(`Kubernetes %s "%s" is required to bind %s "%s" to service account %s:%s.`,
+									rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+							} else {
+								err = fmt.Errorf(`Kubernetes %s "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.`,
+									rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+							}
 						}
 					} else {
 						err = fmt.Errorf(`Unknown object type for Kubernetes %s "%s".`, rbacRoleBindingDesc, bindingName)
