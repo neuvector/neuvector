@@ -14,9 +14,9 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc => google.golang.org/grpc v1.30.1
-	k8s.io/api => k8s.io/api v0.19.0
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.17.17
+	k8s.io/api => k8s.io/api v0.21.14
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.14
+	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
 	k8s.io/apiserver => k8s.io/apiserver v0.20.15
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.20.15
 	k8s.io/client-go => k8s.io/client-go v0.20.15
