@@ -31,6 +31,7 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
  */
 #define UNKNOWN_IP_CACHE_TIMEOUT 600 //sec
 #define POLICY_DESC_VER_CHG_MAX 60 //sec
+#define UNKNOWN_IP_TRY_COUNT 10 //10 times
 typedef struct dpi_unknown_ip_desc_ {
     uint32_t sip;
     uint32_t dip;
@@ -44,6 +45,7 @@ typedef struct dpi_unknown_ip_cache_ {
     dpi_unknown_ip_desc_t desc;
     uint32_t start_hit;
     uint32_t last_hit;
+    uint8_t try_cnt;
 } dpi_unknown_ip_cache_t;
 
 static int unknown_ip_match(struct cds_lfht_node *ht_node, const void *key)
@@ -80,12 +82,24 @@ static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_des
         memcpy(&cache->desc, desc, sizeof(*desc));
         cache->start_hit = th_snap.tick;
         cache->last_hit = th_snap.tick;
+        cache->try_cnt = UNKNOWN_IP_TRY_COUNT;
         rcu_map_add(&th_unknown_ip_map, cache, key);
 
         timer_wheel_entry_init(&cache->ts_entry);
         timer_wheel_entry_start(&th_timer, &cache->ts_entry,
                                 unknown_ip_release, UNKNOWN_IP_CACHE_TIMEOUT, th_snap.tick);
     }
+}
+
+static void refresh_unknown_ip_cache(dpi_unknown_ip_cache_t *cache, uint16_t thdl_ver, uint8_t try_cnt)
+{
+    cache->try_cnt = try_cnt;
+    cache->desc.hdl_ver = thdl_ver;
+    //restart timestamp
+    cache->start_hit = th_snap.tick;
+    cache->last_hit = th_snap.tick;
+
+    timer_wheel_entry_refresh(&th_timer, &cache->ts_entry, th_snap.tick);
 }
 
 static void update_unknown_ip_cache(dpi_unknown_ip_cache_t *cache)
@@ -694,6 +708,16 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
                 desc->flags |= POLICY_DESC_UNKNOWN_IP;
                 desc->action = DP_POLICY_ACTION_OPEN;
                 update_unknown_ip_cache(uip_cache);
+            } else {
+                //try above condition UNKNOWN_IP_TRY_COUNT time
+                uint8_t try_cnt = uip_cache->try_cnt;
+                if (try_cnt > 0) {
+                    try_cnt--;
+                    refresh_unknown_ip_cache(uip_cache, thdl_ver, try_cnt);
+                    desc->flags &= ~(POLICY_DESC_CHECK_VER);
+                    desc->flags |= POLICY_DESC_UNKNOWN_IP;
+                    desc->action = DP_POLICY_ACTION_OPEN;
+                }
             }
         } else {
             /*
@@ -972,12 +996,6 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
     if (unlikely((s->policy_desc.hdl_ver != p->ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_UNKNOWN_IP))) {
         dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
-        //if ip is still unmatchable to policy after new policy push
-        //from controller, restore action to policy default action
-        //it is not quick start anymore
-        if (s->policy_desc.flags & POLICY_DESC_UNKNOWN_IP) {
-            s->policy_desc.action = hdl?hdl->def_action:DP_POLICY_ACTION_OPEN;
-        }
         policy_eval = 1;
     }
 
