@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -19,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 )
 
 const ldapconfigmap string = "/etc/config/ldapinitcfg.yaml"
@@ -277,6 +277,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			SyslogCategories:          rc.SyslogCategories,
 			SyslogInJSON:              rc.SyslogInJSON,
 			SingleCVEPerSyslog:        rc.SingleCVEPerSyslog,
+			SyslogServerCert:          rc.SyslogServerCert,
 			AuthOrder:                 rc.AuthOrder,
 			AuthByPlatform:            rc.AuthByPlatform,
 			RancherEP:                 rc.RancherEP,

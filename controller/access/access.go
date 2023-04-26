@@ -1546,3 +1546,18 @@ func (acc *AccessControl) AuthorizeOwn(obj share.AccessObject, f share.GetAccess
 
 	return authz
 }
+
+func (acc *AccessControl) GetRoleDomains() map[string][]string{
+	var roleDomains = make(map[string][]string)
+
+	for d, role := range acc.roles {
+		roleDomains[role] = append(roleDomains[role], d)
+	}
+
+	return roleDomains
+}
+
+func ContainsNonSupportRole(role string) bool {
+	var roles = utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader, api.UserRoleIBMSA, api.UserRoleImportStatus)
+	return roles.Contains(role)
+}

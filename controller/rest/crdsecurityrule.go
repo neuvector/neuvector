@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -35,6 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spaolacci/murmur3"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"sigs.k8s.io/yaml"
 )
 
 type nvCrdHandler struct {
@@ -513,7 +513,7 @@ LOOPALLDEL:
 			}
 		}
 		// at this point no crd using the group
-		// In cfg import case can't relay on cacher as at this point, can't be sure cacher is written
+		// In cfg import case can't rely on cacher as at this point, can't be sure cacher is written
 		// in regular case check if group was used by user created policy.
 		// however, in restart case, this function could be called before any group/policy kv callback is called.
 		// in this case the group & all policies related to it will be deleted.
@@ -2118,12 +2118,22 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 		modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 		for idx, crdRule := range admCtrlSecRule.Spec.Rules {
 			var errMsg string
-			if crdRule.Action == nil ||
-				(*crdRule.Action != api.ValidatingAllowRuleType && *crdRule.Action != api.ValidatingDenyRuleType) ||
-				len(crdRule.Criteria) == 0 ||
-				(*crdRule.Action == api.ValidatingAllowRuleType && crdRule.RuleMode != nil) ||
-				(*crdRule.Action == api.ValidatingDenyRuleType && crdRule.RuleMode != nil && !modes.Contains(*crdRule.RuleMode)) {
-				errMsg := fmt.Sprintf("%s file format error:  validation error in %s", reviewTypeDisplay, name)
+			var errDetails string
+			if crdRule.Action == nil {
+				errDetails = "action missing"
+			} else if *crdRule.Action != api.ValidatingAllowRuleType && *crdRule.Action != api.ValidatingDenyRuleType {
+				errDetails = "unsupported action"
+			} else if len(crdRule.Criteria) == 0 {
+				errDetails = "no criteria"
+			} else if crdRule.RuleMode != nil {
+				ruleMode := *crdRule.RuleMode
+				if (*crdRule.Action == api.ValidatingAllowRuleType && ruleMode != "") ||
+					(*crdRule.Action == api.ValidatingDenyRuleType && !modes.Contains(ruleMode)) {
+					errDetails = "unsupported rule_mode"
+				}
+			}
+			if errDetails != "" {
+				errMsg := fmt.Sprintf("%s file format error:  validation error in %s. Details: %s", reviewTypeDisplay, name, errDetails)
 				return nil, 1, errMsg, recordName
 			}
 			crdRuleType := *crdRule.Action

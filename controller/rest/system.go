@@ -23,10 +23,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"encoding/pem"
+	"crypto/rsa"
+	"crypto/x509"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -285,6 +288,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						SyslogCategories:   rconf.SyslogCategories,
 						SyslogInJSON:       rconf.SyslogInJSON,
 						SingleCVEPerSyslog: rconf.SingleCVEPerSyslog,
+						SyslogServerCert:   rconf.SyslogServerCert,
 					},
 					Auth: api.RESTSystemConfigAuthV2{
 						AuthOrder:      rconf.AuthOrder,
@@ -1149,7 +1153,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				ipproto := *rc.SyslogIPProto
 				if ipproto == 0 {
 					cconf.SyslogIPProto = syscall.IPPROTO_UDP
-				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP {
+				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP && ipproto != api.SyslogProtocolTCPTLS {
 					e := "Invalid syslog protocol"
 					log.WithFields(log.Fields{"protocol": ipproto}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
@@ -1201,6 +1205,10 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			// SingleCVEPerSyslog
 			if rc.SingleCVEPerSyslog != nil {
 				cconf.SingleCVEPerSyslog = *rc.SingleCVEPerSyslog
+			}
+
+			if rc.SyslogServerCert != nil {
+				cconf.SyslogServerCert = *rc.SyslogServerCert
 			}
 
 			// Auth order
@@ -1480,6 +1488,15 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.SyslogCategories = configV2.SyslogCfg.SyslogCategories
 				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
 				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
+				config.SyslogServerCert = configV2.SyslogCfg.SyslogServerCert
+
+				if *config.SyslogIPProto == api.SyslogProtocolTCPTLS {
+					if certErr := validateCertificate(*config.SyslogServerCert); certErr != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Request error,  invalid syslog server certificate")
+						restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+						return
+					}
+				}
 			}
 			if configV2.AuthCfg != nil {
 				config.AuthOrder = configV2.AuthCfg.AuthOrder
@@ -2381,4 +2398,19 @@ func replaceFedSystemConfig(newCfg *share.CLUSSystemConfig) bool {
 	}
 
 	return true
+}
+
+func validateCertificate(certificate string) error {
+	block, _ := pem.Decode([]byte(certificate))
+	if block == nil {
+		return errors.New("Invalid certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return errors.New("Invalid certificate")
+	}
+	if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+		return errors.New("Invalid certificate, certificate doesn't contain a public key")
+	}
+	return nil
 }

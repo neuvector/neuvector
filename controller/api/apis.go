@@ -1637,6 +1637,7 @@ type RESTSystemConfigConfig struct {
 	SyslogEnable              *bool                            `json:"syslog_status,omitempty"`
 	SyslogCategories          *[]string                        `json:"syslog_categories,omitempty"`
 	SyslogInJSON              *bool                            `json:"syslog_in_json,omitempty"`
+	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
 	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
@@ -1681,6 +1682,8 @@ type RESTSystemConfigConfigCfgMap struct {
 	AlwaysReload bool                  `json:"always_reload"`
 }
 
+const SyslogProtocolTCPTLS = 66
+
 type RESTSystemConfigConfigData struct {
 	Config     *RESTSystemConfigConfig   `json:"config,omitempty"`
 	ConfigV2   *RESTSystemConfigConfigV2 `json:"config_v2,omitempty"`
@@ -1703,6 +1706,7 @@ type RESTSystemConfigSyslogCfgV2 struct {
 	SyslogCategories   *[]string `json:"syslog_categories,omitempty"`
 	SyslogInJSON       *bool     `json:"syslog_in_json,omitempty"`
 	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
+	SyslogServerCert   *string   `json:"syslog_server_cert,omitempty"`
 }
 
 type RESTSystemConfigAuthCfgV2 struct {
@@ -1775,6 +1779,7 @@ type RESTSystemConfig struct {
 	SyslogEnable              bool                      `json:"syslog_status"`
 	SyslogCategories          []string                  `json:"syslog_categories"`
 	SyslogInJSON              bool                      `json:"syslog_in_json"`
+	SyslogServerCert          string                    `json:"syslog_server_cert"`
 	SingleCVEPerSyslog        bool                      `json:"single_cve_per_syslog"`
 	AuthOrder                 []string                  `json:"auth_order"`
 	AuthByPlatform            bool                      `json:"auth_by_platform"`
@@ -1824,6 +1829,7 @@ type RESTSystemConfigSyslogV2 struct {
 	SyslogCategories   []string `json:"syslog_categories"`
 	SyslogInJSON       bool     `json:"syslog_in_json"`
 	SingleCVEPerSyslog bool     `json:"single_cve_per_syslog"`
+	SyslogServerCert   string   `json:"syslog_server_cert"`
 }
 
 type RESTSystemConfigAuthV2 struct {
