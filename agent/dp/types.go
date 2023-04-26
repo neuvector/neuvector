@@ -47,6 +47,7 @@ type Connection struct {
 	ToSidecar    bool
 	MeshToSvr    bool
 	LinkLocal    bool
+	TmpOpen      bool
 }
 
 type ConnectionData struct {

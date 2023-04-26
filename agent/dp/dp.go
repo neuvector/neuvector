@@ -198,6 +198,10 @@ func dpMsgConnection(msg []byte) {
 			// used by cilium CNI
 			cc.LinkLocal = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_TMP_OPEN) != 0 {
+			// temporary OPEN connection
+			cc.TmpOpen = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),

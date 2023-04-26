@@ -706,6 +706,7 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
                 th_snap.tick - uip_cache->start_hit < POLICY_DESC_VER_CHG_MAX) {
                 desc->flags &= ~(POLICY_DESC_CHECK_VER);
                 desc->flags |= POLICY_DESC_UNKNOWN_IP;
+                desc->flags |= POLICY_DESC_TMP_OPEN;
                 desc->action = DP_POLICY_ACTION_OPEN;
                 update_unknown_ip_cache(uip_cache);
             } else {
@@ -716,6 +717,7 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
                     refresh_unknown_ip_cache(uip_cache, thdl_ver, try_cnt);
                     desc->flags &= ~(POLICY_DESC_CHECK_VER);
                     desc->flags |= POLICY_DESC_UNKNOWN_IP;
+                    desc->flags |= POLICY_DESC_TMP_OPEN;
                     desc->action = DP_POLICY_ACTION_OPEN;
                 }
             }
@@ -733,11 +735,13 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
             add_unknown_ip_cache(&uip_desc, &uip_desc);
             desc->flags &= ~(POLICY_DESC_CHECK_VER);
             desc->flags |= POLICY_DESC_UNKNOWN_IP;
+            desc->flags |= POLICY_DESC_TMP_OPEN;
             desc->action = DP_POLICY_ACTION_OPEN;
         }
     } else if (iptype == DP_IPTYPE_DEVIP) {
         //connection from nv device is open
         desc->flags &= ~(POLICY_DESC_CHECK_VER);
+        desc->flags |= POLICY_DESC_TMP_OPEN;
         desc->action = DP_POLICY_ACTION_OPEN;
     }
 }
@@ -813,6 +817,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         desc->id = 0;
         desc->action = DP_POLICY_ACTION_OPEN;
         desc->flags = POLICY_DESC_CHECK_VER;
+        desc->flags |= POLICY_DESC_TMP_OPEN;
         if (is_ingress) {
             desc->flags |= dpi_is_ip4_internal(sip)?
                                POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
