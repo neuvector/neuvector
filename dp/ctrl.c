@@ -2644,6 +2644,9 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_LINK_LOCAL)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_LINK_LOCAL);
             }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_TMP_OPEN)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_TMP_OPEN);
+            }
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;
             conn->Sessions = count_session;

@@ -553,6 +553,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		ToSidecar:    c.ToSidecar,
 		MeshToSvr:    c.MeshToSvr,
 		LinkLocal:    c.LinkLocal,
+		TmpOpen:      c.TmpOpen,
 	}
 }
 

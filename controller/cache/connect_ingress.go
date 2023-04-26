@@ -260,6 +260,11 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			ca.workload = true
 			ca.managed = true
 			return &ca, &sa, &stip, true
+		} else if conn.TmpOpen {
+			cctx.ConnLog.WithFields(log.Fields{
+				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
+			}).Debug("Ignore ingress temporary open connection")
+			return &ca, &sa, &stip, false
 		} else if isDeviceIP(net.IP(conn.ClientIP)) {
 			cctx.ConnLog.WithFields(log.Fields{
 				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
@@ -337,6 +342,11 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 			sa.workload = true
 			sa.managed = true
 			return &ca, &sa, &stip, true
+		} else if conn.TmpOpen {
+			cctx.ConnLog.WithFields(log.Fields{
+				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
+			}).Debug("Ignore egress temporary open connection")
+			return &ca, &sa, &stip, false
 		} else if isDeviceIP(net.IP(conn.ServerIP)) {
 			cctx.ConnLog.WithFields(log.Fields{
 				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),

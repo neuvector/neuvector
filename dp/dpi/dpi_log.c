@@ -792,6 +792,9 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
         if (sess->policy_desc.flags & POLICY_DESC_LINK_LOCAL) {
             dps->Flags |= DPSESS_FLAG_LINK_LOCAL;
         }
+        if (sess->policy_desc.flags & POLICY_DESC_TMP_OPEN) {
+            dps->Flags |= DPSESS_FLAG_TMP_OPEN;
+        }
     } else {
         dps->EtherType = ETH_P_IPV6;
         memcpy(dps->ClientIP, &c->ip.ip6, 16);
@@ -891,6 +894,9 @@ static void dpi_session_log_from_pkt(dpi_packet_t *p, int to_server, dpi_policy_
         }
         if (desc->flags & POLICY_DESC_LINK_LOCAL) {
             dps->Flags |= DPSESS_FLAG_LINK_LOCAL;
+        }
+        if (desc->flags & POLICY_DESC_TMP_OPEN) {
+            dps->Flags |= DPSESS_FLAG_TMP_OPEN;
         }
     } else {
         struct ip6_hdr *ip6h = (struct ip6_hdr *)(p->pkt + p->l3);

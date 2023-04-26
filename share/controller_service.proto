@@ -108,6 +108,7 @@ message CLUSConnection {
 	bool ToSidecar = 28;
 	bool MeshToSvr = 29;
 	bool LinkLocal = 30;
+	bool TmpOpen = 31;
 }
 
 message CLUSConnectionArray {
