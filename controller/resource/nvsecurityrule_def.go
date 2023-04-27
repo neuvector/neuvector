@@ -46,6 +46,13 @@ const NvWafSecurityRuleKind = "NvWafSecurityRule"
 const NvWafSecurityRuleListKind = "NvWafSecurityRuleList"
 const NvWafSecurityRuleSingular = "nvwafsecurityrule"
 
+const NvVulProfileSecurityRuleName = "nvvulnerabilityprofiles.neuvector.com"
+const NvVulProfileSecurityRuleVersion = "v1"
+const NvVulProfileSecurityRulePlural = "nvvulnerabilityprofiles"
+const NvVulProfileSecurityRuleKind = "NvVulnerabilityProfile"
+const NvVulProfileSecurityRuleListKind = "NvVulnerabilityProfileList"
+const NvVulProfileSecurityRuleSingular = "nvvulnerabilityprofile"
+
 // csp billing adapter
 const NvCspUsageName = "neuvectorusagerecords.neuvector.com"
 const NvCspUsagePlural = "neuvectorusagerecords"
@@ -68,6 +75,10 @@ type NvCrdAdmCtrlConfig struct {
 	AdmClientMode string `json:"adm_client_mode"`
 }
 
+type NvCrdVulProfileConfig struct {
+	Profile *api.RESTVulnerabilityProfileConfig `json:"profile"`
+}
+
 type NvSecurityParse struct {
 	TargetName        string
 	PolicyModeCfg     *api.RESTServiceConfig
@@ -81,6 +92,7 @@ type NvSecurityParse struct {
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
+	VulProfileCfg     *NvCrdVulProfileConfig         // vulnerability profile defined by this crd object
 }
 
 type NvSecurityTarget struct {
@@ -322,6 +334,47 @@ func (m *NvWafSecurityRule) GetMetadata() *metav1.ObjectMeta {
 }
 
 func (m *NvWafSecurityRuleList) GetMetadata() *metav1.ListMeta {
+	return m.Metadata
+}
+
+// vulnerability profile
+type NvSecurityVulProfileEntry struct {
+	Name    string   `json:"name"`
+	Comment *string  `json:"comment,omitempty"`
+	Days    *uint    `json:"days,omitempty"` // Only used for 'recent' vuln entries
+	Domains []string `json:"domains,omitempty"`
+	Images  []string `json:"images,omitempty"`
+}
+
+type NvSecurityVulProfile struct {
+	Name    string                       `json:"name"`
+	Entries []*NvSecurityVulProfileEntry `json:"entries,omitempty"`
+}
+
+type NvSecurityVulProfileSpec struct {
+	Profile *NvSecurityVulProfile `json:"profile,omitempty"`
+}
+
+type NvVulProfileSecurityRule struct {
+	Kind       *string                  `json:"kind,omitempty"`
+	ApiVersion *string                  `json:"apiVersion,omitempty"`
+	Metadata   *metav1.ObjectMeta       `json:"metadata"`
+	Spec       NvSecurityVulProfileSpec `json:"spec"`
+}
+
+type NvVulProfileSecurityRuleList struct {
+	Kind             *string                     `json:"kind,omitempty"`
+	ApiVersion       *string                     `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ListMeta            `json:"metadata"`
+	Items            []*NvVulProfileSecurityRule `json:"items"`
+	XXX_unrecognized []byte                      `json:"-"`
+}
+
+func (m *NvVulProfileSecurityRule) GetMetadata() *metav1.ObjectMeta {
+	return m.Metadata
+}
+
+func (m *NvVulProfileSecurityRuleList) GetMetadata() *metav1.ListMeta {
 	return m.Metadata
 }
 

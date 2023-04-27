@@ -1366,8 +1366,10 @@ func StartRESTServer() {
 	r.POST("/v1/file/dlp/config", handlerDlpImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
 	r.POST("/v1/file/waf", handlerWafExport)                  // supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/waf/config", handlerWafImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.GET("/v1/internal/system", handlerInternalSystem)       // skip API document
-	r.GET("/v1/system/usage", handlerSystemUsage)             // skip API document
+	r.POST("/v1/file/vulnerability/profile", handlerVulProfileExport)
+	r.POST("/v1/file/vulnerability/profile/config", handlerVulProfileImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.GET("/v1/internal/system", handlerInternalSystem)                      // skip API document
+	r.GET("/v1/system/usage", handlerSystemUsage)                            // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
 	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.

@@ -158,7 +158,7 @@ type CacheInterface interface {
 	// Vulnerability
 	GetVulnerabilityProfile(name string, acc *access.AccessControl) (*api.RESTVulnerabilityProfile, error)
 	GetVulnerabilityProfileInterface(name string) scanUtils.VPFInterface
-	GetAllVulnerabilityProfiles(acc *access.AccessControl) []*api.RESTVulnerabilityProfile
+	GetAllVulnerabilityProfiles(acc *access.AccessControl) (api.RESTVulProfileSettings, []*api.RESTVulnerabilityProfile)
 
 	// Admission control - non-UI
 	SyncAdmCtrlStateToK8s(svcName, nvAdmName string) (bool, error)

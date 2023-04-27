@@ -2219,6 +2219,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				go importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			case share.IMPORT_TYPE_WAF:
 				go importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+            case share.IMPORT_TYPE_VUL_PROFILE:
+				go importVulProfile(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			}
 
 			resp := api.RESTImportTaskData{
@@ -2254,6 +2256,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "DLP configurations"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF configurations"
+    case share.IMPORT_TYPE_VUL_PROFILE:
+		msgToken = "vulnerability profile"
 	}
 	configLog(share.CLUSEvImportFail, login, fmt.Sprintf("Failed to import %s", msgToken))
 	return
@@ -2299,6 +2303,8 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		msgToken = "DLP rules"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF rules"
+    case share.IMPORT_TYPE_VUL_PROFILE:
+		msgToken = "vulnerability profile"
 	}
 
 	importTask.LastUpdateTime = time.Now().UTC()
@@ -2357,6 +2363,12 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 				SpecNamesKind: resource.NvWafSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvWafSecurityRuleKind,
+			},
+			&resource.NvCrdInfo{
+				RscType:       resource.RscTypeCrdVulProfile,
+				SpecNamesKind: resource.NvVulProfileSecurityRuleKind,
+				LockKey:       share.CLUSLockVulKey,
+				KvCrdKind:     resource.NvVulProfileSecurityRuleKind,
 			},
 		}
 		for _, crdInfo := range nvCrdInfo {

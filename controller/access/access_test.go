@@ -1436,6 +1436,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_VULNERABILITY: []string{
 			"v1/vulnerability/profile/*/entry",
+			"v1/file/vulnerability/profile",
+			"v1/file/vulnerability/profile/config",
 		},
 	}
 

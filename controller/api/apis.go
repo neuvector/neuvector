@@ -336,10 +336,10 @@ type RESTX509CertInfo struct {
 }
 
 type RESTServerSAML struct {
-	SSOURL     string `json:"sso_url"`
-	Issuer     string `json:"issuer"`
-	X509Cert   string `json:"x509_cert,cloak"`
-	GroupClaim string `json:"group_claim"`
+	SSOURL     string             `json:"sso_url"`
+	Issuer     string             `json:"issuer"`
+	X509Cert   string             `json:"x509_cert,cloak"`
+	GroupClaim string             `json:"group_claim"`
 	X509Certs  []RESTX509CertInfo `json:"x509_certs"`
 
 	Enable           bool                      `json:"enable"`
@@ -509,6 +509,10 @@ type RESTAdmCtrlRulesExport struct {
 
 type RESTWafSensorExport struct {
 	Names []string `json:"names"`
+}
+
+type RESTVulProfilesExport struct { // vlunerability profile export
+	Profiles []string `json:"profiles"`
 }
 
 type RESTUser struct {
@@ -2504,19 +2508,27 @@ type RESTVulnerabilityProfileEntry struct {
 type RESTVulnerabilityProfile struct {
 	Name    string                          `json:"name"`
 	Entries []RESTVulnerabilityProfileEntry `json:"entries"`
+	CfgType string                          `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileData struct {
 	Profile *RESTVulnerabilityProfile `json:"profile"`
 }
 
+type RESTVulProfileSettings struct {
+	ActiveProfile string `json:"active_profile"`
+	CfgType       string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
+}
+
 type RESTVulnerabilityProfilesData struct {
+	Settings RESTVulProfileSettings      `json:"settings"`
 	Profiles []*RESTVulnerabilityProfile `json:"profiles"`
 }
 
 type RESTVulnerabilityProfileConfig struct {
 	Name    string                            `json:"name"`
 	Entries *[]*RESTVulnerabilityProfileEntry `json:"entries,omitempty"`
+	CfgType string                            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileConfigData struct {
@@ -3413,11 +3425,11 @@ type RESTAdminCriteriaTemplate struct {
 }
 
 const (
-	ApikeyExpireNever       string = "never"
-	ApikeyExpireOneDay      string = "oneday"
-	ApikeyExpireOneMonth    string = "onemonth"
-	ApikeyExpireOneYear     string = "oneyear"
-	ApikeyExpireCustomHour  string = "hours"
+	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneDay     string = "oneday"
+	ApikeyExpireOneMonth   string = "onemonth"
+	ApikeyExpireOneYear    string = "oneyear"
+	ApikeyExpireCustomHour string = "hours"
 )
 
 type RESTApikeyData struct {
@@ -3425,16 +3437,16 @@ type RESTApikeyData struct {
 }
 
 type RESTApikey struct {
-	ExpirationType        string              `json:"expiration_type"`
-	ExpirationHours       uint32              `json:"expiration_hours"`
-	Name                  string              `json:"apikey_name"`
-	SecretKey             string              `json:"apikey_secret,cloak"`
-	Description           string              `json:"description"`
-	Role                  string              `json:"role"`
-	RoleDomains           map[string][]string `json:"role_domains,omitempty"` // role -> domains
-	ExpirationTimestamp   int64               `json:"expiration_timestamp"`   // used in GET
-	CreatedTimestamp      int64               `json:"created_timestamp"`      // used in GET
-	CreatedByEntity       string              `json:"created_by_entity"`	  // it could be username or apikey (access key)
+	ExpirationType      string              `json:"expiration_type"`
+	ExpirationHours     uint32              `json:"expiration_hours"`
+	Name                string              `json:"apikey_name"`
+	SecretKey           string              `json:"apikey_secret,cloak"`
+	Description         string              `json:"description"`
+	Role                string              `json:"role"`
+	RoleDomains         map[string][]string `json:"role_domains,omitempty"` // role -> domains
+	ExpirationTimestamp int64               `json:"expiration_timestamp"`   // used in GET
+	CreatedTimestamp    int64               `json:"created_timestamp"`      // used in GET
+	CreatedByEntity     string              `json:"created_by_entity"`      // it could be username or apikey (access key)
 }
 
 type RESTApikeyPreGeneratedData struct {
@@ -3442,8 +3454,8 @@ type RESTApikeyPreGeneratedData struct {
 }
 
 type RESTApikeyPreGenerated struct {
-	Name       string  `json:"apikey_name"`
-	SecretKey  string  `json:"apikey_secret"`
+	Name      string `json:"apikey_name"`
+	SecretKey string `json:"apikey_secret"`
 }
 
 type RESTApikeysData struct {
@@ -3453,7 +3465,7 @@ type RESTApikeysData struct {
 }
 
 type RESTSelfApikeyData struct {
-	Apikey              *RESTApikey                      `json:"apikey"`
-	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
-	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
+	Apikey        *RESTApikey                      `json:"apikey"`
+	GlobalPermits []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }

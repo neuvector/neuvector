@@ -24,8 +24,8 @@ func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
 
 	switch req.Kind.Kind {
 	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind, resource.NvAdmCtrlSecurityRuleKind,
-		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind:
-		h.crdGFwRuleHandler(req)
+		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind, resource.NvVulProfileSecurityRuleKind:
+		h.crdSecurityRuleHandler(req)
 	}
 	return
 }
@@ -152,6 +152,8 @@ func CrdQueueProc() {
 			record := crdProcRecord.CrdRecord
 			if record.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
 				lockKey = share.CLUSLockAdmCtrlKey
+			} else if record.Request.Kind.Kind == resource.NvVulProfileSecurityRuleKind {
+				lockKey = share.CLUSLockVulKey
 			} else {
 				lockKey = share.CLUSLockPolicyKey
 			}

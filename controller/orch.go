@@ -70,7 +70,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 	case resource.RscTypeCrd:
 
 		if event == resource.WatchEventDelete {
-			log.WithFields(log.Fields{"xsun event": event, "xsun type": rt, "xsun object": res, "xsun old object": old}).Debug("Event received")
+			log.WithFields(log.Fields{"crd event": event, "type": rt, "object": res, "old": old}).Debug("Event received")
 			nvCrdInfo := map[string]*resource.NvCrdInfo{
 				resource.NvSecurityRuleName: &resource.NvCrdInfo{
 					LockKey:   share.CLUSLockPolicyKey,
@@ -91,6 +91,10 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 				resource.NvWafSecurityRuleName: &resource.NvCrdInfo{
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvWafSecurityRuleKind,
+				},
+				resource.NvVulProfileSecurityRuleName: &resource.NvCrdInfo{
+					LockKey:   share.CLUSLockVulKey,
+					KvCrdKind: resource.NvVulProfileSecurityRuleKind,
 				},
 			}
 			if crd, ok := res.(*apiextv1b1.CustomResourceDefinition); ok {
@@ -165,6 +169,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 		resource.RscTypeCrdAdmCtrlSecurityRule,
 		resource.RscTypeCrdDlpSecurityRule,
 		resource.RscTypeCrdWafSecurityRule,
+		resource.RscTypeCrdVulProfile,
 	}
 	for _, r := range rscTypes {
 		global.ORCH.RegisterResource(r)

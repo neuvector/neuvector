@@ -830,6 +830,66 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSch
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulProfileV1Schema() *apiextv1.JSONSchemaProps {
+	schema := &apiextv1.JSONSchemaProps{
+		Type: &b.schemaTypeObject,
+		Properties: map[string]*apiextv1.JSONSchemaProps{
+			"spec": &apiextv1.JSONSchemaProps{
+				Type:     &b.schemaTypeObject,
+				Required: []string{"profile"},
+				Properties: map[string]*apiextv1.JSONSchemaProps{
+					"profile": &apiextv1.JSONSchemaProps{
+						Type:     &b.schemaTypeObject,
+						Required: []string{"name"},
+						Properties: map[string]*apiextv1.JSONSchemaProps{
+							"name": &apiextv1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+							},
+							"entries": &apiextv1.JSONSchemaProps{
+								Type: &b.schemaTypeArray,
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     &b.schemaTypeObject,
+										Required: []string{"name"},
+										Properties: map[string]*apiextv1.JSONSchemaProps{
+											"name": &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+											},
+											"comment": &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+											},
+											"days": &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeInteger,
+											},
+											"domains": &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeArray,
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+												},
+											},
+											"images": &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeArray,
+												Items: &apiextv1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
@@ -924,6 +984,66 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSO
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulProfileV1B1Schema() *apiextv1b1.JSONSchemaProps {
+	schema := &apiextv1b1.JSONSchemaProps{
+		Type: &b.schemaTypeObject,
+		Properties: map[string]*apiextv1b1.JSONSchemaProps{
+			"spec": &apiextv1b1.JSONSchemaProps{
+				Type:     &b.schemaTypeObject,
+				Required: []string{"profile"},
+				Properties: map[string]*apiextv1b1.JSONSchemaProps{
+					"profile": &apiextv1b1.JSONSchemaProps{
+						Type:     &b.schemaTypeObject,
+						Required: []string{"name"},
+						Properties: map[string]*apiextv1b1.JSONSchemaProps{
+							"name": &apiextv1b1.JSONSchemaProps{
+								Type: &b.schemaTypeString,
+							},
+							"entries": &apiextv1b1.JSONSchemaProps{
+								Type: &b.schemaTypeArray,
+								Items: &apiextv1b1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1b1.JSONSchemaProps{
+										Type:     &b.schemaTypeObject,
+										Required: []string{"name"},
+										Properties: map[string]*apiextv1b1.JSONSchemaProps{
+											"name": &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+											},
+											"comment": &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+											},
+											"days": &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeInteger,
+											},
+											"domains": &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeArray,
+												Items: &apiextv1b1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+												},
+											},
+											"images": &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeArray,
+												Items: &apiextv1b1.JSONSchemaPropsOrArray{
+													Schema: &apiextv1b1.JSONSchemaProps{
+														Type: &b.schemaTypeString,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
@@ -955,6 +1075,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1Schema()
+	case resource.NvVulProfileSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdVulProfileV1Schema()
 	case resource.NvCspUsageName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1Schema()
 	}
@@ -976,6 +1098,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1B1Schema()
+	case resource.NvVulProfileSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdVulProfileV1B1Schema()
 	case resource.NvCspUsageName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1B1Schema()
 	}
@@ -1322,6 +1446,19 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 			SpecNamesListKind: resource.NvWafSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
 			KvCrdKind:         resource.NvWafSecurityRuleKind,
+		},
+		&resource.NvCrdInfo{
+			RscType:           resource.RscTypeCrdVulProfile,
+			MetaName:          resource.NvVulProfileSecurityRuleName,
+			SpecScope:         resource.NvClusterSecurityRuleScope,
+			SpecGroup:         common.OEMClusterSecurityRuleGroup,
+			SpecVersion:       resource.NvVulProfileSecurityRuleVersion,
+			SpecNamesPlural:   resource.NvVulProfileSecurityRulePlural,
+			SpecNamesKind:     resource.NvVulProfileSecurityRuleKind,
+			SpecNamesSingular: resource.NvVulProfileSecurityRuleSingular,
+			SpecNamesListKind: resource.NvVulProfileSecurityRuleListKind,
+			LockKey:           share.CLUSLockVulKey,
+			KvCrdKind:         resource.NvVulProfileSecurityRuleKind,
 		},
 	}
 	if cspType != share.CSP_NONE {

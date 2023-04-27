@@ -35,6 +35,7 @@ const (
 	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
 	RscTypeCrdNvCspUsage                  = "neuvectorusagerecords" // case sensitive
+	RscTypeCrdVulProfile                  = "nvvulnerabilityprofiles"
 	RscTypeRbacRoles                      = "roles"
 	RscTypeRbacClusterRoles               = "clusterroles"
 	RscTypeRbacRolebindings               = "rolebindings"

@@ -137,8 +137,10 @@ type ClusterHelper interface {
 
 	GetAllVulnerabilityProfiles(acc *access.AccessControl) []*share.CLUSVulnerabilityProfile
 	GetVulnerabilityProfile(name string, acc *access.AccessControl) (*share.CLUSVulnerabilityProfile, uint64, error)
-	PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev uint64) error
+	PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev *uint64) error
 	PutVulnerabilityProfileIfNotExist(cp *share.CLUSVulnerabilityProfile) error
+	GetVulProfileSettings(acc *access.AccessControl) (share.CLUSVulProfileSettings, uint64, error)
+	PutVulProfileSettings(s share.CLUSVulProfileSettings, rev *uint64) error
 
 	GetRegistry(name string, acc *access.AccessControl) (*share.CLUSRegistryConfig, uint64, error)
 	GetAllRegistry(scope string) []*share.CLUSRegistryConfig
@@ -885,6 +887,7 @@ func (m clusterHelper) PutDlpVer(s *share.CLUSDlpRuleVer) error {
 	value, _ := enc.Marshal(s)
 	return cluster.Put(key, value)
 }
+
 // event policy
 
 func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleHead {
@@ -1377,16 +1380,48 @@ func (m clusterHelper) GetVulnerabilityProfile(name string, acc *access.AccessCo
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m clusterHelper) PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev uint64) error {
+func (m clusterHelper) PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev *uint64) error {
 	key := share.CLUSVulnerabilityProfileKey(cp.Name)
 	value, _ := json.Marshal(cp)
-	return cluster.PutRev(key, value, rev)
+	if rev == nil {
+		return cluster.Put(key, value)
+	} else {
+		return cluster.PutRev(key, value, *rev)
+	}
 }
 
 func (m clusterHelper) PutVulnerabilityProfileIfNotExist(cp *share.CLUSVulnerabilityProfile) error {
 	key := share.CLUSVulnerabilityProfileKey(cp.Name)
 	value, _ := json.Marshal(cp)
 	return cluster.PutIfNotExist(key, value, false)
+}
+
+func (m clusterHelper) GetVulProfileSettings(acc *access.AccessControl) (share.CLUSVulProfileSettings, uint64, error) {
+	var s share.CLUSVulProfileSettings
+	key := share.CLUSVulnerabilityProfileKey("")
+	key = key[:len(key)-1]
+	value, rev, _ := m.get(key)
+	if value != nil {
+		json.Unmarshal(value, &s)
+
+		if !acc.Authorize(&s, nil) {
+			return s, 0, common.ErrObjectAccessDenied
+		}
+
+		return s, rev, nil
+	}
+	return s, 0, common.ErrObjectNotFound
+}
+
+func (m clusterHelper) PutVulProfileSettings(s share.CLUSVulProfileSettings, rev *uint64) error {
+	key := share.CLUSVulnerabilityProfileKey("")
+	key = key[:len(key)-1]
+	value, _ := json.Marshal(s)
+	if rev == nil {
+		return cluster.Put(key, value)
+	} else {
+		return cluster.PutRev(key, value, *rev)
+	}
 }
 
 // Registry Scan
@@ -2872,37 +2907,37 @@ func (m clusterHelper) PutImportTask(importTask *share.CLUSImportTask) error {
 }
 
 func (m clusterHelper) GetApikeyRev(name string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error) {
-    key := share.CLUSApikeyKey(url.QueryEscape(name))
-    if value, rev, _ := m.get(key); value != nil {
-        var apikey share.CLUSApikey
-        json.Unmarshal(value, &apikey)
-        if !acc.Authorize(&apikey, nil) {    
-            return nil, 0, common.ErrObjectAccessDenied
-        }
-        return &apikey, rev, nil
-    }
-    return nil, 0, common.ErrObjectNotFound
+	key := share.CLUSApikeyKey(url.QueryEscape(name))
+	if value, rev, _ := m.get(key); value != nil {
+		var apikey share.CLUSApikey
+		json.Unmarshal(value, &apikey)
+		if !acc.Authorize(&apikey, nil) {
+			return nil, 0, common.ErrObjectAccessDenied
+		}
+		return &apikey, rev, nil
+	}
+	return nil, 0, common.ErrObjectNotFound
 }
 
 func (m clusterHelper) CreateApikey(apikey *share.CLUSApikey) error {
-    key := share.CLUSApikeyKey(url.QueryEscape(apikey.Name))
-    value, _ := json.Marshal(apikey)
-    // secret_key is already hashed
-    return cluster.PutIfNotExist(key, value, false)
+	key := share.CLUSApikeyKey(url.QueryEscape(apikey.Name))
+	value, _ := json.Marshal(apikey)
+	// secret_key is already hashed
+	return cluster.PutIfNotExist(key, value, false)
 }
 
 // caller needs to decide whether to authorize accessing each returned apikey object
 func (m clusterHelper) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
-    apikeys := make(map[string]*share.CLUSApikey)
-    keys, _ := cluster.GetStoreKeys(share.CLUSConfigApikeyStore)
-    for _, key := range keys {
-        if value, _, _ := m.get(key); value != nil {
-            var apikey share.CLUSApikey
-            json.Unmarshal(value, &apikey)
-            apikeys[apikey.Name] = &apikey
-        }
-    }
-    return apikeys
+	apikeys := make(map[string]*share.CLUSApikey)
+	keys, _ := cluster.GetStoreKeys(share.CLUSConfigApikeyStore)
+	for _, key := range keys {
+		if value, _, _ := m.get(key); value != nil {
+			var apikey share.CLUSApikey
+			json.Unmarshal(value, &apikey)
+			apikeys[apikey.Name] = &apikey
+		}
+	}
+	return apikeys
 }
 
 func (m clusterHelper) DeleteApikey(name string) error {

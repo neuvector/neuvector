@@ -2,11 +2,10 @@ package rest
 
 import (
 	"encoding/json"
-	"testing"
-
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
-	"sigs.k8s.io/yaml"
+	"testing"
+    "sigs.k8s.io/yaml"
 )
 
 func TestParseCrdSecurityRule(t *testing.T) {
@@ -27,7 +26,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount > 0 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -40,7 +39,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("1 parse error\n %v", err)
 	}
@@ -54,7 +53,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("1 parse error\n %v", err)
 	}
@@ -68,7 +67,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("1 parse error\n %v", err)
 	}
@@ -81,7 +80,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("1 parse error\n %v", err)
 	}
@@ -94,7 +93,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("1 parse error\n %v", err)
 	}
@@ -107,7 +106,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -120,7 +119,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -134,7 +133,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -147,7 +146,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -160,7 +159,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -173,7 +172,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -187,7 +186,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}
@@ -199,7 +198,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 		t.Errorf("0 parse error\n %v", err)
 
 	}
-	_, errCount, err, _ = crdHandler.parseCurCrdContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+	_, errCount, err, _ = crdHandler.parseCurCrdGroupContent(&gfwrule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 	if errCount != 1 {
 		t.Errorf("0 parse error\n %v", err)
 	}

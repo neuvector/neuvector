@@ -34,6 +34,7 @@ const CLUSLockCrdQueueKey string = CLUSLockStore + "crd_queue"
 const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
 const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
+const CLUSLockVulKey string = CLUSLockStore + "vulnerability"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -454,7 +455,7 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 }
 
 func CLUSApikeyKey(name string) string {
-    return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
+	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
 }
 
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
@@ -617,7 +618,7 @@ func CLUSVulnerabilityKey2Type(key string) string {
 }
 
 func CLUSVulnerabilityProfileKey2Name(key string) string {
-	return keyLastToken(key)
+	return CLUSKeyNthToken(key, 4)
 }
 
 func CLUSDomainKey2Name(key string) string {
@@ -1445,6 +1446,12 @@ type CLUSVulnerabilityProfileEntry struct {
 type CLUSVulnerabilityProfile struct {
 	Name    string                           `json:"name"`
 	Entries []*CLUSVulnerabilityProfileEntry `json:"entries"`
+	CfgType TCfgType                         `json:"cfg_type"`
+}
+
+type CLUSVulProfileSettings struct {
+	ActiveProfile string   `json:"active_profile"`
+	CfgType       TCfgType `json:"cfg_type"`
 }
 
 type CLUSBenchItem struct {
@@ -1939,6 +1946,11 @@ type CLUSCrdProcessProfile struct {
 	Baseline string `json:"baseline"` // "default" or "shield", for process profile
 }
 
+type CLUSCrdVulProfile struct {
+	Name string `json:"name"`
+	MD5  string `json:"md5"`
+}
+
 type CLUSCrdSecurityRule struct {
 	Name            string                `json:"name"`
 	Groups          []string              `json:"groups"`
@@ -1953,6 +1965,7 @@ type CLUSCrdSecurityRule struct {
 	AdmCtrlRules    map[string]uint32     `json:"admctrl_rules"`     // map key is the generated name of admission control rule, valud is assigned rule id
 	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
+	VulProfile      CLUSCrdVulProfile     `json:"vul_profile"`       // vulnerability profile defined in this crd security rule
 }
 
 // Multi-Clusters (Federation)
@@ -2607,6 +2620,7 @@ const (
 	PREFIX_IMPORT_ADMCTRL      = "admctrl_import_"
 	PREFIX_IMPORT_DLP          = "dlp_import_"
 	PREFIX_IMPORT_WAF          = "waf_import_"
+	PREFIX_IMPORT_VUL_PROFILE  = "vul_profile_import_" // for vulnerability profile
 )
 
 const (
@@ -2615,6 +2629,7 @@ const (
 	IMPORT_TYPE_ADMCTRL      = "admctrl"
 	IMPORT_TYPE_DLP          = "dlp"
 	IMPORT_TYPE_WAF          = "waf"
+	IMPORT_TYPE_VUL_PROFILE  = "vul_profile" // for vulnerability profile
 )
 
 const IMPORT_QUERY_INTERVAL = 30
@@ -2665,19 +2680,21 @@ func CLUSNodeProfileGroupKey(nodeID, profile, group string) string {
 type TReviewType int
 
 const (
-	ReviewTypeCRD           = iota + 1
-	ReviewTypeImportGroup   // interactive import
-	ReviewTypeImportAdmCtrl // interactive import
-	ReviewTypeImportDLP     // interactive import
-	ReviewTypeImportWAF     // interactive import
+	ReviewTypeCRD              = iota + 1
+	ReviewTypeImportGroup      // interactive import
+	ReviewTypeImportAdmCtrl    // interactive import
+	ReviewTypeImportDLP        // interactive import
+	ReviewTypeImportWAF        // interactive import
+	ReviewTypeImportVulProfile // interactive import vulnerability profile
 )
 
 const (
-	ReviewTypeDisplayCRD       = "CRD"
-	ReviewTypeDisplayGroup     = "Group Policy"                     // interactive import
-	ReviewTypeDisplayAdmission = "Admission Control Configurations" // interactive import
-	ReviewTypeDisplayDLP       = "DLP Configurations"               // interactive import
-	ReviewTypeDisplayWAF       = "WAF Configurations"               // interactive import
+	ReviewTypeDisplayCRD        = "CRD"
+	ReviewTypeDisplayGroup      = "Group Policy"                     // interactive import
+	ReviewTypeDisplayAdmission  = "Admission Control Configurations" // interactive import
+	ReviewTypeDisplayDLP        = "DLP Configurations"               // interactive import
+	ReviewTypeDisplayWAF        = "WAF Configurations"               // interactive import
+	ReviewTypeDisplayVulProfile = "Vulnerability Profile"            // interactive import
 )
 
 // Telemetry (upgrade responder)
@@ -2709,5 +2726,5 @@ type CLUSApikey struct {
 	RoleDomains         map[string][]string `json:"role_domains"`
 	ExpirationTimestamp int64               `json:"expiration_timestamp"`
 	CreatedTimestamp    int64               `json:"created_timestamp"`
-	CreatedByEntity     string              `json:"created_by_entity"`	 // it could be username or apikey (access key)
+	CreatedByEntity     string              `json:"created_by_entity"` // it could be username or apikey (access key)
 }

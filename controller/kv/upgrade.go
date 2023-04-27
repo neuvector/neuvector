@@ -542,6 +542,20 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 					return &cfg, wrt
 				}
 			}
+		case share.CFGEndpointVulnerability:
+			if key == share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName) {
+				var cfg share.CLUSVulnerabilityProfile
+				if err := json.Unmarshal(value, &cfg); err == nil {
+					upd := false
+					if cfg.CfgType == 0 {
+						cfg.CfgType = share.UserCreated
+						upd = true
+					}
+					if upd {
+						return &cfg, upd
+					}
+				}
+			}
 		}
 	}
 
@@ -760,7 +774,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"28ea479c", initFedScanRevKey},
 
-	{"FCAB0BF2", nil},
+	{"FCAB0BF2", upgradeDefaultVulProfile},
+
+	{"449EC339", nil},
 }
 
 func latestKVVersion() string {
@@ -1633,5 +1649,26 @@ func initFedScanRevKey() {
 		} else if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
 		}
+	}
+}
+
+func upgradeDefaultVulProfile() {
+	acc := access.NewAdminAccessControl()
+	clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc)
+
+	s := share.CLUSVulProfileSettings{
+		ActiveProfile: share.DefaultVulnerabilityProfileName,
+		CfgType:       share.UserCreated,
+	}
+	value, _ := json.Marshal(s)
+	cluster.Put(share.CLUSConfigVulnerabilityStore+"profile", value)
+
+	_, _, err := clusHelper.GetVulProfileSettings(acc)
+	if err == common.ErrObjectNotFound {
+		cs := share.CLUSVulProfileSettings{
+			ActiveProfile: share.DefaultVulnerabilityProfileName,
+			CfgType:       share.UserCreated,
+		}
+		clusHelper.PutVulProfileSettings(cs, nil)
 	}
 }

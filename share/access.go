@@ -203,6 +203,10 @@ func (o *CLUSVulnerabilityProfile) GetDomain(f GetAccessObjectFunc) ([]string, [
 	return nil, nil
 }
 
+func (o *CLUSVulProfileSettings) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}
+
 func (o *CLUSDomain) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	return nil, nil
 }
@@ -411,7 +415,11 @@ func (o *CLUSFileMonitorProfile) GetDomain(f GetAccessObjectFunc) ([]string, []s
 }
 
 func (o *CLUSAdmissionState) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
-	return nil, nil
+	if o.CfgType == FederalCfg {
+		return _fedDomainSlice, _fedDomainSlice
+	} else {
+		return nil, nil
+	}
 }
 
 func (o *CLUSAdmissionRule) GetDomain(f GetAccessObjectFunc) ([]string, []string) {

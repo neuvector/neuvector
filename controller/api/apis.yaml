@@ -3324,6 +3324,26 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTSystemConfigDataV2'
+    patch:
+      tags:
+        - System
+      summary: System configure. Leverage config_v2(RESTSystemConfigConfigV2) in RESTSystemConfigConfigData in the request payload
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: System configure data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTSystemConfigConfigData'
+      responses:
+        '200':
+          description: Success
   /v1/system/config/webhook:
     post:
       tags:
@@ -3878,6 +3898,53 @@ paths:
           required: true
           type: integer
           format: uint32
+      responses:
+        '200':
+          description: Success
+  /v1/file/vulnerability/profile:
+    post:
+      tags:
+        - File
+      summary: Export vulnerability profile as a yaml format. The exported yaml file can be imported by CRD or REST API to update the vulnerability profile.
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Names of profiles to export
+          schema:
+            $ref: '#/definitions/RESTVulProfilesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/vulnerability/profile/config:
+    post:
+      tags:
+        - File
+      description: Importing vulnerability profile. The payload body is the content of the vulnerability profile yaml file.
+      summary: import vulnerability profile
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: vulnerability profile yaml file
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Success
@@ -11399,6 +11466,14 @@ definitions:
       fixed_version:
         type: string
         example: ""
+  RESTVulProfilesExport:
+    type: object
+    properties:
+      profiles:
+        type: array
+        items:
+          type: string
+          example: ["default"]
   RESTWafConfig:
     type: object
     required:
