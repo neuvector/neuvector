@@ -137,6 +137,7 @@ static void netify_session_log(DPMsgSession *dps)
     dps->Idle = htons(dps->Idle);
     dps->Life = htons(dps->Life);
     dps->PolicyId = htonl(dps->PolicyId);
+    dps->Flags = htons(dps->Flags);
     dps->ThreatID = htonl(dps->ThreatID);
     dps->XffApp = htons(dps->XffApp);
     dps->XffPort = htons(dps->XffPort);

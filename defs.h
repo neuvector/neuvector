@@ -236,8 +236,7 @@ typedef struct {
     uint8_t  ICMPCode;
     uint8_t  ICMPType;
     uint8_t  IPProto;
-    uint16_t Flags;
-    uint8_t  Padding[3];
+    uint8_t  Padding;
     uint32_t ClientPkts;
     uint32_t ServerPkts;
     uint32_t ClientBytes;
@@ -256,6 +255,7 @@ typedef struct {
     uint32_t PolicyId;
     uint8_t  PolicyAction;
     uint8_t  Severity;
+    uint16_t Flags;
     uint8_t  XffIP[16];
     uint16_t XffApp;
     uint16_t XffPort;
