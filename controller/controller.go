@@ -646,20 +646,21 @@ func main() {
 
 	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
-		LocalDev:         dev,
-		EvQueue:          evqueue,
-		AuditQueue:       auditQueue,
-		Messenger:        messenger,
-		Cacher:           cacher,
-		Scanner:          scanner,
-		RESTPort:         *restPort,
-		FedPort:          *fedPort,
-		PwdValidUnit:     *pwdValidUnit,
-		TeleNeuvectorURL: *teleNeuvectorEP,
-		TeleFreq:         *telemetryFreq,
-		TeleCurrentVer:   *teleCurrentVer,
-		CspType:          cspType,
-		CspPauseInterval: *cspPauseInterval,
+		LocalDev:           dev,
+		EvQueue:            evqueue,
+		AuditQueue:         auditQueue,
+		Messenger:          messenger,
+		Cacher:             cacher,
+		Scanner:            scanner,
+		RESTPort:           *restPort,
+		FedPort:            *fedPort,
+		PwdValidUnit:       *pwdValidUnit,
+		TeleNeuvectorURL:   *teleNeuvectorEP,
+		TeleFreq:           *telemetryFreq,
+		TeleCurrentVer:     *teleCurrentVer,
+		CspType:            cspType,
+		CspPauseInterval:   *cspPauseInterval,
+		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
 	}
 	rest.InitContext(&rctx)
 

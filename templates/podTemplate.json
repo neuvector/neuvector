@@ -127,6 +127,7 @@
             }
           }
         },
+        "imagePullPolicy": "imagePullPolicyValue",
         "securityContext": {
           "capabilities": {
             "add": [
@@ -282,6 +283,7 @@
             }
           }
         },
+        "imagePullPolicy": "imagePullPolicyValue",
         "securityContext": {
           "capabilities": {
             "add": [
@@ -437,6 +439,7 @@
             }
           }
         },
+        "imagePullPolicy": "imagePullPolicyValue",
         "securityContext": {
           "capabilities": {
             "add": [
