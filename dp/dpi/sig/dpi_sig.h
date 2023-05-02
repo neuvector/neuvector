@@ -2,7 +2,7 @@
 #define __DPI_SIG_H__
 
 #include "utils/bits.h"
-#include "urcu/list.h"
+#include <urcu/list.h>
 #include "dpi/sig/dpi_sig_share.h"
 #include "dpi/sig/dpi_hyperscan_common.h"
 

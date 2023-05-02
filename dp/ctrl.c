@@ -9,8 +9,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "jansson.h"
-#include "urcu.h"
+#include <jansson.h>
+#include <urcu.h>
 
 #include "main.h"
 #include "apis.h"

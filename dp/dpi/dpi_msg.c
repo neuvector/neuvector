@@ -6,8 +6,8 @@
 #include <linux/if_ether.h>
 #include <netinet/in.h>
 
-#include "jansson.h"
-#include "urcu.h"
+#include <jansson.h>
+#include <urcu.h>
 
 #include "dpi/dpi_module.h"
 #include "dpi/sig/dpi_search.h"

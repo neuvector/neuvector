@@ -5,7 +5,7 @@
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
 
-#include "urcu.h"
+#include <urcu.h>
 
 #include "apis.h"
 #include "utils/helper.h"

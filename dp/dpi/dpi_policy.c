@@ -10,7 +10,7 @@
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include "urcu.h"
+#include <urcu.h>
 #include "debug.h"
 #include "utils/rcu_map.h"
 #include "dpi/dpi_module.h"

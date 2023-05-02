@@ -14,8 +14,8 @@
 #include <sys/types.h>
 #include <sys/eventfd.h>
 
-#include "urcu.h"
-#include "urcu/rcuhlist.h"
+#include <urcu.h>
+#include <urcu/rcuhlist.h>
 
 #include "main.h"
 #include "apis.h"

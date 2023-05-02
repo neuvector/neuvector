@@ -10,8 +10,8 @@
 #include <linux/netfilter.h>		/* for NF_ACCEPT */
 #include <linux/netfilter/nfnetlink_queue.h>
 
-#include "urcu.h"
-#include "urcu/rcuhlist.h"
+#include <urcu.h>
+#include <urcu/rcuhlist.h>
 
 #include "main.h"
 #include "apis.h"

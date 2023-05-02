@@ -45,7 +45,7 @@ endif
 # Compile *.o object files into an executable
 ifdef TARGET_PROG
 $(TARGET_PROG): $(addprefix $(OBJDIR)/, $(OBJS)) $(SUBDIR_OBJS)
-	$(CC) -o $@ $(LDFLAGS) $^ $(STATIC_LIBS) $(EXTRA_LDFLAGS) 
+	$(CC) -o $@ $(LDFLAGS) $^ $(EXTRA_LDFLAGS)
 endif
 
 # Compile *.o object files into one .o file

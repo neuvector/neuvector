@@ -1,7 +1,7 @@
 #ifndef __TIMEOUT_QUEUE_H_
 #define __TIMEOUT_QUEUE_H_
 
-#include "urcu/list.h"
+#include <urcu/list.h>
 
 typedef struct timer_node_ {
     struct cds_list_head link;

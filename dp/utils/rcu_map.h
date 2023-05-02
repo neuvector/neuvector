@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "urcu.h"
-#include "urcu/rculfhash.h"
+#include <urcu.h>
+#include <urcu/rculfhash.h>
 
 typedef uint32_t (*rcu_map_hash_fct)(const void *key);
 // return true to exit loop

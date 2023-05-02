@@ -7,8 +7,8 @@
 #include <arpa/inet.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
-#include "urcu.h"
-#include "urcu/hlist.h"
+#include <urcu.h>
+#include <urcu/hlist.h>
 
 #include "utils/timer_queue.h"
 #include "utils/rcu_map.h"
