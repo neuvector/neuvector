@@ -1207,7 +1207,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if len(name) >= 32 {
+	if len(name) > 32 {
 		e := "Exceed maximum name length limitation (32 characters)"
 		log.WithFields(log.Fields{"login": login.fullname, "create": rapikey.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
@@ -1259,6 +1259,11 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	case api.ApikeyExpireOneYear:
 		apikey.ExpirationTimestamp = now.AddDate(1, 0, 0).UTC().Unix()
 	case api.ApikeyExpireCustomHour:
+		if rapikey.ExpirationHours == 0 {
+			e := "invalid expiration hour value"
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return
+		}
 		apikey.ExpirationTimestamp = now.Add(time.Duration(rapikey.ExpirationHours) * time.Hour).UTC().Unix()
 	default:
 		e := "invalid expiration type"
