@@ -2435,6 +2435,16 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				case share.PolicyActionLearn, share.PolicyActionCheckApp:	// exclude these two actions
 				default:
 					pp.Action = share.PolicyActionAllow
+					if !allowSuspicious && proc.action == share.PolicyActionCheckApp {
+						switch mode {
+						case share.PolicyModeLearn:
+							pp.Action = share.PolicyActionCheckApp
+						case share.PolicyModeEvaluate:
+							pp.Action = share.PolicyActionViolate
+						case share.PolicyModeEnforce:
+							pp.Action = share.PolicyActionDeny
+						}
+					}
 				}
 			} else {
 				// NVSHAS-7501 - I think we have to assume false on keep alive.
