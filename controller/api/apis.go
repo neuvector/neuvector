@@ -336,10 +336,10 @@ type RESTX509CertInfo struct {
 }
 
 type RESTServerSAML struct {
-	SSOURL     string `json:"sso_url"`
-	Issuer     string `json:"issuer"`
-	X509Cert   string `json:"x509_cert,cloak"`
-	GroupClaim string `json:"group_claim"`
+	SSOURL     string             `json:"sso_url"`
+	Issuer     string             `json:"issuer"`
+	X509Cert   string             `json:"x509_cert,cloak"`
+	GroupClaim string             `json:"group_claim"`
 	X509Certs  []RESTX509CertInfo `json:"x509_certs"`
 
 	Enable           bool                      `json:"enable"`
@@ -595,6 +595,7 @@ type RESTPwdProfile struct {
 	EnableBlockAfterFailedLogin bool   `json:"enable_block_after_failed_login"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       int    `json:"block_after_failed_login_count"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                int    `json:"block_minutes"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              uint32 `json:"session_timeout"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfileBasic struct {
@@ -621,6 +622,7 @@ type RESTPwdProfileConfig struct {
 	EnableBlockAfterFailedLogin *bool   `json:"enable_block_after_failed_login,omitempty"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       *int    `json:"block_after_failed_login_count,omitempty"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                *int    `json:"block_minutes,omitempty"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              *uint32 `json:"session_timeout,omitempty"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfilesData struct {
@@ -652,6 +654,7 @@ type RESTPwdProfileConditional struct {
 	EnableBlockAfterFailedLogin *bool   `json:"enable_block_after_failed_login,omitempty"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       *int    `json:"block_after_failed_login_count,omitempty"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                *int    `json:"block_minutes,omitempty"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              *uint32 `json:"session_timeout,omitempty"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfileDataConditional struct {
@@ -3413,11 +3416,11 @@ type RESTAdminCriteriaTemplate struct {
 }
 
 const (
-	ApikeyExpireNever       string = "never"
-	ApikeyExpireOneDay      string = "oneday"
-	ApikeyExpireOneMonth    string = "onemonth"
-	ApikeyExpireOneYear     string = "oneyear"
-	ApikeyExpireCustomHour  string = "hours"
+	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneDay     string = "oneday"
+	ApikeyExpireOneMonth   string = "onemonth"
+	ApikeyExpireOneYear    string = "oneyear"
+	ApikeyExpireCustomHour string = "hours"
 )
 
 type RESTApikeyData struct {
@@ -3425,16 +3428,16 @@ type RESTApikeyData struct {
 }
 
 type RESTApikey struct {
-	ExpirationType        string              `json:"expiration_type"`
-	ExpirationHours       uint32              `json:"expiration_hours"`
-	Name                  string              `json:"apikey_name"`
-	SecretKey             string              `json:"apikey_secret,cloak"`
-	Description           string              `json:"description"`
-	Role                  string              `json:"role"`
-	RoleDomains           map[string][]string `json:"role_domains,omitempty"` // role -> domains
-	ExpirationTimestamp   int64               `json:"expiration_timestamp"`   // used in GET
-	CreatedTimestamp      int64               `json:"created_timestamp"`      // used in GET
-	CreatedByEntity       string              `json:"created_by_entity"`	  // it could be username or apikey (access key)
+	ExpirationType      string              `json:"expiration_type"`
+	ExpirationHours     uint32              `json:"expiration_hours"`
+	Name                string              `json:"apikey_name"`
+	SecretKey           string              `json:"apikey_secret,cloak"`
+	Description         string              `json:"description"`
+	Role                string              `json:"role"`
+	RoleDomains         map[string][]string `json:"role_domains,omitempty"` // role -> domains
+	ExpirationTimestamp int64               `json:"expiration_timestamp"`   // used in GET
+	CreatedTimestamp    int64               `json:"created_timestamp"`      // used in GET
+	CreatedByEntity     string              `json:"created_by_entity"`      // it could be username or apikey (access key)
 }
 
 type RESTApikeyPreGeneratedData struct {
@@ -3442,8 +3445,8 @@ type RESTApikeyPreGeneratedData struct {
 }
 
 type RESTApikeyPreGenerated struct {
-	Name       string  `json:"apikey_name"`
-	SecretKey  string  `json:"apikey_secret"`
+	Name      string `json:"apikey_name"`
+	SecretKey string `json:"apikey_secret"`
 }
 
 type RESTApikeysData struct {
@@ -3453,7 +3456,7 @@ type RESTApikeysData struct {
 }
 
 type RESTSelfApikeyData struct {
-	Apikey              *RESTApikey                      `json:"apikey"`
-	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
-	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
+	Apikey        *RESTApikey                      `json:"apikey"`
+	GlobalPermits []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }

@@ -8050,6 +8050,7 @@ definitions:
       - enable_block_after_failed_login
       - block_after_failed_login_count
       - block_minutes
+      - session_timeout
     properties:
       name:
         type: string
@@ -8093,6 +8094,9 @@ definitions:
       block_minutes:
         type: integer
         example: 0
+      session_timeout:
+        type: integer
+        example: 300
   RESTPwdProfileBasic:
     type: object
     required:
@@ -8167,6 +8171,9 @@ definitions:
       block_minutes:
         type: integer
         example: 0
+      session_timeout:
+        type: integer
+        example: 300
   RESTPwdProfileConfigData:
     type: object
     required:
