@@ -64,6 +64,7 @@ message ScanVulnerability {
     string FeedRating = 16;
     bool InBase = 17;
     string DBKey = 18;
+    string FileName = 19;
 }
 
 message ScanLayerResult {

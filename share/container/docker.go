@@ -71,9 +71,7 @@ func getContainerSocketPath(client *dockerclient.DockerClient, id, endpoint stri
 	info, err := client.InspectContainer(id)
 	if err == nil {
 		endpoint = strings.TrimPrefix(endpoint, "unix://")
-		log.WithFields(log.Fields{"endpoint": endpoint}).Info("JW:")
 		for _, m := range info.Mounts {
-			log.WithFields(log.Fields{"m": m}).Info("JW:")
 			if m.Destination == endpoint {
 				return m.Source, nil
 			}
@@ -92,7 +90,6 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	sockPath := endpoint
 	if id, _, err := sys.GetSelfContainerID(); err == nil {
 		sockPath, err = getContainerSocketPath(client, id, endpoint)
-		log.WithFields(log.Fields{"sockPath": sockPath}).Info("JW:")
 	}
 
 	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client, version: ver, info: info}
@@ -108,14 +105,14 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	return &driver, nil
 }
 
-func  (d *dockerDriver) reConnect() error {
+func (d *dockerDriver) reConnect() error {
 	if !d.pidHost {
 		return errors.New("Not pidHost")
 	}
 
 	// the original socket has been recreated and its mounted path was also lost.
 	endpoint := d.endpoint
-	if d.endpointHost != "" {	// use the host
+	if d.endpointHost != "" { // use the host
 		endpoint = "unix://" + filepath.Join("/proc/1/root", d.endpointHost)
 	}
 
@@ -188,7 +185,7 @@ func (d *dockerDriver) ListContainerIDs() (utils.Set, utils.Set) {
 }
 
 func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
-	containers, err := d.client.ListContainers( !runningOnly, false, "")
+	containers, err := d.client.ListContainers(!runningOnly, false, "")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "runningOnly": runningOnly}).Error("Fail to list containers")
 		return nil, err
