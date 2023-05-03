@@ -383,21 +383,22 @@ func validateLearnGroupConfig(rg *api.RESTGroupConfig) (int, string) {
 					e = "Learned ip service group does not allow service criteria"
 				} else {
 					if serviceFind {
-						e = "Learned group only allow one service criteria"
+						e = "Learned group only allows one service criteria"
 					} else {
 						serviceFind = true
 						if serviceName != utils.NormalizeForURL(ct.Value) {
-							e = "Learned group service not match between value and name (urlNormalized value replace [/?%& ] to :, without NonPrintable) "
+							e = fmt.Sprintf("Learned group service does not match between name and criteria(key: %s, value: %s). For value, replace [/?%%& ] to :, without NonPrintable.",
+								ct.Key, ct.Value)
 						}
 					}
 				}
 			} else if ct.Key == share.CriteriaKeyDomain {
 				if domainFind {
-					e = "Learned group only allow one domain criteria"
+					e = "Learned group only allows one domain criteria"
 				} else {
 					domainFind = true
 					if len(tokens) < 3 || tokens[len(tokens)-1] != ct.Value { // we can only assume the last token in rg.Name is the domain
-						e = "Learned group domain not match between value and name"
+						e = fmt.Sprintf("Learned group domain does not match between name and criteria(key: %s, value: %s)", ct.Key, ct.Value)
 					}
 				}
 			} else {
@@ -457,27 +458,28 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 		}
 
 		if ct.Op != share.CriteriaOpEqual && ct.Op != share.CriteriaOpNotEqual && ct.Value == "" {
-			e := "Empty criteria value is only allowed for exact match"
+			e := fmt.Sprintf("Empty criteria value is only allowed for exact match (key: %s)", ct.Key)
 			log.WithFields(log.Fields{"key": ct.Key, "value": ct.Value}).Error(e)
 			return api.RESTErrInvalidRequest, e, hasAddrCT
 		}
 
 		if !isNamePathValid(ct.Key) {
-			e := "Invalid characters in criteria key"
+			e := fmt.Sprintf("Invalid characters in criteria key %s", ct.Key)
 			log.WithFields(log.Fields{"key": ct.Key}).Error(e)
 			return api.RESTErrInvalidRequest, e, hasAddrCT
 		}
 		if ct.Op != share.CriteriaOpEqual && ct.Op != share.CriteriaOpContains &&
 			ct.Op != share.CriteriaOpPrefix && ct.Op != share.CriteriaOpRegex &&
 			ct.Op != share.CriteriaOpNotEqual && ct.Op != share.CriteriaOpNotRegex {
-			e := "Invalid operation in criteria"
+			e := fmt.Sprintf("Invalid operation in criteria (key: %s, op: %s)", ct.Key, ct.Op)
 			log.WithFields(log.Fields{"key": ct.Key}).Error(e)
 			return api.RESTErrInvalidRequest, e, hasAddrCT
 		}
 
+		kovStr := fmt.Sprintf("(key: %s, op: %s, value: %s)", ct.Key, ct.Op, ct.Value)
 		if ct.Op == share.CriteriaOpRegex || ct.Op == share.CriteriaOpNotRegex {
 			if _, err := regexp.Compile(ct.Value); err != nil {
-				e := "Invalid regex in criteria"
+				e := fmt.Sprintf("Invalid regex value in criteria %s", kovStr)
 				log.WithFields(log.Fields{"error": err}).Error(e)
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
@@ -486,7 +488,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 			if strings.ContainsAny(ct.Value, "?*") {
 				// Check simplified regex
 				if strings.ContainsAny(ct.Value, "^$") {
-					e := "Invalid simple regex in criteria"
+					e := fmt.Sprintf("Invalid simple regex value in criteria %s", kovStr)
 					log.WithFields(log.Fields{"value": ct.Value}).Error(e)
 					return api.RESTErrInvalidRequest, e, hasAddrCT
 				}
@@ -502,7 +504,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 				grp = &share.CLUSGroup{CfgType: cfgType, CreaterDomains: []string{ct.Value}}
 			}
 			if !acc.Authorize(grp, nil) {
-				e := "No permission on the specified namespace/domain criteria"
+				e := fmt.Sprintf("No permission on the specified namespace/domain criteria %s", kovStr)
 				log.WithFields(log.Fields{"value": ct.Value}).Error(e)
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
@@ -510,26 +512,27 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 
 		if ct.Key == share.CriteriaKeyAddress {
 			if ct.Op != share.CriteriaOpEqual {
-				e := "Only exact match is supported for address criteria"
+				e := fmt.Sprintf("Only exact match is supported for address criteria %s", kovStr)
 				log.Error(e)
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
 
 			if hasObjCT {
-				e := "Cannot mix address and other criteria in a group"
+				e := fmt.Sprintf("Cannot mix address and other criteria in a group %s", kovStr)
 				log.Error(e)
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
 			if err := validateAddressRange(ct.Value); err != nil {
 				if validateDomainName(ct.Value) == false {
-					log.WithFields(log.Fields{"address": ct.Value}).Error("invalid address")
+					e := fmt.Sprintf("Invalid address criteria %s", kovStr)
+					log.WithFields(log.Fields{"address": ct.Value}).Error(e)
 					return api.RESTErrInvalidRequest, "Invalid address", hasAddrCT
 				}
 			}
 			hasAddrCT = true
 		} else {
 			if hasAddrCT {
-				e := "Cannot mix address and other criteria in a group"
+				e := fmt.Sprintf("Cannot mix address and other criteria in a group %s", kovStr)
 				log.Error(e)
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
