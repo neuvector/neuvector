@@ -24,7 +24,7 @@ import (
 	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
-const DefaultIdleTimeout uint32 = 300
+const DefIdleTimeoutInternal uint32 = 300
 const DefaultAdminUser string = "admin"
 const DefaultAdminPass string = "admin"
 const ReservedFedUser string = "~fedOperator" // user name with prefix "~" cannot be created thru configmap/rest api
@@ -84,6 +84,8 @@ var defaultWebhookCategory []string = []string{}
 var defaultSyslogCategory []string = []string{
 	api.CategoryEvent, api.CategoryRuntime, api.CategoryAudit,
 }
+
+var DefaultIdleTimeout uint32 = DefIdleTimeoutInternal
 
 const defaultClusterName string = "cluster.local"
 
