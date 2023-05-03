@@ -1164,6 +1164,18 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				}
 			}
 
+			if rc.SyslogServerCert != nil {
+				cconf.SyslogServerCert = *rc.SyslogServerCert
+			}
+			if cconf.SyslogIPProto == api.SyslogProtocolTCPTLS && (rc.SyslogIPProto != nil || rc.SyslogServerCert != nil) {
+				if certErr := validateCertificate(cconf.SyslogServerCert); certErr != nil {
+					e := "Invalid syslog server certificate"
+					log.WithFields(log.Fields{"error": certErr}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
+
 			if rc.SyslogPort != nil {
 				if *rc.SyslogPort == 0 {
 					cconf.SyslogPort = api.SyslogDefaultUDPPort
@@ -1206,10 +1218,6 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			// SingleCVEPerSyslog
 			if rc.SingleCVEPerSyslog != nil {
 				cconf.SingleCVEPerSyslog = *rc.SingleCVEPerSyslog
-			}
-
-			if rc.SyslogServerCert != nil {
-				cconf.SyslogServerCert = *rc.SyslogServerCert
 			}
 
 			// Auth order
@@ -1490,14 +1498,6 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
 				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
 				config.SyslogServerCert = configV2.SyslogCfg.SyslogServerCert
-
-				if *config.SyslogIPProto == api.SyslogProtocolTCPTLS {
-					if certErr := validateCertificate(*config.SyslogServerCert); certErr != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Request error,  invalid syslog server certificate")
-						restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-						return
-					}
-				}
 			}
 			if configV2.AuthCfg != nil {
 				config.AuthOrder = configV2.AuthCfg.AuthOrder

@@ -1211,7 +1211,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 						v0 := crdSpec.Versions[0]
 						schema := v0.Schema
 						if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-							if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+							if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || (ok && spec != nil) {
 								var builder nvCrdSchmaBuilder
 								builder.Init()
 								if expected := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
@@ -1236,7 +1236,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 						if v0.Served != nil && *v0.Served && v0.Storage != nil && *v0.Storage {
 							schema := crdRes.Spec.Versions[0].Schema
 							if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-								if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; ok && spec != nil {
+								if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || (ok && spec != nil) {
 									var builder nvCrdSchmaBuilder
 									builder.Init()
 									if expected := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
@@ -1348,7 +1348,9 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		crdConfigured, crdUpToDate, err := isCrdUpToDate(leader, crdInfo)
 		if crdConfigured {
 			if leader && create {
-				rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
+				if crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
+					rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
+				}
 			}
 			if !crdUpToDate {
 				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)

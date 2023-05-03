@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
-	"math"
-	"regexp"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -644,8 +644,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		if ruser.Timeout != nil {
 			if *ruser.Timeout == 0 {
 				*ruser.Timeout = common.DefaultIdleTimeout
-			} else if *ruser.Timeout > api.UserIdleTimeoutMax ||
-				*ruser.Timeout < api.UserIdleTimeoutMin {
+			} else if *ruser.Timeout > api.UserIdleTimeoutMax || *ruser.Timeout < api.UserIdleTimeoutMin {
 				e := fmt.Sprintf("Invalid idle timeout value. (%v, %v)", api.UserIdleTimeoutMin, api.UserIdleTimeoutMax)
 				log.WithFields(log.Fields{"user": fullname, "timeout": *ruser.Timeout}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
@@ -1094,7 +1093,6 @@ func normalizeApikeyRoles(user *share.CLUSApikey) error {
 	return nil
 }
 
-
 func handlerApikeyList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -1165,7 +1163,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	if len(body) == 0 {
 		if !acc.Authorize(&share.CLUSApikey{
-			RoleDomains:  acc.GetRoleDomains()}, nil) {
+			RoleDomains: acc.GetRoleDomains()}, nil) {
 			log.WithFields(log.Fields{"login": login.fullname}).Error(common.ErrObjectAccessDenied.Error())
 			restRespAccessDenied(w, login)
 			return
@@ -1176,7 +1174,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 		var resp api.RESTApikeyPreGeneratedData
 		resp.Apikey = &api.RESTApikeyPreGenerated{
-			Name: fmt.Sprintf("token-%s", utils.RandomString(5)),
+			Name:      fmt.Sprintf("token-%s", utils.RandomString(5)),
 			SecretKey: utils.EncryptPassword(tmpGuid),
 		}
 		restRespSuccess(w, r, &resp, nil, nil, nil, "Create API key")
@@ -1199,7 +1197,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	// only english characters, numbers and -,_ allowed 
+	// only english characters, numbers and -,_ allowed
 	if !isApiAccessKeyFormatValid(name) {
 		e := "Invalid characters in name"
 		log.WithFields(log.Fields{"login": login.fullname, "create": rapikey.Name}).Error(e)
@@ -1207,7 +1205,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if len(name) >= 32 {
+	if len(name) > 32 {
 		e := "Exceed maximum name length limitation (32 characters)"
 		log.WithFields(log.Fields{"login": login.fullname, "create": rapikey.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
@@ -1231,15 +1229,15 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	// 1. Only fedAdmin can create users with fedAdmin/fedReader role (on master cluster)
 	// 2. For every domain that a namespace user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
 	apikey := share.CLUSApikey{
-		ExpirationType:    rapikey.ExpirationType,
-		ExpirationHours:   rapikey.ExpirationHours,
-		Name:              rapikey.Name,
-		Description:       rapikey.Description,
-		Role:              rapikey.Role,
-		RoleDomains:       rapikey.RoleDomains,
-		Locale:            common.OEMDefaultUserLocale,
-		CreatedTimestamp:  time.Now().UTC().Unix(),
-		CreatedByEntity:   login.fullname,
+		ExpirationType:   rapikey.ExpirationType,
+		ExpirationHours:  rapikey.ExpirationHours,
+		Name:             rapikey.Name,
+		Description:      rapikey.Description,
+		Role:             rapikey.Role,
+		RoleDomains:      rapikey.RoleDomains,
+		Locale:           common.OEMDefaultUserLocale,
+		CreatedTimestamp: time.Now().UTC().Unix(),
+		CreatedByEntity:  login.fullname,
 	}
 	if !acc.AuthorizeOwn(&apikey, nil) {
 		log.WithFields(log.Fields{"login": login.fullname, "apikey": rapikey.Name}).Error(common.ErrObjectAccessDenied.Error())
@@ -1251,7 +1249,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	now := time.Now()
 	switch rapikey.ExpirationType {
 	case api.ApikeyExpireNever:
-		apikey.ExpirationTimestamp = math.MaxInt64 
+		apikey.ExpirationTimestamp = math.MaxInt64
 	case api.ApikeyExpireOneDay:
 		apikey.ExpirationTimestamp = now.AddDate(0, 0, 1).UTC().Unix()
 	case api.ApikeyExpireOneMonth:
@@ -1259,10 +1257,15 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	case api.ApikeyExpireOneYear:
 		apikey.ExpirationTimestamp = now.AddDate(1, 0, 0).UTC().Unix()
 	case api.ApikeyExpireCustomHour:
+		if rapikey.ExpirationHours == 0 {
+			e := "invalid expiration hour value"
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return
+		}
 		apikey.ExpirationTimestamp = now.Add(time.Duration(rapikey.ExpirationHours) * time.Hour).UTC().Unix()
 	default:
 		e := "invalid expiration type"
-		log.WithFields(log.Fields{"Name": rapikey.Name, "ExpirationType": rapikey.ExpirationType}).Error(e)	
+		log.WithFields(log.Fields{"Name": rapikey.Name, "ExpirationType": rapikey.ExpirationType}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 		return
 	}
@@ -1276,7 +1279,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	// Check if apikey already exists
 	if apikeyExisting, _, _ := clusHelper.GetApikeyRev(rapikey.Name, acc); apikeyExisting != nil {
 		e := "apikey name already exists"
-		log.WithFields(log.Fields{"Name": login.fullname, "create": rapikey.Name}).Error(e)	
+		log.WithFields(log.Fields{"Name": login.fullname, "create": rapikey.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
 		return
 	}

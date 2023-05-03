@@ -454,7 +454,7 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 }
 
 func CLUSApikeyKey(name string) string {
-    return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
+	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
 }
 
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
@@ -2591,6 +2591,7 @@ type CLUSPwdProfile struct {
 	EnableBlockAfterFailedLogin bool   `json:"enable_block_after_failed_login"` // for "Block X minutes after N times failed attempts"
 	BlockAfterFailedCount       int    `json:"block_after_failed_login_count"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                int    `json:"block_minutes"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              uint32 `json:"session_timeout"`                 // for default user session timeout (in seconds)
 }
 
 // Import task
@@ -2709,5 +2710,5 @@ type CLUSApikey struct {
 	RoleDomains         map[string][]string `json:"role_domains"`
 	ExpirationTimestamp int64               `json:"expiration_timestamp"`
 	CreatedTimestamp    int64               `json:"created_timestamp"`
-	CreatedByEntity     string              `json:"created_by_entity"`	 // it could be username or apikey (access key)
+	CreatedByEntity     string              `json:"created_by_entity"` // it could be username or apikey (access key)
 }

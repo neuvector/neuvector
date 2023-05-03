@@ -45,7 +45,7 @@ type loginSession struct {
 	eolAt           time.Time // end of life
 	timer           *time.Timer
 	domainRoles     access.DomainRole // map: domain -> role
-	loginType       int       // 0=user (default), 1=apikey
+	loginType       int               // 0=user (default), 1=apikey
 
 	nvPage string // could change in every request even in the same login session
 }
@@ -539,7 +539,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 	token, ok := r.Header[api.RESTTokenHeader]
 	if !ok || len(token) != 1 {
-		// "X-Auth-Token" header not exist, check apikey "X-Auth-Apikey" 
+		// "X-Auth-Token" header not exist, check apikey "X-Auth-Apikey"
 		apikey, ok2 := r.Header[api.RESTAPIKeyHeader]
 		if !ok2 || len(apikey) != 1 {
 			return nil, userInvalidRequest, rsessToken
@@ -560,7 +560,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 				// check timeout
 				now := time.Now()
-				if now.UTC().Unix() >= apikeyAccount.ExpirationTimestamp  {
+				if now.UTC().Unix() >= apikeyAccount.ExpirationTimestamp {
 					return nil, userTimeout, rsessToken
 				}
 
@@ -1947,7 +1947,7 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 			PasswordHash: utils.HashPassword(secret),
 			Domain:       "",
 			Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
-			Timeout:      common.DefaultIdleTimeout,
+			Timeout:      common.DefIdleTimeoutInternal,
 			RoleDomains:  make(map[string][]string),
 			Locale:       common.OEMDefaultUserLocale,
 			PwdResetTime: time.Now().UTC(),

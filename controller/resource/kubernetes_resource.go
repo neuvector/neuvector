@@ -1867,7 +1867,7 @@ func AdjustAdmResForOC() {
 				},
 			}}
 		rbacRoleBindingsWanted[nvOperatorsRoleBinding] = &k8sRbacBindingInfo{
-			subject:  &ctrlerSubjectWanted,
+			subjects: ctrlerSubjectsWanted,
 			rbacRole: rbacRolesWanted[nvOperatorsRole],
 		}
 	}
@@ -1897,7 +1897,7 @@ func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8s
 			},
 		}
 		rbacRoleBindingsWanted[nvCspUsageRoleBinding] = &k8sRbacBindingInfo{
-			subject:  &ctrlerSubjectWanted,
+			subjects: ctrlerSubjectsWanted,
 			rbacRole: rbacRolesWanted[nvCspUsageRole],
 		}
 	}
@@ -2000,53 +2000,35 @@ func UpdateDeploymentReplicates(name string, replicas int32) error {
 }
 
 func getNeuvectorSvcAccount(objName string) error {
-	type tPodInfo struct {
-		ownerRT   string
-		podPrefix string
-		sa        *string
+	// controller's sa is known by k8s token, not by deployment resource
+	resInfo := map[string]string{ // resource object name : resource type
+		"neuvector-updater-pod": RscTypeCronJob,
+		//"neuvector-enforcer-pod": RscTypeDaemonSet,
 	}
-
-	// controller's sa is known by k8s token
-	resInfo := map[string]tPodInfo{
-		"neuvector-updater-pod": tPodInfo{
-			ownerRT: RscTypeCronJob,
-			sa:      &updaterSubjectWanted,
-		},
-		/*
-			"neuvector-enforcer-pod": tPodInfo{
-				ownerRT:   RscTypeDaemonSet,
-				sa:        &enforcerSubjectWanted,
-			},
-		*/
-	}
-	for name, info := range resInfo {
-		if objName == name {
-			sa := "default"
-			obj, err := global.ORCH.GetResource(info.ownerRT, NvAdmSvcNamespace, objName)
-			if err != nil {
-				log.WithFields(log.Fields{"name": objName, "err": err}).Error("resource no found")
-				return err
-			}
-			switch objName {
-			case "neuvector-updater-pod": // get updater cronjob service account
-				if cronjobObj, ok := obj.(*CronJob); ok {
-					sa = cronjobObj.SA
-				}
-				/*
-				   case "neuvector-enforcer-pod": // get enforcer daemonset service account
-				   				if dsObj, ok := obj.(*DaemonSet); ok {
-				   					sa = dsObj.SA
-				   				}
-				*/
-			default:
-				return ErrResourceNotSupported
-			}
-			if *info.sa != sa {
-				*info.sa = sa
-			}
-			log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
-			return nil
+	if rt, ok := resInfo[objName]; ok {
+		var sa string
+		obj, err := global.ORCH.GetResource(rt, NvAdmSvcNamespace, objName)
+		if err != nil {
+			log.WithFields(log.Fields{"name": objName, "err": err}).Error("resource no found")
+			return err
 		}
+		switch objName {
+		case "neuvector-updater-pod": // get updater cronjob service account
+			if cronjobObj, ok := obj.(*CronJob); ok {
+				sa = cronjobObj.SA
+				if updaterSubjectWanted != sa {
+					updaterSubjectWanted = sa
+					scannerSubjecstWanted[0] = ctrlerSubjectWanted
+					scannerSubjecstWanted[1] = updaterSubjectWanted
+				}
+			}
+		case "neuvector-enforcer-pod": // get enforcer daemonset service account
+			if dsObj, ok := obj.(*DaemonSet); ok {
+				sa = dsObj.SA
+			}
+		}
+		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
+		return nil
 	}
 
 	return common.ErrObjectNotFound

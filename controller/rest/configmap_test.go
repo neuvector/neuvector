@@ -204,6 +204,7 @@ func TestPwdProfileCfg(t *testing.T) {
   password_expire_after_days: 90
   enable_password_history: True
   password_keep_history_count: 5
+  session_timeout: 789
 - name: profile2
   Comment: profile2 from configMap
   min_len:  6
@@ -237,6 +238,7 @@ func TestPwdProfileCfg(t *testing.T) {
 			EnableBlockAfterFailedLogin: true,
 			BlockAfterFailedCount:       3,
 			BlockMinutes:                30,
+			SessionTimeout:              789,
 		},
 		/*&share.CLUSPwdProfile{	//-> stage 2/3
 			Name:              "profile2",
@@ -262,6 +264,59 @@ func TestPwdProfileCfg(t *testing.T) {
 		} else {
 			if *expected != *s {
 				t.Errorf("[%d] Got %v but expect %v\n", idx, *s, *expected)
+			}
+		}
+	}
+
+	{
+		yaml_data := `pwd_profiles:
+- name: default
+  comment: default from configMap
+  min_len: 10
+  min_uppercase_count: 2
+  min_lowercase_count: 2
+  min_digit_count: 2
+  min_special_count: 2
+  enable_block_after_failed_login: True
+  block_after_failed_login_count: 3
+  block_minutes: 30
+  enable_password_expiration: True
+  password_expire_after_days: 90
+  enable_password_history: True
+  password_keep_history_count: 5
+`
+
+		var context configMapHandlerContext
+		yaml_byte := []byte(yaml_data)
+		err := handlepwdprofilecfg(yaml_byte, true, &skip, &context)
+		if err != nil {
+			t.Errorf("handlepwdprofilecfg return error:%v\n", err)
+		}
+
+		expected := share.CLUSPwdProfile{
+			Name:                        "default",
+			Comment:                     "default from configMap",
+			MinLen:                      10,
+			MinUpperCount:               2,
+			MinLowerCount:               2,
+			MinSpecialCount:             2,
+			MinDigitCount:               2,
+			EnablePwdExpiration:         true,
+			PwdExpireAfterDays:          90,
+			EnablePwdHistory:            true,
+			PwdHistoryCount:             5,
+			EnableBlockAfterFailedLogin: true,
+			BlockAfterFailedCount:       3,
+			BlockMinutes:                30,
+			SessionTimeout:              300,
+		}
+
+		s, _, _ := clusHelper.GetPwdProfileRev(expected.Name, accAdmin)
+		if s == nil {
+			t.Errorf("(2) Failed to get %s config\n", expected.Name)
+		} else {
+			if expected != *s {
+				t.Errorf("(2) Got %v but expect %v\n", *s, expected)
 			}
 		}
 	}
