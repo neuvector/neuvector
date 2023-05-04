@@ -75,14 +75,18 @@ void dpi_unknown_ip_init(void)
     rcu_map_init(&th_unknown_ip_map, 64, offsetof(dpi_unknown_ip_cache_t, node), unknown_ip_match, unknown_ip_hash);
 }
 
-static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key)
+static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key, uint8_t iptype)
 {
     dpi_unknown_ip_cache_t *cache = calloc(1, sizeof(*cache));
     if (cache != NULL) {
         memcpy(&cache->desc, desc, sizeof(*desc));
         cache->start_hit = th_snap.tick;
         cache->last_hit = th_snap.tick;
-        cache->try_cnt = UNKNOWN_IP_TRY_COUNT;
+        if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
+            cache->try_cnt = 0;
+        } else {
+            cache->try_cnt = UNKNOWN_IP_TRY_COUNT;
+        }
         rcu_map_add(&th_unknown_ip_map, cache, key);
 
         timer_wheel_entry_init(&cache->ts_entry);
@@ -691,17 +695,6 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
         uint16_t thdl_ver = hdl?hdl->ver:0;
         dpi_unknown_ip_cache_t *uip_cache = rcu_map_lookup(&th_unknown_ip_map, &uip_desc);
         if (uip_cache != NULL) {
-            /*
-             * existing unknown_ip_cache found
-             * 1. policy handle version is still same and lapse time for handle
-             *    version change is less than POLICY_DESC_VER_CHG_MAX seconds 
-             *    so we keep action as OPEN
-             * 2. handle version changes, but policy matches implicit default
-             *    action which means unmanaged wl/host ip, keep default action
-             * 3. handle version does not change, but 60s has passed,
-             *    this means there is no new policy push from controller/enforcer
-             *    to dp, which means unmanaged wl/host ip, keep default action
-             */
             if (thdl_ver == uip_cache->desc.hdl_ver &&
                 th_snap.tick - uip_cache->start_hit < POLICY_DESC_VER_CHG_MAX) {
                 desc->flags &= ~(POLICY_DESC_CHECK_VER);
@@ -722,17 +715,8 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
                 }
             }
         } else {
-            /*
-             * existing unknown_ip_cache not found, traffic is internal,
-             * but no explicit policy is found thus default action is taken.
-             * 1. some workload send traffic immediately when it comes up,
-             *    dp see packet faster than it receives rules from controller,
-             *    change action to open and reevaluate after receive rules
-             *    from controller.
-             * 2. it can also be traffic sent from/to unmanaged wl/host ip
-             */
             uip_desc.hdl_ver = thdl_ver;
-            add_unknown_ip_cache(&uip_desc, &uip_desc);
+            add_unknown_ip_cache(&uip_desc, &uip_desc, iptype);
             desc->flags &= ~(POLICY_DESC_CHECK_VER);
             desc->flags |= POLICY_DESC_UNKNOWN_IP;
             desc->flags |= POLICY_DESC_TMP_OPEN;
