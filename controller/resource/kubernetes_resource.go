@@ -272,7 +272,7 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 }
 
 var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule,
-	RscTypeCrdWafSecurityRule, RscTypeCrdNvCspUsage)
+	RscTypeCrdWafSecurityRule)
 var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 	&NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,

@@ -108,7 +108,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	var err error
 	var obj interface{}
 	rscName := resource.RscCspUsageName
-	t := time.Now().Format(time.RFC3339)
+	t := time.Now().Format("2006-01-02T15:04:05.000000-07:00")
 	if obj, err = global.ORCH.GetResource(resource.RscTypeCrdNvCspUsage, "", rscName); err == nil {
 		if !addOnly {
 			if crCspUsage, ok := obj.(*resource.NvCspUsage); ok {

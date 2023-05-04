@@ -49,7 +49,7 @@ func GetCspConfig(nvVersion string) api.RESTFedCspSupportResp {
 						resp.ExpireTime = cspConfig.Expire
 						resp.CspErrors = cspConfig.Errors
 						resp.CspConfigFrom = "local cluster"
-						if tExpire, err = time.Parse(time.RFC3339, resp.ExpireTime); err == nil {
+						if tExpire, err = time.Parse("2006-01-02T15:04:05.000000-07:00", resp.ExpireTime); err == nil {
 							if cspConfig.BillingApiAccessOk && tExpire.After(now) {
 								resp.Compliant = true
 							}
