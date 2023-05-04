@@ -285,6 +285,8 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 			if rprofile.SessionTimeout != nil {
 				profile.SessionTimeout = *rprofile.SessionTimeout
+			} else if profile.SessionTimeout == 0 {
+				profile.SessionTimeout = common.DefIdleTimeoutInternal
 			}
 			if profile.PwdHistoryCount > _maxPwdHistoryCount {
 				profile.PwdHistoryCount = _maxPwdHistoryCount
