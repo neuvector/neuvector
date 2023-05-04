@@ -526,7 +526,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 				if validateDomainName(ct.Value) == false {
 					e := fmt.Sprintf("Invalid address criteria %s", kovStr)
 					log.WithFields(log.Fields{"address": ct.Value}).Error(e)
-					return api.RESTErrInvalidRequest, "Invalid address", hasAddrCT
+					return api.RESTErrInvalidRequest, e, hasAddrCT
 				}
 			}
 			hasAddrCT = true
