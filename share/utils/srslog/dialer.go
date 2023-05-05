@@ -60,7 +60,8 @@ func (w *Writer) unixDialer() (serverConn, string, error) {
 // tlsDialer connects to TLS over TCP, and is used for the "tcp+tls" network
 // type.
 func (w *Writer) tlsDialer() (serverConn, string, error) {
-	c, err := tls.Dial("tcp", w.raddr, w.tlsConfig)
+	d := net.Dialer{Timeout: w.dialTimeout}
+	c, err := tls.DialWithDialer(&d, "tcp", w.raddr, w.tlsConfig)
 	var sc serverConn
 	hostname := w.hostname
 	if err == nil {
@@ -75,7 +76,8 @@ func (w *Writer) tlsDialer() (serverConn, string, error) {
 // basicDialer is the most common dialer for syslog, and supports both TCP and
 // UDP connections.
 func (w *Writer) basicDialer() (serverConn, string, error) {
-	c, err := net.Dial(w.network, w.raddr)
+	d := net.Dialer{Timeout: w.dialTimeout}
+	c, err := d.Dial(w.network, w.raddr)
 	var sc serverConn
 	hostname := w.hostname
 	if err == nil {
