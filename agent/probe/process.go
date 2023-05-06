@@ -2314,13 +2314,16 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		switch proc.name {
 		case "portmap", "containerd", "sleep", "uptime", "nice":
 			return true
+		case "busybox":
+			// exception: ps and its parent is a runtime process
+			if len(proc.cmds) > 0 && (filepath.Base(proc.cmds[0]) == "ps") {
+				return bRtProcP
+			}
+			return false
 		case "ps":
 			// Exception for process where the parent is a runtime process.
 			// Some CNI daemons will call `ps` and we will get false positives without the exception.
-			if bRtProcP {
-				return true
-			}
-			return false
+			return bRtProcP
 		case "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
 		default:
