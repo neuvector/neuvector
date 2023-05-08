@@ -132,6 +132,8 @@ const (
 	jwtFedMasterTokenType
 )
 
+const loginTypeApikey int = 1
+
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
 
@@ -582,7 +584,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 					fullname:    apikeyAccount.Name,
 					remote:      r.RemoteAddr,
 					domainRoles: roles,
-					loginType:   1,
+					loginType:   loginTypeApikey,
 				}
 
 				return s, userOK, rsessToken
