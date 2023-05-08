@@ -83,9 +83,9 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 			return "", nil, ctx.Err()
 		}
 
-		if !withOCIManifest && strings.Contains(err.Error(), MediaTypeOCIMissingManifest) {
+		if !withOCIManifest && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingManifest)) {
 			withOCIManifest = true
-		} else if !withOCIIndex && strings.Contains(err.Error(), MediaTypeOCIMissingIndex) {
+		} else if !withOCIIndex && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingIndex)) {
 			withOCIIndex = true
 		} else {
 			retry++
