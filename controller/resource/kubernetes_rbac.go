@@ -140,10 +140,10 @@ var crdPolicyRoleVerbs utils.Set = utils.NewSet("delete", "list")
 
 var ctrlerSubjectWanted string = "controller"
 var updaterSubjectWanted string = "updater"
+var enforcerSubjectWanted string = "enforcer"
 var ctrlerSubjectsWanted []string = []string{"controller"}
 var scannerSubjecstWanted []string = []string{"updater", "controller"}
-
-// var enforcerSubjectWanted string = "enforcer"
+var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
 
@@ -728,7 +728,7 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 			case "ServiceAccount":
 				if s.GetNamespace() == NvAdmSvcNamespace {
 					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
+					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
 						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
 						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 					}
@@ -779,7 +779,7 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 			case "ServiceAccount":
 				if s.GetNamespace() == NvAdmSvcNamespace {
 					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
+					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
 						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
 						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 					}
@@ -824,7 +824,7 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 			case "ServiceAccount":
 				if s.GetNamespace() == NvAdmSvcNamespace {
 					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
+					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
 						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
 						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 					}
@@ -1497,6 +1497,8 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 		ctrlerSubjectsWanted[0] = ctrlerSubjectWanted
 		scannerSubjecstWanted[0] = ctrlerSubjectWanted
 		scannerSubjecstWanted[1] = updaterSubjectWanted
+		enforcerSubjecstWanted[0] = ctrlerSubjectWanted
+		enforcerSubjecstWanted[1] = enforcerSubjectWanted
 	}
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
 
@@ -1525,9 +1527,11 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	roleErrors := emptySlice
 	roleBindingErrors := emptySlice
 
-	for _, name := range []string{"neuvector-updater-pod"} {
-		getNeuvectorSvcAccount(name)
+	resInfo := map[string]string{ // resource object name : resource type
+		"neuvector-updater-pod":  RscTypeCronJob,
+		"neuvector-enforcer-pod": RscTypeDaemonSet,
 	}
+	getNeuvectorSvcAccount(resInfo)
 
 	// check neuvector-updater-pod cronjob exists in k8s or not. if it exists, check rolebinding neuvector-binding-scanner / neuvector-admin
 	// rolebinding neuvector-binding-scanner is preferred in 5.2(+)
