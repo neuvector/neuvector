@@ -333,7 +333,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
 	users := clusHelper.GetAllUsersNoAuth()
 	for _, user := range users {
-		if login.fullname != user.Fullname { // a user can always see himself/herself
+		if login.fullname != user.Fullname || login.loginType == 1 { // a user can always see himself/herself
 			if !acc.Authorize(user, nil) {
 				continue
 			}
