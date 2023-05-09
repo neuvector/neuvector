@@ -624,7 +624,7 @@ func main() {
 		resource.GetNvCtrlerServiceAccount(cache.CacheEvent)
 		resource.SetLeader(Ctrler.Leader)
 
-		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, "", false)
+		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, "", true)
 		if len(clusterRoleErrors) > 0 || len(roleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {
 			msgs := clusterRoleErrors
 			msgs = append(msgs, clusterRoleBindingErrors...)

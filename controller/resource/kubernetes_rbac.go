@@ -673,16 +673,17 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: s.GetNamespace()}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
@@ -718,20 +719,18 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
@@ -769,20 +768,18 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
@@ -814,20 +811,18 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted || saName == enforcerSubjectWanted {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
