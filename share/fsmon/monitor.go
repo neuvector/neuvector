@@ -31,13 +31,13 @@ const inodeChangeMask = syscall.IN_CLOSE_WRITE |
 	syscall.IN_MOVE_SELF |
 	syscall.IN_MOVED_TO
 
-const inodeMovedMask = 	syscall.IN_MOVE | syscall.IN_MOVE_SELF | syscall.IN_MOVED_TO
+const inodeMovedMask = syscall.IN_MOVE | syscall.IN_MOVE_SELF | syscall.IN_MOVED_TO
 
 var packageFile utils.Set = utils.NewSet(
 	"/var/lib/dpkg/status",
 	"/var/lib/rpm/Packages",
 	"/var/lib/rpm/Packages.db",
-	"/lib/apk/db/installed",)
+	"/lib/apk/db/installed")
 
 type SendAggregateReportCallback func(fsmsg *MonitorMessage) bool
 
@@ -135,7 +135,7 @@ type groupInfo struct {
 
 type FileWatch struct {
 	mux        sync.Mutex
-	bEnable    bool		// profile function is enabled, default: true
+	bEnable    bool // profile function is enabled, default: true
 	aufs       bool
 	fanotifier *FaNotify
 	inotifier  *Inotify
@@ -263,7 +263,7 @@ func NewFileWatcher(config *FileMonitorConfig) (*FileWatch, error) {
 	go ni.MonitorFileEvents()
 
 	fw.fanotifier = n
-	fw.inotifier= ni
+	fw.inotifier = ni
 
 	go fw.loop()
 	return fw, nil
@@ -407,6 +407,13 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, eve
 	}
 	w.mux.Unlock()
 
+	if event == fileEventAttr {
+		// it depends on the init conditions by runtime engine
+		if isRunTimeAddedFile(filepath.Join("/root", path)) {
+			return
+		}
+	}
+
 	if event != fileEventAccessed ||
 		(mode == share.PolicyModeEnforce || mode == share.PolicyModeEvaluate) {
 		w.sendMsg(fmod.finfo.ContainerId, path, event, fmod.pInfo, mode)
@@ -489,13 +496,13 @@ func (w *FileWatch) addFile(bIncInotify bool, finfo *osutil.FileInfoExt) {
 	w.fanotifier.AddMonitorFile(finfo.Path, finfo.Filter, finfo.Protect, finfo.UserAdded, w.cbNotify, finfo)
 	//if _, path := global.SYS.ParseContainerFilePath(finfo.Path); packageFile.Contains(path) {
 	flt := finfo.Filter.(*filterRegex)
-	if bIncInotify && !strings.HasSuffix(flt.path, "/.*")	{ // this wildcard has established its directory for all
+	if bIncInotify && !strings.HasSuffix(flt.path, "/.*") { // this wildcard has established its directory for all
 		w.inotifier.AddMonitorFile(finfo.Path, w.cbNotify, finfo)
 	}
 }
 
 func (w *FileWatch) removeFile(fullpath string) {
-	w.fanotifier.RemoveMonitorFile(fullpath)		// should not
+	w.fanotifier.RemoveMonitorFile(fullpath) // should not
 	w.inotifier.RemoveMonitorFile(fullpath)
 }
 
@@ -585,7 +592,7 @@ func (w *FileWatch) addCoreFile(bIncINotify bool, cid string, dirList map[string
 		if ok && !isRunTimeAddedFile(finfo.Path) {
 			finfo.Filter = di.Filter
 			di.Children = append(di.Children, finfo)
-		} else  {
+		} else {
 			finfo.ContainerId = cid
 			w.addFile(bIncINotify, finfo)
 		}
@@ -721,7 +728,7 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 			} else {
 				if bIsDir {
 					event = fileEventDirCreate
-					fmod.finfo.Path = fullPath		// new subdir
+					fmod.finfo.Path = fullPath // new subdir
 					fmod.finfo.FileMode = info.Mode()
 					flt := fmod.finfo.Filter.(*filterRegex)
 					if !flt.recursive {
@@ -729,7 +736,7 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 						return event
 					}
 				} else {
-					if (info.Mode() & os.ModeSymlink != 0) {
+					if info.Mode()&os.ModeSymlink != 0 {
 						// a new symbolic link
 						event = fileEventSymCreate
 						if link_to, err := os.Readlink(fullPath); err == nil {
@@ -764,7 +771,7 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 		} else if (fmod.mask & syscall.IN_ATTRIB) > 0 {
 			if bIsDir {
 				event = fileEventDirAttr
-			} else{
+			} else {
 				event = fileEventAttr
 			}
 			// fmod.finfo.FileMode: keep its original flag
@@ -815,7 +822,7 @@ func (w *FileWatch) handleFileEvents(fmod *fileMod, info os.FileInfo, fullPath s
 			//attribute is changed
 			event = fileEventAttr
 			fmod.finfo.FileMode = info.Mode()
-		} else if (fmod.mask & (syscall.IN_ACCESS|syscall.IN_CLOSE_WRITE|syscall.IN_MODIFY)) > 0 {
+		} else if (fmod.mask & (syscall.IN_ACCESS | syscall.IN_CLOSE_WRITE | syscall.IN_MODIFY)) > 0 {
 			// check the hash existing and match
 			event = fileEventAccessed
 			if hash, err := osutil.GetFileHash(fullPath); err == nil {
@@ -1019,7 +1026,7 @@ func (w *FileWatch) getDirFileList(pid int, base, regexStr, cid string, flt inte
 		}
 		dirs.Remove(any)
 
-		if !recur {	// only 1st layer of directory
+		if !recur { // only 1st layer of directory
 			break
 		}
 	}

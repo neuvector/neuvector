@@ -97,6 +97,10 @@ It has these top-level messages:
 	ScanAppRequest
 	ScanAwsLambdaRequest
 	ScanImageRequest
+	SigstoreRootOfTrust
+	SigstoreVerifier
+	SigstoreKeypairOptions
+	SigstoreKeylessOptions
 */
 package share
 
