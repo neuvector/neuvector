@@ -93,8 +93,8 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client, version: ver, info: info}
-	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current", "docker-containerd-shim-current", "containerd", "containerd-shim")
-
+	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current",
+	         "docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
 	name, _ := os.Readlink("/proc/1/exe")
 	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
 		driver.pidHost = false

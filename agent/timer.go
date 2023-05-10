@@ -95,7 +95,13 @@ func statsLoop(bPassiveContainerDetect bool) {
 			gone := gInfo.allContainers.Difference(existing)
 			creates := existing.Difference(gInfo.allContainers)
 			if stops != nil {
-				stops = gInfo.allContainers.Intersect(stops)
+				// differentiate from active containers
+				for id := range stops.Iter() {
+					cid := id.(string)
+					if _, ok := gInfo.activeContainers[cid]; !ok {
+						stops.Remove(cid)
+					}
+				}
 			}
 			gInfoRUnlock()
 			if stops != nil {
