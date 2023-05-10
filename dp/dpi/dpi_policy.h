@@ -34,6 +34,7 @@ typedef struct dpi_policy_desc_ {
 #define POLICY_DESC_MESH_TO_SVR    0x0080
 #define POLICY_DESC_LINK_LOCAL     0x0100
 #define POLICY_DESC_TMP_OPEN       0x0200
+#define POLICY_DESC_UWLIP          0x0400
     uint16_t hdl_ver;
     uint32_t order;
 } dpi_policy_desc_t;

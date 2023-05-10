@@ -639,6 +639,20 @@ func connectFromGlobal(conn *share.CLUSConnection, ca *nodeAttr, stip *serverTip
 		if alive == false && wouldGenerateUnmanagedEndpoint(conn, true) {
 			scheduleControllerResync(resyncRequestReasonEphemeral)
 		}
+		if conn.UwlIp {
+			// Unmanaged workload
+			if ep := getAddrGroupNameFromPolicy(conn.PolicyId, true); ep != "" {
+				conn.ClientWL = ep
+				ca.addrgrp = true
+			} else {
+				ipStr := net.IP(conn.ClientIP).String()
+				ep = specialEPName(api.LearnedWorkloadPrefix, ipStr)
+				conn.ClientWL = ep
+			}
+			stip.wlPort = uint16(conn.ServerPort)
+			ca.workload = true
+			return true
+		}
 		cctx.ConnLog.WithFields(log.Fields{
 			"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 		}).Debug("Ignore ingress connection from global IP space")
