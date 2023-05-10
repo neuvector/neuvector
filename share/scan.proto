@@ -64,6 +64,7 @@ message ScanVulnerability {
     string FeedRating = 16;
     bool InBase = 17;
     string DBKey = 18;
+    string FileName = 19;
 }
 
 message ScanLayerResult {
@@ -131,6 +132,7 @@ message ScanResult {
     repeated ScanSetIdPermLog SetIdPerms = 22;
     ScanProvider Provider = 23;
     int64 Size = 24;
+    repeated string Verifiers = 25;
 }
 
 message ScanRunningRequest {

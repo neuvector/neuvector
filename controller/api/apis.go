@@ -1641,7 +1641,7 @@ type RESTSystemConfigConfig struct {
 	SyslogCategories          *[]string                        `json:"syslog_categories,omitempty"`
 	SyslogInJSON              *bool                            `json:"syslog_in_json,omitempty"`
 	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
-	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog"`
+	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
 	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
@@ -1661,6 +1661,10 @@ type RESTSystemConfigConfig struct {
 	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
 	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
+}
+
+type RESTFedSystemConfigConfig struct {
+	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
 }
 
 type RESTSysNetConfigConfig struct {
@@ -1688,11 +1692,11 @@ type RESTSystemConfigConfigCfgMap struct {
 const SyslogProtocolTCPTLS = 66
 
 type RESTSystemConfigConfigData struct {
-	Config     *RESTSystemConfigConfig   `json:"config,omitempty"`
-	ConfigV2   *RESTSystemConfigConfigV2 `json:"config_v2,omitempty"`
-	FedConfig  *RESTSystemConfigConfig   `json:"fed_config,omitempty"`
-	NetConfig  *RESTSysNetConfigConfig   `json:"net_config,omitempty"`
-	AtmoConfig *RESTSysAtmoConfigConfig  `json:"atmo_config,omitempty"`
+	Config     *RESTSystemConfigConfig    `json:"config,omitempty"`
+	ConfigV2   *RESTSystemConfigConfigV2  `json:"config_v2,omitempty"`
+	FedConfig  *RESTFedSystemConfigConfig `json:"fed_config,omitempty"`
+	NetConfig  *RESTSysNetConfigConfig    `json:"net_config,omitempty"`
+	AtmoConfig *RESTSysAtmoConfigConfig   `json:"atmo_config,omitempty"`
 }
 
 type RESTSystemConfigSvcCfgV2 struct {
@@ -1723,10 +1727,6 @@ type RESTSystemConfigProxyCfgV2 struct {
 	RegistryHttpsProxyEnable *bool      `json:"registry_https_proxy_status,omitempty"`
 	RegistryHttpProxy        *RESTProxy `json:"registry_http_proxy,omitempty"`
 	RegistryHttpsProxy       *RESTProxy `json:"registry_https_proxy,omitempty"`
-}
-
-type RESTSystemConfigWebhookCfgV2 struct {
-	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
 }
 
 type RESTSystemConfigMiscCfgV2 struct {
