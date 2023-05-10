@@ -554,6 +554,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		MeshToSvr:    c.MeshToSvr,
 		LinkLocal:    c.LinkLocal,
 		TmpOpen:      c.TmpOpen,
+		UwlIp:        c.UwlIp,
 	}
 }
 

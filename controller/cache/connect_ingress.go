@@ -203,6 +203,20 @@ func connectPAIToGlobal(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTi
 		if alive == false && wouldGenerateUnmanagedEndpoint(conn, false) {
 			scheduleControllerResync(resyncRequestReasonEphemeral)
 		}
+		if conn.UwlIp {
+			// Unmanaged workload
+			if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+				conn.ServerWL = ep
+				sa.addrgrp = true
+			} else {
+				ipStr := net.IP(conn.ServerIP).String()
+				ep = specialEPName(api.LearnedWorkloadPrefix, ipStr)
+				conn.ServerWL = ep
+			}
+			stip.wlPort = uint16(conn.ServerPort)
+			sa.workload = true
+			return true
+		}
 		cctx.ConnLog.WithFields(log.Fields{
 			"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 		}).Debug("Ignore egress connection to global IP space")
