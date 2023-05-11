@@ -833,13 +833,16 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSch
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"managed_node_count", "reporting_time"},
+		Required: []string{"managed_node_count", "reporting_time", "base_product"},
 		Properties: map[string]*apiextv1.JSONSchemaProps{
 			"reporting_time": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
 			},
 			"managed_node_count": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeInteger,
+			},
+			"base_product": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
 			},
 		},
 	}
@@ -927,13 +930,16 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSO
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"managed_node_count", "reporting_time"},
+		Required: []string{"managed_node_count", "reporting_time", "base_product"},
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
 			"reporting_time": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
 			},
 			"managed_node_count": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeInteger,
+			},
+			"base_product": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
 			},
 		},
 	}

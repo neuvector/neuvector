@@ -3110,7 +3110,7 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	resp := resource.GetCspConfig(nvSemanticVersion)
+	resp := resource.GetCspConfig()
 
 	restRespSuccess(w, r, &resp, accReadAll, nil, nil, "")
 }
