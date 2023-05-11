@@ -1867,7 +1867,7 @@ func AdjustAdmResForOC() {
 				},
 			}}
 		rbacRoleBindingsWanted[nvOperatorsRoleBinding] = &k8sRbacBindingInfo{
-			subjects: ctrlerSubjectsWanted,
+			subjects: enforcerSubjecstWanted,
 			rbacRole: rbacRolesWanted[nvOperatorsRole],
 		}
 	}
@@ -1999,18 +1999,14 @@ func UpdateDeploymentReplicates(name string, replicas int32) error {
 	return nil
 }
 
-func getNeuvectorSvcAccount(objName string) error {
+func getNeuvectorSvcAccount(resInfo map[string]string) {
 	// controller's sa is known by k8s token, not by deployment resource
-	resInfo := map[string]string{ // resource object name : resource type
-		"neuvector-updater-pod": RscTypeCronJob,
-		//"neuvector-enforcer-pod": RscTypeDaemonSet,
-	}
-	if rt, ok := resInfo[objName]; ok {
+	for objName, rt := range resInfo {
 		var sa string
 		obj, err := global.ORCH.GetResource(rt, NvAdmSvcNamespace, objName)
 		if err != nil {
-			log.WithFields(log.Fields{"name": objName, "err": err}).Error("resource no found")
-			return err
+			log.WithFields(log.Fields{"name": objName, "rt": rt, "err": err}).Error("resource no found")
+			continue
 		}
 		switch objName {
 		case "neuvector-updater-pod": // get updater cronjob service account
@@ -2025,11 +2021,14 @@ func getNeuvectorSvcAccount(objName string) error {
 		case "neuvector-enforcer-pod": // get enforcer daemonset service account
 			if dsObj, ok := obj.(*DaemonSet); ok {
 				sa = dsObj.SA
+				if enforcerSubjectWanted != sa {
+					enforcerSubjectWanted = sa
+					enforcerSubjecstWanted[0] = ctrlerSubjectWanted
+					enforcerSubjecstWanted[1] = enforcerSubjectWanted
+				}
 			}
 		}
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
-		return nil
+		continue
 	}
-
-	return common.ErrObjectNotFound
 }

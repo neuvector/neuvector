@@ -636,16 +636,24 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                  hdl, proto, DBG_IPV4_TUPLE(sip), DBG_IPV4_TUPLE(dip), dport, app, is_ingress, to_server);
     dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc, p);
 
-    if ((desc->flags & POLICY_DESC_INTERNAL) && _dpi_policy_implicit_default(hdl, desc)) {
+    if ((desc->flags & POLICY_DESC_INTERNAL)) {
         if (is_ingress) {
             iptype = dpi_ip4_iptype(sip);
-            inPolicyAddr = dpi_is_policy_addr(sip);
         } else {
             iptype = dpi_ip4_iptype(dip);
-            inPolicyAddr = dpi_is_policy_addr(dip);
         }
-        if (!inPolicyAddr) {
-            _dpi_policy_chk_unknown_ip(hdl, sip, dip, iptype, &desc);
+        if (_dpi_policy_implicit_default(hdl, desc)) {
+            if (is_ingress) {
+                inPolicyAddr = dpi_is_policy_addr(sip);
+            } else {
+                inPolicyAddr = dpi_is_policy_addr(dip);
+            }
+            if (!inPolicyAddr) {
+                _dpi_policy_chk_unknown_ip(hdl, sip, dip, iptype, &desc);
+            }
+        }
+        if (iptype == DP_IPTYPE_UWLIP) {
+            desc->flags |= POLICY_DESC_UWLIP;
         }
     }
 

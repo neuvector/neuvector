@@ -546,7 +546,7 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 	//workload, reset unManagedWlTimer to update unmanaged workload ip to prevent
 	//neuvector device being treated as unmanaged wl
 	if addcnt > 0 {
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 	}
 
 	// cleanup ephemeral entries
@@ -776,7 +776,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 		//workload on host without agent is unmanaged
 		//process unmanaged wl ip for special subnet
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 
 		cacheMutexUnlock()
 
@@ -798,7 +798,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 		//workload on host without agent is unmanaged
 		//process unmanaged wl ip for special subnet
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 
 		cacheMutexUnlock()
 
