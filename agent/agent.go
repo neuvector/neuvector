@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
-	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -94,7 +94,7 @@ func taskReexamHostIntf() {
 	oldTunnelIP := Host.TunnelIP
 	getHostIPs()
 	if reflect.DeepEqual(oldIfaces, Host.Ifaces) != true ||
-	reflect.DeepEqual(oldTunnelIP, Host.TunnelIP) != true {
+		reflect.DeepEqual(oldTunnelIP, Host.TunnelIP) != true {
 		putHostIfInfo()
 	}
 }
@@ -359,6 +359,7 @@ func main() {
 
 	walkerTask = workerlet.NewWalkerTask(*show_monitor_trace, global.SYS)
 
+	log.WithFields(log.Fields{"cgroups": global.SYS.GetCgroupsVersion()}).Info()
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -688,7 +689,7 @@ func main() {
 
 	waitContainerTaskExit()
 
-	if driver != pipe.PIPE_NOTC  && driver != pipe.PIPE_CLM {
+	if driver != pipe.PIPE_NOTC && driver != pipe.PIPE_CLM {
 		dp.DPCtrlDelSrvcPort(nvSvcPort)
 	}
 
