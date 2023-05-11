@@ -67,10 +67,10 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 		} else {
 			// master cluster is unreachable from this joint cluster
-			resp = resource.GetCspConfig(nvSemanticVersion)
+			resp = resource.GetCspConfig()
 		}
 	} else {
-		resp = resource.GetCspConfig(nvSemanticVersion)
+		resp = resource.GetCspConfig()
 	}
 	if err != nil || resp.CspConfigData == "" || resp.CspConfigData == "{}" {
 		log.WithFields(log.Fields{"error": err, "cspConfig": resp.CspConfigData}).Error("no data")

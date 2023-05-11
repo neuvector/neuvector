@@ -332,6 +332,7 @@ type NvCspUsage struct {
 	Metadata         *metav1.ObjectMeta `json:"metadata"`
 	ManagedNodeCount int                `json:"managed_node_count"` // sum of all reachable clusters' nodes count. 0 means "do not report to CSP API"
 	ReportingTime    string             `json:"reporting_time"`
+	BaseProduct      string             `json:"base_product"`
 	XXX_unrecognized []byte             `json:"-"`
 }
 

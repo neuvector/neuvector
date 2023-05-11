@@ -13,9 +13,10 @@ import (
 )
 
 type tCustomerCspData struct {
-	AccountID     string `json:"account_id"`
-	Arch          string `json:"arch"`
-	CloudProvider string `json:"cloud_provider"`
+	AccountID        string `json:"account_id"`
+	Arch             string `json:"arch"`
+	CloudProvider    string `json:"cloud_provider"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
 type tCspConfig struct {
@@ -27,9 +28,10 @@ type tCspConfig struct {
 	Usage              map[string]int   `json:"usage"`
 	CustomerCspData    tCustomerCspData `json:"customer_csp_data"`
 	BaseProduct        string           `json:"base_product"`
+	XXX_unrecognized   []byte           `json:"-"`
 }
 
-func GetCspConfig(nvVersion string) api.RESTFedCspSupportResp {
+func GetCspConfig() api.RESTFedCspSupportResp {
 	var err error
 	var tExpire time.Time
 	var resp api.RESTFedCspSupportResp
@@ -49,14 +51,10 @@ func GetCspConfig(nvVersion string) api.RESTFedCspSupportResp {
 						resp.ExpireTime = cspConfig.Expire
 						resp.CspErrors = cspConfig.Errors
 						resp.CspConfigFrom = "local cluster"
-						if tExpire, err = time.Parse("2006-01-02T15:04:05.000000-07:00", resp.ExpireTime); err == nil {
+						if tExpire, err = time.Parse("2023-01-02T15:04:05.000000+00:00", resp.ExpireTime); err == nil {
 							if cspConfig.BillingApiAccessOk && tExpire.After(now) {
 								resp.Compliant = true
 							}
-						}
-						cspConfig.BaseProduct = fmt.Sprintf("cpe:/o:suse:neuvector:%s", nvVersion)
-						if jsonData, err := json.Marshal(&cspConfig); err == nil {
-							resp.CspConfigData = string(jsonData)
 						}
 					}
 				}
