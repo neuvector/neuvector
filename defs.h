@@ -194,6 +194,7 @@ typedef struct {
 #define DPSESS_FLAG_MESH_TO_SVR   0x0040 // mesh traffic to svr
 #define DPSESS_FLAG_LINK_LOCAL    0x0080 // link local(169.254.0.0)
 #define DPSESS_FLAG_TMP_OPEN      0x0100 // temp open connection
+#define DPSESS_FLAG_UWLIP         0x0200 // uwl connection
 
 #define DP_POLICY_APPLY_EGRESS  0x1
 #define DP_POLICY_APPLY_INGRESS 0x2
@@ -405,6 +406,7 @@ typedef struct {
 #define DPCONN_FLAG_MESH_TO_SVR   0x10
 #define DPCONN_FLAG_LINK_LOCAL    0x20
 #define DPCONN_FLAG_TMP_OPEN      0x40
+#define DPCONN_FLAG_UWLIP         0x80
 
 typedef struct {
     uint8_t  EPMAC[6];

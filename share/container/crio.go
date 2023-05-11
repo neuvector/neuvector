@@ -569,7 +569,7 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 		}
 	}
 
-	if exited_sandboxes, err := criListPodSandboxes(d.criClient, ctx, true); err == nil && exited_sandboxes != nil {
+	if exited_sandboxes, err := criListPodSandboxes(d.criClient, ctx, false); err == nil && exited_sandboxes != nil {
 		for _, pod := range exited_sandboxes.Items {
 			stops.Add(pod.Id)
 			ids.Add(pod.Id)

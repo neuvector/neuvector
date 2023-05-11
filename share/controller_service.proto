@@ -109,6 +109,7 @@ message CLUSConnection {
 	bool MeshToSvr = 29;
 	bool LinkLocal = 30;
 	bool TmpOpen = 31;
+	bool UwlIp = 32;
 }
 
 message CLUSConnectionArray {
