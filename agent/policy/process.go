@@ -474,6 +474,25 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
+func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
+	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: csp")
+	var whtLst []ProcProfileBrief = []ProcProfileBrief{
+		/////////////////////////////////
+		// scanner cores :  wildcard
+		{"csp-billing-ada", "*"},
+
+		// k8s or openshift environment
+		{"pause", "/pause"},     // k8s, pause
+		{"pod", "/usr/bin/pod"}, // openshift, pod
+		{"mount", "*"},          // k8s volume plug-in
+		{"grep", "*"},           // CIS bench tests
+		{"pgrep", "*"},
+		{"sed", "*"},
+	}
+
+	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
+}
+
 /////////////////////////////////////////////////////////////////////
 func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: controller")
@@ -700,6 +719,8 @@ func (e *Engine) InsertNeuvectorProcessProfilePolicy(group, role string) {
 		profile = buildScannerProfileList(group)
 	case "updater", "fetcher": // should not have protection, phase-out soon
 		profile = buildAllowAllProfile(group)
+	case "csp":
+		profile = buildCspProfileList(group)
 	}
 
 	// now, we use minimum policy for other neuvector containers

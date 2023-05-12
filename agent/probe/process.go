@@ -614,25 +614,21 @@ func (p *Probe) isAgentChildren(proc *procInternal, id string) bool {
 			// log.WithFields(log.Fields{"children": c.children.String(), "rootPid": c.rootPid, "oursider": c.outsider.String()}).Debug("PROC:")
 			ppid := proc.ppid
 			for i := 0; i < 5; i++ {	// lookup 5 ancestries
-				if pproc, ok := p.pidProcMap[ppid]; ok {
-					// log.WithFields(log.Fields{"pproc": pproc, "i": i}).Debug("PROC:")
-					if unexpectedAgentProcess(pproc.name){
-						return false
-					}
-
-					if isFamilyProcess(c.children, pproc) || pproc.pid == p.agentPid || pproc.pid == c.rootPid {
-						c.children.Add(proc.pid)
-						return true
-					}
-					ppid = pproc.ppid
-					continue
+				pproc, ok := p.pidProcMap[ppid]
+				if !ok {
+					break	// no parent process for reference
 				}
 
-				// give up lookup
-				if i == 0 {	// no parent process for reference
+				// log.WithFields(log.Fields{"pproc": pproc, "i": i}).Debug("PROC:")
+				if unexpectedAgentProcess(pproc.name){
+					break
+				}
+
+				if isFamilyProcess(c.children, pproc) || pproc.pid == p.agentPid || pproc.pid == c.rootPid {
+					c.children.Add(proc.pid)
 					return true
 				}
-				break
+				ppid = pproc.ppid
 			}
 		}
 	}
@@ -1855,7 +1851,6 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		}
 	}
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
-	//}
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
@@ -2244,7 +2239,7 @@ func (p *Probe) isAllowCniCommand(path string) bool {
 
 func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
 	if p.bKubePlatform {
-		return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && proc.cmds[0] == "/bin/calico-node")
+		return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && filepath.Base(proc.cmds[0]) == "calico-node")
 	}
 	return false
 }
@@ -2274,8 +2269,15 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		return false
 	}
 
+
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+
+	// both names are in the runtime list
+	if bRtProc && bRtProcP {
+		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
+		return true
+	}
 
 	// parent: matching only from binary
 	pname := filepath.Base(proc.ppath)
@@ -2297,33 +2299,24 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		}
 	}
 
-	// both names are in the runtime list
-	if bRtProc && bRtProcP {
-		log.WithFields(log.Fields{"name": proc.name, "path": proc.path}).Debug("PROC:")
-		return true
-	}
-
 	// network plug-in: calico-node
 	if bRtProcP && p.isAllowCalicoCommand(proc) {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path, "pname": proc.pname}).Debug("PROC:")
 		return true
 	}
 
-	// CNI commands from node
-	if bRtProcP || (bParentHostProc && p.isAllowCniCommand(proc.ppath)) {
+	// maintainance jobs running from runtime engine
+	if bRtProcP {
 		switch proc.name {
-		case "portmap", "containerd", "sleep", "uptime", "nice":
-			return true
 		case "busybox":
 			// exception: ps and its parent is a runtime process
 			if len(proc.cmds) > 0 && (filepath.Base(proc.cmds[0]) == "ps") {
-				return bRtProcP
+				return true
 			}
-			return false
 		case "ps":
 			// Exception for process where the parent is a runtime process.
 			// Some CNI daemons will call `ps` and we will get false positives without the exception.
-			return bRtProcP
+			return true
 		case "mount", "lsof", "getent", "adduser", "useradd": // from AWS
 			return true
 		default:
@@ -2332,20 +2325,32 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			}
 		}
 
-		// NV4856
-		if p.isAllowIpRuntimeCommand(proc.cmds) {
-			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
-			return true
-		}
-
 		if p.isAllowCniCommand(proc.path) {
 			mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
 			return true
 		}
 	}
 
+	// NV4856
+	if p.isAllowIpRuntimeCommand(proc.cmds) {
+		mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
+		return true
+	}
+
 	// maintainance jobs running from node
 	if bParentHostProc {
+		// CNI commands from node
+		if p.isAllowCniCommand(proc.ppath) {
+			switch proc.name {
+			case "portmap", "containerd", "sleep", "uptime", "nice":
+				return true
+			}
+			if p.isAllowCniCommand(proc.path) {
+				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "path": proc.path}).Debug("PROC:")
+				return true
+			}
+		}
+
 		switch proc.pname {
 		case "udisksd":
 			return proc.name == "dumpe2fs"
@@ -2363,7 +2368,6 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			log.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds, "path": proc.path}).Info("")
 			return true
 		}
-
 
 		if bRtProcP && len(proc.cmds) >= 3 {
 			if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
