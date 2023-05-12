@@ -587,7 +587,14 @@ func TestApikeyCreateDelete(t *testing.T) {
 	body, _ := json.Marshal(data)
 	w := restCall("POST", "/v1/api_key", body, api.UserRoleAdmin)
 	if w.status != http.StatusOK {
-		t.Fatalf("Failed to create apikey: status=%v.", w.status)
+		// use another key, no valid keys.go in github workflow 
+		data.Apikey.SecretKey = "RWHOWPsR9fQp3C+0AeKkdcVCnh5Nvam5vdLteh30cqgf9m6Jhsd4rnHYWvKQNsSX"
+
+		body, _ = json.Marshal(data)
+		w = restCall("POST", "/v1/api_key", body, api.UserRoleAdmin)
+		if w.status != http.StatusOK {
+			t.Fatalf("Failed to create apikey: status=%v.", w.status)
+		}
 	}
 
 	// Check apikey in cluster
