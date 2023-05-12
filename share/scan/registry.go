@@ -3,7 +3,6 @@ package scan
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"sort"
 	"strings"
@@ -253,24 +252,24 @@ func GetCosignSignatureTagFromDigest(digest string) string {
 //
 // More information about the cosign's signature specification can be found here:
 // https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
-func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, err error) {
+func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, errCode share.ScanErrorCode) {
 	signatureTag := GetCosignSignatureTagFromDigest(digest)
 	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag)
 	if errCode != share.ScanErrorCode_ScanErrNone {
-		return SignatureData{}, fmt.Errorf("error code while scanning for image info: %s", errCode)
+		return SignatureData{}, errCode
 	}
 	s.Payloads = make(map[string]string)
 	for _, layer := range info.Layers {
 		rdr, _, err := rc.DownloadLayer(context.Background(), repo, goDigest.Digest(layer))
 		if err != nil {
-			return SignatureData{}, fmt.Errorf("error while downloading layer: %s", err.Error())
+			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
 		}
 		layerBytes, err := ioutil.ReadAll(rdr)
 		if err != nil {
-			return SignatureData{}, fmt.Errorf("error while reading layer %s: %s", layer, err.Error())
+			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
 		}
 		s.Payloads[layer] = string(layerBytes)
 	}
 	s.Manifest = string(info.RawManifest)
-	return s, nil
+	return s, share.ScanErrorCode_ScanErrNone
 }
