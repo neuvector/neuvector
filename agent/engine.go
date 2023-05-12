@@ -242,6 +242,8 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 		entryPtSig = "sleep" // 4.4: "/usr/local/bin/upgrader"
 	case "fetcher":
 		entryPtSig = "/usr/local/bin/fetcher"
+	case "csp":
+		entryPtSig = "/usr/bin/csp-billing-adapter"
 	default:
 		//	log.WithFields(log.Fields{"invalid role": role}).Debug("PROC:")
 		return false // exclude others
@@ -1631,12 +1633,14 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	// Send event to controller
 	if !isChild {
 		if c.pid != 0 {
+			prober.BuildProcessFamilyGroups(c.id, c.pid, true, info.Privileged)
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
 			examNeuVectorInterface(c, changeInit)
 		}
 	} else {
 		if parent != nil && !parent.examIntface {
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false, info.Privileged)
 			parent.examIntface = true
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
@@ -1649,6 +1653,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// process killer per policy: removed by evaluating other same-kind instances
 		// since the same policy might be shared by several same-kind instances in a node
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
+
 
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
