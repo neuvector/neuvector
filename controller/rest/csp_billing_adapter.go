@@ -125,12 +125,12 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 				_, err = tarw.Write(f.data)
 			}
 			if err != nil {
+				log.WithFields(log.Fields{"name": f.filename, "error": err}).Error()
 				break
 			}
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error()
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailExport, err.Error())
 	}
 }
