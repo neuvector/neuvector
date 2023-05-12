@@ -1263,6 +1263,17 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 // do not update CustomResourceDefinition resource(schema) anymore
 func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 
+	if cspType != share.CSP_NONE {
+		clusHelper := kv.GetClusterHelper()
+		var fedRole string = api.FedRoleNone
+		var masterClusterID string
+		if m := clusHelper.GetFedMembership(); m != nil {
+			fedRole = m.FedRole
+			masterClusterID = m.MasterCluster.ID
+		}
+		cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
+	}
+
 	nvCrdInfo := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
 			RscType:           resource.RscTypeCrdSecurityRule,
@@ -1382,19 +1393,6 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		err := fmt.Errorf("CRD schema of %s is out of date.", strings.Join(crdOutOfDate, ", "))
 		log.WithFields(log.Fields{"err": err}).Warning("crd schema")
 		errors = append(errors, err.Error())
-	}
-
-	if cspType != share.CSP_NONE {
-		if leader {
-			clusHelper := kv.GetClusterHelper()
-			var fedRole string = api.FedRoleNone
-			var masterClusterID string
-			if m := clusHelper.GetFedMembership(); m != nil {
-				fedRole = m.FedRole
-				masterClusterID = m.MasterCluster.ID
-			}
-			cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
-		}
 	}
 
 	return errors
