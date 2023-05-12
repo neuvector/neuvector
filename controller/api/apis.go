@@ -2836,7 +2836,7 @@ type RESTDerivedDlpRuleMacData struct {
 	Macs []*RESTDerivedDlpRuleMac `json:"macs"`
 }
 
-//waf
+// waf
 const MinWafRuleID = 40000
 const MaxWafRuleID = 50000
 
