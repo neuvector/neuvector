@@ -203,7 +203,7 @@ const CLUSScannerStatsStore string = CLUSScanStore + "scanner_stats/"
 const CLUSScannerDBVersionID string = "NeuVectorCVEDBVersion" // used for indicate db version changed
 const CLUSScannerDBStore string = CLUSScanStore + "database/"
 
-//recalculate
+// recalculate
 const CLUSRecalPolicyStore string = CLUSRecalculateStore + "policy/" //not to be watched by consul
 const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/"       //not to be watched by consul
 
@@ -219,7 +219,7 @@ func CLUSRecalDlpWlRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSRecalDlpStore, name)
 }
 
-//fqdn
+// fqdn
 const CLUSFqdnIpStore string = CLUSFqdnStore + "ip/" //not to be watched by consul
 
 func CLUSFqdnIpKey(hostID string, fqdname string) string {
@@ -2188,7 +2188,7 @@ type CLUSFedScanRevisions struct {
 	Restoring      bool              `json:"restoring"`        // fed registry revision
 }
 
-//dlp rule
+// dlp rule
 const (
 	DlpRuleKeyPattern string = "pattern"
 )
@@ -2313,7 +2313,7 @@ type CLUSDlpGroup struct {
 	CfgType TCfgType          `json:"cfg_type"`
 }
 
-//waf
+// waf
 type CLUSWafCriteriaEntry struct {
 	Key     string `json:"key"`
 	Value   string `json:"value"`
@@ -2372,14 +2372,15 @@ type CLUSCrdEventRecord struct {
 	CrdEventRecord []string
 }
 
-////// Process UUID Rules
-//     Reserved(256 entries): 	00000000-0000-0000-0000-0000000000XX
-//     Default rules:			00000000-0000-0000-0000-00000000000X
-//     Linux-specific:  		00000000-0000-0000-0000-00000000001X ans 2X
-//     Windows-specific:  		00000000-0000-0000-0000-00000000003X ans 4X
+// //// Process UUID Rules
+//
+//	Reserved(256 entries): 	00000000-0000-0000-0000-0000000000XX
+//	Default rules:			00000000-0000-0000-0000-00000000000X
+//	Linux-specific:  		00000000-0000-0000-0000-00000000001X ans 2X
+//	Windows-specific:  		00000000-0000-0000-0000-00000000003X ans 4X
 const CLUSReservedUuidPrefix string = "00000000-0000-0000-0000-0000000000" // reserved the last 2 digits
 
-//////
+// ////
 const CLUSReservedUuidNotAlllowed string = "00000000-0000-0000-0000-000000000000"    // processes beyond white list
 const CLUSReservedUuidRiskyApp string = "00000000-0000-0000-0000-000000000001"       // riskApp
 const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"     // tunnel
@@ -2499,7 +2500,7 @@ type SecretLog struct {
 	RuleDesc string `json:"rule_desc"` // rule description
 }
 
-/////// Secret Types
+// ///// Secret Types
 const (
 	SecretPrivateKey string = "privatekey" // Private Key
 	SecretX509       string = "x.509"      // X.509 certificates (ignored)
@@ -2531,7 +2532,7 @@ type CLUSSetIdPermLog struct {
 	Evidence string `json:"evidence"` // file attributes
 }
 
-/////// For custom roles
+// ///// For custom roles
 func CLUSUserRoleKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigUserRoleStore, name)
 }
