@@ -8,6 +8,7 @@ import (
 	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/resource"
@@ -29,9 +30,6 @@ func (m CacheMethod) GetNvUsage(fedRole string) api.RESTNvUsage {
 	localUsage := &api.RESTClusterCspUsage{
 		CspType: cspType,
 		Nodes:   clusterUsage.nodes,
-	}
-	if localUsage.Nodes == 0 {
-		localUsage.Nodes = 1
 	}
 	roleMapping := map[string]string{
 		api.FedRoleMaster: "primary",
@@ -86,10 +84,17 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 
 	var totalNodes int
 
-	if objs, err := global.ORCH.ListResource(resource.RscTypeNode); err == nil {
-		clusterUsage.nodes = len(objs)
+	if localDev.Host.Platform == share.PlatformDocker {
+		acc := access.NewAdminAccessControl()
+		// The pricing generally should be based on total node count in the cluster, not enforcer count, even though those two are usually the same.
+		// However, for NV deployment on native docker (as downstream cluster in multi-cluster env), downstream nv reports its enforcer count as node count to master cluster.
+		clusterUsage.nodes = cacher.GetAgentCount(acc, "")
 	} else {
-		clusterUsage.nodes = 1
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNode); err == nil {
+			clusterUsage.nodes = len(objs)
+		} else {
+			clusterUsage.nodes = 1
+		}
 	}
 
 	if fedRole == api.FedRoleMaster {

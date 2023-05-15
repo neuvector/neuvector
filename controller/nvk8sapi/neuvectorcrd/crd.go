@@ -1263,18 +1263,8 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 // do not update CustomResourceDefinition resource(schema) anymore
 func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 
-	if cspType != share.CSP_NONE {
-		clusHelper := kv.GetClusterHelper()
-		var fedRole string = api.FedRoleNone
-		var masterClusterID string
-		if m := clusHelper.GetFedMembership(); m != nil {
-			fedRole = m.FedRole
-			masterClusterID = m.MasterCluster.ID
-		}
-		cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
-	}
-
-	nvCrdInfo := []*resource.NvCrdInfo{
+	nvCrdInfo := []*resource.NvCrdInfo{}
+	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
 			RscType:           resource.RscTypeCrdSecurityRule,
 			MetaName:          resource.NvSecurityRuleName,
@@ -1342,20 +1332,25 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		},
 	}
 	if cspType != share.CSP_NONE {
-		nvCrdInfo = append(nvCrdInfo, &resource.NvCrdInfo{
-			RscType:           resource.RscTypeCrdNvCspUsage,
-			MetaName:          resource.NvCspUsageName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
-			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvCrdV1,
-			SpecNamesPlural:   resource.NvCspUsagePlural,
-			SpecNamesKind:     resource.NvCspUsageKind,
-			SpecNamesSingular: resource.NvCspUsageSingular,
-			SpecNamesListKind: resource.NvCspUsageListKind,
-			LockKey:           "",
-			KvCrdKind:         resource.NvCspUsageKind,
-			ShortNames:        []string{"nur"},
-		})
+		nvCrdInfo = []*resource.NvCrdInfo{
+			&resource.NvCrdInfo{
+				RscType:           resource.RscTypeCrdNvCspUsage,
+				MetaName:          resource.NvCspUsageName,
+				SpecScope:         resource.NvClusterSecurityRuleScope,
+				SpecGroup:         common.OEMClusterSecurityRuleGroup,
+				SpecVersion:       resource.NvCrdV1,
+				SpecNamesPlural:   resource.NvCspUsagePlural,
+				SpecNamesKind:     resource.NvCspUsageKind,
+				SpecNamesSingular: resource.NvCspUsageSingular,
+				SpecNamesListKind: resource.NvCspUsageListKind,
+				LockKey:           "",
+				KvCrdKind:         resource.NvCspUsageKind,
+				ShortNames:        []string{"nur"},
+			},
+		}
+		nvCrdInfo = append(nvCrdInfo, nvCrdInfoBasic...)
+	} else {
+		nvCrdInfo = nvCrdInfoBasic
 	}
 
 	crdOutOfDate := make([]string, 0, len(nvCrdInfo))
@@ -1369,6 +1364,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 					rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
 				}
 			}
+
 			if !crdUpToDate {
 				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)
 				continue
@@ -1380,12 +1376,21 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 					break
 				}
 			}
-			if err != nil {
-				errors = append(errors, err.Error())
-				log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "error": err}).Error()
+		}
+
+		if crdInfo.RscType == resource.RscTypeCrdNvCspUsage {
+			clusHelper := kv.GetClusterHelper()
+			var fedRole string = api.FedRoleNone
+			var masterClusterID string
+			if m := clusHelper.GetFedMembership(); m != nil {
+				fedRole = m.FedRole
+				masterClusterID = m.MasterCluster.ID
 			}
-		} else if err != nil {
-			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "err": err}).Error("crd schema")
+			cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
+		}
+
+		if err != nil {
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "err": err}).Error("crd schema")
 			errors = append(errors, err.Error())
 		}
 	}
