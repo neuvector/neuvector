@@ -3460,3 +3460,29 @@ type RESTSelfApikeyData struct {
 	GlobalPermits []*RESTRolePermission            `json:"global_permissions,omitempty"`
 	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }
+
+type RESTSigstoreRootOfTrust struct {
+	Name           *string                         `json:"name"`
+	RekorPublicKey *string                         `json:"rekor_public_key,omitempty"`
+	RootCert       *string                         `json:"root_cert,omitempty"`
+	SCTPublicKey   *string                         `json:"sct_public_key,omitempty"`
+	Verifiers      map[string]RESTSigstoreVerifier `json:"verifiers,omitempty"`
+}
+
+type RESTSigstoreVerifier struct {
+	Name           *string                             `json:"name"`
+	Type           *string                             `json:"type"`
+	IgnoreTLog     *bool                               `json:"ignore_tlog"`
+	IgnoreSCT      *bool                               `json:"ignore_sct"`
+	KeypairOptions *RESTSigstoreVerifierKeypairOptions `json:"keypair_options,omitempty"`
+	KeylessOptions *RESTSigstoreVerifierKeylessOptions `json:"keyless_options,omitempty"`
+}
+
+type RESTSigstoreVerifierKeypairOptions struct {
+	PublicKey *string `json:"public_key"`
+}
+
+type RESTSigstoreVerifierKeylessOptions struct {
+	CertIssuer  *string `json:"cert_issuer"`
+	CertSubject *string `json:"cert_subject"`
+}
