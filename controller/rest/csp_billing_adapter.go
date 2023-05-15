@@ -67,10 +67,10 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 			}
 		} else {
 			// master cluster is unreachable from this joint cluster
-			resp = resource.GetCspConfig(nvSemanticVersion)
+			resp = resource.GetCspConfig()
 		}
 	} else {
-		resp = resource.GetCspConfig(nvSemanticVersion)
+		resp = resource.GetCspConfig()
 	}
 	if err != nil || resp.CspConfigData == "" || resp.CspConfigData == "{}" {
 		log.WithFields(log.Fields{"error": err, "cspConfig": resp.CspConfigData}).Error("no data")
@@ -125,12 +125,12 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 				_, err = tarw.Write(f.data)
 			}
 			if err != nil {
+				log.WithFields(log.Fields{"name": f.filename, "error": err}).Error()
 				break
 			}
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error()
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailExport, err.Error())
 	}
 }

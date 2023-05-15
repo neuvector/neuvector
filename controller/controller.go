@@ -287,6 +287,7 @@ func main() {
 
 	ocImageRegistered := false
 	enableRmNsGrps := true
+	log.WithFields(log.Fields{"cgroups": global.SYS.GetCgroupsVersion()}).Info()
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -548,6 +549,32 @@ func main() {
 		kv.ValidateWebhookCert()
 	}
 
+	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
+	var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
+	{
+		if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+			// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
+			// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
+			// nvSemanticVersion : in the format v{major}.{minor}.{patch}
+			var ver share.CLUSCtrlVersion
+			json.Unmarshal(value, &ver)
+			if strings.HasPrefix(ver.CtrlVersion, "interim/") {
+				// it's daily dev build image
+				if *teleCurrentVer == "" {
+					nvAppFullVersion = "5.2.0"
+				} else {
+					nvAppFullVersion = *teleCurrentVer
+				}
+			} else {
+				// it's official release image
+				nvAppFullVersion = ver.CtrlVersion[1:]
+			}
+			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
+				nvSemanticVersion = "v" + ss[0]
+			}
+		}
+	}
+
 	checkDefAdminFreq := *pwdValidUnit // check default admin's password every 24 hours by default
 	if isNewCluster && *noDefAdmin {
 		checkDefAdminFreq = 0 // do not check default admin's password if it's disabled
@@ -597,6 +624,7 @@ func main() {
 		CspType:                  cspType,
 		CspPauseInterval:         *cspPauseInterval,
 		CtrlerVersion:            Version,
+		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
 	}
@@ -657,7 +685,8 @@ func main() {
 		PwdValidUnit:       *pwdValidUnit,
 		TeleNeuvectorURL:   *teleNeuvectorEP,
 		TeleFreq:           *telemetryFreq,
-		TeleCurrentVer:     *teleCurrentVer,
+		NvAppFullVersion:   nvAppFullVersion,
+		NvSemanticVersion:  nvSemanticVersion,
 		CspType:            cspType,
 		CspPauseInterval:   *cspPauseInterval,
 		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,

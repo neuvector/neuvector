@@ -421,36 +421,36 @@ func (m clusterHelper) putSizeAware(key string, value []byte) error {
 }
 
 /*
-func (m clusterHelper) putSizeAwareRev(key string, value []byte, rev uint64) error {
-	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
-		zb := utils.GzipBytes(value)
-		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
-			err := fmt.Errorf("zip data(%d) too big", len(zb))
-			log.WithFields(log.Fields{"key": key}).Error(err)
-			return err
+	func (m clusterHelper) putSizeAwareRev(key string, value []byte, rev uint64) error {
+		if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
+			zb := utils.GzipBytes(value)
+			if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
+				err := fmt.Errorf("zip data(%d) too big", len(zb))
+				log.WithFields(log.Fields{"key": key}).Error(err)
+				return err
+			}
+			return cluster.PutBinaryRev(key, zb, rev)
+		} else {
+			return cluster.PutRev(key, value, rev)
 		}
-		return cluster.PutBinaryRev(key, zb, rev)
-	} else {
-		return cluster.PutRev(key, value, rev)
 	}
-}
 
 // do not consider UpgradeAndConvert yet. if need to do UpgradeAndConvert, value size needs to be considered in UpgradeAndConvert()
-func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
-	value, rev, err := cluster.GetRev(key)
-	if err != nil || value == nil {
-		return nil, rev, err
-	} else {
-		// [31, 139] is the first 2 bytes of gzip-format data
-		if len(value) >= 2 && value[0] == 31 && value[1] == 139 {
-			value = utils.GunzipBytes(value)
-			if value == nil {
-				err = fmt.Errorf("Failed to unzip data")
+	func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
+		value, rev, err := cluster.GetRev(key)
+		if err != nil || value == nil {
+			return nil, rev, err
+		} else {
+			// [31, 139] is the first 2 bytes of gzip-format data
+			if len(value) >= 2 && value[0] == 31 && value[1] == 139 {
+				value = utils.GunzipBytes(value)
+				if value == nil {
+					err = fmt.Errorf("Failed to unzip data")
+				}
 			}
+			return value, rev, err
 		}
-		return value, rev, err
 	}
-}
 
 */
 func (m clusterHelper) PutInstallationID() (string, error) {
@@ -885,6 +885,7 @@ func (m clusterHelper) PutDlpVer(s *share.CLUSDlpRuleVer) error {
 	value, _ := enc.Marshal(s)
 	return cluster.Put(key, value)
 }
+
 // event policy
 
 func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleHead {
@@ -2074,7 +2075,7 @@ func (m clusterHelper) DeleteAdmissionRuleTxn(txn *cluster.ClusterTransact, admT
 	return nil
 }
 
-//------
+// ------
 func (m clusterHelper) GetCrdSecurityRuleRecord(crdKind, crdName string) *share.CLUSCrdSecurityRule {
 	key := share.CLUSCrdKey(crdKind, crdName)
 	if value, _, _ := m.get(key); len(value) > 0 {
@@ -2872,37 +2873,37 @@ func (m clusterHelper) PutImportTask(importTask *share.CLUSImportTask) error {
 }
 
 func (m clusterHelper) GetApikeyRev(name string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error) {
-    key := share.CLUSApikeyKey(url.QueryEscape(name))
-    if value, rev, _ := m.get(key); value != nil {
-        var apikey share.CLUSApikey
-        json.Unmarshal(value, &apikey)
-        if !acc.Authorize(&apikey, nil) {    
-            return nil, 0, common.ErrObjectAccessDenied
-        }
-        return &apikey, rev, nil
-    }
-    return nil, 0, common.ErrObjectNotFound
+	key := share.CLUSApikeyKey(url.QueryEscape(name))
+	if value, rev, _ := m.get(key); value != nil {
+		var apikey share.CLUSApikey
+		json.Unmarshal(value, &apikey)
+		if !acc.Authorize(&apikey, nil) {
+			return nil, 0, common.ErrObjectAccessDenied
+		}
+		return &apikey, rev, nil
+	}
+	return nil, 0, common.ErrObjectNotFound
 }
 
 func (m clusterHelper) CreateApikey(apikey *share.CLUSApikey) error {
-    key := share.CLUSApikeyKey(url.QueryEscape(apikey.Name))
-    value, _ := json.Marshal(apikey)
-    // secret_key is already hashed
-    return cluster.PutIfNotExist(key, value, false)
+	key := share.CLUSApikeyKey(url.QueryEscape(apikey.Name))
+	value, _ := json.Marshal(apikey)
+	// secret_key is already hashed
+	return cluster.PutIfNotExist(key, value, false)
 }
 
 // caller needs to decide whether to authorize accessing each returned apikey object
 func (m clusterHelper) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
-    apikeys := make(map[string]*share.CLUSApikey)
-    keys, _ := cluster.GetStoreKeys(share.CLUSConfigApikeyStore)
-    for _, key := range keys {
-        if value, _, _ := m.get(key); value != nil {
-            var apikey share.CLUSApikey
-            json.Unmarshal(value, &apikey)
-            apikeys[apikey.Name] = &apikey
-        }
-    }
-    return apikeys
+	apikeys := make(map[string]*share.CLUSApikey)
+	keys, _ := cluster.GetStoreKeys(share.CLUSConfigApikeyStore)
+	for _, key := range keys {
+		if value, _, _ := m.get(key); value != nil {
+			var apikey share.CLUSApikey
+			json.Unmarshal(value, &apikey)
+			apikeys[apikey.Name] = &apikey
+		}
+	}
+	return apikeys
 }
 
 func (m clusterHelper) DeleteApikey(name string) error {

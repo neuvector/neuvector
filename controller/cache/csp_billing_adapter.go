@@ -30,6 +30,9 @@ func (m CacheMethod) GetNvUsage(fedRole string) api.RESTNvUsage {
 		CspType: cspType,
 		Nodes:   clusterUsage.nodes,
 	}
+	if localUsage.Nodes == 0 {
+		localUsage.Nodes = 1
+	}
 	roleMapping := map[string]string{
 		api.FedRoleMaster: "primary",
 		api.FedRoleJoint:  "downstream",
@@ -108,12 +111,14 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	var err error
 	var obj interface{}
 	rscName := resource.RscCspUsageName
+	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", cctx.NvSemanticVersion)
 	t := time.Now().Format("2006-01-02T15:04:05.000000-07:00")
 	if obj, err = global.ORCH.GetResource(resource.RscTypeCrdNvCspUsage, "", rscName); err == nil {
 		if !addOnly {
 			if crCspUsage, ok := obj.(*resource.NvCspUsage); ok {
 				crCspUsage.ManagedNodeCount = totalNodes
 				crCspUsage.ReportingTime = t
+				crCspUsage.BaseProduct = baseProduct
 				err = global.ORCH.UpdateResource(resource.RscTypeCrdNvCspUsage, crCspUsage)
 			} else {
 				err = fmt.Errorf("unsupported type")
@@ -130,6 +135,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 			},
 			ManagedNodeCount: totalNodes,
 			ReportingTime:    t,
+			BaseProduct:      baseProduct,
 		}
 		err = global.ORCH.AddResource(resource.RscTypeCrdNvCspUsage, crCspUsage)
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+
 	//	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -1240,8 +1241,9 @@ type Context struct {
 	RESTPort           uint
 	PwdValidUnit       uint
 	TeleNeuvectorURL   string
-	TeleCurrentVer     string
 	TeleFreq           uint
+	NvAppFullVersion   string
+	NvSemanticVersion  string
 	CspType            share.TCspType
 	CspPauseInterval   uint // in minutes
 	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
@@ -1274,27 +1276,6 @@ func InitContext(ctx *Context) {
 	}
 
 	_teleNeuvectorURL = ctx.TeleNeuvectorURL
-	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
-		// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
-		// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
-		// nvSemanticVersion : in the format v{major}.{minor}.{patch}
-		var ver share.CLUSCtrlVersion
-		json.Unmarshal(value, &ver)
-		if strings.HasPrefix(ver.CtrlVersion, "interim/") {
-			// it's daily dev build image
-			if ctx.TeleCurrentVer == "" {
-				nvAppFullVersion = "5.1.0"
-			} else {
-				nvAppFullVersion = ctx.TeleCurrentVer
-			}
-		} else {
-			// it's official release image
-			nvAppFullVersion = ver.CtrlVersion[1:]
-		}
-		if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
-			nvSemanticVersion = "v" + ss[0]
-		}
-	}
 	_teleFreq = ctx.TeleFreq
 	if _teleFreq == 0 {
 		_teleFreq = 60

@@ -120,7 +120,7 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		resp.TelemetryStatus = api.RESTTeleStatus{
 			TeleFreq:       _teleFreq,
 			TeleURL:        _teleNeuvectorURL,
-			CurrentVersion: nvAppFullVersion,
+			CurrentVersion: cctx.NvAppFullVersion,
 		}
 
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
