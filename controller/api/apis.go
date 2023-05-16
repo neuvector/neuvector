@@ -3440,11 +3440,11 @@ type RESTApikey struct {
 	CreatedByEntity     string              `json:"created_by_entity"`      // it could be username or apikey (access key)
 }
 
-type RESTApikeyPreGeneratedData struct {
-	Apikey *RESTApikeyPreGenerated `json:"apikey"`
+type RESTApikeyGeneratedData struct {
+	Apikey *RESTApikeyGenerated `json:"apikey"`
 }
 
-type RESTApikeyPreGenerated struct {
+type RESTApikeyGenerated struct {
 	Name      string `json:"apikey_name"`
 	SecretKey string `json:"apikey_secret"`
 }

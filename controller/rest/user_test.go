@@ -578,10 +578,9 @@ func TestApikeyCreateDelete(t *testing.T) {
 
 	data := api.RESTApikeyData{Apikey: &api.RESTApikey{
 		ExpirationType: "never",
-		Description: "unit-test",
-		Name: "token-12345", 
-		SecretKey: "0u+tVOWNPRfpCK7p9qznEpnzr/K+a3rYqYBNgz3GVgqIh7n+66OEJf9gTdnmFDgq", 
-		Role: api.UserRoleReader,
+		Description:    "unit-test",
+		Name:           "token-12345",
+		Role:           api.UserRoleReader,
 	}}
 
 	body, _ := json.Marshal(data)
