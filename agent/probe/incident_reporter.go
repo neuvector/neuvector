@@ -302,7 +302,7 @@ func (p *Probe) processAggregateProbeReports() int {
 			if pmsga.count > 1 {
 				go p.sendReport(*pmsga)
 				cnt++
-			} else if pmsga.bFsMonMsg && pmsga.count >= 1 {
+			} else if pmsga.bFsMonMsg && pmsga.count > 1 {	// no more adding entry
 				go p.sendReport(*pmsga)
 				cnt++
 			}

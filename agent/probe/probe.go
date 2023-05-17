@@ -400,9 +400,6 @@ func (p *Probe) processContainerChanges(pidSetNew utils.Set) {
 
 func (p *Probe) monitorProcessChanges() {
 	// netlink proc: avoid deadlocks
-	p.processContainerNewChanges()
-	p.processContainerStopChanges()
-
 	// keep an eye on the launched applications
 	p.inspectNewProcesses(false) // Evaluations
 	// p.processContainerAppPortChanges()

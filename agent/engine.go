@@ -2025,10 +2025,6 @@ func taskStopContainer(id string, pid int) {
 		log.WithFields(log.Fields{"id": id, "error": err}).Error("Failed to read container. Use cached info.")
 		info = c.info
 		info.Running = false
-	} else if info.Running {
-		// not a relaible source: from process monitor
-		log.WithFields(log.Fields{"id": id}).Debug("skip stop as container is still running")
-		return
 	}
 
 	if info.FinishedAt.IsZero() {
