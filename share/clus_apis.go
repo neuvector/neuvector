@@ -2729,6 +2729,8 @@ type CLUSSigstoreRootOfTrust struct {
 	RekorPublicKey string `json:"rekor_public_key"`
 	RootCert       string `json:"root_cert"`
 	SCTPublicKey   string `json:"sct_public_key"`
+	CfgType        string `json:"cfg_type"`
+	Comment        string `json:"comment"`
 }
 
 type CLUSSigstoreVerifier struct {

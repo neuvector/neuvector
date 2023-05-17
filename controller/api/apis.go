@@ -3467,11 +3467,13 @@ type RESTSigstoreRootOfTrust struct {
 	RootCert       *string                         `json:"root_cert,omitempty"`
 	SCTPublicKey   *string                         `json:"sct_public_key,omitempty"`
 	Verifiers      map[string]RESTSigstoreVerifier `json:"verifiers,omitempty"`
+	CfgType        string                          `json:"cfg_type"`
+	Comment        *string                         `json:"comment"`
 }
 
 type RESTSigstoreVerifier struct {
 	Name           *string                             `json:"name"`
-	Type           *string                             `json:"type"`
+	VerifierType   *string                             `json:"verifier_type"`
 	IgnoreTLog     *bool                               `json:"ignore_tlog"`
 	IgnoreSCT      *bool                               `json:"ignore_sct"`
 	KeypairOptions *RESTSigstoreVerifierKeypairOptions `json:"keypair_options,omitempty"`

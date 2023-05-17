@@ -162,12 +162,12 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 
 	clusVerifier := share.CLUSSigstoreVerifier{
 		Name:       *verifier.Name,
-		Type:       *verifier.Type,
+		Type:       *verifier.VerifierType,
 		IgnoreTLog: *verifier.IgnoreTLog,
 		IgnoreSCT:  *verifier.IgnoreSCT,
 	}
 
-	if *verifier.Type == "keypair" {
+	if *verifier.VerifierType == "keypair" {
 		clusVerifier.KeypairOptions.PublicKey = *verifier.KeypairOptions.PublicKey
 	} else {
 		clusVerifier.KeylessOptions.CertIssuer = *verifier.KeylessOptions.CertIssuer
@@ -275,15 +275,17 @@ func CLUSRootToRESTRoot(clusRoot *share.CLUSSigstoreRootOfTrust) api.RESTSigstor
 		RekorPublicKey: &clusRoot.RekorPublicKey,
 		RootCert:       &clusRoot.RootCert,
 		SCTPublicKey:   &clusRoot.SCTPublicKey,
+		CfgType:        clusRoot.CfgType,
+		Comment:        &clusRoot.Comment,
 	}
 }
 
 func CLUSVerifierToRESTVerifier(clusVerifier *share.CLUSSigstoreVerifier) api.RESTSigstoreVerifier {
 	return api.RESTSigstoreVerifier{
-		Name:       &clusVerifier.Name,
-		Type:       &clusVerifier.Type,
-		IgnoreTLog: &clusVerifier.IgnoreTLog,
-		IgnoreSCT:  &clusVerifier.IgnoreSCT,
+		Name:         &clusVerifier.Name,
+		VerifierType: &clusVerifier.Type,
+		IgnoreTLog:   &clusVerifier.IgnoreTLog,
+		IgnoreSCT:    &clusVerifier.IgnoreSCT,
 		KeypairOptions: &api.RESTSigstoreVerifierKeypairOptions{
 			PublicKey: &clusVerifier.KeypairOptions.PublicKey,
 		},
@@ -300,15 +302,15 @@ func withVerifiers(r *http.Request) bool {
 }
 
 func validateRESTVerifier(verifier api.RESTSigstoreVerifier) error {
-	if *verifier.Name == "" || *verifier.Type == "" {
+	if *verifier.Name == "" || *verifier.VerifierType == "" {
 		return errors.New("fields \"name\" and \"type\" cannot be empty")
 	}
 
-	if *verifier.Type != "keyless" && *verifier.Type != "keypair" {
+	if *verifier.VerifierType != "keyless" && *verifier.VerifierType != "keypair" {
 		return errors.New("field \"type\" must be either \"keyless\" or \"keypair\"")
 	}
 
-	if *verifier.Type == "keypair" {
+	if *verifier.VerifierType == "keypair" {
 		if verifier.KeypairOptions == nil {
 			return errors.New("field \"keypair_options\" is required for a verifier of type \"keypair\"")
 		}
@@ -349,8 +351,8 @@ func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.R
 		clusVerifier.Name = *updates.Name
 	}
 
-	if updates.Type != nil {
-		clusVerifier.Type = *updates.Type
+	if updates.VerifierType != nil {
+		clusVerifier.Type = *updates.VerifierType
 	}
 
 	if updates.IgnoreTLog != nil {
