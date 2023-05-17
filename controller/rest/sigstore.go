@@ -14,7 +14,7 @@ import (
 
 func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	body, _ := ioutil.ReadAll(r.Body)
-	var rootOfTrust api.RESTSigstoreRootOfTrust
+	var rootOfTrust api.REST_SigstoreRootOfTrust_POST
 	err := json.Unmarshal(body, &rootOfTrust)
 	if err != nil {
 		msg := fmt.Sprintf("could not unmarshal request body: %s", err.Error())
@@ -22,16 +22,19 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	if *rootOfTrust.Name == "" {
+	if rootOfTrust.Name == "" {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Field \"name\" cannot be empty.")
 		return
 	}
 
 	clusRootOfTrust := share.CLUSSigstoreRootOfTrust{
-		Name:           *rootOfTrust.Name,
-		RekorPublicKey: *rootOfTrust.RekorPublicKey,
-		RootCert:       *rootOfTrust.RootCert,
-		SCTPublicKey:   *rootOfTrust.SCTPublicKey,
+		Name:           rootOfTrust.Name,
+		IsPrivate:      rootOfTrust.IsPrivate,
+		RekorPublicKey: rootOfTrust.RekorPublicKey,
+		RootCert:       rootOfTrust.RootCert,
+		SCTPublicKey:   rootOfTrust.SCTPublicKey,
+		CfgType:        rootOfTrust.CfgType,
+		Comment:        rootOfTrust.Comment,
 	}
 
 	err = clusHelper.PutSigstoreRootOfTrust(&clusRootOfTrust)
@@ -55,7 +58,7 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 	if rootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
 	}
-	resp := CLUSRootToRESTRoot(rootOfTrust)
+	resp := CLUSRootToRESTRoot_GET(rootOfTrust)
 	if withVerifiers(r) {
 		verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(rootName)
 		if err != nil {
@@ -63,7 +66,7 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 			return
 		}
-		resp.Verifiers = make(map[string]api.RESTSigstoreVerifier, len(verifiers))
+		resp.Verifiers = make(map[string]api.REST_SigstoreVerifier, len(verifiers))
 		for name, verifier := range verifiers {
 			resp.Verifiers[name] = CLUSVerifierToRESTVerifier(verifier)
 		}
@@ -83,7 +86,7 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
-	var restRootOfTrust *api.RESTSigstoreRootOfTrust
+	var restRootOfTrust *api.REST_SigstoreRootOfTrust_PATCH
 	err = json.Unmarshal(body, restRootOfTrust)
 	if err != nil {
 		msg := fmt.Sprintf("could not unmarshal request body: %s", err.Error())
@@ -124,9 +127,9 @@ func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	resp := make(map[string]api.RESTSigstoreRootOfTrust, len(rootsOfTrust))
+	resp := make(map[string]api.REST_SigstoreRootOfTrust_GET, len(rootsOfTrust))
 	for key, rootOfTrust := range rootsOfTrust {
-		restRootOfTrust := CLUSRootToRESTRoot(rootOfTrust)
+		restRootOfTrust := CLUSRootToRESTRoot_GET(rootOfTrust)
 		if withVerifiers(r) {
 			verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(key)
 			if err != nil {
@@ -134,7 +137,7 @@ func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 				return
 			}
-			restRootOfTrust.Verifiers = make(map[string]api.RESTSigstoreVerifier, len(verifiers))
+			restRootOfTrust.Verifiers = make(map[string]api.REST_SigstoreVerifier, len(verifiers))
 			for name, verifier := range verifiers {
 				restRootOfTrust.Verifiers[name] = CLUSVerifierToRESTVerifier(verifier)
 			}
@@ -146,7 +149,7 @@ func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps
 
 func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	body, _ := ioutil.ReadAll(r.Body)
-	var verifier api.RESTSigstoreVerifier
+	var verifier api.REST_SigstoreVerifier
 	err := json.Unmarshal(body, &verifier)
 	if err != nil {
 		msg := fmt.Sprintf("could not unmarshal request body: %s", err.Error())
@@ -154,24 +157,20 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if validationError := validateRESTVerifier(verifier); validationError != nil {
+	clusVerifier := share.CLUSSigstoreVerifier{
+		Name:         verifier.Name,
+		VerifierType: verifier.VerifierType,
+		IgnoreTLog:   verifier.IgnoreTLog,
+		IgnoreSCT:    verifier.IgnoreSCT,
+		PublicKey:    verifier.PublicKey,
+		CertIssuer:   verifier.CertIssuer,
+		CertSubject:  verifier.CertSubject,
+	}
+
+	if validationError := validateCLUSVerifier(clusVerifier); validationError != nil {
 		msg := fmt.Sprintf("Invalid verifier in request: %s", validationError.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
 		return
-	}
-
-	clusVerifier := share.CLUSSigstoreVerifier{
-		Name:       *verifier.Name,
-		Type:       *verifier.VerifierType,
-		IgnoreTLog: *verifier.IgnoreTLog,
-		IgnoreSCT:  *verifier.IgnoreSCT,
-	}
-
-	if *verifier.VerifierType == "keypair" {
-		clusVerifier.KeypairOptions.PublicKey = *verifier.KeypairOptions.PublicKey
-	} else {
-		clusVerifier.KeylessOptions.CertIssuer = *verifier.KeylessOptions.CertIssuer
-		clusVerifier.KeylessOptions.CertSubject = *verifier.KeylessOptions.CertSubject
 	}
 
 	err = clusHelper.PutSigstoreVerifier(ps.ByName("root_name"), &clusVerifier)
@@ -213,7 +212,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
-	var restVerifier *api.RESTSigstoreVerifier
+	var restVerifier *api.REST_SigstoreVerifier_PATCH
 	err = json.Unmarshal(body, restVerifier)
 	if err != nil {
 		msg := fmt.Sprintf("could not unmarshal request body: %s", err.Error())
@@ -223,7 +222,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 
 	updateCLUSVerifier(clusVerifier, restVerifier)
 
-	if validationError := validateRESTVerifier(CLUSVerifierToRESTVerifier(clusVerifier)); validationError != nil {
+	if validationError := validateCLUSVerifier(*clusVerifier); validationError != nil {
 		msg := fmt.Sprintf("Patch would result in invalid verifier: %s", validationError.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
 		return
@@ -262,37 +261,34 @@ func handlerSigstoreVerifierGetAll(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-	resp := make(map[string]api.RESTSigstoreVerifier, len(verifiers))
+	resp := make(map[string]api.REST_SigstoreVerifier, len(verifiers))
 	for key, verifier := range verifiers {
 		resp[key] = CLUSVerifierToRESTVerifier(verifier)
 	}
 	restRespSuccess(w, r, &resp, nil, nil, nil, "Get all sigstore verifiers")
 }
 
-func CLUSRootToRESTRoot(clusRoot *share.CLUSSigstoreRootOfTrust) api.RESTSigstoreRootOfTrust {
-	return api.RESTSigstoreRootOfTrust{
-		Name:           &clusRoot.Name,
-		RekorPublicKey: &clusRoot.RekorPublicKey,
-		RootCert:       &clusRoot.RootCert,
-		SCTPublicKey:   &clusRoot.SCTPublicKey,
+func CLUSRootToRESTRoot_GET(clusRoot *share.CLUSSigstoreRootOfTrust) api.REST_SigstoreRootOfTrust_GET {
+	return api.REST_SigstoreRootOfTrust_GET{
+		Name:           clusRoot.Name,
+		IsPrivate:      clusRoot.IsPrivate,
+		RekorPublicKey: clusRoot.RekorPublicKey,
+		RootCert:       clusRoot.RootCert,
+		SCTPublicKey:   clusRoot.SCTPublicKey,
 		CfgType:        clusRoot.CfgType,
-		Comment:        &clusRoot.Comment,
+		Comment:        clusRoot.Comment,
 	}
 }
 
-func CLUSVerifierToRESTVerifier(clusVerifier *share.CLUSSigstoreVerifier) api.RESTSigstoreVerifier {
-	return api.RESTSigstoreVerifier{
-		Name:         &clusVerifier.Name,
-		VerifierType: &clusVerifier.Type,
-		IgnoreTLog:   &clusVerifier.IgnoreTLog,
-		IgnoreSCT:    &clusVerifier.IgnoreSCT,
-		KeypairOptions: &api.RESTSigstoreVerifierKeypairOptions{
-			PublicKey: &clusVerifier.KeypairOptions.PublicKey,
-		},
-		KeylessOptions: &api.RESTSigstoreVerifierKeylessOptions{
-			CertIssuer:  &clusVerifier.KeylessOptions.CertIssuer,
-			CertSubject: &clusVerifier.KeylessOptions.CertSubject,
-		},
+func CLUSVerifierToRESTVerifier(clusVerifier *share.CLUSSigstoreVerifier) api.REST_SigstoreVerifier {
+	return api.REST_SigstoreVerifier{
+		Name:         clusVerifier.Name,
+		VerifierType: clusVerifier.VerifierType,
+		IgnoreTLog:   clusVerifier.IgnoreTLog,
+		IgnoreSCT:    clusVerifier.IgnoreSCT,
+		PublicKey:    clusVerifier.PublicKey,
+		CertIssuer:   clusVerifier.CertIssuer,
+		CertSubject:  clusVerifier.CertSubject,
 	}
 }
 
@@ -301,36 +297,34 @@ func withVerifiers(r *http.Request) bool {
 	return q.Get("with_verifiers") == "true"
 }
 
-func validateRESTVerifier(verifier api.RESTSigstoreVerifier) error {
-	if *verifier.Name == "" || *verifier.VerifierType == "" {
+func validateCLUSVerifier(verifier share.CLUSSigstoreVerifier) error {
+	if verifier.Name == "" || verifier.VerifierType == "" {
 		return errors.New("fields \"name\" and \"type\" cannot be empty")
 	}
 
-	if *verifier.VerifierType != "keyless" && *verifier.VerifierType != "keypair" {
+	if verifier.VerifierType != "keyless" && verifier.VerifierType != "keypair" {
 		return errors.New("field \"type\" must be either \"keyless\" or \"keypair\"")
 	}
 
-	if *verifier.VerifierType == "keypair" {
-		if verifier.KeypairOptions == nil {
-			return errors.New("field \"keypair_options\" is required for a verifier of type \"keypair\"")
-		}
-		if *verifier.KeypairOptions.PublicKey == "" {
+	if verifier.VerifierType == "keypair" {
+		if verifier.PublicKey == "" {
 			return errors.New("field \"public_key\" cannot be empty for a verifier of type \"keypair\"")
 		}
 	} else {
-		if verifier.KeylessOptions == nil {
-			return errors.New("field \"keyless_options\" is required for a verifier of type \"keyless\"")
-		}
-		if *verifier.KeylessOptions.CertIssuer == "" || *verifier.KeylessOptions.CertSubject == "" {
-			return errors.New("fields \"cert_subject\" and \"cert_issuer\" in field \"keyless_options\" cannot be empty for a verifier of type \"keyless\"")
+		if verifier.CertIssuer == "" || verifier.CertSubject == "" {
+			return errors.New("fields \"cert_subject\" and \"cert_issuer\" cannot be empty for a verifier of type \"keyless\"")
 		}
 	}
 	return nil
 }
 
-func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.RESTSigstoreRootOfTrust) {
+func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.REST_SigstoreRootOfTrust_PATCH) {
 	if updates.Name != nil {
 		clusRoot.Name = *updates.Name
+	}
+
+	if updates.IsPrivate != nil {
+		clusRoot.IsPrivate = *updates.IsPrivate
 	}
 
 	if updates.RekorPublicKey != nil {
@@ -344,15 +338,19 @@ func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.RESTSi
 	if updates.SCTPublicKey != nil {
 		clusRoot.SCTPublicKey = *updates.SCTPublicKey
 	}
+
+	if updates.Comment != nil {
+		clusRoot.Comment = *updates.Comment
+	}
 }
 
-func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.RESTSigstoreVerifier) {
+func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.REST_SigstoreVerifier_PATCH) {
 	if updates.Name != nil {
 		clusVerifier.Name = *updates.Name
 	}
 
 	if updates.VerifierType != nil {
-		clusVerifier.Type = *updates.VerifierType
+		clusVerifier.VerifierType = *updates.VerifierType
 	}
 
 	if updates.IgnoreTLog != nil {
@@ -363,19 +361,15 @@ func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.R
 		clusVerifier.IgnoreSCT = *updates.IgnoreSCT
 	}
 
-	if updates.KeylessOptions != nil {
-		if updates.KeylessOptions.CertIssuer != nil {
-			clusVerifier.KeylessOptions.CertIssuer = *updates.KeylessOptions.CertIssuer
-		}
-
-		if updates.KeylessOptions.CertSubject != nil {
-			clusVerifier.KeylessOptions.CertSubject = *updates.KeylessOptions.CertSubject
-		}
+	if updates.PublicKey != nil {
+		clusVerifier.PublicKey = *updates.PublicKey
 	}
 
-	if updates.KeypairOptions != nil {
-		if updates.KeypairOptions.PublicKey != nil {
-			clusVerifier.KeypairOptions.PublicKey = *updates.KeypairOptions.PublicKey
-		}
+	if updates.CertIssuer != nil {
+		clusVerifier.CertIssuer = *updates.CertIssuer
+	}
+
+	if updates.CertSubject != nil {
+		clusVerifier.CertSubject = *updates.CertSubject
 	}
 }

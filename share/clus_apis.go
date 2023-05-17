@@ -2726,6 +2726,7 @@ type CLUSApikey struct {
 
 type CLUSSigstoreRootOfTrust struct {
 	Name           string `json:"name"`
+	IsPrivate      bool   `json:"is_private"`
 	RekorPublicKey string `json:"rekor_public_key"`
 	RootCert       string `json:"root_cert"`
 	SCTPublicKey   string `json:"sct_public_key"`
@@ -2734,19 +2735,11 @@ type CLUSSigstoreRootOfTrust struct {
 }
 
 type CLUSSigstoreVerifier struct {
-	Name           string                             `json:"name"`
-	Type           string                             `json:"type"`
-	IgnoreTLog     bool                               `json:"ignore_tlog"`
-	IgnoreSCT      bool                               `json:"ignore_sct"`
-	KeypairOptions CLUSSigstoreVerifierKeypairOptions `json:"keypair_options"`
-	KeylessOptions CLUSSigstoreVerifierKeylessOptions `json:"keyless_options"`
-}
-
-type CLUSSigstoreVerifierKeypairOptions struct {
-	PublicKey string `json:"public_key"`
-}
-
-type CLUSSigstoreVerifierKeylessOptions struct {
-	CertIssuer  string `json:"cert_issuer"`
-	CertSubject string `json:"cert_subject"`
+	Name         string `json:"name"`
+	VerifierType string `json:"verifier_type"`
+	IgnoreTLog   bool   `json:"ignore_tlog"`
+	IgnoreSCT    bool   `json:"ignore_sct"`
+	PublicKey    string `json:"public_key"`
+	CertIssuer   string `json:"cert_issuer"`
+	CertSubject  string `json:"cert_subject"`
 }

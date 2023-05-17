@@ -3461,30 +3461,52 @@ type RESTSelfApikeyData struct {
 	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
 }
 
-type RESTSigstoreRootOfTrust struct {
-	Name           *string                         `json:"name"`
-	RekorPublicKey *string                         `json:"rekor_public_key,omitempty"`
-	RootCert       *string                         `json:"root_cert,omitempty"`
-	SCTPublicKey   *string                         `json:"sct_public_key,omitempty"`
-	Verifiers      map[string]RESTSigstoreVerifier `json:"verifiers,omitempty"`
-	CfgType        string                          `json:"cfg_type"`
-	Comment        *string                         `json:"comment"`
+type REST_SigstoreRootOfTrust_GET struct {
+	Name           string                           `json:"name"`
+	IsPrivate      bool                             `json:"is_private"`
+	RekorPublicKey string                           `json:"rekor_public_key,omitempty"`
+	RootCert       string                           `json:"root_cert,omitempty"`
+	SCTPublicKey   string                           `json:"sct_public_key,omitempty"`
+	Verifiers      map[string]REST_SigstoreVerifier `json:"verifiers,omitempty"`
+	CfgType        string                           `json:"cfg_type"`
+	Comment        string                           `json:"comment,omitempty"`
 }
 
-type RESTSigstoreVerifier struct {
-	Name           *string                             `json:"name"`
-	VerifierType   *string                             `json:"verifier_type"`
-	IgnoreTLog     *bool                               `json:"ignore_tlog"`
-	IgnoreSCT      *bool                               `json:"ignore_sct"`
-	KeypairOptions *RESTSigstoreVerifierKeypairOptions `json:"keypair_options,omitempty"`
-	KeylessOptions *RESTSigstoreVerifierKeylessOptions `json:"keyless_options,omitempty"`
+type REST_SigstoreRootOfTrust_POST struct {
+	Name           string `json:"name"`
+	IsPrivate      bool   `json:"is_private"`
+	RekorPublicKey string `json:"rekor_public_key,omitempty"`
+	RootCert       string `json:"root_cert,omitempty"`
+	SCTPublicKey   string `json:"sct_public_key,omitempty"`
+	CfgType        string `json:"cfg_type"`
+	Comment        string `json:"comment,omitempty"`
 }
 
-type RESTSigstoreVerifierKeypairOptions struct {
-	PublicKey *string `json:"public_key"`
+type REST_SigstoreRootOfTrust_PATCH struct {
+	Name           *string `json:"name"`
+	IsPrivate      *bool   `json:"is_private"`
+	RekorPublicKey *string `json:"rekor_public_key,omitempty"`
+	RootCert       *string `json:"root_cert,omitempty"`
+	SCTPublicKey   *string `json:"sct_public_key,omitempty"`
+	Comment        *string `json:"comment"`
 }
 
-type RESTSigstoreVerifierKeylessOptions struct {
-	CertIssuer  *string `json:"cert_issuer"`
-	CertSubject *string `json:"cert_subject"`
+type REST_SigstoreVerifier struct {
+	Name         string `json:"name"`
+	VerifierType string `json:"verifier_type"`
+	IgnoreTLog   bool   `json:"ignore_tlog"`
+	IgnoreSCT    bool   `json:"ignore_sct"`
+	PublicKey    string `json:"public_key"`
+	CertIssuer   string `json:"cert_issuer"`
+	CertSubject  string `json:"cert_subject"`
+}
+
+type REST_SigstoreVerifier_PATCH struct {
+	Name         *string `json:"name"`
+	VerifierType *string `json:"verifier_type"`
+	IgnoreTLog   *bool   `json:"ignore_tlog"`
+	IgnoreSCT    *bool   `json:"ignore_sct"`
+	PublicKey    *string `json:"public_key"`
+	CertIssuer   *string `json:"cert_issuer"`
+	CertSubject  *string `json:"cert_subject"`
 }
