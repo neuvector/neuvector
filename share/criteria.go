@@ -49,6 +49,7 @@ const (
 	CriteriaKeyHasPssViolation     string = "violatePssPolicy"
 	CriteriaKeyCustomPath          string = "customPath"
 	CriteriaKeySaBindRiskyRole     string = "saBindRiskyRole"
+	CriteriaKeyImageVerifiers      string = "imageVerifiers"
 )
 
 const (
