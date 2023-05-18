@@ -40,6 +40,7 @@ It has these top-level messages:
 	CLUSKickLoginSessionsRequest
 	CLUSLoginTokenInfo
 	CLUSKubernetesResInfo
+	CLUSMaxConcurrentScanCallsResponse
 	CLUSKick
 	CLUSFilter
 	CLUSSession

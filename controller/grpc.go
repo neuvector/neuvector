@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/neuvector/neuvector/controller/access"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/rest"
@@ -544,6 +545,24 @@ func (cs *ControllerService) ReportK8SResToOPA(ctx context.Context, ops *share.C
 	rest.ReportK8SResToOPA(ops)
 	log.WithFields(log.Fields{"ops": ops}).Debug("ReportK8SResToOPA (gprc-server)")
 	return &share.RPCVoid{}, nil
+}
+
+func (cs *ControllerService) GetMaxConcurrentScanCalls(ctx context.Context, v *share.RPCVoid) (*share.CLUSMaxConcurrentScanCallsResponse, error) {
+	var maxConcurrentCalls uint32
+	acc := access.NewReaderAccessControl()
+	cfg := cacher.GetSystemConfig(acc)
+	if cfg.ScannerAutoscale.Strategy != api.AutoScaleNone {
+		// scanner autoscale is triggered in per-minute checking of the queued scan tasks.
+		// if all the queued scan tasks can be consumed in 1 minute, scanner autoscale-up won't happen.
+		// to fully leverage the configured max scanners capability, we reutn MaxPods(for scanners).
+		maxConcurrentCalls = cfg.ScannerAutoscale.MaxPods
+	} else {
+		maxConcurrentCalls = uint32(cacher.GetScannerCount(acc))
+	}
+	resp := share.CLUSMaxConcurrentScanCallsResponse{
+		MaxConcurrentCalls: maxConcurrentCalls,
+	}
+	return &resp, nil
 }
 
 func startGRPCServer(port uint16) (*cluster.GRPCServer, uint16) {
