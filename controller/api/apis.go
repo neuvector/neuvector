@@ -2836,7 +2836,7 @@ type RESTDerivedDlpRuleMacData struct {
 	Macs []*RESTDerivedDlpRuleMac `json:"macs"`
 }
 
-//waf
+// waf
 const MinWafRuleID = 40000
 const MaxWafRuleID = 50000
 
@@ -3427,6 +3427,10 @@ type RESTApikeyData struct {
 	Apikey *RESTApikey `json:"apikey"`
 }
 
+type RESTApikeyCreationData struct {
+	Apikey *RESTApikeyCreation `json:"apikey"`
+}
+
 type RESTApikey struct {
 	ExpirationType      string              `json:"expiration_type"`
 	ExpirationHours     uint32              `json:"expiration_hours"`
@@ -3440,11 +3444,20 @@ type RESTApikey struct {
 	CreatedByEntity     string              `json:"created_by_entity"`      // it could be username or apikey (access key)
 }
 
-type RESTApikeyPreGeneratedData struct {
-	Apikey *RESTApikeyPreGenerated `json:"apikey"`
+type RESTApikeyCreation struct {
+	ExpirationType  string              `json:"expiration_type"`
+	ExpirationHours uint32              `json:"expiration_hours"`
+	Name            string              `json:"apikey_name"`
+	Description     string              `json:"description"`
+	Role            string              `json:"role"`
+	RoleDomains     map[string][]string `json:"role_domains,omitempty"` // role -> domains
 }
 
-type RESTApikeyPreGenerated struct {
+type RESTApikeyGeneratedData struct {
+	Apikey *RESTApikeyGenerated `json:"apikey"`
+}
+
+type RESTApikeyGenerated struct {
 	Name      string `json:"apikey_name"`
 	SecretKey string `json:"apikey_secret"`
 }

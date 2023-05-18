@@ -833,13 +833,16 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSch
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1Schema() *apiextv1.JSONSchemaProps {
 	schema := &apiextv1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"managed_node_count", "reporting_time"},
+		Required: []string{"managed_node_count", "reporting_time", "base_product"},
 		Properties: map[string]*apiextv1.JSONSchemaProps{
 			"reporting_time": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
 			},
 			"managed_node_count": &apiextv1.JSONSchemaProps{
 				Type: &b.schemaTypeInteger,
+			},
+			"base_product": &apiextv1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
 			},
 		},
 	}
@@ -927,13 +930,16 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSO
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := &apiextv1b1.JSONSchemaProps{
 		Type:     &b.schemaTypeObject,
-		Required: []string{"managed_node_count", "reporting_time"},
+		Required: []string{"managed_node_count", "reporting_time", "base_product"},
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
 			"reporting_time": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeString,
 			},
 			"managed_node_count": &apiextv1b1.JSONSchemaProps{
 				Type: &b.schemaTypeInteger,
+			},
+			"base_product": &apiextv1b1.JSONSchemaProps{
+				Type: &b.schemaTypeString,
 			},
 		},
 	}
@@ -1257,7 +1263,8 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 // do not update CustomResourceDefinition resource(schema) anymore
 func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 
-	nvCrdInfo := []*resource.NvCrdInfo{
+	nvCrdInfo := []*resource.NvCrdInfo{}
+	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
 			RscType:           resource.RscTypeCrdSecurityRule,
 			MetaName:          resource.NvSecurityRuleName,
@@ -1325,20 +1332,25 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		},
 	}
 	if cspType != share.CSP_NONE {
-		nvCrdInfo = append(nvCrdInfo, &resource.NvCrdInfo{
-			RscType:           resource.RscTypeCrdNvCspUsage,
-			MetaName:          resource.NvCspUsageName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
-			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvCrdV1,
-			SpecNamesPlural:   resource.NvCspUsagePlural,
-			SpecNamesKind:     resource.NvCspUsageKind,
-			SpecNamesSingular: resource.NvCspUsageSingular,
-			SpecNamesListKind: resource.NvCspUsageListKind,
-			LockKey:           "",
-			KvCrdKind:         resource.NvCspUsageKind,
-			ShortNames:        []string{"nur"},
-		})
+		nvCrdInfo = []*resource.NvCrdInfo{
+			&resource.NvCrdInfo{
+				RscType:           resource.RscTypeCrdNvCspUsage,
+				MetaName:          resource.NvCspUsageName,
+				SpecScope:         resource.NvClusterSecurityRuleScope,
+				SpecGroup:         common.OEMClusterSecurityRuleGroup,
+				SpecVersion:       resource.NvCrdV1,
+				SpecNamesPlural:   resource.NvCspUsagePlural,
+				SpecNamesKind:     resource.NvCspUsageKind,
+				SpecNamesSingular: resource.NvCspUsageSingular,
+				SpecNamesListKind: resource.NvCspUsageListKind,
+				LockKey:           "",
+				KvCrdKind:         resource.NvCspUsageKind,
+				ShortNames:        []string{"nur"},
+			},
+		}
+		nvCrdInfo = append(nvCrdInfo, nvCrdInfoBasic...)
+	} else {
+		nvCrdInfo = nvCrdInfoBasic
 	}
 
 	crdOutOfDate := make([]string, 0, len(nvCrdInfo))
@@ -1352,6 +1364,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 					rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
 				}
 			}
+
 			if !crdUpToDate {
 				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)
 				continue
@@ -1363,23 +1376,9 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 					break
 				}
 			}
-			if err != nil {
-				errors = append(errors, err.Error())
-				log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "error": err}).Error()
-			}
-		} else if err != nil {
-			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "err": err}).Error("crd schema")
-			errors = append(errors, err.Error())
 		}
-	}
-	if len(crdOutOfDate) > 0 {
-		err := fmt.Errorf("CRD schema of %s is out of date.", strings.Join(crdOutOfDate, ", "))
-		log.WithFields(log.Fields{"err": err}).Warning("crd schema")
-		errors = append(errors, err.Error())
-	}
 
-	if cspType != share.CSP_NONE {
-		if leader {
+		if crdInfo.RscType == resource.RscTypeCrdNvCspUsage {
 			clusHelper := kv.GetClusterHelper()
 			var fedRole string = api.FedRoleNone
 			var masterClusterID string
@@ -1389,6 +1388,16 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 			}
 			cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
 		}
+
+		if err != nil {
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "err": err}).Error("crd schema")
+			errors = append(errors, err.Error())
+		}
+	}
+	if len(crdOutOfDate) > 0 {
+		err := fmt.Errorf("CRD schema of %s is out of date.", strings.Join(crdOutOfDate, ", "))
+		log.WithFields(log.Fields{"err": err}).Warning("crd schema")
+		errors = append(errors, err.Error())
 	}
 
 	return errors

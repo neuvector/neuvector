@@ -13,9 +13,10 @@ import (
 )
 
 type tCustomerCspData struct {
-	AccountID     string `json:"account_id"`
-	Arch          string `json:"arch"`
-	CloudProvider string `json:"cloud_provider"`
+	AccountID        string `json:"account_id"`
+	Arch             string `json:"arch"`
+	CloudProvider    string `json:"cloud_provider"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
 type tCspConfig struct {
@@ -27,9 +28,10 @@ type tCspConfig struct {
 	Usage              map[string]int   `json:"usage"`
 	CustomerCspData    tCustomerCspData `json:"customer_csp_data"`
 	BaseProduct        string           `json:"base_product"`
+	XXX_unrecognized   []byte           `json:"-"`
 }
 
-func GetCspConfig(nvVersion string) api.RESTFedCspSupportResp {
+func GetCspConfig() api.RESTFedCspSupportResp {
 	var err error
 	var tExpire time.Time
 	var resp api.RESTFedCspSupportResp
@@ -53,10 +55,6 @@ func GetCspConfig(nvVersion string) api.RESTFedCspSupportResp {
 							if cspConfig.BillingApiAccessOk && tExpire.After(now) {
 								resp.Compliant = true
 							}
-						}
-						cspConfig.BaseProduct = fmt.Sprintf("cpe:/o:suse:neuvector:%s", nvVersion)
-						if jsonData, err := json.Marshal(&cspConfig); err == nil {
-							resp.CspConfigData = string(jsonData)
 						}
 					}
 				}

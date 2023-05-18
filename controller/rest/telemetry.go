@@ -19,9 +19,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
-var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
-
 var lastTeleErrorDay int = -1
 
 type tTelemetryReqData struct {
@@ -50,12 +47,12 @@ func reportTelemetryData(rawData common.TelemetryData) {
 	extraInfo["clusters"] = strconv.Itoa(rawData.Clusters)
 	extraInfo["primaryClusters"] = strconv.Itoa(rawData.PrimaryCluster)
 
-	var nvMajorMinor string                                       // in the format {major}.{minor}
-	if ss := strings.Split(nvAppFullVersion, "."); len(ss) >= 2 { // in the format {major}.{minor}[.{patch}][-s{#}]
+	var nvMajorMinor string                                            // in the format {major}.{minor}
+	if ss := strings.Split(cctx.NvAppFullVersion, "."); len(ss) >= 2 { // in the format {major}.{minor}[.{patch}][-s{#}]
 		nvMajorMinor = fmt.Sprintf("%s.%s", ss[0], ss[1])
 	}
 	reqPayload := tTelemetryReqData{
-		AppVersion: nvSemanticVersion, // in the format v{major}.{minor}.{patch}
+		AppVersion: cctx.NvSemanticVersion, // in the format v{major}.{minor}.{patch}
 		ExtraInfo:  extraInfo,
 	}
 
@@ -151,7 +148,7 @@ func reportTelemetryData(rawData common.TelemetryData) {
 					if ss := strings.Split(verImageTag, "-"); len(ss) >= 2 && ss[1][0] == 's' {
 						verSecNum, _ = strconv.Atoi(ss[1][1:])
 					}
-					if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 2 && ss[1][0] == 's' {
+					if ss := strings.Split(cctx.NvAppFullVersion, "-"); len(ss) >= 2 && ss[1][0] == 's' {
 						localSecNum, _ = strconv.Atoi(ss[1][1:])
 					}
 					if verSecNum <= localSecNum {
@@ -169,7 +166,7 @@ func reportTelemetryData(rawData common.TelemetryData) {
 						verMinor = intVar1
 					}
 				}
-				if verImageTag != "" && verImageTag != nvAppFullVersion &&
+				if verImageTag != "" && verImageTag != cctx.NvAppFullVersion &&
 					(idx == 0 || verMajorMinor == nvMajorMinor || (verMajor > nvVerMajor || (verMajor == nvVerMajor && verMinor > nvVerMinor))) {
 					upgradeVersion := share.CLUSCheckUpgradeVersion{
 						Version:     v.Name,

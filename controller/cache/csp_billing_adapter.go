@@ -8,6 +8,7 @@ import (
 	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/resource"
@@ -83,10 +84,17 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 
 	var totalNodes int
 
-	if objs, err := global.ORCH.ListResource(resource.RscTypeNode); err == nil {
-		clusterUsage.nodes = len(objs)
+	if localDev.Host.Platform == share.PlatformDocker {
+		acc := access.NewAdminAccessControl()
+		// The pricing generally should be based on total node count in the cluster, not enforcer count, even though those two are usually the same.
+		// However, for NV deployment on native docker (as downstream cluster in multi-cluster env), downstream nv reports its enforcer count as node count to master cluster.
+		clusterUsage.nodes = cacher.GetAgentCount(acc, "")
 	} else {
-		clusterUsage.nodes = 1
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNode); err == nil {
+			clusterUsage.nodes = len(objs)
+		} else {
+			clusterUsage.nodes = 1
+		}
 	}
 
 	if fedRole == api.FedRoleMaster {
@@ -108,12 +116,14 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	var err error
 	var obj interface{}
 	rscName := resource.RscCspUsageName
+	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", cctx.NvSemanticVersion)
 	t := time.Now().Format("2006-01-02T15:04:05.000000-07:00")
 	if obj, err = global.ORCH.GetResource(resource.RscTypeCrdNvCspUsage, "", rscName); err == nil {
 		if !addOnly {
 			if crCspUsage, ok := obj.(*resource.NvCspUsage); ok {
 				crCspUsage.ManagedNodeCount = totalNodes
 				crCspUsage.ReportingTime = t
+				crCspUsage.BaseProduct = baseProduct
 				err = global.ORCH.UpdateResource(resource.RscTypeCrdNvCspUsage, crCspUsage)
 			} else {
 				err = fmt.Errorf("unsupported type")
@@ -130,6 +140,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 			},
 			ManagedNodeCount: totalNodes,
 			ReportingTime:    t,
+			BaseProduct:      baseProduct,
 		}
 		err = global.ORCH.AddResource(resource.RscTypeCrdNvCspUsage, crCspUsage)
 	}
