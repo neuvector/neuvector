@@ -37,7 +37,7 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		Comment:        rootOfTrust.Comment,
 	}
 
-	err = clusHelper.PutSigstoreRootOfTrust(&clusRootOfTrust)
+	err = clusHelper.CreateSigstoreRootOfTrust(&clusRootOfTrust, nil)
 	if err != nil {
 		msg := fmt.Sprintf("could not save root of trust to kv store: %s", err.Error())
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
@@ -50,7 +50,7 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 
 func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	rootName := ps.ByName("root_name")
-	rootOfTrust, err := clusHelper.GetSigstoreRootOfTrust(rootName)
+	rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
@@ -76,7 +76,7 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 
 func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	rootName := ps.ByName("root_name")
-	clusRootOfTrust, err := clusHelper.GetSigstoreRootOfTrust(rootName)
+	clusRootOfTrust, rev, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
@@ -96,7 +96,7 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 
 	updateCLUSRoot(clusRootOfTrust, restRootOfTrust)
 
-	err = clusHelper.PutSigstoreRootOfTrust(clusRootOfTrust)
+	err = clusHelper.UpdateSigstoreRootOfTrust(clusRootOfTrust, nil, rev)
 	if err != nil {
 		msg := fmt.Sprintf("could not save root of trust to kv store: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -173,7 +173,7 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	err = clusHelper.PutSigstoreVerifier(ps.ByName("root_name"), &clusVerifier)
+	err = clusHelper.CreateSigstoreVerifier(ps.ByName("root_name"), &clusVerifier, nil)
 	if err != nil {
 		msg := fmt.Sprintf("could not save verifier to kv store: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -187,7 +187,7 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
-	verifier, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
+	verifier, _, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
@@ -202,7 +202,7 @@ func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps
 func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
-	clusVerifier, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
+	clusVerifier, rev, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
@@ -228,7 +228,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	err = clusHelper.PutSigstoreVerifier(rootName, clusVerifier)
+	err = clusHelper.UpdateSigstoreVerifier(rootName, clusVerifier, nil, rev)
 	if err != nil {
 		msg := fmt.Sprintf("could not save verifier to kv store: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -319,10 +319,6 @@ func validateCLUSVerifier(verifier share.CLUSSigstoreVerifier) error {
 }
 
 func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.REST_SigstoreRootOfTrust_PATCH) {
-	if updates.Name != nil {
-		clusRoot.Name = *updates.Name
-	}
-
 	if updates.IsPrivate != nil {
 		clusRoot.IsPrivate = *updates.IsPrivate
 	}
@@ -345,10 +341,6 @@ func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.REST_S
 }
 
 func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.REST_SigstoreVerifier_PATCH) {
-	if updates.Name != nil {
-		clusVerifier.Name = *updates.Name
-	}
-
 	if updates.VerifierType != nil {
 		clusVerifier.VerifierType = *updates.VerifierType
 	}

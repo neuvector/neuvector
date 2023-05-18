@@ -280,12 +280,14 @@ type ClusterHelper interface {
 	PutImportTask(importTask *share.CLUSImportTask) error
 
 	// sigstore verification
-	PutSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust) error
-	GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, error)
+	CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact) error
+	UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error
+	GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error)
 	DeleteSigstoreRootOfTrust(rootName string) error
 	GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error)
-	PutSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier) error
-	GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, error)
+	CreateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact) error
+	UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error
+	GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error)
 	DeleteSigstoreVerifier(rootName string, verifierName string) error
 	GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error)
 
@@ -2922,29 +2924,85 @@ func (m clusterHelper) DeleteApikey(name string) error {
 }
 
 // sigstore
-func (m clusterHelper) PutSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust) error {
-	value, err := enc.Marshal(rootOfTrust)
+func (m clusterHelper) CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
+
+	if cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" already exists", rootOfTrust.Name)
+	}
+
+	value, err := json.Marshal(rootOfTrust)
 	if err != nil {
 		return err
 	}
-	return cluster.Put(share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name), value)
+
+	if txn != nil {
+		txn.Put(rootKey, value)
+	} else {
+		cluster.Put(rootKey, value)
+	}
+
+	return nil
 }
 
-func (m clusterHelper) GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, error) {
-	rootOfTrustData, _, err := m.get(share.CLUSSigstoreRootOfTrustKey(rootName))
-	if err != nil || rootOfTrustData == nil {
-		return nil, err
+func (m clusterHelper) UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootOfTrust.Name)
 	}
+
+	value, err := json.Marshal(rootOfTrust)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		if rev != nil {
+			txn.PutRev(rootKey, value, *rev)
+		} else {
+			txn.Put(rootKey, value)
+		}
+	} else {
+		if rev != nil {
+			cluster.PutRev(rootKey, value, *rev)
+		} else {
+			cluster.Put(rootKey, value)
+		}
+	}
+
+	return nil
+}
+
+func (m clusterHelper) GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error) {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+
+	if !cluster.Exist(rootKey) {
+		return nil, nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	rootOfTrustData, rev, err := m.get(rootKey)
+	if err != nil || rootOfTrustData == nil {
+		return nil, nil, err
+	}
+
 	rootOfTrust := &share.CLUSSigstoreRootOfTrust{}
 	err = json.Unmarshal(rootOfTrustData, rootOfTrust)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return rootOfTrust, nil
+
+	return rootOfTrust, &rev, nil
 }
 
 func (m clusterHelper) DeleteSigstoreRootOfTrust(rootName string) error {
-	return cluster.Delete(share.CLUSSigstoreRootOfTrustKey(rootName))
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	return cluster.Delete(rootKey)
 }
 
 func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error) {
@@ -2968,38 +3026,105 @@ func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*sha
 	return rootsOfTrust, nil
 }
 
-func (m clusterHelper) PutSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier) error {
-	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
+func (m clusterHelper) CreateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
+
+	if !cluster.Exist(rootKey) {
 		return fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
-	value, err := enc.Marshal(verifier)
+
+	if cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" already exists", verifier.Name)
+	}
+
+	value, err := json.Marshal(verifier)
 	if err != nil {
 		return err
 	}
-	return cluster.Put(share.CLUSSigstoreVerifierKey(rootName, verifier.Name), value)
+
+	if txn != nil {
+		txn.Put(verifierKey, value)
+	} else {
+		cluster.Put(verifierKey, value)
+	}
+
+	return nil
 }
 
-func (m clusterHelper) GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, error) {
-	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
-		return nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+func (m clusterHelper) UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
-	verifierData, _, err := m.get(share.CLUSSigstoreVerifierKey(rootName, verifierName))
+
+	if !cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" does not exist", verifier.Name)
+	}
+
+	value, err := json.Marshal(verifier)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		if rev != nil {
+			txn.PutRev(verifierKey, value, *rev)
+		} else {
+			txn.Put(verifierKey, value)
+		}
+	} else {
+		if rev != nil {
+			cluster.PutRev(verifierKey, value, *rev)
+		} else {
+			cluster.Put(verifierKey, value)
+		}
+	}
+
+	return nil
+}
+
+func (m clusterHelper) GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error) {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
+
+	if !cluster.Exist(rootKey) {
+		return nil, nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	if !cluster.Exist(verifierKey) {
+		return nil, nil, fmt.Errorf("verifier \"%s\" does not exist", verifierName)
+	}
+
+	verifierData, rev, err := m.get(verifierKey)
 	if err != nil || verifierData == nil {
-		return nil, err
+		return nil, nil, err
 	}
+
 	verifier := &share.CLUSSigstoreVerifier{}
 	err = json.Unmarshal(verifierData, verifier)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return verifier, nil
+
+	return verifier, &rev, nil
 }
 
 func (m clusterHelper) DeleteSigstoreVerifier(rootName string, verifierName string) error {
-	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
+
+	if !cluster.Exist(rootKey) {
 		return fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
-	return cluster.Delete(share.CLUSSigstoreVerifierKey(rootName, verifierName))
+
+	if !cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" does not exist", verifierName)
+	}
+
+	return cluster.Delete(verifierKey)
 }
 
 func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error) {

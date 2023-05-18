@@ -3483,7 +3483,6 @@ type REST_SigstoreRootOfTrust_POST struct {
 }
 
 type REST_SigstoreRootOfTrust_PATCH struct {
-	Name           *string `json:"name"`
 	IsPrivate      *bool   `json:"is_private"`
 	RekorPublicKey *string `json:"rekor_public_key,omitempty"`
 	RootCert       *string `json:"root_cert,omitempty"`
@@ -3502,7 +3501,6 @@ type REST_SigstoreVerifier struct {
 }
 
 type REST_SigstoreVerifier_PATCH struct {
-	Name         *string `json:"name"`
 	VerifierType *string `json:"verifier_type"`
 	IgnoreTLog   *bool   `json:"ignore_tlog"`
 	IgnoreSCT    *bool   `json:"ignore_sct"`
