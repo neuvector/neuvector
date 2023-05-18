@@ -237,7 +237,7 @@ info "4.2 - Kubelet"
 
 #todo review all audits
 check_4_2_1="4.2.1  - Ensure that the --anonymous-auth argument is set to false (Scored) "
-if check_argument "$CIS_KUBELET_CMD" '--allow-privileged=false' >/dev/null 2>&1; then
+if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
     pass "$check_4_2_1"
 else
     warn "$check_4_2_1"
