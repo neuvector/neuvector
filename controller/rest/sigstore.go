@@ -10,9 +10,13 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
+	log "github.com/sirupsen/logrus"
 )
 
 func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	body, _ := ioutil.ReadAll(r.Body)
 	var rootOfTrust api.REST_SigstoreRootOfTrust_POST
 	err := json.Unmarshal(body, &rootOfTrust)
@@ -49,6 +53,9 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 }
 
 func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
@@ -75,6 +82,9 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 }
 
 func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	clusRootOfTrust, rev, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
@@ -108,6 +118,9 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 }
 
 func handlerSigstoreRootOfTrustDeleteByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	err := clusHelper.DeleteSigstoreRootOfTrust(rootName)
 	if err != nil {
@@ -120,6 +133,9 @@ func handlerSigstoreRootOfTrustDeleteByName(w http.ResponseWriter, r *http.Reque
 }
 
 func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootsOfTrust, err := clusHelper.GetAllSigstoreRootsOfTrust()
 	if err != nil {
 		msg := fmt.Sprintf("could not retrieve sigstore roots of trust from kv store: %s", err.Error())
@@ -148,6 +164,9 @@ func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps
 }
 
 func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	body, _ := ioutil.ReadAll(r.Body)
 	var verifier api.REST_SigstoreVerifier
 	err := json.Unmarshal(body, &verifier)
@@ -185,6 +204,9 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 }
 
 func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	verifier, _, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
@@ -200,6 +222,9 @@ func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps
 }
 
 func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	clusVerifier, rev, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
@@ -240,6 +265,9 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 }
 
 func handlerSigstoreVerifierDeleteByName(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	err := clusHelper.DeleteSigstoreVerifier(rootName, verifierName)
@@ -253,6 +281,9 @@ func handlerSigstoreVerifierDeleteByName(w http.ResponseWriter, r *http.Request,
 }
 
 func handlerSigstoreVerifierGetAll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+	
 	rootName := ps.ByName("root_name")
 	verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(rootName)
 	if err != nil {
