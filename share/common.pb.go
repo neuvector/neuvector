@@ -17,6 +17,8 @@ It has these top-level messages:
 	CLUSBoolean
 	CLUSMetry
 	CLUSStats
+	AdapterScanImageRequest
+	GetScannersResponse
 	ScannerRegisterData
 	ScannerDeregisterData
 	CLUSFilePacket
