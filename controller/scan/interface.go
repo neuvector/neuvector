@@ -195,6 +195,7 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			SecretsCnt:      len(s.cache.secrets),
 			SetIDPermCnt:    len(s.cache.setIDPerm),
 			Modules:         s.cache.modules,
+			Verifiers:       s.cache.verifiers,
 		}
 		for _, v := range s.cache.vulTraits {
 			if !v.IsFiltered() {
@@ -313,6 +314,7 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		Status:    api.ScanStatusFinished,
 		Author:    result.Author,
 		ScanFlags: share.ScanFlagCVE,
+		Verifiers: result.Verifiers,
 	}
 	if result.Secrets != nil {
 		sum.ScanFlags |= share.ScanFlagFiles

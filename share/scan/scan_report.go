@@ -409,6 +409,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 			SetIDs:  ridperms,
 			Checks:  checks,
 			Cmds:    result.Cmds,
+			Verifiers: result.Verifiers,
 		},
 	}
 }

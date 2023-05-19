@@ -1672,6 +1672,7 @@ type CLUSRegistryImageSummary struct {
 	ScanFlags uint32        `json:"scan_flags"`
 	Provider  ScanProvider  `json:"provider"`
 	Size      int64         `json:"size"`
+	Verifiers []string      `json:"verifiers"`
 }
 
 type CLUSScanner struct {

@@ -2156,14 +2156,15 @@ type RESTScanReportData struct {
 }
 
 type RESTScanReport struct {
-	Vuls    []*RESTVulnerability `json:"vulnerabilities"`
-	Modules []*RESTScanModule    `json:"modules,omitempty"`
-	Checks  []*RESTBenchItem     `json:"checks,omitempty"`
-	Secrets []*RESTScanSecret    `json:"secrets,omitempty"`
-	SetIDs  []*RESTScanSetIdPerm `json:"setid_perms,omitempty"`
-	Envs    []string             `json:"envs,omitempty"`
-	Labels  map[string]string    `json:"labels,omitempty"`
-	Cmds    []string             `json:"cmds,omitempty"`
+	Vuls      []*RESTVulnerability `json:"vulnerabilities"`
+	Modules   []*RESTScanModule    `json:"modules,omitempty"`
+	Checks    []*RESTBenchItem     `json:"checks,omitempty"`
+	Secrets   []*RESTScanSecret    `json:"secrets,omitempty"`
+	SetIDs    []*RESTScanSetIdPerm `json:"setid_perms,omitempty"`
+	Envs      []string             `json:"envs,omitempty"`
+	Labels    map[string]string    `json:"labels,omitempty"`
+	Cmds      []string             `json:"cmds,omitempty"`
+	Verifiers []string             `json:"verifiers,omitempty"`
 }
 
 type RESTScanLayer struct {
