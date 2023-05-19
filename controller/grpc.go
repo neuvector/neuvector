@@ -275,6 +275,20 @@ func (ss *ScanService) SubmitScanResult(ctx context.Context, result *share.ScanR
 }
 
 // --
+
+type ScanAdapterService struct {
+}
+
+func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*share.GetScannersResponse, error) {
+	var c share.GetScannersResponse
+	return &c, nil
+}
+
+func (sas *ScanAdapterService) ScanImage(ctx context.Context, req *share.AdapterScanImageRequest) (*share.ScanResult, error) {
+	return nil, nil
+}
+
+// --
 type CapService struct {
 }
 
@@ -569,6 +583,7 @@ func startGRPCServer(port uint16) (*cluster.GRPCServer, uint16) {
 	go agentReportWorker(ch)
 
 	share.RegisterControllerScanServiceServer(grpc.GetServer(), new(ScanService))
+	share.RegisterControllerScanAdapterServiceServer(grpc.GetServer(), new(ScanAdapterService))
 	share.RegisterControllerCapServiceServer(grpc.GetServer(), new(CapService))
 	share.RegisterControllerUpgradeServiceServer(grpc.GetServer(), new(UpgradeService))
 	share.RegisterControllerAgentServiceServer(grpc.GetServer(), &ControllerAgentService{reportCh: ch})
