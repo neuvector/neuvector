@@ -1194,6 +1194,10 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/registry/*/image/*",
 			"v1/scan/registry/*/layers/*",
 			"v1/list/registry_type",
+			"v1/scan/sigstore/root_of_trust",
+			"v1/scan/sigstore/root_of_trust/*",
+			"v1/scan/sigstore/root_of_trust/*/verifier",
+			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
 		CONST_API_INFRA: []string{
 			"v1/host",
@@ -1374,6 +1378,10 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/registry/*/scan",
 			"v1/scan/registry",
 			"v1/scan/registry/*/test",
+			"v1/scan/sigstore/root_of_trust",
+			"v1/scan/sigstore/root_of_trust/*/verifier",
+			"v1/file/scan/sigstore",
+			"v1/file/scan/sigstore/config",
 		},
 		CONST_API_CICD_SCAN: []string{
 			"v1/scan/result/repository",
@@ -1451,6 +1459,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*",
+			"v1/scan/sigstore/root_of_trust/*",
+			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
 		CONST_API_INFRA: []string{
 			"v1/domain",
@@ -1533,6 +1543,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/registry/*/scan",
 			"v1/scan/registry/*",
 			"v1/scan/registry/*/test",
+			"v1/scan/sigstore/root_of_trust/*",
+			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
 		CONST_API_GROUP: []string{
 			"v1/group/*",
