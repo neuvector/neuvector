@@ -282,6 +282,7 @@ func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 
 func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -304,6 +305,7 @@ func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -369,6 +371,7 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -564,6 +567,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -678,6 +682,7 @@ func replaceFedAdmissionRules(ruleType string, rulesNew *share.CLUSAdmissionRule
 
 func handlerGetAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -841,6 +846,7 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 
 func handlerDeleteAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -874,6 +880,7 @@ func handlerDeleteAdmissionRules(w http.ResponseWriter, r *http.Request, ps http
 
 func handlerGetAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -897,6 +904,7 @@ func handlerGetAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 
 func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1042,6 +1050,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 
 func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1146,6 +1155,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1228,6 +1238,7 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Info()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -1482,6 +1493,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {

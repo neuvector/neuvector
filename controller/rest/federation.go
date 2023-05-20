@@ -1300,6 +1300,7 @@ func preConditionCheck() string {
 
 func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(FedRoleAny, _readerRequired, w, r)
 	if acc == nil || login == nil {
@@ -1327,6 +1328,7 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(FedRoleAny, _adminRequired, w, r)
 	if acc == nil || login == nil {
@@ -1447,6 +1449,7 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if isFedRulesCleanupOngoing(w) {
 		return
@@ -1596,6 +1599,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 
 func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1658,6 +1662,7 @@ func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprout
 
 func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {
@@ -1688,6 +1693,7 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 
 func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if isFedRulesCleanupOngoing(w) {
 		return
@@ -1879,6 +1885,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1950,6 +1957,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1989,6 +1997,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2146,6 +2155,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 
 func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2192,6 +2202,8 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 }
 
 func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
@@ -2221,6 +2233,8 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func handlerTestJointInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleNone {
 		restRespSuccess(w, r, nil, nil, nil, nil, "")
 	} else {
@@ -2230,6 +2244,7 @@ func handlerTestJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2302,6 +2317,7 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *acc
 
 func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !licenseAllowFed(1) {
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
@@ -2843,6 +2859,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 // handles polling requests on master cluster
 func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -2930,6 +2947,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 // handles scan data polling requests on master cluster
 func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -3011,6 +3029,7 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 // handles fed command on joint cluster
 func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleJoint, _adminRequired, w, r)
 	if acc == nil || login == nil {
@@ -3062,6 +3081,8 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handlerGetJointClusterView(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {
 		return
@@ -3078,6 +3099,8 @@ func handlerGetJointClusterView(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -3309,24 +3332,28 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerFedClusterForwardGet(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodGet)
 }
 
 func handlerFedClusterForwardPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodPost)
 }
 
 func handlerFedClusterForwardPatch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodPatch)
 }
 
 func handlerFedClusterForwardDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodDelete)
 }
