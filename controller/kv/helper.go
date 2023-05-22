@@ -17,7 +17,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -278,6 +278,18 @@ type ClusterHelper interface {
 	// import task
 	GetImportTask() (share.CLUSImportTask, error)
 	PutImportTask(importTask *share.CLUSImportTask) error
+
+	// sigstore verification
+	CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact) error
+	UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error
+	GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error)
+	DeleteSigstoreRootOfTrust(rootName string) error
+	GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error)
+	CreateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact) error
+	UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error
+	GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error)
+	DeleteSigstoreVerifier(rootName string, verifierName string) error
+	GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -2909,4 +2921,232 @@ func (m clusterHelper) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
 func (m clusterHelper) DeleteApikey(name string) error {
 	key := share.CLUSApikeyKey(url.QueryEscape(name))
 	return cluster.Delete(key)
+}
+
+// sigstore
+func (m clusterHelper) CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
+
+	if cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" already exists", rootOfTrust.Name)
+	}
+
+	value, err := json.Marshal(rootOfTrust)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		txn.Put(rootKey, value)
+	} else {
+		cluster.Put(rootKey, value)
+	}
+
+	return nil
+}
+
+func (m clusterHelper) UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootOfTrust.Name)
+	}
+
+	value, err := json.Marshal(rootOfTrust)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		if rev != nil {
+			txn.PutRev(rootKey, value, *rev)
+		} else {
+			txn.Put(rootKey, value)
+		}
+	} else {
+		if rev != nil {
+			cluster.PutRev(rootKey, value, *rev)
+		} else {
+			cluster.Put(rootKey, value)
+		}
+	}
+
+	return nil
+}
+
+func (m clusterHelper) GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error) {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+
+	if !cluster.Exist(rootKey) {
+		return nil, nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	rootOfTrustData, rev, err := m.get(rootKey)
+	if err != nil || rootOfTrustData == nil {
+		return nil, nil, err
+	}
+
+	rootOfTrust := &share.CLUSSigstoreRootOfTrust{}
+	err = json.Unmarshal(rootOfTrustData, rootOfTrust)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rootOfTrust, &rev, nil
+}
+
+func (m clusterHelper) DeleteSigstoreRootOfTrust(rootName string) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	return cluster.Delete(rootKey)
+}
+
+func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error) {
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust)
+	if err != nil && err.Error() != "Empty store" {
+		return nil, err
+	}
+	rootsOfTrust := make(map[string]*share.CLUSSigstoreRootOfTrust, len(keys))
+	for _, key := range keys {
+		if value, _, err := m.get(key); value != nil {
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve all roots of trust, error retrieving \"%s\": %s", key, err.Error())
+			}
+			rootsOfTrust[key] = &share.CLUSSigstoreRootOfTrust{}
+			err = json.Unmarshal(value, rootsOfTrust[key])
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return rootsOfTrust, nil
+}
+
+func (m clusterHelper) CreateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	if cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" already exists", verifier.Name)
+	}
+
+	value, err := json.Marshal(verifier)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		txn.Put(verifierKey, value)
+	} else {
+		cluster.Put(verifierKey, value)
+	}
+
+	return nil
+}
+
+func (m clusterHelper) UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	if !cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" does not exist", verifier.Name)
+	}
+
+	value, err := json.Marshal(verifier)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		if rev != nil {
+			txn.PutRev(verifierKey, value, *rev)
+		} else {
+			txn.Put(verifierKey, value)
+		}
+	} else {
+		if rev != nil {
+			cluster.PutRev(verifierKey, value, *rev)
+		} else {
+			cluster.Put(verifierKey, value)
+		}
+	}
+
+	return nil
+}
+
+func (m clusterHelper) GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error) {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
+
+	if !cluster.Exist(rootKey) {
+		return nil, nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	if !cluster.Exist(verifierKey) {
+		return nil, nil, fmt.Errorf("verifier \"%s\" does not exist", verifierName)
+	}
+
+	verifierData, rev, err := m.get(verifierKey)
+	if err != nil || verifierData == nil {
+		return nil, nil, err
+	}
+
+	verifier := &share.CLUSSigstoreVerifier{}
+	err = json.Unmarshal(verifierData, verifier)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return verifier, &rev, nil
+}
+
+func (m clusterHelper) DeleteSigstoreVerifier(rootName string, verifierName string) error {
+	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
+	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
+
+	if !cluster.Exist(rootKey) {
+		return fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+
+	if !cluster.Exist(verifierKey) {
+		return fmt.Errorf("verifier \"%s\" does not exist", verifierName)
+	}
+
+	return cluster.Delete(verifierKey)
+}
+
+func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error) {
+	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
+		return nil, fmt.Errorf("root \"%s\" does not exist", rootName)
+	}
+	keys, err := cluster.GetStoreKeys(share.CLUSSigstoreRootOfTrustKey(rootName) + "/")
+	if err != nil && err.Error() != "Empty store" {
+		return nil, err
+	}
+	verifiers := make(map[string]*share.CLUSSigstoreVerifier, len(keys))
+	for _, key := range keys {
+		if value, _, err := m.get(key); value != nil {
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve all verifiers, error retrieving \"%s\": %s", key, err.Error())
+			}
+			verifiers[key] = &share.CLUSSigstoreVerifier{}
+			err = json.Unmarshal(value, verifiers[key])
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return verifiers, nil
 }

@@ -43,34 +43,35 @@ const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
 const (
-	CFGEndpointSystem           = "system"
-	CFGEndpointEULA             = "eula_oss"
-	CFGEndpointScan             = "scan"
-	CFGEndpointUser             = "user"
-	CFGEndpointServer           = "server"
-	CFGEndpointGroup            = "group"
-	CFGEndpointPolicy           = "policy"
-	CFGEndpointLicense          = "license"
-	CFGEndpointResponseRule     = "response_rule"
-	CFGEndpointProcessProfile   = "process_profile"
-	CFGEndpointRegistry         = "registry"
-	CFGEndpointDomain           = "domain"
-	CFGEndpointFileMonitor      = "file_monitor"
-	CFGEndpointFileAccessRule   = "file_rule"
-	CFGEndpointAdmissionControl = "admission_control"
-	CFGEndpointCrd              = "crd"
-	CFGEndpointFederation       = "federation"
-	CFGEndpointDlpRule          = "dlp_rule"
-	CFGEndpointDlpGroup         = "dlp_group"
-	CFGEndpointWafRule          = "waf_rule"
-	CFGEndpointWafGroup         = "waf_group"
-	CFGEndpointScript           = "script"
-	CFGEndpointCloud            = "cloud"
-	CFGEndpointCompliance       = "compliance"
-	CFGEndpointVulnerability    = "vulnerability"
-	CFGEndpointUserRole         = "user_role"
-	CFGEndpointPwdProfile       = "pwd_profile"
-	CFGEndpointApikey           = "apikey"
+	CFGEndpointSystem               = "system"
+	CFGEndpointEULA                 = "eula_oss"
+	CFGEndpointScan                 = "scan"
+	CFGEndpointUser                 = "user"
+	CFGEndpointServer               = "server"
+	CFGEndpointGroup                = "group"
+	CFGEndpointPolicy               = "policy"
+	CFGEndpointLicense              = "license"
+	CFGEndpointResponseRule         = "response_rule"
+	CFGEndpointProcessProfile       = "process_profile"
+	CFGEndpointRegistry             = "registry"
+	CFGEndpointDomain               = "domain"
+	CFGEndpointFileMonitor          = "file_monitor"
+	CFGEndpointFileAccessRule       = "file_rule"
+	CFGEndpointAdmissionControl     = "admission_control"
+	CFGEndpointCrd                  = "crd"
+	CFGEndpointFederation           = "federation"
+	CFGEndpointDlpRule              = "dlp_rule"
+	CFGEndpointDlpGroup             = "dlp_group"
+	CFGEndpointWafRule              = "waf_rule"
+	CFGEndpointWafGroup             = "waf_group"
+	CFGEndpointScript               = "script"
+	CFGEndpointCloud                = "cloud"
+	CFGEndpointCompliance           = "compliance"
+	CFGEndpointVulnerability        = "vulnerability"
+	CFGEndpointUserRole             = "user_role"
+	CFGEndpointPwdProfile           = "pwd_profile"
+	CFGEndpointApikey               = "apikey"
+	CFGEndpointSigstoreRootsOfTrust = "sigstore_roots_of_trust"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -101,6 +102,7 @@ const CLUSConfigDomainStore string = CLUSConfigStore + CFGEndpointDomain + "/"
 const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "/"
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
 const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
+const CLUSConfigSigstoreRootsOfTrust string = CLUSConfigStore + CFGEndpointSigstoreRootsOfTrust + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -630,6 +632,14 @@ func CLUSFileMonitorKey2Group(key string) string {
 
 func CLUSGroupKey2GroupName(key string) string {
 	return CLUSKeyNthToken(key, 3)
+}
+
+func CLUSSigstoreRootOfTrustKey(rootName string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigSigstoreRootsOfTrust, rootName)
+}
+
+func CLUSSigstoreVerifierKey(rootName string, verifierName string) string {
+	return fmt.Sprintf("%s/%s", CLUSSigstoreRootOfTrustKey(rootName), verifierName)
 }
 
 type CLUSDistLocker struct {
@@ -1662,6 +1672,7 @@ type CLUSRegistryImageSummary struct {
 	ScanFlags uint32        `json:"scan_flags"`
 	Provider  ScanProvider  `json:"provider"`
 	Size      int64         `json:"size"`
+	Verifiers []string      `json:"verifiers"`
 }
 
 type CLUSScanner struct {
@@ -2712,4 +2723,24 @@ type CLUSApikey struct {
 	ExpirationTimestamp int64               `json:"expiration_timestamp"`
 	CreatedTimestamp    int64               `json:"created_timestamp"`
 	CreatedByEntity     string              `json:"created_by_entity"` // it could be username or apikey (access key)
+}
+
+type CLUSSigstoreRootOfTrust struct {
+	Name           string `json:"name"`
+	IsPrivate      bool   `json:"is_private"`
+	RekorPublicKey string `json:"rekor_public_key"`
+	RootCert       string `json:"root_cert"`
+	SCTPublicKey   string `json:"sct_public_key"`
+	CfgType        string `json:"cfg_type"`
+	Comment        string `json:"comment"`
+}
+
+type CLUSSigstoreVerifier struct {
+	Name         string `json:"name"`
+	VerifierType string `json:"verifier_type"`
+	IgnoreTLog   bool   `json:"ignore_tlog"`
+	IgnoreSCT    bool   `json:"ignore_sct"`
+	PublicKey    string `json:"public_key"`
+	CertIssuer   string `json:"cert_issuer"`
+	CertSubject  string `json:"cert_subject"`
 }
