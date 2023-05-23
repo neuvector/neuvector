@@ -1,5 +1,10 @@
 package api
 
+import (
+	"context"
+	"time"
+)
+
 // Status can be used to query the Status endpoints
 type Status struct {
 	c *Client
@@ -12,7 +17,11 @@ func (c *Client) Status() *Status {
 
 // Leader is used to query for a known leader
 func (s *Status) Leader() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
 	r := s.c.newRequest("GET", "/v1/status/leader")
+	r.setQueryOptions(&QueryOptions{ctx:ctx})
 	_, resp, err := requireOK(s.c.doRequest(r))
 	if err != nil {
 		return "", err

@@ -117,6 +117,11 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		ScanSecrets: scanSecrets,
 		BaseImage:   req.BaseImage,
 	}
+	scanReq.RootsOfTrust, err = getScanReqRootsOfTrust()
+	if err != nil {
+		rsr.errCode = api.RESTErrFailReadCluster
+		rsr.errMsg = fmt.Sprintf("could not retrieve sigstore roots of trust: %s", err.Error())
+	}
 	result, err := rpc.ScanImage("", ctx, scanReq)
 
 	if result == nil {
@@ -315,4 +320,46 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	restRespSuccess(w, r, nil, acc, login, &data, "Summit repository scan result")
+}
+
+func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust, err error) {
+	clusRootsOfTrust, err := clusHelper.GetAllSigstoreRootsOfTrust()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve roots of trust from kv store: %s", err.Error())
+	}
+
+	for key, clusRoot := range clusRootsOfTrust {
+		scanRoot := &share.SigstoreRootOfTrust{
+			Name:           clusRoot.Name,
+			RekorPublicKey: clusRoot.RekorPublicKey,
+			RootCert:       clusRoot.RootCert,
+			SCTPublicKey:   clusRoot.SCTPublicKey,
+		}
+
+		verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(key)
+		if err != nil {
+			return scanReqRootsOfTrust, fmt.Errorf("could not retrieve verifiers for root \"%s\": %s", key, err.Error())
+		}
+
+		for _, verifier := range verifiers {
+			scanVerifier := &share.SigstoreVerifier{
+				Name:       verifier.Name,
+				Type:       verifier.VerifierType,
+				IgnoreTLog: verifier.IgnoreTLog,
+				IgnoreSCT:  verifier.IgnoreSCT,
+				KeypairOptions: &share.SigstoreKeypairOptions{
+					PublicKey: verifier.PublicKey,
+				},
+				KeylessOptions: &share.SigstoreKeylessOptions{
+					CertIssuer:  verifier.CertIssuer,
+					CertSubject: verifier.CertSubject,
+				},
+			}
+			scanRoot.Verifiers = append(scanRoot.Verifiers, scanVerifier)
+		}
+
+		scanReqRootsOfTrust = append(scanReqRootsOfTrust, scanRoot)
+	}
+
+	return scanReqRootsOfTrust, nil
 }
