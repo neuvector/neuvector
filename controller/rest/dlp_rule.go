@@ -13,11 +13,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -272,6 +272,52 @@ func handlerDlpGroupShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 var regPattern *regexp.Regexp = regexp.MustCompile(`^\.*\*$`)
 
+func wildCardToRegexp(pattern string) string {
+	/* Match one or many simple wildcard characters "?" or one "*" with
+	   previous token being a letter, number, whitespace or the start of the pattern.
+	   Do not expect user's input with 2 continuous "*" characters in the pattern. */
+	re := regexp.MustCompile(`(^|\pL|\pN|\s)(\?+|\*)`)
+	return re.ReplaceAllStringFunc(pattern, func(match string) string {
+		if len(match) == 1 {
+			// Convert pattern starts with single "?" or "*" character.
+			if match[0] == '*' {
+				return ".*"
+			} else if match[0] == '?' {
+				return "."
+			} else {
+				return match
+			}
+		} else if len(match) == 2 {
+			// Do not expect user's input with 2 continuous "*" characters in the pattern.
+			if match[1] == '*' {
+				return string(match[0]) + ".*"
+			} else if match[1] == '?' {
+				/* If the pattern starts with 2 continuous "?" characters, convert them to ".*". 
+				   Additionally, single "?" character will be converted to ".". */
+				if match[0] == '?' {
+					return ".*"
+				} else {
+					return string(match[0]) + "."
+				}
+			} else {
+				return match
+			}
+		} else {
+			/* If the pattern starts with multiple continuous "?" characters, convert them to ".*".
+ 			   Additionally, convert multiple continuous "?" characters to ".*". */
+			if match[1] == '?' {
+				if match[0] == '?' {
+					return ".*"
+				} else {
+					return string(match[0]) + ".*"
+				}
+			} else {
+				return match
+			}
+		}
+	})
+}
+
 func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 	for _, rule := range list {
 		if !isObjectNameValid(rule.Name) || len(rule.Name) > api.DlpRuleNameMaxLen {
@@ -287,9 +333,9 @@ func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 			return fmt.Errorf("dlp rule %s: must have no more than %d patterns", rule.Name, api.DlpRulePatternMaxNum)
 		}
 		total_len := 0
-		for _, pt := range rule.Patterns {
+		for i, pt := range rule.Patterns {
 			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
-				if len(pt.Value) > api.DlpRulePatternMaxLen || len(pt.Value) <= 0 {
+				if len(pt.Value) > api.DlpRulePatternMaxLen {
 					log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
 					return fmt.Errorf("dlp rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
 				}
@@ -306,13 +352,14 @@ func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 					log.WithFields(log.Fields{"context": pt.Context}).Error("Invalid pattern context")
 					return fmt.Errorf("dlp rule %s: invalid pattern context (%s)", rule.Name, pt.Context)
 				}
-				if _, err := pcre.Compile(pt.Value, 0); err != nil {
+				rule.Patterns[i].Value = wildCardToRegexp(pt.Value)
+				if _, err := pcre.Compile(rule.Patterns[i].Value, 0); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("Invalid regex in pattern criteria")
-					return fmt.Errorf("dlp rule %s: invalid regex in pattern criteria (%s)", rule.Name, pt.Value)
+					return fmt.Errorf("dlp rule %s: invalid regex in pattern criteria (%s)", rule.Name, rule.Patterns[i].Value)
 				} else {
-					if regPattern.MatchString(pt.Value) {
+					if regPattern.MatchString(rule.Patterns[i].Value) {
 						log.WithFields(log.Fields{"error": err}).Error("Invalid regex in pattern criteria")
-						return fmt.Errorf("dlp rule %s: invalid regex in pattern criteria (%s)", rule.Name, pt.Value)
+						return fmt.Errorf("dlp rule %s: invalid regex in pattern criteria (%s)", rule.Name, rule.Patterns[i].Value)
 					}
 				}
 			}

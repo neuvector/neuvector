@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
-	criRT "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
@@ -33,6 +35,8 @@ const k8sContainerdNamespace = "k8s.io"
 type containerdDriver struct {
 	sys           *system.SystemTools
 	sysInfo       *sysinfo.SysInfo
+	endpoint      string
+	endpointHost  string
 	nodeHostname  string
 	client        *containerd.Client
 	criClient     *grpc.ClientConn
@@ -40,6 +44,7 @@ type containerdDriver struct {
 	cancelMonitor context.CancelFunc
 	rtProcMap     utils.Set
 	snapshotter   string
+	pidHost		  bool
 }
 
 // patch for the mismatched grpc versions
@@ -58,27 +63,27 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		return nil, wrapIntoErrorString(err)
 	}
 
+	sockPath := endpoint
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// optional
 	snapshotter := ""
-	cri, err := newCriClient(endpoint)
+	cri, criVer, err := newCriClient(endpoint, ctx)
 	if err == nil {
-		crt := criRT.NewRuntimeServiceClient(cri)
-		req := &criRT.VersionRequest{}
-		if criVer, err := crt.Version(ctx, req); err == nil {
-			log.WithFields(log.Fields{"version": criVer}).Info("cri")
-		}
-
-		reqStatus := &criRT.StatusRequest{Verbose: true}
-		if status, err := crt.Status(ctx, reqStatus); err == nil {
+		log.WithFields(log.Fields{"version": criVer}).Info("cri")
+		if status, err := criGetStatus(cri, ctx); err == nil {
 			snapshotter, err = decodeSnapshotter(status.Info)
 			if err != nil { // reserved debug for newer versions
 				log.WithFields(log.Fields{"info": status.Info, "error": err}).Error()
 			}
 		} else {
 			log.WithFields(log.Fields{"error": err}).Error("cri info")
+		}
+
+		if id, _, err := sys.GetSelfContainerID(); err == nil {
+			sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
 		}
 	}
 
@@ -87,17 +92,66 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 		return nil, wrapIntoErrorString(err)
 	}
 
-	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
+	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver}).Info("containerd connected")
 
 	driver := containerdDriver{
-		sys: sys, client: client, version: &ver, criClient: cri,
+		sys: sys, client: client, version: &ver, criClient: cri, endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), snapshotter: snapshotter,
 	}
 
 	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim", "containerd-shim-runc-v1", "containerd-shim-runc-v2")
+
+	name, _ := os.Readlink("/proc/1/exe")
+	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
+		driver.pidHost = false
+	} else {
+		driver.pidHost = true
+	}
 	return &driver, nil
 }
+
+func (d *containerdDriver) reConnect() error {
+	if !d.pidHost {
+		return errors.New("Not pidHost")
+	}
+	// the original socket has been recreated and its mounted path was also lost.
+	endpoint := d.endpoint
+	if d.endpointHost != "" {	// use the host
+		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+	}
+
+	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
+
+	client, err := containerd.New(endpoint,
+		containerd.WithDefaultNamespace(k8sContainerdNamespace),
+		containerd.WithTimeout(clientConnectTimeout))
+	if err != nil {
+		return wrapIntoErrorString(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ver, err := client.Version(ctx)
+	if err != nil {
+		return wrapIntoErrorString(err)
+	}
+	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("containerd connected")
+
+	// optional: cri connection
+	cri, criVer, err := newCriClient(endpoint, ctx)
+	if err == nil {
+		log.WithFields(log.Fields{"version": criVer}).Info("cri")
+	}
+
+	// update records
+	d.client = client
+	d.criClient = cri
+	d.version = &ver
+	return nil
+}
+
 
 func (d *containerdDriver) String() string {
 	return RuntimeContainerd
@@ -387,7 +441,9 @@ func (d *containerdDriver) GetImageHistory(name string) ([]*ImageHistory, error)
 }
 
 func (d *containerdDriver) GetImage(name string) (*ImageMeta, error) {
-	return getCriImageMeta(d.criClient, name)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	return criGetImageMeta(d.criClient, ctx, name)
 }
 
 func (d *containerdDriver) GetImageFile(id string) (io.ReadCloser, error) {
@@ -461,6 +517,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 		return ErrMethodNotSupported
 	}
 
+	var connectErrorCnt int
 	for {
 		ctx, cancel := context.WithCancel(context.Background())
 		d.cancelMonitor = cancel
@@ -496,10 +553,23 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 					default:
 						log.WithFields(log.Fields{"event": v}).Debug("Unknown containderd event")
 					}
+					connectErrorCnt = 0		// reset
 				}
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
 					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
+					if strings.Contains( err.Error(), "rpc error: code = Unavailable"){
+						// lost connection, wait for 10 second try reconnect
+						time.Sleep(time.Second * 10)
+						if err := d.reConnect(); err != nil {
+							log.WithFields(log.Fields{"err": err}).Error()
+							break
+						}
+					}
+					connectErrorCnt++
+					if connectErrorCnt >= 12 {	// restart enforcer
+						cb(EventSocketError, "", 0)
+					}
 				}
 				break Loop
 			case <-ctx.Done():
@@ -599,8 +669,7 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true})
+	pod, err := criPodSandboxStatus(d.criClient, ctx, id)
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
 			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
@@ -616,7 +685,7 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 		pid, _ = d.getContainerPid_CRI(pod.GetInfo())
 	} else {
 		// an APP container
-		cs, err2 := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true})
+		cs, err2 := criContainerStatus(d.criClient, ctx, id)
 		if err2 != nil || cs.Status == nil || cs.Info == nil {
 			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
 			return nil, 0, 0, err2
@@ -661,8 +730,8 @@ func (d *containerdDriver) isPrivilegedContainer_CRI(id string) bool {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	if cs, err := crt.ContainerStatus(ctx, &criRT.ContainerStatusRequest{ContainerId: id, Verbose: true}); err == nil {
+
+	if cs, err := criContainerStatus(d.criClient, ctx, id); err == nil {
 		var res criContainerInfoRes
 		jsonInfo := buildJsonFromMap(cs.GetInfo()) // from map[string]string
 		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {
@@ -684,8 +753,8 @@ func (d *containerdDriver) isPrivilegedPod_CRI(id string) bool {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	crt := criRT.NewRuntimeServiceClient(d.criClient) // GRPC
-	if pod, err := crt.PodSandboxStatus(ctx, &criRT.PodSandboxStatusRequest{PodSandboxId: id, Verbose: true}); err == nil {
+
+	if pod, err := criPodSandboxStatus(d.criClient, ctx, id); err == nil {
 		var res criContainerInfoRes
 		jsonInfo := buildJsonFromMap(pod.GetInfo()) // from map[string]string
 		if err := json.Unmarshal([]byte(jsonInfo), &res); err != nil {

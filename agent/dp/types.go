@@ -47,6 +47,8 @@ type Connection struct {
 	ToSidecar    bool
 	MeshToSvr    bool
 	LinkLocal    bool
+	TmpOpen      bool
+	UwlIp        bool
 }
 
 type ConnectionData struct {

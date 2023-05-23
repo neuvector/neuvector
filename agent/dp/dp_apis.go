@@ -138,6 +138,22 @@ type DPSysConfReq struct {
 	Sysconf *DPSysConf `json:"ctrl_sys_conf"`
 }
 
+type DPDisableNetPolicy struct {
+	DisableNetPolicy	*bool  `json:"disable_net_policy"`
+}
+
+type DPDisableNetPolicyReq struct {
+	DisableNetPolicyConf *DPDisableNetPolicy `json:"ctrl_disable_net_policy"`
+}
+
+type DPDetectUnmanagedWl struct {
+	DetectUnmanagedWl	*bool  `json:"detect_unmanaged_wl"`
+}
+
+type DPDetectUnmanagedWlReq struct {
+	DetectUnmanagedWlConf *DPDetectUnmanagedWl `json:"ctrl_detect_unmanaged_wl"`
+}
+
 type DPStatsMACReq struct {
 	Stats *DPMACArray `json:"ctrl_stats_macs"`
 }
@@ -206,6 +222,7 @@ type DPPolicyIPRule struct {
 	Action  uint8          `json:"action"`
 	Ingress bool           `json:"ingress"`
 	Fqdn    string         `json:"fqdn,omitempty"`
+	Vhost	bool           `json:"vhost,omitempty"`
 	Apps    []*DPPolicyApp `json:"apps,omitempty"`
 }
 
@@ -242,6 +259,7 @@ type DPFqdnDeleteReq struct {
 type DPFqdnIps struct {
 	FqdnName string    `json:"fqdn_name"`
 	FqdnIps   []net.IP  `json:"fqdn_ips"`
+	Vhost    *bool  	`json:"vhost,omitempty"`
 }
 
 type DPFqdnIpSetReq struct {

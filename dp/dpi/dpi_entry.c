@@ -441,6 +441,8 @@ int dpi_recv_packet(io_ctx_t *ctx, uint8_t *ptr, int len)
     th_policy_addr = g_policy_addr;
     th_specialip_subnet4 = g_specialip_subnet4;
     th_xff_enabled = g_xff_enabled;
+    th_disable_net_policy = g_disable_net_policy;
+    th_detect_unmanaged_wl = g_detect_unmanaged_wl;
 
     if (likely(th_packet.cap_len >= sizeof(struct ethhdr))) {
         struct ethhdr *eth = (struct ethhdr *)(th_packet.pkt + th_packet.l2);

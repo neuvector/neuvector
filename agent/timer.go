@@ -54,8 +54,8 @@ var nextConnectReportTick uint32 = reportInterval
 
 ///
 const memoryRecyclePeriod uint32 = 10                       // minutes
-const memEnforcerMediumPeak uint64 = 256 * 1024 * 1024      // 256 MB
-const memEnforcerTopPeak uint64 = 8 * memEnforcerMediumPeak // 2 GB
+const memEnforcerMediumPeak uint64 = 3 * 512 * 1024 * 1024  // 1.5 GB
+const memEnforcerTopPeak uint64 = 2 * memEnforcerMediumPeak // 3.0 GB
 const memSafeGap uint64 = 64 * 1024 * 1024                  // 64 MB
 var memStatsEnforcerResetMark uint64 = memEnforcerTopPeak - memSafeGap
 
@@ -95,7 +95,13 @@ func statsLoop(bPassiveContainerDetect bool) {
 			gone := gInfo.allContainers.Difference(existing)
 			creates := existing.Difference(gInfo.allContainers)
 			if stops != nil {
-				stops = gInfo.allContainers.Intersect(stops)
+				// differentiate from active containers
+				for id := range stops.Iter() {
+					cid := id.(string)
+					if _, ok := gInfo.activeContainers[cid]; !ok {
+						stops.Remove(cid)
+					}
+				}
 			}
 			gInfoRUnlock()
 			if stops != nil {
@@ -447,6 +453,9 @@ func updateConnectionMap(conn *dp.Connection, EPMAC net.HardwareAddr, id string)
 }
 
 func updateHostConnection(conns []*dp.ConnectionData) {
+	if gInfo.disableNetPolicy {
+		return
+	}
 	for _, data := range conns {
 		conn := data.Conn
 
@@ -550,6 +559,8 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		ToSidecar:    c.ToSidecar,
 		MeshToSvr:    c.MeshToSvr,
 		LinkLocal:    c.LinkLocal,
+		TmpOpen:      c.TmpOpen,
+		UwlIp:        c.UwlIp,
 	}
 }
 

@@ -24,7 +24,7 @@ import (
 	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
-const DefaultIdleTimeout uint32 = 300
+const DefIdleTimeoutInternal uint32 = 300
 const DefaultAdminUser string = "admin"
 const DefaultAdminPass string = "admin"
 const ReservedFedUser string = "~fedOperator" // user name with prefix "~" cannot be created thru configmap/rest api
@@ -85,6 +85,8 @@ var defaultSyslogCategory []string = []string{
 	api.CategoryEvent, api.CategoryRuntime, api.CategoryAudit,
 }
 
+var DefaultIdleTimeout uint32 = DefIdleTimeoutInternal
+
 const defaultClusterName string = "cluster.local"
 
 const RegistryRepoScanName string = "_repo_scan"
@@ -103,6 +105,7 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 		SyslogEnable:     false,
 		SyslogCategories: defaultSyslogCategory,
 		SyslogInJSON:     false,
+		SyslogServerCert: "",
 	},
 	AuthOrder:            []string{},
 	ClusterName:          defaultClusterName,
@@ -112,6 +115,8 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 	XffEnabled:           true,
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
+	DisableNetPolicy:     false,
+	DetectUnmanagedWl:    false,
 }
 
 func ActionString(action uint8) string {
@@ -147,6 +152,8 @@ func PolicyActionString(action uint8) string {
 		return share.PolicyActionViolate
 	case C.DP_POLICY_ACTION_CHECK_APP:
 		return share.PolicyActionCheckApp
+	case C.DP_POLICY_ACTION_CHECK_VH:
+		return share.PolicyActionCheckVh
 	default:
 		return share.PolicyActionAllow
 	}
@@ -166,6 +173,8 @@ func PolicyActionRESTString(action uint8) string {
 		return share.PolicyActionViolate
 	case C.DP_POLICY_ACTION_CHECK_APP:
 		return share.PolicyActionCheckApp
+	case C.DP_POLICY_ACTION_CHECK_VH:
+		return share.PolicyActionCheckVh
 	default:
 		return share.PolicyActionAllow
 	}
@@ -639,6 +648,11 @@ func MergeProcess(list []*share.CLUSProcessProfileEntry, p *share.CLUSProcessPro
 			changed = true
 		}
 
+		if p.CfgType != share.Learned {
+			pp.CfgType = p.CfgType
+			changed = true
+		}
+
 		if changed {
 			// update entry
 			pp.UpdatedAt = time.Now().UTC()
@@ -914,4 +928,31 @@ func GetWafRuleID(wafsensor *share.CLUSWafSensor) uint32 {
 	} else {
 		return 0
 	}
+}
+
+func GetMappedCspType(pCspType *string, ptCspType *share.TCspType) (share.TCspType, string) {
+	cspMapping := map[string]share.TCspType{
+		"none":   share.CSP_NONE,
+		"aws":    share.CSP_EKS,
+		"gcloud": share.CSP_GKE,
+		"azure":  share.CSP_AKS,
+		"ibm":    share.CSP_IBM,
+	}
+	if pCspType != nil {
+		strCspType := *pCspType
+		if strCspType == "" {
+			strCspType = "none"
+		}
+		if tCspType, ok := cspMapping[strCspType]; ok {
+			return tCspType, strCspType
+		}
+	} else if ptCspType != nil {
+		for k, v := range cspMapping {
+			if v == *ptCspType {
+				return v, k
+			}
+		}
+	}
+
+	return share.CSP_NONE, "none"
 }

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,8 +28,10 @@ import (
 )
 
 const logCacheSize int = 4096
+const maxSyslogMsg int32 = 256
 
 var syslogMutex sync.RWMutex
+var syslogMsgCount int32
 
 func syslogMutexLock() {
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Acquire ...")
@@ -479,6 +482,17 @@ func webhookAudit(act *actionDesc, arg interface{}) {
 }
 
 func sendSyslog(elog interface{}, level, cat, header string) {
+	// In the case syslog server is not configured correctly, send() call could take long time
+	// to timeout. A lot of goroutines wait to grab the lock and consume large amount of memory.
+	// Set a limit to prevent this situation.
+	c := atomic.AddInt32(&syslogMsgCount, 1)
+	defer atomic.AddInt32(&syslogMsgCount, -1)
+
+	if c >= maxSyslogMsg {
+		log.Error("Maximum concurrent syslog message reached. Check syslog server settings.")
+		return
+	}
+
 	syslogMutexLock()
 	defer syslogMutexUnlock()
 
@@ -534,6 +548,16 @@ func logIncident(arg interface{}) {
 	}
 }
 
+func fillAuditPackages(l *api.Audit, cve string) {
+	if !systemConfigCache.SingleCVEPerSyslog {
+		return
+	}
+	val, ok := l.PackageMap[cve]
+	if ok {
+		l.Packages = val
+	}
+}
+
 func logAudit(arg interface{}) {
 	rlog := arg.(*api.Audit)
 	recordAudit(rlog)
@@ -551,6 +575,7 @@ func logAudit(arg interface{}) {
 					l.MediumVuls = []string{}
 					l.HighCnt = 1
 					l.MediumCnt = 0
+					fillAuditPackages(&l, v)
 					sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 				}
 				for _, v := range rlog.MediumVuls {
@@ -559,6 +584,7 @@ func logAudit(arg interface{}) {
 					l.MediumVuls = []string{v}
 					l.HighCnt = 0
 					l.MediumCnt = 1
+					fillAuditPackages(&l, v)
 					sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 				}
 			}()
@@ -1795,6 +1821,17 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	clog.MediumVuls = meds
 	clog.HighCnt = len(highs)
 	clog.MediumCnt = len(meds)
+	if systemConfigCache.SingleCVEPerSyslog {
+		clog.PackageMap = make(map[string][]string)
+		for _, reportvuln := range report.Vuls {
+			val, ok := clog.PackageMap[reportvuln.Name]
+			if ok {
+				clog.PackageMap[reportvuln.Name] = append(val, reportvuln.PackageName)
+			} else {
+				clog.PackageMap[reportvuln.Name] = []string{reportvuln.PackageName}
+			}
+		}
+	}
 
 	// mask not support error
 	if report.Error == share.ScanErrorCode_ScanErrNotSupport {

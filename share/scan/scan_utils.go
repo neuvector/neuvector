@@ -58,6 +58,7 @@ const (
 var libsList utils.Set = utils.NewSet(
 	// rpm files are added as union
 	dpkgStatus,
+	dpkgStatusDir,
 	apkPackages,
 	"etc/lsb-release",
 	"etc/os-release",
@@ -143,6 +144,22 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 				continue
 			}
 			hasPackage = true
+		} else if lib == dpkgStatusDir {
+			dpkgfiles, err := ioutil.ReadDir(path)
+			if err != nil {
+				continue
+			}
+			for _, file := range dpkgfiles {
+				filepath := fmt.Sprintf("%s%s", path, file.Name())
+				filedata, err := getDpkgStatus(filepath, kernel)
+				if err != nil {
+					continue
+				}
+				name := fmt.Sprintf("%s%s", dpkgStatusDir, file.Name())
+				files = append(files, utils.TarFileInfo{name, filedata})
+			}
+			hasPackage = true
+			continue
 		} else if lib == dpkgStatus {
 			//get the dpkg status file
 			data, err = getDpkgStatus(path, kernel)
@@ -750,8 +767,8 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 			size = info.Size
 		}
 
-		pathMap, err := selectiveFilesFromPath(layerPath, maxFileSize, func(path string) bool {
-			if libsList.Contains(path) || isAppsPkgFile(path) {
+		pathMap, err := selectiveFilesFromPath(layerPath, maxFileSize, func(path, fullpath string) bool {
+			if libsList.Contains(path) || isAppsPkgFile(path, fullpath) {
 				return true
 			}
 			if strings.HasPrefix(path, dpkgStatusDir) {
@@ -786,7 +803,7 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 				if err != nil {
 					continue
 				}
-			} else if isAppsPkgFile(filename) {
+			} else if isAppsPkgFile(filename, fullpath) {
 				curLayerApps.extractAppPkg(filename, fullpath)
 				continue
 			} else {
@@ -893,7 +910,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	defer os.RemoveAll(tmpDir)
 
 	for _, file := range r.File {
-		if isAppsPkgFile(file.Name) {
+		if isAppsPkgFile(file.Name, file.Name) {
 			zFile, err := file.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Debug("open zipped file fail")
@@ -1067,7 +1084,7 @@ func downloadLayers(ctx context.Context, layers []string, sizes map[string]int64
 
 // selectiveFilesFromPath the specified files and folders
 // store them in a map indexed by file paths
-func selectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(string) bool) (map[string]string, error) {
+func selectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(string, string) bool) (map[string]string, error) {
 	rootLen := len(filepath.Clean(rootPath))
 	data := make(map[string]string)
 
@@ -1081,7 +1098,7 @@ func selectiveFilesFromPath(rootPath string, maxFileSize int64, selected func(st
 		if !info.IsDir() {
 			if info.Mode().IsRegular() && (maxFileSize > 0 && info.Size() < maxFileSize) {
 				inpath := path[(rootLen + 1):] // remove the root "/"
-				if selected(inpath) {
+				if selected(inpath, path) {
 					data[inpath] = path
 				}
 			}

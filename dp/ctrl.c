@@ -1369,6 +1369,7 @@ static int dp_ctrl_cfg_policy(json_t *msg)
         policy.rule_list[i].proto = json_integer_value(json_object_get(rule_obj, "proto"));
         policy.rule_list[i].action = json_integer_value(json_object_get(rule_obj, "action"));
         policy.rule_list[i].ingress = json_boolean_value(json_object_get(rule_obj, "ingress"));
+        policy.rule_list[i].vh = json_boolean_value(json_object_get(rule_obj, "vhost"));
         fqdn_obj = json_object_get(rule_obj,"fqdn");
         if (fqdn_obj != NULL) {
             strlcpy(policy.rule_list[i].fqdn, json_string_value(fqdn_obj), MAX_FQDN_LEN);
@@ -1414,6 +1415,13 @@ static int dp_ctrl_set_fqdn(json_t *msg)
     char fqdname[MAX_FQDN_LEN];
     json_t *obj;
     uint32_t fqdnip;
+    json_t *vhost_obj;
+    bool vhost = false;
+
+    vhost_obj = json_object_get(msg, "vhost");
+    if (vhost_obj != NULL) {
+        vhost = json_boolean_value(vhost_obj);
+    }
 
     strlcpy(fqdname, json_string_value(json_object_get(msg, "fqdn_name")), MAX_FQDN_LEN);
     obj = json_object_get(msg, "fqdn_ips");
@@ -1422,8 +1430,8 @@ static int dp_ctrl_set_fqdn(json_t *msg)
     rcu_read_lock();
     for (i = 0; i < count; i++) {
         fqdnip = inet_addr(json_string_value(json_array_get(obj, i)));
-        //DEBUG_CTRL("fqdn(%s) => "DBG_IPV4_FORMAT"\n", fqdname, DBG_IPV4_TUPLE(fqdnip));
-        config_fqdn_ipv4_mapping(g_fqdn_hdl, fqdname, fqdnip);
+        //DEBUG_CTRL("fqdn(%s) vhost(%d) => "DBG_IPV4_FORMAT"\n", fqdname, vhost, DBG_IPV4_TUPLE(fqdnip));
+        config_fqdn_ipv4_mapping(g_fqdn_hdl, fqdname, fqdnip, vhost);
     }
     rcu_read_unlock();
 
@@ -2244,6 +2252,42 @@ static int dp_ctrl_sys_conf(json_t *msg)
     return 0;
 }
 
+uint8_t g_disable_net_policy = 0;
+
+static int dp_ctrl_disable_net_policy(json_t *msg)
+{
+    json_t *disable_net_policy_obj;
+    bool disable_net_policy = false;
+
+    disable_net_policy_obj = json_object_get(msg, "disable_net_policy");
+    if (disable_net_policy_obj != NULL) {
+        disable_net_policy = json_boolean_value(disable_net_policy_obj);
+    }
+    g_disable_net_policy = disable_net_policy ? 1 : 0;
+
+    DEBUG_CTRL("g_disable_net_policy=%u\n", g_disable_net_policy);
+
+    return 0;
+}
+
+uint8_t g_detect_unmanaged_wl = 0;
+
+static int dp_ctrl_detect_unmanaged_wl(json_t *msg)
+{
+    json_t *detect_unmanaged_wl_obj;
+    bool detect_unmanaged_wl = false;
+
+    detect_unmanaged_wl_obj = json_object_get(msg, "detect_unmanaged_wl");
+    if (detect_unmanaged_wl_obj != NULL) {
+        detect_unmanaged_wl = json_boolean_value(detect_unmanaged_wl_obj);
+    }
+    g_detect_unmanaged_wl = detect_unmanaged_wl ? 1 : 0;
+
+    DEBUG_CTRL("g_detect_unmanaged_wl=%u\n", g_detect_unmanaged_wl);
+
+    return 0;
+}
+
 #define BUF_SIZE 8192
 char ctrl_msg_buf[BUF_SIZE];
 static int dp_ctrl_handler(int fd)
@@ -2341,6 +2385,10 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_bld_dlp_update_ep(msg);
         } else if (strcmp(key, "ctrl_sys_conf") == 0) {
             ret = dp_ctrl_sys_conf(msg);
+        } else if (strcmp(key, "ctrl_disable_net_policy") == 0) {
+            ret = dp_ctrl_disable_net_policy(msg);
+        } else if (strcmp(key, "ctrl_detect_unmanaged_wl") == 0) {
+            ret = dp_ctrl_detect_unmanaged_wl(msg);
         }
         DEBUG_CTRL("\"%s\" done\n", key);
     }
@@ -2596,6 +2644,12 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_LINK_LOCAL)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_LINK_LOCAL);
             }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_TMP_OPEN)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_TMP_OPEN);
+            }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_UWLIP)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_UWLIP);
+            }
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;
             conn->Sessions = count_session;
@@ -2620,6 +2674,9 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
 
 static void send_connects(int count)
 {
+    if (g_disable_net_policy) {
+        return;
+    }
     //DEBUG_CTRL("count=%d\n", count);
 
     DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;
@@ -2738,7 +2795,9 @@ static void dp_ctrl_update_fqdn_ip(void)
 
         hdr->Kind = DP_KIND_FQDN_UPDATE;
         strlcpy(fh->FqdnName, name_entry->r->name, DP_POLICY_FQDN_NAME_MAX_LEN);
-
+        if (name_entry->r->vh) {
+            FLAGS_SET(fh->Flags, DPFQDN_IP_FLAG_VH);
+        }
         // Iterate through all ips
         fqdn_ipv4_item_t *ipv4_itr, *ipv4_next;
         cds_list_for_each_entry_safe(ipv4_itr, ipv4_next, &(name_entry->r->iplist), node) {
@@ -2757,7 +2816,7 @@ static void dp_ctrl_update_fqdn_ip(void)
             DEBUG_CTRL("Not all ips are sent. ipcnt=%u sent=%u\n", name_entry->r->ip_cnt, ipcnt);
         }
 
-        DEBUG_CTRL("name: %s ipcnt=%d, len=%u\n", fh->FqdnName, ipcnt, len);
+        //DEBUG_CTRL("name: %s flags=0x%02x ipcnt=%d, len=%u\n", fh->FqdnName, fh->Flags, ipcnt, len);
 
         dp_ctrl_notify_ctrl(g_notify_msg, len);
     }

@@ -624,7 +624,6 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
 		clusHelper.DeleteGroup(gname)
@@ -1037,6 +1036,8 @@ func deleteGroupFromCluster(groupname string) bool {
 	return true
 }
 
+const groupsRemovalAdditionalDelay = time.Duration(time.Second * 10)
+
 // Protected by cacheMutexLock
 func scheduleGroupRemoval(cache *groupCache) {
 	//Reserved group and CRD group cannot be deleted
@@ -1069,7 +1070,10 @@ func scheduleGroupRemoval(cache *groupCache) {
 	}
 
 	unusedGrpAge := time.Duration(cacher.GetUnusedGroupAging())
-	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge)
+	//NVSHAS-7791, because our timer-wheel’s one round duration is 1 hour
+	//task may not be scheduled into current slot which cause it to wait
+	//for 1 more hour to expire. Add additional 10sec to avoid this.
+	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge) + groupsRemovalAdditionalDelay
 
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
@@ -1211,15 +1215,31 @@ func groupWorkloadJoin(id string, param interface{}) {
 
 	cacheMutexLock()
 
+	// This is set when the workload joins with a different learned group name
+	if wlc.svcChanged != "" {
+		if cache, ok := groupCacheMap[wlc.svcChanged]; ok {
+			wlc.groups.Remove(wlc.svcChanged)
+			cache.members.Remove(wl.ID)
+
+			log.WithFields(log.Fields{"group": cache.group.Name}).Debug("Leave learned group")
+			if cache.members.Cardinality() == 0 && cacher.GetUnusedGroupAging() != 0 {
+				scheduleGroupRemoval(cache)
+			}
+		}
+
+		// Not calling ip policy and dlp recalculation because it WILL be done in the next section.
+		// Dispatcher will refresh its cache in WorkloadJoin in the next section
+		wlc.svcChanged = ""
+	}
+
 	// TODO: multi-controller
 	// Normally, we are first notified with the new workload, create group then handle group
 	// creation; in multi-controller case, when the new controller joins the cluster, the
 	// order of cluster watch update for workload and group is not guaranteed.
-	// Would it cause issue?
 	// Join and create learned group.
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
-			if bHasGroupProfile && !dispatchHelper.IsGroupAdded(wlc.learnedGroupName) {
+			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
@@ -1374,6 +1394,30 @@ func refreshGroupMember(cache *groupCache) {
 
 	if bHasCustomGroupProfile {
 		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
+	}
+}
+
+// This function is used to mitigate the case when old enforcer cannot derive the correct pod service group,
+// and the old controller cannot create the correct group when the new enforcer joins.
+// See the caller for more info.
+func refreshLearnedGroupMembership() {
+	var notGroupedPods []*workloadCache
+
+	cacheMutexRLock()
+	for _, wlc := range wlCacheMap {
+		if wlc.learnedGroupName == "" {
+			continue
+		}
+
+		if _, ok := groupCacheMap[wlc.learnedGroupName]; !ok {
+			notGroupedPods = append(notGroupedPods, wlc)
+		}
+	}
+	cacheMutexRUnlock()
+
+	for _, wlc := range notGroupedPods {
+		groupWorkloadJoin(wlc.workload.ID, wlc)
+		connectWorkloadDelete(wlc.workload.ID, wlc)
 	}
 }
 
@@ -1906,7 +1950,7 @@ func domainChange(domain share.CLUSDomain) {
 	// For every workload, re-calculate its membership
 	dptLearnedGrpAdds := utils.NewSet()
 	for _, cache := range groups {
-		cache.members.Clear()	// reset
+		cache.members.Clear() // reset
 		for _, wlc := range wlCacheMap {
 			if !wlc.workload.Running {
 				continue

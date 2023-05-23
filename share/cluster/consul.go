@@ -23,8 +23,8 @@ import (
 
 // const consulUIDir string = "/usr/local/bin/ui"
 const consulExe string = "/usr/local/bin/consul"
-const consulConf string = "/tmp/consul.json"
 const consulDataDir string = "/tmp/neuvector"
+const consulConf string = consulDataDir + "/consul.json"
 const consulPeers string = consulDataDir + "/raft/peers.json"
 
 const defaultRPCPort = 18300
@@ -132,6 +132,7 @@ func createConfigFile(cc *ClusterConfig) error {
 		lanPort = defaultLANPort
 	}
 
+	os.MkdirAll(consulDataDir, os.ModePerm)
 	f, err := os.Create(consulConf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create consul config file")
@@ -163,13 +164,16 @@ func createConfigFile(cc *ClusterConfig) error {
 	if cc.Debug {
 		sa = append(sa, fmt.Sprintf("    \"log_level\": \"DEBUG\",\n"))
 	} else {
-		sa = append(sa, fmt.Sprintf("    \"log_level\": \"INFO\",\n"))
+		sa = append(sa, fmt.Sprintf("    \"log_level\": \"ERROR\",\n"))
 	}
 	sa = append(sa, fmt.Sprintf("    \"ports\": {\n"))
 	sa = append(sa, fmt.Sprintf("        \"dns\": %d,\n", -1))
 	sa = append(sa, fmt.Sprintf("        \"server\": %d,\n", rpcPort))
 	sa = append(sa, fmt.Sprintf("        \"serf_lan\": %d,\n", lanPort))
 	sa = append(sa, fmt.Sprintf("        \"serf_wan\": %d\n", -1))
+	sa = append(sa, fmt.Sprintf("    },\n"))
+	sa = append(sa, fmt.Sprintf("    \"performance\": {\n"))
+	sa = append(sa, fmt.Sprintf("        \"rpc_hold_timeout\": \"%ds\"\n", 300))
 	sa = append(sa, fmt.Sprintf("    }\n"))
 	sa = append(sa, fmt.Sprintf("}\n"))
 
@@ -550,7 +554,7 @@ func (s *sessionMethod) Associate(key string) error {
 	kv := s.c.KV()
 	pair := &api.KVPair{Key: key, Value: []byte(s.id), Session: s.id}
 	if ok, _, err := kv.Acquire(pair, nil); err != nil {
-		return nil
+		return fmt.Errorf("Failed to hold, err=%s", err.Error())
 	} else if !ok {
 		return fmt.Errorf("Failed to hold")
 	} else {
@@ -625,6 +629,21 @@ func (m *consulMethod) Exist(key string) bool {
 		}
 	}
 	return false
+}
+
+func (m *consulMethod) GetKeys(prefix, separater string) ([]string, error) {
+	c, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	keys, _, err := c.KV().Keys(prefix, separater, m.defaultQueryOption())
+	if err != nil {
+		return nil, err
+	} else if keys == nil {
+		return nil, ErrEmptyStore
+	}
+	return keys, nil
 }
 
 func (m *consulMethod) GetRev(key string) ([]byte, uint64, error) {
@@ -760,6 +779,8 @@ func (m *consulMethod) Transact(entries []transactEntry) (bool, error) {
 			ops = append(ops, &api.KVTxnOp{Verb: api.KVDeleteCAS, Key: e.key, Index: e.rev})
 		case clusterTransactCheckRev:
 			ops = append(ops, &api.KVTxnOp{Verb: api.KVCheckIndex, Key: e.key, Index: e.rev})
+		case clusterTransactDeleteTree:
+			ops = append(ops, &api.KVTxnOp{Verb: api.KVDeleteTree, Key: e.key})
 		default:
 			return false, errors.New("Unsupported verb")
 		}

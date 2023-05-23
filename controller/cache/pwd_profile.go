@@ -27,6 +27,9 @@ func pwdProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value [
 				} else {
 					activePwdProfileName = share.CLUSDefPwdProfileName
 				}
+				if p, ok := pwdProfiles[activePwdProfileName]; ok && p.SessionTimeout != 0 {
+					common.DefaultIdleTimeout = p.SessionTimeout
+				}
 			}
 			return
 		}
@@ -38,6 +41,9 @@ func pwdProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value [
 		json.Unmarshal(value, &profile)
 		cacheMutexLock()
 		pwdProfiles[name] = &profile
+		if name == activePwdProfileName && profile.SessionTimeout != 0 {
+			common.DefaultIdleTimeout = profile.SessionTimeout
+		}
 		cacheMutexUnlock()
 	case cluster.ClusterNotifyDelete:
 		cacheMutexLock()

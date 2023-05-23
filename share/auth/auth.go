@@ -131,36 +131,55 @@ func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *ap
 }
 
 func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (map[string][]string, error) {
-	sp := saml.ServiceProvider{
-		IDPSSOURL:           csaml.SSOURL,
-		IDPSSODescriptorURL: csaml.Issuer,
-		IDPPublicCert:       csaml.X509Cert,
+	var certs []string
+	certs = append(certs, csaml.X509Cert)
+	certs = append(certs, csaml.X509CertExtra...)
+
+	r, err := saml.ParseSAMLResponse(tokenData.Token)
+	if err != nil {
+		return nil, err
 	}
 
-	if r, err := saml.ParseSAMLResponse(tokenData.Token); err != nil {
-		return nil, err
-	} else if err = r.Validate(&sp, true); err != nil {
-		return nil, err
-	} else {
-		return r.GetAttributes(), nil
+	for i, c := range certs {
+		sp := saml.ServiceProvider{
+			IDPSSOURL:           csaml.SSOURL,
+			IDPSSODescriptorURL: csaml.Issuer,
+			IDPPublicCert:       c,
+		}
+
+		err = r.Validate(&sp, true)
+		if err != nil{
+			log.WithFields(log.Fields{"samlCertIndex": i, "error": err}).Debug("saml cert failed")
+		} else {
+			log.WithFields(log.Fields{"samlCertIndex": i}).Debug("saml cert succeed")
+			return r.GetAttributes(), nil
+		}
 	}
+
+	return nil, err		// err will be the last r.Validate() result
 }
 
 func (a *remoteAuth) OIDCDiscover(issuer string) (string, string, string, string, error) {
-	if eps, err := oidc.Discover(context.Background(), issuer); err != nil {
-		return "", "", "", "", err
-	} else {
-		return eps.AuthURL, eps.TokenURL, eps.JWKSURL, eps.UserInfoURL, nil
+	var lastError error
+	for i := 0; i < 3; i++ {
+		if eps, err := oidc.Discover(context.Background(), issuer); err != nil {
+			lastError = err
+			log.WithFields(log.Fields{"error": err}).Debug("oidc discover failed")
+		} else {
+			return eps.AuthURL, eps.TokenURL, eps.JWKSURL, eps.UserInfoURL, nil
+		}
+		time.Sleep(1 * time.Second)
 	}
+	return "", "", "", "", lastError
 }
 
 func (a *remoteAuth) generateState() string {
 	s := fmt.Sprintf("%d", time.Now().Unix())
-	return utils.EncryptPassword(s)
+	return utils.EncryptURLSafe(s)
 }
 
 func (a *remoteAuth) verifyState(state string) error {
-	if tsStr := utils.DecryptPassword(state); tsStr == "" {
+	if tsStr := utils.DecryptURLSafe(state); tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")
 	} else if ts, err := strconv.ParseInt(tsStr, 10, 64); err != nil {
 		return errors.New("Invalid state: wrong format")

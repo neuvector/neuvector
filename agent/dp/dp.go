@@ -198,6 +198,14 @@ func dpMsgConnection(msg []byte) {
 			// used by cilium CNI
 			cc.LinkLocal = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_TMP_OPEN) != 0 {
+			// temporary OPEN connection
+			cc.TmpOpen = true
+		}
+		if (conn.Flags & C.DPCONN_FLAG_UWLIP) != 0 {
+			// uwl connection
+			cc.UwlIp = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),
@@ -237,6 +245,9 @@ func dpMsgFqdnIpUpdate(msg []byte) {
 	}
 
 	fqdns.FqdnName = C.GoString(&fqdnIpHdr.FqdnName[0])
+	if (fqdnIpHdr.Flags & C.DPFQDN_IP_FLAG_VH) != 0 {
+		fqdns.Vhost = true
+	}
 
 	for i := 0; i < ipcnt; i++ {
 		binary.Read(r, binary.BigEndian, &fqdnIp)

@@ -37,8 +37,8 @@ type faProcGrpRef struct {
 }
 
 type regWhiteRule struct {
-    decision int
-    path string
+	decision int
+	path     string
 }
 
 // whitelist per container
@@ -153,9 +153,9 @@ func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]in
 func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	log.Debug("FA: ")
 	fa := &FileAccessCtrl{
-		bEnabled: false,
-		roots:    make(map[string]*rootFd),
-		prober:   p,
+		bEnabled:      false,
+		roots:         make(map[string]*rootFd),
+		prober:        p,
 		bKubePlatform: p.bKubePlatform,
 		kubeFlavor:    p.kubeFlavor,
 	}
@@ -163,7 +163,7 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	// docker cp (file changes) might change the polling behaviors,
 	// remove the non-block io to controller the polling timeouts
 	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE | fsmon.FAN_NONBLOCK
-	fn, err := fsmon.Initialize(flags, unix.O_RDONLY | unix.O_LARGEFILE)
+	fn, err := fsmon.Initialize(flags, unix.O_RDONLY|unix.O_LARGEFILE)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FA: Initialize")
 		return nil, false
@@ -293,7 +293,7 @@ func (fa *FileAccessCtrl) isRecursiveDirectoryList(root *rootFd, name, path stri
 
 	if index := strings.Index(path, "/*/"); index > -1 {
 		log.WithFields(log.Fields{"path": path}).Debug("FA:")
-		root.reglst = append( root.reglst, regWhiteRule{ path: path, decision: decision})
+		root.reglst = append(root.reglst, regWhiteRule{path: path, decision: decision})
 		return true
 	}
 	return false
@@ -639,13 +639,13 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup str
 	}
 
 	if res == rule_allowed_updateAlert {
-		ppe.AllowFileUpdate = false  // common case
+		ppe.AllowFileUpdate = false // common case
 	} else {
-		ppe.AllowFileUpdate = true   // user-defined
+		ppe.AllowFileUpdate = true // user-defined
 	}
 
 	if pass := fa.prober.IsAllowedShieldProcess(id, share.PolicyModeEnforce, svcGroup, proc, ppe, false); pass {
-		return ""	// no violation cause, passed
+		return "" // no violation cause, passed
 	}
 	return ppe.Uuid // cause
 }
@@ -656,7 +656,7 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	profileSetting := share.ProfileBasic
 	// check if the /proc/xxx/cgroup exists
 	id, _, _, found := global.SYS.GetContainerIDByPID(pid)
-	if id == fa.prober.selfID || !found  || !fa.bEnabled {
+	if id == fa.prober.selfID || !found || !fa.bEnabled {
 		// log.WithFields(log.Fields{"id": id}).Debug("FA: bypass")
 		return id, profileSetting, svcGroup, res // allow agent operations
 	}
@@ -720,7 +720,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 			// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
 			if profileSetting == share.ProfileZeroDrift {
 				switch res {
-				case rule_denied, rule_allowed:	// matched a rule or bypass
+				case rule_denied, rule_allowed: // matched a rule or bypass
 				default:
 					if rule_uuid = fa.checkAllowedShieldProcess(id, name, path, svcGroup, ppid, res); rule_uuid == "" {
 						res = rule_allowed_zdrift
@@ -729,7 +729,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 						res = rule_not_defined // reject it
 					}
 				}
-			} else {	// basic
+			} else { // basic
 				if res >= rule_allowed {
 					res = rule_allowed
 				}
@@ -750,22 +750,26 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 						}
 
 						pmsg := &ProbeProcess{
-								ID:    id,
-								Pid:   ppid,
-								Path:  path,
-								Name:  name,
-								PPath: ppath,
-								PName: filepath.Base(ppath),
-								Msg:   msg,
-								Group: svcGroup,
-								RuleID: rule_uuid,
+							ID:     id,
+							Pid:    ppid,
+							Path:   path,
+							Name:   name,
+							PPath:  ppath,
+							PName:  filepath.Base(ppath),
+							Msg:    msg,
+							Group:  svcGroup,
+							RuleID: rule_uuid,
 						}
 
 						if fa.prober != nil {
 							if pmsg.RuleID == "" {
-								pmsg.Group, pmsg.RuleID = fa.prober.getEstimateProcGroup(pmsg.ID, pmsg.Name, pmsg.Path)
+								if grp, ruleid := fa.prober.getEstimateProcGroup(pmsg.ID, pmsg.Name, pmsg.Path); grp != "" {
+									// the container is still alive
+									pmsg.Group = grp
+									pmsg.RuleID = ruleid
+								}
 							}
-								// log.WithFields(log.Fields{"id": id, "alert": *alert}).Info("FA: Process denied")
+							// log.WithFields(log.Fields{"id": id, "alert": *alert}).Info("FA: Process denied")
 							rpt := ProbeMessage{Type: PROBE_REPORT_PROCESS_DENIED, Process: pmsg, ContainerIDs: utils.NewSet(id)}
 							fa.prober.SendAggregateProbeReport(&rpt, true)
 						}
@@ -858,12 +862,16 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 //     crio uses "docker-runc-current", but docker-native uses "docker"
 func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) bool {
 	// mlog.WithFields(log.Fields{"ppath": ppath, "path": path}).Debug("FA:")
-	if name == "ps" {
-		return true // common service call
-	}
 
 	// parent: matching only from binary
 	pname := filepath.Base(ppath)
+	if name == "ps" {
+		if global.RT.IsRuntimeProcess(pname, nil) {
+			return true
+		}
+		return false // common service call
+	}
+
 	if fa.bKubePlatform {
 		switch pname {
 		case "pod", "kubelet":
@@ -872,7 +880,7 @@ func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) boo
 
 		// oc specific
 		if fa.kubeFlavor == share.FlavorOpenShift {
-			switch pname  {
+			switch pname {
 			case "hyperkube", "coreutils":
 				return true
 			case "openshift-sdn-node":

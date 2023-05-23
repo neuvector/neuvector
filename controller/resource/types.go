@@ -34,18 +34,21 @@ const (
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
 	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
+	RscTypeCrdNvCspUsage                  = "neuvectorusagerecords" // case sensitive
 	RscTypeRbacRoles                      = "roles"
 	RscTypeRbacClusterRoles               = "clusterroles"
 	RscTypeRbacRolebindings               = "rolebindings"
 	RscTypeRbacClusterRolebindings        = "clusterrolebindings"
 	RscTypeDeployment                     = "deployment"
 	RscTypeCronJob                        = "cronjob"
+	RscTypeDaemonSet                      = "daemonset"
 )
 
 const (
 	RscNamespaces                          = "namespaces"
 	RscServices                            = "services"
 	RscDeployments                         = "deployments"
+	RscConfigMaps                          = "configmaps"
 	RscNameMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"   // case sensitive!
 	RscNameValidatingWebhookConfigurations = "validatingwebhookconfigurations" // case sensitive!
 	RscNameCustomResourceDefinitions       = "customresourcedefinitions"       // case sensitive!
@@ -53,6 +56,8 @@ const (
 	RscKindMutatingWebhookConfiguration   = "MutatingWebhookConfiguration"   // case sensitive!
 	RscKindValidatingWebhookConfiguration = "ValidatingWebhookConfiguration" // case sensitive!
 )
+
+const RscCspUsageName = "neuvector-usage"
 
 // ValidatingWebhookConfiguration resource instance (neuvector-validating-admission-webhook) contains 2 webhooks:
 // 	1. neuvector-validating-admission-webhook.neuvector.svc
@@ -126,10 +131,18 @@ type Deployment struct {
 	Replicas int32
 }
 
+type DaemonSet struct {
+	UID    string
+	Name   string
+	Domain string
+	SA     string
+}
+
 type CronJob struct {
 	UID    string
 	Name   string
 	Domain string
+	SA     string
 }
 
 type ImageTag struct {
@@ -162,6 +175,7 @@ type ConfigMap struct {
 	UID    string
 	Name   string
 	Domain string
+	Data   map[string]string
 }
 
 type AdmissionWebhookConfiguration struct {

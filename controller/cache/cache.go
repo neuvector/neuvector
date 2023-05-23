@@ -101,6 +101,7 @@ type workloadCache struct {
 	platformRole     string
 	displayName      string
 	podName          string
+	svcChanged       string // old learned group name
 	serviceAccount   string
 	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
 	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
@@ -184,6 +185,7 @@ type Context struct {
 	RancherSSO               bool   // from yaml/helm chart
 	TelemetryFreq            uint   // from yaml
 	CheckDefAdminFreq        uint   // from yaml, in minutes
+	CspPauseInterval         uint   // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -191,9 +193,13 @@ type Context struct {
 	OrchChan                 chan *resource.Event
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
+	EnableRmNsGroups         bool
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
+	CspType                  share.TCspType
+	CtrlerVersion            string
+	NvSemanticVersion        string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
 }
@@ -228,6 +234,7 @@ type CacheMethod struct {
 	leaderElectedAt time.Time
 	disablePCAP     bool
 	k8sPodEvents    map[string]*k8sPodEvent
+	rmNsGrps        bool
 }
 
 var cacher CacheMethod
@@ -275,6 +282,18 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	if !isLeader {
 		return
 	}
+
+	// NVSHAS-7485: Here we are dealing a case that container's learned group cannot be created in version<=5.1.0
+	// In pre-5.0 versions, the enforcer cannot derive some pods' learned group name correctly.
+	// Although it is fixed in 5.0, during upgrade, the learned group with the correct name is not created.
+	// Even we reboot the enforcer again, the correct learned group still fails to be created.
+	// The reason being the controller regards the pod as running during enforcer upgrade, so when it is
+	// reported to the controller by the new enforcer, the controller won't create new group. Even we fix
+	// this login in the controller, because only the lead create learned group and the lead can be
+	// the old controller, the group still cannot be created.
+	// ==> Here we give the new controller a chance to refresh pods' learned group membership when it becomes
+	// the lead.
+	refreshLearnedGroupMembership()
 
 	// When lead change, synchonize states in case operation was missed
 	syncLeftNVObjectsToCluster()
@@ -1301,6 +1320,9 @@ func (m CacheMethod) GetAllWorkloadsRisk(acc *access.AccessControl) []*common.Wo
 		if common.OEMIgnoreWorkload(cache.workload) {
 			continue
 		}
+		if !cache.workload.Running {
+			continue
+		}
 
 		if cache.workload.ShareNetNS == "" {
 			wl := workload2Risk(cache)
@@ -1623,15 +1645,24 @@ func getIPAddrScope(ip net.IP) string {
 // give enough time for all agent to settle
 const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
+const pruneKVPeriod = time.Duration(time.Minute * 30)
+const pruneGroupPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
-var uwlUpdated bool
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
+	pruneTicker := time.NewTicker(pruneGroupPeriod)
+	if !cacher.rmNsGrps {
+		pruneTicker.Stop()
+	}
+
+	wlSuspected := utils.NewSet() // supicious workload ids
+	pruneKvTicker := time.NewTicker(pruneKVPeriod)
+	pruneWorkloadKV(wlSuspected) // the first scan
 
 	noTelemetry := false
 	telemetryFreq := ctx.TelemetryFreq
@@ -1665,19 +1696,25 @@ func startWorkerThread(ctx *Context) {
 					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
 						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
+
+					masterCluster := cacher.GetFedMasterCluster(access.NewReaderAccessControl())
+					ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
 				}
+			case <-pruneTicker.C:
+				pruneGroupsByNamespace()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
-				uwlUpdated = true
 				refreshInternalIPNet()
 				cacheMutexRUnlock()
 			case <-ephemeralTicker.C:
 				cacheMutexLock()
 				refreshuwl := timeoutEphemeralWorkload()
-				if refreshuwl && uwlUpdated {
+				if refreshuwl {
 					refreshInternalIPNet()
 				}
 				cacheMutexUnlock()
+			case <-pruneKvTicker.C:
+				pruneWorkloadKV(wlSuspected)
 			case <-scannerTicker.C:
 				if isScanner() {
 					// Remove stalled scanner
@@ -1750,6 +1787,7 @@ func startWorkerThread(ctx *Context) {
 					if n != nil {
 						if o == nil {
 							addrOrchHostAdd(n.IPNets)
+							clusterUsage.nodes += 1
 						} else {
 							if ((o.IPNets == nil || len(o.IPNets) == 0) &&
 								(n.IPNets != nil && len(n.IPNets) > 0)) ||
@@ -1763,6 +1801,9 @@ func startWorkerThread(ctx *Context) {
 						//new is nil and old is not nil
 						addrOrchHostDelete(o.IPNets)
 						connectOrchHostDelete(o.IPNets)
+						if clusterUsage.nodes > 1 {
+							clusterUsage.nodes -= 1
+						}
 					}
 					if n != nil {
 						cacheMutexLock()
@@ -1801,12 +1842,16 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Namespace)
 					}
-					if n == nil {
-						if o != nil {
-							domainDelete(o.Name)
+					if n != nil {
+						// ignore neuvector domain
+						if n.Name != localDev.Ctrler.Domain {
+							domainAdd(n.Name, n.Labels)
+						} else {
+							// for the upgrade cas
+							domainDelete(n.Name)
 						}
-					} else {
-						domainAdd(n.Name, n.Labels)
+					} else if o != nil {
+						domainDelete(o.Name)
 					}
 					if n != nil {
 						if skip := atomic.LoadUint32(&nvDeployDeleted); skip == 0 && isLeader() && admission.IsNsSelectorSupported() {
@@ -1939,9 +1984,17 @@ func startWorkerThread(ctx *Context) {
 						if n.Domain == resource.NvAdmSvcNamespace && n.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, uint32(n.Replicas))
 						}
+
+						if o == nil && n.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": n.Name, "domain": n.Domain}).Info("detected")
+						}
 					} else if o != nil { // delete
 						if o.Domain == resource.NvAdmSvcNamespace && o.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, 0)
+						}
+
+						if o.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": o.Name, "domain": o.Domain}).Info("deleted")
 						}
 					}
 				/*
@@ -2019,7 +2072,7 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 	}
 }
 
-func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
+func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInterface {
 	log.WithFields(log.Fields{"isLeader": leader, "leadAddr": leadAddr}).Info()
 
 	cctx = ctx
@@ -2028,7 +2081,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	cacher.isLeader = leader
 	cacher.leadAddr = leadAddr
 	cacher.k8sPodEvents = make(map[string]*k8sPodEvent)
-
+	cacher.rmNsGrps = ctx.EnableRmNsGroups
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 	dispatchHelper = kv.GetDispatchHelper()
@@ -2053,7 +2106,7 @@ func Init(ctx *Context, leader bool, leadAddr string) CacheInterface {
 	scanInit()
 
 	crdInit()
-	fedInit()
+	fedInit(restoredFedRole)
 	// Keep license update at last. Data structure preparation should be done before this point,
 	// license update will update the limit and could trigger actions
 	licenseInit()
@@ -2124,4 +2177,84 @@ func (m CacheMethod) GetConfigKvData(key string) ([]byte, bool) {
 		return backupKvStores.GetBackupKvStore(key)
 	}
 	return nil, false
+}
+
+func lookupPurgeWorkloadEntries(keys []string, nIndex int, curr, suspected, confirm, updated utils.Set) []string {
+	var removed []string
+	for _, key := range keys {
+		id := share.CLUSKeyNthToken(key, nIndex)
+		if !strings.Contains(id, ":") { // filter out non-id case, like "nodeID"
+			if !updated.Contains(id) { // allow one updated missing per round
+				if !curr.Contains(id) {
+					if suspected.Contains(id) {
+						confirm.Add(id) // confirmed
+						removed = append(removed, key)
+					} else {
+						suspected.Add(id)
+						updated.Add(id) // mark this as missed and updated
+					}
+				}
+			}
+		}
+	}
+	return removed
+}
+
+func pruneWorkloadKV(suspected utils.Set) {
+	ids := utils.NewSet()
+	confirmed := utils.NewSet()
+	updated := utils.NewSet() // allow one update per round
+
+	cacheMutexRLock()
+	for id, _ := range wlCacheMap {
+		ids.Add(id)
+		suspected.Remove(id) // remove the missing id
+	}
+	cacheMutexRUnlock()
+
+	// Those keys are written at enforcers so they are not synchronized with the cacher
+	// It is a slow process, it need a flag to mark the missing id(s)
+	// Implement: continuous 2-strikes out method
+	// When it is confirmed by next cycle, it relative keys are deleted
+
+	// (1) bench reports: bench/<id>/report/<BenchType>
+	keys, _ := cluster.GetKeys(share.CLUSBenchStore, "/") // middle element
+	removed := lookupPurgeWorkloadEntries(keys, 1, ids, suspected, confirmed, updated)
+	// log.WithFields(log.Fields{"keys": keys, "suspected": suspected}).Debug("bench reports")
+
+	// (2) bench scan state: scan/state/bench/workload/<id>
+	keys, _ = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ") // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("bench wl state")
+
+	// (3) auto scan reports: scan/data/report/workload/<id>
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ") // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("auto scan reports")
+
+	// (4) scan state records: scan/state/report/workload/<id>
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ") // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+
+	// remove confirmed ids from the missing ids and pass into the next round
+	for id := range suspected.Iter() {
+		if !updated.Contains(id) || confirmed.Contains(id) {
+			// disappeared or need to be removed
+			suspected.Remove(id)
+		}
+	}
+
+	if isLeader() {
+		// log.WithFields(log.Fields{"confirmed": confirmed, "suspected": suspected}).Debug()
+		if len(removed) > 0 {
+			// delete kv entries: transact is faster
+			txn := cluster.Transact()
+			for _, key := range removed {
+				txn.DeleteTree(key)
+			}
+			txn.Apply()
+			txn.Close()
+			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
+		}
+	}
 }

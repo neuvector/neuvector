@@ -62,6 +62,7 @@ type imageInfoCache struct {
 	secrets         []*share.ScanSecretLog
 	setIDPerm       []*share.ScanSetIdPermLog
 	filteredTime    time.Time
+	verifiers       []string
 }
 
 type Registry struct {
@@ -478,6 +479,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				c.secrets = report.Secrets.Logs
 			}
 			c.setIDPerm = report.SetIdPerms
+			c.verifiers = report.Verifiers
 
 			c.layers = make([]string, len(report.Layers))
 			for i, l := range report.Layers {

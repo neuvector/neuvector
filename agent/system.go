@@ -48,7 +48,7 @@ func policyInit() {
 	} else {
 		policyApplyDir = C.DP_POLICY_APPLY_EGRESS
 	}
-	pe.Init(Host.ID, gInfo.hostIPs, Host.TunnelIP, ObtainGroupProcessPolicy)
+	pe.Init(Host.ID, gInfo.hostIPs, Host.TunnelIP, ObtainGroupProcessPolicy, policyApplyDir)
 }
 
 func updateContainerPolicyMode(id, policyMode string) {
@@ -125,6 +125,26 @@ func systemConfigXff(xffenabled bool) {
 	dp.DPCtrlSetSysConf(&xff)
 }
 
+func systemConfigNetPolicy(disableNetPolicy bool) {
+	if gInfo.disableNetPolicy == disableNetPolicy {
+		return
+	}
+	gInfo.disableNetPolicy = disableNetPolicy
+	//set disableNetPolicy to dp
+	dnp := gInfo.disableNetPolicy
+	dp.DPCtrlSetDisableNetPolicy(&dnp)
+}
+
+func systemConfigUnmanagedWl(detectUnmanagedWl bool) {
+	if gInfo.detectUnmanagedWl == detectUnmanagedWl {
+		return
+	}
+	gInfo.detectUnmanagedWl = detectUnmanagedWl
+	//set detectUnmanagedWl to dp
+	duw := gInfo.detectUnmanagedWl
+	dp.DPCtrlSetDetectUnmanagedWl(&duw)
+}
+
 func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -135,18 +155,29 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigPolicyMode(conf.NewServicePolicyMode)
 		systemConfigTapProxymesh(conf.TapProxymesh)
 		systemConfigXff(conf.XffEnabled)
+		systemConfigNetPolicy(conf.DisableNetPolicy)
+		systemConfigUnmanagedWl(conf.DetectUnmanagedWl)
 	case cluster.ClusterNotifyDelete:
 		systemConfigPolicyMode(defaultPolicyMode)
 		systemConfigTapProxymesh(defaultTapProxymesh)
 		systemConfigXff(defaultXffEnabled)
+		systemConfigNetPolicy(defaultDisableNetPolicy)
+		systemConfigUnmanagedWl(defaultDetectUnmanagedWl)
 	}
 }
 
 func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
 	for wlID, c := range gInfo.activeContainers {
+		//container that has no datapath needs not be
+		//in workloadPolicyMap to save memory and cpu
+		if !c.hasDatapath {
+			continue
+		}
 		pInfo := policy.WorkloadIPPolicyInfo{
 			RuleMap: make(map[string]*dp.DPPolicyIPRule),
+			AppMap: c.appMap,
+			PortMap: c.portMap,
 			Policy: dp.DPWorkloadIPPolicy{
 				WlID:        wlID,
 				WorkloadMac: nil,
@@ -327,6 +358,10 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 }
 
 func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
+	if gInfo.disableNetPolicy {
+		return 0, C.DP_POLICY_ACTION_OPEN, false
+	}
+
 	gInfoRLock()
 
 	// Use parent's policy if the connection is reported on child
@@ -439,8 +474,8 @@ func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byt
 		systemConfigInternalSubnet(nType, key, value)
 	case share.SpecialIPNetDefaultName:
 		systemConfigSpecialSubnet(nType, key, value)
-	case share.DlpRulesDefaultName:
-		dlpConfigRule(nType, key, value)
+	case share.DlpRulesVersionID:
+		dlpConfigRuleVersion(nType, key, value)
 	case share.CFGEndpointSystem:
 		systemConfigProc(nType, key, value)
 	default:
@@ -703,6 +738,9 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 	workloadDlpRulesMap := make(map[string]*dp.DPWorkloadDlpRule)
 
 	for _, dre := range DlpWlRules {
+		if dre == nil {
+			continue
+		}
 		if c, ok := gInfo.activeContainers[dre.WorkloadId]; ok {
 			if c.hasDatapath {
 				dlpWlRule := dp.DPWorkloadDlpRule{
@@ -849,12 +887,19 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 
 	//update rules
 	for _, cdre := range drlist {
+		if cdre == nil {
+			continue
+		}
 		if _, ok := dlprulenames[cdre.Name]; ok {
 			dpdlpre := dp.DPDlpRuleEntry{
 				Name: cdre.Name,
 				ID:   cdre.ID,
 			}
 			for _, pc := range cdre.Patterns {
+				//ignore empty pattern rule
+				if pc.Value == "" {
+					continue
+				}
 				pat := ""
 				if pc.Op == share.CriteriaOpNotRegex {
 					pat = fmt.Sprintf("!")
@@ -915,20 +960,11 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 	return updated, macUpdated
 }
 
-func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
-	var dlprules share.CLUSWorkloadDlpRules
+
+func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	var dlprulenames map[string]string = make(map[string]string)
 	var wlmacs utils.Set = utils.NewSet()
 	var dlprnid map[string]uint32 = make(map[string]uint32)
-
-	uzb := utils.GunzipBytes(value)
-	if uzb == nil {
-		log.Error("Failed to unzip data")
-		return
-	}
-	json.Unmarshal(uzb, &dlprules)
-
-	//log.WithFields(log.Fields{"value": string(uzb)}).Debug("")
 
 	//no dlp rules to build detection tree
 	if len(dlprules.DlpRuleList) == 0 &&
@@ -947,14 +983,10 @@ func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
 		return
 	}
 
-	if nType == cluster.ClusterNotifyDelete {
-		// This should not happen
-		log.Error("Dlp rule/sensor delete not supported!")
-		return
-	}
-
 	for _, cdr := range dlprules.DlpRuleList {
-		dlprnid[cdr.Name] = cdr.ID
+		if cdr != nil {
+			dlprnid[cdr.Name] = cdr.ID
+		}
 	}
 
 	configUpdated := updateWorkloadDlpRuleConfig(dlprules.DlpWlRules, dlprulenames, wlmacs, dlprnid)
@@ -966,6 +998,93 @@ func dlpConfigRule(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 	if detectUpdated || macUpdated {
 		log.WithFields(log.Fields{"detectUpdated": detectUpdated, "macUpdated": macUpdated}).Debug("rebuild detect tree")
+	}
+}
+
+func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUSWorkloadDlpRules {
+	dlprules := share.CLUSWorkloadDlpRules{
+		DlpRuleList: make([]*share.CLUSDlpRule, ruleslen),
+		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, wlen),
+	}
+	//log.WithFields(log.Fields{"newRuleKey": newRuleKey, "slots": slots, "ruleslen": ruleslen, "wlen": wlen}).Debug("")
+	for i := 0; i < slots; i++ {
+		key := fmt.Sprintf("%s%v", newRuleKey, i)
+		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
+		if value, _ := cluster.Get(key); value != nil {
+			dlprule := share.CLUSWorkloadDlpRules{
+				DlpRuleList: make([]*share.CLUSDlpRule, 0),
+				DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
+			}
+			uzb := utils.GunzipBytes(value)
+			if uzb == nil {
+				log.Error("Failed to unzip data")
+				continue
+			}
+			err := json.Unmarshal(uzb, &dlprule)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Cannot decode dlprule")
+				continue
+			}
+			//log.WithFields(log.Fields{"value": string(uzb)}).Debug("dlp per rule key")
+
+			//to keep the original rules order
+			for idx, plc := range dlprule.DlpRuleList {
+				tidx := slots*idx + i
+				if tidx < ruleslen {
+					dlprules.DlpRuleList[tidx] = plc
+				}
+			}
+			for idx, plc := range dlprule.DlpWlRules {
+				tidx := slots*idx + i
+				if tidx < wlen {
+					dlprules.DlpWlRules[tidx] = plc
+				}
+			}
+		}
+	}
+	return dlprules
+}
+
+func dlpUpdateRuleVersion(s share.CLUSDlpRuleVer) share.CLUSWorkloadDlpRules {
+	dlprules := share.CLUSWorkloadDlpRules{
+		DlpRuleList: make([]*share.CLUSDlpRule, 0),
+		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
+	}
+
+	//check whether key "recalculate/DlpWorkloadRules" exist
+	var rule_key, newRuleKey string
+	rule_key = fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
+	if cluster.Exist(rule_key) {
+		// indicate network policy version change.
+		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.DlpRulesVersion)
+		//log.WithFields(log.Fields{"newRuleKey": newRuleKey}).Debug("")
+
+		//combine dlp rules from separate slots
+		dlprules = getDlpRulesVersion(newRuleKey, s.SlotNo, s.RulesLen, s.WorkloadLen)
+	}
+	return dlprules
+}
+
+func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []byte) {
+	if nType == cluster.ClusterNotifyDelete {
+		// This should not happen
+		log.Error("Dlp key delete not supported!")
+		return
+	}
+
+	//get dlp rules from cluster
+	var s share.CLUSDlpRuleVer
+	if err := json.Unmarshal(value, &s); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return
+	}
+	dlprules := dlpUpdateRuleVersion(s)
+	dlpConfigRule(dlprules)
+	//when network policy is disabled, change workload's datapath via dlp
+	if gInfo.disableNetPolicy {
+		for wlid, dlpInfo := range pe.GetNetworkDlpWorkloadRulesInfo() {
+			updateContainerPolicyMode(wlid, dlpInfo.Mode)
+		}
 	}
 }
 

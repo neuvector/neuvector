@@ -18,6 +18,10 @@ import (
 
 const (
 	MediaTypeOCIManifest = "application/vnd.oci.image.manifest.v1+json"
+	MediaTypeOCIIndex    = "application/vnd.oci.image.index.v1+json"
+
+	MediaTypeOCIMissingManifest = "Accept header does not support OCI manifests"
+	MediaTypeOCIMissingIndex    = "Accept header does not support OCI indexes"
 )
 
 type ManifestInfo struct {
@@ -40,6 +44,8 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 	var req *http.Request
 	var err error
 	retry := 0
+	withOCIManifest := false
+	withOCIIndex := false
 	for retry < retryTimes {
 		req, err = http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
@@ -49,10 +55,20 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 		case 1:
 			req.Header.Add("Accept", manifestV1.MediaTypeManifest)
 			req.Header.Add("Accept", manifestV1.MediaTypeSignedManifest)
-			req.Header.Add("Accept", MediaTypeOCIManifest)
+			if withOCIManifest {
+				req.Header.Add("Accept", MediaTypeOCIManifest)
+			}
+			if withOCIIndex {
+				req.Header.Add("Accept", MediaTypeOCIIndex)
+			}
 		case 2:
 			req.Header.Add("Accept", manifestV2.MediaTypeManifest)
-			req.Header.Add("Accept", MediaTypeOCIManifest)
+			if withOCIManifest {
+				req.Header.Add("Accept", MediaTypeOCIManifest)
+			}
+			if withOCIIndex {
+				req.Header.Add("Accept", MediaTypeOCIIndex)
+			}
 		default:
 			return "", nil, errors.New("Unsupported manifest schema version")
 		}
@@ -67,7 +83,13 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 			return "", nil, ctx.Err()
 		}
 
-		retry++
+		if !withOCIManifest && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingManifest)) {
+			withOCIManifest = true
+		} else if !withOCIIndex && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingIndex)) {
+			withOCIIndex = true
+		} else {
+			retry++
+		}
 	}
 	if err != nil {
 		return "", nil, err

@@ -546,7 +546,7 @@ func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
 	//workload, reset unManagedWlTimer to update unmanaged workload ip to prevent
 	//neuvector device being treated as unmanaged wl
 	if addcnt > 0 {
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 	}
 
 	// cleanup ephemeral entries
@@ -776,7 +776,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 		//workload on host without agent is unmanaged
 		//process unmanaged wl ip for special subnet
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 
 		cacheMutexUnlock()
 
@@ -798,7 +798,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 		//workload on host without agent is unmanaged
 		//process unmanaged wl ip for special subnet
-		scheduleUnmanagedWlProc(false)
+		scheduleUnmanagedWlProc(true)
 
 		cacheMutexUnlock()
 
@@ -1347,6 +1347,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if wlCache, ok = wlCacheMap[wl.ID]; ok && !isDummyWorkloadCache(wlCache) {
 			oldRunning := wlCache.workload.Running
 			oldQuar := wlCache.workload.Quarantine
+			oldSvc := wlCache.workload.Service
 
 			if reflect.DeepEqual(wlCache.workload.Ifaces, wl.Ifaces) != true ||
 				reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) != true {
@@ -1376,6 +1377,15 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 				if !oldRunning {
 					wlCache.serviceName = utils.NormalizeForURL(wl.Service)
 					wlCache.learnedGroupName = makeLearnedGroupName(wlCache.serviceName)
+
+					started = true
+				} else if oldSvc != wl.Service {
+					// If service name is changed, it must be that the enforcer has been replaced,
+					// we need create the new learned group.
+					wlCache.serviceName = utils.NormalizeForURL(wl.Service)
+					wlCache.learnedGroupName = makeLearnedGroupName(wlCache.serviceName)
+					oldSvcName := utils.NormalizeForURL(oldSvc)
+					wlCache.svcChanged = makeLearnedGroupName(oldSvcName)
 
 					started = true
 				}
@@ -1461,7 +1471,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			addrWorkloadAdd(wl.ID, wlCache)
 		}
 		//NVSHAS-7433, it is possible newly added short-lived workload is not running
-		//so we need to delete Workload:IP and its related policy 
+		//so we need to delete Workload:IP and its related policy
 		if wl.Running || newWorkload {
 			connectWorkloadAdd(wl.ID, wlCache)
 		}
@@ -1973,7 +1983,7 @@ func updateInternalIPNet(ipnet *net.IPNet, scope string, loose bool) {
 	}
 
 	// Workload overlay/global address
-	if uwlUpdated && !isdevip {
+	if !isdevip {
 		if wlp, ok := ipWLMap[ipnet.IP.String()]; ok {
 			if wlmanaged := isNodeManaged(wlp.node); !wlmanaged {
 				uwl_ipnet := &net.IPNet{IP: wlp.ipnet.IP, Mask: net.CIDRMask(32, 32)}
@@ -2041,18 +2051,16 @@ func refreshInternalIPNet() {
 	// Workload overlay/global address
 	for _, wlp := range ipWLMap {
 		addInternalIPNet(newSubnets, &wlp.ipnet, share.CLUSIPAddrScopeGlobal, true)
-		if uwlUpdated {
-			if _, ok := ipDevMap[wlp.ipnet.IP.String()]; ok {
-				//device ip is not unmanaged
-				continue
-			}
-			if wlmanaged := isNodeManaged(wlp.node); wlmanaged {
-				continue
-			}
-			uwl_ipnet := &net.IPNet{IP: wlp.ipnet.IP, Mask: net.CIDRMask(32, 32)}
-			log.WithFields(log.Fields{"ip": uwl_ipnet.IP.String(), "mask": uwl_ipnet.Mask.String()}).Debug("unmanaged ip-workload map")
-			addSpecialInternalIPNet(newSpecialSubnets, uwl_ipnet, share.CLUSIPAddrScopeGlobal, share.SpecInternalUwlIP, false)
+		if _, ok := ipDevMap[wlp.ipnet.IP.String()]; ok {
+			//device ip is not unmanaged
+			continue
 		}
+		if wlmanaged := isNodeManaged(wlp.node); wlmanaged {
+			continue
+		}
+		uwl_ipnet := &net.IPNet{IP: wlp.ipnet.IP, Mask: net.CIDRMask(32, 32)}
+		log.WithFields(log.Fields{"ip": uwl_ipnet.IP.String(), "mask": uwl_ipnet.Mask.String()}).Debug("unmanaged ip-workload map")
+		addSpecialInternalIPNet(newSpecialSubnets, uwl_ipnet, share.CLUSIPAddrScopeGlobal, share.SpecInternalUwlIP, false)
 	}
 
 	// Service address
@@ -2162,10 +2170,7 @@ func getAppPorts(wl *share.CLUSWorkload) map[string]string {
 }
 
 func scheduleUnmanagedWlProc(fast bool) {
-	log.WithFields(log.Fields{"uwlUpdated": uwlUpdated, "fast": fast}).Debug("")
-	if uwlUpdated {
-		uwlUpdated = false
-	}
+	log.WithFields(log.Fields{"fast": fast}).Debug("")
 	if fast {
 		unManagedWlTimer.Reset(unManagedWlProcDelayFast)
 	} else {

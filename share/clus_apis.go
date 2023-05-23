@@ -33,6 +33,7 @@ const CLUSLockScannerKey string = CLUSLockStore + "scanner"
 const CLUSLockCrdQueueKey string = CLUSLockStore + "crd_queue"
 const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
+const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -42,33 +43,35 @@ const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
 const (
-	CFGEndpointSystem           = "system"
-	CFGEndpointEULA             = "eula_oss"
-	CFGEndpointScan             = "scan"
-	CFGEndpointUser             = "user"
-	CFGEndpointServer           = "server"
-	CFGEndpointGroup            = "group"
-	CFGEndpointPolicy           = "policy"
-	CFGEndpointLicense          = "license"
-	CFGEndpointResponseRule     = "response_rule"
-	CFGEndpointProcessProfile   = "process_profile"
-	CFGEndpointRegistry         = "registry"
-	CFGEndpointDomain           = "domain"
-	CFGEndpointFileMonitor      = "file_monitor"
-	CFGEndpointFileAccessRule   = "file_rule"
-	CFGEndpointAdmissionControl = "admission_control"
-	CFGEndpointCrd              = "crd"
-	CFGEndpointFederation       = "federation"
-	CFGEndpointDlpRule          = "dlp_rule"
-	CFGEndpointDlpGroup         = "dlp_group"
-	CFGEndpointWafRule          = "waf_rule"
-	CFGEndpointWafGroup         = "waf_group"
-	CFGEndpointScript           = "script"
-	CFGEndpointCloud            = "cloud"
-	CFGEndpointCompliance       = "compliance"
-	CFGEndpointVulnerability    = "vulnerability"
-	CFGEndpointUserRole         = "user_role"
-	CFGEndpointPwdProfile       = "pwd_profile"
+	CFGEndpointSystem               = "system"
+	CFGEndpointEULA                 = "eula_oss"
+	CFGEndpointScan                 = "scan"
+	CFGEndpointUser                 = "user"
+	CFGEndpointServer               = "server"
+	CFGEndpointGroup                = "group"
+	CFGEndpointPolicy               = "policy"
+	CFGEndpointLicense              = "license"
+	CFGEndpointResponseRule         = "response_rule"
+	CFGEndpointProcessProfile       = "process_profile"
+	CFGEndpointRegistry             = "registry"
+	CFGEndpointDomain               = "domain"
+	CFGEndpointFileMonitor          = "file_monitor"
+	CFGEndpointFileAccessRule       = "file_rule"
+	CFGEndpointAdmissionControl     = "admission_control"
+	CFGEndpointCrd                  = "crd"
+	CFGEndpointFederation           = "federation"
+	CFGEndpointDlpRule              = "dlp_rule"
+	CFGEndpointDlpGroup             = "dlp_group"
+	CFGEndpointWafRule              = "waf_rule"
+	CFGEndpointWafGroup             = "waf_group"
+	CFGEndpointScript               = "script"
+	CFGEndpointCloud                = "cloud"
+	CFGEndpointCompliance           = "compliance"
+	CFGEndpointVulnerability        = "vulnerability"
+	CFGEndpointUserRole             = "user_role"
+	CFGEndpointPwdProfile           = "pwd_profile"
+	CFGEndpointApikey               = "apikey"
+	CFGEndpointSigstoreRootsOfTrust = "sigstore_roots_of_trust"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -98,6 +101,8 @@ const CLUSConfigVulnerabilityStore string = CLUSConfigStore + CFGEndpointVulnera
 const CLUSConfigDomainStore string = CLUSConfigStore + CFGEndpointDomain + "/"
 const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "/"
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
+const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
+const CLUSConfigSigstoreRootsOfTrust string = CLUSConfigStore + CFGEndpointSigstoreRootsOfTrust + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -123,6 +128,7 @@ const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 // network
 const PolicyIPRulesDefaultName string = "GroupIPRules"
 const PolicyIPRulesVersionID string = "NeuVectorPolicyVersion" // used for indicate policy version changed
+const DlpRulesVersionID string = "NeuVectorDlpVersion"         // used for indicate dlp version changed
 const DlpRulesDefaultName string = "DlpWorkloadRules"
 const DlpRuleName string = "dlprule"
 const DlpRuleStore string = CLUSNetworkStore + DlpRuleName + "/"
@@ -199,8 +205,9 @@ const CLUSScannerStatsStore string = CLUSScanStore + "scanner_stats/"
 const CLUSScannerDBVersionID string = "NeuVectorCVEDBVersion" // used for indicate db version changed
 const CLUSScannerDBStore string = CLUSScanStore + "database/"
 
-//recalculate
+// recalculate
 const CLUSRecalPolicyStore string = CLUSRecalculateStore + "policy/" //not to be watched by consul
+const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/"       //not to be watched by consul
 
 func CLUSPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSNetworkStore, name)
@@ -210,7 +217,11 @@ func CLUSRecalPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSRecalPolicyStore, name)
 }
 
-//fqdn
+func CLUSRecalDlpWlRulesKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSRecalDlpStore, name)
+}
+
+// fqdn
 const CLUSFqdnIpStore string = CLUSFqdnStore + "ip/" //not to be watched by consul
 
 func CLUSFqdnIpKey(hostID string, fqdname string) string {
@@ -444,6 +455,10 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 	return fmt.Sprintf("%s%s", ProfileFileAccessStore, name)
 }
 
+func CLUSApikeyKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
+}
+
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
 // quickly. Without it, we have to loop through all workload keys; using agent ID is
 // also problematic, as a new agent has no idea of the agent ID when the workload
@@ -619,6 +634,14 @@ func CLUSGroupKey2GroupName(key string) string {
 	return CLUSKeyNthToken(key, 3)
 }
 
+func CLUSSigstoreRootOfTrustKey(rootName string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigSigstoreRootsOfTrust, rootName)
+}
+
+func CLUSSigstoreVerifierKey(rootName string, verifierName string) string {
+	return fmt.Sprintf("%s/%s", CLUSSigstoreRootOfTrustKey(rootName), verifierName)
+}
+
 type CLUSDistLocker struct {
 	LockedBy string    `json:"locked_by"`
 	LockedAt time.Time `json:"locked_at"`
@@ -654,6 +677,7 @@ type CLUSSyslogConfig struct {
 	SyslogEnable     bool     `json:"syslog_enable"`
 	SyslogCategories []string `json:"syslog_categories"`
 	SyslogInJSON     bool     `json:"syslog_in_json"`
+	SyslogServerCert string   `json:"syslog_server_cert"`
 }
 
 type CLUSSystemUsageReport struct {
@@ -742,6 +766,8 @@ type CLUSSystemConfig struct {
 	CfgType              TCfgType                  `json:"cfg_type"`
 	NetServiceStatus     bool                      `json:"net_service_status"`
 	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy     bool                      `json:"disable_net_policy"`
+	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
 	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
@@ -807,10 +833,11 @@ type CLUSServerLDAP struct {
 
 type CLUSServerSAML struct {
 	CLUSServerAuth
-	SSOURL     string `json:"sso_url"`
-	Issuer     string `json:"issuer"`
-	X509Cert   string `json:"x509_cert,cloak"`
-	GroupClaim string `json:"group_claim"`
+	SSOURL        string   `json:"sso_url"`
+	Issuer        string   `json:"issuer"`
+	X509Cert      string   `json:"x509_cert,cloak"`
+	GroupClaim    string   `json:"group_claim"`
+	X509CertExtra []string `json:"x509_cert_extra"`
 }
 
 type CLUSServerOIDC struct {
@@ -996,6 +1023,7 @@ type CLUSCriteriaEntry struct {
 type CLUSFqdnIp struct {
 	FqdnName string   `json:"fqdn_name"`
 	FqdnIP   []net.IP `json:"fqdn_ip"`
+	Vhost    bool     `json:"vhost,omitempty"`
 }
 
 type TCfgType int
@@ -1092,9 +1120,11 @@ var CLUSWLModeGroup string = "nv.mode_group"
 var CLUSWLAddressGroup string = "nv.address_group"
 var CLUSHostAddrGroup string = "nv.hostaddr_group" //used as wlid for "nodes" in policy calculation
 var CLUSWLFqdnPrefix string = "fqdn:"
+var CLUSWLFqdnVhPrefix string = "vh:"
 var CLUSLearnedHostPrefix string = "Host:"
 var CLUSLearnedWorkloadPrefix string = "Workload:"
 var CLUSEndpointIngress string = "ingress"
+var CLUSWLAllContainer string = "nv.allcontainer"
 
 const DefaultGroupRuleID uint32 = 0
 const PolicyLearnedIDBase = 10000
@@ -1143,6 +1173,14 @@ type CLUSGroupIPPolicyVer struct {
 	RulesLen             int    `json:"rules_len"`
 	WorkloadSlot         int    `json:"workload_slot,omitempty"`
 	WorkloadLen          int    `json:"workload_len,omitempty"`
+}
+
+type CLUSDlpRuleVer struct {
+	Key             string `json:"key"`
+	DlpRulesVersion string `json:"dlp_version"`
+	SlotNo          int    `json:"slot_no"`
+	RulesLen        int    `json:"rules_len"`
+	WorkloadLen     int    `json:"workload_len"`
 }
 
 type CLUSSubnet struct {
@@ -1634,6 +1672,7 @@ type CLUSRegistryImageSummary struct {
 	ScanFlags uint32        `json:"scan_flags"`
 	Provider  ScanProvider  `json:"provider"`
 	Size      int64         `json:"size"`
+	Verifiers []string      `json:"verifiers"`
 }
 
 type CLUSScanner struct {
@@ -1781,6 +1820,7 @@ type CLUSAdmissionRule struct { // see type RESTAdmissionRule
 	CfgType           TCfgType                `json:"cfg_type"`
 	RuleType          string                  `json:"rule_type"` // "exception", "deny"
 	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
+	RuleMode          string                  `json:"rule_mode"` // "", "monitor", "protect"
 }
 
 type CLUSAdmissionRules struct {
@@ -2073,11 +2113,29 @@ type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
 }
 
 type CLUSFedClusterStatus struct {
-	Status int `json:"status"` // status of a joint cluster
+	Status            int       `json:"status"` // status of a joint cluster
+	CspType           TCspType  `json:"csp_type"`
+	Nodes             int       `json:"nodes"`               // total nodes count in this cluster
+	LastConnectedTime time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
 }
 
 type CLUSFedJoinedClusterList struct { // only available on master cluster
 	IDs []string `json:"ids,omitempty"` // all non-master clusters' id in the federation
+}
+
+type TCspType int
+
+const (
+	CSP_NONE = iota
+	CSP_EKS
+	CSP_GKE
+	CSP_AKS
+	CSP_IBM
+)
+
+type CLUSClusterCspUsage struct {
+	CspType TCspType `json:"csp_type"`
+	Nodes   int      `json:"nodes"` // total nodes count in this cluster
 }
 
 // fed ruleTypes' revision data. stored under object/config/federation/rules_revision
@@ -2141,7 +2199,7 @@ type CLUSFedScanRevisions struct {
 	Restoring      bool              `json:"restoring"`        // fed registry revision
 }
 
-//dlp rule
+// dlp rule
 const (
 	DlpRuleKeyPattern string = "pattern"
 )
@@ -2266,7 +2324,7 @@ type CLUSDlpGroup struct {
 	CfgType TCfgType          `json:"cfg_type"`
 }
 
-//waf
+// waf
 type CLUSWafCriteriaEntry struct {
 	Key     string `json:"key"`
 	Value   string `json:"value"`
@@ -2325,14 +2383,15 @@ type CLUSCrdEventRecord struct {
 	CrdEventRecord []string
 }
 
-////// Process UUID Rules
-//     Reserved(256 entries): 	00000000-0000-0000-0000-0000000000XX
-//     Default rules:			00000000-0000-0000-0000-00000000000X
-//     Linux-specific:  		00000000-0000-0000-0000-00000000001X ans 2X
-//     Windows-specific:  		00000000-0000-0000-0000-00000000003X ans 4X
+// //// Process UUID Rules
+//
+//	Reserved(256 entries): 	00000000-0000-0000-0000-0000000000XX
+//	Default rules:			00000000-0000-0000-0000-00000000000X
+//	Linux-specific:  		00000000-0000-0000-0000-00000000001X ans 2X
+//	Windows-specific:  		00000000-0000-0000-0000-00000000003X ans 4X
 const CLUSReservedUuidPrefix string = "00000000-0000-0000-0000-0000000000" // reserved the last 2 digits
 
-//////
+// ////
 const CLUSReservedUuidNotAlllowed string = "00000000-0000-0000-0000-000000000000"    // processes beyond white list
 const CLUSReservedUuidRiskyApp string = "00000000-0000-0000-0000-000000000001"       // riskApp
 const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"     // tunnel
@@ -2452,7 +2511,7 @@ type SecretLog struct {
 	RuleDesc string `json:"rule_desc"` // rule description
 }
 
-/////// Secret Types
+// ///// Secret Types
 const (
 	SecretPrivateKey string = "privatekey" // Private Key
 	SecretX509       string = "x.509"      // X.509 certificates (ignored)
@@ -2484,7 +2543,7 @@ type CLUSSetIdPermLog struct {
 	Evidence string `json:"evidence"` // file attributes
 }
 
-/////// For custom roles
+// ///// For custom roles
 func CLUSUserRoleKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigUserRoleStore, name)
 }
@@ -2544,6 +2603,7 @@ type CLUSPwdProfile struct {
 	EnableBlockAfterFailedLogin bool   `json:"enable_block_after_failed_login"` // for "Block X minutes after N times failed attempts"
 	BlockAfterFailedCount       int    `json:"block_after_failed_login_count"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                int    `json:"block_minutes"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              uint32 `json:"session_timeout"`                 // for default user session timeout (in seconds)
 }
 
 // Import task
@@ -2649,4 +2709,38 @@ type CLUSCheckUpgradeInfo struct {
 // throttled events/logs
 type CLUSThrottledEvents struct {
 	LastReportTime map[TLogEvent]int64 `json:"last_report_at"` // key is event id, value is time.Unix()
+}
+
+type CLUSApikey struct {
+	ExpirationType      string              `json:"expiration_type"`
+	ExpirationHours     uint32              `json:"expiration_hours"`
+	Name                string              `json:"name"`
+	SecretKeyHash       string              `json:"secret_key_hash"`
+	Description         string              `json:"description"`
+	Locale              string              `json:"locale"`
+	Role                string              `json:"role"`
+	RoleDomains         map[string][]string `json:"role_domains"`
+	ExpirationTimestamp int64               `json:"expiration_timestamp"`
+	CreatedTimestamp    int64               `json:"created_timestamp"`
+	CreatedByEntity     string              `json:"created_by_entity"` // it could be username or apikey (access key)
+}
+
+type CLUSSigstoreRootOfTrust struct {
+	Name           string `json:"name"`
+	IsPrivate      bool   `json:"is_private"`
+	RekorPublicKey string `json:"rekor_public_key"`
+	RootCert       string `json:"root_cert"`
+	SCTPublicKey   string `json:"sct_public_key"`
+	CfgType        string `json:"cfg_type"`
+	Comment        string `json:"comment"`
+}
+
+type CLUSSigstoreVerifier struct {
+	Name         string `json:"name"`
+	VerifierType string `json:"verifier_type"`
+	IgnoreTLog   bool   `json:"ignore_tlog"`
+	IgnoreSCT    bool   `json:"ignore_sct"`
+	PublicKey    string `json:"public_key"`
+	CertIssuer   string `json:"cert_issuer"`
+	CertSubject  string `json:"cert_subject"`
 }

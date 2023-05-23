@@ -296,8 +296,13 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 		tokens := strings.Split(scanner.Text(), ":")
 		if len(tokens) > 2 {
 			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
+			// For k8s, we're looking for kubepods
 			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
-			if strings.HasPrefix(tokens[2], "/kubepods") {
+			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
+			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
+			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
+			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
+			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
 				return filepath.Join("/sys/fs/cgroup", tokens[2])
 			}
 		}
@@ -316,15 +321,13 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 	f, err := os.Open(path)
 	if err != nil {
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
 		return "", err
 	}
+	defer 	f.Close()
 
 	cpath := getCgroupPathReaderV2(f)
-	f.Close()
 
-	if pid != 0 {
-		cpath = filepath.Join("/proc", strconv.Itoa(pid), "root", cpath)
-	}
 	return cpath, nil
 
 }
@@ -347,9 +350,8 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		} else {
 			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
 		}
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
-		}
+		return path, nil
+
 	case cgroup_v2:
 		// unified file structure
 		return getCgroupPath_cgroup_v2(pid)
@@ -519,6 +521,7 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
 			return nil
 		}
 		return err
@@ -719,7 +722,7 @@ func (s *SystemTools) CGroupMemoryStatReset(threshold uint64) bool {
 			log.WithFields(log.Fields{"usage": usage, "threshold": threshold}).Info()
 			go func() {
 				if err := s.setMemoryForceEmpty(); err != nil && err != errUnsupported {
-					log.WithFields(log.Fields{"err": err}).Error()
+					log.WithFields(log.Fields{"err": err}).Debug()
 				}
 			}()
 			return true

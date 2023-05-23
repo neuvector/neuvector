@@ -20,6 +20,7 @@ type Writer struct {
 
 	//non-nil if custom dialer set, used in getDialer
 	customDial  DialFunc
+	dialTimeout time.Duration
 	sendTimeout time.Duration
 
 	mu   sync.RWMutex // guards conn

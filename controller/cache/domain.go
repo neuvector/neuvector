@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"reflect"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 type domainCache struct {
@@ -20,6 +23,7 @@ type domainCache struct {
 
 var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
 var domainMutex sync.RWMutex
+var domainRemoveMap map[string]time.Time = make(map[string]time.Time)
 
 func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
 	return &share.CLUSDomain{Name: name, Labels: nsLabels}
@@ -72,6 +76,12 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		domainMutex.Lock()
 		oDomain, _ := domainCacheMap[name]
 		domainCacheMap[name] = &domainCache{domain: &domain}
+		if cacher.rmNsGrps {
+			if _, ok := domainRemoveMap[name]; ok {
+				log.WithFields(log.Fields{"domain": name}).Debug()
+				delete(domainRemoveMap, name)
+			}
+		}
 		domainMutex.Unlock()
 
 		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
@@ -88,6 +98,13 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			return
 		}
 
+		// Put pruned namespaces
+		if cacher.rmNsGrps {
+			if _, ok := domainRemoveMap[name]; !ok {
+				log.WithFields(log.Fields{"domain": name}).Debug()
+				domainRemoveMap[name] = time.Now()
+			}
+		}
 		// Shouldn't happen, but have the logic anyway. Not delete kv, only initial the cache
 		domainCacheMap[name] = &domainCache{domain: initDomain(name, nil)}
 	}
@@ -155,7 +172,7 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 		if !acc.Authorize(cache.domain, nil) {
 			continue
 		}
-		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags}
+		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags, Labels: cache.domain.Labels}
 	}
 
 	domainMutex.RUnlock()
@@ -212,4 +229,56 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 		i++
 	}
 	return domains, tagPerDomain
+}
+
+const PruneGroupDelay time.Duration = time.Minute*time.Duration(1)
+func pruneGroupsByNamespace() {
+	domains := utils.NewSet()
+	now := time.Now()
+
+	domainMutex.Lock()
+	for name, t := range domainRemoveMap {
+		if now.Sub(t) >= PruneGroupDelay {
+			delete(domainRemoveMap, name)
+			domains.Add(name)
+		}
+	}
+	domainMutex.Unlock()
+
+	if domains.Cardinality() == 0 {
+		return
+	}
+
+	// only leader has the action items.
+	if isLeader() {
+		var groups []string
+		log.WithFields(log.Fields{"domains": domains}).Debug()
+
+	/*
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
+		if err != nil {
+			// wait for next turn
+			log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	*/
+
+		cacheMutexRLock()
+		for name, groupCache := range groupCacheMap {
+			if domains.Contains(groupCache.group.Domain) {
+				groups = append(groups, name)
+			}
+		}
+		cacheMutexRUnlock()
+
+		if len(groups) > 0 {
+			log.WithFields(log.Fields{"groups": groups}).Debug()
+			for _, name := range groups {
+				kv.DeletePolicyByGroup(name)
+				kv.DeleteResponseRuleByGroup(name)
+				clusHelper.DeleteGroup(name)
+			}
+		}
+	}
 }

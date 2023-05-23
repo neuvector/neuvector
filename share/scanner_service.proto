@@ -15,6 +15,33 @@ message ScanImageRequest {
     bool ScanLayers = 7;
     bool ScanSecrets = 8;
     string BaseImage = 9;
+    repeated SigstoreRootOfTrust RootsOfTrust  = 10;
+}
+
+message SigstoreRootOfTrust {
+  string Name = 1;
+  string RekorPublicKey = 2;
+  string RootCert = 3;
+  string SCTPublicKey = 4;
+  repeated SigstoreVerifier Verifiers = 5;
+}
+
+message SigstoreVerifier {
+  string Name = 1;
+  string Type = 2;
+  bool IgnoreTLog = 3;
+  bool IgnoreSCT = 4;
+  SigstoreKeypairOptions KeypairOptions = 5;
+  SigstoreKeylessOptions KeylessOptions = 6;
+}
+
+message SigstoreKeypairOptions {
+  string PublicKey = 1;
+}
+
+message SigstoreKeylessOptions {
+  string CertIssuer = 1;
+  string CertSubject = 2;
 }
 
 service ScannerService {

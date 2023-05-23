@@ -344,7 +344,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		} else {
 			list := b.getBenchMsg(out)
 			b.assignKubeBenchMeta(list)
-
+			b.kubeHostDone = true
 			b.logHostResult(list)
 			b.putBenchReport(Host.ID, share.BenchKubeMaster, list, share.BenchStatusFinished)
 		}
@@ -365,13 +365,13 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		} else {
 			list := b.getBenchMsg(out)
 			b.assignKubeBenchMeta(list)
-
+			b.kubeHostDone = true
 			b.logHostResult(list)
 			b.putBenchReport(Host.ID, share.BenchKubeWorker, list, share.BenchStatusFinished)
 		}
 	}
 
-	b.kubeHostDone = true
+
 
 	return errMaster, errWorker
 }

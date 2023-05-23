@@ -45,6 +45,7 @@ type loginSession struct {
 	eolAt           time.Time // end of life
 	timer           *time.Timer
 	domainRoles     access.DomainRole // map: domain -> role
+	loginType       int               // 0=user (default), 1=apikey
 
 	nvPage string // could change in every request even in the same login session
 }
@@ -130,6 +131,8 @@ const (
 	jwtRegularTokenType = iota
 	jwtFedMasterTokenType
 )
+
+const loginTypeApikey int = 1
 
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
@@ -280,7 +283,10 @@ func _deleteSessionToken(s *loginSession) {
 	}
 
 	key := share.CLUSExpiredTokenKey(s.token)
-	jwtLastExpiredTokenSession.Associate(key)
+	err := jwtLastExpiredTokenSession.Associate(key)
+	if err != nil {
+		log.WithFields(log.Fields{"id": s.id, "err": err}).Error()
+	}
 }
 
 // with userMutex locked when calling this
@@ -535,6 +541,56 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 	token, ok := r.Header[api.RESTTokenHeader]
 	if !ok || len(token) != 1 {
+		// "X-Auth-Token" header not exist, check apikey "X-Auth-Apikey"
+		apikey, ok2 := r.Header[api.RESTAPIKeyHeader]
+		if !ok2 || len(apikey) != 1 {
+			return nil, userInvalidRequest, rsessToken
+		} else {
+			parts := strings.Split(apikey[0], ":")
+			if len(parts) == 2 {
+				apikeyAccount, _, _ := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+
+				if apikeyAccount == nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check password
+				hash := utils.HashPassword(parts[1])
+				if hash != apikeyAccount.SecretKeyHash {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check timeout
+				now := time.Now()
+				if now.UTC().Unix() >= apikeyAccount.ExpirationTimestamp {
+					return nil, userTimeout, rsessToken
+				}
+
+				roles := make(map[string]string)
+				for role, domains := range apikeyAccount.RoleDomains {
+					for _, d := range domains {
+						roles[d] = role
+					}
+				}
+				roles[access.AccessDomainGlobal] = apikeyAccount.Role
+
+				_, _, err := access.GetDomainPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains)
+				if err != nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				s := &loginSession{
+					id:          utils.GetRandomID(idLength, ""),
+					fullname:    apikeyAccount.Name,
+					remote:      r.RemoteAddr,
+					domainRoles: roles,
+					loginType:   loginTypeApikey,
+				}
+
+				return s, userOK, rsessToken
+			}
+		}
+
 		return nil, userInvalidRequest, rsessToken
 	}
 
@@ -1167,9 +1223,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var publicKey *rsa.PublicKey
 
 	if secret == "" {
-		tokenString = utils.DecryptPasswordForURL(encryptedToken)
+		tokenString = utils.DecryptUserToken(encryptedToken)
 	} else {
-		tokenString = utils.DecryptSensitiveForURL(encryptedToken, []byte(secret))
+		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
 	if tokenString == "" {
 		return nil, fmt.Errorf("unrecognized token")
@@ -1217,7 +1273,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data := utils.DecryptSensitiveForURL(encryptedData, []byte(secret))
+	data := utils.DecryptSensitive(encryptedData, []byte(secret))
 	if data != "" {
 		var c joinTicket
 		if err := json.Unmarshal([]byte(data), &c); err == nil {
@@ -1275,7 +1331,7 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, _ := token.SignedString(jwtPrivateKey)
-	return id, utils.EncryptPasswordForURL(tokenString), &c
+	return id, utils.EncryptUserToken(tokenString), &c
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
@@ -1296,7 +1352,7 @@ func jwtGenFedTicket(secret string, duration time.Duration) string {
 		ExpiresAt: now.Add(duration).Unix(),
 	}
 	tokenBytes, _ := json.Marshal(&c)
-	return utils.EncryptSensitiveForURL(string(tokenBytes), []byte(secret))
+	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
 }
 
 func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) string {
@@ -1317,7 +1373,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 	}
 	if privateKey != nil {
 		tokenString, _ := token.SignedString(privateKey)
-		return utils.EncryptSensitiveForURL(tokenString, []byte(secret))
+		return utils.EncryptSensitive(tokenString, []byte(secret))
 	} else {
 		log.WithFields(log.Fields{"id": clusterID}).Error("empty private key")
 	}
@@ -1769,7 +1825,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	var user *share.CLUSUser
 	var blockAfterFailedCount int
 
-	if pw.Username[0] == '~' {
+	if pw.Username == "" || pw.Username[0] == '~' {
 		return nil, false, false, false, 0, errors.New("User not found")
 	}
 	now := time.Now()
@@ -1893,7 +1949,7 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 			PasswordHash: utils.HashPassword(secret),
 			Domain:       "",
 			Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
-			Timeout:      common.DefaultIdleTimeout,
+			Timeout:      common.DefIdleTimeoutInternal,
 			RoleDomains:  make(map[string][]string),
 			Locale:       common.OEMDefaultUserLocale,
 			PwdResetTime: time.Now().UTC(),
@@ -2399,7 +2455,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				return
 			}
 
-			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Error("Token validation succeeded")
+			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Debug("Token validation succeeded")
 
 			username, email, groups := getSAMLUserFromAttrs(attrs, cs.SAML.GroupClaim)
 			if username == "" {

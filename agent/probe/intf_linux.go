@@ -103,6 +103,40 @@ func (m *netlinkIntfMonitor) WaitAddrChange(intval *syscall.Timeval) (bool, erro
 	}
 }
 
+func (m *netlinkIntfMonitor) WaitHostAddrChange(intval *syscall.Timeval) (bool, error) {
+	for {
+		// select() changes timer value, so reinitiate every time.
+		tv := *intval
+		if msgs, err := m.ns.EPollReceive(&tv); err != nil {
+			if err == syscall.EINTR || err == syscall.EAGAIN {		// interrupted by a signal, return, make a yield
+				// log.WithFields(log.Fields{"error": err}).Debug("Receive signal")
+				return false, nil
+			}
+			log.WithFields(log.Fields{"error": err}).Debug("Receive error")
+			return false, err
+		} else if len(msgs) == 0 {
+			// timeout
+			return false, nil
+		} else {
+			var chg bool
+			for _, msg := range msgs {
+				switch msg.Header.Type {
+				case syscall.RTM_NEWADDR:
+					m := (*addrMsg)(unsafe.Pointer(&msg.Data[0]))
+					log.WithFields(log.Fields{"family": m.family, "index": m.index}).Debug("New address")
+					chg = true
+				default:
+					// log.WithFields(log.Fields{"type": msg.Header.Type}).Debug()
+					// ignore other msgs such as NEWROUTE, DELADDR and DELROUTE and select again
+				}
+			}
+			if chg {
+				return true, nil
+			}
+		}
+	}
+}
+
 func (m *netlinkIntfMonitor) Close() {
 	m.ns.Close()
 }
