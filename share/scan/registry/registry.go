@@ -29,7 +29,7 @@ type Registry struct {
 const nonDataTimeout = 20 * time.Second
 const longTimeout = 300 * time.Second
 
-func NewSecure(registryUrl, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
+func NewSecure(registryUrl, token, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
@@ -43,7 +43,7 @@ func NewSecure(registryUrl, username, password, proxy string, trace httptrace.HT
 		transport.Proxy = http.ProxyURL(pxyUrl)
 	}
 
-	r := newFromTransport(registryUrl, username, password, transport, trace)
+	r := newFromTransport(registryUrl, token, username, password, transport, trace)
 	return r, ErrorNone, nil
 }
 
@@ -51,7 +51,7 @@ func NewSecure(registryUrl, username, password, proxy string, trace httptrace.HT
  * Create a new Registry, as with New, using an http.Transport that disables
  * SSL certificate verification.
  */
-func NewInsecure(registryUrl, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
+func NewInsecure(registryUrl, token, username, password, proxy string, trace httptrace.HTTPTrace) (*Registry, uint, error) {
 	// same as http.DefaultTransport
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -66,7 +66,7 @@ func NewInsecure(registryUrl, username, password, proxy string, trace httptrace.
 		transport.Proxy = http.ProxyURL(pxyUrl)
 	}
 
-	r := newFromTransport(registryUrl, username, password, transport, trace)
+	r := newFromTransport(registryUrl, token, username, password, transport, trace)
 	return r, ErrorNone, nil
 }
 
@@ -76,9 +76,10 @@ func NewInsecure(registryUrl, username, password, proxy string, trace httptrace.
  * adds in support for OAuth bearer tokens and HTTP Basic auth, and sets up
  * error handling this library relies on.
  */
-func WrapTransport(transport http.RoundTripper, url, username, password string) http.RoundTripper {
+func wrapTransport(transport http.RoundTripper, url, token, username, password string) http.RoundTripper {
 	tokenTransport := &TokenTransport{
 		Transport: transport,
+		Token:     token,
 		Username:  username,
 		Password:  password,
 	}
@@ -105,9 +106,9 @@ func redirectPolicyFunc(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-func newFromTransport(registryUrl, username, password string, transport http.RoundTripper, trace httptrace.HTTPTrace) *Registry {
+func newFromTransport(registryUrl, token, username, password string, transport http.RoundTripper, trace httptrace.HTTPTrace) *Registry {
 	url := strings.TrimSuffix(registryUrl, "/")
-	transport = WrapTransport(transport, url, username, password)
+	transport = wrapTransport(transport, url, token, username, password)
 
 	return &Registry{
 		URL: url,
@@ -120,7 +121,6 @@ func newFromTransport(registryUrl, username, password string, transport http.Rou
 			},
 		},
 	}
-
 }
 
 func (r *Registry) url(pathTemplate string, args ...interface{}) string {
