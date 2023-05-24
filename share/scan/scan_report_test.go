@@ -49,7 +49,7 @@ func TestVulnerabilityProfile(t *testing.T) {
 		{api.RESTVulnerability{Name: "CVE-2018-BBBB"}, nil, ""},
 	}
 	for _, p := range positives {
-		if !vpf.filterOneVulnerability(&p.v, p.domains, p.image) {
+		if !vpf.filterOneVulREST(&p.v, p.domains, p.image) {
 			t.Errorf("Vulnerability positive test fails: %v", p)
 		}
 	}
@@ -69,7 +69,7 @@ func TestVulnerabilityProfile(t *testing.T) {
 		{api.RESTVulnerability{Name: "CVE-2017-BBBB"}, []string{"stage-1"}, "enforcer:3"},
 	}
 	for _, n := range negtives {
-		if vpf.filterOneVulnerability(&n.v, n.domains, n.image) {
+		if vpf.filterOneVulREST(&n.v, n.domains, n.image) {
 			t.Errorf("Vulnerability negtive test fails: %v", n)
 		}
 	}
@@ -85,7 +85,7 @@ func TestVulnerabilityProfile(t *testing.T) {
 		{true, api.RESTVulnerability{Name: "CVE-2018-BBBB"}, nil, "test"},
 	}
 	for _, s := range tests {
-		r := vpf.FilterVulnerabilities([]*api.RESTVulnerability{&s.v}, s.idns, s.tag)
+		r := vpf.FilterVulREST([]*api.RESTVulnerability{&s.v}, s.idns, s.tag)
 		if !s.skip && len(r) == 0 {
 			t.Errorf("Vulnerability negtive test fails: %v", s)
 		} else if s.skip {

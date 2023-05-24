@@ -1316,7 +1316,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 
 		sdb := scanUtils.GetScannerDB()
-		vuls := scanUtils.FillVulDetails(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
+		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
 		modules := make([]*api.RESTScanModule, len(info.modules))
 		for i, m := range info.modules {
 			modules[i] = scanUtils.ScanModule2REST(m)

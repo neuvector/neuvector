@@ -342,6 +342,24 @@ func ImageBench2REST(cmds []string, secrets []*api.RESTScanSecret, setids []*api
 }
 */
 
+// This is use when grpc structure is returned
+func FillVuls(result *share.ScanResult) {
+	sdb := GetScannerDB()
+
+	for _, vul := range result.Vuls {
+		if vul.DBKey != "" {
+			if vr, ok := sdb.CVEDB[vul.DBKey]; ok {
+				vul.Score = vr.Score
+				vul.Vectors = vr.Vectors
+				vul.ScoreV3 = vr.ScoreV3
+				vul.VectorsV3 = vr.VectorsV3
+				vul.Description = vr.Description
+				vul.Link = vr.Link
+			}
+		}
+	}
+}
+
 func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *api.RESTScanRepoReport {
 	sdb := GetScannerDB()
 
@@ -401,14 +419,14 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
-			Envs:    result.Envs,
-			Labels:  result.Labels,
-			Vuls:    rvuls,
-			Modules: rmods,
-			Secrets: rsecrets,
-			SetIDs:  ridperms,
-			Checks:  checks,
-			Cmds:    result.Cmds,
+			Envs:      result.Envs,
+			Labels:    result.Labels,
+			Vuls:      rvuls,
+			Modules:   rmods,
+			Secrets:   rsecrets,
+			SetIDs:    ridperms,
+			Checks:    checks,
+			Cmds:      result.Cmds,
 			Verifiers: result.Verifiers,
 		},
 	}
@@ -465,7 +483,7 @@ func normalizeBaseOS(baseOS string) string {
 	return baseOS
 }
 
-func FillVulDetails(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
+func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
 	baseOS = normalizeBaseOS(baseOS)
 
 	vuls := make([]*api.RESTVulnerability, 0, len(vts))
@@ -583,9 +601,10 @@ func GatherVulTrait(traits []*VulTrait) ([]string, []string) {
 
 type VPFInterface interface {
 	GetUpdatedTime() time.Time
-	filterOneVulnerability(vul *api.RESTVulnerability, domains []string, image string) bool
-	FilterVulnerabilities(vuls []*api.RESTVulnerability, idns []api.RESTIDName, showTag string) []*api.RESTVulnerability
+	filterOneVulREST(vul *api.RESTVulnerability, domains []string, image string) bool
+	FilterVulREST(vuls []*api.RESTVulnerability, idns []api.RESTIDName, showTag string) []*api.RESTVulnerability
 	FilterVulTraits(traits []*VulTrait, idns []api.RESTIDName) utils.Set
+	FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTIDName) []*share.ScanVulnerability
 }
 
 type vpfEntry struct {
@@ -712,7 +731,7 @@ func (vpf vpFilter) filterOneVulTrait(vul *VulTrait, domains []string, image str
 	return false
 }
 
-func (vpf vpFilter) filterOneVulnerability(vul *api.RESTVulnerability, domains []string, image string) bool {
+func (vpf vpFilter) filterOneVulREST(vul *api.RESTVulnerability, domains []string, image string) bool {
 	for i, e := range vpf.vf.Entries {
 		f := vpf.filters[i]
 
@@ -778,8 +797,80 @@ func (vpf vpFilter) filterOneVulnerability(vul *api.RESTVulnerability, domains [
 	return false
 }
 
+func (vpf vpFilter) filterOneVul(vul *share.ScanVulnerability, domains []string, image string) bool {
+	for i, e := range vpf.vf.Entries {
+		f := vpf.filters[i]
+
+		if e.Name == api.VulnerabilityNameRecent {
+			pubTS, err := strconv.ParseInt(vul.PublishedDate, 0, 64)
+			if err == nil {
+				if uint(time.Since(time.Unix(pubTS, 0)).Hours()/24) >= e.Days {
+					continue
+				}
+			}
+		} else if e.Name == api.VulnerabilityNameRecentWithoutFix {
+			pubTS, err := strconv.ParseInt(vul.PublishedDate, 0, 64)
+			if err == nil {
+				if vul.FixedVersion != "" || uint(time.Since(time.Unix(pubTS, 0)).Hours()/24) >= e.Days {
+					continue
+				}
+			}
+		} else {
+			// case insensitive
+			if f.isNameRegexp && !f.name.MatchString(vul.Name) {
+				continue
+			} else if !f.isNameRegexp && !strings.EqualFold(e.Name, vul.Name) {
+				continue
+			}
+		}
+
+		// if one of domains/images matches move to the next field
+		if len(e.Domains) > 0 {
+			if len(domains) == 0 {
+				continue
+			}
+			for j, fdomain := range e.Domains {
+				if f.isDomainRegexp[j] {
+					for _, domain := range domains {
+						if f.domains[j].MatchString(domain) {
+							goto MATCH_IMAGE
+						}
+					}
+				} else {
+					for _, domain := range domains {
+						if fdomain == domain {
+							goto MATCH_IMAGE
+						}
+					}
+				}
+			}
+			continue
+		}
+
+	MATCH_IMAGE:
+		if len(e.Images) > 0 {
+			if image == "" {
+				continue
+			}
+			for j, fimage := range e.Images {
+				if f.isImageRegexp[j] && f.images[j].MatchString(image) {
+					goto MATCH
+				} else if !f.isImageRegexp[j] && fimage == image {
+					goto MATCH
+				}
+			}
+			continue
+		}
+
+	MATCH:
+		return true
+	}
+
+	return false
+}
+
 // Use Domains as namespace and DisplayName as image name
-func (vpf vpFilter) FilterVulnerabilities(vuls []*api.RESTVulnerability, idns []api.RESTIDName, showTag string) []*api.RESTVulnerability {
+func (vpf vpFilter) FilterVulREST(vuls []*api.RESTVulnerability, idns []api.RESTIDName, showTag string) []*api.RESTVulnerability {
 	if vpf.vf == nil || len(vpf.vf.Entries) == 0 {
 		return vuls
 	}
@@ -788,10 +879,10 @@ func (vpf vpFilter) FilterVulnerabilities(vuls []*api.RESTVulnerability, idns []
 	for _, v := range vuls {
 		skip := false
 		if len(idns) == 0 {
-			skip = vpf.filterOneVulnerability(v, nil, "")
+			skip = vpf.filterOneVulREST(v, nil, "")
 		} else {
 			for _, s := range idns {
-				if vpf.filterOneVulnerability(v, s.Domains, s.DisplayName) {
+				if vpf.filterOneVulREST(v, s.Domains, s.DisplayName) {
 					skip = true
 					break
 				}
@@ -839,4 +930,31 @@ func (vpf vpFilter) FilterVulTraits(traits []*VulTrait, idns []api.RESTIDName) u
 	}
 
 	return alives
+}
+
+// This is used when grpc struct is returned.
+func (vpf vpFilter) FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTIDName) []*share.ScanVulnerability {
+	if vpf.vf == nil || len(vpf.vf.Entries) == 0 {
+		return vuls
+	}
+
+	list := make([]*share.ScanVulnerability, 0, len(vuls))
+	for _, v := range vuls {
+		skip := false
+		if len(idns) == 0 {
+			skip = vpf.filterOneVul(v, nil, "")
+		} else {
+			for _, s := range idns {
+				if vpf.filterOneVul(v, s.Domains, s.DisplayName) {
+					skip = true
+					break
+				}
+			}
+		}
+		if !skip {
+			list = append(list, v)
+		}
+	}
+
+	return list
 }

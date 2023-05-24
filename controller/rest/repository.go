@@ -49,37 +49,6 @@ func newRepoScanMgr() {
 	repoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, repoScanLingeringDuration, maxRepoScanTasks)
 }
 
-// Normalize the request if the registry URL is added to the repo field
-func fixRegRepoForAdmCtrl(result *share.ScanResult) {
-	if result.Registry == "" && result.Repository != "" {
-		var proto string
-		regRepoTag := result.Repository
-		for _, proto = range []string{"http://", "https://"} {
-			if strings.HasPrefix(regRepoTag, proto) {
-				regRepoTag = regRepoTag[len(proto):]
-				break
-			}
-		}
-		if proto == "" {
-			proto = "https://"
-		}
-		if ss := strings.Split(regRepoTag, "/"); len(ss) > 1 {
-			// see splitDockerDomain() in https://github.com/docker/distribution/blob/release/2.7/reference/normalize.go
-			if !strings.ContainsAny(ss[0], ".:") && ss[0] != "localhost" {
-				// there is no registry info in regRepoTag, like "library/centos"
-			} else {
-				// there is registry info in regRepoTag, like "docker.io/library/centos" or "10.1.127.3:5000/......" or "localhost/........"
-				result.Registry = fmt.Sprintf("%s%s/", proto, ss[0])
-				result.Repository = strings.Join(ss[1:], "/")
-			}
-		} else if len(ss) == 1 {
-			// there is no registry info in regRepoTag, like "centos". Adm ctrl always prefix library, so keep the behavior same here
-			// if the local image is 'centos', then it is scanned as 'centos' but store the result as 'library/centos'
-			result.Repository = fmt.Sprintf("library/%s", ss[0])
-		}
-	}
-}
-
 type repoScanTask struct {
 }
 
@@ -145,7 +114,7 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		}).Info("Scan repository finish")
 
 		// store the scan result so it can be used by admission control
-		fixRegRepoForAdmCtrl(result)
+		scan.FixRegRepoForAdmCtrl(result)
 		scanner.StoreRepoScanResult(result)
 
 		// build image compliance list and filter the list
@@ -162,7 +131,7 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		rpt.Checks = filterComplianceChecks(rpt.Checks, cpf)
 
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		rpt.Vuls = vpf.FilterVulnerabilities(rpt.Vuls, []api.RESTIDName{api.RESTIDName{DisplayName: fmt.Sprintf("%s:%s", rpt.Repository, rpt.Tag)}}, "")
+		rpt.Vuls = vpf.FilterVulREST(rpt.Vuls, []api.RESTIDName{api.RESTIDName{DisplayName: fmt.Sprintf("%s:%s", rpt.Repository, rpt.Tag)}}, "")
 
 		rsr.report = rpt
 	}
