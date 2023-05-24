@@ -160,6 +160,37 @@ func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vp
 	return sumMap
 }
 
+// Normalize the request if the registry URL is added to the repo field
+func FixRegRepoForAdmCtrl(result *share.ScanResult) {
+	if result.Registry == "" && result.Repository != "" {
+		var proto string
+		regRepoTag := result.Repository
+		for _, proto = range []string{"http://", "https://"} {
+			if strings.HasPrefix(regRepoTag, proto) {
+				regRepoTag = regRepoTag[len(proto):]
+				break
+			}
+		}
+		if proto == "" {
+			proto = "https://"
+		}
+		if ss := strings.Split(regRepoTag, "/"); len(ss) > 1 {
+			// see splitDockerDomain() in https://github.com/docker/distribution/blob/release/2.7/reference/normalize.go
+			if !strings.ContainsAny(ss[0], ".:") && ss[0] != "localhost" {
+				// there is no registry info in regRepoTag, like "library/centos"
+			} else {
+				// there is registry info in regRepoTag, like "docker.io/library/centos" or "10.1.127.3:5000/......" or "localhost/........"
+				result.Registry = fmt.Sprintf("%s%s/", proto, ss[0])
+				result.Repository = strings.Join(ss[1:], "/")
+			}
+		} else if len(ss) == 1 {
+			// there is no registry info in regRepoTag, like "centos". Adm ctrl always prefix library, so keep the behavior same here
+			// if the local image is 'centos', then it is scanned as 'centos' but store the result as 'library/centos'
+			result.Repository = fmt.Sprintf("library/%s", ss[0])
+		}
+	}
+}
+
 func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary {
 	log.WithFields(log.Fields{"registry": reqImgRegistry, "repo": reqImgRepo, "tag": reqImgTag}).Debug()
 
@@ -407,7 +438,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -417,7 +448,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					vmap[id] = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 					nmap[id] = images2IDNames(rs, sum)
 				}
 			}
@@ -508,7 +539,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			rrpt.Cmds = c.cmds
 
 			refreshScanCache(rs, id, sum, c, vpf)
-			rrpt.Vuls = scanUtils.FillVulDetails(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
 			// The checks are still to be filtered
 			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
 
@@ -575,7 +606,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			for i, vul := range layer.Vuls {
 				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
 			}
-			rvuls = vpf.FilterVulnerabilities(rvuls, idns, showTag)
+			rvuls = vpf.FilterVulREST(rvuls, idns, showTag)
 
 			var rsecrets []*api.RESTScanSecret
 			if !rs.config.DisableFiles && layer.Secrets != nil {

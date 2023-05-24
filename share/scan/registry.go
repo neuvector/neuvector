@@ -22,31 +22,13 @@ type RegClient struct {
 	*registry.Registry
 }
 
-func NewRegClient(url, username, password, proxy string, trace httptrace.HTTPTrace) *RegClient {
+// If token is given, the Authorization header will be added with token appended.
+func NewRegClient(url, token, username, password, proxy string, trace httptrace.HTTPTrace) *RegClient {
 	log.WithFields(log.Fields{"url": url}).Debug("")
 
 	// Ignore errors
-	hub, _, _ := registry.NewInsecure(url, username, password, proxy, trace)
+	hub, _, _ := registry.NewInsecure(url, token, username, password, proxy, trace)
 	return &RegClient{Registry: hub}
-
-	/*
-		var msg string
-		hub, errCode, err := registry.NewSecure(url, username, password, proxy, trace)
-		if errCode == registry.ErrorCertificate {
-			log.Debug("Use insecure connection")
-			hub, errCode, err = registry.NewInsecure(url, username, password, proxy, trace)
-			if errCode == registry.ErrorCertificate {
-				log.WithFields(log.Fields{"error": err}).Error("Certificate error")
-				if err != nil {
-					msg = err.Error()
-				}
-				return nil, share.ScanErrorCode_ScanErrCertificate, msg
-			}
-		}
-
-		// Ignore other errors
-		return &RegClient{Registry: hub}, share.ScanErrorCode_ScanErrNone, ""
-	*/
 }
 
 type ImageInfo struct {
@@ -79,8 +61,6 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 
 	dg, body, err := rc.ManifestRequest(ctx, name, tag, 2)
 	if err == nil {
-		// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
-
 		// check if response is manifest list
 		var ml manifestList.DeserializedManifestList
 		if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&

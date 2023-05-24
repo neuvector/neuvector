@@ -109,7 +109,7 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 				"org": org, "subdomain": dir.Key, "type": dir.DirType, "url": dir.URL, "registry": newURL,
 			}).Debug("Get repo list ...")
 
-			r.rc = scanUtils.NewRegClient(newURL, r.base.username, r.base.password, r.base.proxy, r.tracer)
+			r.rc = scanUtils.NewRegClient(newURL, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 			if rps, err := r.base.GetRepoList(org, name, limit); err == nil {
 				if !strings.Contains(name, "*") {
 					// although repo has no wildcard, we need wait until here so we have the correct subdomain URL
@@ -218,7 +218,7 @@ func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 		sub, subRepo := getSubdomainFromRepo(repo)
 		if url, ok := r.subdomainURL[sub]; ok {
 			if r.regURL != url {
-				rc = scanUtils.NewRegClient(url, r.base.username, r.base.password, r.base.proxy, r.tracer)
+				rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 			}
 		} else {
 			smd.scanLog.WithFields(log.Fields{"subdomain": sub}).Error("connot find the subdomain")
@@ -324,7 +324,7 @@ func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*sc
 		sub, subRepo := getSubdomainFromRepo(repo)
 		if url, ok := r.subdomainURL[sub]; ok {
 			if r.regURL != url {
-				rc = scanUtils.NewRegClient(url, r.base.username, r.base.password, r.base.proxy, r.tracer)
+				rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 			}
 		} else {
 			smd.scanLog.WithFields(log.Fields{"subdomain": sub}).Error("connot find the subdomain")

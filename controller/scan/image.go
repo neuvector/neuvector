@@ -192,7 +192,7 @@ func (r *base) url(pathTemplate string, args ...interface{}) string {
 }
 
 func (r *base) newRegClient(url, username, password string) error {
-	rc := scanUtils.NewRegClient(url, username, password, r.proxy, r.tracer)
+	rc := scanUtils.NewRegClient(url, "", username, password, r.proxy, r.tracer)
 	r.rc = rc
 	r.username = username
 	r.password = password

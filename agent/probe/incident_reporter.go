@@ -172,12 +172,13 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 		pmsga.expireCnt = expireCountdown
 
 		if pmsg.ProcPid != 0 && pmsga.pid == 0 {
+			pmsga.expireCnt = 1
 			pmsg.ProcPid = pmsg.ProcPid
 			pmsga.fsMsg = pmsg // updated
 		} else {
-			pmsga.count++
 			pmsga.fsMsg.Path = pmsg.Path // restored
 		}
+		pmsga.count++
 		mLog.WithFields(log.Fields{"report_a": pmsga, "msg": pmsga.fsMsg, "pmsg": pmsg}).Debug("PROC: accumulated")
 		return false // hold the event for further events
 	}

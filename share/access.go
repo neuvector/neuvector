@@ -207,6 +207,14 @@ func (o *CLUSDomain) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	return nil, nil
 }
 
+func (o *CLUSSigstoreRootOfTrust) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}
+
+func (o *CLUSSigstoreVerifier) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}
+
 func (o *CLUSGroup) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	if o.CfgType == FederalCfg {
 		return _fedDomainSlice, _fedDomainSlice
