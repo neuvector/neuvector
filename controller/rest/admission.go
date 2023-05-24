@@ -600,6 +600,19 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	resp.Options.PspCollection = pspCollection
 	resp.Options.PssCollections = cacher.GetAdmissionPssDesc()
+	sigstoreVerifiers := []string{}
+	if keys, _ := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust); len(keys) > 0 {
+		sigstoreVerifiers = make([]string, 0, len(keys))
+		for _, key := range keys {
+			if ss := strings.Split(key, "/"); len(ss) != 5 {
+				continue
+			} else {
+				sigstoreVerifiers = append(sigstoreVerifiers, fmt.Sprintf("%s/%s", ss[3], ss[4]))
+			}
+		}
+	}
+	resp.Options.SigstoreVerifiers = sigstoreVerifiers
+
 	restRespSuccess(w, r, resp, acc, login, nil, "Get admission control rule options")
 }
 

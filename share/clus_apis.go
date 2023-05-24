@@ -634,6 +634,14 @@ func CLUSGroupKey2GroupName(key string) string {
 	return CLUSKeyNthToken(key, 3)
 }
 
+func CLUSRootOfTrustKey2RootOfTrustName(key string) string {
+	return CLUSKeyNthToken(key, 3)
+}
+
+func CLUSVerifierKey2VerifierName(key string) string {
+	return CLUSKeyNthToken(key, 4)
+}
+
 func CLUSSigstoreRootOfTrustKey(rootName string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigSigstoreRootsOfTrust, rootName)
 }
@@ -2726,13 +2734,13 @@ type CLUSApikey struct {
 }
 
 type CLUSSigstoreRootOfTrust struct {
-	Name           string `json:"name"`
-	IsPrivate      bool   `json:"is_private"`
-	RekorPublicKey string `json:"rekor_public_key"`
-	RootCert       string `json:"root_cert"`
-	SCTPublicKey   string `json:"sct_public_key"`
-	CfgType        string `json:"cfg_type"`
-	Comment        string `json:"comment"`
+	Name           string   `json:"name"`
+	IsPrivate      bool     `json:"is_private"`
+	RekorPublicKey string   `json:"rekor_public_key"`
+	RootCert       string   `json:"root_cert"`
+	SCTPublicKey   string   `json:"sct_public_key"`
+	CfgType        TCfgType `json:"cfg_type"`
+	Comment        string   `json:"comment"`
 }
 
 type CLUSSigstoreVerifier struct {
@@ -2743,4 +2751,5 @@ type CLUSSigstoreVerifier struct {
 	PublicKey    string `json:"public_key"`
 	CertIssuer   string `json:"cert_issuer"`
 	CertSubject  string `json:"cert_subject"`
+	Comment      string `json:"comment"`
 }
