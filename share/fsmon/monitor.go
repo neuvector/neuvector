@@ -348,17 +348,27 @@ func (w *FileWatch) reportLearningRules() {
 	for _, grp := range w.groups {
 		if len(grp.learnRules) > 0 {
 			for flt, rule := range grp.learnRules {
+				group := grp.profile.Group
+				// It enables to correlate its derived groups, like federal groups
+				//for _, fltp := range grp.profile.Filters {
+				//	if fltp.CustomerAdd && flt == filterIndexKey(fltp) {
+				//		group = fltp.DerivedGroup
+				//		mLog.WithFields(log.Fields{"group": group}).Debug("FMON:")
+				//		break
+				//	}
+				//}
+
 				for itr := range rule.Iter() {
 					prf := itr.(string)
 					rl := &share.CLUSFileAccessRuleReq{
-						GroupName: grp.profile.Group,
+						GroupName: group,
 						Filter:    flt,
 						Path:      prf,
 					}
 					learnRules = append(learnRules, rl)
 				}
 			}
-			grp.learnRules = make(map[string]utils.Set)
+			grp.learnRules = make(map[string]utils.Set)	// reset
 		}
 	}
 	w.mux.Unlock()
@@ -371,6 +381,43 @@ func filterIndexKey(filter share.CLUSFileMonitorFilter) string {
 	return fmt.Sprintf("%s/%s", filter.Path, filter.Regex)
 }
 
+func filterPathMatch(path string, flt share.CLUSFileMonitorFilter) bool {
+	if flt.Regex == "" {
+		return flt.Path == path
+	} else {
+		fstr := fmt.Sprintf("%s/%s", filepath.Dir(path), flt.Regex)
+		log.WithFields(log.Fields{"fstr": fstr}).Debug("FMON: fstr")
+		if regx, err := regexp.Compile(fmt.Sprintf("^%s$", fstr)); err == nil {
+			return regx.MatchString(path)
+		}
+	}
+	return false
+}
+
+func addLearnedRules(grp *groupInfo, flt share.CLUSFileMonitorFilter, pInfo []*ProcInfo) {
+	index := filterIndexKey(flt)
+	if applyRules, ok := grp.applyRules[index]; ok {
+		learnRules, ok := grp.learnRules[index]
+		if !ok {
+			learnRules = utils.NewSet()
+		}
+		for _, pf := range pInfo {
+			// only use the process name/path as profile
+			if pf != nil && pf.Path != "" {
+				if !applyRules.Contains(pf.Path) && !learnRules.Contains(pf.Path) {
+					learnRules.Add(pf.Path)
+				}
+			}
+		}
+
+		if learnRules.Cardinality() > 0 {
+			grp.learnRules[index] = learnRules	// update grp
+		}
+	} else {
+		log.WithFields(log.Fields{"index": index}).Debug("FMON: no access rules")
+	}
+}
+
 func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, event uint32) {
 	// mLog.WithFields(log.Fields{"rootpid": rootPid, "path": path, "event": event}).Debug()
 	w.mux.Lock()
@@ -381,28 +428,17 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, eve
 		return
 	}
 	mode := grp.mode
-	if mode == share.PolicyModeLearn {
-		flt := fmod.finfo.Filter.(*filterRegex)
-		if applyRules, ok := grp.applyRules[flt.path]; ok {
-			learnRules, ok := grp.learnRules[flt.path]
-			if !ok {
-				learnRules = utils.NewSet()
+	if mode == share.PolicyModeLearn && len(fmod.pInfo) > 0 {	// inotify has no process info
+		for _, flt := range grp.profile.Filters {
+			if flt.CustomerAdd && filterPathMatch(path, flt) {
+				addLearnedRules(grp, flt, fmod.pInfo)
 			}
-			for _, pf := range fmod.pInfo {
-				// only use the process name/path as profile
-				if pf != nil && pf.Path != "" {
-					if !applyRules.Contains(pf.Path) && !learnRules.Contains(pf.Path) {
-						learnRules.Add(pf.Path)
-						// mLog.WithFields(log.Fields{"rule": pf.Path, "filter": flt}).Debug("FMON:")
-					}
-				}
+		}
+
+		for _, flt := range grp.profile.FiltersCRD {
+			if flt.CustomerAdd && filterPathMatch(path, flt) {
+				addLearnedRules(grp, flt, fmod.pInfo)
 			}
-			// for inotify, cannot learn
-			if learnRules.Cardinality() > 0 {
-				grp.learnRules[flt.path] = learnRules
-			}
-		} else {
-			log.WithFields(log.Fields{"path": path}).Debug("FMON: no access rules")
 		}
 	}
 	w.mux.Unlock()
