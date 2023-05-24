@@ -77,6 +77,8 @@ var faccessCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointFileAc
 	section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey, purgeFilter: purgeGroupFilter} // file access cfgEndpoint
 var registryCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointRegistry, key: share.CLUSConfigRegistryStore, isStore: true,
 	section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey}
+var sigstoreCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointSigstoreRootsOfTrust, key: share.CLUSConfigSigstoreRootsOfTrust, isStore: true,
+	section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey}
 
 // Order is important
 var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
@@ -107,6 +109,7 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 	&cfgEndpoint{name: share.CFGEndpointScan, key: share.CLUSConfigScanKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
+	sigstoreCfgEndpoint,
 	registryCfgEndpoint,
 	&cfgEndpoint{name: share.CFGEndpointAdmissionControl, key: share.CLUSConfigAdmissionControlStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockAdmCtrlKey},
