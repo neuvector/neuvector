@@ -56,7 +56,7 @@ func decScanningCount(sid string) {
 	defer scanMutex.RUnlock()
 
 	s, ok := scanners[sid]
-	if !ok && s.scanning > 0 {
+	if ok && s.scanning > 0 {
 		s.scanning--
 	}
 }
