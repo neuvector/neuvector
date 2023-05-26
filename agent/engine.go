@@ -113,6 +113,8 @@ type localSystemInfo struct {
 	jumboFrameMTU   bool
 	xffEnabled      bool
 	ciliumCNI       bool
+	disableNetPolicy bool
+	detectUnmanagedWl bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -120,6 +122,8 @@ var defaultTapProxymesh bool = true
 
 //to avoid false positive implicit violation on dp during upgrade, set XFF default to disabled
 var defaultXffEnabled bool = false
+var defaultDisableNetPolicy bool = false
+var defaultDetectUnmanagedWl bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
@@ -238,6 +242,8 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 		entryPtSig = "sleep" // 4.4: "/usr/local/bin/upgrader"
 	case "fetcher":
 		entryPtSig = "/usr/local/bin/fetcher"
+	case "csp":
+		entryPtSig = "/usr/bin/csp-billing-adapter"
 	default:
 		//	log.WithFields(log.Fields{"invalid role": role}).Debug("PROC:")
 		return false // exclude others
@@ -1627,12 +1633,14 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	// Send event to controller
 	if !isChild {
 		if c.pid != 0 {
+			prober.BuildProcessFamilyGroups(c.id, c.pid, true, info.Privileged)
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
 			examNeuVectorInterface(c, changeInit)
 		}
 	} else {
 		if parent != nil && !parent.examIntface {
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false, info.Privileged)
 			parent.examIntface = true
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
@@ -1645,6 +1653,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// process killer per policy: removed by evaluating other same-kind instances
 		// since the same policy might be shared by several same-kind instances in a node
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
+
 
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
@@ -2016,10 +2025,6 @@ func taskStopContainer(id string, pid int) {
 		log.WithFields(log.Fields{"id": id, "error": err}).Error("Failed to read container. Use cached info.")
 		info = c.info
 		info.Running = false
-	} else if info.Running {
-		// not a relaible source: from process monitor
-		log.WithFields(log.Fields{"id": id}).Debug("skip stop as container is still running")
-		return
 	}
 
 	if info.FinishedAt.IsZero() {
@@ -2144,7 +2149,9 @@ func taskDPConnect() {
 		}
 	}
 	pe.PushFqdnInfoToDP()
-	pe.PushNetworkPolicyToDP()
+	if gInfo.disableNetPolicy == false {
+		pe.PushNetworkPolicyToDP()
+	}
 
 	dp.DPCtrlRefreshApp()
 
@@ -2153,6 +2160,12 @@ func taskDPConnect() {
 	//set xff
 	xffenabled := gInfo.xffEnabled
 	dp.DPCtrlSetSysConf(&xffenabled)
+	//set disableNetPolicy
+	dnp := gInfo.disableNetPolicy
+	dp.DPCtrlSetDisableNetPolicy(&dnp)
+	//set detectUnmanagedWl
+	duw := gInfo.detectUnmanagedWl
+	dp.DPCtrlSetDetectUnmanagedWl(&duw)
 }
 
 var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version

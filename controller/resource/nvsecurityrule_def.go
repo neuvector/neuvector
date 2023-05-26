@@ -7,6 +7,7 @@ import (
 )
 
 const constApiGroupNV = "neuvector.com"
+const NvCrdV1 = "v1"
 
 const NvSecurityRuleName = "nvsecurityrules.neuvector.com"
 const NvSecurityRuleVersion = "v1"
@@ -44,6 +45,13 @@ const NvWafSecurityRulePlural = "nvwafsecurityrules"
 const NvWafSecurityRuleKind = "NvWafSecurityRule"
 const NvWafSecurityRuleListKind = "NvWafSecurityRuleList"
 const NvWafSecurityRuleSingular = "nvwafsecurityrule"
+
+// csp billing adapter
+const NvCspUsageName = "neuvectorusagerecords.neuvector.com"
+const NvCspUsagePlural = "neuvectorusagerecords"
+const NvCspUsageKind = "NeuvectorUsageRecord" // CR kind
+const NvCspUsageListKind = "NeuvectorUsageRecordList"
+const NvCspUsageSingular = "neuvectorusagerecord"
 
 type NvCrdAdmCtrlRule struct {
 	ID       uint32                      `json:"id"`        // only set for default rules
@@ -314,5 +322,32 @@ func (m *NvWafSecurityRule) GetMetadata() *metav1.ObjectMeta {
 }
 
 func (m *NvWafSecurityRuleList) GetMetadata() *metav1.ListMeta {
+	return m.Metadata
+}
+
+// csp billing adapter integration
+type NvCspUsage struct {
+	Kind             *string            `json:"kind,omitempty"`
+	ApiVersion       *string            `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ObjectMeta `json:"metadata"`
+	ManagedNodeCount int                `json:"managed_node_count"` // sum of all reachable clusters' nodes count. 0 means "do not report to CSP API"
+	ReportingTime    string             `json:"reporting_time"`
+	BaseProduct      string             `json:"base_product"`
+	XXX_unrecognized []byte             `json:"-"`
+}
+
+type NvCspUsageList struct {
+	Kind             *string          `json:"kind,omitempty"`
+	ApiVersion       *string          `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ListMeta `json:"metadata"`
+	Items            []*NvCspUsage    `json:"items"`
+	XXX_unrecognized []byte           `json:"-"`
+}
+
+func (m *NvCspUsage) GetMetadata() *metav1.ObjectMeta {
+	return m.Metadata
+}
+
+func (m *NvCspUsageList) GetMetadata() *metav1.ListMeta {
 	return m.Metadata
 }

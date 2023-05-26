@@ -16,7 +16,7 @@ import (
 
 type orchConnInterface interface {
 	LeadChangeNotify(leader bool)
-	Start(ocRegImage bool)
+	Start(ocRegImage bool, cspType share.TCspType)
 	Stop()
 	Close()
 }
@@ -124,7 +124,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 	log.WithFields(log.Fields{"event": event, "type": rt}).Debug("Event done")
 }
 
-func (c *orchConn) Start(ocImageRegistered bool) {
+func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	var r string
 
 	// Make sure register resource first, otherwise it may trigger a race condition in k8s client library
@@ -168,6 +168,10 @@ func (c *orchConn) Start(ocImageRegistered bool) {
 	}
 	for _, r := range rscTypes {
 		global.ORCH.RegisterResource(r)
+	}
+
+	if cspType != share.CSP_NONE {
+		global.ORCH.RegisterResource(resource.RscTypeCrdNvCspUsage)
 	}
 
 	if ocImageRegistered {

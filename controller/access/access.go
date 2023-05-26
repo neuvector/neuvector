@@ -580,6 +580,7 @@ func CompileUriPermitsMapping() {
 				"v1/token_auth_server",
 				"v1/token_auth_server/*",
 				"v1/eula",
+				"v1/fed/healthcheck",
 			},
 			CONST_API_DEBUG: []string{
 				"v1/fed/member",
@@ -620,6 +621,10 @@ func CompileUriPermitsMapping() {
 				"v1/scan/registry/*/image/*",
 				"v1/scan/registry/*/layers/*",
 				"v1/list/registry_type",
+				"v1/scan/sigstore/root_of_trust",
+				"v1/scan/sigstore/root_of_trust/*",
+				"v1/scan/sigstore/root_of_trust/*/verifier",
+				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
 			CONST_API_INFRA: []string{
 				"v1/host",
@@ -740,6 +745,9 @@ func CompileUriPermitsMapping() {
 				"v1/user",
 				"v1/user/*",
 				"v1/selfuser", // Any user is allowed to use the login token to retrieve his/her own user info. temporarily given PERM_AUTHORIZATION for retrieving caller's user info
+				"v1/api_key",
+				"v1/api_key/*",
+				"v1/selfapikey",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile",
@@ -786,6 +794,7 @@ func CompileUriPermitsMapping() {
 				"v1/controller/*/profiling",
 				"v1/enforcer/*/profiling",
 				"v1/file/config",
+				"v1/csp/file/support",
 			},
 			CONST_API_RT_SCAN: []string{
 				"v1/scan/workload/*",
@@ -796,6 +805,8 @@ func CompileUriPermitsMapping() {
 				"v1/scan/registry/*/scan",
 				"v1/scan/registry",
 				"v1/scan/registry/*/test",
+				"v1/scan/sigstore/root_of_trust",
+				"v1/scan/sigstore/root_of_trust/*/verifier",
 			},
 			CONST_API_CICD_SCAN: []string{
 				"v1/scan/result/repository",
@@ -836,6 +847,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_AUTHORIZATION: []string{
 				"v1/user_role",
 				"v1/user",
+				"v1/api_key",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile",
@@ -872,6 +884,8 @@ func CompileUriPermitsMapping() {
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry/*",
+				"v1/scan/sigstore/root_of_trust/*",
+				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
 			CONST_API_INFRA: []string{
 				"v1/domain",
@@ -954,6 +968,8 @@ func CompileUriPermitsMapping() {
 				"v1/scan/registry/*/scan",
 				"v1/scan/registry/*",
 				"v1/scan/registry/*/test",
+				"v1/scan/sigstore/root_of_trust/*",
+				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
 			CONST_API_GROUP: []string{
 				"v1/group/*",
@@ -981,6 +997,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_AUTHORIZATION: []string{
 				"v1/user_role/*",
 				"v1/user/*",
+				"v1/api_key/*",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile/*",
@@ -1538,4 +1555,19 @@ func (acc *AccessControl) AuthorizeOwn(obj share.AccessObject, f share.GetAccess
 	// }
 
 	return authz
+}
+
+func (acc *AccessControl) GetRoleDomains() map[string][]string{
+	var roleDomains = make(map[string][]string)
+
+	for d, role := range acc.roles {
+		roleDomains[role] = append(roleDomains[role], d)
+	}
+
+	return roleDomains
+}
+
+func ContainsNonSupportRole(role string) bool {
+	var roles = utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader, api.UserRoleIBMSA, api.UserRoleImportStatus)
+	return roles.Contains(role)
 }

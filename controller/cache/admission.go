@@ -91,6 +91,7 @@ var critDisplayName map[string]string = map[string]string{
 	share.CriteriaKeyRequestLimit:        "resource limitation",
 	share.CriteriaKeyCustomPath:          "custom path violation",
 	share.CriteriaKeySaBindRiskyRole:     "service account bounds high risk role violation",
+	share.CriteriaKeyImageVerifiers:      "image verifiers",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
@@ -159,6 +160,9 @@ func initCache() {
 					switch crt.Op {
 					case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
 						crt.ValueSlice = strings.Split(crt.Value, setDelim)
+						for i, value := range crt.ValueSlice {
+							crt.ValueSlice[i] = strings.TrimSpace(value)
+						}
 					}
 				}
 				ruleCaches[idx].RuleMap[arh.ID] = r
@@ -1379,6 +1383,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyHasPssViolation:
 			met = len(pssViolations(crt, c, scannedImage.RunAsRoot)) > 0
 			positive = true
+		case share.CriteriaKeyImageVerifiers:
+			met, positive = isSetCriterionMet(crt, utils.NewSetFromStringSlice(scannedImage.Verifiers))
 		default:
 			met, positive = false, true
 		}

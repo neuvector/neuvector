@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
-  version: 5.2
+  version: '5.2'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -4342,11 +4342,102 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/csp/file/support:
+    post:
+      tags:
+        - File
+      summary: Export support config tarball in gz format
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success. Get a tarball gz file.
   /v1/fed/healthcheck:
     get:
       tags:
         - Federation
       summary: Health Check of Federate Primary REST server
+      responses:
+        '200':
+          description: Success
+  /v1/api_key:
+    get:
+      tags:
+        - Apikey
+      summary: Gets a list of apikeys
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTApikeysData'
+    post:
+      tags:
+        - Apikey
+      summary: Creates an apikey
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Apikey information
+          required: true
+          schema:
+            $ref: '#/definitions/RESTApikeyCreation'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTApikeyGeneratedData'
+  /v1/api_key/{accesskey}:
+    get:
+      tags:
+        - Apikey
+      summary: Gets an apikey
+      produces:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: accesskey
+          description: Apikey access key
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTApikeyData'
+    delete:
+      tags:
+        - Apikey
+      summary: Delete apikey
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: path
+          name: accesskey
+          description: Apikey access key
+          required: true
+          type: string
       responses:
         '200':
           description: Success
@@ -4380,38 +4471,39 @@ definitions:
     properties:
       name:
         type: string
-        example: "Container.Managed"
+        example: Container.Managed
       level:
         type: string
-        example: "INFO"
+        example: INFO
       reported_timestamp:
         type: integer
         format: int64
         example: 1516832670
       reported_at:
         type: string
-        example: "2018-01-24T22:24:30Z"
+        format: date-time
+        example: 2018-01-24T22:24:30Z
       cluster_name:
         type: string
-        example: "cluster1"
+        example: cluster1
       response_rule_id:
         type: integer
         example: 10007
       host_id:
         type: string
-        example: "2AU7:TIEN:O5KX:QK56:LFQP:IJSV:FXBN:QJV7"
+        example: 2AU7:TIEN:O5KX:QK56:LFQP:IJSV:FXBN:QJV7
       host_name:
         type: string
-        example: "ubuntu64"
+        example: ubuntu64
       enforcer_id:
         type: string
-        example: "bced57295eefbd3f3bd0cf798b6184fa789"
+        example: bced57295eefbd3f3bd0cf798b6184fa789
       enforcer_name:
         type: string
         example: allinone
       workload_id:
         type: string
-        example: "7df6a19648e2860c89fe12c8d5b1c52079a"
+        example: 7df6a19648e2860c89fe12c8d5b1c52079a
       workload_name:
         type: string
         example: ""
@@ -4426,7 +4518,7 @@ definitions:
         example: ""
       image_id:
         type: string
-        example: "d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f"
+        example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -4466,7 +4558,7 @@ definitions:
         example: ""
       user:
         type: string
-        example: "root"
+        example: root
       error:
         type: string
         example: "Request failed"
@@ -4530,25 +4622,26 @@ definitions:
         example: 1516832670
       reported_at:
         type: string
-        example: "2018-01-24T22:24:30Z"
+        format: date-time
+        example: 2018-01-24T22:24:30Z
       cluster_name:
         type: string
-        example: "cluster1"
+        example: cluster1
       response_rule_id:
         type: integer
         example: 10009
       host_id:
         type: string
-        example: "QK56:LFQP:IJSV:FXBN:QJV7:5MBB:6PL5"
+        example: QK56:LFQP:IJSV:FXBN:QJV7:5MBB:6PL5
       host_name:
         type: string
-        example: "ubuntu64"
+        example: ubuntu64
       enforcer_id:
         type: string
-        example: "bced57295eefbd3f3bd0cf798b6184fa789"
+        example: bced57295eefbd3f3bd0cf798b6184fa789
       enforcer_name:
         type: string
-        example: "allinone"
+        example: allinone
       controller_id:
         type: string
         example: ""
@@ -4557,34 +4650,33 @@ definitions:
         example: ""
       workload_id:
         type: string
-        example: "7df6a19648e2860c89fe12c8d5b1c52079a"
+        example: 7df6a19648e2860c89fe12c8d5b1c52079a
       workload_name:
         type: string
-        example: "kafkadocker_zookeeper_1"
+        example: kafkadocker_zookeeper_1
       workload_domain:
         type: string
         example: ""
       workload_image:
         type: string
-        example: "zookeeper"
+        example: zookeeper
       workload_service:
         type: string
         example: ""
       category:
         type: string
-        example: "WORKLOAD"
+        example: WORKLOAD
       user:
         type: string
-        example: "user"
+        example: user
       user_roles:
         type: object
-        properties:
-          key:
-            type: string
-            example: user1
-          value:
-            type: string
-            example: userRole
+        description: map key is domain(string type)
+        additionalProperties:
+          type: string
+        example:
+          domain1: admin
+          domain2: reader
       user_addr:
         type: string
         example: ""
@@ -4617,10 +4709,10 @@ definitions:
     properties:
       group:
         type: string
-        example:
+        example: "Domain Admins"
       global_role:
         type: string
-        example:
+        example: admin
       role_domains:
         type: object
         properties:
@@ -4631,19 +4723,40 @@ definitions:
             type: array
             items:
               type: string
-              example: ["domain1", "domain2"]
+            example: ["domain1", "domain2"]
   Incident:
     type: object
     required:
+      - name
       - level
       - reported_timestamp
       - reported_at
       - cluster_name
+      - response_rule_id
       - host_id
       - host_name
       - enforcer_id
       - enforcer_name
       - id
+      - workload_id
+      - workload_name
+      - workload_domain
+      - workload_image
+      - workload_service
+      - remote_workload_id
+      - remote_workload_name
+      - remote_workload_domain
+      - remote_workload_image
+      - remote_workload_service
+      - proc_name
+      - proc_path
+      - proc_cmd
+      - proc_real_uid
+      - proc_effective_uid
+      - proc_real_user
+      - proc_effective_user
+      - file_path
+      - file_name
       - client_ip
       - server_ip
       - client_port
@@ -4652,10 +4765,13 @@ definitions:
       - ether_type
       - ip_proto
       - conn_ingress
+      - proc_parent_name
+      - proc_parent_path
       - action
       - group
       - rule_id
       - aggregation_from
+      - count
       - message
     properties:
       name:
@@ -4670,7 +4786,8 @@ definitions:
         example: 1515020888
       reported_at:
         type: string
-        example: "2018-01-03T23:08:08Z"
+        format: date-time
+        example: 2018-01-03T23:08:08Z
       cluster_name:
         type: string
         example: cluster1
@@ -4679,55 +4796,55 @@ definitions:
         example: 10006
       host_id:
         type: string
-        example: "ubuntu64:ZYA3:UZL5:2WOT:QYEF:SLVT:LIBD"
+        example: ubuntu64:ZYA3:UZL5:2WOT:QYEF:SLVT:LIBD
       host_name:
         type: string
-        example: "ubuntu64"
+        example: ubuntu64
       enforcer_id:
         type: string
-        example: "a928be54f34fbb696426890a7249c067"
+        example: a928be54f34fbb696426890a7249c067
       enforcer_name:
         type: string
-        example: "allinone"
+        example: allinone
       id:
         type: string
-        example: "e6e19591-75a0-43e9-bebb-145d588e6718"
+        example: e6e19591-75a0-43e9-bebb-145d588e6718
       workload_id:
         type: string
-        example: "83e76eabd68494649440fa0a35451315289c70eb3094454e419952dffaa7715a"
+        example: 83e76eabd68494649440fa0a35451315289c70eb3094454e419952dffaa7715a
       workload_name:
         type: string
-        example: "iperfserver"
+        example: iperfserver
       workload_domain:
         type: string
         example: ""
       workload_image:
         type: string
-        example: "iperfserver"
+        example: iperfserver
       workload_service:
         type: string
-        example: "iperfserver"
+        example: iperfserver
       remote_workload_id:
         type: string
-        example: "external"
+        example: external
       remote_workload_name:
         type: string
-        example: "iperfclient"
+        example: iperfclient
       remote_workload_domain:
         type: string
         example: ""
       remote_workload_image:
         type: string
-        example: "iperfclient"
+        example: iperfclient
       remote_workload_service:
         type: string
-        example: "iperfclient"
+        example: iperfclient
       proc_name:
         type: string
-        example: "nc"
+        example: nc
       proc_path:
         type: string
-        example: "/bin/nc.traditional"
+        example: /bin/nc.traditional
       proc_cmd:
         type: string
         example: "./dns_tunneling/iodine/bin/iodine -f -r 172.17.0.3 -P"
@@ -4753,10 +4870,10 @@ definitions:
           example: ""
       client_ip:
         type: string
-        example: "192.168.1.62"
+        example: 192.168.1.62
       server_ip:
         type: string
-        example: "10.1.4.3"
+        example: 10.1.4.3
       client_port:
         type: integer
         format: uint16
@@ -4782,19 +4899,19 @@ definitions:
         example: false
       proc_parent_name:
         type: string
-        example: "sh"
+        example: sh
       proc_parent_path:
         type: string
-        example: "/bin/dash"
+        example: /bin/dash
       action:
         type: string
-        example: "violate"
+        example: violate
       group:
         type: string
-        example: "nv.iperfserver"
+        example: nv.iperfserver
       rule_id:
         type: string
-        example: "00000000-0000-0000-0000-000000000001"
+        example: 00000000-0000-0000-0000-000000000001
       aggregation_from:
         type: integer
         format: int64
@@ -4854,10 +4971,10 @@ definitions:
         example: 1
       name:
         type: string
-        example: "iperfserver"
+        example: iperfserver
       kind:
         type: string
-        example: "Deployment"
+        example: Deployment
       message:
         type: string
         example: "Assessment Creation of Kubernetes Deployment resource (iperfserver) is denied because of deny rule id 1000 with criteria: (allow privilege escalation = true) [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]"
@@ -4871,7 +4988,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["user","userGroups"]
+        example: ["user", "userGroups"]
       results:
         type: array
         items:
@@ -4896,7 +5013,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["risky_role_view_secret","risky_role_create_pod"]
+        example: ["risky_role_view_secret", "risky_role_create_pod"]
   RESTAdmissionRule:
     type: object
     required:
@@ -4916,7 +5033,7 @@ definitions:
         example: 2
       category:
         type: string
-        example: "Kubernetes"
+        example: Kubernetes
       comment:
         type: string
         example: "Do not delete this exception rule"
@@ -4932,7 +5049,7 @@ definitions:
         example: false
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground, federal]
       rule_type:
         type: string
         enum: [exception, deny]
@@ -4971,7 +5088,7 @@ definitions:
           example: ""
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground, federal]
       rule_type:
         type: string
         enum: [exception, deny]
@@ -5014,21 +5131,21 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - containsAny
-            - containsAll
-            - =
+        example:
+          - containsAny
+          - containsAll
+          - =
       values:
         type: array
         items:
           type: string
-          example:
-            - none
-            - true
-            - false
+        example:
+          - ""
+          - "true"
+          - "false"
       match_src:
         type: string
-        example: "yaml"
+        example: yaml
       sub_options:
         type: object
         properties:
@@ -5098,14 +5215,19 @@ definitions:
           $ref: '#/definitions/RESTAdmRuleCriterion'
       pss_collections:
         type: object
-        properties:
-          key:
+        description: map key is domain(string type)
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: restricted
-          value:
-            type: array
-            items:
-              type: string
+        example:
+          restricted: ["Uses illegal volume type.", "Allows running as root user."]
+          baseline: ["Sets HostNetwork, HostPID, or HostIPC to true.", "Allows privileged container(s)."]
+      sigstore_verifiers:
+        type: array
+        items:
+          type: string
+        example: ["public/verifier1", "private1/verifier1", "private1/verifier2"]
   RESTAdmissionState:
     type: object
     properties:
@@ -5230,13 +5352,11 @@ definitions:
         example: 0.1.0
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: com.docker.compose.service
-          value:
-            type: string
-            example: allinone
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          com.docker.compose.service: allinone
       domain:
         type: string
         example: ""
@@ -5248,13 +5368,16 @@ definitions:
         example: host
       created_at:
         type: string
-        example: "2018-01-23T21:14:31Z"
+        format: date-time
+        example: 2018-01-23T21:14:31Z
       started_at:
         type: string
-        example: "2018-01-23T21:14:31Z"
+        format: date-time
+        example: 2018-01-23T21:14:31Z
       joined_at:
         type: string
-        example: "2018-01-23T21:14:55Z"
+        format: date-time
+        example: 2018-01-23T21:14:55Z
       memory_limit:
         type: integer
         format: int64
@@ -5294,14 +5417,14 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "packet"
-            - "log"
-            - "parser"
-            - "tcp"
-            - "session"
-            - "timer"
-            - "error"
+        example:
+          - packet
+          - log
+          - parser
+          - tcp
+          - session
+          - timer
+          - error
       disable_nvprotect:
         type: boolean
         example: false
@@ -5327,7 +5450,8 @@ definitions:
         example: 541386aa8e36fe113593cc0dc6678b7d2a
       read_at:
         type: string
-        example: "2018-01-18T07:20:15Z"
+        format: date-time
+        example: 2018-01-18T07:20:15Z
       stats:
         $ref: '#/definitions/RESTStats'
   RESTAuditsData:
@@ -5362,6 +5486,7 @@ definitions:
         example: admin
       password:
         type: string
+        format: password
         example: mypassword
   RESTAuthToken:
     type: object
@@ -5387,13 +5512,13 @@ definitions:
         example: "831010404316"
       access_key_id:
         type: string
-        example: "AKIAIHUHS4BTYUDKVV4Q"
+        example: AKIAIHUHS4BTYUDKVV4Q
       secret_access_key:
         type: string
-        example: "D7XGZO34AMUfTbunL"
+        example: D7XGZO34AMUfTbunL
       region:
         type: string
-        example: "us-west-2"
+        example: us-west-2
   RESTAwsCloudRes:
     type: object
     required:
@@ -5404,18 +5529,18 @@ definitions:
     properties:
       cloud_type:
         type: string
-        example: "aws_cloud"
+        example: aws_cloud
       project_name:
         type: string
-        example: "demo_project"
+        example: demo_project
       region_list:
         type: array
         items:
           type: string
-          example:
-            - "us-east-1"
-            - "us-west-1"
-            - "us-west-2"
+        example:
+          - us-east-1
+          - us-west-1
+          - us-west-2
       aws_lambda_resource:
         $ref: '#/definitions/RESTAwsLambdaRes'
   RESTAwsFuncPermission:
@@ -5431,18 +5556,18 @@ definitions:
         example: true
       policy_permission_level:
         type: string
-        example: "High"
+        example: High
       permission_state:
         type: array
         items:
           type: string
-          example: ["Full Access policy  AWSLambdaFullAccess", "In policy AWSLambdaFullAccess : Full Access to dynamodb "]
+        example: ["Full Access policy  AWSLambdaFullAccess", "In policy AWSLambdaFullAccess : Full Access to dynamodb "]
       allowed_detail:
         type: object
         properties:
           key:
             type: string
-            example: "cloudformation"
+            example: cloudformation
           value:
             type: array
             items:
@@ -5455,10 +5580,10 @@ definitions:
     properties:
       function_name:
         type: string
-        example: "nvnodejs"
+        example: nvnodejs
       region:
         type: string
-        example: "us-west-1"
+        example: us-west-1
       report:
         type: array
         items:
@@ -5477,13 +5602,13 @@ definitions:
     properties:
       function_id:
         type: string
-        example: "project_id"
+        example: project_id
       version:
         type: string
         example: "1.0"
       function_name:
         type: string
-        example: "demo_project"
+        example: demo_project
       scan_result:
         type: string
         example: ""
@@ -5498,7 +5623,7 @@ definitions:
         example: ""
       status:
         type: string
-        example: "data_lost"
+        example: data_lost
   RESTAwsLambdaResDetail:
     type: object
     required:
@@ -5507,7 +5632,7 @@ definitions:
     properties:
       status:
         type: string
-        example: "data_lost"
+        example: data_lost
       func_list:
         type: array
         items:
@@ -5520,7 +5645,7 @@ definitions:
     properties:
       status:
         type: string
-        example: "data_lost"
+        example: data_lost
       aws_region_resource:
         type: object
         properties:
@@ -5538,10 +5663,10 @@ definitions:
     properties:
       permission_level:
         type: string
-        example: "Low"
+        example: Low
       resource:
         type: string
-        example: "DescribeChangeSet"
+        example: DescribeChangeSet
       permission_state:
         type: string
         example: ""
@@ -5560,14 +5685,14 @@ definitions:
         example: ""
       project_name:
         type: string
-        example: "demo_project"
+        example: demo_project
       region_list:
         type: array
         items:
           type: string
-          example:
-            - "us-east-1"
-            - "us-east-2"
+        example:
+          - us-east-1
+          - us-east-2
       aws_lambda_resource:
         $ref: '#/definitions/RESTAwsLambdaRes'
   RESTAwsResourceConfig:
@@ -5577,7 +5702,7 @@ definitions:
     properties:
       project_name:
         type: string
-        example: "demo_project"
+        example: demo_project
       acc_id:
         type: string
         example: ""
@@ -5588,10 +5713,10 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "us-east-1"
-            - "us-west-1"
-            - "us-west-2"
+        example:
+          - us-east-1
+          - us-west-1
+          - us-west-2
   RESTAwsResourceCreate:
     type: object
     required:
@@ -5599,7 +5724,7 @@ definitions:
     properties:
       project_name:
         type: string
-        example: "demo_project"
+        example: demo_project
       acc_id:
         type: string
         example: ""
@@ -5610,10 +5735,10 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "us-east-1"
-            - "us-west-1"
-            - "us-west-2"
+        example:
+          - us-east-1
+          - us-west-1
+          - us-west-2
   RESTBenchItem:
     type: object
     required:
@@ -5678,7 +5803,8 @@ definitions:
         example: 1516561253
       run_at:
         type: string
-        example: "2018-06-21T19:00:53Z"
+        format: date-time
+        example: 2018-06-21T19:00:53Z
       cis_version:
         type: string
         example: "1.5.1"
@@ -5720,7 +5846,8 @@ definitions:
         example: 1516561253
       run_at:
         type: string
-        example: "2018-06-21T19:00:53Z"
+        format: date-time
+        example: 2018-06-21T19:00:53Z
       kubernetes_cis_category:
         type: string
         example: ""
@@ -5743,7 +5870,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       disable_system:
         type: boolean
         example: false
@@ -5758,7 +5885,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       disable_system:
         type: boolean
         example: false
@@ -5853,25 +5980,26 @@ definitions:
         example: "0.1.0"
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: com.docker.compose.config-hash
-          value:
-            type: string
-            example: e94ce458b3bc97cd478e9738a759d76fb819
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          com.docker.compose.config-hash: e94ce458b3bc97cd478e9738a759d76fb819
       domain:
         type: string
         example: ""
       created_at:
         type: string
-        example: "2018-01-24T17:16:59Z"
+        format: date-time
+        example: 2018-01-24T17:16:59Z
       started_at:
         type: string
-        example: "2018-01-24T17:16:59Z"
+        format: date-time
+        example: 2018-01-24T17:16:59Z
       joined_at:
         type: string
-        example: "2018-01-24T17:17:10Z"
+        format: date-time
+        example: 2018-01-24T17:17:10Z
       memory_limit:
         type: integer
         format: int64
@@ -5911,12 +6039,12 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "log"
-            - "parser"
-            - "tcp"
-            - "session"
-            - "error"
+        example:
+          - "log"
+          - "parser"
+          - "tcp"
+          - "session"
+          - "error"
   RESTControllerConfigData:
     type: object
     required:
@@ -5924,33 +6052,6 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/RESTControllerConfig'
-  RESTCrdDlpGroupSetting:
-    type: object
-    required:
-      - name
-      - action
-    properties:
-      name:
-        type: string
-        example: ""
-      action:
-        type: string
-        example: ""
-  RESTCrdDlpGroupConfig:
-    type: object
-    required:
-      - name
-    properties:
-      name:
-        type: string
-        example: ""
-      status:
-        type: boolean
-        example: false
-      replace:
-        type: array
-        items:
-          $ref: '#/definitions/RESTCrdDlpGroupSetting'
   RESTCriteriaEntry:
     type: object
     required:
@@ -5960,13 +6061,13 @@ definitions:
     properties:
       key:
         type: string
-        example: "pattern"
+        example: pattern
       value:
         type: string
         example: "[0-9]"
       op:
         type: string
-        example: "regex"
+        example: regex
   RESTCustomCheck:
     type: object
     required:
@@ -6102,7 +6203,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "testrule413251424153561246153614615462515134635"
+        example: testrule413251424153561246153614615462515134635
       id:
         type: integer
         format: uint32
@@ -6113,7 +6214,7 @@ definitions:
           $ref: '#/definitions/RESTCriteriaEntry'
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground]
   RESTDlpRuleData:
     type: object
     required:
@@ -6131,9 +6232,9 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "ssn"
-            - "credit"
+        example:
+          - "ssn"
+          - "credit"
       rules:
         type: array
         items:
@@ -6159,12 +6260,12 @@ definitions:
     properties:
       name:
         type: string
-        example: "sensor.ssn"
+        example: sensor.ssn
       groups:
         type: array
         items:
           type: string
-          example: ["external", "nodes"]
+        example: ["external", "nodes"]
       rules:
         type: array
         items:
@@ -6177,7 +6278,7 @@ definitions:
         example: true
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground]
   RESTDlpSensorConfig:
     type: object
     required:
@@ -6185,7 +6286,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "sensor.creditcard"
+        example: sensor.creditcard
       change:
         type: array
         items:
@@ -6224,7 +6325,7 @@ definitions:
         type: array
         items:
           type: string
-          example: [""]
+        example: [""]
   RESTDlpSensorsData:
     type: object
     required:
@@ -6262,7 +6363,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "iperfspace"
+        example: iperfspace
       workloads:
         type: integer
         example: 14
@@ -6279,16 +6380,14 @@ definitions:
         type: array
         items:
           type: string
-          example: [""]
+        example: [""]
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: "ns.env-1"
-          value:
-            type: string
-            example: "production"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          ns.env-1: production
   RESTDomainConfig:
     type: object
     properties:
@@ -6322,12 +6421,12 @@ definitions:
     properties:
       name:
         type: string
-        example: "iperfspace"
+        example: iperfspace
       tags:
         type: array
         items:
           type: string
-          example: [""]
+        example: [""]
   RESTDomainEntryConfigData:
     type: object
     required:
@@ -6433,7 +6532,7 @@ definitions:
         type: array
         items:
           type: string
-          example: [""]
+        example: [""]
   RESTFileMonitorFileData:
     type: object
     required:
@@ -6516,7 +6615,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["domain1", "domain2"]
+        example: ["domain1", "domain2"]
       kind:
         type: string
         example: ""
@@ -6607,7 +6706,8 @@ definitions:
         example: ""
       cfg_type:
         type: string
-        example: "ground"
+        enum: [learned, user_created, ground, federal]
+        example: ground
       baseline_profile:
         type: string
         example: ""
@@ -6643,7 +6743,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "containers"
+        example: containers
       learned:
         type: boolean
         example: true
@@ -6655,24 +6755,24 @@ definitions:
         example: ""
       domain:
         type: string
-        example: "external"
+        example: external
       creater_domains:
         type: array
         items:
           type: string
-          example: ["domain1", "domain2"]
+        example: ["domain1", "domain2"]
       kind:
         type: string
         example: ""
       platform_role:
         type: string
-        example: "admin"
+        example: admin
       cap_change_mode:
         type: boolean
         example: false
       cfg_type:
         type: string
-        example: "ground"
+        enum: [learned, user_created, ground, federal]
       criteria:
         type: array
         items:
@@ -6713,7 +6813,7 @@ definitions:
           $ref: '#/definitions/RESTCriteriaEntry'
       cfg_type:
         type: string
-        example: "ground"
+        enum: [learned, user_created, ground, federal]
   RESTGroupConfigData:
     type: object
     required:
@@ -6730,10 +6830,10 @@ definitions:
         type: array
         items:
           type: string
-          example: "demo"
+          example: demo
       policy_mode:
         type: string
-        example: "Monitor"
+        example: Monitor
   RESTHost:
     type: object
     required:
@@ -6800,13 +6900,10 @@ definitions:
         example: 107
       interfaces:
         type: object
-        properties:
-          key:
-            type: string
-            example: eth0
-          value:
-            type: array
-            items:
+        description: map key is string type like "eth0"
+        additionalProperties:
+          type: array
+          items:
               $ref: '#/definitions/RESTIPAddr'
       state:
         type: string
@@ -6819,43 +6916,35 @@ definitions:
         example: true
       docker_bench_status:
         type: string
-        example: "running"
+        example: running
       kube_bench_status:
         type: string
-        example: "scheduled"
+        example: scheduled
       policy_mode:
         type: string
-        example: "Discover"
+        example: Discover
       profile_mode:
         type: string
-        example: "Discover"
+        example: Discover
       scan_summary:
         $ref: '#/definitions/RESTScanBrief'
       storage_driver:
         type: string
-        example: "aufs"
+        example: aufs
       labels:
         type: object
-        properties:
-          key:
-            type: array
-            items:
-              type: string
-              example: "beta.kubernetes.io/os"
-          value:
-            type: string
-            example: "linux"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          beta.kubernetes.io/os: linux
       annotations:
         type: object
-        properties:
-          key:
-            type: array
-            items:
-              type: string
-              example: "kubeadm.alpha.kubernetes.io/cri-socket"
-          value:
-            type: string
-            example: "/var/run/dockershim.sock"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          kubeadm.alpha.kubernetes.io/cri-socket: /var/run/dockershim.sock
   RESTHostsData:
     type: object
     required:
@@ -6893,7 +6982,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["domain1", "domain2"]
+        example: ["domain1", "domain2"]
   RESTImportTask:
     type: object
     required:
@@ -6903,10 +6992,10 @@ definitions:
     properties:
       tid:
         type: string
-        example: "c5af897b62a258212ece91c0551d3a4a"
+        example: c5af897b62a258212ece91c0551d3a4a
       ctrler_id:
         type: string
-        example: "6e60452b244b90456f3450c9fed0a50f57f4b849dcb74a5fad289e8116f32f36"
+        example: 6e60452b244b90456f3450c9fed0a50f57f4b849dcb74a5fad289e8116f32f36
       last_update_time:
         type: string
         format: date-time
@@ -6916,10 +7005,10 @@ definitions:
         example: 100
       triggered_by:
         type: string
-        example: "admin"
+        example: admin
       status:
         type: string
-        example: "done"
+        example: done
       temp_token:
         type: string
         example: ""
@@ -6986,22 +7075,24 @@ definitions:
         example: ""
       password:
         type: string
+        format: password
         example: ""
   RESTJfrogXrayConfig:
     type: object
     properties:
       url:
         type: string
-        example: "https://docker-virtual.com"
+        example: https://docker-virtual.com
       enable:
         type: boolean
         example: true
       username:
         type: string
-        example: "myUser"
+        example: myUser
       password:
         type: string
-        example: "password"
+        format: password
+        example: password
   RESTLicenseInfo:
     type: object
     required:
@@ -7015,6 +7106,7 @@ definitions:
         example: name
       email:
         type: string
+        format: email
         example: user@mail.com
       phone:
         type: string
@@ -7027,7 +7119,7 @@ definitions:
         example: ""
       installation_id:
         type: string
-        example: "ae2049871b8dd5b002fb7980f3a8c59f"
+        example: ae2049871b8dd5b002fb7980f3a8c59f
   RESTLicenseKey:
     type: object
     properties:
@@ -7046,6 +7138,7 @@ definitions:
         example: name
       email:
         type: string
+        format: email
         example: user@mail.com
       phone:
         type: string
@@ -7082,23 +7175,23 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "default_role_1"
-            - "default_role_2"
+        example:
+          - "default_role_1"
+          - "default_role_2"
       group_roles:
         type: array
         items:
           type: string
-          example:
-            - "group_role_1"
-            - "group_role_2"
+        example:
+          - "group_role_1"
+          - "group_role_2"
       group_domain_roles:
         type: array
         items:
           type: string
-          example:
-            - "group_domain_role_1"
-            - "group_domain_role_2"
+        example:
+          - "group_domain_role_1"
+          - "group_domain_role_2"
   RESTMetry:
     type: object
     required:
@@ -7241,7 +7334,7 @@ definitions:
         example: 1516573243
       cfg_type:
         type: string
-        example: "ground"
+        enum: [learned, user_created, ground, federal]
       priority:
         type: integer
         format: uint32
@@ -7293,16 +7386,15 @@ definitions:
         type: array
         items:
           type: string
-          example:
-            - "HTTP"
-            - "SSH"
+        example:
+          - "HTTP"
+          - "SSH"
       disable:
         type: boolean
         example: true
       cfg_type:
         type: string
-        example: CfgTypeLearned
-        description: CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
+        enum: [learned, user_created, ground, federal]
       priority:
         type: integer
         format: uint32
@@ -7462,16 +7554,17 @@ definitions:
         example: 1273
       action:
         type: string
-        example: "allow"
+        example: allow
       cfg_type:
         type: string
-        example: "ground"
+        enum: [learned, user_created, ground, federal, system_defined]
       uuid:
         type: string
-        example: "5654bfac-0011-4678-8e67-9eda136f18b1"
+        format: uuid
+        example: 5654bfac-0011-4678-8e67-9eda136f18b1
       group:
         type: string
-        example: "nodes"
+        example: nodes
       created_timestamp:
         type: integer
         format: int64
@@ -7567,7 +7660,7 @@ definitions:
         example: 1
       group:
         type: string
-        example: "nodes"
+        example: nodes
       rule:
         $ref: '#/definitions/RESTProcessProfileEntry'
   RESTAWSAccountKey:
@@ -7584,10 +7677,10 @@ definitions:
         example: NSKN3KM0OSN854MZ2LOV90S7DFVCL6
       secret_access_key:
         type: string
-        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       region:
         type: string
-        example: "us-east-1"
+        example: us-east-1
   RESTProcessProfileEntryConfig:
     type: object
     required:
@@ -7633,6 +7726,7 @@ definitions:
         example: myusername
       password:
         type: string
+        format: password
         example: mypassword
       auth_token:
         type: string
@@ -7737,27 +7831,22 @@ definitions:
         type: array
         items:
           type: string
-          example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
+        example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
       labels:
         type: object
-        properties:
-          key:
-            type: array
-            items:
-              type: string
-              example:
-                - "label_1"
-                - "label_2"
-          value:
-            type: string
-            example: "label_value"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          label1: value1
+          label2: value2
       layers:
         type: array
         items:
           type: string
-          example:
-            - "layer_1"
-            - "layer_2"
+        example:
+          - "layer_1"
+          - "layer_2"
       status:
         type: string
         example: scheduled
@@ -7776,7 +7865,8 @@ definitions:
         example: 1516561253
       scanned_at:
         type: string
-        example: "2018-01-21T19:00:53Z"
+        format: date-time
+        example: 2018-01-21T19:00:53Z
       base_os:
         type: string
         example: ubuntu:16.04
@@ -7785,7 +7875,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
   RESTRegistryImageSummaryData:
     type: object
     required:
@@ -7809,6 +7900,7 @@ definitions:
         example: username
       password:
         type: string
+        format: password
         example: password
   RESTSystemConfigAutoscale:
     type: object
@@ -7819,7 +7911,7 @@ definitions:
     properties:
       strategy:
         type: string
-        example: "delayed"
+        enum: ["", immediate, delayed]
       min_pods:
         type: integer
         format: uint32
@@ -7833,7 +7925,7 @@ definitions:
     properties:
       strategy:
         type: string
-        example: "delayed"
+        enum: ["", immediate, delayed]
       min_pods:
         type: integer
         format: uint32
@@ -7847,10 +7939,10 @@ definitions:
     properties:
       new_service_policy_mode:
         type: string
-        example: "Discover"
+        example: Discover
       new_service_profile_baseline:
         type: string
-        example: "zero-drift"
+        example: zero-drift
   RESTSystemConfigSyslogCfgV2:
     type: object
     properties:
@@ -7867,7 +7959,7 @@ definitions:
         example: 514
       syslog_level:
         type: string
-        example: "INFO"
+        example: INFO
       syslog_status:
         type: boolean
         example: true
@@ -7875,13 +7967,16 @@ definitions:
         type: array
         items:
           type: string
-          example: ["event", "violation", "threat", "incident"]
+        example: ["event", "violation", "threat", "incident"]
       syslog_in_json:
         type: boolean
         example: true
       single_cve_per_syslog:
         type: boolean
         example: true
+      syslog_server_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
   RESTSystemConfigAuthCfgV2:
     type: object
     properties:
@@ -7889,13 +7984,13 @@ definitions:
         type: array
         items:
           type: string
-          example: ["local", "ldap"]
+        example: ["local", "ldap"]
       auth_by_platform:
         type: boolean
         example: true
       rancher_ep:
         type: string
-        example: "https://my-rancher.test:30000"
+        example: https://my-rancher.test:30000
   RESTSystemConfigProxyCfgV2:
     type: object
     properties:
@@ -7926,7 +8021,7 @@ definitions:
         example: 30
       cluster_name:
         type: string
-        example: "cluster1"
+        example: cluster1
       controller_debug:
         type: array
         items:
@@ -7958,13 +8053,14 @@ definitions:
       - enable_block_after_failed_login
       - block_after_failed_login_count
       - block_minutes
+      - session_timeout
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       comment:
         type: string
-        example: "default"
+        example: default
       min_len:
         type: integer
         example: 6
@@ -8001,6 +8097,9 @@ definitions:
       block_minutes:
         type: integer
         example: 0
+      session_timeout:
+        type: integer
+        example: 300
   RESTPwdProfileBasic:
     type: object
     required:
@@ -8032,7 +8131,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       active:
         type: boolean
         example: true
@@ -8075,6 +8174,9 @@ definitions:
       block_minutes:
         type: integer
         example: 0
+      session_timeout:
+        type: integer
+        example: 300
   RESTPwdProfileConfigData:
     type: object
     required:
@@ -8102,7 +8204,7 @@ definitions:
           $ref: '#/definitions/RESTPwdProfile'
       active_profile_name:
         type: string
-        example: "default"
+        example: default
   RESTRegistrySummary:
     type: object
     required:
@@ -8146,6 +8248,7 @@ definitions:
         example: myusername
       password:
         type: string
+        format: password
         example: mypassword
       auth_token:
         type: string
@@ -8204,7 +8307,8 @@ definitions:
         example: ""
       started_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       scanned:
         type: integer
         format: uint32
@@ -8226,7 +8330,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
   RESTRegistrySummaryData:
     type: object
     required:
@@ -8288,7 +8393,7 @@ definitions:
         example: false
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground, federal]
   RESTResponseRuleData:
     type: object
     required:
@@ -8343,7 +8448,7 @@ definitions:
         example: false
       cfg_type:
         type: string
-        example: "ground"
+        enum: [user_created, ground, federal]
   RESTResponseRuleConfigData:
     type: object
     required:
@@ -8377,7 +8482,7 @@ definitions:
     properties:
       id:
         type: string
-        example: "ci_scan"
+        example: ci_scan
       read:
         type: boolean
         example: false
@@ -8400,7 +8505,7 @@ definitions:
         example: openssl
       version:
         type: string
-        example: "1.1.1c-r0"
+        example: 1.1.1c-r0
       file_name:
         type: string
         example: OPENSSL_init
@@ -8440,7 +8545,7 @@ definitions:
         properties:
           key:
             type: string
-            example: "AWSLambdaFullAccess"
+            example: AWSLambdaFullAccess
           value:
             $ref: '#/definitions/RESTAwsFuncPermission'
       req_resources:
@@ -8482,7 +8587,8 @@ definitions:
         example: 1516561253
       scanned_at:
         type: string
-        example: "2018-01-21T19:00:53Z"
+        format: date-time
+        example: 2018-01-21T19:00:53Z
       base_os:
         type: string
         example: ubuntu:16.04
@@ -8491,7 +8597,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
   RESTScanConfig:
     type: object
     required:
@@ -8537,13 +8644,13 @@ definitions:
         example: "calico/node:v3.8.2"
       image_id:
         type: string
-        example: "11cd78b9e13d420f93d5d5b2611e803bda012ae5cd8b476d4cc328dc133773ce"
+        example: 11cd78b9e13d420f93d5d5b2611e803bda012ae5cd8b476d4cc328dc133773ce
       author:
         type: string
         example: ""
       status:
         type: string
-        example: "finished"
+        example: finished
       high:
         type: integer
         example: 26
@@ -8552,14 +8659,14 @@ definitions:
         example: 33
       result:
         type: string
-        example: "succeeded"
+        example: succeeded
       scanned_timestamp:
         type: integer
         format: int64
         example: 1593130227
       scanned_at:
         type: string
-        example: "2020-06-26T00:10:27Z"
+        example: 2020-06-26T00:10:27Z
       base_os:
         type: string
         example: "debian:10"
@@ -8568,7 +8675,7 @@ definitions:
         example: "1.938"
       cvedb_create_time:
         type: string
-        example: "2020-06-25T10:32:40Z"
+        example: 2020-06-25T10:32:40Z
   RESTScanLayer:
     type: object
     required:
@@ -8677,7 +8784,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
       server:
         type: string
         example: 10.1.5.1
@@ -8747,7 +8855,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
       vulnerabilities:
         type: array
         items:
@@ -8777,7 +8886,7 @@ definitions:
     properties:
       platform:
         type: string
-        example: "Kubernetes"
+        example: Kubernetes
       kube_version:
         type: string
         example: "1.19.2"
@@ -8786,7 +8895,7 @@ definitions:
         example: ""
       status:
         type: string
-        example: "finished"
+        example: finished
       high:
         type: integer
         example: 3
@@ -8795,7 +8904,7 @@ definitions:
         example: 1
       result:
         type: string
-        example: "succeeded"
+        example: succeeded
       scanned_timestamp:
         type: integer
         format: int64
@@ -8850,18 +8959,15 @@ definitions:
         type: array
         items:
           type: string
-          example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
+        example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
       labels:
         type: object
-        properties:
-          key:
-            type: array
-            items:
-              type: string
-              example: ""
-          value:
-            type: string
-            example: ""
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          label1: value1
+          label2: value2
       cmds:
         type: array
         items:
@@ -8926,7 +9032,8 @@ definitions:
         example: "1.00"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
       layers:
         type: array
         items:
@@ -8943,18 +9050,15 @@ definitions:
         type: array
         items:
           type: string
-          example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
+        example: ["PATH=/usr/local/sbin", "GOSU_VERSION=1.12", "REDIS_VERSION=6.0.2"]
       labels:
         type: object
-        properties:
-          key:
-            type: array
-            items:
-              type: string
-              example: ["label1", "label2"]
-          value:
-            type: string
-            example: "label_value"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          label1: value1
+          label2: value2
   RESTScanRepoReportData:
     type: object
     required:
@@ -8982,6 +9086,7 @@ definitions:
         example: myusername
       password:
         type: string
+        format: password
         example: mypassword
       repository:
         type: string
@@ -8994,7 +9099,7 @@ definitions:
         example: false
       base_image:
         type: string
-        example: "alpine"
+        example: alpine
   RESTScanRepoReqData:
     type: object
     required:
@@ -9077,7 +9182,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
   RESTScanSummary:
     type: object
     required:
@@ -9186,7 +9292,8 @@ definitions:
         example: 1516561253
       scanned_at:
         type: string
-        example: "2018-01-21T19:00:53Z"
+        format: date-time
+        example: 2018-01-21T19:00:53Z
       base_os:
         type: string
         example: ubuntu:16.04
@@ -9284,7 +9391,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9304,19 +9411,19 @@ definitions:
     properties:
       issuer:
         type: string
-        example: "https://dev-256438.oktapreview.com"
+        example: https://dev-256438.oktapreview.com
       authorization_endpoint:
         type: string
-        example: "https://dev-256438.oktapreview.com/oauth2/v1/authorize"
+        example: https://dev-256438.oktapreview.com/oauth2/v1/authorize
       token_endpoint:
         type: string
-        example: "https://dev-256438.oktapreview.com/oauth2/v1/token"
+        example: https://dev-256438.oktapreview.com/oauth2/v1/token
       user_info_endpoint:
         type: string
-        example: "https://dev-256438.oktapreview.com/oauth2/v1/userinfo"
+        example: https://dev-256438.oktapreview.com/oauth2/v1/userinfo
       client_id:
         type: string
-        example: "0oai4gal8xXh0itGi0h7"
+        example: 0oai4gal8xXh0itGi0h7
       ClientSecret:
         type: string
         example: ""
@@ -9344,7 +9451,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9360,13 +9467,13 @@ definitions:
     properties:
       issuer:
         type: string
-        example: "https://dev-256438.oktapreview.com"
+        example: https://dev-256438.oktapreview.com
       client_id:
         type: string
-        example: "0oai4gcl8xXh2itGi1h7"
+        example: 0oai4gcl8xXh2itGi1h7
       client_secret:
         type: string
-        example: "QJju4mL1VLU0CAcD05WJ83K0D_e0gQEydowOvVqv"
+        example: QJju4mL1VLU0CAcD05WJ83K0D_e0gQEydowOvVqv
       group_claim:
         type: string
         example: ""
@@ -9391,7 +9498,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9413,7 +9520,7 @@ definitions:
         example: http://www.okta.com/exkgp9avqo07
       x509_cert:
         type: string
-        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       group_claim:
         type: string
         example: ""
@@ -9433,7 +9540,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9496,7 +9603,7 @@ definitions:
         example: true
       base_dn:
         type: string
-        example: "dc=win,dc=nv,dc=com"
+        example: dc=win,dc=nv,dc=com
       bind_dn:
         type: string
         example: administrator
@@ -9525,7 +9632,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9545,7 +9652,7 @@ definitions:
         example: http://www.okta.com/xkbjKIvo0h
       x509_cert:
         type: string
-        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       group_claim:
         type: string
         example: ""
@@ -9565,7 +9672,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["admin1", "admin2"]
+            example: [admin1, admin2]
       group_mapped_roles:
         type: array
         items:
@@ -9574,7 +9681,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
+        example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
   RESTServerConfig:
     type: object
     required:
@@ -9613,7 +9720,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["reader1", "reader2"]
+        example: [reader1, reader2]
   RESTServerRoleGroupsConfigData:
     type: object
     required:
@@ -9743,7 +9850,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["iperfserver", "iperfclient"]
+        example: [iperfserver, iperfclient]
       policy_mode:
         type: string
         example: Monitor
@@ -9832,7 +9939,7 @@ definitions:
         example: running
       args:
         type: string
-        example: -C 10 -w /var/cm/pcap/3ccad_ -W 10 ether host 6f:61:35:50:10:0c
+        example: "-C 10 -w /var/cm/pcap/3ccad_ -W 10 ether host 6f:61:35:50:10:0c"
       start_time:
         type: integer
         format: int64
@@ -9864,11 +9971,6 @@ definitions:
         $ref: '#/definitions/RESTMetry'
   RESTSysAtmoConfigConfig:
     type: object
-    required:
-      - mode_auto_d2m
-      - mode_auto_d2m_duration
-      - mode_auto_m2p
-      - mode_auto_m2p_duration
     properties:
       mode_auto_d2m:
         type: boolean
@@ -9893,6 +9995,12 @@ definitions:
       net_service_policy_mode:
         type: string
         example: ""
+      disable_net_policy:
+        type: boolean
+        example: false
+      detect_unmanaged_wl:
+        type: boolean
+        example: true
   RESTSystemConfig:
     type: object
     required:
@@ -9929,13 +10037,15 @@ definitions:
       - mode_auto_d2m_duration
       - mode_auto_m2p
       - mode_auto_m2p_duration
+      - scanner_autoscale
+      - no_telemetry_report
     properties:
       new_service_policy_mode:
         type: string
         example: Discover
       new_service_profile_baseline:
         type: string
-        example: "zero-drift"
+        example: zero-drift
       unused_group_aging:
         type: integer
         format: uint8
@@ -9961,18 +10071,21 @@ definitions:
         type: array
         items:
           type: string
-          example: ["event", "violation", "threat", "incident"]
+        example: ["event", "violation", "threat", "incident"]
       syslog_in_json:
         type: boolean
         example: true
       single_cve_per_syslog:
         type: boolean
         example: false
+      syslog_server_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       auth_order:
         type: array
         items:
           type: string
-          example: ["local", "ldap"]
+        example: ["local", "ldap"]
       auth_by_platform:
         type: boolean
         example: true
@@ -9983,7 +10096,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["69.89.0.0/16", "172.217.5.0/23"]
+        example: ["69.89.0.0/16", "172.217.5.0/23"]
       webhooks:
         type: array
         items:
@@ -10030,7 +10143,7 @@ definitions:
         example: false
       net_service_policy_mode:
         type: string
-        example: "Monitor"
+        example: Monitor
       mode_auto_d2m:
         type: boolean
         example: false
@@ -10061,7 +10174,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["local", "ldap"]
+        example: ["local", "ldap"]
       auth_by_platform:
         type: boolean
         example: true
@@ -10097,12 +10210,14 @@ definitions:
       - controller_debug
       - monitor_service_mesh
       - xff_enabled
+      - no_telemetry_report
+      - cfg_type
     properties:
       configured_internal_subnets:
         type: array
         items:
           type: string
-          example: ["69.89.0.0/16", "172.217.5.0/23"]
+        example: ["69.89.0.0/16", "172.217.5.0/23"]
       unused_group_aging:
         type: integer
         format: uint8
@@ -10114,7 +10229,7 @@ definitions:
         type: array
         items:
           type: string
-          example: "all"
+          example: all
       monitor_service_mesh:
         type: boolean
         example: true
@@ -10124,6 +10239,9 @@ definitions:
       no_telemetry_report:
         type: boolean
         example: false
+      cfg_type:
+        type: string
+        enum: [user_created, ground, federal]
   RESTSystemConfigModeAutoV2:
     type: object
     required:
@@ -10151,13 +10269,21 @@ definitions:
     required:
       - net_service_status
       - new_service_profile_baseline
+      - disable_net_policy
+      - detect_unmanaged_wl
     properties:
       net_service_status:
         type: boolean
         example: true
       new_service_profile_baseline:
         type: string
-        example: "zero-drift"
+        example: zero-drift
+      disable_net_policy:
+        type: boolean
+        example: false
+      detect_unmanaged_wl:
+        type: boolean
+        example: true
   RESTSystemConfigNewSvcV2:
     type: object
     required:
@@ -10166,10 +10292,10 @@ definitions:
     properties:
       new_service_policy_mode:
         type: string
-        example: "Discover"
+        example: Discover
       new_service_profile_baseline:
         type: string
-        example: "zero-drift"
+        example: zero-drift
   RESTSystemConfigProxyV2:
     type: object
     required:
@@ -10199,6 +10325,7 @@ definitions:
       - syslog_categories
       - syslog_in_json
       - single_cve_per_syslog
+      - syslog_server_cert
     properties:
       syslog_ip:
         type: string
@@ -10221,13 +10348,16 @@ definitions:
         type: array
         items:
           type: string
-          example: ["event", "violation", "threat", "incident"]
+        example: ["event", "violation", "threat", "incident"]
       syslog_in_json:
         type: boolean
         example: true
       single_cve_per_syslog:
         type: boolean
         example: false
+      syslog_server_cert:
+        type: string
+        example: ""
   RESTSystemConfigV2:
     type: object
     required:
@@ -10240,6 +10370,7 @@ definitions:
       - ibmsa
       - net_svc
       - mode_auto
+      - scanner_autoscale
     properties:
       new_svc:
         $ref: '#/definitions/RESTSystemConfigNewSvcV2'
@@ -10265,9 +10396,6 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigAutoscale'
   RESTSystemConfigData:
     type: object
-    required:
-      - config
-      - fed_config
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfig'
@@ -10275,9 +10403,6 @@ definitions:
         $ref: '#/definitions/RESTFedSystemConfig'
   RESTSystemConfigDataV2:
     type: object
-    required:
-      - config
-      - fed_config
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigV2'
@@ -10285,12 +10410,14 @@ definitions:
         $ref: '#/definitions/RESTFedSystemConfig'
   RESTSystemConfigConfig:
     type: object
-    required:
-      - single_cve_per_syslog
+    description: only for POST(v1/system/config)
     properties:
       new_service_policy_mode:
         type: string
         example: Discover
+      new_service_profile_baseline:
+        type: string
+        example: zero-drift
       unused_group_aging:
         type: integer
         format: uint8
@@ -10316,10 +10443,13 @@ definitions:
         type: array
         items:
           type: string
-          example: ["event", "violation", "threat", "incident"]
+        example: ["event", "violation", "threat", "incident"]
       syslog_in_json:
         type: boolean
         example: true
+      syslog_server_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       single_cve_per_syslog:
         type: boolean
         example: true
@@ -10334,12 +10464,6 @@ definitions:
       rancher_ep:
         type: string
         example: ""
-      webhook_status:
-        type: string
-        example:
-      webhook_url:
-        type: string
-        example: "https://hooks.slack.com/services/T00000000"
       webhooks:
         type: array
         items:
@@ -10381,8 +10505,7 @@ definitions:
         example: false
   RESTSystemConfigConfigV2:
     type: object
-    required:
-      - single_cve_per_syslog
+    description: only for POST(v2/system/config)
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
@@ -10402,139 +10525,22 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigAutoscaleConfig'
       misc_cfg:
         $ref: '#/definitions/RESTSystemConfigMiscCfgV2'
-  RESTSystemConfigConfigCfgMap:
+  RESTFedSystemConfigConfig:
     type: object
-    required:
-      - single_cve_per_syslog
-      - mode_auto_d2m
-      - mode_auto_d2m_duration
-      - mode_auto_m2p
-      - mode_auto_m2p_duration
-      - always_reload
     properties:
-      new_service_policy_mode:
-        type: string
-        example: Discover
-      unused_group_aging:
-        type: integer
-        format: uint8
-        example: 123
-      syslog_ip:
-        type: string
-        example: ""
-      syslog_ip_proto:
-        type: integer
-        format: uint8
-        example: 6
-      syslog_port:
-        type: integer
-        format: uint16
-        example: 514
-      syslog_level:
-        type: string
-        example: INFO
-      syslog_status:
-        type: boolean
-        example: false
-      syslog_categories:
-        type: array
-        items:
-          type: string
-          example: ["event", "violation", "threat", "incident"]
-      syslog_in_json:
-        type: boolean
-        example: true
-      single_cve_per_syslog:
-        type: boolean
-        example: true
-      auth_order:
-        type: array
-        items:
-          type: string
-          example: ""
-      auth_by_platform:
-        type: boolean
-        example: true
-      rancher_ep:
-        type: string
-        example: ""
-      webhook_status:
-        type: string
-        example: ""
-      webhook_url:
-        type: string
-        example: "https://hooks.slack.com/services/T00000000"
       webhooks:
         type: array
         items:
           $ref: '#/definitions/RESTWebhook'
-      cluster_name:
-        type: string
-        example: cluster1
-      controller_debug:
-        type: array
-        items:
-          type: string
-          example: all
-      monitor_service_mesh:
-        type: boolean
-        example: true
-      registry_http_proxy_status:
-        type: boolean
-        example: true
-      registry_https_proxy_status:
-        type: boolean
-        example: false
-      registry_http_proxy:
-        $ref: '#/definitions/RESTProxy'
-      registry_https_proxy:
-        $ref: '#/definitions/RESTProxy'
-      ibmsa_ep_enabled:
-        type: boolean
-        example: false
-      ibmsa_ep_dashboard_url:
-        type: string
-        example: ""
-      xff_enabled:
-        type: boolean
-        example: false
-      net_service_status:
-        type: boolean
-        example: true
-      net_service_policy_mode:
-        type: string
-        example: ""
-      mode_auto_d2m:
-        type: boolean
-        example: false
-      mode_auto_d2m_duration:
-        type: integer
-        format: int64
-        example: 1505755716
-      mode_auto_m2p:
-        type: boolean
-        example: false
-      mode_auto_m2p_duration:
-        type: integer
-        format: int64
-        example: 1505755716
-      always_reload:
-        type: boolean
-        example: false
   RESTSystemConfigConfigData:
     type: object
-    required:
-      - config
-      - fed_config
-      - net_config
-      - atmo_config
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
       config_v2:
         $ref: '#/definitions/RESTSystemConfigConfigV2'
       fed_config:
-        $ref: '#/definitions/RESTSystemConfigConfig'
+        $ref: '#/definitions/RESTFedSystemConfigConfig'
       net_config:
         $ref: '#/definitions/RESTSysNetConfigConfig'
       atmo_config:
@@ -10603,7 +10609,8 @@ definitions:
         example: "1.011"
       cvedb_create_time:
         type: string
-        example: "2018-06-20T19:00:53Z"
+        format: date-time
+        example: 2018-06-20T19:00:53Z
       component_versions:
         type: array
         items:
@@ -10621,7 +10628,7 @@ definitions:
     properties:
       baseline_profile:
         type: string
-        example: "Zero-Drift"
+        example: Zero-Drift
       policy_mode:
         type: string
         example: Discover
@@ -10689,9 +10696,10 @@ definitions:
         example: admin
       password:
         type: string
-        example: mypassword
+        example: ""
       email:
         type: string
+        format: email
         example: user@email.com
       role:
         type: string
@@ -10718,7 +10726,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["domain1", "domain2"]
+            example: ["domain1", "domain2"]
       last_login_timestamp:
         type: integer
         format: int64
@@ -10784,9 +10792,11 @@ definitions:
         example: admin
       password:
         type: string
+        format: password
         example: mypassword
       email:
         type: string
+        format: email
         example: user@mail.com
       role:
         type: string
@@ -10815,7 +10825,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["domain1", "domain2"]
+            example: ["domain1", "domain2"]
       last_login_timestamp:
         type: integer
         format: int64
@@ -10847,7 +10857,7 @@ definitions:
     properties:
       fullname:
         type: string
-        example: "admin"
+        example: admin
       clear_failed_login:
         type: boolean
         example: true
@@ -10871,7 +10881,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "ciops"
+        example: ciops
       comment:
         type: string
         example: "CI Integration role"
@@ -10891,7 +10901,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "customadmin"
+        example: customadmin
       comment:
         type: string
         example: ""
@@ -10937,12 +10947,12 @@ definitions:
         type: array
         items:
           type: string
-          example: ["admin", "reader"]
+        example: ["admin", "reader"]
       domain_roles:
         type: array
         items:
           type: string
-          example: ["role1", "role2"]
+        example: ["role1", "role2"]
   RESTUserConfig:
     type: object
     required:
@@ -10954,6 +10964,7 @@ definitions:
         example: name
       password:
         type: string
+        format: password
         example: mypassword
       new_password:
         type: string
@@ -10963,6 +10974,7 @@ definitions:
         example:
       email:
         type: string
+        format: email
         example: user@mail.com
       role:
         type: string
@@ -10984,7 +10996,7 @@ definitions:
             type: array
             items:
               type: string
-              example: ["domain1", "domain2"]
+            example: ["domain1", "domain2"]
   RESTUserConfigData:
     type: object
     required:
@@ -11074,7 +11086,7 @@ definitions:
         example: 1:7.2p2-3
       link:
         type: string
-        example: "https://security-tracker.debian.org/tracker/CVE-2015-8356"
+        example: https://security-tracker.debian.org/tracker/CVE-2015-8356
       score_v3:
         type: number
         format: float32
@@ -11141,14 +11153,11 @@ definitions:
         example: ""
       packages:
         type: object
-        properties:
-          key:
-            type: string
-            example: ""
-          value:
-            type: array
-            items:
-              $ref: '#/definitions/RESTVulnPackageVersion'
+        description: map key is string type
+        additionalProperties:
+          type: array
+          items:
+            $ref: '#/definitions/RESTVulnPackageVersion'
       package_name:
         type: string
         example: ""
@@ -11205,7 +11214,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       entries:
         type: array
         items:
@@ -11217,7 +11226,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "default"
+        example: default
       entries:
         type: array
         items:
@@ -11268,7 +11277,7 @@ definitions:
         example: 1003
       name:
         type: string
-        example: "CVE-2020-29661"
+        example: CVE-2020-29661
       comment:
         type: string
         example: "Accepted by admin at Dec 09, 2021 12:00:02 from Vulnerabilities page"
@@ -11280,12 +11289,12 @@ definitions:
         type: array
         items:
           type: string
-          example: ["domain1", "domain2"]
+        example: ["domain1", "domain2"]
       images:
         type: array
         items:
           type: string
-          example: []
+        example: []
   RESTVulnPackageVersion:
     type: object
     required:
@@ -11322,16 +11331,16 @@ definitions:
     properties:
       key:
         type: string
-        example: "pattern"
+        example: pattern
       value:
         type: string
         example: "[0-9]"
       op:
         type: string
-        example: "regex"
+        example: regex
       context:
         type: string
-        example: "packet"
+        example: packet
   RESTWafGroupConfig:
     type: object
     required:
@@ -11373,7 +11382,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "nv.kube-proxy.kube-system"
+        example: nv.kube-proxy.kube-system
       status:
         type: boolean
         example: true
@@ -11383,7 +11392,7 @@ definitions:
           $ref: '#/definitions/RESTWafSetting'
       cfg_type:
         type: string
-        example: "learned"
+        enum: [user_created, ground]
   RESTWafGroupData:
     type: object
     required:
@@ -11410,7 +11419,7 @@ definitions:
     properties:
       name:
         type: string
-        example: "test"
+        example: test
       id:
         type: integer
         format: uint32
@@ -11421,7 +11430,7 @@ definitions:
           $ref: '#/definitions/RESTWafCriteriaEntry'
       cfg_type:
         type: string
-        example: "user_created"
+        enum: [user_created, ground]
   RESTWafRuleData:
     type: object
     required:
@@ -11439,7 +11448,7 @@ definitions:
         type: array
         items:
           type: string
-          example: "test"
+          example: test
       rules:
         type: array
         items:
@@ -11465,12 +11474,12 @@ definitions:
     properties:
       name:
         type: string
-        example: "test4321546242574254672462572452615362453"
+        example: test4321546242574254672462572452615362453
       groups:
         type: array
         items:
           type: string
-          example: "nv.kube-proxy.kube-system"
+          example: nv.kube-proxy.kube-system
       rules:
         type: array
         items:
@@ -11483,7 +11492,7 @@ definitions:
         example: false
       cfg_type:
         type: string
-        example: "user_created"
+        enum: [user_created, ground]
   RESTWafSensorConfig:
     type: object
     required:
@@ -11530,7 +11539,7 @@ definitions:
         type: array
         items:
           type: string
-          example: "test4321546242574254672462572452615362453"
+          example: test4321546242574254672462572452615362453
   RESTWafSensorsData:
     type: object
     required:
@@ -11550,10 +11559,10 @@ definitions:
     properties:
       name:
         type: string
-        example: "test"
+        example: test
       action:
         type: string
-        example: "deny"
+        example: deny
       exist:
         type: boolean
         example: true
@@ -11562,7 +11571,7 @@ definitions:
         example: ""
       cfg_type:
         type: string
-        example: "user_created"
+        enum: [user_created, ground]
   RESTWebhook:
     type: object
     required:
@@ -11574,19 +11583,19 @@ definitions:
     properties:
       name:
         type: string
-        example: "slack-webhook"
+        example: slack-webhook
       url:
         type: string
-        example: "https://neuvector.slack.com/archives/C8AU75GKE"
+        example: https://neuvector.slack.com/archives/C8AU75GKE
       enable:
         type: boolean
         example: true
       type:
         type: string
-        example: "Slack"
+        enum: ["", Slack, JSON, Teams]
       cfg_type:
         type: string
-        example: "user_created"
+        enum: [user_created, ground, federal]
   RESTWorkload:
     type: object
     required:
@@ -11641,19 +11650,19 @@ definitions:
         example: calico-node-mzhtk
       pod_name:
         type: string
-        example: "istio-policy-5cdbc47674-t67p4"
+        example: istio-policy-5cdbc47674-t67p4
       image:
         type: string
         example: "istio/mixer:1.4.3"
       image_id:
         type: string
-        example: "5b7b52f8e75898efe2b7b258322e623c280d856b9f5a527fbbdc25689adf6e95"
+        example: 5b7b52f8e75898efe2b7b258322e623c280d856b9f5a527fbbdc25689adf6e95
       platform_role:
         type: string
         example: core
       domain:
         type: string
-        example: "istio-system"
+        example: istio-system
       state:
         type: string
         example: exit
@@ -11715,31 +11724,32 @@ definitions:
         example: host
       created_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       started_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       finished_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       running:
         type: boolean
         example: false
       secured_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       exit_code:
         type: integer
         example: 0
       interfaces:
         type: object
-        properties:
-          key:
-            type: string
-            example: eth0
-          value:
-            type: array
-            items:
+        description: map key is string type like "eth0"
+        additionalProperties:
+          type: array
+          items:
               $ref: '#/definitions/RESTIPAddr'
       ports:
         type: array
@@ -11747,13 +11757,11 @@ definitions:
           $ref: '#/definitions/RESTWorkloadPorts'
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: io.kubernetes.pod.name
-          value:
-            type: string
-            example: calico-node-mzhtk
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          io.kubernetes.pod.name: calico-node-mzhtk
       applications:
         type: array
         items:
@@ -11811,19 +11819,23 @@ definitions:
         example: core
       created_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       started_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       finished_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       running:
         type: boolean
         example: false
       secured_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       exit_code:
         type: integer
         example: 0
@@ -11862,7 +11874,7 @@ definitions:
     properties:
       pod_name:
         type: string
-        example: "istio-policy-5cdbc47674-t67p4"
+        example: istio-policy-5cdbc47674-t67p4
       share_ns_with:
         type: string
         example: cc0709d522749203042e89dba28bf6924a4b0d360648
@@ -11874,13 +11886,11 @@ definitions:
         example: false
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: io.kubernetes.pod.name
-          value:
-            type: string
-            example: calico-node-mzhtk
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          io.kubernetes.pod.name: calico-node-mzhtk
       memory_limit:
         type: integer
         format: int64
@@ -11896,13 +11906,10 @@ definitions:
         example: host
       interfaces:
         type: object
-        properties:
-          key:
-            type: string
-            example: eth0
-          value:
-            type: array
-            items:
+        description: map key is string type like "eth0"
+        additionalProperties:
+          type: array
+          items:
               $ref: '#/definitions/RESTIPAddr'
       ports:
         type: array
@@ -11994,13 +12001,13 @@ definitions:
         example: calico-node-mzhtk
       pod_name:
         type: string
-        example: "istio-policy-5cdbc47674-t67p4"
+        example: istio-policy-5cdbc47674-t67p4
       image:
         type: string
         example: calico
       image_id:
         type: string
-        example: "d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f"
+        example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
       platform_role:
         type: string
         example: core
@@ -12097,7 +12104,7 @@ definitions:
         example: calico
       image_id:
         type: string
-        example: "d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f"
+        example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
       domain:
         type: string
         example: ""
@@ -12223,31 +12230,32 @@ definitions:
         example: true
       created_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       started_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       finished_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       running:
         type: boolean
         example: false
       secured_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       exit_code:
         type: integer
         example: 0
       interfaces:
         type: object
-        properties:
-          key:
-            type: string
-            example: eth0
-          value:
-            type: array
-            items:
+        description: map key is string type like "eth0"
+        additionalProperties:
+          type: array
+          items:
               $ref: '#/definitions/RESTIPAddr'
       ports:
         type: array
@@ -12255,13 +12263,11 @@ definitions:
           $ref: '#/definitions/RESTWorkloadPorts'
       labels:
         type: object
-        properties:
-          key:
-            type: string
-            example: io.kubernetes.pod.name
-          value:
-            type: string
-            example: calico-node-mzhtk
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          io.kubernetes.pod.name: calico-node-mzhtk
       applications:
         type: array
         items:
@@ -12278,16 +12284,14 @@ definitions:
         type: array
         items:
           type: string
-          example: ["nv.iperfclient-pod", "nv.pod"]
+        example: ["nv.iperfclient-pod", "nv.pod"]
       app_ports:
         type: object
-        properties:
-          key:
-            type: string
-            example: TCP
-          value:
-            type: string
-            example: "9999"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          TCP: "9999"
       children:
         type: array
         items:
@@ -12331,19 +12335,23 @@ definitions:
         example: core
       created_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       started_at:
         type: string
-        example: "2018-01-18T00:44:02Z"
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       finished_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       running:
         type: boolean
         example: false
       secured_at:
         type: string
-        example: "2018-01-18T01:20:02Z"
+        format: date-time
+        example: 2018-01-18T01:20:02Z
       exit_code:
         type: integer
         example: 0
@@ -12374,16 +12382,14 @@ definitions:
         type: array
         items:
           type: string
-          example: ["nv.iperfclient-pod", "nv.pod"]
+        example: ["nv.iperfclient-pod", "nv.pod"]
       app_ports:
         type: object
-        properties:
-          key:
-            type: string
-            example: TCP
-          value:
-            type: string
-            example: "9999"
+        description: map key is string type
+        additionalProperties:
+          type: string
+        example:
+          TCP: "9999"
       children:
         type: array
         items:
@@ -12436,7 +12442,8 @@ definitions:
         example: 0fdf601ddc3ab541386aa8e36fe113593c
       read_at:
         type: string
-        example: "2018-01-21T06:25:15Z"
+        format: date-time
+        example: 2018-01-21T06:25:15Z
       stats:
         $ref: '#/definitions/RESTStats'
   Threat:
@@ -12650,7 +12657,8 @@ definitions:
         example: 1516160219
       reported_at:
         type: string
-        example: "2018-01-17T03:36:59Z"
+        format: date-time
+        example: 2018-01-17T03:36:59Z
       cluster_name:
         type: string
         example: cluster1
@@ -12662,16 +12670,16 @@ definitions:
         example: "2AU7:TIEN:O5KX:QK56:LFQP:IJSV:FXBN:QJV7"
       host_name:
         type: string
-        example: "ubuntu64"
+        example: ubuntu64
       enforcer_id:
         type: string
-        example: "bced57295eefbd3f3bd0cf798b6184fa789"
+        example: bced57295eefbd3f3bd0cf798b6184fa789
       enforcer_name:
         type: string
-        example: "allinone"
+        example: allinone
       id:
         type: string
-        example: "e6e19591-75a0-43e9-bebb-145d588e6718"
+        example: e6e19591-75a0-43e9-bebb-145d588e6718
       client_id:
         type: string
         example: 25f773945fff1d8880b9eb67d26be22f5321d
@@ -12719,7 +12727,7 @@ definitions:
         type: array
         items:
           type: string
-          example: ["server1", "server2"]
+        example: ["server1", "server2"]
       sessions:
         type: integer
         format: uint32
@@ -12747,15 +12755,15 @@ definitions:
         type: array
         items:
           type: string
-          example: ["exist","notExist"]
+        example: ["exist","notExist"]
       values:
         type: array
         items:
           type: string
-          example: ["true", "false"]
+        example: ["true", "false"]
       valuetype:
         type: string
-        example: "key"
+        example: key
   RESTAdminCriteriaTemplate:
     type: object
     required:
@@ -12764,7 +12772,7 @@ definitions:
     properties:
       kind:
         type: string
-        example: "podTemplate"
+        example: podTemplate
       rawjson:
         type: string
         example: "{\"key\": \"value\"}"
@@ -12773,14 +12781,143 @@ definitions:
     properties:
       x509_cert:
         type: string
-        example: "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       issuer_cn:
         type: string
-        example: "dev-11563853"
+        example: dev-11563853
       subject_cn:
         type: string
-        example: "dev-11563853"
+        example: dev-11563853
       subject_notafter:
         type: integer
         format: uint64
         example: 1988147822
+  RESTApikey:
+    type: object
+    required:
+      - expiration_type
+      - apikey_name
+      - role
+    properties:
+      expiration_type:
+        type: string
+        example: never
+      expiration_hours:
+        type: integer
+        format: uint32
+        example: 1
+      apikey_name:
+        type: string
+        example: token-cicd-scan
+      apikey_secret:
+        type: string
+        example: 0u+tVOWNPRfpCK7p9qz
+      description:
+        type: string
+        example: "cicd image scanning"
+      role:
+        type: string
+        example: admin
+      role_domains:
+        type: object
+        properties:
+          role:
+            type: string
+            example: admin
+          domains:
+            type: array
+            items:
+              type: string
+            example: ["domain1", "domain2"]
+      expiration_timestamp:
+        type: integer
+        format: int64
+        example: 11515020888
+      created_timestamp:
+        type: integer
+        format: int64
+        example: 11515020888
+      created_by_entity:
+        type: string
+        example: admin
+  RESTApikeyData:
+    type: object
+    required:
+      - apikey
+    properties:
+      apikey:
+        $ref: '#/definitions/RESTApikey'
+  RESTApikeysData:
+    type: object
+    required:
+      - apikeys
+      - global_roles
+      - domain_roles
+    properties:
+      apikeys:
+        type: array
+        items:
+          $ref: '#/definitions/RESTApikey'
+      global_roles:
+        type: array
+        items:
+          type: string
+        example: ["admin", "reader"]
+      domain_roles:
+        type: array
+        items:
+          type: string
+        example: ["role1", "role2"]
+  RESTApikeyCreation:
+    type: object
+    required:
+      - expiration_type
+      - apikey_name
+      - role
+    properties:
+      expiration_type:
+        type: string
+        example: never
+      expiration_hours:
+        type: integer
+        format: uint32
+        example: 1
+      apikey_name:
+        type: string
+        example: token-cicd-scan
+      description:
+        type: string
+        example: cicd image scanning
+      role:
+        type: string
+        example: admin
+      role_domains:
+        type: object
+        properties:
+          role:
+            type: string
+            example: admin
+          domains:
+            type: array
+            items:
+              type: string
+              example: ["domain1", "domain2"]  
+  RESTApikeyGeneratedData:
+    type: object
+    required:
+      - apikey
+    properties:
+      apikey:
+        $ref: '#/definitions/RESTApikeyGenerated'
+  RESTApikeyGenerated:
+    type: object
+    required:
+      - apikey_name
+      - apikey_secret
+    properties:
+      apikey_name:
+        type: string
+        example: token-cicd-scan
+      apikey_secret:
+        type: string
+        example: 0u+tVOWNPRfpCK7p9qz

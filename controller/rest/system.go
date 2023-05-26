@@ -6,7 +6,10 @@ import "C"
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -21,12 +24,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -116,7 +120,7 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		resp.TelemetryStatus = api.RESTTeleStatus{
 			TeleFreq:       _teleFreq,
 			TeleURL:        _teleNeuvectorURL,
-			CurrentVersion: nvAppFullVersion,
+			CurrentVersion: cctx.NvAppFullVersion,
 		}
 
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
@@ -285,6 +289,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						SyslogCategories:   rconf.SyslogCategories,
 						SyslogInJSON:       rconf.SyslogInJSON,
 						SingleCVEPerSyslog: rconf.SingleCVEPerSyslog,
+						SyslogServerCert:   rconf.SyslogServerCert,
 					},
 					Auth: api.RESTSystemConfigAuthV2{
 						AuthOrder:      rconf.AuthOrder,
@@ -316,6 +321,8 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					NetSvc: api.RESTSystemConfigNetSvcV2{
 						NetServiceStatus:     rconf.NetServiceStatus,
 						NetServicePolicyMode: rconf.NetServicePolicyMode,
+						DisableNetPolicy:     rconf.DisableNetPolicy,
+						DetectUnmanagedWl:    rconf.DetectUnmanagedWl,
 					},
 					ModeAuto: api.RESTSystemConfigModeAutoV2{
 						ModeAutoD2M:         rconf.ModeAutoD2M,
@@ -325,6 +332,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					},
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
+			}
+			if scope == share.ScopeLocal || scope == share.ScopeAll {
+				_, strCspType := common.GetMappedCspType(nil, &cctx.CspType)
+				respV2.Config.Misc.CspType = strCspType
 			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
@@ -1006,6 +1017,12 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 					return kick, errors.New(e)
 				}
 			}
+			if nc.DisableNetPolicy != nil {
+				cconf.DisableNetPolicy = *nc.DisableNetPolicy
+			}
+			if nc.DetectUnmanagedWl != nil {
+				cconf.DetectUnmanagedWl = *nc.DetectUnmanagedWl
+			}
 		}
 
 		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
@@ -1137,13 +1154,25 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				ipproto := *rc.SyslogIPProto
 				if ipproto == 0 {
 					cconf.SyslogIPProto = syscall.IPPROTO_UDP
-				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP {
+				} else if ipproto != syscall.IPPROTO_UDP && ipproto != syscall.IPPROTO_TCP && ipproto != api.SyslogProtocolTCPTLS {
 					e := "Invalid syslog protocol"
 					log.WithFields(log.Fields{"protocol": ipproto}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 					return kick, errors.New(e)
 				} else {
 					cconf.SyslogIPProto = ipproto
+				}
+			}
+
+			if rc.SyslogServerCert != nil {
+				cconf.SyslogServerCert = *rc.SyslogServerCert
+			}
+			if cconf.SyslogIPProto == api.SyslogProtocolTCPTLS && (rc.SyslogIPProto != nil || rc.SyslogServerCert != nil) {
+				if certErr := validateCertificate(cconf.SyslogServerCert); certErr != nil {
+					e := "Invalid syslog server certificate"
+					log.WithFields(log.Fields{"error": certErr}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
 				}
 			}
 
@@ -1468,6 +1497,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.SyslogCategories = configV2.SyslogCfg.SyslogCategories
 				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
 				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
+				config.SyslogServerCert = configV2.SyslogCfg.SyslogServerCert
 			}
 			if configV2.AuthCfg != nil {
 				config.AuthOrder = configV2.AuthCfg.AuthOrder
@@ -1820,10 +1850,18 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		RoleErrors:               emptySlice,
 		RoleBindingErrors:        emptySlice,
 		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
+		NvCrdSchemaErrors:        emptySlice,
 	}
 	if k8sPlatform {
 		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleErrors, resp.RoleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
+		if checkCrdSchemaFunc != nil {
+			var leader bool
+			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
+				leader = true
+			}
+			resp.NvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
+		}
 	}
 
 	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
@@ -2369,4 +2407,19 @@ func replaceFedSystemConfig(newCfg *share.CLUSSystemConfig) bool {
 	}
 
 	return true
+}
+
+func validateCertificate(certificate string) error {
+	block, _ := pem.Decode([]byte(certificate))
+	if block == nil {
+		return errors.New("Invalid certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return errors.New("Invalid certificate")
+	}
+	if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+		return errors.New("Invalid certificate, certificate doesn't contain a public key")
+	}
+	return nil
 }

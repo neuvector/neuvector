@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -19,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 )
 
 const ldapconfigmap string = "/etc/config/ldapinitcfg.yaml"
@@ -277,6 +277,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			SyslogCategories:          rc.SyslogCategories,
 			SyslogInJSON:              rc.SyslogInJSON,
 			SingleCVEPerSyslog:        rc.SingleCVEPerSyslog,
+			SyslogServerCert:          rc.SyslogServerCert,
 			AuthOrder:                 rc.AuthOrder,
 			AuthByPlatform:            rc.AuthByPlatform,
 			RancherEP:                 rc.RancherEP,
@@ -299,6 +300,8 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		NetConfig: &api.RESTSysNetConfigConfig{
 			NetServiceStatus:     rc.NetServiceStatus,
 			NetServicePolicyMode: rc.NetServicePolicyMode,
+			DisableNetPolicy:     rc.DisableNetPolicy,
+			DetectUnmanagedWl:    rc.DetectUnmanagedWl,
 		},
 		AtmoConfig: &api.RESTSysAtmoConfigConfig{
 			ModeAutoD2M:         rc.ModeAutoD2M,
@@ -423,8 +426,7 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 
 	if ruser.Timeout == 0 {
 		ruser.Timeout = common.DefaultIdleTimeout
-	} else if ruser.Timeout > api.UserIdleTimeoutMax ||
-		ruser.Timeout < api.UserIdleTimeoutMin {
+	} else if ruser.Timeout > api.UserIdleTimeoutMax || ruser.Timeout < api.UserIdleTimeoutMin {
 		e := "Invalid idle timeout value"
 		log.WithFields(log.Fields{"create": common.DefaultAdminUser, "timeout": ruser.Timeout}).Error(e)
 		return
@@ -504,11 +506,17 @@ func handlepwdprofilecfg(yaml_data []byte, load bool, skip *bool, context *confi
 		profile.EnableBlockAfterFailedLogin = rprofile.EnableBlockAfterFailedLogin
 		profile.BlockAfterFailedCount = rprofile.BlockAfterFailedCount
 		profile.BlockMinutes = rprofile.BlockMinutes
+		if rprofile.SessionTimeout == 0 {
+			profile.SessionTimeout = common.DefIdleTimeoutInternal
+		} else {
+			profile.SessionTimeout = rprofile.SessionTimeout
+		}
 		if profile.MinLen <= 0 || profile.MinUpperCount < 0 || profile.MinLowerCount < 0 || profile.MinDigitCount < 0 || profile.MinSpecialCount < 0 ||
 			(profile.EnablePwdExpiration && profile.PwdExpireAfterDays <= 0) ||
 			(profile.EnablePwdHistory && profile.PwdHistoryCount <= 0) ||
 			(profile.EnableBlockAfterFailedLogin && (profile.BlockAfterFailedCount <= 0 || profile.BlockMinutes <= 0)) ||
-			(profile.MinLen < (profile.MinUpperCount + profile.MinLowerCount + profile.MinDigitCount + profile.MinSpecialCount)) {
+			(profile.MinLen < (profile.MinUpperCount + profile.MinLowerCount + profile.MinDigitCount + profile.MinSpecialCount)) ||
+			(profile.SessionTimeout > api.UserIdleTimeoutMax || profile.SessionTimeout < api.UserIdleTimeoutMin) {
 			log.WithFields(log.Fields{"rprofile": *rprofile}).Error("invalid value")
 			continue
 		}
@@ -652,9 +660,11 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		}
 
 		if ruser.Timeout == 0 {
-			ruser.Timeout = common.DefaultIdleTimeout
-		} else if ruser.Timeout > api.UserIdleTimeoutMax ||
-			ruser.Timeout < api.UserIdleTimeoutMin {
+			ruser.Timeout = profile.SessionTimeout
+			if ruser.Timeout == 0 {
+				ruser.Timeout = common.DefIdleTimeoutInternal
+			}
+		} else if ruser.Timeout > api.UserIdleTimeoutMax || ruser.Timeout < api.UserIdleTimeoutMin {
 			e := "Invalid idle timeout value"
 			log.WithFields(log.Fields{"create": ruser.Fullname, "timeout": ruser.Timeout}).Error(e)
 			continue

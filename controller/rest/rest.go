@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+
 	//	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -93,6 +94,8 @@ var restErrNeedAgentFilter = errors.New("Enforcer filter must be provided")
 var restErrWorkloadNotFound error = errors.New("Container is not found")
 var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
+
+var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
 
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
@@ -1228,22 +1231,29 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev         *common.LocalDevice
-	EvQueue          cluster.ObjectQueueInterface
-	AuditQueue       cluster.ObjectQueueInterface
-	Messenger        cluster.MessengerInterface
-	Cacher           cache.CacheInterface
-	Scanner          scan.ScanInterface
-	FedPort          uint
-	RESTPort         uint
-	PwdValidUnit     uint
-	TeleNeuvectorURL string
-	TeleCurrentVer   string
-	TeleFreq         uint
+	LocalDev           *common.LocalDevice
+	EvQueue            cluster.ObjectQueueInterface
+	AuditQueue         cluster.ObjectQueueInterface
+	Messenger          cluster.MessengerInterface
+	Cacher             cache.CacheInterface
+	Scanner            scan.ScanInterface
+	FedPort            uint
+	RESTPort           uint
+	PwdValidUnit       uint
+	TeleNeuvectorURL   string
+	TeleFreq           uint
+	NvAppFullVersion   string
+	NvSemanticVersion  string
+	CspType            share.TCspType
+	CspPauseInterval   uint // in minutes
+	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
 }
+
+var cctx *Context
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
 func InitContext(ctx *Context) {
+	cctx = ctx
 	localDev = ctx.LocalDev
 	cacher = ctx.Cacher
 	scanner = ctx.Scanner
@@ -1259,33 +1269,13 @@ func InitContext(ctx *Context) {
 	_fedPort = ctx.FedPort
 	_fedServerChan = make(chan bool, 1)
 	crdEventProcTicker = time.NewTicker(crdEventProcPeriod)
+	checkCrdSchemaFunc = ctx.CheckCrdSchemaFunc
 
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
 		_pwdValidUnit = time.Duration(ctx.PwdValidUnit)
 	}
 
 	_teleNeuvectorURL = ctx.TeleNeuvectorURL
-	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
-		// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
-		// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
-		// nvSemanticVersion : in the format v{major}.{minor}.{patch}
-		var ver share.CLUSCtrlVersion
-		json.Unmarshal(value, &ver)
-		if strings.HasPrefix(ver.CtrlVersion, "interim/") {
-			// it's daily dev build image
-			if ctx.TeleCurrentVer == "" {
-				nvAppFullVersion = "5.1.0"
-			} else {
-				nvAppFullVersion = ctx.TeleCurrentVer
-			}
-		} else {
-			// it's official release image
-			nvAppFullVersion = ver.CtrlVersion[1:]
-		}
-		if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
-			nvSemanticVersion = "v" + ss[0]
-		}
-	}
 	_teleFreq = ctx.TeleFreq
 	if _teleFreq == 0 {
 		_teleFreq = 60
@@ -1550,6 +1540,18 @@ func StartRESTServer() {
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
 	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
 
+	// Sigstore Configuration
+	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
+	r.POST("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustPost)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustGetByName)
+	r.PATCH("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustPatchByName)
+	r.DELETE("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustDeleteByName)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name/verifier", handlerSigstoreVerifierGetAll)
+	r.POST("/v1/scan/sigstore/root_of_trust/:root_name/verifier", handlerSigstoreVerifierPost)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierGetByName)
+	r.PATCH("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierPatchByName)
+	r.DELETE("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierDeleteByName)
+
 	// compliance
 	r.GET("/v1/compliance/asset", handlerAssetCompliance) // Skip API document
 	r.GET("/v1/bench/host/:id/docker", handlerDockerBench)
@@ -1620,6 +1622,16 @@ func StartRESTServer() {
 	r.PATCH("/v1/user_role/:name", handlerRoleConfig)
 	r.DELETE("/v1/user_role/:name", handlerRoleDelete)
 
+	// api key
+	r.GET("/v1/api_key", handlerApikeyList)
+	r.GET("/v1/api_key/:name", handlerApikeyShow)
+	r.POST("/v1/api_key", handlerApikeyCreate)
+	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
+	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
+
+	// csp billing adapter integration
+	r.POST("/v1/csp/file/support", handlerCspSupportExport) // Skip API document. For downloading the tar ball that can be submitted to support portal
+
 	access.CompileUriPermitsMapping()
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
@@ -1671,6 +1683,7 @@ func startFedRestServer(fedPingInterval uint32) {
 	r.POST("/v1/fed/poll_internal", handlerPollFedRulesInternal)         // Skip API document, called from joint cluster to master cluster
 	r.POST("/v1/fed/scan_data_internal", handlerPollFedScanDataInternal) // Skip API document, called from joint cluster to master cluster
 	r.POST("/v1/fed/leave_internal", handlerLeaveFedInternal)            // Skip API document, called from joint cluster to master cluster
+	r.POST("/v1/fed/csp_support_internal", handlerCspSupportInternal)    // Skip API document, called from joint cluster to master cluster for collecting support config
 	r.GET("/v1/fed/healthcheck", handlerFedHealthCheck)                  // for fed master REST server health-check. no token required
 
 	config := &tls.Config{MinVersion: tls.VersionTLS11}

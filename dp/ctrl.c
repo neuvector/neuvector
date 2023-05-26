@@ -2252,6 +2252,42 @@ static int dp_ctrl_sys_conf(json_t *msg)
     return 0;
 }
 
+uint8_t g_disable_net_policy = 0;
+
+static int dp_ctrl_disable_net_policy(json_t *msg)
+{
+    json_t *disable_net_policy_obj;
+    bool disable_net_policy = false;
+
+    disable_net_policy_obj = json_object_get(msg, "disable_net_policy");
+    if (disable_net_policy_obj != NULL) {
+        disable_net_policy = json_boolean_value(disable_net_policy_obj);
+    }
+    g_disable_net_policy = disable_net_policy ? 1 : 0;
+
+    DEBUG_CTRL("g_disable_net_policy=%u\n", g_disable_net_policy);
+
+    return 0;
+}
+
+uint8_t g_detect_unmanaged_wl = 0;
+
+static int dp_ctrl_detect_unmanaged_wl(json_t *msg)
+{
+    json_t *detect_unmanaged_wl_obj;
+    bool detect_unmanaged_wl = false;
+
+    detect_unmanaged_wl_obj = json_object_get(msg, "detect_unmanaged_wl");
+    if (detect_unmanaged_wl_obj != NULL) {
+        detect_unmanaged_wl = json_boolean_value(detect_unmanaged_wl_obj);
+    }
+    g_detect_unmanaged_wl = detect_unmanaged_wl ? 1 : 0;
+
+    DEBUG_CTRL("g_detect_unmanaged_wl=%u\n", g_detect_unmanaged_wl);
+
+    return 0;
+}
+
 #define BUF_SIZE 8192
 char ctrl_msg_buf[BUF_SIZE];
 static int dp_ctrl_handler(int fd)
@@ -2349,6 +2385,10 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_bld_dlp_update_ep(msg);
         } else if (strcmp(key, "ctrl_sys_conf") == 0) {
             ret = dp_ctrl_sys_conf(msg);
+        } else if (strcmp(key, "ctrl_disable_net_policy") == 0) {
+            ret = dp_ctrl_disable_net_policy(msg);
+        } else if (strcmp(key, "ctrl_detect_unmanaged_wl") == 0) {
+            ret = dp_ctrl_detect_unmanaged_wl(msg);
         }
         DEBUG_CTRL("\"%s\" done\n", key);
     }
@@ -2604,6 +2644,12 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_LINK_LOCAL)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_LINK_LOCAL);
             }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_TMP_OPEN)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_TMP_OPEN);
+            }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_UWLIP)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_UWLIP);
+            }
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;
             conn->Sessions = count_session;
@@ -2628,6 +2674,9 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
 
 static void send_connects(int count)
 {
+    if (g_disable_net_policy) {
+        return;
+    }
     //DEBUG_CTRL("count=%d\n", count);
 
     DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;

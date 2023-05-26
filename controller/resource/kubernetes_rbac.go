@@ -87,7 +87,7 @@ type k8sRbacRoleInfo struct { // for role & cluster role
 
 type k8sRbacBindingInfo struct {
 	namespace string // "" means cluster rolebinding
-	subject   *string
+	subjects  []string
 	rbacRole  *k8sRbacRoleInfo
 }
 
@@ -140,8 +140,10 @@ var crdPolicyRoleVerbs utils.Set = utils.NewSet("delete", "list")
 
 var ctrlerSubjectWanted string = "controller"
 var updaterSubjectWanted string = "updater"
-
-// var enforcerSubjectWanted string = "enforcer"
+var enforcerSubjectWanted string = "enforcer"
+var ctrlerSubjectsWanted []string = []string{"controller"}
+var scannerSubjecstWanted []string = []string{"updater", "controller"}
+var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
 
@@ -233,7 +235,7 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 			&k8sRbacRoleRuleInfo{
 				apiGroup:  "apps",
 				resources: utils.NewSet(RscDeployments),
-				verbs:     utils.NewSet("get", "patch", "update"),
+				verbs:     utils.NewSet("get", "watch", "patch", "update"),
 			},
 		},
 	},
@@ -253,49 +255,49 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 // rolebinding can binds to either role or clusterrole
 var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacBindingInfo{ // cluster rolebindings -> cluster role settings required by nv
 	nvAppRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvAppRole],
 	},
 	nvRbacRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvRbacRole],
 	},
 	nvAdmCtrlRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvAdmCtrlRole],
 	},
 	nvCrdRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdRole],
 	},
 	nvCrdSecRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdSecRuleRole],
 	},
 	nvCrdAdmCtrlRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdAdmCtrlRole],
 	},
 	nvCrdDlpRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdDlpRole],
 	},
 	nvCrdWafRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdWafRole],
 	},
 	nvViewRoleBinding: &k8sRbacBindingInfo{
-		subject:  &ctrlerSubjectWanted,
+		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[k8sClusterRoleView],
 	},
 	NvScannerRoleBinding: &k8sRbacBindingInfo{ // for updater pod
 		namespace: constNvNamespace,
-		subject:   &updaterSubjectWanted,
+		subjects:  scannerSubjecstWanted,
 		rbacRole:  rbacRolesWanted[NvScannerRole],
 	},
 	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
 		namespace: constNvNamespace,
-		subject:   &updaterSubjectWanted,
+		subjects:  scannerSubjecstWanted,
 		rbacRole:  rbacRolesWanted[k8sClusterRoleAdmin],
 	},
 }
@@ -671,16 +673,17 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: s.GetNamespace()}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
@@ -716,20 +719,18 @@ func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
@@ -767,20 +768,18 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
@@ -812,20 +811,18 @@ func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
 		roleBind.roleKind = role.GetKind()
 
 		for _, s := range subjects {
+			ns := s.GetNamespace()
 			switch subKind = s.GetKind(); subKind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: s.GetNamespace(), subType: SUBJECT_USER}
+				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
 				if subKind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if s.GetNamespace() == NvAdmSvcNamespace {
-					saName := s.GetName()
-					if saName == ctrlerSubjectWanted || saName == updaterSubjectWanted /* || saName == enforcerSubjectWanted*/ {
-						objRef := k8sObjectRef{name: saName, domain: s.GetNamespace()}
-						roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-					}
+				if ns == NvAdmSvcNamespace {
+					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
@@ -915,14 +912,14 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 				if nRtVerbs, ok1 := n.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok1 {
 					if nVerbs, ok1 := nRtVerbs[RscNameCustomResourceDefinitions]; ok1 {
 						if old == nil {
-							nvCrdInitFunc(isLeader)
+							nvCrdInitFunc(isLeader, cspType)
 						} else {
 							if o = old.(*k8sRole); o.apiRtVerbs != nil {
 								if oRtVerbs, ok2 := o.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok2 {
 									if oVerbs, ok2 := oRtVerbs[RscNameCustomResourceDefinitions]; ok2 {
 										if (nVerbs.Contains("update") || nVerbs.Contains("*")) &&
 											(!oVerbs.Contains("update") && !oVerbs.Contains("*")) {
-											nvCrdInitFunc(isLeader)
+											nvCrdInitFunc(isLeader, cspType)
 										}
 									}
 								}
@@ -1095,28 +1092,25 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 		// 5. nv-required clusterrolebinding check
 		{
 			if bindingInfo, ok := rbacRoleBindingsWanted[n.name]; ok && n.domain == bindingInfo.namespace {
-				checkRBAC := true
+				var errs []string
 				if n.name == NvAdminRoleBinding || n.name == NvScannerRoleBinding {
-					if _, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, "neuvector-updater-pod"); err != nil {
-						checkRBAC = false
-					} else {
-						// when one of (neuvector-admin, neuvector-binding-scanner) rolebinding is configured correctly, do not care another rolebinding's settings
-						var checkName string
-						if n.name == NvAdminRoleBinding {
-							checkName = NvScannerRoleBinding
-						} else {
-							checkName = NvAdminRoleBinding
-						}
-						if errs, _ := VerifyNvRbacRoleBindings([]string{checkName}, false, false); len(errs) == 0 {
-							checkRBAC = false
+					if _, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, "neuvector-updater-pod"); err == nil {
+						// rolebinding neuvector-binding-scanner is preferred in 5.2(+)
+						// rolebinding neuvector-admin is majorly for backward compatibility
+						if errs, _ = VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, false, false); len(errs) > 0 {
+							// access denied for reading rolebinding resources, rolebinding neuvector-admin is not found or it's incorrectly configured
+							if errs2, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, false, true); !k8sRbac403 && len(errs) > 0 {
+								// rolebinding neuvector-binding-scanner is not found or it's incorrectly configured
+								errs = errs2
+							}
 						}
 					}
+				} else {
+					errs, _ = VerifyNvRbacRoleBindings([]string{n.name}, false, true)
 				}
-				if checkRBAC {
-					if errs, _ := VerifyNvRbacRoleBindings([]string{n.name}, false, true); len(errs) > 0 {
-						log.WithFields(log.Fields{"role": n.role.name}).Warn(errs[0])
-						cacheRbacEvent(d.flavor, errs[0], false)
-					}
+				if len(errs) > 0 {
+					log.WithFields(log.Fields{"role": n.role.name}).Warn(errs[0])
+					cacheRbacEvent(d.flavor, errs[0], false)
 				}
 			}
 		}
@@ -1336,7 +1330,7 @@ func VerifyNvRbacRoleBindings(bindingNames []string, existOnly, logging bool) ([
 			var rbacRoleBindingDesc string
 			var rbacRoleBind interface{}
 			var obj interface{}
-			var foundSA bool
+			var foundSAs bool
 
 			if bindingWanted.namespace == "" {
 				rbacRoleBindingDesc = "clusterrolebinding"
@@ -1374,8 +1368,7 @@ func VerifyNvRbacRoleBindings(bindingNames []string, existOnly, logging bool) ([
 								if roleWanted.k8sReserved {
 									// this (cluster) role binding binds to k8s reserved cluster role
 									if !roleWanted.supersetRoles.Contains(binding.role.name) {
-										err = fmt.Errorf(`Kubernetes %s "%s" is required to bind %s "%s" to service account %s:%s.`,
-											rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+										wrongBinding = true
 									}
 								} else if binding.role.name != roleWanted.name || binding.role.domain != roleWanted.namespace {
 									wrongBinding = true
@@ -1387,16 +1380,30 @@ func VerifyNvRbacRoleBindings(bindingNames []string, existOnly, logging bool) ([
 							wrongBinding = true
 						}
 						if !wrongBinding && err == nil {
-							for _, sa := range binding.svcAccounts {
-								if *bindingWanted.subject == sa.name && NvAdmSvcNamespace == sa.domain {
-									foundSA = true
+							foundSAs = true
+							for _, saWanted := range bindingWanted.subjects {
+								found := false
+								for _, sa := range binding.svcAccounts {
+									if saWanted == sa.name && NvAdmSvcNamespace == sa.domain {
+										found = true
+										break
+									}
+								}
+								if !found {
+									foundSAs = false
 									break
 								}
 							}
 						}
-						if err == nil && (!foundSA || wrongBinding) {
-							err = fmt.Errorf(`Kubernetes %s "%s" is required to grant the permissions defined in %s "%s" to service account %s:%s.`,
-								rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, NvAdmSvcNamespace, *bindingWanted.subject)
+						if err == nil && (!foundSAs || wrongBinding) {
+							subjects := getSubjectsString(NvAdmSvcNamespace, bindingWanted.subjects)
+							if roleWanted, ok := rbacRolesWanted[bindingWanted.rbacRole.name]; ok && roleWanted.k8sReserved {
+								err = fmt.Errorf(`Kubernetes %s "%s" is required to bind %s "%s" to service account(s) %s.`,
+									rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, subjects)
+							} else {
+								err = fmt.Errorf(`Kubernetes %s "%s" is required to grant the permissions defined in %s "%s" to service account(s) %s.`,
+									rbacRoleBindingDesc, bindingName, rbacRoleDesc, bindingWanted.rbacRole.name, subjects)
+							}
 						}
 					} else {
 						err = fmt.Errorf(`Unknown object type for Kubernetes %s "%s".`, rbacRoleBindingDesc, bindingName)
@@ -1482,10 +1489,23 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	}
 	if nvControllerSA != ctrlerSubjectWanted {
 		ctrlerSubjectWanted = nvControllerSA
+		ctrlerSubjectsWanted[0] = ctrlerSubjectWanted
+		scannerSubjecstWanted[0] = ctrlerSubjectWanted
+		scannerSubjecstWanted[1] = updaterSubjectWanted
+		enforcerSubjecstWanted[0] = ctrlerSubjectWanted
+		enforcerSubjecstWanted[1] = enforcerSubjectWanted
 	}
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
 
 	return
+}
+
+func getSubjectsString(ns string, subjects []string) string {
+	fullSubjects := make([]string, len(subjects))
+	for i, s := range subjects {
+		fullSubjects[i] = fmt.Sprintf("%s:%s", ns, s)
+	}
+	return strings.Join(fullSubjects, ", ")
 }
 
 func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []string, []string) {
@@ -1502,30 +1522,31 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	roleErrors := emptySlice
 	roleBindingErrors := emptySlice
 
-	for _, name := range []string{"neuvector-updater-pod"} {
-		getNeuvectorSvcAccount(name)
+	resInfo := map[string]string{ // resource object name : resource type
+		"neuvector-updater-pod":  RscTypeCronJob,
+		"neuvector-enforcer-pod": RscTypeDaemonSet,
 	}
+	getNeuvectorSvcAccount(resInfo)
 
 	// check neuvector-updater-pod cronjob exists in k8s or not. if it exists, check rolebinding neuvector-binding-scanner / neuvector-admin
 	// rolebinding neuvector-binding-scanner is preferred in 5.2(+)
 	// rolebinding neuvector-admin is majorly for backward compatibility
 	if _, err := global.ORCH.GetResource(RscTypeCronJob, NvAdmSvcNamespace, "neuvector-updater-pod"); err == nil {
 		// updater cronjob is found
-		if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, existOnly, false); k8sRbac403 {
-			// access denied for reading rolebinding resources
-			roleBindingErrors = errs
-		} else if len(errs) > 0 {
-			// rolebinding neuvector-admin is not found or it's incorrectly configured
-			if errs, _ = VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); len(errs) > 0 {
+		if errs, _ := VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, existOnly, false); len(errs) > 0 {
+			// access denied for reading rolebinding resources, rolebinding neuvector-admin is not found or it's incorrectly configured
+			if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); !k8sRbac403 && len(errs) > 0 {
 				// rolebinding neuvector-binding-scanner is not found or it's incorrectly configured
-				roleBindingErrors = errs
+				roleBindingErrors = append(roleBindingErrors, errs...)
 			}
-			roleErrors, _ = VerifyNvRbacRoles([]string{NvScannerRole}, existOnly)
+			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly); !k8sRbac403 && len(errs) > 0 {
+				roleErrors = append(roleErrors, errs...)
+			}
 		}
 	}
 
 	for name, role := range rbacRolesWanted {
-		if name == NvScannerRole {
+		if name == NvScannerRole || role.k8sReserved {
 			continue
 		}
 		if role.namespace == "" {

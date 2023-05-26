@@ -31,6 +31,7 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
  */
 #define UNKNOWN_IP_CACHE_TIMEOUT 600 //sec
 #define POLICY_DESC_VER_CHG_MAX 60 //sec
+#define UNKNOWN_IP_TRY_COUNT 10 //10 times
 typedef struct dpi_unknown_ip_desc_ {
     uint32_t sip;
     uint32_t dip;
@@ -44,6 +45,7 @@ typedef struct dpi_unknown_ip_cache_ {
     dpi_unknown_ip_desc_t desc;
     uint32_t start_hit;
     uint32_t last_hit;
+    uint8_t try_cnt;
 } dpi_unknown_ip_cache_t;
 
 static int unknown_ip_match(struct cds_lfht_node *ht_node, const void *key)
@@ -73,19 +75,35 @@ void dpi_unknown_ip_init(void)
     rcu_map_init(&th_unknown_ip_map, 64, offsetof(dpi_unknown_ip_cache_t, node), unknown_ip_match, unknown_ip_hash);
 }
 
-static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key)
+static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key, uint8_t iptype)
 {
     dpi_unknown_ip_cache_t *cache = calloc(1, sizeof(*cache));
     if (cache != NULL) {
         memcpy(&cache->desc, desc, sizeof(*desc));
         cache->start_hit = th_snap.tick;
         cache->last_hit = th_snap.tick;
+        if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
+            cache->try_cnt = 0;
+        } else {
+            cache->try_cnt = UNKNOWN_IP_TRY_COUNT;
+        }
         rcu_map_add(&th_unknown_ip_map, cache, key);
 
         timer_wheel_entry_init(&cache->ts_entry);
         timer_wheel_entry_start(&th_timer, &cache->ts_entry,
                                 unknown_ip_release, UNKNOWN_IP_CACHE_TIMEOUT, th_snap.tick);
     }
+}
+
+static void refresh_unknown_ip_cache(dpi_unknown_ip_cache_t *cache, uint16_t thdl_ver, uint8_t try_cnt)
+{
+    cache->try_cnt = try_cnt;
+    cache->desc.hdl_ver = thdl_ver;
+    //restart timestamp
+    cache->start_hit = th_snap.tick;
+    cache->last_hit = th_snap.tick;
+
+    timer_wheel_entry_refresh(&th_timer, &cache->ts_entry, th_snap.tick);
 }
 
 static void update_unknown_ip_cache(dpi_unknown_ip_cache_t *cache)
@@ -618,16 +636,24 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                  hdl, proto, DBG_IPV4_TUPLE(sip), DBG_IPV4_TUPLE(dip), dport, app, is_ingress, to_server);
     dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc, p);
 
-    if ((desc->flags & POLICY_DESC_INTERNAL) && _dpi_policy_implicit_default(hdl, desc)) {
+    if ((desc->flags & POLICY_DESC_INTERNAL)) {
         if (is_ingress) {
             iptype = dpi_ip4_iptype(sip);
-            inPolicyAddr = dpi_is_policy_addr(sip);
         } else {
             iptype = dpi_ip4_iptype(dip);
-            inPolicyAddr = dpi_is_policy_addr(dip);
         }
-        if (!inPolicyAddr) {
-            _dpi_policy_chk_unknown_ip(hdl, sip, dip, iptype, &desc);
+        if (_dpi_policy_implicit_default(hdl, desc)) {
+            if (is_ingress) {
+                inPolicyAddr = dpi_is_policy_addr(sip);
+            } else {
+                inPolicyAddr = dpi_is_policy_addr(dip);
+            }
+            if (!inPolicyAddr) {
+                _dpi_policy_chk_unknown_ip(hdl, sip, dip, iptype, &desc);
+            }
+        }
+        if (iptype == DP_IPTYPE_UWLIP) {
+            desc->flags |= POLICY_DESC_UWLIP;
         }
     }
 
@@ -677,43 +703,37 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
         uint16_t thdl_ver = hdl?hdl->ver:0;
         dpi_unknown_ip_cache_t *uip_cache = rcu_map_lookup(&th_unknown_ip_map, &uip_desc);
         if (uip_cache != NULL) {
-            /*
-             * existing unknown_ip_cache found
-             * 1. policy handle version is still same and lapse time for handle
-             *    version change is less than POLICY_DESC_VER_CHG_MAX seconds 
-             *    so we keep action as OPEN
-             * 2. handle version changes, but policy matches implicit default
-             *    action which means unmanaged wl/host ip, keep default action
-             * 3. handle version does not change, but 60s has passed,
-             *    this means there is no new policy push from controller/enforcer
-             *    to dp, which means unmanaged wl/host ip, keep default action
-             */
             if (thdl_ver == uip_cache->desc.hdl_ver &&
                 th_snap.tick - uip_cache->start_hit < POLICY_DESC_VER_CHG_MAX) {
                 desc->flags &= ~(POLICY_DESC_CHECK_VER);
                 desc->flags |= POLICY_DESC_UNKNOWN_IP;
+                desc->flags |= POLICY_DESC_TMP_OPEN;
                 desc->action = DP_POLICY_ACTION_OPEN;
                 update_unknown_ip_cache(uip_cache);
+            } else {
+                //try above condition UNKNOWN_IP_TRY_COUNT time
+                uint8_t try_cnt = uip_cache->try_cnt;
+                if (try_cnt > 0) {
+                    try_cnt--;
+                    refresh_unknown_ip_cache(uip_cache, thdl_ver, try_cnt);
+                    desc->flags &= ~(POLICY_DESC_CHECK_VER);
+                    desc->flags |= POLICY_DESC_UNKNOWN_IP;
+                    desc->flags |= POLICY_DESC_TMP_OPEN;
+                    desc->action = DP_POLICY_ACTION_OPEN;
+                }
             }
         } else {
-            /*
-             * existing unknown_ip_cache not found, traffic is internal,
-             * but no explicit policy is found thus default action is taken.
-             * 1. some workload send traffic immediately when it comes up,
-             *    dp see packet faster than it receives rules from controller,
-             *    change action to open and reevaluate after receive rules
-             *    from controller.
-             * 2. it can also be traffic sent from/to unmanaged wl/host ip
-             */
             uip_desc.hdl_ver = thdl_ver;
-            add_unknown_ip_cache(&uip_desc, &uip_desc);
+            add_unknown_ip_cache(&uip_desc, &uip_desc, iptype);
             desc->flags &= ~(POLICY_DESC_CHECK_VER);
             desc->flags |= POLICY_DESC_UNKNOWN_IP;
+            desc->flags |= POLICY_DESC_TMP_OPEN;
             desc->action = DP_POLICY_ACTION_OPEN;
         }
     } else if (iptype == DP_IPTYPE_DEVIP) {
         //connection from nv device is open
         desc->flags &= ~(POLICY_DESC_CHECK_VER);
+        desc->flags |= POLICY_DESC_TMP_OPEN;
         desc->action = DP_POLICY_ACTION_OPEN;
     }
 }
@@ -784,11 +804,12 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
 {
     dpi_rule_key_t key;
 
-    if (unlikely(!hdl)) {
+    if (unlikely(!hdl || th_disable_net_policy)) {
         // workload just created, allow traffic pass until policy being configured
         desc->id = 0;
         desc->action = DP_POLICY_ACTION_OPEN;
         desc->flags = POLICY_DESC_CHECK_VER;
+        desc->flags |= POLICY_DESC_TMP_OPEN;
         if (is_ingress) {
             desc->flags |= dpi_is_ip4_internal(sip)?
                                POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
@@ -832,6 +853,14 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                 desc->flags |= POLICY_DESC_HOSTIP;
             }
         } else {
+            if (iptype == DP_IPTYPE_UWLIP && !th_detect_unmanaged_wl) {
+                // traffic from unmanaged workload is not enforced,
+                // therefore  east-west ingress traffic is allowed
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = is_internal ? POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
+                goto exit;
+            }
             dpi_policy_desc_t desc2;
             _dpi_policy_lookup_by_key(hdl, &key, is_ingress, desc);
 
@@ -890,6 +919,14 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
             desc->action = DP_POLICY_ACTION_OPEN;
             desc->flags = POLICY_DESC_INTERNAL;
         } else {
+            if (iptype == DP_IPTYPE_UWLIP && !th_detect_unmanaged_wl) {
+                // traffic to unmanaged workload is not enforced,
+                // therefore  east-west egress traffic is allowed
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = is_internal ? POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
+                goto exit;
+            }
             dpi_policy_desc_t desc2;
             _dpi_policy_lookup_by_key(hdl, &key, is_ingress, desc);
 
@@ -956,12 +993,6 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
     if (unlikely((s->policy_desc.hdl_ver != p->ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_UNKNOWN_IP))) {
         dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
-        //if ip is still unmatchable to policy after new policy push
-        //from controller, restore action to policy default action
-        //it is not quick start anymore
-        if (s->policy_desc.flags & POLICY_DESC_UNKNOWN_IP) {
-            s->policy_desc.action = hdl?hdl->def_action:DP_POLICY_ACTION_OPEN;
-        }
         policy_eval = 1;
     }
 

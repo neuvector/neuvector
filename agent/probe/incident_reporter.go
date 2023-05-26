@@ -154,6 +154,7 @@ func (p *Probe) SendAggregateProbeReport(pmsg *ProbeMessage, bExtOp bool) bool {
 /////
 // dpkg[ubuntu, debian], yum[centos,fedora] , dnf[centos, coreos,fedora], rpm[redhat], apk[busybox], zypper[bci]
 var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk", "zypper")
+
 const (
 	fsPackageUpdate = "Software packages were updated."
 	fsComboAction   = "Files were modified or deleted."
@@ -171,12 +172,14 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 		pmsga.expireCnt = expireCountdown
 
 		if pmsg.ProcPid != 0 && pmsga.pid == 0 {
-			pmsg.ProcPid =  pmsg.ProcPid
-			pmsga.fsMsg = pmsg	// updated
+			pmsga.expireCnt = 1
+			pmsg.ProcPid = pmsg.ProcPid
+			pmsga.fsMsg = pmsg // updated
 		} else {
-			pmsga.count++
+			pmsga.fsMsg.Path = pmsg.Path // restored
 		}
-		mLog.WithFields(log.Fields{"report_a": pmsga, "msg": pmsga.fsMsg}).Debug("PROC: accumulated")
+		pmsga.count++
+		mLog.WithFields(log.Fields{"report_a": pmsga, "msg": pmsga.fsMsg, "pmsg": pmsg}).Debug("PROC: accumulated")
 		return false // hold the event for further events
 	}
 
@@ -185,7 +188,7 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 	bHasPackageInstalled := false
 	for key, pmsga := range p.pMsgAggregates {
 		if pmsga.bFsMonMsg {
-			if pmsga.fsMsg.ID != pmsg.ID {	// excludes other containers
+			if pmsga.fsMsg.ID != pmsg.ID { // excludes other containers
 				continue
 			}
 
@@ -202,17 +205,17 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 				// (2) Unreliable timing: the report could be either at the start or the end
 				// (3) Looking any non-expired installation event by processes (bPackageOpInProgress)
 				if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
-					pmsg.Path = fmt.Sprintf( "%s, %s", pmsga.fsMsg.Path, pmsg.Path)
+					pmsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
 				}
 				pmsga.pid = pmsg.ProcPid
 				pmsga.fsMsg = nil
-				pmsga.fsMsg = pmsg    // replaced
+				pmsga.fsMsg = pmsg // replaced
 				pmsga.fsMsg.Package = true
 				// log.WithFields(log.Fields{"Path": pmsga.fsMsg.Path}).Debug("PROC: update")
 				p.pMsgAggregates[key] = pmsga
 				return false
 			} else {
-				if pmsga.pid == pmsg.ProcPid && pmsg.ProcPid != 0 {  // same process
+				if pmsga.pid == pmsg.ProcPid && pmsg.ProcPid != 0 { // same process
 					if pmsga.fsMsg.Msg != fsComboAction && pmsga.fsMsg.Msg != pmsg.Msg {
 						pmsga.fsMsg.Msg = fsComboAction
 					}
@@ -252,7 +255,7 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 						}
 
 						if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
-							pmsga.fsMsg.Path = fmt.Sprintf( "%s, %s", pmsga.fsMsg.Path, pmsg.Path)
+							pmsga.fsMsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
 						}
 						// log.WithFields(log.Fields{"Path": pmsga.fsMsg.Path}).Debug("PROC: append")
 						p.pMsgAggregates[key] = pmsga
@@ -300,7 +303,7 @@ func (p *Probe) processAggregateProbeReports() int {
 			if pmsga.count > 1 {
 				go p.sendReport(*pmsga)
 				cnt++
-			} else if pmsga.bFsMonMsg && pmsga.count >= 1 {
+			} else if pmsga.bFsMonMsg && pmsga.count > 1 {	// no more adding entry
 				go p.sendReport(*pmsga)
 				cnt++
 			}
@@ -347,7 +350,7 @@ func (p *Probe) sendFsMonReport(fsMsg fsmon.MonitorMessage, count int, start tim
 	fsMsg.StartAt = start
 
 	// update package msg
-	if fsMsg.Package  {
+	if fsMsg.Package {
 		fsMsg.Msg = fsPackageUpdate
 	}
 

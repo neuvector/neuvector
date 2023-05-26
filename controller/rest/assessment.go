@@ -5,17 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -23,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -41,6 +41,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var defaultAction int = nvsysadmission.AdmCtrlActionAllow
+	var mode string = share.AdmCtrlModeProtect
 	if k8sPlatform {
 		var ctrlState *share.CLUSAdmCtrlState
 		state, _ := clusHelper.GetAdmissionStateRev(resource.NvAdmSvcName)
@@ -53,7 +54,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err)
 			return
 		}
-		_, _, defaultAction, _, _ = cacher.IsAdmControlEnabled(&ctrlState.Uri)
+		_, mode, defaultAction, _, _ = cacher.IsAdmControlEnabled(&ctrlState.Uri)
 	}
 
 	var resp api.RESTAdmCtrlRulesTestResults
@@ -75,7 +76,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 
 	// first pass: put RBAC resources into OPA
 	// note the format and length of this guid is important, rego code rely on this signature
-	sessionGuid := fmt.Sprintf("%s_config_assessment_", randomString(5))
+	sessionGuid := fmt.Sprintf("%s_config_assessment_", utils.RandomString(5))
 	opaKeys := []string{}
 	for _, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -174,7 +175,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 						},
 					}
 					stamps.Start = time.Now()
-					if response, reqIgnored := whsvr.validate(&ar, share.AdmCtrlModeProtect, defaultAction, &stamps, true); response == nil {
+					if response, reqIgnored := whsvr.validate(&ar, mode, defaultAction, &stamps, true); response == nil {
 						msg = "Could not get response"
 					} else if reqIgnored {
 						msg = "Request is ignored"
@@ -198,17 +199,4 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Test admission control rules")
-}
-
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz"
-
-	var seededRand *rand.Rand = rand.New(
-		rand.NewSource(time.Now().UnixNano()))
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
 }

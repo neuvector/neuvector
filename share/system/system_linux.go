@@ -30,6 +30,7 @@ import (
 	namespace "github.com/neuvector/neuvector/share/system/ns"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 	"github.com/neuvector/neuvector/share/system/sysinfo"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 const defaultHostProc string = "/proc/"
@@ -96,7 +97,6 @@ func NewSystemTools() *SystemTools {
 	// fill cgroup info
 	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
 	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err == nil {
-		log.Info("cgroup v2")
 		s.cgroupVersion = cgroup_v2
 		// update cgroup v2 path
 		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
@@ -105,11 +105,14 @@ func NewSystemTools() *SystemTools {
 			s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
 		}
 	} else {
-		log.Info("cgroup v1")
 		s.cgroupVersion = cgroup_v1
 		s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
 	}
 	return s
+}
+
+func (s *SystemTools) GetCgroupsVersion() int {
+	return s.cgroupVersion
 }
 
 func (s *SystemTools) GetSystemInfo() *sysinfo.SysInfo {
@@ -614,9 +617,11 @@ func (s *SystemTools) ContainerFilePath(pid int, path string) string {
 	return fmt.Sprintf("%s%d/root%s", s.procDir, pid, path)
 }
 
-func (s *SystemTools) IsNotContainerFile(pid int, path string) bool {
-	_, err := os.Stat(s.ContainerFilePath(pid, path))
-	return os.IsNotExist(err)
+func (s *SystemTools) IsNotContainerFile(pid int, path string) (bool, bool) {
+	rpath := s.ContainerFilePath(pid, path)
+	_, err := os.Stat(rpath)
+	os.IsNotExist(err)
+	return os.IsNotExist(err), utils.IsMountPoint(filepath.Dir(rpath))
 }
 
 func (s *SystemTools) ReadContainerFile(filePath string, pid, start, length int) ([]byte, error) {

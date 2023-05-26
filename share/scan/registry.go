@@ -3,13 +3,14 @@ package scan
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"sort"
 	"strings"
 
 	manifestList "github.com/docker/distribution/manifest/manifestlist"
 	manifestV1 "github.com/docker/distribution/manifest/schema1"
 	manifestV2 "github.com/docker/distribution/manifest/schema2"
-	digest "github.com/opencontainers/go-digest"
+	goDigest "github.com/opencontainers/go-digest"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
@@ -21,45 +22,38 @@ type RegClient struct {
 	*registry.Registry
 }
 
-func NewRegClient(url, username, password, proxy string, trace httptrace.HTTPTrace) *RegClient {
+// If token is given, the Authorization header will be added with token appended.
+func NewRegClient(url, token, username, password, proxy string, trace httptrace.HTTPTrace) *RegClient {
 	log.WithFields(log.Fields{"url": url}).Debug("")
 
 	// Ignore errors
-	hub, _, _ := registry.NewInsecure(url, username, password, proxy, trace)
+	hub, _, _ := registry.NewInsecure(url, token, username, password, proxy, trace)
 	return &RegClient{Registry: hub}
-
-	/*
-		var msg string
-		hub, errCode, err := registry.NewSecure(url, username, password, proxy, trace)
-		if errCode == registry.ErrorCertificate {
-			log.Debug("Use insecure connection")
-			hub, errCode, err = registry.NewInsecure(url, username, password, proxy, trace)
-			if errCode == registry.ErrorCertificate {
-				log.WithFields(log.Fields{"error": err}).Error("Certificate error")
-				if err != nil {
-					msg = err.Error()
-				}
-				return nil, share.ScanErrorCode_ScanErrCertificate, msg
-			}
-		}
-
-		// Ignore other errors
-		return &RegClient{Registry: hub}, share.ScanErrorCode_ScanErrNone, ""
-	*/
 }
 
 type ImageInfo struct {
-	Layers    []string
-	ID        string
-	Digest    string
-	Author    string
-	Signed    bool
-	RunAsRoot bool
-	Envs      []string
-	Cmds      []string
-	Labels    map[string]string
-	Sizes     map[string]int64
-	RepoTags  []string
+	Layers      []string
+	ID          string
+	Digest      string
+	Author      string
+	Signed      bool
+	RunAsRoot   bool
+	Envs        []string
+	Cmds        []string
+	Labels      map[string]string
+	Sizes       map[string]int64
+	RepoTags    []string
+	RawManifest []byte
+}
+
+// SignatureData represents signature image data retrieved from the registry to be
+// used in verification.
+type SignatureData struct {
+	// The raw manifest JSON retrieved from the registry
+	Manifest string `json:"Manifest"`
+
+	// A collection of signature payloads referenced by the manifest to be verified.
+	Payloads map[string]string `json:"Payloads"`
 }
 
 func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*ImageInfo, share.ScanErrorCode) {
@@ -67,8 +61,6 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 
 	dg, body, err := rc.ManifestRequest(ctx, name, tag, 2)
 	if err == nil {
-		// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
-
 		// check if response is manifest list
 		var ml manifestList.DeserializedManifestList
 		if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
@@ -187,6 +179,8 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 		imageInfo.Envs = make([]string, 0)
 	}
 
+	imageInfo.RawManifest = body
+
 	return &imageInfo, share.ScanErrorCode_ScanErrNone
 }
 
@@ -196,7 +190,7 @@ func (rc *RegClient) DownloadRemoteImage(ctx context.Context, name, imgPath stri
 
 	// scheme is always set to v1 because layers of v2 image have been reversed in GetImageInfo.
 	return getImageLayerIterate(ctx, layers, sizes, true, imgPath, func(ctx context.Context, layer string) (interface{}, int64, error) {
-		return rc.DownloadLayer(ctx, name, digest.Digest(layer))
+		return rc.DownloadLayer(ctx, name, goDigest.Digest(layer))
 	})
 }
 
@@ -216,4 +210,46 @@ func (rc *RegClient) getSchemaV1Id(manV1 *manifestV1.SignedManifest) string {
 
 func (rc *RegClient) Alive() (uint, error) {
 	return rc.Ping()
+}
+
+// GetCosignSignatureTagFromDigest takes an image digest and returns the default tag
+// used by Cosign to store signature data for the given digest.
+//
+// Example transition
+//
+// Given Image Digest: sha256:5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16
+//
+// Resulting Signature Tag: sha256-5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16.sig
+func GetCosignSignatureTagFromDigest(digest string) string {
+	signatureTag := []rune(digest)
+	signatureTag[strings.Index(digest, ":")] = '-'
+	return string(signatureTag) + ".sig"
+}
+
+// GetSignatureDataForImage fetches the signature image's maniest and layers for the
+// given repository and digest. The layers are small JSON blobs that represent the payload created and signed
+// by Sigstore's Cosign to be used in verification later.
+//
+// More information about the cosign's signature specification can be found here:
+// https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
+func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, errCode share.ScanErrorCode) {
+	signatureTag := GetCosignSignatureTagFromDigest(digest)
+	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag)
+	if errCode != share.ScanErrorCode_ScanErrNone {
+		return SignatureData{}, errCode
+	}
+	s.Payloads = make(map[string]string)
+	for _, layer := range info.Layers {
+		rdr, _, err := rc.DownloadLayer(context.Background(), repo, goDigest.Digest(layer))
+		if err != nil {
+			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
+		}
+		layerBytes, err := ioutil.ReadAll(rdr)
+		if err != nil {
+			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
+		}
+		s.Payloads[layer] = string(layerBytes)
+	}
+	s.Manifest = string(info.RawManifest)
+	return s, share.ScanErrorCode_ScanErrNone
 }

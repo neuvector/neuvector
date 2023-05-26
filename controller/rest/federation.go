@@ -28,6 +28,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -1069,15 +1070,40 @@ func updateSystemClusterName(newName string, acc *access.AccessControl) string {
 	return name
 }
 
-func updateClusterState(id string, status int, acc *access.AccessControl) bool {
+func updateClusterState(id, masterClusterID string, status int, cspUsage *share.CLUSClusterCspUsage, acc *access.AccessControl) bool {
 	if status == _fedSuccess {
 		return true
 	}
-	oldStatus := cacher.GetFedJoinedClusterStatus(id, acc)
-	if oldStatus != status {
-		data := share.CLUSFedClusterStatus{Status: status}
-		clusHelper.PutFedJointClusterStatus(id, &data)
+
+	changed := false
+	cached := cacher.GetFedJoinedClusterStatus(id, acc)
+	if masterClusterID != "" {
+		// _fedClusterConnected(200), _fedClusterJoined(201), _fedClusterOutOfSync(202), _fedClusterSynced(203)
+		connectedStates := utils.NewSet(200, 201, 202, 203)
+		if connectedStates.Contains(status) {
+			now := time.Now()
+			duration := time.Duration(cctx.CspPauseInterval*15) * time.Second
+			if cached.LastConnectedTime.IsZero() || cached.Status != status || now.After(cached.LastConnectedTime.Add(duration)) {
+				cached.LastConnectedTime = now
+				changed = true
+			}
+		}
 	}
+	if cached.Status != status {
+		cached.Status = status
+		changed = true
+	}
+	if cspUsage != nil {
+		if cspUsage.CspType != cached.CspType || cspUsage.Nodes != cached.Nodes {
+			cached.CspType = cspUsage.CspType
+			cached.Nodes = cspUsage.Nodes
+			changed = true
+		}
+	}
+	if changed {
+		clusHelper.PutFedJointClusterStatus(id, &cached)
+	}
+
 	return true
 }
 
@@ -1114,7 +1140,7 @@ func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
 	}
 	for j := 0; j < notify; j++ {
 		notifyResult := <-ch
-		updateClusterState(notifyResult.id, notifyResult.result, acc)
+		updateClusterState(notifyResult.id, "", notifyResult.result, nil, acc)
 	}
 }
 
@@ -1123,7 +1149,7 @@ func updateFedRulesRevision(ruleTypes []string, acc *access.AccessControl, login
 		ids := cacher.GetFedJoinedClusterIdMap(acc)
 		for id, disabled := range ids {
 			if !disabled {
-				updateClusterState(id, _fedClusterOutOfSync, acc)
+				updateClusterState(id, "", _fedClusterOutOfSync, nil, acc)
 			}
 		}
 	}
@@ -1224,17 +1250,17 @@ func pingJointClusters() bool {
 					}
 					if jointNWErrCount[deployResult.id] >= 3 { // change worker cluster's state to disconnected after 5 http.Client.Do() errors
 						jointNWErrCount[deployResult.id] = 0
-						updateClusterState(deployResult.id, _fedClusterDisconnected, acc)
+						updateClusterState(deployResult.id, "", _fedClusterDisconnected, nil, acc)
 					}
 				} else {
 					if state == _fedMasterUpgradeRequired {
 						state = _fedJointVersionTooNew
 					} else if state == _fedSuccess {
-						if oldStatus := cacher.GetFedJoinedClusterStatus(deployResult.id, acc); oldStatus == _fedClusterDisconnected {
+						if old := cacher.GetFedJoinedClusterStatus(deployResult.id, acc); old.Status == _fedClusterDisconnected {
 							state = _fedClusterConnected
 						}
 					}
-					updateClusterState(deployResult.id, state, acc)
+					updateClusterState(deployResult.id, "", state, nil, acc)
 					jointNWErrCount[deployResult.id] = 0
 				}
 			}
@@ -1274,6 +1300,7 @@ func preConditionCheck() string {
 
 func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(FedRoleAny, _readerRequired, w, r)
 	if acc == nil || login == nil {
@@ -1301,6 +1328,7 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(FedRoleAny, _adminRequired, w, r)
 	if acc == nil || login == nil {
@@ -1421,6 +1449,7 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if isFedRulesCleanupOngoing(w) {
 		return
@@ -1563,11 +1592,14 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 	}
 
+	cache.ConfigCspUsages(false, false, api.FedRoleMaster, masterID)
+
 	restRespSuccess(w, r, &resp, acc, login, nil, "Promote to primary cluster")
 }
 
 func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1623,11 +1655,14 @@ func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprout
 	revertFedRoles(acc)
 	cleanFedRules()
 
+	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+
 	restRespSuccess(w, r, nil, acc, login, nil, "Demote from primary cluster")
 }
 
 func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {
@@ -1658,6 +1693,7 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 
 func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if isFedRulesCleanupOngoing(w) {
 		return
@@ -1743,6 +1779,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
 		return
 	}
+	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
 
 	reqTo := api.RESTFedJoinReqInternal{
 		User:         login.fullname, // user on joint cluster who triggered join-federation request
@@ -1758,6 +1795,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			User:     login.fullname, // user on joint cluster who issued join-federation request
 			RestInfo: restInfo,
 		},
+		CspType: nvUsage.LocalClusterUsage.CspType,
+		Nodes:   nvUsage.LocalClusterUsage.Nodes,
 	}
 
 	bodyTo, _ := json.Marshal(&reqTo)
@@ -1813,11 +1852,12 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			}
 			if err = clusHelper.PutFedMembership(&m); err == nil {
 				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
-				updateClusterState(respTo.MasterCluster.ID, _fedClusterConnected, acc)
-				updateClusterState(jointID, _fedClusterJoined, acc)
+				updateClusterState(respTo.MasterCluster.ID, respTo.MasterCluster.ID, _fedClusterConnected, nil, acc)
+				updateClusterState(jointID, "", _fedClusterJoined, nil, acc)
 				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, req.Server)
 				cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles)
 				atomic.StoreUint32(&_fedFullPolling, 1)
+				cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID)
 				restRespSuccess(w, r, nil, acc, login, nil, "Join federation")
 				return
 			}
@@ -1845,6 +1885,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1907,11 +1948,16 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	} else {
 		err99 = err
 	}
+
+	// after leaving federation, standalone NV reports its usage to CSP
+	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err99.Error())
 }
 
 func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -1932,7 +1978,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	updateClusterState(id, _fedClusterKicked, acc) // intermediate state
+	updateClusterState(id, "", _fedClusterKicked, &share.CLUSClusterCspUsage{}, acc) // intermediate state
 	reqTo := api.RESTFedRemovedReqInternal{
 		User: login.fullname, // user on master cluster who issues remove-from-federation request
 	}
@@ -1951,6 +1997,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2070,7 +2117,13 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, msg)
 		return
 	}
-	updateClusterState(joinedCluster.ID, _fedClusterJoined, accReadAll)
+
+	cspType, _ := common.GetMappedCspType(&reqData.CspType, nil)
+	cspUsage := share.CLUSClusterCspUsage{
+		CspType: cspType,
+		Nodes:   reqData.Nodes,
+	}
+	updateClusterState(joinedCluster.ID, "", _fedClusterJoined, &cspUsage, accReadAll)
 
 	list := clusHelper.GetFedJointClusterList()
 	if list != nil {
@@ -2102,6 +2155,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 
 func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2148,6 +2202,8 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 }
 
 func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
@@ -2177,6 +2233,8 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func handlerTestJointInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleNone {
 		restRespSuccess(w, r, nil, nil, nil, nil, "")
 	} else {
@@ -2186,6 +2244,7 @@ func handlerTestJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	var err error
 	var lock cluster.LockInterface
@@ -2215,6 +2274,10 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
 	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles)
 	go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
+
+	// after being kicked out of federation, standalone NV reports its usage to CSP
+	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+
 	restRespSuccess(w, r, nil, acc, login, nil, "Leave federation by primary cluster's request")
 }
 
@@ -2254,6 +2317,7 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *acc
 
 func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !licenseAllowFed(1) {
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
@@ -2316,7 +2380,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 		for j := 0; j < deploy; j++ {
 			deployResult := <-ch
 			resp.Results[deployResult.id] = deployResult.result
-			updateClusterState(deployResult.id, deployResult.result, acc)
+			updateClusterState(deployResult.id, "", deployResult.result, nil, acc)
 			if deployResult.result == _fedCmdReceived || deployResult.result == _fedClusterSynced {
 				oneSuccess = true
 			}
@@ -2488,6 +2552,7 @@ func haveSameContent(src, dest map[string]uint64) bool {
 }
 
 func pollFedRules(forcePulling bool, tryTimes int) bool {
+	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
 	doPoll := atomic.CompareAndSwapUint32(&_fedPollOngoing, 0, 1)
 	if doPoll {
 		defer atomic.StoreUint32(&_fedPollOngoing, 0)
@@ -2497,6 +2562,8 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 			FedKvVersion: kv.GetFedKvVer(),
 			RestVersion:  kv.GetRestVer(),
 			Name:         cacher.GetSystemConfigClusterName(accReadAll),
+			CspType:      nvUsage.LocalClusterUsage.CspType,
+			Nodes:        nvUsage.LocalClusterUsage.Nodes,
 		}
 
 		masterCluster := cacher.GetFedMasterCluster(accReadAll)
@@ -2536,8 +2603,8 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					atomic.StoreUint32(&_fedPollInterval, respTo.PollInterval)
 				}
 				if respTo.Result == _fedSuccess { // success
-					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
-					updateClusterState(masterCluster.ID, _fedClusterConnected, accReadAll)
+					updateClusterState(jointCluster.ID, "", _fedClusterJoined, nil, accReadAll)
+					updateClusterState(masterCluster.ID, masterCluster.ID, _fedClusterConnected, nil, accReadAll)
 					status = _fedSuccess
 					fedCfg := cacher.GetFedSettings()
 					if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
@@ -2555,7 +2622,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					if respTo.Settings != nil {
 						var settings api.RESTFedRulesSettings
 						if err = json.Unmarshal(respTo.Settings, &settings); err == nil {
-							updateClusterState(jointCluster.ID, _fedClusterSyncing, accReadAll)
+							updateClusterState(jointCluster.ID, "", _fedClusterSyncing, nil, accReadAll)
 							if workFedRules(&settings, respTo.Revisions, reqTo.Revisions, accReadAll) {
 								// if any fed rule is updated, re-send polling request simply for updating joint cluster info on master cluster
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
@@ -2568,11 +2635,11 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 
 					go getFedRegScanData(false, fedCfg, respTo.ScanDataRevs, 1)
 
-					updateClusterState(jointCluster.ID, _fedClusterJoined, accReadAll)
+					updateClusterState(jointCluster.ID, "", _fedClusterJoined, nil, accReadAll)
 				} else if respTo.Result == _fedMasterUpgradeRequired {
-					updateClusterState(jointCluster.ID, _fedJointVersionTooNew, accReadAll)
+					updateClusterState(jointCluster.ID, "", _fedJointVersionTooNew, nil, accReadAll)
 				} else if respTo.Result == _fedJointUpgradeRequired {
-					updateClusterState(jointCluster.ID, _fedJointUpgradeRequired, accReadAll)
+					updateClusterState(jointCluster.ID, "", _fedJointUpgradeRequired, nil, accReadAll)
 				} else if respTo.Result == _fedClusterImporting {
 					status = _fedSuccess
 				}
@@ -2584,17 +2651,17 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 				log.WithFields(log.Fields{"err": err, "msg": respErr, "proxyUsed": proxyUsed}).Error("Request failed")
 			}
 			if statusCode == http.StatusGone {
-				updateClusterState(jointCluster.ID, _fedClusterKicked, accReadAll)
+				updateClusterState(jointCluster.ID, "", _fedClusterKicked, nil, accReadAll)
 			} else if statusCode == http.StatusNotFound {
 				var restErr api.RESTError
 				if json.Unmarshal(respData, &restErr) == nil {
 					if restErr.Code == api.RESTErrLicenseFail {
-						updateClusterState(jointCluster.ID, _fedLicenseDisallowed, accReadAll)
+						updateClusterState(jointCluster.ID, "", _fedLicenseDisallowed, nil, accReadAll)
 					}
 				}
 			}
 		}
-		updateClusterState(masterCluster.ID, status, accReadAll)
+		updateClusterState(masterCluster.ID, masterCluster.ID, status, nil, accReadAll)
 	}
 	return doPoll
 }
@@ -2792,6 +2859,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 // handles polling requests on master cluster
 func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -2864,7 +2932,13 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 				status = _fedClusterSynced
 			}
 		}
-		updateClusterState(jointCluster.ID, status, accReadAll)
+
+		cspType, _ := common.GetMappedCspType(&req.CspType, nil)
+		cspUsage := share.CLUSClusterCspUsage{
+			CspType: cspType,
+			Nodes:   req.Nodes,
+		}
+		updateClusterState(jointCluster.ID, "", status, &cspUsage, accReadAll)
 	}
 
 	restRespSuccess(w, r, &resp, accReadAll, nil, nil, "") // no event log
@@ -2873,6 +2947,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 // handles scan data polling requests on master cluster
 func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	accReadAll := access.NewReaderAccessControl()
 	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
@@ -2954,6 +3029,7 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 // handles fed command on joint cluster
 func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleJoint, _adminRequired, w, r)
 	if acc == nil || login == nil {
@@ -3005,6 +3081,8 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handlerGetJointClusterView(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {
 		return
@@ -3018,6 +3096,46 @@ func handlerGetJointClusterView(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "")
+}
+
+func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	defer r.Body.Close()
+
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	accReadAll := access.NewReaderAccessControl()
+	if !isNoAuthFedOpAllowed(api.FedRoleMaster, w, r, accReadAll) {
+		return
+	}
+
+	var err error
+	var req api.RESTFedCspSupportReq
+	body, _ := ioutil.ReadAll(r.Body)
+	if err = json.Unmarshal(body, &req); err != nil {
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	// Validate token
+	jointCluster := cacher.GetFedJoinedCluster(req.ID, accReadAll)
+	if jointCluster.ID != req.ID {
+		statusCode := http.StatusBadRequest
+		if jointCluster.ID == "" {
+			statusCode = http.StatusGone
+		}
+		restRespError(w, statusCode, api.RESTErrInvalidRequest)
+		return
+	} else if jointCluster.Disabled {
+		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
+		return
+	}
+	if err = jwtValidateFedJoinTicket(req.JointTicket, jointCluster.Secret); err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
+		return
+	}
+
+	resp := resource.GetCspConfig()
+
+	restRespSuccess(w, r, &resp, accReadAll, nil, nil, "")
 }
 
 func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -3187,7 +3305,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				if !refreshToken {
 					continue
 				}
-				updateClusterState(id, _fedClusterDisconnected, acc)
+				updateClusterState(id, "", _fedClusterDisconnected, nil, acc)
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrRemoterRequestFail, "Unable to forward request to the cluster")
 				return
 			} else if statusCode != http.StatusRequestTimeout {
@@ -3202,7 +3320,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				restRespNotFoundLogAccessDenied(w, login, err)
 				return
 			} else {
-				updateClusterState(id, _fedClusterDisconnected, acc)
+				updateClusterState(id, "", _fedClusterDisconnected, nil, acc)
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrRemoterRequestFail, "Unable to forward request to the cluster")
 				return
 			}
@@ -3214,24 +3332,28 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerFedClusterForwardGet(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodGet)
 }
 
 func handlerFedClusterForwardPost(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodPost)
 }
 
 func handlerFedClusterForwardPatch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodPatch)
 }
 
 func handlerFedClusterForwardDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodDelete)
 }

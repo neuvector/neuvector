@@ -19,17 +19,21 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/neuvector/neuvector/controller/access"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/rpc"
+	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
 const scanImageDataTimeout = time.Second * 45
+const repoScanTimeout = time.Minute * 20
 
 type ScanService struct {
 }
@@ -272,6 +276,67 @@ func (ss *ScanService) SubmitScanResult(ctx context.Context, result *share.ScanR
 
 	err := scanner.StoreRepoScanResult(result)
 	return &share.RPCVoid{}, err
+}
+
+// --
+
+type ScanAdapterService struct {
+}
+
+func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*share.GetScannersResponse, error) {
+	var c share.GetScannersResponse
+
+	acc := access.NewReaderAccessControl()
+	cfg := cacher.GetSystemConfig(acc)
+
+	busy, idle := rpc.CountScanners()
+	c.Scanners = uint32(cacher.GetScannerCount(acc))
+	c.IdleScanners = idle
+
+	// MaxScanner means max number of available scanners, including those to be scaled up. The number can be larger than c.Scanners.
+	if cfg.ScannerAutoscale.Strategy != api.AutoScaleNone {
+		if cfg.ScannerAutoscale.MaxPods > busy {
+			c.MaxScanners = cfg.ScannerAutoscale.MaxPods - busy
+		}
+	} else {
+		if c.Scanners > busy {
+			c.MaxScanners = c.Scanners - busy
+		}
+	}
+
+	return &c, nil
+}
+
+func (sas *ScanAdapterService) ScanImage(ctx context.Context, req *share.AdapterScanImageRequest) (*share.ScanResult, error) {
+	log.WithFields(log.Fields{"request": req}).Debug("Scan image request")
+
+	ctx, cancel := context.WithTimeout(context.Background(), repoScanTimeout)
+	defer cancel()
+
+	scanReq := &share.ScanImageRequest{
+		Registry:    req.Registry,
+		Repository:  req.Repository,
+		Tag:         req.Tag,
+		Token:       req.Token,
+		ScanLayers:  req.ScanLayers,
+		ScanSecrets: false,
+	}
+
+	result, err := rpc.ScanImage("", ctx, scanReq)
+	if result == nil || result.Error != share.ScanErrorCode_ScanErrNone {
+		return result, err
+	}
+
+	// store the scan result so it can be used by admission control
+	scan.FixRegRepoForAdmCtrl(result)
+	scanner.StoreRepoScanResult(result)
+
+	// Fill the detail and filter the result
+	scanUtils.FillVuls(result)
+	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
+	result.Vuls = vpf.FilterVuls(result.Vuls, []api.RESTIDName{api.RESTIDName{DisplayName: fmt.Sprintf("%s:%s", result.Repository, result.Tag)}})
+
+	return result, err
 }
 
 // --
@@ -569,6 +634,7 @@ func startGRPCServer(port uint16) (*cluster.GRPCServer, uint16) {
 	go agentReportWorker(ch)
 
 	share.RegisterControllerScanServiceServer(grpc.GetServer(), new(ScanService))
+	share.RegisterControllerScanAdapterServiceServer(grpc.GetServer(), new(ScanAdapterService))
 	share.RegisterControllerCapServiceServer(grpc.GetServer(), new(CapService))
 	share.RegisterControllerUpgradeServiceServer(grpc.GetServer(), new(UpgradeService))
 	share.RegisterControllerAgentServiceServer(grpc.GetServer(), &ControllerAgentService{reportCh: ch})

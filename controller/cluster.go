@@ -155,8 +155,8 @@ func leadChangeHandler(newLead, oldLead string) {
 			//old still use 16bit loose factor for mask while new use 8bit loose
 			//factor, here we push internal subnet to enforcer after lead change
 			cache.PutInternalIPNetToCluseterUpgrade()
-			//make sure xff_enabled=true is updated in enforcer
-			kv.EnforceXffEnabledSetting()
+			//make sure xff_enabled=true or DisableNetPolicy=true or DetectUnmanagedWl=true is updated in enforcer
+			kv.EnforceNetSysConfig()
 		}
 	}
 }

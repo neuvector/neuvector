@@ -8,6 +8,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 )
@@ -303,7 +304,7 @@ func TestFixRegRepo(t *testing.T) {
 
 	for _, c := range cases {
 		result := &share.ScanResult{Registry: c[0], Repository: c[1]}
-		fixRegRepoForAdmCtrl(result)
+		scan.FixRegRepoForAdmCtrl(result)
 		if result.Registry != c[2] || result.Repository != c[3] {
 			t.Errorf("Error: input:%s -- %s, expect:%s -- %s, output:%s -- %s", c[0], c[1], c[2], c[3], result.Registry, result.Repository)
 		}

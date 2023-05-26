@@ -30,7 +30,7 @@
 #define ENV_CTRL_SERVER_PORT   "CTRL_SERVER_PORT"
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
-#define ENV_CTRL_PRUNE_NSGRPS  "CTRL_PRUNE_NSGROUPS"
+#define ENV_CTRL_NOT_RM_NSGRPS "CTRL_NOT_PRUNE_NSGROUPS"
 #define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
 #define ENV_TAP_INTERFACE      "TAP_INTERFACE"
 #define ENV_TAP_ALL_CONTAINERS "TAP_ALL_CONTAINERS"
@@ -53,6 +53,8 @@
 #define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
 #define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
+#define ENV_CSP_ENV            "CSP_ENV"
+#define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -207,7 +209,7 @@ static pid_t fork_exec(int i)
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period;
-    char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq;
+    char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     int a;
 
     switch (i) {
@@ -398,10 +400,18 @@ static pid_t fork_exec(int i)
                 args[a ++] = "-no_def_admin";
             }
         }
-        if ((enable = getenv(ENV_CTRL_PRUNE_NSGRPS)) != NULL) {
+        if ((enable = getenv(ENV_CTRL_NOT_RM_NSGRPS)) != NULL) {
             if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-rm_nsgroups";
+                args[a ++] = "-no_rm_nsgroups";
             }
+        }
+        if ((csp_env = getenv(ENV_CSP_ENV)) != NULL) {
+            args[a++] = "-csp_env";
+            args[a++] = csp_env;
+        }
+        if ((csp_pause_interval = getenv(ENV_CSP_PAUSE_INTERVAL)) != NULL) {
+            args[a++] = "-csp_pause_interval";
+            args[a++] = csp_pause_interval;
         }
         args[a] = NULL;
         break;

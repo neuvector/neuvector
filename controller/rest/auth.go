@@ -45,6 +45,7 @@ type loginSession struct {
 	eolAt           time.Time // end of life
 	timer           *time.Timer
 	domainRoles     access.DomainRole // map: domain -> role
+	loginType       int               // 0=user (default), 1=apikey
 
 	nvPage string // could change in every request even in the same login session
 }
@@ -130,6 +131,8 @@ const (
 	jwtRegularTokenType = iota
 	jwtFedMasterTokenType
 )
+
+const loginTypeApikey int = 1
 
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
@@ -538,6 +541,56 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 
 	token, ok := r.Header[api.RESTTokenHeader]
 	if !ok || len(token) != 1 {
+		// "X-Auth-Token" header not exist, check apikey "X-Auth-Apikey"
+		apikey, ok2 := r.Header[api.RESTAPIKeyHeader]
+		if !ok2 || len(apikey) != 1 {
+			return nil, userInvalidRequest, rsessToken
+		} else {
+			parts := strings.Split(apikey[0], ":")
+			if len(parts) == 2 {
+				apikeyAccount, _, _ := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+
+				if apikeyAccount == nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check password
+				hash := utils.HashPassword(parts[1])
+				if hash != apikeyAccount.SecretKeyHash {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				// check timeout
+				now := time.Now()
+				if now.UTC().Unix() >= apikeyAccount.ExpirationTimestamp {
+					return nil, userTimeout, rsessToken
+				}
+
+				roles := make(map[string]string)
+				for role, domains := range apikeyAccount.RoleDomains {
+					for _, d := range domains {
+						roles[d] = role
+					}
+				}
+				roles[access.AccessDomainGlobal] = apikeyAccount.Role
+
+				_, _, err := access.GetDomainPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains)
+				if err != nil {
+					return nil, userInvalidRequest, rsessToken
+				}
+
+				s := &loginSession{
+					id:          utils.GetRandomID(idLength, ""),
+					fullname:    apikeyAccount.Name,
+					remote:      r.RemoteAddr,
+					domainRoles: roles,
+					loginType:   loginTypeApikey,
+				}
+
+				return s, userOK, rsessToken
+			}
+		}
+
 		return nil, userInvalidRequest, rsessToken
 	}
 
@@ -1896,7 +1949,7 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 			PasswordHash: utils.HashPassword(secret),
 			Domain:       "",
 			Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
-			Timeout:      common.DefaultIdleTimeout,
+			Timeout:      common.DefIdleTimeoutInternal,
 			RoleDomains:  make(map[string][]string),
 			Locale:       common.OEMDefaultUserLocale,
 			PwdResetTime: time.Now().UTC(),
@@ -2402,7 +2455,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				return
 			}
 
-			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Error("Token validation succeeded")
+			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Debug("Token validation succeeded")
 
 			username, email, groups := getSAMLUserFromAttrs(attrs, cs.SAML.GroupClaim)
 			if username == "" {

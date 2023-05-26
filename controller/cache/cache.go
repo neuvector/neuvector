@@ -185,6 +185,7 @@ type Context struct {
 	RancherSSO               bool   // from yaml/helm chart
 	TelemetryFreq            uint   // from yaml
 	CheckDefAdminFreq        uint   // from yaml, in minutes
+	CspPauseInterval         uint   // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -196,6 +197,9 @@ type Context struct {
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
+	CspType                  share.TCspType
+	CtrlerVersion            string
+	NvSemanticVersion        string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
 }
@@ -1645,7 +1649,6 @@ const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
-var uwlUpdated bool
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
@@ -1657,9 +1660,9 @@ func startWorkerThread(ctx *Context) {
 		pruneTicker.Stop()
 	}
 
-	wlSuspected := utils.NewSet()	// supicious workload ids
+	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
-	pruneWorkloadKV(wlSuspected)  // the first scan
+	pruneWorkloadKV(wlSuspected) // the first scan
 
 	noTelemetry := false
 	telemetryFreq := ctx.TelemetryFreq
@@ -1693,18 +1696,20 @@ func startWorkerThread(ctx *Context) {
 					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
 						checkDefAdminPwd(ctx.CheckDefAdminFreq) // default to log event per-24 hours
 					}
+
+					masterCluster := cacher.GetFedMasterCluster(access.NewReaderAccessControl())
+					ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
-				uwlUpdated = true
 				refreshInternalIPNet()
 				cacheMutexRUnlock()
 			case <-ephemeralTicker.C:
 				cacheMutexLock()
 				refreshuwl := timeoutEphemeralWorkload()
-				if refreshuwl && uwlUpdated {
+				if refreshuwl {
 					refreshInternalIPNet()
 				}
 				cacheMutexUnlock()
@@ -1782,6 +1787,7 @@ func startWorkerThread(ctx *Context) {
 					if n != nil {
 						if o == nil {
 							addrOrchHostAdd(n.IPNets)
+							clusterUsage.nodes += 1
 						} else {
 							if ((o.IPNets == nil || len(o.IPNets) == 0) &&
 								(n.IPNets != nil && len(n.IPNets) > 0)) ||
@@ -1795,6 +1801,9 @@ func startWorkerThread(ctx *Context) {
 						//new is nil and old is not nil
 						addrOrchHostDelete(o.IPNets)
 						connectOrchHostDelete(o.IPNets)
+						if clusterUsage.nodes > 1 {
+							clusterUsage.nodes -= 1
+						}
 					}
 					if n != nil {
 						cacheMutexLock()
@@ -1975,9 +1984,17 @@ func startWorkerThread(ctx *Context) {
 						if n.Domain == resource.NvAdmSvcNamespace && n.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, uint32(n.Replicas))
 						}
+
+						if o == nil && n.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": n.Name, "domain": n.Domain}).Info("detected")
+						}
 					} else if o != nil { // delete
 						if o.Domain == resource.NvAdmSvcNamespace && o.Name == "neuvector-scanner-pod" {
 							atomic.StoreUint32(&scannerReplicas, 0)
+						}
+
+						if o.Name == "neuvector-csp-pod" {
+							log.WithFields(log.Fields{"name": o.Name, "domain": o.Domain}).Info("deleted")
 						}
 					}
 				/*
@@ -2166,11 +2183,11 @@ func lookupPurgeWorkloadEntries(keys []string, nIndex int, curr, suspected, conf
 	var removed []string
 	for _, key := range keys {
 		id := share.CLUSKeyNthToken(key, nIndex)
-		if !strings.Contains(id, ":") {	// filter out non-id case, like "nodeID"
-			if !updated.Contains(id) {	// allow one updated missing per round
+		if !strings.Contains(id, ":") { // filter out non-id case, like "nodeID"
+			if !updated.Contains(id) { // allow one updated missing per round
 				if !curr.Contains(id) {
 					if suspected.Contains(id) {
-						confirm.Add(id)		// confirmed
+						confirm.Add(id) // confirmed
 						removed = append(removed, key)
 					} else {
 						suspected.Add(id)
@@ -2186,12 +2203,12 @@ func lookupPurgeWorkloadEntries(keys []string, nIndex int, curr, suspected, conf
 func pruneWorkloadKV(suspected utils.Set) {
 	ids := utils.NewSet()
 	confirmed := utils.NewSet()
-	updated := utils.NewSet()	// allow one update per round
+	updated := utils.NewSet() // allow one update per round
 
 	cacheMutexRLock()
 	for id, _ := range wlCacheMap {
 		ids.Add(id)
-		suspected.Remove(id)	// remove the missing id
+		suspected.Remove(id) // remove the missing id
 	}
 	cacheMutexRUnlock()
 
@@ -2206,17 +2223,17 @@ func pruneWorkloadKV(suspected utils.Set) {
 	// log.WithFields(log.Fields{"keys": keys, "suspected": suspected}).Debug("bench reports")
 
 	// (2) bench scan state: scan/state/bench/workload/<id>
-	keys, _ = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ")  // last element
-	removed  = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
+	keys, _ = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ") // last element
+	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("bench wl state")
 
 	// (3) auto scan reports: scan/data/report/workload/<id>
-	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ")  // last element
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ") // last element
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("auto scan reports")
 
 	// (4) scan state records: scan/state/report/workload/<id>
-	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ")  // last element
+	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ") // last element
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 
 	// remove confirmed ids from the missing ids and pass into the next round

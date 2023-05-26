@@ -53,7 +53,7 @@ func dpClientUnlock() {
 func dpSendMsgExSilent(msg []byte, timeout int, cb DPCallback, param interface{}) int {
 	if dpConn == nil {
 		log.Error("Data path not connected")
-		if cb != nil {
+		if cb != nil && param != nil {
 			cb(nil, param)
 		}
 		return -1
@@ -66,13 +66,13 @@ func dpSendMsgExSilent(msg []byte, timeout int, cb DPCallback, param interface{}
 		// Let keep alive to close dp to avoid reentry
 		// closeDP()
 		// debug.PrintStack()
-		if cb != nil {
+		if cb != nil && param != nil {
 			cb(nil, param)
 		}
 		return -1
 	}
 
-	if cb != nil {
+	if cb != nil && param != nil {
 		if timeout == 0 {
 			timeout = defaultDPMsgTimeout
 		}
@@ -206,6 +206,29 @@ func DPCtrlSetSysConf(xffenabled *bool) {
 	data := DPSysConfReq{
 		Sysconf: &DPSysConf{
 			XffEnabled: xffenabled,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
+func DPCtrlSetDisableNetPolicy(disableNetPolicy *bool) {
+	log.WithFields(log.Fields{"disableNetPolicy": *disableNetPolicy}).Debug("")
+
+	data := DPDisableNetPolicyReq{
+		DisableNetPolicyConf: &DPDisableNetPolicy{
+			DisableNetPolicy: disableNetPolicy,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
+func DPCtrlSetDetectUnmanagedWl(detectUnmanagedWl *bool) {
+
+	data := DPDetectUnmanagedWlReq{
+		DetectUnmanagedWlConf: &DPDetectUnmanagedWl{
+			DetectUnmanagedWl: detectUnmanagedWl,
 		},
 	}
 	msg, _ := json.Marshal(data)

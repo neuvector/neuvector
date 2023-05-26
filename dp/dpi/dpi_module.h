@@ -18,6 +18,8 @@ extern rcu_map_t g_ep_map;
 extern io_internal_subnet4_t *g_internal_subnet4;
 extern io_spec_internal_subnet4_t *g_specialip_subnet4;
 extern uint8_t g_xff_enabled;
+extern uint8_t g_disable_net_policy;
+extern uint8_t g_detect_unmanaged_wl;
 extern io_internal_subnet4_t *g_policy_addr;
 
 typedef struct dpi_snap_ {
@@ -55,6 +57,8 @@ typedef struct dpi_thread_data_ {
     uint8_t dp_msg[DP_MSG_SIZE];
     uint32_t hs_detect_id;
     uint8_t xff_enabled;
+    uint8_t disable_net_policy;
+    uint8_t detect_unmanaged_wl;
 } dpi_thread_data_t;
 
 extern dpi_thread_data_t g_dpi_thread_data[];
@@ -84,5 +88,7 @@ extern dpi_thread_data_t g_dpi_thread_data[];
 #define th_dp_msg   (g_dpi_thread_data[THREAD_ID].dp_msg)
 #define th_hs_detect_id        (g_dpi_thread_data[THREAD_ID].hs_detect_id)
 #define th_xff_enabled (g_dpi_thread_data[THREAD_ID].xff_enabled)
+#define th_disable_net_policy (g_dpi_thread_data[THREAD_ID].disable_net_policy)
+#define th_detect_unmanaged_wl (g_dpi_thread_data[THREAD_ID].detect_unmanaged_wl)
 
 #endif

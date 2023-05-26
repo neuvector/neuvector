@@ -25,7 +25,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-type fedClusterCache struct { // only master cluster needs to get/set this cache
+type tFedClusterCache struct { // only master cluster needs to get/set this cache
 	cluster    *share.CLUSFedJointClusterInfo
 	tokenCache map[string]string // key is mainSessionID (from claim.id in login token of master cluster). value is token with admin role
 }
@@ -48,10 +48,10 @@ var cachedFedSettingsRev map[string]uint64 // contains only the revisions of the
 var cachedFedSettingBytes []byte           // contains only the fed rules subset for the last polling managed cluster
 
 var fedMembershipCache share.CLUSFedMembership
-var fedJoinedClustersCache = make(map[string]*fedClusterCache) // key is cluster id
-var fedJoinedClusterStatusCache = make(map[string]int)         // key is cluster id, value ex: _fedClusterJoined, _fedClusterSynced
-var fedSettingsCache share.CLUSFedSettings                     // general fed settings
-var fedCacheMutex sync.RWMutex                                 // for accessing fedMembershipCache/fedJoinedClustersCache/fedJoinedClusterStatusCache
+var fedJoinedClustersCache = make(map[string]*tFedClusterCache)               // key is cluster id
+var fedJoinedClusterStatusCache = make(map[string]share.CLUSFedClusterStatus) // key is cluster id, value ex: _fedClusterJoined, _fedClusterSynced
+var fedSettingsCache share.CLUSFedSettings                                    // general fed settings
+var fedCacheMutex sync.RWMutex                                                // for accessing fedMembershipCache/fedJoinedClustersCache/fedJoinedClusterStatusCache
 
 func fedInit(restoredFedRole string) {
 	m := clusHelper.GetFedMembership()
@@ -215,7 +215,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				cache, ok := fedJoinedClustersCache[id]
 				if cache == nil || !ok {
 					log.WithFields(log.Fields{"id": id}).Info("add")
-					cache = &fedClusterCache{
+					cache = &tFedClusterCache{
 						cluster:    &cluster,
 						tokenCache: make(map[string]string),
 					}
@@ -238,7 +238,10 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			var status share.CLUSFedClusterStatus
 			json.Unmarshal(value, &status)
-			fedJoinedClusterStatusCache[id] = status.Status
+			if status.Nodes == 0 {
+				status.Nodes = 1
+			}
+			fedJoinedClusterStatusCache[id] = status
 		case share.CLUSFedRulesRevisionSubKey:
 			var revCache share.CLUSFedRulesRevision
 			json.Unmarshal(value, &revCache)
@@ -291,8 +294,8 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 	case cluster.ClusterNotifyDelete:
 		switch cfgType {
 		case share.CLUSFedClustersListSubKey:
-			fedJoinedClustersCache = make(map[string]*fedClusterCache)
-			fedJoinedClusterStatusCache = make(map[string]int)
+			fedJoinedClustersCache = make(map[string]*tFedClusterCache)
+			fedJoinedClusterStatusCache = make(map[string]share.CLUSFedClusterStatus)
 		case share.CLUSFedClustersSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			if _, ok := fedJoinedClustersCache[id]; ok {
@@ -352,24 +355,24 @@ func (m CacheMethod) GetFedMember(statusMap map[int]string, acc *access.AccessCo
 				RestInfo:      c.cluster.RestInfo,
 				ProxyRequired: c.cluster.ProxyRequired,
 			}
-			if status, ok := fedJoinedClusterStatusCache[c.cluster.ID]; ok && status > 0 {
-				jointCluster.Status = statusMap[status]
+			if cache, ok := fedJoinedClusterStatusCache[c.cluster.ID]; ok && cache.Status > 0 {
+				jointCluster.Status = statusMap[cache.Status]
 			}
 			s.JointClusters = append(s.JointClusters, jointCluster)
 		}
 		sort.Slice(s.JointClusters, func(i, j int) bool { return s.JointClusters[i].Name < s.JointClusters[j].Name })
 	case api.FedRoleJoint:
 		s.MasterCluster.Name = fedMembershipCache.MasterCluster.Name
-		if status, ok := fedJoinedClusterStatusCache[s.MasterCluster.ID]; ok && status > 0 {
-			s.MasterCluster.Status = statusMap[status]
+		if cache, ok := fedJoinedClusterStatusCache[s.MasterCluster.ID]; ok && cache.Status > 0 {
+			s.MasterCluster.Status = statusMap[cache.Status]
 		}
 		local := &api.RESTFedJointClusterInfo{
 			Name:     m.GetSystemConfigClusterName(acc),
 			ID:       fedMembershipCache.JointCluster.ID,
 			RestInfo: fedMembershipCache.JointCluster.RestInfo,
 		}
-		if status, ok := fedJoinedClusterStatusCache[fedMembershipCache.JointCluster.ID]; ok && status > 0 {
-			local.Status = statusMap[status]
+		if cache, ok := fedJoinedClusterStatusCache[fedMembershipCache.JointCluster.ID]; ok && cache.Status > 0 {
+			local.Status = statusMap[cache.Status]
 		}
 		s.JointClusters = []*api.RESTFedJointClusterInfo{local}
 	}
@@ -485,16 +488,16 @@ func (m CacheMethod) GetFedJoinedCluster(id string, acc *access.AccessControl) s
 	return share.CLUSFedJointClusterInfo{}
 }
 
-func (m CacheMethod) GetFedJoinedClusterStatus(id string, acc *access.AccessControl) int {
+func (m CacheMethod) GetFedJoinedClusterStatus(id string, acc *access.AccessControl) share.CLUSFedClusterStatus {
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
 	if acc.Authorize(&fedMembershipCache, nil) {
-		if s, ok := fedJoinedClusterStatusCache[id]; ok && s > 0 {
+		if s, ok := fedJoinedClusterStatusCache[id]; ok {
 			return s
 		}
 	}
-	return -1
+	return share.CLUSFedClusterStatus{Status: -1}
 }
 
 // Be careful when calling the following functions because access control is not applied

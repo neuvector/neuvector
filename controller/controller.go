@@ -61,9 +61,9 @@ var timerWheel *utils.TimerWheel
 
 const statsInterval uint32 = 5
 const controllerStartGapThreshold = time.Duration(time.Minute * 2)
-const memoryRecyclePeriod uint32 = 10                     	// minutes
-const memControllerTopPeak uint64 = 4 * 1024 * 1024 * 1024 	// 4 GB (inc. allinone case)
-const memSafeGap uint64 = 64 * 1024 * 1024                	// 64 MB
+const memoryRecyclePeriod uint32 = 10                      // minutes
+const memControllerTopPeak uint64 = 4 * 1024 * 1024 * 1024 // 4 GB (inc. allinone case)
+const memSafeGap uint64 = 64 * 1024 * 1024                 // 64 MB
 
 // Unlike in enforcer, only read host IPs in host mode, so no need to enter host network namespace
 func getHostModeHostIPs() {
@@ -238,7 +238,9 @@ func main() {
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
-	rmNsGrps := flag.Bool("rm_nsgroups", false, "Remove groups when namespace was deleted")
+	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
+	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
+	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
 	flag.Parse()
 
 	if *debug {
@@ -284,7 +286,8 @@ func main() {
 	}
 
 	ocImageRegistered := false
-	enableRmNsGrps := false
+	enableRmNsGrps := true
+	log.WithFields(log.Fields{"cgroups": global.SYS.GetCgroupsVersion()}).Info()
 	log.WithFields(log.Fields{"endpoint": *rtSock, "runtime": global.RT.String()}).Info("Container socket connected")
 	if platform == share.PlatformKubernetes {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -301,9 +304,9 @@ func main() {
 		}
 		log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer, "flavor": flavor}).Info()
 
-		if *rmNsGrps {
+		if *noRmNsGrps {
 			log.Info("Remove groups when namespace was deleted")
-			enableRmNsGrps = true
+			enableRmNsGrps = false
 		}
 	}
 
@@ -362,8 +365,17 @@ func main() {
 	Ctrler.Domain = global.ORCH.GetDomain(Ctrler.Labels)
 	parentCtrler.Domain = global.ORCH.GetDomain(parentCtrler.Labels)
 	resource.NvAdmSvcNamespace = Ctrler.Domain
+
+	cspType, _ := common.GetMappedCspType(cspEnv, nil)
+	if cspType != share.CSP_NONE && cspType != share.CSP_EKS {
+		cspType = share.CSP_NONE
+	}
+	if *cspPauseInterval == 0 {
+		*cspPauseInterval = 240
+	}
+
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs, "")
+		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs, cspType)
 	}
 
 	// Assign controller interface/IP scope
@@ -462,7 +474,8 @@ func main() {
 
 	isNewCluster := likelyNewCluster()
 
-	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster, "noDefAdmin": *noDefAdmin}).Info()
+	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster,
+		"noDefAdmin": *noDefAdmin, "cspEnv": *cspEnv}).Info()
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
@@ -536,6 +549,32 @@ func main() {
 		kv.ValidateWebhookCert()
 	}
 
+	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
+	var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
+	{
+		if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+			// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
+			// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
+			// nvSemanticVersion : in the format v{major}.{minor}.{patch}
+			var ver share.CLUSCtrlVersion
+			json.Unmarshal(value, &ver)
+			if strings.HasPrefix(ver.CtrlVersion, "interim/") {
+				// it's daily dev build image
+				if *teleCurrentVer == "" {
+					nvAppFullVersion = "5.2.0"
+				} else {
+					nvAppFullVersion = *teleCurrentVer
+				}
+			} else {
+				// it's official release image
+				nvAppFullVersion = ver.CtrlVersion[1:]
+			}
+			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
+				nvSemanticVersion = "v" + ss[0]
+			}
+		}
+	}
+
 	checkDefAdminFreq := *pwdValidUnit // check default admin's password every 24 hours by default
 	if isNewCluster && *noDefAdmin {
 		checkDefAdminFreq = 0 // do not check default admin's password if it's disabled
@@ -582,6 +621,10 @@ func main() {
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
+		CspType:                  cspType,
+		CspPauseInterval:         *cspPauseInterval,
+		CtrlerVersion:            Version,
+		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
 	}
@@ -624,25 +667,29 @@ func main() {
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered)
+	orchConnector.Start(ocImageRegistered, cspType)
 
 	// GRPC should be started after cacher as the handler are cache functions
 	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
 
 	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
-		LocalDev:         dev,
-		EvQueue:          evqueue,
-		AuditQueue:       auditQueue,
-		Messenger:        messenger,
-		Cacher:           cacher,
-		Scanner:          scanner,
-		RESTPort:         *restPort,
-		FedPort:          *fedPort,
-		PwdValidUnit:     *pwdValidUnit,
-		TeleNeuvectorURL: *teleNeuvectorEP,
-		TeleFreq:         *telemetryFreq,
-		TeleCurrentVer:   *teleCurrentVer,
+		LocalDev:           dev,
+		EvQueue:            evqueue,
+		AuditQueue:         auditQueue,
+		Messenger:          messenger,
+		Cacher:             cacher,
+		Scanner:            scanner,
+		RESTPort:           *restPort,
+		FedPort:            *fedPort,
+		PwdValidUnit:       *pwdValidUnit,
+		TeleNeuvectorURL:   *teleNeuvectorEP,
+		TeleFreq:           *telemetryFreq,
+		NvAppFullVersion:   nvAppFullVersion,
+		NvSemanticVersion:  nvSemanticVersion,
+		CspType:            cspType,
+		CspPauseInterval:   *cspPauseInterval,
+		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
 	}
 	rest.InitContext(&rctx)
 

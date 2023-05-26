@@ -21,15 +21,17 @@ import (
 
 const syslogFacility = syslog.LOG_LOCAL0
 const notificationHeader = "notification"
-const syslogTimeout = time.Second * 8
+const syslogTimeout = time.Second * 30
+const syslogDialTimeout = time.Second * 30
 
 type Syslogger struct {
-	writer *syslog.Writer
-	proto  string
-	addr   string
-	catSet utils.Set
-	prio   syslog.Priority
-	inJSON bool
+	writer     *syslog.Writer
+	proto      string
+	addr       string
+	catSet     utils.Set
+	prio       syslog.Priority
+	inJSON     bool
+	serverCert string
 }
 
 func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
@@ -41,6 +43,8 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 	}
 	if cfg.SyslogIPProto == syscall.IPPROTO_TCP {
 		proto = "tcp"
+	} else if cfg.SyslogIPProto == api.SyslogProtocolTCPTLS {
+		proto = "tcp+tls"
 	} else {
 		proto = "udp"
 	}
@@ -56,11 +60,12 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 		}
 	}
 	return &Syslogger{
-		proto:  proto,
-		addr:   fmt.Sprintf("%s:%d", server, cfg.SyslogPort),
-		catSet: catSet,
-		prio:   prio,
-		inJSON: cfg.SyslogInJSON,
+		proto:      proto,
+		addr:       fmt.Sprintf("%s:%d", server, cfg.SyslogPort),
+		catSet:     catSet,
+		prio:       prio,
+		inJSON:     cfg.SyslogInJSON,
+		serverCert: cfg.SyslogServerCert,
 	}
 }
 
@@ -180,7 +185,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 
 		s.Close()
 	}
-	if wr, err := syslog.Dial(s.proto, s.addr, syslogFacility|prio, "neuvector"); err != nil {
+	if wr, err := s.makeDial(prio, syslogDialTimeout); err != nil {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
@@ -188,6 +193,14 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}
+}
+
+func (s *Syslogger) makeDial(prio syslog.Priority, timeout time.Duration) (*syslog.Writer, error) {
+	if s.proto == "tcp+tls" {
+		return syslog.DialWithTLSCert("tcp+tls", s.addr, timeout, syslogFacility|prio, "neuvector", []byte(s.serverCert))
+	}
+
+	return syslog.Dial(s.proto, s.addr, timeout, syslogFacility|prio, "neuvector")
 }
 
 // --

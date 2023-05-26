@@ -639,6 +639,20 @@ func connectFromGlobal(conn *share.CLUSConnection, ca *nodeAttr, stip *serverTip
 		if alive == false && wouldGenerateUnmanagedEndpoint(conn, true) {
 			scheduleControllerResync(resyncRequestReasonEphemeral)
 		}
+		if conn.UwlIp {
+			// Unmanaged workload
+			if ep := getAddrGroupNameFromPolicy(conn.PolicyId, true); ep != "" {
+				conn.ClientWL = ep
+				ca.addrgrp = true
+			} else {
+				ipStr := net.IP(conn.ClientIP).String()
+				ep = specialEPName(api.LearnedWorkloadPrefix, ipStr)
+				conn.ClientWL = ep
+			}
+			stip.wlPort = uint16(conn.ServerPort)
+			ca.workload = true
+			return true
+		}
 		cctx.ConnLog.WithFields(log.Fields{
 			"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 		}).Debug("Ignore ingress connection from global IP space")
@@ -931,6 +945,11 @@ func preProcessConnect(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *serve
 			ca.workload = true
 			ca.managed = true
 			return &ca, &sa, &stip, true
+		} else if conn.TmpOpen {
+			cctx.ConnLog.WithFields(log.Fields{
+				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
+			}).Debug("Ignore ingress temporary open connection")
+			return &ca, &sa, &stip, false
 		} else if isDeviceIP(conn.ClientIP) {
 			cctx.ConnLog.WithFields(log.Fields{
 				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
@@ -1004,6 +1023,11 @@ func preProcessConnect(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *serve
 			sa.workload = true
 			sa.managed = true
 			return &ca, &sa, &stip, true
+		} else if conn.TmpOpen {
+			cctx.ConnLog.WithFields(log.Fields{
+				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
+			}).Debug("Ignore egress temporary open connection")
+			return &ca, &sa, &stip, false
 		} else if isDeviceIP(conn.ServerIP) {
 			cctx.ConnLog.WithFields(log.Fields{
 				"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),

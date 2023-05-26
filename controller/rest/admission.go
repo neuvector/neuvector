@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/julienschmidt/httprouter"
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -282,6 +282,7 @@ func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 
 func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -304,6 +305,7 @@ func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -369,6 +371,7 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 
 func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -564,6 +567,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -596,6 +600,19 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	resp.Options.PspCollection = pspCollection
 	resp.Options.PssCollections = cacher.GetAdmissionPssDesc()
+	sigstoreVerifiers := []string{}
+	if keys, _ := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust); len(keys) > 0 {
+		sigstoreVerifiers = make([]string, 0, len(keys))
+		for _, key := range keys {
+			if ss := strings.Split(key, "/"); len(ss) != 5 {
+				continue
+			} else {
+				sigstoreVerifiers = append(sigstoreVerifiers, fmt.Sprintf("%s/%s", ss[3], ss[4]))
+			}
+		}
+	}
+	resp.Options.SigstoreVerifiers = sigstoreVerifiers
+
 	restRespSuccess(w, r, resp, acc, login, nil, "Get admission control rule options")
 }
 
@@ -678,6 +695,7 @@ func replaceFedAdmissionRules(ruleType string, rulesNew *share.CLUSAdmissionRule
 
 func handlerGetAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -841,6 +859,7 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 
 func handlerDeleteAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -874,6 +893,7 @@ func handlerDeleteAdmissionRules(w http.ResponseWriter, r *http.Request, ps http
 
 func handlerGetAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -897,6 +917,7 @@ func handlerGetAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 
 func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1042,6 +1063,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 
 func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1146,6 +1168,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -1228,6 +1251,7 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 
 func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Info()
+	defer r.Body.Close()
 
 	if !k8sPlatform {
 		restRespError(w, http.StatusPreconditionFailed, api.RESTErrAdmCtrlUnSupported)
@@ -1356,7 +1380,9 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 				ruleItem.ID = &rule.ID
 				ruleItem.Disabled = &rule.Disable
 			}
-			ruleItem.RuleMode = &rule.RuleMode
+			if *ruleItem.Action == actionDeny {
+				ruleItem.RuleMode = &rule.RuleMode
+			}
 			if rule.Comment != "" {
 				ruleItem.Comment = &rule.Comment
 			}
@@ -1480,6 +1506,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
 
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {

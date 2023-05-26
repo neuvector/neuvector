@@ -10,6 +10,7 @@ const RESTTokenHeader string = "X-Auth-Token"
 const RESTNvPageHeader string = "X-Nv-Page"
 const RESTRancherTokenHeader string = "X-R-Sess"
 const RESTMaskedValue string = "The value is masked"
+const RESTAPIKeyHeader string = "X-Auth-Apikey"
 
 const RESTNvPageDashboard string = "dashboard"
 
@@ -335,10 +336,10 @@ type RESTX509CertInfo struct {
 }
 
 type RESTServerSAML struct {
-	SSOURL     string `json:"sso_url"`
-	Issuer     string `json:"issuer"`
-	X509Cert   string `json:"x509_cert,cloak"`
-	GroupClaim string `json:"group_claim"`
+	SSOURL     string             `json:"sso_url"`
+	Issuer     string             `json:"issuer"`
+	X509Cert   string             `json:"x509_cert,cloak"`
+	GroupClaim string             `json:"group_claim"`
 	X509Certs  []RESTX509CertInfo `json:"x509_certs"`
 
 	Enable           bool                      `json:"enable"`
@@ -594,6 +595,7 @@ type RESTPwdProfile struct {
 	EnableBlockAfterFailedLogin bool   `json:"enable_block_after_failed_login"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       int    `json:"block_after_failed_login_count"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                int    `json:"block_minutes"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              uint32 `json:"session_timeout"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfileBasic struct {
@@ -620,6 +622,7 @@ type RESTPwdProfileConfig struct {
 	EnableBlockAfterFailedLogin *bool   `json:"enable_block_after_failed_login,omitempty"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       *int    `json:"block_after_failed_login_count,omitempty"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                *int    `json:"block_minutes,omitempty"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              *uint32 `json:"session_timeout,omitempty"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfilesData struct {
@@ -651,6 +654,7 @@ type RESTPwdProfileConditional struct {
 	EnableBlockAfterFailedLogin *bool   `json:"enable_block_after_failed_login,omitempty"` // for "Block X minutes after N times consecutive failed attempts"
 	BlockAfterFailedCount       *int    `json:"block_after_failed_login_count,omitempty"`  // must be > 0 when EnableBlockAfterFailedLogin is true
 	BlockMinutes                *int    `json:"block_minutes,omitempty"`                   // must be > 0 when EnableBlockAfterFailedLogin is true
+	SessionTimeout              *uint32 `json:"session_timeout,omitempty"`                 // for default user session timeout (in seconds)
 }
 
 type RESTPwdProfileDataConditional struct {
@@ -1636,7 +1640,8 @@ type RESTSystemConfigConfig struct {
 	SyslogEnable              *bool                            `json:"syslog_status,omitempty"`
 	SyslogCategories          *[]string                        `json:"syslog_categories,omitempty"`
 	SyslogInJSON              *bool                            `json:"syslog_in_json,omitempty"`
-	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog"`
+	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
+	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
 	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
@@ -1658,9 +1663,15 @@ type RESTSystemConfigConfig struct {
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
+type RESTFedSystemConfigConfig struct {
+	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
+}
+
 type RESTSysNetConfigConfig struct {
 	NetServiceStatus     *bool   `json:"net_service_status,omitempty"`
 	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
+	DisableNetPolicy     *bool   `json:"disable_net_policy,omitempty"`
+	DetectUnmanagedWl    *bool   `json:"detect_unmanaged_wl,omitempty"`
 }
 
 type RESTSysAtmoConfigConfig struct {
@@ -1678,12 +1689,14 @@ type RESTSystemConfigConfigCfgMap struct {
 	AlwaysReload bool                  `json:"always_reload"`
 }
 
+const SyslogProtocolTCPTLS = 66
+
 type RESTSystemConfigConfigData struct {
-	Config     *RESTSystemConfigConfig   `json:"config,omitempty"`
-	ConfigV2   *RESTSystemConfigConfigV2 `json:"config_v2,omitempty"`
-	FedConfig  *RESTSystemConfigConfig   `json:"fed_config,omitempty"`
-	NetConfig  *RESTSysNetConfigConfig   `json:"net_config,omitempty"`
-	AtmoConfig *RESTSysAtmoConfigConfig  `json:"atmo_config,omitempty"`
+	Config     *RESTSystemConfigConfig    `json:"config,omitempty"`
+	ConfigV2   *RESTSystemConfigConfigV2  `json:"config_v2,omitempty"`
+	FedConfig  *RESTFedSystemConfigConfig `json:"fed_config,omitempty"`
+	NetConfig  *RESTSysNetConfigConfig    `json:"net_config,omitempty"`
+	AtmoConfig *RESTSysAtmoConfigConfig   `json:"atmo_config,omitempty"`
 }
 
 type RESTSystemConfigSvcCfgV2 struct {
@@ -1700,6 +1713,7 @@ type RESTSystemConfigSyslogCfgV2 struct {
 	SyslogCategories   *[]string `json:"syslog_categories,omitempty"`
 	SyslogInJSON       *bool     `json:"syslog_in_json,omitempty"`
 	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
+	SyslogServerCert   *string   `json:"syslog_server_cert,omitempty"`
 }
 
 type RESTSystemConfigAuthCfgV2 struct {
@@ -1713,10 +1727,6 @@ type RESTSystemConfigProxyCfgV2 struct {
 	RegistryHttpsProxyEnable *bool      `json:"registry_https_proxy_status,omitempty"`
 	RegistryHttpProxy        *RESTProxy `json:"registry_http_proxy,omitempty"`
 	RegistryHttpsProxy       *RESTProxy `json:"registry_https_proxy,omitempty"`
-}
-
-type RESTSystemConfigWebhookCfgV2 struct {
-	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
 }
 
 type RESTSystemConfigMiscCfgV2 struct {
@@ -1772,6 +1782,7 @@ type RESTSystemConfig struct {
 	SyslogEnable              bool                      `json:"syslog_status"`
 	SyslogCategories          []string                  `json:"syslog_categories"`
 	SyslogInJSON              bool                      `json:"syslog_in_json"`
+	SyslogServerCert          string                    `json:"syslog_server_cert"`
 	SingleCVEPerSyslog        bool                      `json:"single_cve_per_syslog"`
 	AuthOrder                 []string                  `json:"auth_order"`
 	AuthByPlatform            bool                      `json:"auth_by_platform"`
@@ -1792,6 +1803,8 @@ type RESTSystemConfig struct {
 	XffEnabled                bool                      `json:"xff_enabled"`
 	NetServiceStatus          bool                      `json:"net_service_status"`
 	NetServicePolicyMode      string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy          bool                      `json:"disable_net_policy"`
+	DetectUnmanagedWl         bool                      `json:"detect_unmanaged_wl"`
 	ModeAutoD2M               bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration       int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P               bool                      `json:"mode_auto_m2p"`
@@ -1819,6 +1832,7 @@ type RESTSystemConfigSyslogV2 struct {
 	SyslogCategories   []string `json:"syslog_categories"`
 	SyslogInJSON       bool     `json:"syslog_in_json"`
 	SingleCVEPerSyslog bool     `json:"single_cve_per_syslog"`
+	SyslogServerCert   string   `json:"syslog_server_cert"`
 }
 
 type RESTSystemConfigAuthV2 struct {
@@ -1835,6 +1849,7 @@ type RESTSystemConfigMiscV2 struct {
 	MonitorServiceMesh bool     `json:"monitor_service_mesh"`
 	XffEnabled         bool     `json:"xff_enabled"`
 	NoTelemetryReport  bool     `json:"no_telemetry_report"`
+	CspType            string   `json:"csp_type"`
 }
 
 // for scanner autoscaling
@@ -1867,6 +1882,8 @@ type RESTSystemConfigIBMSAV2 struct {
 type RESTSystemConfigNetSvcV2 struct {
 	NetServiceStatus     bool   `json:"net_service_status"`
 	NetServicePolicyMode string `json:"net_service_policy_mode"`
+	DisableNetPolicy     bool   `json:"disable_net_policy"`
+	DetectUnmanagedWl    bool   `json:"detect_unmanaged_wl"`
 }
 
 type RESTSystemConfigModeAutoV2 struct {
@@ -2139,14 +2156,15 @@ type RESTScanReportData struct {
 }
 
 type RESTScanReport struct {
-	Vuls    []*RESTVulnerability `json:"vulnerabilities"`
-	Modules []*RESTScanModule    `json:"modules,omitempty"`
-	Checks  []*RESTBenchItem     `json:"checks,omitempty"`
-	Secrets []*RESTScanSecret    `json:"secrets,omitempty"`
-	SetIDs  []*RESTScanSetIdPerm `json:"setid_perms,omitempty"`
-	Envs    []string             `json:"envs,omitempty"`
-	Labels  map[string]string    `json:"labels,omitempty"`
-	Cmds    []string             `json:"cmds,omitempty"`
+	Vuls      []*RESTVulnerability `json:"vulnerabilities"`
+	Modules   []*RESTScanModule    `json:"modules,omitempty"`
+	Checks    []*RESTBenchItem     `json:"checks,omitempty"`
+	Secrets   []*RESTScanSecret    `json:"secrets,omitempty"`
+	SetIDs    []*RESTScanSetIdPerm `json:"setid_perms,omitempty"`
+	Envs      []string             `json:"envs,omitempty"`
+	Labels    map[string]string    `json:"labels,omitempty"`
+	Cmds      []string             `json:"cmds,omitempty"`
+	Verifiers []string             `json:"verifiers,omitempty"`
 }
 
 type RESTScanLayer struct {
@@ -2819,7 +2837,7 @@ type RESTDerivedDlpRuleMacData struct {
 	Macs []*RESTDerivedDlpRuleMac `json:"macs"`
 }
 
-//waf
+// waf
 const MinWafRuleID = 40000
 const MaxWafRuleID = 50000
 
@@ -3099,10 +3117,11 @@ type RESTAdmCatOptions struct {
 }
 
 type RESTAdmRuleTypeOptions struct {
-	DenyOptions      *RESTAdmCatOptions      `json:"deny_options"`
-	ExceptionOptions *RESTAdmCatOptions      `json:"exception_options"`
-	PspCollection    []*RESTAdmRuleCriterion `json:"psp_collection,omitempty"`
-	PssCollections   map[string][]string     `json:"pss_collections,omitempty"`
+	DenyOptions       *RESTAdmCatOptions      `json:"deny_options"`
+	ExceptionOptions  *RESTAdmCatOptions      `json:"exception_options"`
+	PspCollection     []*RESTAdmRuleCriterion `json:"psp_collection,omitempty"`
+	PssCollections    map[string][]string     `json:"pss_collections,omitempty"`
+	SigstoreVerifiers []string                `json:"sigstore_verifiers,omitempty"`
 }
 
 type RESTAdmissionState struct {
@@ -3396,4 +3415,112 @@ type RESTAdminCustomCriteriaOptions struct {
 type RESTAdminCriteriaTemplate struct {
 	Kind    string `json:"kind"`
 	RawJson string `json:"rawjson"`
+}
+
+const (
+	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneDay     string = "oneday"
+	ApikeyExpireOneMonth   string = "onemonth"
+	ApikeyExpireOneYear    string = "oneyear"
+	ApikeyExpireCustomHour string = "hours"
+)
+
+type RESTApikeyData struct {
+	Apikey *RESTApikey `json:"apikey"`
+}
+
+type RESTApikeyCreationData struct {
+	Apikey *RESTApikeyCreation `json:"apikey"`
+}
+
+type RESTApikey struct {
+	ExpirationType      string              `json:"expiration_type"`
+	ExpirationHours     uint32              `json:"expiration_hours"`
+	Name                string              `json:"apikey_name"`
+	SecretKey           string              `json:"apikey_secret,cloak"`
+	Description         string              `json:"description"`
+	Role                string              `json:"role"`
+	RoleDomains         map[string][]string `json:"role_domains,omitempty"` // role -> domains
+	ExpirationTimestamp int64               `json:"expiration_timestamp"`   // used in GET
+	CreatedTimestamp    int64               `json:"created_timestamp"`      // used in GET
+	CreatedByEntity     string              `json:"created_by_entity"`      // it could be username or apikey (access key)
+}
+
+type RESTApikeyCreation struct {
+	ExpirationType  string              `json:"expiration_type"`
+	ExpirationHours uint32              `json:"expiration_hours"`
+	Name            string              `json:"apikey_name"`
+	Description     string              `json:"description"`
+	Role            string              `json:"role"`
+	RoleDomains     map[string][]string `json:"role_domains,omitempty"` // role -> domains
+}
+
+type RESTApikeyGeneratedData struct {
+	Apikey *RESTApikeyGenerated `json:"apikey"`
+}
+
+type RESTApikeyGenerated struct {
+	Name      string `json:"apikey_name"`
+	SecretKey string `json:"apikey_secret"`
+}
+
+type RESTApikeysData struct {
+	Apikeys     []*RESTApikey `json:"apikeys"`
+	GlobalRoles []string      `json:"global_roles"`
+	DomainRoles []string      `json:"domain_roles"`
+}
+
+type RESTSelfApikeyData struct {
+	Apikey        *RESTApikey                      `json:"apikey"`
+	GlobalPermits []*RESTRolePermission            `json:"global_permissions,omitempty"`
+	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
+}
+
+type REST_SigstoreRootOfTrust_GET struct {
+	Name           string                           `json:"name"`
+	IsPrivate      bool                             `json:"is_private"`
+	RekorPublicKey string                           `json:"rekor_public_key,omitempty"`
+	RootCert       string                           `json:"root_cert,omitempty"`
+	SCTPublicKey   string                           `json:"sct_public_key,omitempty"`
+	Verifiers      map[string]REST_SigstoreVerifier `json:"verifiers,omitempty"`
+	CfgType        string                           `json:"cfg_type"`
+	Comment        string                           `json:"comment"`
+}
+
+type REST_SigstoreRootOfTrust_POST struct {
+	Name           string `json:"name"`
+	IsPrivate      bool   `json:"is_private"`
+	RekorPublicKey string `json:"rekor_public_key,omitempty"`
+	RootCert       string `json:"root_cert,omitempty"`
+	SCTPublicKey   string `json:"sct_public_key,omitempty"`
+	Comment        string `json:"comment"`
+}
+
+type REST_SigstoreRootOfTrust_PATCH struct {
+	IsPrivate      *bool   `json:"is_private,omitempty"`
+	RekorPublicKey *string `json:"rekor_public_key,omitempty"`
+	RootCert       *string `json:"root_cert,omitempty"`
+	SCTPublicKey   *string `json:"sct_public_key,omitempty"`
+	Comment        *string `json:"comment,omitempty"`
+}
+
+type REST_SigstoreVerifier struct {
+	Name         string `json:"name"`
+	VerifierType string `json:"verifier_type"`
+	IgnoreTLog   bool   `json:"ignore_tlog"`
+	IgnoreSCT    bool   `json:"ignore_sct"`
+	PublicKey    string `json:"public_key"`
+	CertIssuer   string `json:"cert_issuer"`
+	CertSubject  string `json:"cert_subject"`
+	Comment      string `json:"comment"`
+}
+
+type REST_SigstoreVerifier_PATCH struct {
+	VerifierType *string `json:"verifier_type,omitempty"`
+	IgnoreTLog   *bool   `json:"ignore_tlog,omitempty"`
+	IgnoreSCT    *bool   `json:"ignore_sct,omitempty"`
+	PublicKey    *string `json:"public_key,omitempty"`
+	CertIssuer   *string `json:"cert_issuer,omitempty"`
+	CertSubject  *string `json:"cert_subject,omitempty"`
+	Comment      *string `json:"comment,omitempty"`
 }

@@ -54,6 +54,8 @@ const (
 	python            = "python"
 	ruby              = "ruby"
 	dotnetDepsMaxSize = 10 * 1024 * 1024
+
+	golang = "golang"
 )
 
 var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
@@ -111,9 +113,13 @@ func NewScanApps(v2 bool) *ScanApps {
 	return &ScanApps{pkgs: make(map[string][]AppPackage), dedup: utils.NewSet(), replace: v2}
 }
 
-func isAppsPkgFile(filename string) bool {
-	return isNodejs(filename) || isJava(filename) || isPython(filename) ||
-		isRuby(filename) || isDotNet(filename) || isWordpress(filename)
+func isAppsPkgFile(filename, fullpath string) bool {
+	if isNodejs(filename) || isJava(filename) || isPython(filename) ||
+		isRuby(filename) || isDotNet(filename) || isWordpress(filename) {
+		return true
+	}
+	// Keep golang check at last as it requires reading file data
+	return isGolang(filename, fullpath)
 }
 
 func (s *ScanApps) name() string {
@@ -169,6 +175,8 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 		s.parseDotNetPackage(filename, fullpath)
 	} else if isWordpress(filename) {
 		s.parseWordpressPackage(filename, fullpath)
+	} else {
+		s.parseGolangPackage(filename, fullpath)
 	}
 }
 
@@ -190,6 +198,67 @@ func (s *ScanApps) DerivePkg(data map[string][]byte) []AppPackage {
 		}
 	}
 	return pkgs
+}
+
+func isExe(info os.FileInfo) bool {
+	return info.Mode().IsRegular() && (info.Mode()&0111) != 0
+}
+
+func isGolang(filename, fullpath string) bool {
+	info, err := os.Stat(fullpath)
+	if err != nil || !isExe(info) {
+		return false
+	}
+
+	f, err := openExe(fullpath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	_, _, err = readRawBuildInfo(f, true)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
+	f, err := openExe(fullpath)
+	if err != nil {
+		log.WithFields(log.Fields{"file": filename}).Error("open error")
+		return
+	}
+	defer f.Close()
+
+	_, mod, err := readRawBuildInfo(f, false)
+	if err != nil {
+		log.WithFields(log.Fields{"file": filename}).Error("read error")
+		return
+	}
+
+	bi, err := parseBuildInfo(mod)
+	if err != nil {
+		log.WithFields(log.Fields{"file": filename, "error": err.Error()}).Error("parse error")
+		return
+	}
+
+	pkgs := make([]AppPackage, len(bi.Deps))
+	for i, m := range bi.Deps {
+		if m.Replace != nil {
+			m = m.Replace
+		}
+
+		pkg := AppPackage{
+			AppName:    golang,
+			ModuleName: fmt.Sprintf("go:%s", m.Path),
+			Version:    strings.TrimPrefix(m.Version, "v"),
+			FileName:   filename,
+		}
+		pkgs[i] = pkg
+	}
+	s.pkgs[filename] = pkgs
 }
 
 func isNodejs(filename string) bool {
@@ -467,7 +536,7 @@ func (s *ScanApps) parsePythonPackage(filename string) {
 		pkgPath = strings.TrimRight(pkgPath, ".dist-info/WHEEL")
 		pkg := AppPackage{
 			AppName:    python,
-			ModuleName: python + ":" + name,
+			ModuleName: fmt.Sprintf("python:%s", name),
 			Version:    ver,
 			FileName:   pkgPath,
 		}

@@ -44,11 +44,15 @@ func handlerPwdProfileCreate(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	rprofile := rconf.PwdProfile
+	if rprofile.SessionTimeout == 0 {
+		rprofile.SessionTimeout = common.DefIdleTimeoutInternal
+	}
 	if rprofile.MinLen <= 0 || rprofile.MinUpperCount < 0 || rprofile.MinLowerCount < 0 || rprofile.MinDigitCount < 0 || rprofile.MinSpecialCount < 0 ||
 		(rprofile.EnablePwdExpiration && rprofile.PwdExpireAfterDays <= 0) ||
 		(rprofile.EnablePwdHistory && rprofile.PwdHistoryCount <= 0) ||
 		(rprofile.EnableBlockAfterFailedLogin && (rprofile.BlockAfterFailedCount <= 0 || rprofile.BlockMinutes <= 0)) ||
-		(rprofile.MinLen < (rprofile.MinUpperCount + rprofile.MinLowerCount + rprofile.MinDigitCount + rprofile.MinSpecialCount)) {
+		(rprofile.MinLen < (rprofile.MinUpperCount + rprofile.MinLowerCount + rprofile.MinDigitCount + rprofile.MinSpecialCount)) ||
+		(rprofile.SessionTimeout > api.UserIdleTimeoutMax || rprofile.SessionTimeout < api.UserIdleTimeoutMin) {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "invalid value")
 		return
 	}
@@ -68,6 +72,7 @@ func handlerPwdProfileCreate(w http.ResponseWriter, r *http.Request, ps httprout
 		EnableBlockAfterFailedLogin: rprofile.EnableBlockAfterFailedLogin,
 		BlockAfterFailedCount:       rprofile.BlockAfterFailedCount,
 		BlockMinutes:                rprofile.BlockMinutes,
+		SessionTimeout:              rprofile.SessionTimeout,
 	}
 	if profile.PwdHistoryCount > _maxPwdHistoryCount {
 		profile.PwdHistoryCount = _maxPwdHistoryCount
@@ -117,6 +122,8 @@ func handlerPwdProfileShow(w http.ResponseWriter, r *http.Request, ps httprouter
 		log.WithFields(log.Fields{"name": name}).Error("Request error")
 		restRespNotFoundLogAccessDenied(w, login, common.ErrObjectNotFound)
 		return
+	} else if profile.SessionTimeout == 0 {
+		profile.SessionTimeout = common.DefIdleTimeoutInternal
 	}
 
 	var resp api.RESTPwdProfileDataConditional
@@ -136,6 +143,7 @@ func handlerPwdProfileShow(w http.ResponseWriter, r *http.Request, ps httprouter
 			EnableBlockAfterFailedLogin: &profile.EnableBlockAfterFailedLogin,
 			BlockAfterFailedCount:       &profile.BlockAfterFailedCount,
 			BlockMinutes:                &profile.BlockMinutes,
+			SessionTimeout:              &profile.SessionTimeout,
 		}
 	} else {
 		resp.PwdProfile = &api.RESTPwdProfileConditional{
@@ -167,6 +175,9 @@ func handlerPwdProfileList(w http.ResponseWriter, r *http.Request, ps httprouter
 	resp.ActiveProfileName = activeProfileName
 	resp.PwdProfiles = make([]*api.RESTPwdProfile, 0, len(profiles))
 	for _, profile := range profiles {
+		if profile.SessionTimeout == 0 {
+			profile.SessionTimeout = common.DefIdleTimeoutInternal
+		}
 		resp.PwdProfiles = append(resp.PwdProfiles, &api.RESTPwdProfile{
 			Name:                        profile.Name,
 			Comment:                     profile.Comment,
@@ -182,6 +193,7 @@ func handlerPwdProfileList(w http.ResponseWriter, r *http.Request, ps httprouter
 			EnableBlockAfterFailedLogin: profile.EnableBlockAfterFailedLogin,
 			BlockAfterFailedCount:       profile.BlockAfterFailedCount,
 			BlockMinutes:                profile.BlockMinutes,
+			SessionTimeout:              profile.SessionTimeout,
 		})
 	}
 
@@ -271,6 +283,11 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 			if rprofile.BlockMinutes != nil {
 				profile.BlockMinutes = *rprofile.BlockMinutes
 			}
+			if rprofile.SessionTimeout != nil {
+				profile.SessionTimeout = *rprofile.SessionTimeout
+			} else if profile.SessionTimeout == 0 {
+				profile.SessionTimeout = common.DefIdleTimeoutInternal
+			}
 			if profile.PwdHistoryCount > _maxPwdHistoryCount {
 				profile.PwdHistoryCount = _maxPwdHistoryCount
 			}
@@ -278,7 +295,8 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 				(profile.EnablePwdExpiration && profile.PwdExpireAfterDays <= 0) ||
 				(profile.EnablePwdHistory && profile.PwdHistoryCount <= 0) ||
 				(profile.EnableBlockAfterFailedLogin && (profile.BlockAfterFailedCount <= 0 || profile.BlockMinutes <= 0)) ||
-				(profile.MinLen < (profile.MinUpperCount + profile.MinLowerCount + profile.MinDigitCount + profile.MinSpecialCount)) {
+				(profile.MinLen < (profile.MinUpperCount + profile.MinLowerCount + profile.MinDigitCount + profile.MinSpecialCount)) ||
+				(profile.SessionTimeout > api.UserIdleTimeoutMax || profile.SessionTimeout < api.UserIdleTimeoutMin) {
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "invalid value")
 				return
 			}

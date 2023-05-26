@@ -207,6 +207,14 @@ func (o *CLUSDomain) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	return nil, nil
 }
 
+func (o *CLUSSigstoreRootOfTrust) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}
+
+func (o *CLUSSigstoreVerifier) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}
+
 func (o *CLUSGroup) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	if o.CfgType == FederalCfg {
 		return _fedDomainSlice, _fedDomainSlice
@@ -536,4 +544,34 @@ func (o *CLUSWebhook) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	} else {
 		return nil, nil
 	}
+}
+
+func (o *CLUSApikey) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	if o.Role != "" { // "" means api.UserRoleNone
+		if o.Role == userRoleFedAdmin || o.Role == userRoleFedReader {
+			return _fedDomainSlice, _fedDomainSlice
+		}
+		return nil, nil
+	}
+
+	// This is used for listing users. Config needs special handling.
+	// If a user has global access, only global users can list it; otherwise,
+	// anyone has the read right of one of user's domains can see that user.
+	s := make(map[string]interface{})
+	for _, domains := range o.RoleDomains {
+		for _, d := range domains {
+			s[d] = nil
+		}
+	}
+
+	domains := make([]string, len(s))
+	i := 0
+	for d, _ := range s {
+		domains[i] = d
+		i++
+	}
+	if len(domains) == 0 {
+		domains = nil
+	}
+	return domains, nil
 }

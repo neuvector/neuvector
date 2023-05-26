@@ -37,6 +37,7 @@ type MockCluster struct {
 	activePwdProfileName string
 	pwdProfileCluster    map[string]*share.CLUSPwdProfile
 	usersCluster         map[string]*share.CLUSUser
+	apikeysCluster       map[string]*share.CLUSApikey
 	serversCluster       map[string]*share.CLUSServer
 	registries           map[string]*share.CLUSRegistryConfig
 
@@ -83,6 +84,7 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.pwdProfileCluster = make(map[string]*share.CLUSPwdProfile)
 	m.activePwdProfileName = share.CLUSDefPwdProfileName
 	m.usersCluster = make(map[string]*share.CLUSUser)
+	m.apikeysCluster = make(map[string]*share.CLUSApikey)
 	m.serversCluster = make(map[string]*share.CLUSServer)
 	m.registries = make(map[string]*share.CLUSRegistryConfig)
 
@@ -523,5 +525,38 @@ func (m *MockCluster) GetScanReport(key string) *share.CLUSScanReport {
 		return rpt
 	} else {
 		return nil
+	}
+}
+
+func (m *MockCluster) GetApikeyRev(fullname string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error) {
+	if user, ok := m.apikeysCluster[fullname]; ok {
+		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
+		var clone share.CLUSApikey
+		value, _ := json.Marshal(user)
+		json.Unmarshal(value, &clone)
+		if !acc.Authorize(&clone, nil) {
+			return nil, 0, common.ErrObjectAccessDenied
+		}
+		return &clone, 0, nil
+	}
+	return nil, 0, common.ErrObjectNotFound
+}
+
+func (m *MockCluster) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
+	return m.apikeysCluster
+}
+
+func (m *MockCluster) CreateApikey(apikey *share.CLUSApikey) error {
+	clone := *apikey
+	m.apikeysCluster[apikey.Name] = &clone
+	return nil
+}
+
+func (m *MockCluster) DeleteApikey(name string) error {
+	if _, ok := m.apikeysCluster[name]; ok {
+		delete(m.apikeysCluster, name)
+		return nil
+	} else {
+		return common.ErrObjectNotFound
 	}
 }

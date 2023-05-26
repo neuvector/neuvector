@@ -184,6 +184,10 @@ func getNetServicePolicyMode() string {
 	return systemConfigCache.NetServicePolicyMode
 }
 
+func getDisableNetPolicyStatus() bool {
+	return systemConfigCache.DisableNetPolicy
+}
+
 func getNewServiceProfileBaseline() string {
 	return systemConfigCache.NewServiceProfileBaseline
 }
@@ -198,6 +202,10 @@ func (m CacheMethod) GetNetServiceStatus() bool {
 
 func (m CacheMethod) GetNetServicePolicyMode() string {
 	return getNetServicePolicyMode()
+}
+
+func (m CacheMethod) GetDisableNetPolicyStatus() bool {
+	return getDisableNetPolicyStatus()
 }
 
 func (m CacheMethod) GetNewServiceProfileBaseline() string {
@@ -261,11 +269,14 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		XffEnabled:                systemConfigCache.XffEnabled,
 		NetServiceStatus:          systemConfigCache.NetServiceStatus,
 		NetServicePolicyMode:      systemConfigCache.NetServicePolicyMode,
+		DisableNetPolicy:          systemConfigCache.DisableNetPolicy,
+		DetectUnmanagedWl:         systemConfigCache.DetectUnmanagedWl,
 		ModeAutoD2M:               systemConfigCache.ModeAutoD2M,
 		ModeAutoD2MDuration:       systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 		NoTelemetryReport:         systemConfigCache.NoTelemetryReport,
+		SyslogServerCert:          systemConfigCache.SyslogServerCert,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -372,7 +383,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
 	var cfg share.CLUSSystemConfig
-
+	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		json.Unmarshal(value, &cfg)
@@ -397,6 +408,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleIPPolicyCalculation(true)
 			scheduleDlpRuleCalculation(true)
 		}
+		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && cfg.DisableNetPolicy == false {
+			bSchedulePolicy = true
+			scheduleDlpRuleCalculation(true)
+		}
 		automodeConfigUpdate(cfg, systemConfigCache)
 	case cluster.ClusterNotifyDelete:
 		// Triggered at configuration import
@@ -418,6 +433,9 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	putInternalIPNetToCluseter(true)
 	cacheMutexUnlock()
 
+	if bSchedulePolicy {
+		scheduleIPPolicyCalculation(true)
+	}
 	httpsProxy := cfg.RegistryHttpsProxy
 	httpProxy := cfg.RegistryHttpProxy
 	var param1 interface{} = &httpsProxy

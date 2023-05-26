@@ -247,6 +247,7 @@ static void pcap_packet(char *user, struct pcap_pkthdr *hdr, uint8_t *pkt)
     g_now = hdr->ts;
     context.tick = g_now.tv_sec;
     context.tap = true;
+    context.quar = false;
     dpi_recv_packet(&context, pkt, hdr->caplen);
 
     struct timeval td = tv_diff(last_now, g_now);
