@@ -2455,7 +2455,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				return
 			}
 
-			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Error("Token validation succeeded")
+			log.WithFields(log.Fields{"server": server, "attrs": attrs}).Debug("Token validation succeeded")
 
 			username, email, groups := getSAMLUserFromAttrs(attrs, cs.SAML.GroupClaim)
 			if username == "" {

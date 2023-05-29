@@ -571,7 +571,7 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 		// the container has exited, clean up
 		if containerRemoved {
 			clearContainerProcesses(c)
-			p.containerStops.Add(c.id)
+			// p.containerStops.Add(c.id)
 			delete(p.containerMap, c.id)
 			log.WithFields(log.Fields{"pid": pid, "id": c.id, "cnt": len(p.containerMap) - 2}).Debug("PROC: Container remove")
 		} else {
@@ -675,6 +675,28 @@ func (p *Probe) evaluateRuncTrigger(id string, proc *procInternal) {
 		}
 	}
 }
+
+func (p *Probe) evaluateRuntimeCmd(proc *procInternal) bool {
+	if global.RT.IsRuntimeProcess(filepath.Base(proc.ppath), nil) {
+		if global.RT.IsRuntimeProcess(filepath.Base(proc.path), nil) {
+			return true
+		}
+
+		// runc [global options] command [command options] [arguments...]
+		for i, cmd := range proc.cmds {
+			switch i {
+			case 0:
+				if !global.RT.IsRuntimeProcess(filepath.Base(cmd), nil) {
+					return false
+				}
+			case 1:
+				return cmd == "init"
+			}
+		}
+	}
+	return false
+}
+
 
 // Debug purpose:
 func (p *Probe) printProcReport(id string, proc *procInternal) {
@@ -1563,7 +1585,7 @@ func (p *Probe) initReadProcesses() bool {
 		}
 	}
 	p.walkNewProcesses()
-	p.processContainerNewChanges()
+	// p.processContainerNewChanges()
 	p.inspectNewProcesses(true) // catch existing processes
 	return foundKube
 }
@@ -1775,6 +1797,10 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	// only allowing the NS op from the agent's root session
 	if p.isAgentChildren(proc, id) {
 		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
+		return
+	}
+
+	if id != "" && p.evaluateRuntimeCmd(proc) {
 		return
 	}
 
@@ -2498,7 +2524,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		p.reportLearnProc(svcGroup, pp)
 	}
 
-	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "action": pp.Action, "riskType": proc.riskType}).Debug("PROC:")
+	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "action": pp.Action, "riskType": proc.riskType, "svcGroup": svcGroup}).Debug("PROC:")
 	return pp.Action, true
 }
 
@@ -2769,10 +2795,6 @@ func (p *Probe) evaluateLiveApps(id string) {
 }
 
 func (p *Probe) processProfileReeval(id string, pg *share.CLUSProcessProfile, bAddContainer bool) {
-	if bAddContainer {
-		go p.PutBeginningProcEventsBackToWork(id)
-	}
-
 	go p.evaluateLiveApps(id)
 
 	// update riskApp by current policy
@@ -2937,6 +2959,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	if !ok {
 		// the container was exited before we investigate into it
 		mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("SHD: Unknown ID")
+		return true
+	}
+
+	// container is gone
+	if !osutil.IsPidValid(c.rootPid) {
 		return true
 	}
 

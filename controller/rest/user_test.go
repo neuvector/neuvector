@@ -576,12 +576,11 @@ func TestApikeyCreateDelete(t *testing.T) {
 	clusHelper = &mockCluster
 	cacher = &mockCache{}
 
-	data := api.RESTApikeyData{Apikey: &api.RESTApikey{
+	data := api.RESTApikeyCreationData{Apikey: &api.RESTApikeyCreation{
 		ExpirationType: "never",
-		Description: "unit-test",
-		Name: "token-12345", 
-		SecretKey: "0u+tVOWNPRfpCK7p9qznEpnzr/K+a3rYqYBNgz3GVgqIh7n+66OEJf9gTdnmFDgq", 
-		Role: api.UserRoleReader,
+		Description:    "unit-test",
+		Name:           "token-12345",
+		Role:           api.UserRoleReader,
 	}}
 
 	body, _ := json.Marshal(data)
