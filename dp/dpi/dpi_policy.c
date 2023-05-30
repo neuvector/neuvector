@@ -523,6 +523,16 @@ int dpi_rule_add(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l, dpi_rule_key_t *k
             app_rule.rule_id = desc->id;
             ret = dpi_add_app_rule(hdl, key_l, key_h, &app_rule, dir, desc, &exist_desc);
         }
+    } else if (ret > 0) {
+        //newly added rule match any application
+        if (desc->id > 0 && desc->action != DP_POLICY_ACTION_CHECK_APP) {
+            // install an app any rule
+            dpi_policy_app_rule_t app_rule;
+            app_rule.app = 0;
+            app_rule.action = desc->action;
+            app_rule.rule_id = desc->id;
+            ret = dpi_add_app_rule(hdl, key_l, key_h, &app_rule, dir, desc, &exist_desc);
+        }
     }
 
     if (app_num > 0) {

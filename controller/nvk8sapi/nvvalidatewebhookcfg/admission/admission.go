@@ -50,6 +50,7 @@ type ScannedImageSummary struct {
 	VulNames        utils.Set
 	Scanned         bool
 	Signed          bool
+	Verifiers       []string
 	RunAsRoot       bool
 	EnvVars         map[string]string
 	Labels          map[string]string
@@ -203,6 +204,7 @@ var setOps1 = []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsA
 var boolOps = []string{"true", "false"}
 var boolTrueOp = []string{"true"}
 var pssPolicies = []string{share.PssPolicyRestricted, share.PssPolicyBaseline}
+var verifierOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny}
 
 func (info AdmContainerInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(*newJSONAdmContainerInfo(&info))
@@ -436,6 +438,11 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      []string{share.CriteriaOpContainsTagAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
+			share.CriteriaKeyImageVerifiers: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyImageVerifiers,
+				Ops:      verifierOps,
+				MatchSrc: api.MatchSrcImage,
+			},
 		}
 	}
 	return admK8sDenyRuleOptions
@@ -553,6 +560,11 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 			share.CriteriaKeyModules: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyModules,
 				Ops:      allSetOps,
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyImageVerifiers: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyImageVerifiers,
+				Ops:      verifierOps,
 				MatchSrc: api.MatchSrcImage,
 			},
 		}

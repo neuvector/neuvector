@@ -406,7 +406,7 @@ func handlecustomrolecfg(yaml_data []byte, load bool, skip *bool, context *confi
 func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 	user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
 	if user == nil {
-		log.WithFields(log.Fields{"error": err}).Error("Admin user date not find")
+		log.WithFields(log.Fields{"error": err}).Error("Admin user data not find")
 		return
 	}
 
@@ -416,16 +416,97 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		return
 	}
 
-	if weak, _, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil, nil); weak {
-		log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
-		return
-	} else {
-		user.PasswordHash = utils.HashPassword(ruser.Password)
-		user.PwdResetTime = time.Now().UTC()
+	var profile share.CLUSPwdProfile
+	if _, err := os.Stat(pwdprofileconfigmap); err == nil {
+		if profileyaml_data, err := ioutil.ReadFile(pwdprofileconfigmap); err == nil {
+			if json_data, err := yaml.YAMLToJSON(profileyaml_data); err == nil {
+				var rconf api.RESTPwdProfilesDataCfgMap
+				if err := json.Unmarshal(json_data, &rconf); err == nil {
+					for _, rprofile := range rconf.PwdProfiles {
+						if rprofile != nil && rprofile.Name == share.CLUSDefPwdProfileName {
+							profile.MinLen = rprofile.MinLen
+							profile.MinUpperCount = rprofile.MinUpperCount
+							profile.MinLowerCount = rprofile.MinLowerCount
+							profile.MinDigitCount = rprofile.MinDigitCount
+							profile.MinSpecialCount = rprofile.MinSpecialCount
+							profile.EnablePwdExpiration = rprofile.EnablePwdExpiration
+							profile.PwdExpireAfterDays = rprofile.PwdExpireAfterDays
+							profile.EnablePwdHistory = rprofile.EnablePwdHistory
+							profile.PwdHistoryCount = rprofile.PwdHistoryCount
+							if profile.PwdHistoryCount > _maxPwdHistoryCount {
+								profile.PwdHistoryCount = _maxPwdHistoryCount
+							}
+							profile.EnableBlockAfterFailedLogin = rprofile.EnableBlockAfterFailedLogin
+							profile.BlockAfterFailedCount = rprofile.BlockAfterFailedCount
+							profile.BlockMinutes = rprofile.BlockMinutes
+							if rprofile.SessionTimeout == 0 {
+								profile.SessionTimeout = common.DefIdleTimeoutInternal
+							} else {
+								profile.SessionTimeout = rprofile.SessionTimeout
+							}
+							if profile.MinLen <= 0 || profile.MinUpperCount < 0 || profile.MinLowerCount < 0 || profile.MinDigitCount < 0 || profile.MinSpecialCount < 0 ||
+								(profile.EnablePwdExpiration && profile.PwdExpireAfterDays <= 0) ||
+								(profile.EnablePwdHistory && profile.PwdHistoryCount <= 0) ||
+								(profile.EnableBlockAfterFailedLogin && (profile.BlockAfterFailedCount <= 0 || profile.BlockMinutes <= 0)) ||
+								(profile.MinLen < (profile.MinUpperCount + profile.MinLowerCount + profile.MinDigitCount + profile.MinSpecialCount)) ||
+								(profile.SessionTimeout > api.UserIdleTimeoutMax || profile.SessionTimeout < api.UserIdleTimeoutMin) {
+								log.WithFields(log.Fields{"profile": profile}).Error("invalid value")
+								profile = share.CLUSPwdProfile{}
+							}
+							break
+						}
+					}
+				}
+			}
+		} else {
+			log.WithFields(log.Fields{"error": err}).Error("password profile config file read error")
+		}
+	}
+	empty := share.CLUSPwdProfile{}
+	if profile == empty {
+		if pprofile, _, _ := clusHelper.GetPwdProfileRev(share.CLUSDefPwdProfileName, acc); pprofile != nil {
+			profile = *pprofile
+		}
 	}
 
+	if profile.EnablePwdHistory && profile.PwdHistoryCount > 0 {
+		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil, &profile); weak {
+			log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
+			return
+		} else {
+			foundInHistory := false
+			newPwdHash := utils.HashPassword(ruser.Password)
+			if newPwdHash == user.PasswordHash {
+				foundInHistory = true
+			} else {
+				for _, oldHash := range user.PwdHashHistory {
+					if newPwdHash == oldHash {
+						foundInHistory = true
+						break
+					}
+				}
+			}
+			if !foundInHistory {
+				if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
+					user.PwdHashHistory = nil
+				} else {
+					user.PwdHashHistory = append(user.PwdHashHistory, user.PasswordHash)
+					if i := len(user.PwdHashHistory) - pwdHistoryToKeep; i >= 0 { // len(user.PwdHashHistory) + 1(current password hash) should be <= pwdHistoryToKeep
+						user.PwdHashHistory = user.PwdHashHistory[i+1:]
+					}
+				}
+			}
+		}
+	}
+	user.PasswordHash = utils.HashPassword(ruser.Password)
+	user.PwdResetTime = time.Now().UTC()
+
 	if ruser.Timeout == 0 {
-		ruser.Timeout = common.DefaultIdleTimeout
+		if profile.SessionTimeout == 0 {
+			ruser.Timeout = common.DefIdleTimeoutInternal
+		} else {
+			ruser.Timeout = profile.SessionTimeout
+		}
 	} else if ruser.Timeout > api.UserIdleTimeoutMax || ruser.Timeout < api.UserIdleTimeoutMin {
 		e := "Invalid idle timeout value"
 		log.WithFields(log.Fields{"create": common.DefaultAdminUser, "timeout": ruser.Timeout}).Error(e)

@@ -15,9 +15,14 @@ type TokenTransport struct {
 	Transport http.RoundTripper
 	Username  string
 	Password  string
+	Token     string
 }
 
 func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.Token != "" {
+		req.Header.Set("Authorization", t.Token)
+	}
+
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
 		return resp, err

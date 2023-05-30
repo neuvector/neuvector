@@ -371,7 +371,7 @@ func (c *configHelper) Restore() (string, error) {
 	eps.Remove(fedCfgEndpoint)
 
 	// restore process profile/file monitor/access rule endpoints to avoid unnecessary kv PutIfNotExists calls when groups are updated in cache
-	priorityCfgEndpoints := utils.NewSet(pprofileCfgEndpoint, fmonitorCfgEndpoint, faccessCfgEndpoint, registryCfgEndpoint)
+	priorityCfgEndpoints := utils.NewSet(pprofileCfgEndpoint, fmonitorCfgEndpoint, faccessCfgEndpoint, sigstoreCfgEndpoint, registryCfgEndpoint)
 	if rc := restoreEPs(priorityCfgEndpoints, ch, &importInfo); rc != nil {
 		err = rc
 	}
