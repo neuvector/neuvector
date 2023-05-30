@@ -1567,15 +1567,19 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 		}
 	}
 
-	if clusterRoleErrors, k8sRbac403 = VerifyNvRbacRoles(k8sClusterRoles, existOnly); !k8sRbac403 {
+	if errs, k8sRbac403 = VerifyNvRbacRoles(k8sClusterRoles, existOnly); !k8sRbac403 {
+		clusterRoleErrors = errs
 		if errs, k8sRbac403 = VerifyNvRbacRoles(k8sRoles, existOnly); !k8sRbac403 {
 			roleErrors = append(roleErrors, errs...)
-			if clusterRoleBindingErrors, k8sRbac403 = VerifyNvRbacRoleBindings(k8sClusterRoleBindings, existOnly, true); !k8sRbac403 {
+			if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sClusterRoleBindings, existOnly, true); !k8sRbac403 {
+				clusterRoleBindingErrors = errs
 				if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sRoleBindings, existOnly, true); !k8sRbac403 && len(roleBindingErrors) > 0 {
 					roleBindingErrors = append(roleBindingErrors, errs...)
 				}
 			}
 		}
+	} else {
+		clusterRoleBindingErrors = errs
 	}
 
 	return clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors
