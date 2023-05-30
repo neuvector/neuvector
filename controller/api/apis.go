@@ -3477,14 +3477,14 @@ type RESTSelfApikeyData struct {
 }
 
 type REST_SigstoreRootOfTrust_GET struct {
-	Name           string                           `json:"name"`
-	IsPrivate      bool                             `json:"is_private"`
-	RekorPublicKey string                           `json:"rekor_public_key,omitempty"`
-	RootCert       string                           `json:"root_cert,omitempty"`
-	SCTPublicKey   string                           `json:"sct_public_key,omitempty"`
-	Verifiers      map[string]REST_SigstoreVerifier `json:"verifiers,omitempty"`
-	CfgType        string                           `json:"cfg_type"`
-	Comment        string                           `json:"comment"`
+	Name           string                  `json:"name"`
+	IsPrivate      bool                    `json:"is_private"`
+	RekorPublicKey string                  `json:"rekor_public_key,omitempty"`
+	RootCert       string                  `json:"root_cert,omitempty"`
+	SCTPublicKey   string                  `json:"sct_public_key,omitempty"`
+	Verifiers      []REST_SigstoreVerifier `json:"verifiers,omitempty"`
+	CfgType        string                  `json:"cfg_type"`
+	Comment        string                  `json:"comment"`
 }
 
 type REST_SigstoreRootOfTrust_POST struct {
@@ -3523,4 +3523,12 @@ type REST_SigstoreVerifier_PATCH struct {
 	CertIssuer   *string `json:"cert_issuer,omitempty"`
 	CertSubject  *string `json:"cert_subject,omitempty"`
 	Comment      *string `json:"comment,omitempty"`
+}
+
+type REST_SigstoreRootOfTrustCollection struct {
+	RootsOfTrust []REST_SigstoreRootOfTrust_GET `json:"roots_of_trust"`
+}
+
+type REST_SigstoreVerifierCollection struct {
+	Verifiers []REST_SigstoreVerifier `json:"verifiers"`
 }
