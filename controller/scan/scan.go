@@ -109,7 +109,7 @@ func countVuln(vuls []*share.ScanVulnerability, alives utils.Set) ([]string, []s
 
 			n, err := strconv.ParseInt(v.PublishedDate, 10, 64)
 			if err != nil {
-				// if vul's publish date is unavailable, treat it as 2 yeaars ago
+				// if vul's publish date is unavailable, treat it as 2 years ago
 				n = time.Now().UTC().AddDate(-2, 0, 0).Unix()
 			}
 

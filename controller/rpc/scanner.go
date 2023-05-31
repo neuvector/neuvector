@@ -14,26 +14,31 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 )
 
-var scanners map[string]*share.CLUSScanner = make(map[string]*share.CLUSScanner)
+type scannerAct struct {
+	scanner  *share.CLUSScanner
+	scanning uint32
+}
+
+var scanners map[string]*scannerAct = make(map[string]*scannerAct)
 var scanMutex sync.RWMutex
 
 func AddScanner(scanner *share.CLUSScanner) {
 	scanMutex.Lock()
 	defer scanMutex.Unlock()
-	scanners[scanner.ID] = scanner
+	scanners[scanner.ID] = &scannerAct{scanner: scanner}
 }
 
 func RemoveScanner(scannerID string) {
 	scanMutex.Lock()
-	scanner, ok := scanners[scannerID]
+	s, ok := scanners[scannerID]
 	if ok {
 		delete(scanners, scannerID)
 	}
 	scanMutex.Unlock()
 
 	// endpoint is also the key
-	if scanner != nil {
-		endpoint := getScannerEndpoint(scanner)
+	if s != nil {
+		endpoint := getScannerEndpoint(s.scanner)
 		cluster.DeleteGRPCClient(endpoint)
 	}
 }
@@ -46,10 +51,21 @@ func createScannerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
 	return share.NewScannerServiceClient(conn)
 }
 
-func getScannerServiceClient(sid string) (share.ScannerServiceClient, error) {
+func decScanningCount(sid string) {
 	scanMutex.RLock()
-	scanner, ok := scanners[sid]
-	scanMutex.RUnlock()
+	defer scanMutex.RUnlock()
+
+	s, ok := scanners[sid]
+	if ok && s.scanning > 0 {
+		s.scanning--
+	}
+}
+
+func getScannerServiceClient(sid string, forScan bool) (share.ScannerServiceClient, error) {
+	scanMutex.RLock()
+	defer scanMutex.RUnlock()
+
+	s, ok := scanners[sid]
 	if !ok {
 		err := fmt.Errorf("Scanner not found")
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
@@ -57,13 +73,16 @@ func getScannerServiceClient(sid string) (share.ScannerServiceClient, error) {
 	}
 
 	// endpoint is also the key
-	endpoint := getScannerEndpoint(scanner)
+	endpoint := getScannerEndpoint(s.scanner)
 	if cluster.GetGRPCClientEndpoint(endpoint) == "" {
 		cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper)
 	}
 
 	c, err := cluster.GetGRPCClient(endpoint, nil, nil)
 	if err == nil {
+		if forScan {
+			s.scanning++
+		}
 		return c.(share.ScannerServiceClient), nil
 	} else {
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error("Failed to connect to grpc server")
@@ -71,8 +90,44 @@ func getScannerServiceClient(sid string) (share.ScannerServiceClient, error) {
 	}
 }
 
+// scanner can handle multiple requests at a time. It's OK not to check then schedule without lock.
+func getAvaliableScanner() string {
+	var s *scannerAct
+
+	scanMutex.RLock()
+	defer scanMutex.RUnlock()
+
+	// first try to find the idle scanner
+	for _, s = range scanners {
+		if s.scanning == 0 {
+			return s.scanner.ID
+		}
+	}
+
+	// then locate any scanner
+	for _, s = range scanners {
+		return s.scanner.ID
+	}
+
+	return ""
+}
+
+func CountScanners() (busy, idle uint32) {
+	scanMutex.RLock()
+	defer scanMutex.RUnlock()
+
+	for _, s := range scanners {
+		if s.scanning > 0 {
+			busy++
+		} else {
+			idle++
+		}
+	}
+	return busy, idle
+}
+
 func Ping(scanner string, timeout time.Duration) error {
-	client, err := getScannerServiceClient(scanner)
+	client, err := getScannerServiceClient(scanner, false)
 	if err != nil {
 		return err
 	}
@@ -90,10 +145,11 @@ func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectTyp
 		return nil, fmt.Errorf("Cannot find enforcer endpoint")
 	}
 
-	client, err := getScannerServiceClient(scanner)
+	client, err := getScannerServiceClient(scanner, true)
 	if err != nil {
 		return nil, err
 	}
+	defer decScanningCount(scanner)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -108,25 +164,12 @@ func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectTyp
 	return result, err
 }
 
-/*
-func ScanImageData(scanner string, data *share.ScanData, timeout time.Duration) (*share.ScanResult, error) {
-	client, err := getScannerServiceClient()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return client.ScanImageData(ctx, data)
-}
-*/
-
 func ScanPlatform(scanner string, k8sVersion, ocVersion string, timeout time.Duration) (*share.ScanResult, error) {
-	client, err := getScannerServiceClient(scanner)
+	client, err := getScannerServiceClient(scanner, true)
 	if err != nil {
 		return nil, err
 	}
+	defer decScanningCount(scanner)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -172,26 +215,19 @@ func ScanPlatform(scanner string, k8sVersion, ocVersion string, timeout time.Dur
 func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest) (*share.ScanResult, error) {
 	if scanner == "" {
 		// This happens when called by ci/cd scan from the REST
-		var s *share.CLUSScanner
-		scanMutex.RLock()
-		for _, s = range scanners {
-			break
-		}
-		scanMutex.RUnlock()
-
-		if s == nil {
+		scanner = getAvaliableScanner()
+		if scanner == "" {
 			err := fmt.Errorf("No scanner available")
 			log.WithFields(log.Fields{"error": err}).Error()
 			return nil, err
 		}
-
-		scanner = s.ID
 	}
 
-	client, err := getScannerServiceClient(scanner)
+	client, err := getScannerServiceClient(scanner, true)
 	if err != nil {
 		return nil, err
 	}
+	defer decScanningCount(scanner)
 
 	result, err := client.ScanImage(ctx, req)
 	if err == nil {
@@ -208,24 +244,18 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 }
 
 func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.ScanResult, error) {
-	// locate the first scanner
-	var scanner *share.CLUSScanner
-	scanMutex.RLock()
-	for _, scanner = range scanners {
-		break
-	}
-	scanMutex.RUnlock()
-
-	if scanner == nil {
+	scanner := getAvaliableScanner()
+	if scanner == "" {
 		err := fmt.Errorf("No scanner available")
 		log.WithFields(log.Fields{"error": err}).Error()
 		return nil, err
 	}
 
-	client, err := getScannerServiceClient(scanner.ID)
+	client, err := getScannerServiceClient(scanner, true)
 	if err != nil {
 		return nil, err
 	}
+	defer decScanningCount(scanner)
 
 	req := &share.ScanAppRequest{
 		Packages: pkgs,
@@ -234,29 +264,15 @@ func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.Scan
 	result, err := client.ScanAppPackage(ctx, req)
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner.ID, share.ScanObjectType_SERVERLESS, result)
+	clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result)
 
 	return result, err
 }
 
 func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInput) (*share.ScanResult, error) {
-	// locate the first scanner
-	var scanner *share.CLUSScanner
-	scanMutex.RLock()
-	for _, scanner = range scanners {
-		break
-	}
-	scanMutex.RUnlock()
-
-	if scanner == nil {
+	scanner := getAvaliableScanner()
+	if scanner == "" {
 		err := fmt.Errorf("No scanner available")
-		log.WithFields(log.Fields{"error": err}).Error()
-		return nil, err
-	}
-
-	client, err := getScannerServiceClient(scanner.ID)
-	if err != nil {
-		err := fmt.Errorf("No scan client available")
 		log.WithFields(log.Fields{"error": err}).Error()
 		return nil, err
 	}
@@ -268,6 +284,14 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 		FuncLink:    funcInput.FuncLink,
 		ScanSecrets: true, // default: always
 	}
+
+	client, err := getScannerServiceClient(scanner, true)
+	if err != nil {
+		err := fmt.Errorf("No scan client available")
+		log.WithFields(log.Fields{"error": err}).Error()
+		return nil, err
+	}
+	defer decScanningCount(scanner)
 
 	result, err := client.ScanAwsLambda(ctx, req)
 	if err != nil {
@@ -281,7 +305,7 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner.ID, share.ScanObjectType_SERVERLESS, result)
+	clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result)
 
 	return result, err
 }

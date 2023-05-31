@@ -158,6 +158,14 @@ func NewSetFromSliceKind(slice interface{}) Set {
 	return &a
 }
 
+func NewSetFromStringSlice(stringSlice []string) Set {
+	interfaceSlice := make([]interface{}, len(stringSlice))
+	for i := range stringSlice {
+		interfaceSlice[i] = stringSlice[i]
+	}
+	return NewSetFromSlice(interfaceSlice)
+}
+
 func NewSetFromSlice(s []interface{}) Set {
 	a := newThreadUnsafeSet()
 	for _, item := range s {

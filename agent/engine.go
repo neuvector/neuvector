@@ -2025,6 +2025,9 @@ func taskStopContainer(id string, pid int) {
 		log.WithFields(log.Fields{"id": id, "error": err}).Error("Failed to read container. Use cached info.")
 		info = c.info
 		info.Running = false
+	} else if info.Running {
+		// Wait for the updated container info
+		return
 	}
 
 	if info.FinishedAt.IsZero() {

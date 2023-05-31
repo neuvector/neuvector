@@ -1540,6 +1540,18 @@ func StartRESTServer() {
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
 	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
 
+	// Sigstore Configuration
+	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
+	r.POST("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustPost)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustGetByName)
+	r.PATCH("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustPatchByName)
+	r.DELETE("/v1/scan/sigstore/root_of_trust/:root_name", handlerSigstoreRootOfTrustDeleteByName)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name/verifier", handlerSigstoreVerifierGetAll)
+	r.POST("/v1/scan/sigstore/root_of_trust/:root_name/verifier", handlerSigstoreVerifierPost)
+	r.GET("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierGetByName)
+	r.PATCH("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierPatchByName)
+	r.DELETE("/v1/scan/sigstore/root_of_trust/:root_name/verifier/:verifier_name", handlerSigstoreVerifierDeleteByName)
+
 	// compliance
 	r.GET("/v1/compliance/asset", handlerAssetCompliance) // Skip API document
 	r.GET("/v1/bench/host/:id/docker", handlerDockerBench)
