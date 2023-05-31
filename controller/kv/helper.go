@@ -3010,7 +3010,7 @@ func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust []*share.CLUSSi
 	if err != nil && err.Error() != "Empty store" {
 		return nil, err
 	}
-	rootsOfTrust := make([]*share.CLUSSigstoreRootOfTrust, len(keys))
+	rootsOfTrust := []*share.CLUSSigstoreRootOfTrust{}
 	for _, key := range keys {
 		if ss := strings.Split(key, "/"); len(ss) != 4 {
 			continue
