@@ -297,7 +297,7 @@ func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust,
 		return nil, fmt.Errorf("could not retrieve roots of trust from kv store: %s", err.Error())
 	}
 
-	for key, clusRoot := range clusRootsOfTrust {
+	for _, clusRoot := range clusRootsOfTrust {
 		scanRoot := &share.SigstoreRootOfTrust{
 			Name:           clusRoot.Name,
 			RekorPublicKey: clusRoot.RekorPublicKey,
@@ -305,9 +305,9 @@ func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust,
 			SCTPublicKey:   clusRoot.SCTPublicKey,
 		}
 
-		verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(key)
+		verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRoot.Name)
 		if err != nil {
-			return scanReqRootsOfTrust, fmt.Errorf("could not retrieve verifiers for root \"%s\": %s", key, err.Error())
+			return scanReqRootsOfTrust, fmt.Errorf("could not retrieve verifiers for root \"%s\": %s", clusRoot.Name, err.Error())
 		}
 
 		for _, verifier := range verifiers {

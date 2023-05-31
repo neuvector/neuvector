@@ -100,9 +100,8 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 			return
 		}
-		resp.Verifiers = make(map[string]api.REST_SigstoreVerifier, len(verifiers))
-		for name, verifier := range verifiers {
-			resp.Verifiers[name] = CLUSVerifierToRESTVerifier(verifier)
+		for _, verifier := range verifiers {
+			resp.Verifiers = append(resp.Verifiers, CLUSVerifierToRESTVerifier(verifier))
 		}
 	}
 	restRespSuccess(w, r, resp, nil, nil, nil, fmt.Sprintf("Retrieved Sigstore Root Of Trust \"%s\"", rootName))
@@ -191,30 +190,31 @@ func handlerSigstoreRootOfTrustGetAll(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	rootsOfTrust, err := clusHelper.GetAllSigstoreRootsOfTrust()
+	clusRootsOfTrust, err := clusHelper.GetAllSigstoreRootsOfTrust()
 	if err != nil {
 		msg := fmt.Sprintf("could not retrieve sigstore roots of trust from kv store: %s", err.Error())
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 		return
 	}
 
-	resp := make(map[string]api.REST_SigstoreRootOfTrust_GET, len(rootsOfTrust))
-	for key, rootOfTrust := range rootsOfTrust {
-		restRootOfTrust := CLUSRootToRESTRoot_GET(rootOfTrust)
+	rootsOfTrust := []api.REST_SigstoreRootOfTrust_GET{}
+	for _, clusRootOfTrust := range clusRootsOfTrust {
+		rootOfTrust := CLUSRootToRESTRoot_GET(clusRootOfTrust)
 		if withVerifiers(r) {
-			verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(key)
+			verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRootOfTrust.Name)
 			if err != nil {
-				msg := fmt.Sprintf("could not retrieve verifiers for root \"%s\": %s", key, err.Error())
+				msg := fmt.Sprintf("could not retrieve verifiers for root \"%s\": %s", clusRootOfTrust.Name, err.Error())
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 				return
 			}
-			restRootOfTrust.Verifiers = make(map[string]api.REST_SigstoreVerifier, len(verifiers))
-			for name, verifier := range verifiers {
-				restRootOfTrust.Verifiers[name] = CLUSVerifierToRESTVerifier(verifier)
+			for _, verifier := range verifiers {
+				rootOfTrust.Verifiers = append(rootOfTrust.Verifiers, CLUSVerifierToRESTVerifier(verifier))
 			}
 		}
-		resp[key] = restRootOfTrust
+		rootsOfTrust = append(rootsOfTrust, rootOfTrust)
 	}
+
+	resp := api.REST_SigstoreRootOfTrustCollection{RootsOfTrust: rootsOfTrust}
 	restRespSuccess(w, r, &resp, nil, nil, nil, "Get all sigstore roots of trust")
 }
 
@@ -393,16 +393,16 @@ func handlerSigstoreVerifierGetAll(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	rootName := ps.ByName("root_name")
-	verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(rootName)
+	clusVerifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(rootName)
 	if err != nil {
 		msg := fmt.Sprintf("could not retrieve sigstore verifiers from kv store for root \"%s\": %s", rootName, err.Error())
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, msg)
 		return
 	}
 
-	resp := make(map[string]api.REST_SigstoreVerifier, len(verifiers))
-	for key, verifier := range verifiers {
-		resp[key] = CLUSVerifierToRESTVerifier(verifier)
+	resp := api.REST_SigstoreVerifierCollection{}
+	for _, clusVerifier := range clusVerifiers {
+		resp.Verifiers = append(resp.Verifiers, CLUSVerifierToRESTVerifier(clusVerifier))
 	}
 	restRespSuccess(w, r, &resp, nil, nil, nil, "Get all sigstore verifiers")
 }

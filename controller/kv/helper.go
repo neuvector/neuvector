@@ -284,12 +284,12 @@ type ClusterHelper interface {
 	UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error)
 	DeleteSigstoreRootOfTrust(rootName string) error
-	GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error)
+	GetAllSigstoreRootsOfTrust() (rootOfTrust []*share.CLUSSigstoreRootOfTrust, err error)
 	CreateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact) error
 	UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error)
 	DeleteSigstoreVerifier(rootName string, verifierName string) error
-	GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error)
+	GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -3005,12 +3005,12 @@ func (m clusterHelper) DeleteSigstoreRootOfTrust(rootName string) error {
 	return cluster.DeleteTree(rootKey)
 }
 
-func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*share.CLUSSigstoreRootOfTrust, err error) {
+func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust []*share.CLUSSigstoreRootOfTrust, err error) {
 	keys, err := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust)
 	if err != nil && err.Error() != "Empty store" {
 		return nil, err
 	}
-	rootsOfTrust := make(map[string]*share.CLUSSigstoreRootOfTrust, len(keys))
+	rootsOfTrust := make([]*share.CLUSSigstoreRootOfTrust, len(keys))
 	for _, key := range keys {
 		if ss := strings.Split(key, "/"); len(ss) != 4 {
 			continue
@@ -3019,11 +3019,12 @@ func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust map[string]*sha
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve all roots of trust, error retrieving \"%s\": %s", key, err.Error())
 			}
-			rootsOfTrust[key] = &share.CLUSSigstoreRootOfTrust{}
-			err = json.Unmarshal(value, rootsOfTrust[key])
+			rootOfTrust := &share.CLUSSigstoreRootOfTrust{}
+			err = json.Unmarshal(value, rootOfTrust)
 			if err != nil {
 				return nil, err
 			}
+			rootsOfTrust = append(rootsOfTrust, rootOfTrust)
 		}
 	}
 	return rootsOfTrust, nil
@@ -3115,7 +3116,7 @@ func (m clusterHelper) DeleteSigstoreVerifier(rootName string, verifierName stri
 	return cluster.Delete(verifierKey)
 }
 
-func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) (map[string]*share.CLUSSigstoreVerifier, error) {
+func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error) {
 	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
 		return nil, fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
@@ -3123,7 +3124,7 @@ func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) (map[stri
 	if err != nil && err.Error() != "Empty store" {
 		return nil, err
 	}
-	verifiers := make(map[string]*share.CLUSSigstoreVerifier, len(keys))
+	verifiers := []*share.CLUSSigstoreVerifier{}
 	for _, key := range keys {
 		if ss := strings.Split(key, "/"); len(ss) != 5 {
 			continue
@@ -3132,11 +3133,12 @@ func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) (map[stri
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve all verifiers, error retrieving \"%s\": %s", key, err.Error())
 			}
-			verifiers[key] = &share.CLUSSigstoreVerifier{}
-			err = json.Unmarshal(value, verifiers[key])
+			verifier := &share.CLUSSigstoreVerifier{}
+			err = json.Unmarshal(value, verifier)
 			if err != nil {
 				return nil, err
 			}
+			verifiers = append(verifiers, verifier)
 		}
 	}
 	return verifiers, nil
