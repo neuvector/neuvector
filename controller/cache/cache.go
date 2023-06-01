@@ -197,6 +197,7 @@ type Context struct {
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
+	K8sResLog                *log.Logger
 	CspType                  share.TCspType
 	CtrlerVersion            string
 	NvSemanticVersion        string
@@ -1768,7 +1769,7 @@ func startWorkerThread(ctx *Context) {
 					}
 				}
 			case ev := <-cctx.OrchChan:
-				log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Event received")
+				cctx.K8sResLog.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Event received")
 				if shouldExit() {
 					break
 				}

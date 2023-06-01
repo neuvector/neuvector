@@ -58,6 +58,7 @@ var cacher cache.CacheInterface
 var scanner scan.ScanInterface
 var orchConnector orchConnInterface
 var timerWheel *utils.TimerWheel
+var k8sResLog *log.Logger
 
 const statsInterval uint32 = 5
 const controllerStartGapThreshold = time.Duration(time.Minute * 2)
@@ -214,6 +215,11 @@ func main() {
 	mutexLog.Level = log.InfoLevel
 	mutexLog.Formatter = &utils.LogFormatter{Module: "CTL"}
 
+	k8sResLog = log.New()
+	k8sResLog.Out = os.Stdout
+	k8sResLog.Level = log.InfoLevel
+	k8sResLog.Formatter = &utils.LogFormatter{Module: "CTL"}
+
 	log.WithFields(log.Fields{"version": Version}).Info("START")
 
 	// bootstrap := flag.Bool("b", false, "Bootstrap cluster")
@@ -246,6 +252,7 @@ func main() {
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 		scanLog.SetLevel(log.DebugLevel)
+		k8sResLog.SetLevel(log.DebugLevel)
 		ctrlEnv.debugCPath = true
 	}
 	if *join != "" {
@@ -621,6 +628,7 @@ func main() {
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
+		K8sResLog:                k8sResLog,
 		CspType:                  cspType,
 		CspPauseInterval:         *cspPauseInterval,
 		CtrlerVersion:            Version,
