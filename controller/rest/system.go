@@ -270,6 +270,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 	if scope == share.ScopeFed {
 		resp.FedConfig = fedConf
 	} else if scope == share.ScopeLocal || scope == share.ScopeAll {
+		_, rconf.CspType = common.GetMappedCspType(nil, &cctx.CspType)
 		if scope == share.ScopeAll && fedConf != nil && len(fedConf.Webhooks) > 0 {
 			rconf.Webhooks = append(fedConf.Webhooks, rconf.Webhooks...)
 		}
@@ -304,6 +305,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						MonitorServiceMesh: rconf.MonitorServiceMesh,
 						XffEnabled:         rconf.XffEnabled,
 						NoTelemetryReport:  rconf.NoTelemetryReport,
+						CspType:            rconf.CspType,
 					},
 					Webhooks: rconf.Webhooks,
 					Proxy: api.RESTSystemConfigProxyV2{
@@ -333,17 +335,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
-			if scope == share.ScopeLocal || scope == share.ScopeAll {
-				_, strCspType := common.GetMappedCspType(nil, &cctx.CspType)
-				respV2.Config.Misc.CspType = strCspType
-			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
 		} else {
 			resp.Config = rconf
 		}
 	}
-
 	restRespSuccess(w, r, resp, acc, login, nil, "Get system configuration")
 }
 

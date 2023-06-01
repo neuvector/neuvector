@@ -49,7 +49,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 
 	switch rt {
 	case resource.RscTypeRBAC:
-		log.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
+		k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
 		var rbac *resource.RBAC
 		if old != nil {
 			rbac = old.(*resource.RBAC)
@@ -58,7 +58,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 		}
 		rest.KickLoginSessionsForRoleChange(rbac.Name, rbac.Domain)
 	case resource.RscTypeImage:
-		log.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
+		k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
 		if event == resource.WatchEventDelete {
 			// Force new resource to nil to indicate the deletion
 			ev := resource.Event{ResourceType: rt, Event: event, ResourceOld: old, ResourceNew: nil}
@@ -70,7 +70,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 	case resource.RscTypeCrd:
 
 		if event == resource.WatchEventDelete {
-			log.WithFields(log.Fields{"xsun event": event, "xsun type": rt, "xsun object": res, "xsun old object": old}).Debug("Event received")
+			k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res, "old object": old}).Debug("Event received")
 			nvCrdInfo := map[string]*resource.NvCrdInfo{
 				resource.NvSecurityRuleName: &resource.NvCrdInfo{
 					LockKey:   share.CLUSLockPolicyKey,
@@ -96,21 +96,21 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 			if crd, ok := res.(*apiextv1b1.CustomResourceDefinition); ok {
 				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
 					if event == resource.WatchEventDelete {
-						log.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
+						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
 						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey, nil)
 					}
 				}
 			} else if crd, ok := res.(*apiextv1.CustomResourceDefinition); ok {
 				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
 					if event == resource.WatchEventDelete {
-						log.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
+						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
 						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey, nil)
 					}
 				}
 			}
 		}
 	default:
-		log.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
+		k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
 		if event == resource.WatchEventDelete {
 			// Force new resource to nil to indicate the deletion
 			ev := resource.Event{ResourceType: rt, Event: event, ResourceOld: old, ResourceNew: nil}
@@ -121,7 +121,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 		}
 	}
 
-	log.WithFields(log.Fields{"event": event, "type": rt}).Debug("Event done")
+	k8sResLog.WithFields(log.Fields{"event": event, "type": rt}).Debug("Event done")
 }
 
 func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {

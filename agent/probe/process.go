@@ -563,7 +563,7 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 				} else {
 					// no valid rootPid: it could be a "flash" container, delete it
 					// for example: "docker run ubuntu echo 123"
-					log.WithFields(log.Fields{"pid": pid}).Info("PROC: orphan container")
+					mLog.WithFields(log.Fields{"pid": pid}).Trace("PROC: orphan container")
 				}
 			}
 		}
@@ -2295,9 +2295,16 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 		return false
 	}
 
+	// the parent name is not ready
+	if proc.pname == "" {
+		proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
+	}
 
 	bRtProc := global.RT.IsRuntimeProcess(proc.name, nil)
 	bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+	if proc.pname == "" {
+		bRtProcP = true		// not trace-able
+	}
 
 	// both names are in the runtime list
 	if bRtProc && bRtProcP {
