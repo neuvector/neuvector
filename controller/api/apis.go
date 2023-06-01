@@ -1811,6 +1811,7 @@ type RESTSystemConfig struct {
 	ModeAutoM2PDuration       int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
+	CspType                   string                    `json:"csp_type"`
 }
 
 type RESTSystemConfigData struct {

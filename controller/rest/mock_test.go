@@ -29,6 +29,8 @@ type mockResponseWriter struct {
 	body   []byte
 }
 
+var ctx Context
+
 func (m *mockResponseWriter) Header() (h http.Header) {
 	return http.Header{}
 }
@@ -501,6 +503,7 @@ func preTest() {
 }
 
 func initTest() {
+	cctx = &ctx
 	localDev = &common.LocalDevice{
 		Host:   &share.CLUSHost{ID: "h1"},
 		Ctrler: &share.CLUSController{CLUSDevice: share.CLUSDevice{ID: "c1"}},
