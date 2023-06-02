@@ -1188,11 +1188,9 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		c.blocking = parent.blocking
 		c.quar = parent.quar
 		if parent.pid == 0 {
-			//in taskInterceptContainer there is logic for parent to
-			//reach this function first, child come later so set child
-			//hasDatapath=parent.hasDatapath, set parent.hasDatapath=false
-			//to prevent duplicate child/ep to be pushed to dp
-			c.hasDatapath = parent.hasDatapath
+			//NVSHAS-7830, multiple children exist, some may not be runnig
+			//when parent pid=0, need to set all child hasDatapath to true
+			c.hasDatapath = true
 			parent.hasDatapath = false
 		}
 	}
@@ -2025,6 +2023,9 @@ func taskStopContainer(id string, pid int) {
 		log.WithFields(log.Fields{"id": id, "error": err}).Error("Failed to read container. Use cached info.")
 		info = c.info
 		info.Running = false
+	} else if info.Running {
+		// Wait for the updated container info
+		return
 	}
 
 	if info.FinishedAt.IsZero() {

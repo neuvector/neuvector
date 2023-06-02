@@ -8026,7 +8026,14 @@ definitions:
         type: array
         items:
           type: string
-          example: "{\"all\"}"
+          enum:
+            - cpath
+            - conn
+            - mutex
+            - scan
+            - cluster
+            - k8s_monitor
+        example: ["scan", "k8s_monitor"]
       monitor_service_mesh:
         type: boolean
         example: true
@@ -10108,7 +10115,17 @@ definitions:
         type: array
         items:
           type: string
-          example: all
+          enum:
+            - cpath
+            - conn
+            - mutex
+            - scan
+            - cluster
+            - k8s_monitor
+        example: ["cpath", "scan", "k8s_monitor"]
+      csp_type:
+        type: string
+        example: aws
       monitor_service_mesh:
         type: boolean
         example: true
@@ -10229,7 +10246,17 @@ definitions:
         type: array
         items:
           type: string
-          example: all
+          enum:
+            - cpath
+            - conn
+            - mutex
+            - scan
+            - cluster
+            - k8s_monitor
+        example: ["scan", "k8s_monitor"]
+      csp_type:
+        type: string
+        example: aws
       monitor_service_mesh:
         type: boolean
         example: true
@@ -10475,7 +10502,14 @@ definitions:
         type: array
         items:
           type: string
-          example: all
+          enum:
+            - cpath
+            - conn
+            - mutex
+            - scan
+            - cluster
+            - k8s_monitor
+        example: ["cpath", "scan", "k8s_monitor"]
       monitor_service_mesh:
         type: boolean
         example: true

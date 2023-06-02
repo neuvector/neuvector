@@ -3,9 +3,11 @@ package rest
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -71,6 +73,17 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 	} else {
 		resp = resource.GetCspConfig()
+	}
+
+	if len(resp.CspErrors) > 0 || resp.NvError != "" {
+		var errors []string
+		if resp.NvError != "" {
+			errors = append(resp.CspErrors, resp.NvError)
+		} else {
+			errors = resp.CspErrors
+		}
+		errHeader := base64.StdEncoding.EncodeToString([]byte(strings.Join(errors, "\n")))
+		w.Header().Set("X-Nv-Csp-Adapter-Errors", errHeader)
 	}
 	if err != nil || resp.CspConfigData == "" || resp.CspConfigData == "{}" {
 		log.WithFields(log.Fields{"error": err, "cspConfig": resp.CspConfigData}).Error("no data")
