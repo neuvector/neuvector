@@ -54,6 +54,8 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 						if tExpire, err = time.Parse("2006-01-02T15:04:05.000000-07:00", resp.ExpireTime); err == nil {
 							if cspConfig.BillingApiAccessOk && tExpire.After(now) {
 								resp.Compliant = true
+							} else {
+								err = fmt.Errorf("Billing data expired on %s", resp.ExpireTime)
 							}
 						}
 					}
@@ -61,7 +63,7 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 			}
 		}
 	}
-	if err != nil {
+	if err != nil || len(resp.CspErrors) > 0 {
 		resp.NvError = err.Error()
 		log.WithFields(log.Fields{"compliant": resp.Compliant, "nvError": resp.NvError, "cspErrors": resp.CspErrors}).Error()
 	}
