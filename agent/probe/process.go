@@ -563,7 +563,7 @@ func (p *Probe) removeProcessInContainer(pid int, id string) {
 				} else {
 					// no valid rootPid: it could be a "flash" container, delete it
 					// for example: "docker run ubuntu echo 123"
-					log.WithFields(log.Fields{"pid": pid}).Info("PROC: orphan container")
+					mLog.WithFields(log.Fields{"pid": pid}).Trace("PROC: orphan container")
 				}
 			}
 		}

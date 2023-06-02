@@ -63,7 +63,7 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 }
 
 func setControllerDebug(debug []string, debugCPath bool) {
-	var hasCPath, hasConn, hasMutex, hasScan, hasCluster bool
+	var hasCPath, hasConn, hasMutex, hasScan, hasCluster, hasK8sMonitor bool
 
 	for _, d := range debug {
 		switch d {
@@ -77,6 +77,8 @@ func setControllerDebug(debug []string, debugCPath bool) {
 			hasScan = true
 		case "cluster":
 			hasCluster = true
+		case "k8s_monitor":
+			hasK8sMonitor = true
 		}
 	}
 	if debugCPath || hasCPath {
@@ -103,6 +105,11 @@ func setControllerDebug(debug []string, debugCPath bool) {
 		cluster.SetLogLevel(log.DebugLevel)
 	} else {
 		cluster.SetLogLevel(log.InfoLevel)
+	}
+	if hasK8sMonitor {
+		cctx.K8sResLog.Level = log.DebugLevel
+	} else {
+		cctx.K8sResLog.Level = log.InfoLevel
 	}
 }
 
