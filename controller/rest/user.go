@@ -1243,8 +1243,8 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	case api.ApikeyExpireOneYear:
 		apikey.ExpirationTimestamp = now.AddDate(1, 0, 0).UTC().Unix()
 	case api.ApikeyExpireCustomHour:
-		if rapikey.ExpirationHours == 0 {
-			e := "invalid expiration hour value"
+		if rapikey.ExpirationHours == 0 || rapikey.ExpirationHours > 8760 {
+			e := "invalid expiration hour value (1 ~ 8760)"
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
