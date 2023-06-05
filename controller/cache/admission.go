@@ -1323,7 +1323,11 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyImageScanned:
 			met, positive = isStringCriterionMet(crt, strconv.FormatBool(scannedImage.Scanned))
 		case share.CriteriaKeyImageSigned:
-			met, positive = isStringCriterionMet(crt, strconv.FormatBool(scannedImage.Signed))
+			imageSigned := false
+			if len(scannedImage.Verifiers) > 0 {
+				imageSigned = true
+			}
+			met, positive = isStringCriterionMet(crt, strconv.FormatBool(imageSigned))
 		case share.CriteriaKeyRunAsPrivileged:
 			met, positive = isStringCriterionMet(crt, strconv.FormatBool(c.Privileged))
 		case share.CriteriaKeyRunAsRoot:
