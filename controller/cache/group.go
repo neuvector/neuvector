@@ -1816,6 +1816,7 @@ func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 		Domain:          gc.group.Domain,
 		PlatformRole:    gc.group.PlatformRole,
 		BaselineProfile: gc.group.BaselineProfile,
+		Comment:         gc.group.Comment,
 	}
 	if withCap {
 		sv.CapChgMode = &gc.capChgMode
