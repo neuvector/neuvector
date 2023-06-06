@@ -40,7 +40,9 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 	}
 
 	if rootOfTrust.IsPrivate {
-		if rootOfTrust.RekorPublicKey == "" && rootOfTrust.RootCert == "" && rootOfTrust.SCTPublicKey == "" {
+		// for private root of trust, RekorPublicKey/SCTPublicKey are optional
+		// a root of trust is public when RootCert/RekorPublicKey/SCTPublicKey are all empty
+		if rootOfTrust.RootCert == "" {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "empty keys")
 			return
 		}
@@ -139,7 +141,8 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 	}
 
 	updateCLUSRoot(clusRootOfTrust, &restRootOfTrust)
-	if clusRootOfTrust.IsPrivate && clusRootOfTrust.RekorPublicKey == "" && clusRootOfTrust.RootCert == "" && clusRootOfTrust.SCTPublicKey == "" {
+	// for private root of trust, RekorPublicKey/SCTPublicKey are optional
+	if clusRootOfTrust.IsPrivate && clusRootOfTrust.RootCert == "" {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "empty keys")
 		return
 	}
@@ -462,10 +465,6 @@ func validateCLUSVerifier(verifier *share.CLUSSigstoreVerifier) error {
 }
 
 func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.REST_SigstoreRootOfTrust_PATCH) {
-	if updates.IsPrivate != nil {
-		clusRoot.IsPrivate = *updates.IsPrivate
-	}
-
 	if clusRoot.IsPrivate {
 		if updates.RekorPublicKey != nil {
 			clusRoot.RekorPublicKey = *updates.RekorPublicKey
