@@ -421,7 +421,6 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: scanner")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
-		// scanner cores :  wildcard
 		{"monitor", "/usr/local/bin/monitor"},
 		{"scanner", "/usr/local/bin/scanner"},
 		{"scannerTask", "/usr/local/bin/scannerTask"},
@@ -445,7 +444,6 @@ func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: csp")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
-		// scanner cores :  wildcard
 		{"csp-billing-ada", "*"},
 		{"ldconfig", "/sbin/ldconfig"},
 		{"python3", "/usr/bin/*"},
@@ -456,6 +454,27 @@ func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},
+
+		// k8s or openshift environment
+		{"pause", "/pause"},     // k8s, pause
+		{"pod", "/usr/bin/pod"}, // openshift, pod
+		{"mount", "*"},          // k8s volume plug-in
+	}
+
+	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
+}
+
+func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProfile {
+	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: registry adapter")
+	var whtLst []ProcProfileBrief = []ProcProfileBrief{
+		/////////////////////////////////
+		{"adapter", "/usr/local/bin/adapter"},
+
+		// tools
+		{"ps", "*"},
+		{"lsof", "*"},
+		{"sh", "*"},
+		{"ls", "*"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -580,9 +599,9 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
-		{"cut", "/usr/bin/cut"},
-		{"awk", "/usr/bin/awk"},
-		{"tr", "/usr/bin/tr"},
+		{"cut", "*"},
+		{"awk", "*"},
+		{"tr", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -663,9 +682,9 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"grep", "*"},           // CIS bench tests
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
-		{"cut", "/usr/bin/cut"},
-		{"awk", "/usr/bin/awk"},
-		{"tr", "/usr/bin/tr"},
+		{"cut", "*"},
+		{"awk", "*"},
+		{"tr", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -690,6 +709,8 @@ func (e *Engine) InsertNeuvectorProcessProfilePolicy(group, role string) {
 		profile = buildAllowAllProfile(group)
 	case "csp":
 		profile = buildCspProfileList(group)
+	case "registry-adapter":
+		profile = buildRegistryAdapterProfileList(group)
 	}
 
 	// now, we use minimum policy for other neuvector containers

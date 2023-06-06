@@ -244,6 +244,8 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 		entryPtSig = "/usr/local/bin/fetcher"
 	case "csp":
 		entryPtSig = "/usr/bin/csp-billing-adapter"
+	case "registry-adapter":
+		entryPtSig = "/usr/local/bin/adapter"
 	default:
 		//	log.WithFields(log.Fields{"invalid role": role}).Debug("PROC:")
 		return false // exclude others
