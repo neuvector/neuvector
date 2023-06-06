@@ -213,6 +213,19 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 
+		if len(sizeErrMsg) == 0 && ar.Request.Operation == admissionv1beta1.Create && ar.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
+			var admCtrlSecRule resource.NvAdmCtrlSecurityRule
+			if err := json.Unmarshal(ar.Request.Object.Raw, &admCtrlSecRule); err == nil {
+				name := ""
+				if admCtrlSecRule.Metadata.Name != nil {
+					name = *admCtrlSecRule.Metadata.Name
+				}
+				if name != share.ScopeLocal {
+					sizeErrMsg = fmt.Sprintf("CRD resource metadata name(%s) is not allowed", name)
+				}
+			}
+		}
+
 		var skip bool
 		var allowed bool
 		var resultMsg string

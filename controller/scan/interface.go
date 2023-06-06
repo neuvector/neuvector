@@ -559,6 +559,11 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			for i, m := range c.modules {
 				rrpt.Modules[i] = scanUtils.ScanModule2REST(m)
 			}
+
+			rrpt.Verifiers = make([]string, len(c.verifiers))
+			for i, v := range c.verifiers {
+				rrpt.Verifiers[i] = v
+			}
 		}
 	}
 

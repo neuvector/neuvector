@@ -71,6 +71,7 @@ type scanInfo struct {
 	filteredTime    time.Time
 	idns            []api.RESTIDName
 	modules         []*share.ScanModule
+	verifiers       []string
 }
 
 type scanTaskInfo struct {
@@ -476,6 +477,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
 		info.modules = report.Modules
+		info.verifiers = report.Verifiers
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)

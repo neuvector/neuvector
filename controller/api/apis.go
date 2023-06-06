@@ -1811,6 +1811,7 @@ type RESTSystemConfig struct {
 	ModeAutoM2PDuration       int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
+	CspType                   string                    `json:"csp_type"`
 }
 
 type RESTSystemConfigData struct {
@@ -3497,7 +3498,6 @@ type REST_SigstoreRootOfTrust_POST struct {
 }
 
 type REST_SigstoreRootOfTrust_PATCH struct {
-	IsPrivate      *bool   `json:"is_private,omitempty"`
 	RekorPublicKey *string `json:"rekor_public_key,omitempty"`
 	RootCert       *string `json:"root_cert,omitempty"`
 	SCTPublicKey   *string `json:"sct_public_key,omitempty"`

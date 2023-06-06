@@ -1535,12 +1535,22 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 		// updater cronjob is found
 		if errs, _ := VerifyNvRbacRoleBindings([]string{NvAdminRoleBinding}, existOnly, false); len(errs) > 0 {
 			// access denied for reading rolebinding resources, rolebinding neuvector-admin is not found or it's incorrectly configured
-			if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); !k8sRbac403 && len(errs) > 0 {
-				// rolebinding neuvector-binding-scanner is not found or it's incorrectly configured
-				roleBindingErrors = append(roleBindingErrors, errs...)
+			if errs, k8sRbac403 := VerifyNvRbacRoleBindings([]string{NvScannerRoleBinding}, existOnly, true); len(errs) > 0 {
+				if !k8sRbac403 {
+					// rolebinding neuvector-binding-scanner is not found or it's incorrectly configured
+					roleBindingErrors = errs
+				} else {
+					// 403 error reading k8s rolebinding means clusterrolebinding "neuvector-binding-rbac" is incorrect
+					clusterRoleBindingErrors = errs
+				}
 			}
-			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly); !k8sRbac403 && len(errs) > 0 {
-				roleErrors = append(roleErrors, errs...)
+			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly); len(errs) > 0 {
+				if !k8sRbac403 {
+					roleErrors = errs
+				} else if len(clusterRoleBindingErrors) == 0 {
+					// 403 error reading k8s role means clusterrolebinding "neuvector-binding-rbac" is incorrect
+					clusterRoleBindingErrors = errs
+				}
 			}
 		}
 	}
@@ -1568,17 +1578,27 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	}
 
 	if errs, k8sRbac403 = VerifyNvRbacRoles(k8sClusterRoles, existOnly); !k8sRbac403 {
-		clusterRoleErrors = errs
+		clusterRoleErrors = append(clusterRoleErrors, errs...)
 		if errs, k8sRbac403 = VerifyNvRbacRoles(k8sRoles, existOnly); !k8sRbac403 {
 			roleErrors = append(roleErrors, errs...)
 			if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sClusterRoleBindings, existOnly, true); !k8sRbac403 {
-				clusterRoleBindingErrors = errs
-				if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sRoleBindings, existOnly, true); !k8sRbac403 && len(roleBindingErrors) > 0 {
+				clusterRoleBindingErrors = append(clusterRoleBindingErrors, errs...)
+				if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sRoleBindings, existOnly, true); !k8sRbac403 {
 					roleBindingErrors = append(roleBindingErrors, errs...)
+				} else if len(errs) > 0 && len(clusterRoleBindingErrors) == 0 {
+					// 403 error reading k8s rolebinding means clusterrolebinding "neuvector-binding-rbac" is incorrect
+					clusterRoleBindingErrors = errs
 				}
+			} else if len(errs) > 0 && len(clusterRoleBindingErrors) == 0 {
+				// 403 error reading k8s clusterrolebinding means clusterrolebinding "neuvector-binding-rbac" is incorrect
+				clusterRoleBindingErrors = errs
 			}
+		} else if len(errs) > 0 && len(clusterRoleBindingErrors) == 0 {
+			// 403 error reading k8s role means clusterrolebinding "neuvector-binding-rbac" is incorrect
+			clusterRoleBindingErrors = errs
 		}
-	} else {
+	} else if len(errs) > 0 && len(clusterRoleBindingErrors) == 0 {
+		// 403 error reading k8s clusterrole means clusterrolebinding "neuvector-binding-rbac" is incorrect
 		clusterRoleBindingErrors = errs
 	}
 

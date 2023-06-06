@@ -244,6 +244,8 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 		entryPtSig = "/usr/local/bin/fetcher"
 	case "csp":
 		entryPtSig = "/usr/bin/csp-billing-adapter"
+	case "registry-adapter":
+		entryPtSig = "/usr/local/bin/adapter"
 	default:
 		//	log.WithFields(log.Fields{"invalid role": role}).Debug("PROC:")
 		return false // exclude others
@@ -1188,11 +1190,9 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		c.blocking = parent.blocking
 		c.quar = parent.quar
 		if parent.pid == 0 {
-			//in taskInterceptContainer there is logic for parent to
-			//reach this function first, child come later so set child
-			//hasDatapath=parent.hasDatapath, set parent.hasDatapath=false
-			//to prevent duplicate child/ep to be pushed to dp
-			c.hasDatapath = parent.hasDatapath
+			//NVSHAS-7830, multiple children exist, some may not be runnig
+			//when parent pid=0, need to set all child hasDatapath to true
+			c.hasDatapath = true
 			parent.hasDatapath = false
 		}
 	}

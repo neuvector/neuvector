@@ -339,13 +339,13 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
-			},
+			},*/
 			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
-			},*/
+			},
 			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
@@ -538,13 +538,13 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
-			},
+			},*/
 			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
-			},*/
+			},
 			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
