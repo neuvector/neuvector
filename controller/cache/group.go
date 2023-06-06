@@ -349,7 +349,9 @@ func isNeuvectorContainerGroup(group string) bool {
 				name == "nv.neuvector-scanner-pod" ||
 				name == "nv.neuvector-controller-pod" ||
 				name == "nv.neuvector-enforcer-pod" ||
-				name == "nv.neuvector-updater-pod" {
+				name == "nv.neuvector-updater-pod" ||
+				name == "nv.neuvector-csp-pod" ||
+				name == "nv.neuvector-registry-adapter-pod" {
 				return true
 			}
 		}
@@ -1923,7 +1925,7 @@ func (m CacheMethod) GetService(name string, view string, withCap bool, acc *acc
 }
 
 func isNeuvectorContainerName(name string) bool {
-	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner)-pod`, name); err == nil {
+	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner|csp|registry-adapter)-pod`, name); err == nil {
 		return matched
 	}
 	return false
