@@ -1806,7 +1806,13 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 
 	p.printProcReport(id, proc)
 	// p.evaluateRuncTrigger(id, proc)
-	riskyReported := (proc.reported & (suspicReported | profileReported)) != 0 // could be reported as profile/risky event
+
+	// NVSHAS-6729 -- setting riskyReported to false. In some scenarios, the process can have another incident
+	// but because this flag (riskyReported) is only to the process and NOT per incident, we can actually hide
+	// a new incident under the previous one. By setting this to false, we make sure to treat it each time the
+	// function is called and issue an alert for all incidents.
+	//riskyReported := (proc.reported & (suspicReported | profileReported)) != 0 // could be reported as profile/risky event
+	riskyReported := false
 
 	// use the executable as the name
 	proc.name = strings.TrimSpace(proc.name)
@@ -1878,8 +1884,10 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	}
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
-	// it has not been reported as a profile/risky event
-	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
+	// NVSHAS-6729 -- setting riskyReported to false.
+	//riskyReported = (proc.reported & (suspicReported | profileReported)) != 0 // check that incident has not been reported
+	riskyReported = false
+
 	if risky && !riskyReported {
 		riskInfo := suspicProcMap[proc.riskType]
 		if riskInfo == nil {
