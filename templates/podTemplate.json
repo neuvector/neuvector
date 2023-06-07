@@ -155,6 +155,16 @@
             "localhostProfile": "localhostProfileValue"
           }
         },
+        "resources": {
+          "limits": {
+            "memory": "memoryLimitValue",
+            "cpu": "cpuLimitValue"
+          },
+          "requests": {
+            "memory": "memoryRequestValue",
+            "cpu": "cpuRequestValue"
+          }
+        },
         "stdin": true,
         "stdinOnce": true,
         "tty": true
@@ -309,6 +319,16 @@
           "seccompProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
+          }
+        },
+        "resources": {
+          "limits": {
+            "memory": "memoryLimitValue",
+            "cpu": "cpuLimitValue"
+          },
+          "requests": {
+            "memory": "memoryRequestValue",
+            "cpu": "cpuRequestValue"
           }
         },
         "stdin": true,
