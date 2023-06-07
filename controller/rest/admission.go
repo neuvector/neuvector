@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -101,6 +102,15 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 				return fmt.Errorf("Invalid criterion value: %s", crt.Value)
 			}
 			continue
+		}
+
+		if crt.Op == share.CriteriaOpRegexContainsAny || crt.Op == share.CriteriaOpRegexNotContainsAny {
+			for _, value := range strings.Split(crt.Value, ",") {
+				value = strings.TrimSpace(value)
+				if _, err := regexp.Compile(value); err != nil {
+					return fmt.Errorf("Invalid criterion value for regex operator: %s", crt.Value)
+				}
+			}
 		}
 
 		if option, exist := options[crt.Name]; exist {
