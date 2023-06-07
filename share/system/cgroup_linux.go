@@ -521,7 +521,11 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
+			// NVSHAS-7990 - I changed this to debug level because this error will spam the logs when there is a
+			// legitimate error. On some systems, the cgroup directory isn't filled so there is nothing we can do
+			// about it. But it will spam the logs with errors unfortunately.
+			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Debug(
+				"Could not find memory stats file")
 			return nil
 		}
 		return err
