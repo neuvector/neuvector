@@ -2026,8 +2026,12 @@ func taskStopContainer(id string, pid int) {
 		info = c.info
 		info.Running = false
 	} else if info.Running {
-		// Wait for the updated container info
-		return
+		if osutil.IsPidValid(info.Pid) && info.FinishedAt.IsZero() {
+			// Wait for the updated container info
+			// log.WithFields(log.Fields{"info": info}).Debug()
+			return
+		}
+		info.Running = false	// update
 	}
 
 	if info.FinishedAt.IsZero() {
