@@ -195,9 +195,12 @@ func updateAgentStats(cpuSystem uint64) {
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
-		mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-		cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
+		// NVSHAS 7990 - Pause is not useful to track stats for and had a setup that threw a ton of file not found errs
+		if c.name != "pause" {
+			mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
+			cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+			system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
+		}
 	}
 }
 
