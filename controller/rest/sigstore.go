@@ -9,6 +9,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	log "github.com/sirupsen/logrus"
 )
@@ -65,7 +66,11 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 	err = clusHelper.CreateSigstoreRootOfTrust(&clusRootOfTrust, nil)
 	if err != nil {
 		msg := fmt.Sprintf("could not save root of trust to kv store: %s", err.Error())
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		if err == common.ErrObjectExists {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, msg)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		}
 		return
 	}
 
@@ -88,11 +93,15 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 	rootName := ps.ByName("root_name")
 	rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		}
 		return
-	}
-	if rootOfTrust == nil {
+	} else if rootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		return
 	}
 	resp := CLUSRootToRESTRoot_GET(rootOfTrust)
 	if withVerifiers(r) {
@@ -124,11 +133,15 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 	rootName := ps.ByName("root_name")
 	clusRootOfTrust, rev, err := clusHelper.GetSigstoreRootOfTrust(rootName)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		}
 		return
-	}
-	if clusRootOfTrust == nil {
+	} else if clusRootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		return
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -150,7 +163,7 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 	err = clusHelper.UpdateSigstoreRootOfTrust(clusRootOfTrust, nil, rev)
 	if err != nil {
 		msg := fmt.Sprintf("could not save root of trust to kv store: %s", err.Error())
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
 		return
 	}
 
@@ -173,8 +186,12 @@ func handlerSigstoreRootOfTrustDeleteByName(w http.ResponseWriter, r *http.Reque
 	rootName := ps.ByName("root_name")
 	err := clusHelper.DeleteSigstoreRootOfTrust(rootName)
 	if err != nil {
-		msg := fmt.Sprintf("could not delete root of trust \"%s\" from kv store: %s", rootName, err.Error())
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			msg := fmt.Sprintf("could not delete root of trust \"%s\" from kv store: %s", rootName, err.Error())
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		}
 		return
 	}
 	msg := fmt.Sprintf("Deleted root of trust \"%s\"", rootName)
@@ -274,7 +291,11 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 	err = clusHelper.CreateSigstoreVerifier(ps.ByName("root_name"), &clusVerifier, nil)
 	if err != nil {
 		msg := fmt.Sprintf("could not save verifier to kv store: %s", err.Error())
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
+		if err == common.ErrObjectExists {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, msg)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		}
 		return
 	}
 
@@ -298,11 +319,15 @@ func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps
 	verifierName := ps.ByName("verifier_name")
 	verifier, _, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		}
 		return
-	}
-	if verifier == nil {
+	} else if verifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		return
 	}
 	resp := CLUSVerifierToRESTVerifier(verifier)
 	restRespSuccess(w, r, resp, nil, nil, nil, fmt.Sprintf("Retrieved Sigstore Verifier \"%s/%s\"", rootName, verifierName))
@@ -324,11 +349,15 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 	verifierName := ps.ByName("verifier_name")
 	clusVerifier, rev, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+		}
 		return
-	}
-	if clusVerifier == nil {
+	} else if clusVerifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		return
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -351,7 +380,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 	err = clusHelper.UpdateSigstoreVerifier(rootName, clusVerifier, nil, rev)
 	if err != nil {
 		msg := fmt.Sprintf("could not save verifier to kv store: %s", err.Error())
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
 		return
 	}
 
@@ -375,8 +404,12 @@ func handlerSigstoreVerifierDeleteByName(w http.ResponseWriter, r *http.Request,
 	verifierName := ps.ByName("verifier_name")
 	err := clusHelper.DeleteSigstoreVerifier(rootName, verifierName)
 	if err != nil {
-		msg := fmt.Sprintf("could not delete verifier \"%s/%s\" from kv store: %s", rootName, verifierName, err.Error())
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		if err == common.ErrObjectNotFound {
+			restRespError(w, http.StatusNotFound, api.RESTErrNotFound)
+		} else {
+			msg := fmt.Sprintf("could not delete verifier \"%s/%s\" from kv store: %s", rootName, verifierName, err.Error())
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		}
 		return
 	}
 	msg := fmt.Sprintf("Deleted root of trust \"%s/%s\"", rootName, verifierName)
