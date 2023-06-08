@@ -20,6 +20,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -35,7 +36,6 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
-	mathrand "math/rand"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/simpleuuid"
@@ -1057,6 +1057,7 @@ func EncryptURLSafe(password string) string {
 // with the device for it's parent.  If they are the same, it's not a mountpoint, if they're
 // different, it is.
 var reProcessRootPath = regexp.MustCompile("/proc/\\d+/root/")
+
 func IsMountPoint(path string) bool {
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -1069,7 +1070,7 @@ func IsMountPoint(path string) bool {
 		// take the first matched
 		rootPath = rpath[0:indexes[1]] // container scope
 	} else {
-		rootPath = rpath + ".."  // relative: compare its upper folder
+		rootPath = rpath + ".." // relative: compare its upper folder
 	}
 	rootStat, err := os.Lstat(rootPath)
 	if err != nil {
