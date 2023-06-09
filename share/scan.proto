@@ -133,6 +133,8 @@ message ScanResult {
     ScanProvider Provider = 23;
     int64 Size = 24;
     repeated string Verifiers = 25;
+    ScanErrorCode SignatureVerificationError = 26;
+    string SignatureVerificationTimestamp = 27;
 }
 
 message ScanRunningRequest {
