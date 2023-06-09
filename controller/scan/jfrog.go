@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/registry"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -331,7 +332,7 @@ func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*sc
 		}
 		repo = subRepo
 	}
-	rinfo, errCode := rc.GetImageInfo(ctx, repo, tag)
+	rinfo, errCode := rc.GetImageInfo(ctx, repo, tag, registry.ManifestRequest_Default)
 	return rinfo, errCode
 }
 

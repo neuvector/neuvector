@@ -56,10 +56,10 @@ type SignatureData struct {
 	Payloads map[string]string `json:"Payloads"`
 }
 
-func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*ImageInfo, share.ScanErrorCode) {
+func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
 	var imageInfo ImageInfo
 
-	dg, body, err := rc.ManifestRequest(ctx, name, tag, 2)
+	dg, body, err := rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
 	if err == nil {
 		// check if response is manifest list
 		var ml manifestList.DeserializedManifestList
@@ -82,7 +82,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 			dg = tag
 			log.WithFields(log.Fields{"os": ml.Manifests[0].Platform.OS, "arch": ml.Manifests[0].Platform.Architecture, "tag": tag}).Debug("manifest list")
 
-			_, body, err = rc.ManifestRequest(ctx, name, tag, 2)
+			_, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
 		}
 	}
 
@@ -234,7 +234,7 @@ func GetCosignSignatureTagFromDigest(digest string) string {
 // https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
 func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, errCode share.ScanErrorCode) {
 	signatureTag := GetCosignSignatureTagFromDigest(digest)
-	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag)
+	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag, registry.ManifestRequest_CosignSignature)
 	if errCode != share.ScanErrorCode_ScanErrNone {
 		return SignatureData{}, errCode
 	}

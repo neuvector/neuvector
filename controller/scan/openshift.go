@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/registry"
 )
 
 const unusedAccount string = "UNUSED"
@@ -147,7 +148,7 @@ func (r *openshift) GetImageMeta(ctx context.Context, domain, repo, tag string) 
 		return nil, share.ScanErrorCode_ScanErrContainerAPI
 	}
 
-	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag)
+	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag, registry.ManifestRequest_Default)
 
 	if errCode == share.ScanErrorCode_ScanErrNone {
 		ibMutex.Lock()
