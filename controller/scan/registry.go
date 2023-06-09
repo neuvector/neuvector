@@ -806,6 +806,10 @@ func (rs *Registry) getScanImages(sctx *scanContext, drv registryDriver, dryrun 
 					continue
 				}
 
+				if info.IsSignatureImage {
+					continue
+				}
+
 				image := share.CLUSImage{Domain: itf.Domain, Repo: itf.Repo, Tag: tag, RegMod: itf.RegMod}
 				if exist, ok := imageMap[info.ID]; ok {
 					exist.Add(image)
@@ -1362,6 +1366,10 @@ func (rs *Registry) scheduleScanImages(
 
 			total++
 			newImage := false
+
+			if info.IsSignatureImage {
+				continue
+			}
 
 			// Add to the map to be returned
 			image := share.CLUSImage{Domain: itf.Domain, Repo: itf.Repo, Tag: tag, RegMod: itf.RegMod}
