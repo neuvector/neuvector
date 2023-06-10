@@ -47,11 +47,11 @@ const NvWafSecurityRuleListKind = "NvWafSecurityRuleList"
 const NvWafSecurityRuleSingular = "nvwafsecurityrule"
 
 // csp billing adapter
-const NvCspUsageName = "neuvectorusagerecords.neuvector.com"
-const NvCspUsagePlural = "neuvectorusagerecords"
-const NvCspUsageKind = "NeuvectorUsageRecord" // CR kind
-const NvCspUsageListKind = "NeuvectorUsageRecordList"
-const NvCspUsageSingular = "neuvectorusagerecord"
+const NvCspUsageName = "cspadapterusagerecords.susecloud.net"
+const NvCspUsagePlural = "cspadapterusagerecords"
+const NvCspUsageKind = "CspAdapterUsageRecord" // CR kind
+const NvCspUsageListKind = "CspAdapterUsageRecordList"
+const NvCspUsageSingular = "cspadapterusagerecord"
 
 type NvCrdAdmCtrlRule struct {
 	ID       uint32                      `json:"id"`        // only set for default rules

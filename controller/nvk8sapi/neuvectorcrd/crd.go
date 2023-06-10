@@ -1337,15 +1337,15 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 				RscType:           resource.RscTypeCrdNvCspUsage,
 				MetaName:          resource.NvCspUsageName,
 				SpecScope:         resource.NvClusterSecurityRuleScope,
-				SpecGroup:         common.OEMClusterSecurityRuleGroup,
-				SpecVersion:       resource.NvCrdV1,
+				SpecGroup:         "susecloud.net",
+				SpecVersion:       "v1",
 				SpecNamesPlural:   resource.NvCspUsagePlural,
 				SpecNamesKind:     resource.NvCspUsageKind,
 				SpecNamesSingular: resource.NvCspUsageSingular,
 				SpecNamesListKind: resource.NvCspUsageListKind,
 				LockKey:           "",
 				KvCrdKind:         resource.NvCspUsageKind,
-				ShortNames:        []string{"nur"},
+				ShortNames:        []string{"caur"},
 			},
 		}
 		nvCrdInfo = append(nvCrdInfo, nvCrdInfoBasic...)
