@@ -130,7 +130,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	} else if strings.Contains(err.Error(), " 404 ") {
 		if addOnly {
 			kind := resource.NvCspUsageKind
-			apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvCrdV1)
+			apiVersion := "susecloud.net/v1"
 			crCspUsage := &resource.NvCspUsage{
 				Kind:       &kind,
 				ApiVersion: &apiVersion,
