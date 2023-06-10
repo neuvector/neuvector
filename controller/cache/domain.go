@@ -36,13 +36,16 @@ func domainAdd(name string, labels map[string]string) {
 	accReadAll := access.NewReaderAccessControl()
 	retry := 0
 	for retry < retryClusterMax {
+		var prev *uint64
 		cd, rev, _ := clusHelper.GetDomain(name, accReadAll)
 		if cd == nil {
 			cd = initDomain(name, labels)
+		} else {
+			prev = &rev
 		}
 		cd.Labels = labels
-		if err := clusHelper.PutDomain(cd, rev); err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+		if err := clusHelper.PutDomain(cd, prev); err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			break
@@ -84,7 +87,7 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		}
 		domainMutex.Unlock()
 
-		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
+		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels) {
 			domainChange(domain)
 		}
 		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
@@ -231,7 +234,8 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 	return domains, tagPerDomain
 }
 
-const PruneGroupDelay time.Duration = time.Minute*time.Duration(1)
+const PruneGroupDelay time.Duration = time.Minute * time.Duration(1)
+
 func pruneGroupsByNamespace() {
 	domains := utils.NewSet()
 	now := time.Now()
@@ -254,15 +258,15 @@ func pruneGroupsByNamespace() {
 		var groups []string
 		log.WithFields(log.Fields{"domains": domains}).Debug()
 
-	/*
-		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
-		if err != nil {
-			// wait for next turn
-			log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-			return
-		}
-		defer clusHelper.ReleaseLock(lock)
-	*/
+		/*
+			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
+			if err != nil {
+				// wait for next turn
+				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+				return
+			}
+			defer clusHelper.ReleaseLock(lock)
+		*/
 
 		cacheMutexRLock()
 		for name, groupCache := range groupCacheMap {
