@@ -259,13 +259,16 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyUser,
-				Ops:      setOps1,
+				Name: share.CriteriaKeyUser,
+				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyK8sGroups,
-				Ops:      allSetOps,
+				Name: share.CriteriaKeyK8sGroups,
+				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
+					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{
@@ -467,13 +470,16 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyUser,
-				Ops:      setOps1,
+				Name: share.CriteriaKeyUser,
+				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyK8sGroups,
-				Ops:      allSetOps,
+				Name: share.CriteriaKeyK8sGroups,
+				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
+					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{

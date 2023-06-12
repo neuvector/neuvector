@@ -165,7 +165,6 @@ func flushEventQueue() {
 	cacher.FlushAdmCtrlStats()
 }
 
-///
 type localSystemInfo struct {
 	mutex sync.Mutex
 	stats share.ContainerStats
@@ -594,6 +593,11 @@ func main() {
 	// orchConnector should be created before LeadChangeCb is registered.
 	orchObjChan := make(chan *resource.Event, 32)
 	orchScanChan := make(chan *resource.Event, 16)
+
+	if strings.HasSuffix(*teleNeuvectorEP, "apikeytest") {
+		rest.TESTApikeySpecifiedCretionTime = true
+		*teleNeuvectorEP = ""
+	}
 
 	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
 		var ver share.CLUSCtrlVersion

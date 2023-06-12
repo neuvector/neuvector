@@ -509,11 +509,12 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"lsof", "*"},
 		{"sh", "*"},
 		{"cat", "*"},                     // k8s readiness and openshift operations
+		{"grep", "*"},                    // monitor
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
 		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},
+		{"netstat", "/bin/busybox"},     // monitor
 		{"touch", "/bin/busybox"},       // detect container layer on the AUFS
 		{"teardown.sh", "/bin/busybox"}, // monitor tool
 
@@ -572,10 +573,11 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
 		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},
+		{"netstat", "/bin/busybox"},      // monitor
 		{"touch", "/bin/busybox"},        // detect container layer on the AUFS
 		{"configure.sh", "/bin/busybox"}, // monitor tool
 		{"teardown.sh", "/bin/busybox"},  // monitor tool
+		{"nproc", "/bin/busybox"},        // dp
 
 		// below entries for debug purpose : docker exec -ti allinone sh
 		{"ip", "/sbin/ip"},
@@ -596,7 +598,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"},           // CIS bench tests
+		{"grep", "*"},           // monitor, CIS bench tests
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
 		{"cut", "*"},
@@ -653,13 +655,14 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
 		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},
+		{"netstat", "/bin/busybox"},      // monitor
 		{"touch", "/bin/busybox"},        // detect container layer on the AUFS
 		{"uname", "/bin/busybox"},        // cli
 		{"which", "/bin/busybox"},        // cli
 		{"configure.sh", "/bin/busybox"}, // monitor tool
 		{"teardown.sh", "/bin/busybox"},  // monitor tool
 		{"stty", "/bin/busybox"},         // python3.9
+		{"nproc", "/bin/busybox"},        // dp
 
 		// below entries for debug purpose : docker exec -ti allinone sh
 		{"ip", "/sbin/ip"},
@@ -679,7 +682,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"},           // CIS bench tests
+		{"grep", "*"},           // monitor, CIS bench tests
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
 		{"cut", "*"},

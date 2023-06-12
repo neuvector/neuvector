@@ -128,6 +128,7 @@ type kubernetes struct {
 
 	k8sVer, ocVer string
 	sys           *system.SystemTools
+	envParser     *utils.EnvironParser
 }
 
 func getVersion(tag string, verToGet int, useToken bool) (string, error) {
@@ -465,6 +466,14 @@ func (d *kubernetes) GetPlatformRole(m *container.ContainerMeta) (string, bool) 
 	vpodns, _ := m.Labels[container.KubeKeyPodNamespace]
 	vcname, _ := m.Labels[container.KubeKeyContainerName]
 	podname, _ := m.Labels[container.KubeKeyPodName]
+
+	svc := d.GetService(m, "")
+	svcName := utils.MakeServiceName(svc.Domain, svc.Name)
+	for _, r := range d.envParser.GetSystemGroups() {
+		if r.MatchString(svcName) {
+			return container.PlatformContainerKubeInfra, false
+		}
+	}
 
 	if vpodns == container.KubeNamespaceSystem {
 		if vcname == container.KubeContainerNamePod {
