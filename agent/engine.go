@@ -2026,6 +2026,10 @@ func taskStopContainer(id string, pid int) {
 		info = c.info
 		info.Running = false
 	} else if info.Running {
+		// docker will have a catchup event to show its Exit code
+		if global.RT.String() == container.RuntimeDocker {
+			return
+		}
 		if osutil.IsPidValid(info.Pid) && info.FinishedAt.IsZero() {
 			// Wait for the updated container info
 			// log.WithFields(log.Fields{"info": info}).Debug()
