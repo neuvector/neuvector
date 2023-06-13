@@ -3420,6 +3420,7 @@ type RESTAdminCriteriaTemplate struct {
 
 const (
 	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneHour    string = "onehour"
 	ApikeyExpireOneDay     string = "oneday"
 	ApikeyExpireOneMonth   string = "onemonth"
 	ApikeyExpireOneYear    string = "oneyear"
