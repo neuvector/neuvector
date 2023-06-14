@@ -367,6 +367,13 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 		// for example, in upgrade case, the group will be created. This is to remove the group as we see it.
 		if isNeuvectorContainerGroup(group.Name) {
+			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+				return
+			}
+			defer clusHelper.ReleaseLock(lock)
+
 			kv.DeletePolicyByGroup(group.Name)
 			kv.DeleteResponseRuleByGroup(group.Name)
 			clusHelper.DeleteGroup(group.Name)
@@ -582,41 +589,6 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 		}
 	}
 
-	// Remove all rules that use the group
-	dels := utils.NewSet()
-	keeps := make([]*share.CLUSRuleHead, 0)
-
-	crhs := clusHelper.GetPolicyRuleList()
-	for _, crh := range crhs {
-		if cr, _ := clusHelper.GetPolicyRule(crh.ID); cr != nil {
-			//if cr.From == gname || cr.To == gname {
-			if (cr.CfgType != share.GroundCfg) && (gname == cr.From || gname == cr.To) {
-				// To be deleted if it's not crd policies. crd policies can only be deleted thru k8s
-				dels.Add(crh.ID)
-			} else {
-				keeps = append(keeps, crh)
-			}
-		}
-	}
-
-	// Write updated rules to the cluster
-	if dels.Cardinality() > 0 {
-		txn := cluster.Transact()
-		defer txn.Close()
-
-		clusHelper.PutPolicyRuleListTxn(txn, keeps)
-		for id := range dels.Iter() {
-			clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
-		}
-		if ok, err := txn.Apply(); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
-			return
-		} else if !ok {
-			log.Error("Atomic write failed")
-			return
-		}
-	}
-	//leave delete group related rule outside of lock
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
@@ -624,6 +596,47 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
+	//NVSHAS-7003, deleteServiceIPGroup hold lock for too long
+	//because when we delete service ip group we also delete related policy.
+	//In k8s there are really no policy can be learned related to service ip,
+	//so we can omit this part for k8s platform, we only delete related policy
+	//for oc platform
+	if !policyApplyIngress {
+		// Remove all rules that use the group
+		dels := utils.NewSet()
+		keeps := make([]*share.CLUSRuleHead, 0)
+
+		crhs := clusHelper.GetPolicyRuleList()
+		for _, crh := range crhs {
+			if cr, _ := clusHelper.GetPolicyRule(crh.ID); cr != nil {
+				//if cr.From == gname || cr.To == gname {
+				if (cr.CfgType != share.GroundCfg) && (gname == cr.From || gname == cr.To) {
+					// To be deleted if it's not crd policies. crd policies can only be deleted thru k8s
+					dels.Add(crh.ID)
+				} else {
+					keeps = append(keeps, crh)
+				}
+			}
+		}
+
+		// Write updated rules to the cluster
+		if dels.Cardinality() > 0 {
+			txn := cluster.Transact()
+			defer txn.Close()
+
+			clusHelper.PutPolicyRuleListTxn(txn, keeps)
+			for id := range dels.Iter() {
+				clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+			}
+			if ok, err := txn.Apply(); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("")
+				return
+			} else if !ok {
+				log.Error("Atomic write failed")
+				return
+			}
+		}
+	}
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
 		clusHelper.DeleteGroup(gname)
@@ -992,14 +1005,10 @@ func (p *groupRemovalEvent) Expire() {
 		//always reset task whether group
 		//is really deleted or not
 		cache.timerTask = ""
-		deleted := deleteGroupFromCluster(p.groupname)
 		cacheMutexUnlock()
+		deleted := deleteGroupFromCluster(p.groupname)
 
-		//leave delete policy by group outside any lock
-		//so that not to hold lock too long
 		if deleted {
-			kv.DeletePolicyByGroup(p.groupname)
-			kv.DeleteResponseRuleByGroup(p.groupname)
 			groupRemoveEvent(share.CLUSEvGroupAutoRemove, p.groupname)
 		}
 	} else {
@@ -1033,6 +1042,10 @@ func deleteGroupFromCluster(groupname string) bool {
 			return false
 		}
 	}
+	//needs to execute delete function inside lock
+	//to keep the integrity of policy ruleHeads
+	kv.DeletePolicyByGroup(groupname)
+	kv.DeleteResponseRuleByGroup(groupname)
 	return true
 }
 

@@ -273,6 +273,13 @@ func pruneGroupsByNamespace() {
 		cacheMutexRUnlock()
 
 		if len(groups) > 0 {
+			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+				return
+			}
+			defer clusHelper.ReleaseLock(lock)
+
 			log.WithFields(log.Fields{"groups": groups}).Debug()
 			for _, name := range groups {
 				kv.DeletePolicyByGroup(name)
