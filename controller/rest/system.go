@@ -202,7 +202,7 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 		summary.Controllers = cacher.GetControllerCount(acc)
 		summary.Agents = cacher.GetAgentCount(acc, "")
 		summary.OfflineAgents = cacher.GetAgentCount(acc, api.StateOffline)
-		summary.Scanners = cacher.GetScannerCount(acc)
+		summary.Scanners, _, _ = cacher.GetScannerCount(acc)
 		summary.CompoVersions = cacher.GetComponentVersions(acc)
 	}
 	summary.Workloads, summary.RunningWorkloads, summary.RunningPods = cacher.GetWorkloadCount(accSysConfig)

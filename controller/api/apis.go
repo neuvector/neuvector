@@ -3420,6 +3420,7 @@ type RESTAdminCriteriaTemplate struct {
 
 const (
 	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneHour    string = "onehour"
 	ApikeyExpireOneDay     string = "oneday"
 	ApikeyExpireOneMonth   string = "onemonth"
 	ApikeyExpireOneYear    string = "oneyear"
@@ -3498,7 +3499,6 @@ type REST_SigstoreRootOfTrust_POST struct {
 }
 
 type REST_SigstoreRootOfTrust_PATCH struct {
-	IsPrivate      *bool   `json:"is_private,omitempty"`
 	RekorPublicKey *string `json:"rekor_public_key,omitempty"`
 	RootCert       *string `json:"root_cert,omitempty"`
 	SCTPublicKey   *string `json:"sct_public_key,omitempty"`

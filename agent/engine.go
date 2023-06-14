@@ -244,6 +244,8 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 		entryPtSig = "/usr/local/bin/fetcher"
 	case "csp":
 		entryPtSig = "/usr/bin/csp-billing-adapter"
+	case "registry-adapter":
+		entryPtSig = "/usr/local/bin/adapter"
 	default:
 		//	log.WithFields(log.Fields{"invalid role": role}).Debug("PROC:")
 		return false // exclude others
@@ -2024,8 +2026,16 @@ func taskStopContainer(id string, pid int) {
 		info = c.info
 		info.Running = false
 	} else if info.Running {
-		// Wait for the updated container info
-		return
+		// docker will have a catchup event to show its Exit code
+		if global.RT.String() == container.RuntimeDocker {
+			return
+		}
+		if osutil.IsPidValid(info.Pid) && info.FinishedAt.IsZero() {
+			// Wait for the updated container info
+			// log.WithFields(log.Fields{"info": info}).Debug()
+			return
+		}
+		info.Running = false	// update
 	}
 
 	if info.FinishedAt.IsZero() {

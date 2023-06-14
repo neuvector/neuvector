@@ -12,6 +12,6 @@ LABEL name="enforcer" \
       release=${NV_TAG} \
       neuvector.image="neuvector/enforcer" \
       neuvector.role="enforcer" \
-	  neuvector.rev="git.xxxx"
+      neuvector.rev="git.xxxx"
 
 ENTRYPOINT ["/usr/local/bin/monitor", "-r"]

@@ -54,7 +54,7 @@ type ClusterHelper interface {
 	PutFedSystemConfigRev(conf *share.CLUSSystemConfig, rev uint64) error
 
 	GetDomain(name string, acc *access.AccessControl) (*share.CLUSDomain, uint64, error)
-	PutDomain(cd *share.CLUSDomain, rev uint64) error
+	PutDomain(cd *share.CLUSDomain, rev *uint64) error
 	PutDomainIfNotExist(cd *share.CLUSDomain) error
 	DeleteDomain(name string) error
 
@@ -644,10 +644,14 @@ func (m clusterHelper) PutDomainIfNotExist(domain *share.CLUSDomain) error {
 	return cluster.PutIfNotExist(key, value, true)
 }
 
-func (m clusterHelper) PutDomain(domain *share.CLUSDomain, rev uint64) error {
+func (m clusterHelper) PutDomain(domain *share.CLUSDomain, rev *uint64) error {
 	key := share.CLUSDomainKey(domain.Name)
 	value, _ := enc.Marshal(domain)
-	return cluster.PutRev(key, value, rev)
+	if rev == nil {
+		return cluster.Put(key, value)
+	} else {
+		return cluster.PutRev(key, value, *rev)
+	}
 }
 
 func (m clusterHelper) DeleteDomain(name string) error {

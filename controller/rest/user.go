@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -23,6 +24,8 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
 )
+
+var TESTApikeySpecifiedCretionTime bool
 
 // return (isWeak, pwdHistoryToKeep, profileBasic, message)
 func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile *share.CLUSPwdProfile) (bool, int, api.RESTPwdProfileBasic, string) {
@@ -1233,9 +1236,22 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// calculate expiration time
 	now := time.Now()
+	if TESTApikeySpecifiedCretionTime {
+		creation_timestamp := r.URL.Query().Get("creation_timestamp")
+		epochTimestamp, err := strconv.ParseInt(creation_timestamp, 10, 64)
+		if err != nil {
+			log.WithFields(log.Fields{"creation_timestamp": creation_timestamp, "err": err}).Debug("TESTApikeySpecifiedCretionTime failed")
+		} else {
+			apikey.CreatedTimestamp = epochTimestamp
+			now = time.Unix(epochTimestamp, 0)
+		}
+	}
+
 	switch rapikey.ExpirationType {
 	case api.ApikeyExpireNever:
 		apikey.ExpirationTimestamp = math.MaxInt64
+	case api.ApikeyExpireOneHour:
+		apikey.ExpirationTimestamp = now.Add(time.Duration(1) * time.Hour).UTC().Unix()
 	case api.ApikeyExpireOneDay:
 		apikey.ExpirationTimestamp = now.AddDate(0, 0, 1).UTC().Unix()
 	case api.ApikeyExpireOneMonth:

@@ -34,7 +34,14 @@ type ManifestInfo struct {
 	Labels         map[string]string
 }
 
-func (r *Registry) ManifestRequest(ctx context.Context, repository, reference string, schema int) (string, []byte, error) {
+type ManifestRequestType int
+
+const (
+	ManifestRequest_Default ManifestRequestType = iota
+	ManifestRequest_CosignSignature
+)
+
+func (r *Registry) ManifestRequest(ctx context.Context, repository, reference string, schema int, reqType ManifestRequestType) (string, []byte, error) {
 	url := r.url("/v2/%s/manifests/%s", repository, reference)
 	log.WithFields(log.Fields{"url": url, "repository": repository, "ref": reference, "schema": schema}).Debug()
 
@@ -46,6 +53,11 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 	retry := 0
 	withOCIManifest := false
 	withOCIIndex := false
+
+	if reqType == ManifestRequest_CosignSignature {
+		withOCIManifest = true
+	}
+
 	for retry < retryTimes {
 		req, err = http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
@@ -107,7 +119,7 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 }
 
 func (r *Registry) Manifest(ctx context.Context, repository, reference string) (*ManifestInfo, error) {
-	dg, body, err := r.ManifestRequest(ctx, repository, reference, 1)
+	dg, body, err := r.ManifestRequest(ctx, repository, reference, 1, ManifestRequest_Default)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +145,7 @@ func (r *Registry) Manifest(ctx context.Context, repository, reference string) (
 }
 
 func (r *Registry) ManifestV2(ctx context.Context, repository, reference string) (*manifestV2.DeserializedManifest, string, error) {
-	dg, body, err := r.ManifestRequest(ctx, repository, reference, 2)
+	dg, body, err := r.ManifestRequest(ctx, repository, reference, 2, ManifestRequest_Default)
 	if err != nil {
 		return nil, "", err
 	}

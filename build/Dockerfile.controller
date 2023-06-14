@@ -10,7 +10,7 @@ LABEL name="controller" \
       release=${NV_TAG} \
       neuvector.image="neuvector/controller" \
       neuvector.role="controller" \
-	  neuvector.rev="git.xxxx"
+      neuvector.rev="git.xxxx"
 
 
 ENTRYPOINT ["/usr/local/bin/monitor", "-c"]

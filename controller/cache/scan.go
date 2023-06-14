@@ -71,6 +71,7 @@ type scanInfo struct {
 	filteredTime    time.Time
 	idns            []api.RESTIDName
 	modules         []*share.ScanModule
+	verifiers       []string
 }
 
 type scanTaskInfo struct {
@@ -476,6 +477,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
 		info.modules = report.Modules
+		info.verifiers = report.Verifiers
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
@@ -510,11 +512,14 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	}
 }
 
-func (m CacheMethod) GetScannerCount(acc *access.AccessControl) int {
+func (m CacheMethod) GetScannerCount(acc *access.AccessControl) (int, string, string) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
+	sdb := scanUtils.GetScannerDB()
+	dbTime := sdb.CVEDBCreateTime
+	dbVers := sdb.CVEDBVersion
 	if acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) {
-		return len(scannerCacheMap)
+		return len(scannerCacheMap), dbTime, dbVers
 	} else {
 		var count int
 		for _, s := range scannerCacheMap {
@@ -523,7 +528,7 @@ func (m CacheMethod) GetScannerCount(acc *access.AccessControl) int {
 			}
 			count++
 		}
-		return count
+		return count, dbTime, dbVers
 	}
 }
 

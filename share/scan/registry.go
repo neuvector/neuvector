@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"strings"
@@ -18,6 +19,10 @@ import (
 	"github.com/neuvector/neuvector/share/scan/registry"
 )
 
+const MediaTypeCosign = "application/vnd.dev.cosign.simplesigning.v1+json"
+const QuayRegistryURL = "https://quay.io"
+const CosignSignatureTagSuffix = ".sig"
+
 type RegClient struct {
 	*registry.Registry
 }
@@ -32,18 +37,19 @@ func NewRegClient(url, token, username, password, proxy string, trace httptrace.
 }
 
 type ImageInfo struct {
-	Layers      []string
-	ID          string
-	Digest      string
-	Author      string
-	Signed      bool
-	RunAsRoot   bool
-	Envs        []string
-	Cmds        []string
-	Labels      map[string]string
-	Sizes       map[string]int64
-	RepoTags    []string
-	RawManifest []byte
+	Layers           []string
+	ID               string
+	Digest           string
+	Author           string
+	Signed           bool
+	RunAsRoot        bool
+	Envs             []string
+	Cmds             []string
+	Labels           map[string]string
+	Sizes            map[string]int64
+	RepoTags         []string
+	IsSignatureImage bool
+	RawManifest      []byte
 }
 
 // SignatureData represents signature image data retrieved from the registry to be
@@ -56,11 +62,75 @@ type SignatureData struct {
 	Payloads map[string]string `json:"Payloads"`
 }
 
-func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*ImageInfo, share.ScanErrorCode) {
-	var imageInfo ImageInfo
+func IsPotentialCosignSignatureTag(tag string) bool {
+	if len(tag) < len(CosignSignatureTagSuffix) {
+		return false
+	}
+	last4CharactersOfTag := tag[len(tag)-4:]
+	return last4CharactersOfTag == CosignSignatureTagSuffix
+}
 
-	dg, body, err := rc.ManifestRequest(ctx, name, tag, 2)
-	if err == nil {
+func IsQuayRegistry(rc *RegClient) bool {
+	return strings.EqualFold(rc.URL[:len(QuayRegistryURL)], QuayRegistryURL)
+}
+
+func BuildV2ImageInfo(dg string, body []byte) (imageInfo ImageInfo, parsedSchemaVersion int, err error) {
+	var manV2 manifestV2.Manifest
+	err = json.Unmarshal(body, &manV2)
+	if err != nil {
+		return ImageInfo{}, manV2.SchemaVersion, err
+	}
+	if manV2.SchemaVersion != 2 {
+		return ImageInfo{}, manV2.SchemaVersion, fmt.Errorf("unexpected manifest schema version: %d", manV2.SchemaVersion)
+	}
+	log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg}).Debug("v2 manifest request")
+	// use v2 config.Digest as repo id
+	imageInfo.ID = string(manV2.Config.Digest)
+	imageInfo.Digest = dg
+	if len(manV2.Layers) > 0 {
+		layerLen := len(manV2.Layers)
+		imageInfo.Layers = make([]string, layerLen)
+		imageInfo.Envs = make([]string, 0)
+		imageInfo.Cmds = make([]string, layerLen)
+		imageInfo.Labels = make(map[string]string, 0)
+		imageInfo.Sizes = make(map[string]int64, 0)
+		allLayersAreCosignPayloads := true
+		for i, des := range manV2.Layers {
+			// reverse the order for v2
+			imageInfo.Layers[layerLen-i-1] = string(des.Digest)
+			imageInfo.Sizes[string(des.Digest)] = des.Size
+			if des.MediaType != MediaTypeCosign {
+				allLayersAreCosignPayloads = false
+			}
+			// log.WithFields(log.Fields{"layer": string(des.Digest)}).Debug("v2 manifest request ====")
+		}
+		imageInfo.IsSignatureImage = allLayersAreCosignPayloads
+	}
+	return imageInfo, manV2.SchemaVersion, nil
+}
+
+func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
+	var imageInfo ImageInfo
+	var dg string
+	var body []byte
+	var err error
+	var isQuaySpecialCase = false
+
+	if IsPotentialCosignSignatureTag(tag) && IsQuayRegistry(rc) {
+		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, registry.ManifestRequest_CosignSignature)
+		if err == nil {
+			imageInfo, _, err = BuildV2ImageInfo(dg, body)
+			if err == nil {
+				isQuaySpecialCase = true
+			}
+		}
+	}
+
+	if !isQuaySpecialCase {
+		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
+	}
+
+	if err == nil && !isQuaySpecialCase {
 		// check if response is manifest list
 		var ml manifestList.DeserializedManifestList
 		if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
@@ -82,36 +152,16 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string) (*Image
 			dg = tag
 			log.WithFields(log.Fields{"os": ml.Manifests[0].Platform.OS, "arch": ml.Manifests[0].Platform.Architecture, "tag": tag}).Debug("manifest list")
 
-			_, body, err = rc.ManifestRequest(ctx, name, tag, 2)
+			_, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
 		}
 	}
 
 	// get schema v2 first
-	if err == nil {
-		// log.WithFields(log.Fields{"body": string(body[:])}).Info("=========")
-
-		var manV2 manifestV2.Manifest
-		if err = json.Unmarshal(body, &manV2); err == nil && manV2.SchemaVersion == 2 {
-			log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg}).Debug("v2 manifest request")
-			// use v2 config.Digest as repo id
-			imageInfo.ID = string(manV2.Config.Digest)
-			imageInfo.Digest = dg
-			if len(manV2.Layers) > 0 {
-				layerLen := len(manV2.Layers)
-				imageInfo.Layers = make([]string, layerLen)
-				imageInfo.Envs = make([]string, 0)
-				imageInfo.Cmds = make([]string, layerLen)
-				imageInfo.Labels = make(map[string]string, 0)
-				imageInfo.Sizes = make(map[string]int64, 0)
-				for i, des := range manV2.Layers {
-					// reverse the order for v2
-					imageInfo.Layers[layerLen-i-1] = string(des.Digest)
-					imageInfo.Sizes[string(des.Digest)] = des.Size
-					// log.WithFields(log.Fields{"layer": string(des.Digest)}).Debug("v2 manifest request ====")
-				}
-			}
-		} else {
-			log.WithFields(log.Fields{"error": err, "schema": manV2.SchemaVersion}).Debug("Failed to get manifest schema v2")
+	if err == nil && !isQuaySpecialCase {
+		var parsedSchemaVersion int
+		imageInfo, parsedSchemaVersion, err = BuildV2ImageInfo(dg, body)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
 		}
 	}
 
@@ -234,7 +284,7 @@ func GetCosignSignatureTagFromDigest(digest string) string {
 // https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
 func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, errCode share.ScanErrorCode) {
 	signatureTag := GetCosignSignatureTagFromDigest(digest)
-	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag)
+	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag, registry.ManifestRequest_CosignSignature)
 	if errCode != share.ScanErrorCode_ScanErrNone {
 		return SignatureData{}, errCode
 	}

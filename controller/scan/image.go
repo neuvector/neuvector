@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	registryUtils "github.com/neuvector/neuvector/share/scan/registry"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -261,11 +262,55 @@ func (r *base) GetAllImages() (map[share.CLUSImage][]string, error) {
 }
 
 func (r *base) GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode) {
-	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag)
+	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag, registryUtils.ManifestRequest_Default)
 	return rinfo, errCode
 }
 
+func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
+	clusRootsOfTrust, err := clusHelper.GetAllSigstoreRootsOfTrust()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sigstore roots of trust from kv store: %s", err.Error())
+	}
+
+	reqRootsOfTrust := []*share.SigstoreRootOfTrust{}
+	for _, clusRootOfTrust := range clusRootsOfTrust {
+		reqRootOfTrust := &share.SigstoreRootOfTrust{
+			Name:           clusRootOfTrust.Name,
+			RekorPublicKey: clusRootOfTrust.RekorPublicKey,
+			RootCert:       clusRootOfTrust.RootCert,
+			SCTPublicKey:   clusRootOfTrust.SCTPublicKey,
+		}
+
+		clusVerifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRootOfTrust.Name)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve verifiers for root \"%s\": %s", clusRootOfTrust.Name, err.Error())
+		}
+
+		for _, clusVerifier := range clusVerifiers {
+			reqVerifier := &share.SigstoreVerifier{
+				Name:       clusVerifier.Name,
+				Type:       clusVerifier.VerifierType,
+				IgnoreTLog: clusVerifier.IgnoreTLog,
+				IgnoreSCT:  clusVerifier.IgnoreSCT,
+			}
+			reqVerifier.KeypairOptions = &share.SigstoreKeypairOptions{
+				PublicKey: clusVerifier.PublicKey,
+			}
+			reqVerifier.KeylessOptions = &share.SigstoreKeylessOptions{
+				CertIssuer:  clusVerifier.CertIssuer,
+				CertSubject: clusVerifier.CertSubject,
+			}
+			reqRootOfTrust.Verifiers = append(reqRootOfTrust.Verifiers, reqVerifier)
+		}
+
+		reqRootsOfTrust = append(reqRootsOfTrust, reqRootOfTrust)
+	}
+
+	return reqRootsOfTrust, nil
+}
+
 func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult {
+	var result *share.ScanResult
 	req := &share.ScanImageRequest{
 		Registry:    r.regURL,
 		Username:    r.username,
@@ -276,7 +321,16 @@ func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, 
 		ScanLayers:  r.scanLayers,
 		ScanSecrets: r.scanSecrets,
 	}
-	result, err := rpc.ScanImage(scanner, ctx, req)
+	rootsOfTrust, err := makeSigstoreScanRequestObj()
+	if err != nil {
+		smd.scanLog.WithFields(log.Fields{"error": err}).Error()
+		result = &share.ScanResult{Error: share.ScanErrorCode_ScanErrArgument}
+		return result
+	}
+
+	req.RootsOfTrust = rootsOfTrust
+
+	result, err = rpc.ScanImage(scanner, ctx, req)
 	if result == nil || err != nil {
 		// rpc request not made
 		smd.scanLog.WithFields(log.Fields{"error": err}).Error()

@@ -1321,17 +1321,22 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			// STOP event is always sent. In case we miss it, we should handle the key deletion
 			if wl.Running {
 				log.WithFields(log.Fields{"NVcontainer": wl.Name}).Info("Add")
+				wlCache := &workloadCache{workload: &wl}
+				if pod, ok := wl.Labels[container.KubeKeyPodName]; ok {
+					wlCache.podName = pod
+				}
 				cacheMutexLock()
 				addrDeviceAdd(wl.ID, wl.Ifaces)
+				nvwlCacheMap[wl.ID] = wlCache
 				cacheMutexUnlock()
 
 				// Remove workload:x.x.x.x from the graph
-				wlCache := &workloadCache{workload: &wl}
 				connectWorkloadAdd(wl.ID, wlCache)
 			} else {
 				log.WithFields(log.Fields{"NVcontainer": wl.Name}).Info("Delete")
 				cacheMutexLock()
 				addrDeviceDelete(wl.ID, wl.Ifaces)
+				delete(nvwlCacheMap, wl.ID)
 				cacheMutexUnlock()
 			}
 			return

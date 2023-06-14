@@ -259,13 +259,16 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyUser,
-				Ops:      setOps1,
+				Name: share.CriteriaKeyUser,
+				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyK8sGroups,
-				Ops:      allSetOps,
+				Name: share.CriteriaKeyK8sGroups,
+				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
+					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{
@@ -339,13 +342,13 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
-			},
+			},*/
 			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
-			},*/
+			},
 			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
@@ -467,13 +470,16 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyUser,
-				Ops:      setOps1,
+				Name: share.CriteriaKeyUser,
+				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
-				Name:     share.CriteriaKeyK8sGroups,
-				Ops:      allSetOps,
+				Name: share.CriteriaKeyK8sGroups,
+				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
+					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{
@@ -538,13 +544,13 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
-			},
+			},*/
 			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
-			},*/
+			},
 			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},

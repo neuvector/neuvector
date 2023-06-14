@@ -166,6 +166,7 @@ var hostCacheMap map[string]*hostCache = make(map[string]*hostCache)         // 
 var k8sHostInfoMap map[string]*k8sHostCache = make(map[string]*k8sHostCache) // key is the host name seen by enforcer. only used in k8s/oc env
 var agentCacheMap map[string]*agentCache = make(map[string]*agentCache)
 var ctrlCacheMap map[string]*ctrlCache = make(map[string]*ctrlCache)
+var nvwlCacheMap map[string]*workloadCache = make(map[string]*workloadCache)
 var wlCacheMap map[string]*workloadCache = make(map[string]*workloadCache)
 var ipHostMap map[string]*hostDigest = make(map[string]*hostDigest)
 var tunnelHostMap map[string]string = make(map[string]string)
@@ -586,6 +587,15 @@ func getNvName(id string) *workloadNames {
 		return names
 	}
 
+	if cache, ok := nvwlCacheMap[id]; ok {
+		wl := cache.workload
+		names := &workloadNames{
+			name:   cache.podName,
+			domain: wl.Domain,
+			image:  wl.Image,
+		}
+		return names
+	}
 	return nil
 }
 
@@ -1843,16 +1853,18 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Namespace)
 					}
-					if n != nil {
-						// ignore neuvector domain
-						if n.Name != localDev.Ctrler.Domain {
-							domainAdd(n.Name, n.Labels)
-						} else {
-							// for the upgrade cas
-							domainDelete(n.Name)
+					if isLeader() {
+						if n != nil {
+							// ignore neuvector domain
+							if n.Name != localDev.Ctrler.Domain {
+								domainAdd(n.Name, n.Labels)
+							} else {
+								// for the upgrade cas
+								domainDelete(n.Name)
+							}
+						} else if o != nil {
+							domainDelete(o.Name)
 						}
-					} else if o != nil {
-						domainDelete(o.Name)
 					}
 					if n != nil {
 						if skip := atomic.LoadUint32(&nvDeployDeleted); skip == 0 && isLeader() && admission.IsNsSelectorSupported() {

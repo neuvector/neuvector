@@ -158,7 +158,8 @@ func initCache() {
 				}
 				for _, crt := range r.Criteria {
 					switch crt.Op {
-					case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
+					case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+						share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 						crt.ValueSlice = strings.Split(crt.Value, setDelim)
 						for i, value := range crt.ValueSlice {
 							crt.ValueSlice[i] = strings.TrimSpace(value)
@@ -508,8 +509,12 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			json.Unmarshal(value, &rule)
 			for _, crt := range rule.Criteria {
 				switch crt.Op {
-				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
+				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 					crt.ValueSlice = strings.Split(crt.Value, setDelim)
+					for i, value := range crt.ValueSlice {
+						crt.ValueSlice[i] = strings.TrimSpace(value)
+					}
 				}
 			}
 			if rule.RuleType == "" {
@@ -592,7 +597,8 @@ func isStringCriterionMet(crt *share.CLUSAdmRuleCriterion, value string) (bool, 
 	case share.CriteriaOpNotRegex:
 		matched, _ := regexp.MatchString(crt.Value, value)
 		return !matched, false
-	case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
+	case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+		share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 		valueSet := utils.NewSet(value)
 		return isSetCriterionMet(crt, valueSet)
 	default:
@@ -725,7 +731,8 @@ func isCveScoreCountCriterionMet(crt *share.CLUSAdmRuleCriterion, highVulInfo, m
 func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (bool, bool) {
 	if valueSet.Cardinality() > 0 {
 		switch crt.Op {
-		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny:
+		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
+			share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 			for _, crtValue := range crt.ValueSlice {
 				switch crt.Op {
 				case share.CriteriaOpContainsAll:
@@ -749,6 +756,18 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 					for value := range valueSet.Iter() {
 						if share.EqualMatch(crtValue, value.(string)) {
 							return false, false
+						}
+					}
+				case share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
+					if regex, err := regexp.Compile(crtValue); err == nil {
+						for value := range valueSet.Iter() {
+							if regex.MatchString(value.(string)) {
+								if crt.Op == share.CriteriaOpRegexContainsAny {
+									return true, true
+								} else {
+									return false, false
+								}
+							}
 						}
 					}
 				}
@@ -777,9 +796,9 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 		} else {
 			return false, true
 		}
-	case share.CriteriaOpContainsAny:
+	case share.CriteriaOpContainsAny, share.CriteriaOpRegexContainsAny:
 		return false, true
-	case share.CriteriaOpNotContainsAny:
+	case share.CriteriaOpNotContainsAny, share.CriteriaOpRegexNotContainsAny:
 		return true, false
 	case share.CriteriaOpContainsOtherThan:
 		return false, true
@@ -1323,7 +1342,11 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyImageScanned:
 			met, positive = isStringCriterionMet(crt, strconv.FormatBool(scannedImage.Scanned))
 		case share.CriteriaKeyImageSigned:
-			met, positive = isStringCriterionMet(crt, strconv.FormatBool(scannedImage.Signed))
+			imageSigned := false
+			if len(scannedImage.Verifiers) > 0 {
+				imageSigned = true
+			}
+			met, positive = isStringCriterionMet(crt, strconv.FormatBool(imageSigned))
 		case share.CriteriaKeyRunAsPrivileged:
 			met, positive = isStringCriterionMet(crt, strconv.FormatBool(c.Privileged))
 		case share.CriteriaKeyRunAsRoot:
@@ -1496,6 +1519,10 @@ func getOpDisplay(crt *share.CLUSAdmRuleCriterion) string {
 		return "contains any in"
 	case share.CriteriaOpNotContainsAny:
 		return "does not contain any in"
+	case share.CriteriaOpRegexContainsAny:
+		return "contains any in regex"
+	case share.CriteriaOpRegexNotContainsAny:
+		return "does not contain any in regex"
 	case share.CriteriaOpContainsOtherThan:
 		return "contains value other than"
 	case share.CriteriaOpExist:
@@ -1551,7 +1578,8 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 				str = fmt.Sprintf("(%s)", displayName)
 			} else {
 				switch crt.Op {
-				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan:
+				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
+					share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 					if crt.Type == "customPath" {
 						str = fmt.Sprintf("(%s, %s %s {%s})", displayName, crt.Path, opDsiplay, crt.Value)
 					} else {
@@ -1993,7 +2021,8 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 			ValueType: crit.ValueType,
 		}
 		var critValues []string
-		if c.Op == share.CriteriaOpContainsAll || c.Op == share.CriteriaOpContainsAny || c.Op == share.CriteriaOpNotContainsAny || c.Op == share.CriteriaOpContainsOtherThan {
+		if c.Op == share.CriteriaOpContainsAll || c.Op == share.CriteriaOpContainsAny || c.Op == share.CriteriaOpNotContainsAny || c.Op == share.CriteriaOpContainsOtherThan ||
+			c.Op == share.CriteriaOpRegexContainsAny || c.Op == share.CriteriaOpRegexNotContainsAny {
 			critValues = strings.Split(crit.Value, setDelim)
 			idx := 0
 			for _, crtValue := range critValues {

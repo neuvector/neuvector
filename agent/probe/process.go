@@ -2263,9 +2263,12 @@ func (p *Probe) isAllowCniCommand(path string) bool {
 	return false
 }
 
-func (p *Probe) isAllowCalicoCommand(proc *procInternal) bool {
+func (p *Probe) isAllowCalicoCommand(proc *procInternal, bRtProcP bool) bool {
 	if p.bKubePlatform {
-		return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && filepath.Base(proc.cmds[0]) == "calico-node")
+		if bRtProcP {
+			return proc.path == "/usr/bin/calico-node" && (len(proc.cmds) > 0 && filepath.Base(proc.cmds[0]) == "calico-node")
+		}
+		return proc.ppath == "/usr/bin/calico-node" && filepath.Dir(proc.path) == "/usr/local/bin"
 	}
 	return false
 }
@@ -2333,7 +2336,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	}
 
 	// network plug-in: calico-node
-	if bRtProcP && p.isAllowCalicoCommand(proc) {
+	if p.isAllowCalicoCommand(proc, bRtProcP) {
 		log.WithFields(log.Fields{"name": proc.name, "path": proc.path, "pname": proc.pname}).Debug("PROC:")
 		return true
 	}

@@ -349,7 +349,9 @@ func isNeuvectorContainerGroup(group string) bool {
 				name == "nv.neuvector-scanner-pod" ||
 				name == "nv.neuvector-controller-pod" ||
 				name == "nv.neuvector-enforcer-pod" ||
-				name == "nv.neuvector-updater-pod" {
+				name == "nv.neuvector-updater-pod" ||
+				name == "nv.neuvector-csp-pod" ||
+				name == "nv.neuvector-registry-adapter-pod" {
 				return true
 			}
 		}
@@ -1829,6 +1831,7 @@ func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 		Domain:          gc.group.Domain,
 		PlatformRole:    gc.group.PlatformRole,
 		BaselineProfile: gc.group.BaselineProfile,
+		Comment:         gc.group.Comment,
 	}
 	if withCap {
 		sv.CapChgMode = &gc.capChgMode
@@ -1935,7 +1938,7 @@ func (m CacheMethod) GetService(name string, view string, withCap bool, acc *acc
 }
 
 func isNeuvectorContainerName(name string) bool {
-	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner)-pod`, name); err == nil {
+	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner|csp|registry-adapter)-pod`, name); err == nil {
 		return matched
 	}
 	return false
