@@ -290,8 +290,11 @@ func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*sh
 	cfg := cacher.GetSystemConfig(acc)
 
 	busy, idle := rpc.CountScanners()
-	c.Scanners = uint32(cacher.GetScannerCount(acc))
+	scanners, dbTime, dbVer := cacher.GetScannerCount(acc)
+	c.Scanners = uint32(scanners)
 	c.IdleScanners = idle
+	c.ScannerDBTime = dbTime
+	c.ScannerVersion = dbVer
 
 	// MaxScanner means max number of available scanners, including those to be scaled up. The number can be larger than c.Scanners.
 	if cfg.ScannerAutoscale.Strategy != api.AutoScaleNone {

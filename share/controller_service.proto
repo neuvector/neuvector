@@ -16,12 +16,15 @@ message AdapterScanImageRequest {
     string Tag = 3;
     string Token = 4;
     bool ScanLayers = 5;
+    string AdapterVersion = 6;
 }
 
 message GetScannersResponse {
     uint32 Scanners = 1;
     uint32 MaxScanners = 2;
     uint32 IdleScanners = 3;
+    string ScannerVersion = 4;
+    string ScannerDBTime = 5;
 }
 
 service ControllerScanAdapterService {
