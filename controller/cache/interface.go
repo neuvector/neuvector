@@ -145,7 +145,7 @@ type CacheInterface interface {
 	ScanPlatform(acc *access.AccessControl) error
 
 	GetAllScanners(acc *access.AccessControl) []*api.RESTScanner
-	GetScannerCount(acc *access.AccessControl) int
+	GetScannerCount(acc *access.AccessControl) (int, string, string)
 	GetScanConfig(acc *access.AccessControl) (*api.RESTScanConfig, error)
 	GetScanStatus(acc *access.AccessControl) (*api.RESTScanStatus, error)
 	GetScanPlatformSummary(acc *access.AccessControl) (*api.RESTScanPlatformSummary, error)
