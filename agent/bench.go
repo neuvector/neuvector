@@ -289,13 +289,15 @@ func (b *Bench) BenchLoop() {
 			gInfoRLock()
 			for id, name := range containers {
 				if c, ok := gInfo.activeContainers[id]; ok {
-					// skip kubernetes pod
-					if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-						wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
-						if agentEnv.scanSecrets {
-							group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
-							b.taskScanner.addScanTask(c.pid, name, id, group)
-						}
+					if Host.Platform == share.PlatformKubernetes && c.parentNS == "" {
+						continue	// skip kubernetes pod
+					}
+
+					// the service name has not the namespace extension
+					wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
+					if agentEnv.scanSecrets {
+						group := makeLearnedGroupName(utils.NormalizeForURL(c.service))
+						b.taskScanner.addScanTask(c.pid, name, id, group)
 					}
 				}
 			}
@@ -306,10 +308,10 @@ func (b *Bench) BenchLoop() {
 			wls := make([]*share.CLUSWorkload, 0)
 			gInfoRLock()
 			for _, c := range gInfo.activeContainers {
-				// skip kubernetes pod
-				if Host.Platform != share.PlatformKubernetes || c.parentNS != "" {
-					wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
+				if Host.Platform == share.PlatformKubernetes && c.parentNS == "" {
+					continue	// skip kubernetes pod
 				}
+				wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 			}
 			gInfoRUnlock()
 

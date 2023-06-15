@@ -323,10 +323,6 @@ func deleteGroupProfileCache(name string) bool {
 func isContainerSelected(c *containerData, group *share.CLUSGroup) bool {
 	// TODO: remove "CriteriaKeyAddress" from entry ??
 	wl := createWorkload(c.info, &c.service, &c.domain)
-	wl.Running = true // from activeContainer
-	wl.Name = c.name
-	wl.Service = c.service
-	wl.Domain = c.domain
 	return share.IsGroupMember(group, wl, getDomainData(wl.Domain))
 }
 

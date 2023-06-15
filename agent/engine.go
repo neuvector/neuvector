@@ -1953,7 +1953,8 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		// service is not reported until container is running; domain should be filled.
 		// it reports the exited container as well
 		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
-		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &svc.Name, domain: &svc.Domain}
+		service := utils.MakeServiceName(svc.Domain, svc.Name)
+		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &service, domain: &svc.Domain}
 		ClusterEventChan <- &ev
 
 		log.Debug("Container not running")

@@ -452,7 +452,8 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 	}
 
 	if svc != nil && domain != nil {
-		wl.Service = utils.MakeServiceName(*domain, *svc)
+		// It must be a full service name, like "iperf.demo".
+		wl.Service = *svc
 		wl.Domain = *domain
 	}
 	return &wl
