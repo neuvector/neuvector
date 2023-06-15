@@ -1879,7 +1879,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
 	// it has not been reported as a profile/risky event
-	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
+	riskyReported = (proc.reported & (suspicReported)) != 0
 	if risky && !riskyReported {
 		riskInfo := suspicProcMap[proc.riskType]
 		if riskInfo == nil {
