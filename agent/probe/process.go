@@ -2470,7 +2470,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
 	// We don't need to report the violations more often, but we should make sure that if we
 	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
-	if (proc.reported & profileReported) == 0  || mode == share.PolicyModeEnforce{
+	if mode == share.PolicyModeEnforce {
 		bZeroDrift := setting == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
