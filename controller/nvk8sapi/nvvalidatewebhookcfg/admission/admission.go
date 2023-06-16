@@ -35,32 +35,31 @@ const (
 )
 
 type ScannedImageSummary struct {
-	ImageID                        string
-	BaseOS                         string
-	Registry                       string
-	RegName                        string
-	Digest                         string
-	Author                         string
-	ScannedAt                      time.Time
-	Result                         int32
-	HighVuls                       int
-	MedVuls                        int
-	HighVulsWithFix                int
-	VulScore                       float32
-	VulNames                       utils.Set
-	Scanned                        bool
-	Signed                         bool
-	SignatureVerificationTimestamp string
-	Verifiers                      []string
-	RunAsRoot                      bool
-	EnvVars                        map[string]string
-	Labels                         map[string]string
-	HighVulInfo                    map[string]share.CLUSScannedVulInfo // key is vul name
-	MediumVulInfo                  map[string]share.CLUSScannedVulInfo // key is vul name
-	LowVulInfo                     []share.CLUSScannedVulInfoSimple    // only care about score
-	SetIDPermCnt                   int                                 // setuid and set gid from image scan
-	SecretsCnt                     int                                 // secrets from image scan
-	Modules                        []*share.ScanModule
+	ImageID         string
+	BaseOS          string
+	Registry        string
+	RegName         string
+	Digest          string
+	Author          string
+	ScannedAt       time.Time
+	Result          int32
+	HighVuls        int
+	MedVuls         int
+	HighVulsWithFix int
+	VulScore        float32
+	VulNames        utils.Set
+	Scanned         bool
+	Signed          bool
+	Verifiers       []string
+	RunAsRoot       bool
+	EnvVars         map[string]string
+	Labels          map[string]string
+	HighVulInfo     map[string]share.CLUSScannedVulInfo // key is vul name
+	MediumVulInfo   map[string]share.CLUSScannedVulInfo // key is vul name
+	LowVulInfo      []share.CLUSScannedVulInfoSimple    // only care about score
+	SetIDPermCnt    int                                 // setuid and set gid from image scan
+	SecretsCnt      int                                 // secrets from image scan
+	Modules         []*share.ScanModule
 }
 
 type K8sContainerType string

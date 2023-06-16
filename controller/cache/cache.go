@@ -1859,7 +1859,7 @@ func startWorkerThread(ctx *Context) {
 							if n.Name != localDev.Ctrler.Domain {
 								domainAdd(n.Name, n.Labels)
 							} else {
-								// for the upgrade cas
+								// for the upgrade case
 								domainDelete(n.Name)
 							}
 						} else if o != nil {
