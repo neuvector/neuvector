@@ -19,9 +19,9 @@ import (
 	"github.com/neuvector/neuvector/share/scan/registry"
 )
 
-const MediaTypeCosign = "application/vnd.dev.cosign.simplesigning.v1+json"
-const QuayRegistryURL = "https://quay.io"
-const CosignSignatureTagSuffix = ".sig"
+const mediaTypeCosign = "application/vnd.dev.cosign.simplesigning.v1+json"
+const quayRegistryURL = "https://quay.io"
+const cosignSignatureTagSuffix = ".sig"
 
 type RegClient struct {
 	*registry.Registry
@@ -63,15 +63,11 @@ type SignatureData struct {
 }
 
 func IsPotentialCosignSignatureTag(tag string) bool {
-	if len(tag) < len(CosignSignatureTagSuffix) {
-		return false
-	}
-	last4CharactersOfTag := tag[len(tag)-4:]
-	return last4CharactersOfTag == CosignSignatureTagSuffix
+	return (strings.HasPrefix(tag, "sha256-") && strings.HasSuffix(tag, cosignSignatureTagSuffix))
 }
 
 func IsQuayRegistry(rc *RegClient) bool {
-	return strings.EqualFold(rc.URL[:len(QuayRegistryURL)], QuayRegistryURL)
+	return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
 }
 
 func BuildV2ImageInfo(dg string, body []byte) (imageInfo ImageInfo, parsedSchemaVersion int, err error) {
@@ -99,7 +95,7 @@ func BuildV2ImageInfo(dg string, body []byte) (imageInfo ImageInfo, parsedSchema
 			// reverse the order for v2
 			imageInfo.Layers[layerLen-i-1] = string(des.Digest)
 			imageInfo.Sizes[string(des.Digest)] = des.Size
-			if des.MediaType != MediaTypeCosign {
+			if des.MediaType != mediaTypeCosign {
 				allLayersAreCosignPayloads = false
 			}
 			// log.WithFields(log.Fields{"layer": string(des.Digest)}).Debug("v2 manifest request ====")

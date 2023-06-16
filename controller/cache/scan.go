@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -957,6 +958,13 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 					currImagesMD5, ok := fedScanResultMD5[fedRegName]
 					if !ok || currImagesMD5 == nil {
 						currImagesMD5 = make(map[string]string, 1)
+					}
+					if report != nil && report.SignatureInfo != nil {
+						if report.SignatureInfo.Verifiers != nil {
+							sort.Strings(report.SignatureInfo.Verifiers)
+						}
+						report.SignatureInfo.VerificationTimestamp = ""
+						report.SignatureInfo.VerificationError = 0
 					}
 					res, _ := json.Marshal(&scanResult)
 					md5Sum := md5.Sum(res)

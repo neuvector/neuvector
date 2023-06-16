@@ -2165,12 +2165,12 @@ type RESTScanReport struct {
 	Envs          []string               `json:"envs,omitempty"`
 	Labels        map[string]string      `json:"labels,omitempty"`
 	Cmds          []string               `json:"cmds,omitempty"`
-	SignatureInfo *RESTScanSignatureInfo `json:"signature_data"`
+	SignatureInfo *RESTScanSignatureInfo `json:"signature_data,omitempty"`
 }
 
 type RESTScanSignatureInfo struct {
-	Verifiers             []string
-	VerificationTimestamp string
+	Verifiers             []string `json:"verifiers,omitempty"`
+	VerificationTimestamp string   `json:"verification_timestamp"`
 }
 
 type RESTScanLayer struct {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/api"
@@ -40,14 +41,8 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	if rootOfTrust.IsPrivate {
-		// for private root of trust, RekorPublicKey/SCTPublicKey are optional
-		// a root of trust is public when RootCert/RekorPublicKey/SCTPublicKey are all empty
-		if rootOfTrust.RootCert == "" {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Empty root certificate")
-			return
-		}
-	} else {
+	// a root of trust is public when RootCert/RekorPublicKey/SCTPublicKey are all empty
+	if !rootOfTrust.IsPrivate {
 		rootOfTrust.RekorPublicKey = ""
 		rootOfTrust.RootCert = ""
 		rootOfTrust.SCTPublicKey = ""
@@ -61,6 +56,11 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		SCTPublicKey:   rootOfTrust.SCTPublicKey,
 		CfgType:        share.UserCreated,
 		Comment:        rootOfTrust.Comment,
+	}
+
+	if err := validateCLUSRootOfTrust(&clusRootOfTrust); err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		return
 	}
 
 	err = clusHelper.CreateSigstoreRootOfTrust(&clusRootOfTrust, nil)
@@ -92,15 +92,11 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 
 	rootName := ps.ByName("root_name")
 	rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-	if err != nil {
-		if err == common.ErrObjectNotFound {
-			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		} else {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
-		}
-		return
-	} else if rootOfTrust == nil {
+	if err == common.ErrObjectNotFound || rootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		return
+	} else if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
 	}
 	resp := CLUSRootToRESTRoot_GET(rootOfTrust)
@@ -132,15 +128,11 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 
 	rootName := ps.ByName("root_name")
 	clusRootOfTrust, rev, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-	if err != nil {
-		if err == common.ErrObjectNotFound {
-			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		} else {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
-		}
-		return
-	} else if clusRootOfTrust == nil {
+	if err == common.ErrObjectNotFound || clusRootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		return
+	} else if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
 	}
 
@@ -155,8 +147,8 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 
 	updateCLUSRoot(clusRootOfTrust, &restRootOfTrust)
 	// for private root of trust, RekorPublicKey/SCTPublicKey are optional
-	if clusRootOfTrust.IsPrivate && clusRootOfTrust.RootCert == "" {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "empty keys")
+	if err := validateCLUSRootOfTrust(clusRootOfTrust); err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
 	}
 
@@ -316,15 +308,11 @@ func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	verifier, _, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
-	if err != nil {
-		if err == common.ErrObjectNotFound {
-			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		} else {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
-		}
-		return
-	} else if verifier == nil {
+	if err == common.ErrObjectNotFound || verifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		return
+	} else if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
 	}
 	resp := CLUSVerifierToRESTVerifier(verifier)
@@ -346,15 +334,11 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	clusVerifier, rev, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
-	if err != nil {
-		if err == common.ErrObjectNotFound {
-			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		} else {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
-		}
-		return
-	} else if clusVerifier == nil {
+	if err == common.ErrObjectNotFound || clusVerifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
+		return
+	} else if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
 		return
 	}
 
@@ -469,6 +453,31 @@ func withVerifiers(r *http.Request) bool {
 	return q.Get("with_verifiers") == "true"
 }
 
+func validateCLUSRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust) error {
+	rootOfTrust.Name = strings.TrimSpace(rootOfTrust.Name)
+	if rootOfTrust.IsPrivate {
+		rootOfTrust.RekorPublicKey = strings.TrimSpace(rootOfTrust.RekorPublicKey)
+		rootOfTrust.RootCert = strings.TrimSpace(rootOfTrust.RootCert)
+		rootOfTrust.SCTPublicKey = strings.TrimSpace(rootOfTrust.SCTPublicKey)
+		// for private root of trust, RekorPublicKey/SCTPublicKey are optional
+		if rootOfTrust.RootCert == "" || !strings.HasPrefix(rootOfTrust.RootCert, "-----BEGIN CERTIFICATE-----") ||
+			!strings.HasSuffix(rootOfTrust.RootCert, "-----END CERTIFICATE-----") {
+			return errors.New("Invalid format for Root Certificate")
+		}
+		rotKeys := map[string]string{
+			"Rekor public key": rootOfTrust.RekorPublicKey,
+			"SCT public key":   rootOfTrust.SCTPublicKey,
+		}
+		for k, v := range rotKeys {
+			if v != "" && (!strings.HasPrefix(v, "-----BEGIN PUBLIC KEY-----") || !strings.HasSuffix(v, "-----END PUBLIC KEY-----")) {
+				return fmt.Errorf("Invalid format for %s", k)
+			}
+		}
+	}
+
+	return nil
+}
+
 func validateCLUSVerifier(verifier *share.CLUSSigstoreVerifier) error {
 	if verifier.Name == "" || verifier.VerifierType == "" {
 		return errors.New("fields \"name\" and \"type\" cannot be empty")
@@ -478,9 +487,12 @@ func validateCLUSVerifier(verifier *share.CLUSSigstoreVerifier) error {
 		return errors.New("field \"type\" must be either \"keyless\" or \"keypair\"")
 	}
 
+	verifier.Name = strings.TrimSpace(verifier.Name)
 	if verifier.VerifierType == "keypair" {
-		if verifier.PublicKey == "" {
-			return errors.New("field \"public_key\" cannot be empty for a verifier of type \"keypair\"")
+		verifier.PublicKey = strings.TrimSpace(verifier.PublicKey)
+		if verifier.PublicKey == "" || !strings.HasPrefix(verifier.PublicKey, "-----BEGIN PUBLIC KEY-----") ||
+			!strings.HasSuffix(verifier.PublicKey, "-----END PUBLIC KEY-----") {
+			return errors.New("Invalid format for Public Key")
 		}
 		verifier.CertIssuer = ""
 		verifier.CertSubject = ""
