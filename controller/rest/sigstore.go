@@ -267,8 +267,6 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 	clusVerifier := share.CLUSSigstoreVerifier{
 		Name:         verifier.Name,
 		VerifierType: verifier.VerifierType,
-		IgnoreTLog:   verifier.IgnoreTLog,
-		IgnoreSCT:    verifier.IgnoreSCT,
 		PublicKey:    verifier.PublicKey,
 		CertIssuer:   verifier.CertIssuer,
 		CertSubject:  verifier.CertSubject,
@@ -459,8 +457,6 @@ func CLUSVerifierToRESTVerifier(clusVerifier *share.CLUSSigstoreVerifier) api.RE
 	return api.REST_SigstoreVerifier{
 		Name:         clusVerifier.Name,
 		VerifierType: clusVerifier.VerifierType,
-		IgnoreTLog:   clusVerifier.IgnoreTLog,
-		IgnoreSCT:    clusVerifier.IgnoreSCT,
 		PublicKey:    clusVerifier.PublicKey,
 		CertIssuer:   clusVerifier.CertIssuer,
 		CertSubject:  clusVerifier.CertSubject,
@@ -524,14 +520,6 @@ func updateCLUSRoot(clusRoot *share.CLUSSigstoreRootOfTrust, updates *api.REST_S
 func updateCLUSVerifier(clusVerifier *share.CLUSSigstoreVerifier, updates *api.REST_SigstoreVerifier_PATCH) {
 	if updates.VerifierType != nil {
 		clusVerifier.VerifierType = *updates.VerifierType
-	}
-
-	if updates.IgnoreTLog != nil {
-		clusVerifier.IgnoreTLog = *updates.IgnoreTLog
-	}
-
-	if updates.IgnoreSCT != nil {
-		clusVerifier.IgnoreSCT = *updates.IgnoreSCT
 	}
 
 	if clusVerifier.VerifierType == "keypair" {
