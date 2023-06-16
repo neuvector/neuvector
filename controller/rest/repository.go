@@ -314,8 +314,6 @@ func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust,
 			scanVerifier := &share.SigstoreVerifier{
 				Name:       verifier.Name,
 				Type:       verifier.VerifierType,
-				IgnoreTLog: verifier.IgnoreTLog,
-				IgnoreSCT:  verifier.IgnoreSCT,
 				KeypairOptions: &share.SigstoreKeypairOptions{
 					PublicKey: verifier.PublicKey,
 				},

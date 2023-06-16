@@ -288,10 +288,8 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 
 		for _, clusVerifier := range clusVerifiers {
 			reqVerifier := &share.SigstoreVerifier{
-				Name:       clusVerifier.Name,
-				Type:       clusVerifier.VerifierType,
-				IgnoreTLog: clusVerifier.IgnoreTLog,
-				IgnoreSCT:  clusVerifier.IgnoreSCT,
+				Name: clusVerifier.Name,
+				Type: clusVerifier.VerifierType,
 			}
 			reqVerifier.KeypairOptions = &share.SigstoreKeypairOptions{
 				PublicKey: clusVerifier.PublicKey,
