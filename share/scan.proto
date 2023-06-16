@@ -132,7 +132,13 @@ message ScanResult {
     repeated ScanSetIdPermLog SetIdPerms = 22;
     ScanProvider Provider = 23;
     int64 Size = 24;
-    repeated string Verifiers = 25;
+    ScanSignatureInfo SignatureInfo = 25;
+}
+
+message ScanSignatureInfo {
+    repeated string Verifiers = 1;
+    string VerificationTimestamp = 2;
+    ScanErrorCode VerificationError = 3;
 }
 
 message ScanRunningRequest {

@@ -205,28 +205,29 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 
 	for _, s := range sumMap {
 		summary := &nvsysadmission.ScannedImageSummary{
-			ImageID:         s.summary.ImageID,
-			BaseOS:          s.summary.BaseOS,
-			Registry:        s.summary.Registry,
-			RegName:         s.summary.RegName,
-			Digest:          s.summary.Digest,
-			Author:          s.summary.Author,
-			ScannedAt:       s.summary.ScannedAt,
-			Result:          int32(s.summary.Result),
-			HighVuls:        s.cache.highVuls,
-			MedVuls:         s.cache.medVuls,
-			HighVulsWithFix: s.cache.highVulsWithFix,
-			VulScore:        s.cache.vulScore,
-			VulNames:        utils.NewSet(),
-			Scanned:         true,
-			Signed:          false, // scanned.Signed, // [2019.Apr] set as false until we can accurately tell it
-			RunAsRoot:       s.summary.RunAsRoot,
-			EnvVars:         make(map[string]string, len(s.cache.envs)),
-			Labels:          make(map[string]string, len(s.cache.labels)),
-			SecretsCnt:      len(s.cache.secrets),
-			SetIDPermCnt:    len(s.cache.setIDPerm),
-			Modules:         s.cache.modules,
-			Verifiers:       s.cache.verifiers,
+			ImageID:                        s.summary.ImageID,
+			BaseOS:                         s.summary.BaseOS,
+			Registry:                       s.summary.Registry,
+			RegName:                        s.summary.RegName,
+			Digest:                         s.summary.Digest,
+			Author:                         s.summary.Author,
+			ScannedAt:                      s.summary.ScannedAt,
+			Result:                         int32(s.summary.Result),
+			HighVuls:                       s.cache.highVuls,
+			MedVuls:                        s.cache.medVuls,
+			HighVulsWithFix:                s.cache.highVulsWithFix,
+			VulScore:                       s.cache.vulScore,
+			VulNames:                       utils.NewSet(),
+			Scanned:                        true,
+			Signed:                         false, // scanned.Signed, // [2019.Apr] set as false until we can accurately tell it
+			RunAsRoot:                      s.summary.RunAsRoot,
+			EnvVars:                        make(map[string]string, len(s.cache.envs)),
+			Labels:                         make(map[string]string, len(s.cache.labels)),
+			SecretsCnt:                     len(s.cache.secrets),
+			SetIDPermCnt:                   len(s.cache.setIDPerm),
+			Modules:                        s.cache.modules,
+			Verifiers:                      s.cache.signatureVerifiers,
+			SignatureVerificationTimestamp: s.cache.signatureVerificationTimestamp,
 		}
 		for _, v := range s.cache.vulTraits {
 			if !v.IsFiltered() {
@@ -345,10 +346,12 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		Status:    api.ScanStatusFinished,
 		Author:    result.Author,
 		ScanFlags: share.ScanFlagCVE,
-		Verifiers: result.Verifiers,
 	}
 	if result.Secrets != nil {
 		sum.ScanFlags |= share.ScanFlagFiles
+	}
+	if result.SignatureInfo != nil {
+		sum.Verifiers = result.SignatureInfo.Verifiers
 	}
 	sum.RunAsRoot, _, _ = scanUtils.ParseImageCmds(result.Cmds)
 	rs.summary[result.ImageID] = sum
@@ -560,9 +563,13 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 				rrpt.Modules[i] = scanUtils.ScanModule2REST(m)
 			}
 
-			rrpt.Verifiers = make([]string, len(c.verifiers))
-			for i, v := range c.verifiers {
-				rrpt.Verifiers[i] = v
+			rrpt.SignatureInfo = &api.RESTScanSignatureInfo{
+				VerificationTimestamp: c.signatureVerificationTimestamp,
+			}
+
+			rrpt.SignatureInfo.Verifiers = make([]string, len(c.signatureVerifiers))
+			for i, v := range c.signatureVerifiers {
+				rrpt.SignatureInfo.Verifiers[i] = v
 			}
 		}
 	}

@@ -93,6 +93,7 @@ It has these top-level messages:
 	ScanSecretResult
 	ScanSetIdPermLog
 	ScanResult
+	ScanSignatureInfo
 	ScanRunningRequest
 	ScanData
 	ScanAppPackage

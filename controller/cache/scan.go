@@ -55,23 +55,24 @@ const (
 )
 
 type scanInfo struct {
-	initStateLoaded bool
-	agentId         string
-	status          int
-	lastResult      share.ScanErrorCode
-	lastScanTime    time.Time
-	baseOS          string
-	priority        scheduler.Priority
-	retry           int
-	objType         share.ScanObjectType
-	version         string
-	cveDBCreateTime string
-	brief           *api.RESTScanBrief    // Stats of filtered entries
-	vulTraits       []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
-	filteredTime    time.Time
-	idns            []api.RESTIDName
-	modules         []*share.ScanModule
-	verifiers       []string
+	initStateLoaded                bool
+	agentId                        string
+	status                         int
+	lastResult                     share.ScanErrorCode
+	lastScanTime                   time.Time
+	baseOS                         string
+	priority                       scheduler.Priority
+	retry                          int
+	objType                        share.ScanObjectType
+	version                        string
+	cveDBCreateTime                string
+	brief                          *api.RESTScanBrief    // Stats of filtered entries
+	vulTraits                      []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	filteredTime                   time.Time
+	idns                           []api.RESTIDName
+	modules                        []*share.ScanModule
+	signatureVerifiers             []string
+	signatureVerificationTimestamp string
 }
 
 type scanTaskInfo struct {
@@ -477,7 +478,8 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
 		info.modules = report.Modules
-		info.verifiers = report.Verifiers
+		info.signatureVerifiers = report.SignatureInfo.Verifiers
+		info.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
