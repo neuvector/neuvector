@@ -406,7 +406,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 
 	checks := ImageBench2REST(result.Cmds, result.Secrets.Logs, result.SetIdPerms, tagMap)
 
-	return &api.RESTScanRepoReport{
+	report := &api.RESTScanRepoReport{
 		CVEDBVersion:    result.Version,
 		CVEDBCreateTime: result.CVEDBCreateTime,
 		ImageID:         result.ImageID,
@@ -427,12 +427,18 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 			SetIDs:    ridperms,
 			Checks:    checks,
 			Cmds:      result.Cmds,
-			SignatureInfo: &api.RESTScanSignatureInfo{
-				Verifiers: result.SignatureInfo.Verifiers,
-				VerificationTimestamp: result.SignatureInfo.VerificationTimestamp,
-			},
 		},
 	}
+	if result.SignatureInfo != nil {
+		report.RESTScanReport.SignatureInfo = &api.RESTScanSignatureInfo{
+			Verifiers: result.SignatureInfo.Verifiers,
+			VerificationTimestamp: result.SignatureInfo.VerificationTimestamp,
+		}
+	} else {
+		report.RESTScanReport.SignatureInfo = &api.RESTScanSignatureInfo{}
+	}
+
+	return report
 }
 
 func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {

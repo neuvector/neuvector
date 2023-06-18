@@ -479,8 +479,10 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
 		info.modules = report.Modules
-		info.signatureVerifiers = report.SignatureInfo.Verifiers
-		info.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
+		if report.SignatureInfo != nil {
+			info.signatureVerifiers = report.SignatureInfo.Verifiers
+			info.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
+		}
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
