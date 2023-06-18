@@ -4,7 +4,7 @@ swagger: '2.0'
 #                              API Information                                 #
 ################################################################################
 info:
-  description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution. Access to and support for this API requires the appropriate NeuVector license. Contact support@neuvector.com with any questions.
+  description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
   version: '5.2'
   title: NeuVector API
   contact:
@@ -13,7 +13,7 @@ schemes:
   - https
 externalDocs:
   description: Find out more about NeuVector
-  url: 'https://neuvector.com'
+  url: 'https://www.suse.com/products/neuvector/'
 
 ################################################################################
 #                                   Tags                                       #
