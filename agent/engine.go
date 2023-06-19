@@ -1670,6 +1670,10 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 			go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
 		}
 	}
+
+	nvRole := container.PlatformContainerNeuVector
+	ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, role: &nvRole, service: &c.service, domain: &c.domain}
+	ClusterEventChan <- &ev
 }
 
 //////
