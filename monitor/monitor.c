@@ -30,6 +30,7 @@
 #define ENV_CTRL_SERVER_PORT   "CTRL_SERVER_PORT"
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
+#define ENV_CTRL_NOT_RM_NSGRPS "CTRL_NOT_PRUNE_NSGROUPS"
 #define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
 #define ENV_TAP_INTERFACE      "TAP_INTERFACE"
 #define ENV_TAP_ALL_CONTAINERS "TAP_ALL_CONTAINERS"
@@ -395,6 +396,11 @@ static pid_t fork_exec(int i)
         if ((enable = getenv(ENV_NO_DEFAULT_ADMIN)) != NULL) {
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-no_def_admin";
+            }
+        }
+        if ((enable = getenv(ENV_CTRL_NOT_RM_NSGRPS)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-no_rm_nsgroups";
             }
         }
         args[a] = NULL;

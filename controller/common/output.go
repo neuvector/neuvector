@@ -21,7 +21,8 @@ import (
 
 const syslogFacility = syslog.LOG_LOCAL0
 const notificationHeader = "notification"
-const syslogTimeout = time.Second * 8
+const syslogTimeout = time.Second * 30
+const syslogDialTimeout = time.Second * 30
 
 type Syslogger struct {
 	writer *syslog.Writer
@@ -180,7 +181,7 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 
 		s.Close()
 	}
-	if wr, err := syslog.Dial(s.proto, s.addr, syslogFacility|prio, "neuvector"); err != nil {
+	if wr, err := syslog.Dial(s.proto, s.addr, syslogDialTimeout, syslogFacility|prio, "neuvector"); err != nil {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
