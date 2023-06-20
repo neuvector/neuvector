@@ -259,6 +259,31 @@ func dpMsgFqdnIpUpdate(msg []byte) {
 	taskCallback(&task)
 }
 
+func dpMsgIpFqdnUpdate(msg []byte) {
+	var ipFqdnHdr C.DPMsgIpFqdnHdr
+	// Verify header length
+	ipFqdnHdrLen := int(unsafe.Sizeof(ipFqdnHdr))
+	if len(msg) < ipFqdnHdrLen {
+		log.WithFields(log.Fields{"expect": ipFqdnHdrLen, "actual": len(msg)}).Error("Short header")
+		return
+	}
+
+	r := bytes.NewReader(msg)
+	binary.Read(r, binary.BigEndian, &ipFqdnHdr)
+
+	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnHdr.IP[0]), 4))
+	name := C.GoString(&ipFqdnHdr.Name[0])
+	ipFqdns := &IpFqdn{
+		IP: ip,
+		Name: name,
+	}
+
+	log.WithFields(log.Fields{"ipFqdns": ipFqdns}).Debug("")
+
+	task := DPTask{Task: DP_TASK_IP_FQDN, IpFqdns: ipFqdns}
+	taskCallback(&task)
+}
+
 func ParseDPMsgHeader(msg []byte) *C.DPMsgHdr {
 	var hdr C.DPMsgHdr
 
@@ -296,6 +321,8 @@ func dpMessenger(msg []byte) {
 		dpMsgConnection(msg[offset:])
 	case C.DP_KIND_FQDN_UPDATE:
 		dpMsgFqdnIpUpdate(msg[offset:])
+	case C.DP_KIND_IP_FQDN_UPDATE:
+		dpMsgIpFqdnUpdate(msg[offset:])
 	}
 }
 

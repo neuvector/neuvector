@@ -1448,6 +1448,19 @@ static uint32_t fqdn_ipv4_hash(const void *key)
     return sdbm_hash((uint8_t *)k, sizeof(uint32_t));
 }
 
+static int ipv4_fqdn_match(struct cds_lfht_node *ht_node, const void *key)
+{
+    ipv4_fqdn_entry_t *s = STRUCT_OF(ht_node, ipv4_fqdn_entry_t, node);
+    const uint32_t *k = key;
+    return (s->r->ip == *k);
+}
+
+static uint32_t ipv4_fqdn_hash(const void *key)
+{
+    const uint32_t *k = key;
+    return sdbm_hash((uint8_t *)k, sizeof(uint32_t));
+}
+
 static dpi_fqdn_hdl_t *dpi_fqdn_hdl_init()
 {
     dpi_fqdn_hdl_t *hdl;
@@ -1468,6 +1481,8 @@ static dpi_fqdn_hdl_t *dpi_fqdn_hdl_init()
                  fqdn_name_match, fqdn_name_hash);
     rcu_map_init(&(hdl->fqdn_ipv4_map), 32, offsetof(fqdn_ipv4_entry_t, node),
                  fqdn_ipv4_match, fqdn_ipv4_hash);
+    rcu_map_init(&(hdl->ipv4_fqdn_map), 32, offsetof(ipv4_fqdn_entry_t, node),
+                 ipv4_fqdn_match, ipv4_fqdn_hash);
     CDS_INIT_LIST_HEAD(&hdl->del_rlist);
     return hdl;
 }
@@ -1838,6 +1853,62 @@ int snooped_fqdn_ipv4_mapping(char *name, uint32_t *ip, int cnt)
     return 0;
 }
 
+// Caller make sure hdl NULL
+int config_ipv4_fqdn_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip)
+{
+    ipv4_fqdn_entry_t *ipv4_fqdn_entry;
+    ipv4_fqdn_record_t *r = NULL;
+
+    ipv4_fqdn_entry = rcu_map_lookup(&hdl->ipv4_fqdn_map, &ip);
+    if (!ipv4_fqdn_entry) {
+        ipv4_fqdn_entry_t *entry;
+        entry = (ipv4_fqdn_entry_t *)calloc(1, sizeof(ipv4_fqdn_entry_t));
+        if (!entry) {
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
+            return -1;
+        }
+
+        r = (ipv4_fqdn_record_t *)calloc(1, sizeof(ipv4_fqdn_record_t));
+        if (!r) {
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
+            free(entry);
+            return -1;
+        }
+        r->ip = ip;
+        strlcpy(r->name, name, MAX_FQDN_LEN);
+        entry->r = r;
+        rcu_map_add(&hdl->ipv4_fqdn_map, entry, &ip);
+        th_counter.domains++;
+        DEBUG_POLICY("create record ip:%x name:%s\n", ip, name);
+    } else {
+        r = ipv4_fqdn_entry->r;
+        DEBUG_POLICY("update existing record for ip: %x old name: %s new name: %s\n", r->ip, r->name, name);
+        strlcpy(r->name, name, MAX_FQDN_LEN);            
+    }
+    return 0;
+}
+
+// Called from parser, make sure ip not NULL
+int snooped_ipv4_fqdn_mapping(char *name, uint32_t *ip, int cnt)
+{
+    if (strlen(name) > 0) {
+        lower_string(name);
+    }
+    DEBUG_POLICY("name: (%s), ip cnt: (%d)\n", name, cnt);
+
+    int i;
+    for (i = 0; i < cnt; i++)
+    {
+        rcu_read_lock();
+        if (config_ipv4_fqdn_mapping(g_fqdn_hdl, name, ip[i]) != 0)
+        {
+            DEBUG_ERROR(DBG_POLICY, "config_ipv4_fqdn_mapping error for ip: %x name: %s\n", ip[i], name);
+        }
+        rcu_read_unlock();
+    }
+    return 0;
+}
+
 static int enqueue_fqdn_name_to_del(dpi_fqdn_hdl_t *hdl, fqdn_name_entry_t *entry)
 {
     if (hdl->del_name_cnt == DPI_FQDN_DELETE_QLEN) {
@@ -2007,4 +2078,83 @@ int dpi_policy_init() {
         return -1;
     }
     return 0;
+}
+
+static int enqueue_ipv4_fqdn_entry_to_del(dpi_fqdn_hdl_t *hdl, ipv4_fqdn_entry_t *entry)
+{
+    if (hdl->del_ipv4_fqdn_cnt == DPI_FQDN_DELETE_QLEN) {
+       return -1;
+    }
+    entry->r->flag |= FQDN_RECORD_DELETED;
+    hdl->del_ipv4_fqdn_list[hdl->del_ipv4_fqdn_cnt] = entry;
+    hdl->del_ipv4_fqdn_cnt++;
+    return 0;
+}
+
+bool check_ipv4_fqdn_entry(struct cds_lfht_node *ht_node, void *args)
+{
+    ipv4_fqdn_entry_t *entry = (ipv4_fqdn_entry_t *)ht_node;
+    fqdn_iter_ctx_t *ctx = (fqdn_iter_ctx_t *)args;
+
+    if (entry->r->flag & FQDN_RECORD_TO_DELETE) {
+        if (enqueue_ipv4_fqdn_entry_to_del(ctx->hdl, entry) == 0) {
+            DEBUG_POLICY("Delete ip: %x fqdn name: %s record\n",
+                         entry->r->ip, entry->r->name);
+            rcu_map_del(&ctx->hdl->ipv4_fqdn_map, ht_node);
+        } else {
+            // Tell the caller that this record is not deleted successfully
+            // due to queue full
+            ctx->more = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void free_ipv4_fqdn(dpi_fqdn_hdl_t *hdl)
+{
+    int i;
+    ipv4_fqdn_record_t *r;
+    for (i = 0; i < hdl->del_ipv4_fqdn_cnt; i++) {
+        r = hdl->del_ipv4_fqdn_list[i]->r;
+        DEBUG_POLICY("Free ip: %x fqdn name %s\n", r->ip, r->name);
+        free(r);
+        free(hdl->del_ipv4_fqdn_list[i]);
+        hdl->del_ipv4_fqdn_list[i] = NULL;
+        th_counter.domains--;
+    }
+    hdl->del_ipv4_fqdn_cnt = 0;
+}
+
+void dpi_ip_fqdn_entry_mark_delete(uint32_t ip)
+{
+    ipv4_fqdn_entry_t *entry;
+
+    entry = rcu_map_lookup(&g_fqdn_hdl->ipv4_fqdn_map, &ip);
+    if (entry) {
+        entry->r->flag |= FQDN_RECORD_TO_DELETE;
+    }
+}
+
+void dpi_ip_fqdn_entry_delete_marked()
+{
+    fqdn_iter_ctx_t ctx;
+    bool more = true;
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.hdl = g_fqdn_hdl;
+
+    while (more) {
+        ctx.more = false;
+        rcu_read_lock();
+        rcu_map_for_each(&ctx.hdl->ipv4_fqdn_map, check_ipv4_fqdn_entry, &ctx);
+        rcu_read_unlock();
+        more = ctx.more;
+
+        if (ctx.hdl->del_ipv4_fqdn_cnt > 0) {
+            synchronize_rcu();
+            free_ipv4_fqdn(ctx.hdl);
+        }
+    }
+    return;
 }

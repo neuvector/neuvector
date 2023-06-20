@@ -132,6 +132,7 @@ message CLUSConnection {
 	bool LinkLocal = 30;
 	bool TmpOpen = 31;
 	bool UwlIp = 32;
+    string EgressFqdn = 33;
 }
 
 message CLUSConnectionArray {
@@ -240,6 +241,15 @@ message CLUSLoginTokenInfo {
 message CLUSKubernetesResInfo {
     string DocKey = 1;
     string Data = 2;			
+}
+
+message CLUSEgressIpFqdn {
+	string IP = 1;
+	string Name = 2;
+}
+
+message CLUSEgressIpFqdnArray {
+    repeated CLUSEgressIpFqdn EgressIpFqdns = 1;
 }
 
 service ControllerCtrlService {

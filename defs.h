@@ -156,6 +156,7 @@
 #define DP_KIND_DEVICE_STATS   9
 #define DP_KIND_KEEP_ALIVE     10
 #define DP_KIND_FQDN_UPDATE    11
+#define DP_KIND_IP_FQDN_UPDATE 12
 
 typedef struct {
     uint8_t  Kind;
@@ -447,5 +448,10 @@ typedef struct {
     uint16_t Reserved;
     uint8_t Flags;
 } DPMsgFqdnIpHdr;
+
+typedef struct {
+    uint8_t  IP[16];
+    char     Name[DP_POLICY_FQDN_NAME_MAX_LEN];
+} DPMsgIpFqdnHdr;
 
 #endif

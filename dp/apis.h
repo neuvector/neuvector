@@ -278,6 +278,8 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *policy, int flag);
 void dp_policy_destroy(void *policy_hdl);
 void dpi_fqdn_entry_mark_delete(const char *name);
 void dpi_fqdn_entry_delete_marked();
+void dpi_ip_fqdn_entry_mark_delete(uint32_t ip);
+void dpi_ip_fqdn_entry_delete_marked();
 
 /*
  * -----------------------------------------------------
@@ -318,17 +320,31 @@ typedef struct fqdn_ipv4_item_ {
     uint32_t ip;
 } fqdn_ipv4_item_t;
 
+typedef struct ipv4_fqdn_record_ {
+    uint32_t ip;
+    char     name[MAX_FQDN_LEN];
+    uint32_t flag;
+} ipv4_fqdn_record_t;
+
+typedef struct ipv4_fqdn_entry_ {
+    struct cds_lfht_node node;
+    ipv4_fqdn_record_t *r;
+} ipv4_fqdn_entry_t;
+
 #define DPI_FQDN_DELETE_QLEN      32
 #define DPI_FQDN_MAX_ENTRIES      DP_POLICY_FQDN_MAX_ENTRIES
 typedef struct dpi_fqdn_hdl_ {
     rcu_map_t fqdn_name_map;
     rcu_map_t fqdn_ipv4_map;
+    rcu_map_t ipv4_fqdn_map;
     bitmap *bm;
     int code_cnt;
     int del_name_cnt;
     int del_ipv4_cnt;
+    int del_ipv4_fqdn_cnt;
     fqdn_name_entry_t *del_name_list[DPI_FQDN_DELETE_QLEN];
     fqdn_ipv4_entry_t *del_ipv4_list[DPI_FQDN_DELETE_QLEN];
+    ipv4_fqdn_entry_t *del_ipv4_fqdn_list[DPI_FQDN_DELETE_QLEN];
     struct cds_list_head del_rlist;
 } dpi_fqdn_hdl_t;
 

@@ -2822,6 +2822,40 @@ static void dp_ctrl_update_fqdn_ip(void)
     }
 }
 
+static void dp_ctrl_update_ip_fqdn(void)
+{
+    //this function is called in ctrl thread, but g_fqdn_hdl is initialized
+    //in data thread, no guarantee g_fqdn_hdl is already initialized when ctrl
+    //thread reach here during dp start, so we check null value here
+    if (g_fqdn_hdl == NULL) {
+        return;
+    }
+    struct cds_lfht_node *ipv4_fqdn_node;
+
+    // Iterate through fqdn map
+    RCU_MAP_FOR_EACH(&g_fqdn_hdl->ipv4_fqdn_map, ipv4_fqdn_node) {
+        ipv4_fqdn_entry_t *ipv4_fqdn_entry = STRUCT_OF(ipv4_fqdn_node, ipv4_fqdn_entry_t, node);
+
+        DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;
+        DPMsgIpFqdnHdr *fh = (DPMsgIpFqdnHdr *)(g_notify_msg + sizeof(*hdr));
+
+        hdr->Kind = DP_KIND_IP_FQDN_UPDATE;
+        ip4_cpy(fh->IP, (uint8_t *)&ipv4_fqdn_entry->r->ip);
+        strlcpy(fh->Name, ipv4_fqdn_entry->r->name, DP_POLICY_FQDN_NAME_MAX_LEN);        
+        uint16_t len = sizeof(*hdr) + sizeof(*fh);
+        hdr->Length = htons(len);
+
+        DEBUG_CTRL("ip: %x name: %s len=%u\n", fh->IP, fh->Name, len);
+
+        dp_ctrl_notify_ctrl(g_notify_msg, len);
+
+        // After send to Agent, mark the entry to be deleted
+        dpi_ip_fqdn_entry_mark_delete(ipv4_fqdn_entry->r->ip);
+    }
+
+    dpi_ip_fqdn_entry_delete_marked();
+}
+
 // -- ctrl loop
 
 void dp_ctrl_init_thread_data(void)
@@ -2894,6 +2928,7 @@ void dp_ctrl_loop(void)
             dp_ctrl_update_app(false);
             dp_ctrl_update_fqdn_ip();
             dp_ctrl_consume_threat_log();
+            dp_ctrl_update_ip_fqdn();
 
             // every 6s
             if ((round % 3) == 0) {

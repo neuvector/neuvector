@@ -254,6 +254,7 @@ static int get_domain_ip_mapping(dpi_packet_t *p, dns_question_t* questions, int
         }
         if (cnt > 0) {
             snooped_fqdn_ipv4_mapping(questions[i].question, ips, cnt);
+            snooped_ipv4_fqdn_mapping(questions[i].question, ips, cnt);
         }
     }
     return 0;

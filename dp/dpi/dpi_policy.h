@@ -96,6 +96,7 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
 int dpi_policy_reeval(dpi_packet_t *p, bool to_server);
 int dpi_policy_init();
 int snooped_fqdn_ipv4_mapping(char *name, uint32_t *ip, int cnt);
+int snooped_ipv4_fqdn_mapping(char *name, uint32_t *ip, int cnt);
 void dpi_unknown_ip_init(void);
 
 #endif

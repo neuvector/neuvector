@@ -15,6 +15,7 @@ const (
 	DP_TASK_HOST_CONNECTION
 	DP_TASK_APPLICATION
 	DP_TASK_FQDN_IP
+	DP_TASK_IP_FQDN
 )
 
 type Connection struct {
@@ -56,6 +57,11 @@ type ConnectionData struct {
 	Conn  *Connection
 }
 
+type IpFqdn struct {
+	IP   net.IP
+	Name string
+}
+
 type DPTask struct {
 	Task     int
 	MAC      net.HardwareAddr
@@ -63,4 +69,5 @@ type DPTask struct {
 	Connects []*ConnectionData
 	Apps     map[share.CLUSProtoPort]*share.CLUSApp
 	Fqdns    *share.CLUSFqdnIp
+	IpFqdns  *IpFqdn
 }

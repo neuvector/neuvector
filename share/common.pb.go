@@ -42,6 +42,8 @@ It has these top-level messages:
 	CLUSKickLoginSessionsRequest
 	CLUSLoginTokenInfo
 	CLUSKubernetesResInfo
+	CLUSEgressIpFqdn
+	CLUSEgressIpFqdnArray
 	CLUSKick
 	CLUSFilter
 	CLUSSession

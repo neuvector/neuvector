@@ -512,6 +512,7 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"toSidecar":      conn.ToSidecar,
 			"meshToSvr":      conn.MeshToSvr,
 			"linkLocal":      conn.LinkLocal,
+			"egressFqdn":     conn.EgressFqdn,
 		}).Debug()
 
 		addConnectToGraph(conn, ca, sa, stip)
