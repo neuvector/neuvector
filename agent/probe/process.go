@@ -1396,14 +1396,19 @@ func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 
 func (p *Probe) getUserName(pid, uid int) (user string) {
 	if c, ok := p.pidContainerMap[pid]; ok {
-		var ok bool
-		if user, ok = c.userns.users[uid]; !ok {
-			if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
-				user, _ = c.userns.users[uid]
-				c.userns.root = root
-				c.userns.uidMin = min
-			}
+
+		if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
+			log.WithFields(log.Fields{"pid": pid, "uid": uid, "user": user, "root": root, "min": min}).Info("JAYU Debugging getUserName")
+			c.userns.root = root
+			c.userns.uidMin = min
+			log.WithFields(log.Fields{"pid": pid, "user": user, "uid": uid,"cur list": c.userns.users}).Info("JAYU Debugging getUserName 222")
 		}
+
+		var userok bool
+		if user, userok = c.userns.users[uid]; !userok {
+			user, _ = c.userns.users[uid]
+		}
+
 	}
 	return
 }
@@ -1426,6 +1431,34 @@ func (p *Probe) checkUserGroup(escalProc *procInternal, c *procContainer) (strin
 		return "", "", false
 	}
 	return rUser, eUser, true
+}
+
+
+func (p *Probe) jayuusername(pid, uid int) (user string) {
+	log.WithFields(log.Fields{"pid": pid, "uid": uid,}).Info("JAYU checking pid container")
+
+	if c, ok := p.pidContainerMap[pid]; ok {
+		log.WithFields(log.Fields{"pid": pid, "uid": uid, "container": c.id}).Info("JAYU found container")
+
+		if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
+			log.WithFields(log.Fields{"pid": pid, "uid": uid, "user": user, "root": root, "min": min}).Info("JAYU Debugging getUserName")
+			user, _ = c.userns.users[uid]
+			c.userns.root = root
+			c.userns.uidMin = min
+			log.WithFields(log.Fields{"pid": pid, "user": user, "uid": uid,"cur list": c.userns.users}).Info("JAYU Debugging getUserName 222")
+		}
+
+		var ok bool
+		if user, ok = c.userns.users[uid]; !ok {
+			log.WithFields(log.Fields{"pid": pid, "uid": uid, "c.userns.users": c.userns.users}).Error("User is missing in the user-name map")
+		}
+	} else {
+		log.WithFields(log.Fields{"pid": pid, "uid": uid}).Error("JAYU could not find container")
+
+	}
+	log.WithFields(log.Fields{"pid": pid, "uid": uid, "user": user}).Error("JAYU found")
+
+	return
 }
 
 // Not pidNetlink: escalProc is the grandparent of proc.
