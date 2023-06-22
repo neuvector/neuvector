@@ -1403,7 +1403,7 @@ func (p *Probe) getUserName(pid, uid int) (user string) {
 			c.userns.uidMin = min
 		}
 
-		if uname, userok := c.userns.users[uid]; !userok {
+		if uname, userok := c.userns.users[uid]; userok {
 			user = uname
 		}
 	}
