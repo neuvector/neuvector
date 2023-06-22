@@ -1394,6 +1394,21 @@ func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 	}
 }
 
+// updateUserNames - Updates the username map by going to /etc/passwd
+func (p *Probe) getUpdatedUsername(pid int, uid int) string {
+	// Get the container for our pid
+	if c, ok := p.pidContainerMap[pid]; ok {
+		// Update the usernames map
+		if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
+			c.userns.root = root
+			c.userns.uidMin = min
+			return c.userns.users[uid]
+		}
+	}
+
+	return ""
+}
+
 func (p *Probe) getUserName(pid, uid int) (user string) {
 	if c, ok := p.pidContainerMap[pid]; ok {
 		var ok bool
@@ -1881,6 +1896,9 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
 	if risky && !riskyReported {
+
+		proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
+
 		riskInfo := suspicProcMap[proc.riskType]
 		if riskInfo == nil {
 			mLog.WithFields(log.Fields{"pid": proc.pid, "riskType": proc.riskType}).Debug("PROC: risky info missing")
@@ -2540,6 +2558,8 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 
 func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup string, proc *procInternal) {
 	var s *ProbeProcess
+
+	proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
 
 	switch uuid {
 	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
