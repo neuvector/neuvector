@@ -1399,7 +1399,7 @@ func (p *Probe) getUpdatedUsername(pid int, uid int) string {
 	// Get the container for our pid
 	if c, ok := p.pidContainerMap[pid]; ok {
 		// Update the usernames map
-		if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
+		if root, min, err := osutil.GetAllUsers(c.rootPid, c.userns.users); err == nil {
 			c.userns.root = root
 			c.userns.uidMin = min
 			return c.userns.users[uid]
