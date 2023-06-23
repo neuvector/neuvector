@@ -30,12 +30,6 @@ type threatLog struct {
 	slog *share.CLUSThreatLog
 }
 
-type ipFqdnName struct {
-	name       string
-	timerWheel *utils.TimerWheel
-	timerTask  string
-}
-
 var threatLogCache []*threatLog
 var incidentLogCache []*share.CLUSIncidentLog
 var connectionMap map[string]*dp.Connection = make(map[string]*dp.Connection)
@@ -48,8 +42,8 @@ var auditLogCache []*share.CLUSAuditLog
 var auditMutex sync.Mutex
 var fqdnIpCache []*share.CLUSFqdnIp
 var fqdnIpMutex sync.Mutex
-var ipFqdnCache map[string]*ipFqdnName = make(map[string]*ipFqdnName)
-var ipFqdnMutex sync.Mutex
+var ipFqdnStorageCache map[string]string = make(map[string]string)
+var ipFqdnStorageMutex sync.Mutex
 
 const reportInterval uint32 = 5
 const statsInterval uint32 = 5
@@ -179,18 +173,17 @@ func dpTaskCallback(task *dp.DPTask) {
 		fqdnIpMutex.Lock()
 		fqdnIpCache = append(fqdnIpCache, task.Fqdns)
 		fqdnIpMutex.Unlock()
-	case dp.DP_TASK_IP_FQDN:
-		ipFqdnMutex.Lock()
-		ip := task.IpFqdns.IP.String()
-		name := &ipFqdnName{
-			name:       task.IpFqdns.Name,
-			timerWheel: agentTimerWheel,
-			timerTask:  "",
-		}
-		// No matter ip is exist or not, update the table
-		ipFqdnCache[ip] = name
-		ScheduleIpFqdnRemoval(ip)
-		ipFqdnMutex.Unlock()
+	case dp.DP_TASK_IP_FQDN_STORAGE_UPDATE:
+		ipFqdnStorageMutex.Lock()
+		ip := task.FqdnStorageUpdate.IP.String()
+		name := task.FqdnStorageUpdate.Name
+		ipFqdnStorageCache[ip] = name
+		ipFqdnStorageMutex.Unlock()
+	case dp.DP_TASK_IP_FQDN_STORAGE_RELEASE:
+		ipFqdnStorageMutex.Lock()
+		ip := task.FqdnStorageRelease.String()
+		delete(ipFqdnStorageCache, ip)
+		ipFqdnStorageMutex.Unlock()
 	case dp.DP_TASK_CONNECTION:
 		connsCacheMutex.Lock()
 		connsCache = append(connsCache, task.Connects...)
@@ -547,7 +540,14 @@ func updateHostConnection(conns []*dp.ConnectionData) {
 // Max number of entries to transmit at one time.
 const connectionListMax int = 2048 * 4
 
-func conn2CLUS(c *dp.Connection, egressFqdn string) *share.CLUSConnection {
+func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
+	fqdn := ""
+	if c.ExternalPeer && len(ipFqdnStorageCache) > 0 {
+		if name, ok := ipFqdnStorageCache[net.IP(c.ServerIP).String()]; ok {
+			fqdn = name
+		}
+	}
+	
 	return &share.CLUSConnection{
 		AgentID:      c.AgentID,
 		HostID:       c.HostID,
@@ -581,7 +581,7 @@ func conn2CLUS(c *dp.Connection, egressFqdn string) *share.CLUSConnection {
 		LinkLocal:    c.LinkLocal,
 		TmpOpen:      c.TmpOpen,
 		UwlIp:        c.UwlIp,
-		EgressFqdn:   egressFqdn,
+		Fqdn:         fqdn,
 	}
 }
 
@@ -608,13 +608,7 @@ func putConnections() {
 	if len(list) > 0 {
 		conns := make([]*share.CLUSConnection, len(list))
 		for i, c := range list {
-			egressFqdn := ""
-			if c.ExternalPeer && len(ipFqdnCache) > 0 {
-				if ipFqdn, ok := ipFqdnCache[net.IP(c.ServerIP).String()]; ok {
-					egressFqdn = ipFqdn.name
-				}
-			}
-			conns[i] = conn2CLUS(c, egressFqdn)
+			conns[i] = conn2CLUS(c)
 		}
 
 		resp, err := sendConnections(conns)
@@ -643,45 +637,4 @@ func putConnections() {
 	}
 
 	nextConnectReportTick += connectReportInterval
-}
-
-const ipFqdnRemovalDelay = time.Duration(time.Minute * 30)
-
-type ipFqdnRemovalEvent struct{
-	ip string
-}
-
-func (p *ipFqdnRemovalEvent) Expire() {
-	ipFqdnMutex.Lock()
-	log.WithFields(
-		log.Fields{
-			"ip":   p.ip,
-			"name": ipFqdnCache[p.ip].name,
-		}).Info("Delete IP - FQDN record")
-	delete(ipFqdnCache, p.ip)
-	ipFqdnMutex.Unlock()
-}
-
-func ScheduleIpFqdnRemoval(ip string) {
-	// Reomve old timer
-	if ipFqdnCache[ip].timerTask != "" {
-		log.WithFields(log.Fields{"ip": ip}).Info("remove old timer")
-		ipFqdnCache[ip].timerWheel.RemoveTask(ipFqdnCache[ip].timerTask)
-		ipFqdnCache[ip].timerTask = ""
-	}
-	// Schedule new timer
-	task := &ipFqdnRemovalEvent{
-		ip: ip,
-	}
-	timertask, _ := ipFqdnCache[ip].timerWheel.AddTask(task, ipFqdnRemovalDelay)
- 	ipFqdnCache[ip].timerTask = timertask
-	if ipFqdnCache[ip].timerTask == "" {
-		log.Error("Fail to insert timer")
-	}
-	log.WithFields(
-		log.Fields{
-			"ip":                 ip,
-			"name":               ipFqdnCache[ip].name,
-			"ipFqdnRemovalDelay": ipFqdnRemovalDelay,
-		}).Info("Timertask scheduled")
 }

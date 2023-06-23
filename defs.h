@@ -145,18 +145,19 @@
 // Message format shares between processes in agent, which is upgraded together,
 // value can be changed.
 
-#define DP_KIND_APP_UPDATE     1
-#define DP_KIND_SESSION_LIST   2
-#define DP_KIND_SESSION_COUNT  3
-#define DP_KIND_DEVICE_COUNTER 4
-#define DP_KIND_METER_LIST     5
-#define DP_KIND_THREAT_LOG     6
-#define DP_KIND_CONNECTION     7
-#define DP_KIND_MAC_STATS      8
-#define DP_KIND_DEVICE_STATS   9
-#define DP_KIND_KEEP_ALIVE     10
-#define DP_KIND_FQDN_UPDATE    11
-#define DP_KIND_IP_FQDN_UPDATE 12
+#define DP_KIND_APP_UPDATE              1
+#define DP_KIND_SESSION_LIST            2
+#define DP_KIND_SESSION_COUNT           3
+#define DP_KIND_DEVICE_COUNTER          4
+#define DP_KIND_METER_LIST              5
+#define DP_KIND_THREAT_LOG              6
+#define DP_KIND_CONNECTION              7
+#define DP_KIND_MAC_STATS               8
+#define DP_KIND_DEVICE_STATS            9
+#define DP_KIND_KEEP_ALIVE              10
+#define DP_KIND_FQDN_UPDATE             11
+#define DP_KIND_IP_FQDN_STORAGE_UPDATE  12
+#define DP_KIND_IP_FQDN_STORAGE_RELEASE 13
 
 typedef struct {
     uint8_t  Kind;
@@ -452,6 +453,10 @@ typedef struct {
 typedef struct {
     uint8_t  IP[16];
     char     Name[DP_POLICY_FQDN_NAME_MAX_LEN];
-} DPMsgIpFqdnHdr;
+} DPMsgIpFqdnStorageUpdateHdr;
+
+typedef struct {
+    uint8_t  IP[16];
+} DPMsgIpFqdnStorageReleaseHdr;
 
 #endif

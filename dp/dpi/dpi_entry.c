@@ -49,6 +49,7 @@ void dpi_init(int reason)
     dpi_log_init();
     dpi_policy_init();
     dpi_unknown_ip_init();
+    dpi_ip_fqdn_storage_init();
     sql_injection_init();
 }
 

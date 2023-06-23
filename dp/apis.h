@@ -16,6 +16,7 @@
 #include "urcu/list.h"
 #include "utils/rcu_map.h"
 #include "utils/bitmap.h"
+#include "utils/timer_wheel.h"
 
 #define MAX_THREAD_NAME_LEN 32
 extern __thread int THREAD_ID;
@@ -278,8 +279,6 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *policy, int flag);
 void dp_policy_destroy(void *policy_hdl);
 void dpi_fqdn_entry_mark_delete(const char *name);
 void dpi_fqdn_entry_delete_marked();
-void dpi_ip_fqdn_entry_mark_delete(uint32_t ip);
-void dpi_ip_fqdn_entry_delete_marked();
 
 /*
  * -----------------------------------------------------
@@ -320,31 +319,17 @@ typedef struct fqdn_ipv4_item_ {
     uint32_t ip;
 } fqdn_ipv4_item_t;
 
-typedef struct ipv4_fqdn_record_ {
-    uint32_t ip;
-    char     name[MAX_FQDN_LEN];
-    uint32_t flag;
-} ipv4_fqdn_record_t;
-
-typedef struct ipv4_fqdn_entry_ {
-    struct cds_lfht_node node;
-    ipv4_fqdn_record_t *r;
-} ipv4_fqdn_entry_t;
-
 #define DPI_FQDN_DELETE_QLEN      32
 #define DPI_FQDN_MAX_ENTRIES      DP_POLICY_FQDN_MAX_ENTRIES
 typedef struct dpi_fqdn_hdl_ {
     rcu_map_t fqdn_name_map;
     rcu_map_t fqdn_ipv4_map;
-    rcu_map_t ipv4_fqdn_map;
     bitmap *bm;
     int code_cnt;
     int del_name_cnt;
     int del_ipv4_cnt;
-    int del_ipv4_fqdn_cnt;
     fqdn_name_entry_t *del_name_list[DPI_FQDN_DELETE_QLEN];
     fqdn_ipv4_entry_t *del_ipv4_list[DPI_FQDN_DELETE_QLEN];
-    ipv4_fqdn_entry_t *del_ipv4_fqdn_list[DPI_FQDN_DELETE_QLEN];
     struct cds_list_head del_rlist;
 } dpi_fqdn_hdl_t;
 
@@ -354,6 +339,26 @@ typedef struct fqdn_iter_ctx_ {
 } fqdn_iter_ctx_t;
 
 uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, bool vh);
+
+/*
+ * -----------------------------------------
+ * --- ip-fqdn storage definition ----------
+ * -----------------------------------------
+ */
+#define IP_FQDN_STORAGE_ENTRY_TIMEOUT 1800 //sec
+// #define IP_FQDN_STORAGE_ENTRY_TIMEOUT 300 //sec
+typedef struct dpi_ip_fqdn_storage_record_ {
+    uint32_t ip;
+    char     name[MAX_FQDN_LEN];
+    uint32_t record_updated;
+} dpi_ip_fqdn_storage_record_t;
+
+typedef struct dpi_ip_fqdn_storage_entry_ {
+    struct cds_lfht_node node;
+    timer_entry_t ts_entry;
+
+    dpi_ip_fqdn_storage_record_t *r;
+} dpi_ip_fqdn_storage_entry_t;
 
 //dlp
 #define MAX_DLP_RULE_NAME_LEN DP_DLP_RULE_NAME_MAX_LEN
@@ -416,5 +421,6 @@ extern int dp_data_wait_ctrl_req_thr(int req, int thr_id);
 extern pthread_cond_t g_dlp_ctrl_req_cond;
 extern pthread_mutex_t g_dlp_ctrl_req_lock;
 extern int dp_dlp_wait_ctrl_req_thr(int req);
+extern void dp_ctrl_release_ip_fqdn_storage(dpi_ip_fqdn_storage_entry_t *entry);
 
 #endif

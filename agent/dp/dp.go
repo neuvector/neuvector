@@ -259,28 +259,48 @@ func dpMsgFqdnIpUpdate(msg []byte) {
 	taskCallback(&task)
 }
 
-func dpMsgIpFqdnUpdate(msg []byte) {
-	var ipFqdnHdr C.DPMsgIpFqdnHdr
+func dpMsgIpFqdnStorageUpdate(msg []byte) {
+	var ipFqdnStorageUpdateHdr C.DPMsgIpFqdnStorageUpdateHdr
 	// Verify header length
-	ipFqdnHdrLen := int(unsafe.Sizeof(ipFqdnHdr))
-	if len(msg) < ipFqdnHdrLen {
-		log.WithFields(log.Fields{"expect": ipFqdnHdrLen, "actual": len(msg)}).Error("Short header")
+	ipFqdnStorageUpdateHdrLen := int(unsafe.Sizeof(ipFqdnStorageUpdateHdr))
+	if len(msg) < ipFqdnStorageUpdateHdrLen {
+		log.WithFields(log.Fields{"expect": ipFqdnStorageUpdateHdrLen, "actual": len(msg)}).Error("Short header")
 		return
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &ipFqdnHdr)
+	binary.Read(r, binary.BigEndian, &ipFqdnStorageUpdateHdr)
 
-	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnHdr.IP[0]), 4))
-	name := C.GoString(&ipFqdnHdr.Name[0])
-	ipFqdns := &IpFqdn{
+	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnStorageUpdateHdr.IP[0]), 4))
+	name := C.GoString(&ipFqdnStorageUpdateHdr.Name[0])
+	ipFqdnStorageUpdate := &IpFqdnStorageUpdate{
 		IP: ip,
 		Name: name,
 	}
 
-	log.WithFields(log.Fields{"ipFqdns": ipFqdns}).Debug("")
+	log.WithFields(log.Fields{"update ipFqdnStorage": ipFqdnStorageUpdate}).Debug("")
 
-	task := DPTask{Task: DP_TASK_IP_FQDN, IpFqdns: ipFqdns}
+	task := DPTask{Task: DP_TASK_IP_FQDN_STORAGE_UPDATE, FqdnStorageUpdate: ipFqdnStorageUpdate}
+	taskCallback(&task)
+}
+
+func dpMsgIpFqdnStorageRelease(msg []byte) {
+	var ipFqdnStorageReleaseHdr C.DPMsgIpFqdnStorageReleaseHdr
+	// Verify header length
+	ipFqdnStorageReleaseHdrLen := int(unsafe.Sizeof(ipFqdnStorageReleaseHdr))
+	if len(msg) < ipFqdnStorageReleaseHdrLen {
+		log.WithFields(log.Fields{"expect": ipFqdnStorageReleaseHdrLen, "actual": len(msg)}).Error("Short header")
+		return
+	}
+
+	r := bytes.NewReader(msg)
+	binary.Read(r, binary.BigEndian, &ipFqdnStorageReleaseHdr)
+
+	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnStorageReleaseHdr.IP[0]), 4))
+
+	log.WithFields(log.Fields{"release ipFqdnStorage": ip}).Debug("")
+
+	task := DPTask{Task: DP_TASK_IP_FQDN_STORAGE_RELEASE, FqdnStorageRelease: ip}
 	taskCallback(&task)
 }
 
@@ -321,8 +341,10 @@ func dpMessenger(msg []byte) {
 		dpMsgConnection(msg[offset:])
 	case C.DP_KIND_FQDN_UPDATE:
 		dpMsgFqdnIpUpdate(msg[offset:])
-	case C.DP_KIND_IP_FQDN_UPDATE:
-		dpMsgIpFqdnUpdate(msg[offset:])
+	case C.DP_KIND_IP_FQDN_STORAGE_UPDATE:
+		dpMsgIpFqdnStorageUpdate(msg[offset:])
+	case C.DP_KIND_IP_FQDN_STORAGE_RELEASE:
+		dpMsgIpFqdnStorageRelease(msg[offset:])
 	}
 }
 

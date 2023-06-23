@@ -15,7 +15,8 @@ const (
 	DP_TASK_HOST_CONNECTION
 	DP_TASK_APPLICATION
 	DP_TASK_FQDN_IP
-	DP_TASK_IP_FQDN
+	DP_TASK_IP_FQDN_STORAGE_UPDATE
+	DP_TASK_IP_FQDN_STORAGE_RELEASE
 )
 
 type Connection struct {
@@ -57,17 +58,18 @@ type ConnectionData struct {
 	Conn  *Connection
 }
 
-type IpFqdn struct {
+type IpFqdnStorageUpdate struct {
 	IP   net.IP
 	Name string
 }
 
 type DPTask struct {
-	Task     int
-	MAC      net.HardwareAddr
-	SecLog   *share.CLUSThreatLog
-	Connects []*ConnectionData
-	Apps     map[share.CLUSProtoPort]*share.CLUSApp
-	Fqdns    *share.CLUSFqdnIp
-	IpFqdns  *IpFqdn
+	Task               int
+	MAC                net.HardwareAddr
+	SecLog             *share.CLUSThreatLog
+	Connects           []*ConnectionData
+	Apps               map[share.CLUSProtoPort]*share.CLUSApp
+	Fqdns              *share.CLUSFqdnIp
+	FqdnStorageUpdate  *IpFqdnStorageUpdate
+	FqdnStorageRelease net.IP
 }
