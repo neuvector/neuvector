@@ -317,6 +317,16 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 	return "", false
 }
 
+func getNeuVectorRole(info *container.ContainerMetaExtra) (string, bool) {
+	labels := info.Labels
+	if Agent.Domain != "" && Agent.Domain != global.ORCH.GetDomain(labels) { // orchestra
+		return "", false
+	}
+
+	role, ok := labels[share.NeuVectorLabelRole]
+	return role, ok
+}
+
 func isSidecarContainer(labels map[string]string) bool {
 	//check if container is a sidecar that is linkerd-proxy or istio-proxy
 	sc_containername, _ := labels[container.KubeKeyContainerName]
