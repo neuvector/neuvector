@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +17,12 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 )
+
+type tCspAdapterErrors struct {
+	CspErrors      []string `json:"csp_errors,omitempty"`
+	NvError        *string  `json:"nv_error,omitempty"`
+	DataExpireTime *int64   `json:"billing_data_expire_time,omitempty"`  // in seconds
+}
 
 func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
@@ -75,14 +80,18 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		resp = resource.GetCspConfig()
 	}
 
-	if len(resp.CspErrors) > 0 || resp.NvError != "" {
-		var errors []string
-		if resp.NvError != "" {
-			errors = append(resp.CspErrors, resp.NvError)
-		} else {
-			errors = resp.CspErrors
-		}
-		errHeader := base64.StdEncoding.EncodeToString([]byte(strings.Join(errors, "\n")))
+	var cspAdapterErrors tCspAdapterErrors
+	if len(resp.CspErrors) > 0 {
+		cspAdapterErrors.CspErrors = resp.CspErrors
+	}
+	if resp.NvError != "" {
+		cspAdapterErrors.NvError = &resp.NvError
+	}
+	if resp.ExpireTime != 0 {
+		cspAdapterErrors.DataExpireTime = &resp.ExpireTime
+	}
+	if data, err := json.Marshal(&cspAdapterErrors); err == nil {
+		errHeader := base64.StdEncoding.EncodeToString(data)
 		w.Header().Set("X-Nv-Csp-Adapter-Errors", errHeader)
 	}
 	if err != nil || resp.CspConfigData == "" || resp.CspConfigData == "{}" {
