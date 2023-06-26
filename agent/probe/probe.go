@@ -538,7 +538,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		}
 	}
 
-	p.selfID, _, _ = global.SYS.GetSelfContainerID()
+	p.selfID = global.RT.GetSelfID()
 	p.agentSessionID = osutil.GetSessionId(p.agentPid)
 	//log.WithFields(log.Fields{"sessionID": p.agentSessionID, "container ID": p.selfID}).Info("PROC: ")
 

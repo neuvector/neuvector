@@ -379,7 +379,8 @@ func main() {
 	agentEnv.runWithController = *withCtlr
 	agentEnv.runInContainer = global.SYS.IsRunningInContainer()
 	if agentEnv.runInContainer {
-		selfID, agentEnv.containerInContainer, err = global.SYS.GetSelfContainerID()
+		_, agentEnv.containerInContainer, _ = global.SYS.GetSelfContainerID()
+		selfID = global.RT.GetSelfID()
 		if selfID == "" { // it is a POD ID in the k8s cgroup v2; otherwise, a real container ID
 			log.WithFields(log.Fields{"error": err}).Error("Unsupported system. Exit!")
 			os.Exit(-2)
