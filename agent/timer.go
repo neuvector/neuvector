@@ -195,12 +195,24 @@ func updateAgentStats(cpuSystem uint64) {
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
-		// NVSHAS 7990 - Pause is not useful to track stats for and had a setup that threw a ton of file not found errs
-		if c.name != "pause" {
-			mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-			cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-			system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
+
+		// Check for resource stats.
+		// Log the error only if the error the container does not have a parent namespace.
+		// It is likely this is a pause container and sometimes won't have stats populated (nor useful)
+		var cpu, mem uint64
+		if ms, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
+			mem = ms
+			if c.parentNS != "" {
+				log.WithFields(log.Fields{"name": c.name, "id": c.pid, "err": err.Error()}).Info("Memory stats error")
+			}
 		}
+		if cs, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
+			cpu = cs
+			if c.parentNS != "" {
+				log.WithFields(log.Fields{"name": c.name, "id": c.pid, "ii": c.info, "err": err.Error()}).Info("CPU stats error")
+			}
+		}
+		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
 }
 
