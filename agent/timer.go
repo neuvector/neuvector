@@ -200,16 +200,17 @@ func updateContainerStats(cpuSystem uint64) {
 		// Log the error only if the error the container does not have a parent namespace.
 		// It is likely this is a pause container and sometimes won't have stats populated (nor useful)
 		var cpu, mem uint64
-		if ms, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
-			mem = ms
+		var err error
+
+		if mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
 			if c.parentNS != "" {
-				log.WithFields(log.Fields{"name": c.name, "id": c.pid, "err": err.Error()}).Info("Memory stats error")
+				log.WithFields(log.Fields{"name": c.name, "pid": c.pid, "error": err.Error()}).Error("Memory stats error")
 			}
 		}
-		if cs, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
-			cpu = cs
+
+		if cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
 			if c.parentNS != "" {
-				log.WithFields(log.Fields{"name": c.name, "id": c.pid, "ii": c.info, "err": err.Error()}).Info("CPU stats error")
+				log.WithFields(log.Fields{"name": c.name, "pid": c.pid, "error": err.Error()}).Error("CPU stats error")
 			}
 		}
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
