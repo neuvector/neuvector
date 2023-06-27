@@ -33,6 +33,7 @@ type crioDriver struct {
 	endpoint     string
 	endpointHost string
 	nodeHostname string
+	selfID       string
 	criClient    *grpc.ClientConn
 	version      *criRT.VersionResponse
 	daemonInfo   types.CrioInfo
@@ -104,16 +105,18 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	sockPath := endpoint
-	if id, _, err := sys.GetSelfContainerID(); err == nil {
-		sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
+	id, _, _ := sys.GetSelfContainerID() // not relaible, could be sandboxID
+	id, _ = criGetSelfID(cri, ctx, id)
+	sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint) // update id
+	if err == nil {
+		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver}).Info("crio connected")
-
 	driver := crioDriver{
 		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod", endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
-		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon,
+		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon, selfID: id,
 	}
 
 	name, _ := os.Readlink("/proc/1/exe")
@@ -206,6 +209,10 @@ func (d *crioDriver) GetHost() (*share.CLUSHost, error) {
 	}
 
 	return &host, nil
+}
+
+func (d *crioDriver) GetSelfID() string {
+	return d.selfID
 }
 
 func (d *crioDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtra, error) {

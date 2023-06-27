@@ -27,6 +27,7 @@ type dockerDriver struct {
 	sys          *system.SystemTools
 	endpoint     string
 	endpointHost string
+	selfID       string
 	evCallback   EventCallback
 	client       *dockerclient.DockerClient
 	version      *dockerclient.Version
@@ -77,7 +78,7 @@ func getContainerSocketPath(client *dockerclient.DockerClient, id, endpoint stri
 			}
 		}
 	}
-	log.WithFields(log.Fields{"error": err, "id": id, "endpoint": endpoint}).Error("Failed to get mounting container socket")
+	log.WithFields(log.Fields{"error": err, "endpoint": endpoint}).Error("Failed to get mounting container socket")
 	return "", err
 }
 
@@ -88,11 +89,15 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	sockPath := endpoint
-	if id, _, err := sys.GetSelfContainerID(); err == nil {
-		sockPath, err = getContainerSocketPath(client, id, endpoint)
+	id, _, err := sys.GetSelfContainerID()	// ref, not reliable
+	sockPath, err = getContainerSocketPath(client, id, endpoint)
+	if err == nil {
+		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 	}
 
-	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client, version: ver, info: info}
+
+	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client,
+		                   version: ver, info: info, selfID: id,}
 	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current",
 	         "docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
 	name, _ := os.Readlink("/proc/1/exe")
@@ -163,6 +168,10 @@ func (d *dockerDriver) GetHost() (*share.CLUSHost, error) {
 	}
 
 	return &host, nil
+}
+
+func (d *dockerDriver) GetSelfID() string {
+	return d.selfID
 }
 
 func (d *dockerDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtra, error) {
