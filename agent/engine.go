@@ -317,6 +317,16 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 	return "", false
 }
 
+func getNeuVectorRole(info *container.ContainerMetaExtra) (string, bool) {
+	labels := info.Labels
+	if Agent.Domain != "" && Agent.Domain != global.ORCH.GetDomain(labels) { // orchestra
+		return "", false
+	}
+
+	role, ok := labels[share.NeuVectorLabelRole]
+	return role, ok
+}
+
 func isSidecarContainer(labels map[string]string) bool {
 	//check if container is a sidecar that is linkerd-proxy or istio-proxy
 	sc_containername, _ := labels[container.KubeKeyContainerName]
@@ -1670,6 +1680,10 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 			go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
 		}
 	}
+
+	nvRole := container.PlatformContainerNeuVector
+	ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, role: &nvRole, service: &c.service, domain: &c.domain}
+	ClusterEventChan <- &ev
 }
 
 //////
@@ -1953,7 +1967,8 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		// service is not reported until container is running; domain should be filled.
 		// it reports the exited container as well
 		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
-		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &svc.Name, domain: &svc.Domain}
+		service := utils.MakeServiceName(svc.Domain, svc.Name)
+		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &service, domain: &svc.Domain}
 		ClusterEventChan <- &ev
 
 		log.Debug("Container not running")
@@ -2026,6 +2041,10 @@ func taskStopContainer(id string, pid int) {
 		info = c.info
 		info.Running = false
 	} else if info.Running {
+		// docker will have a catchup event to show its Exit code
+		if global.RT.String() == container.RuntimeDocker {
+			return
+		}
 		if osutil.IsPidValid(info.Pid) && info.FinishedAt.IsZero() {
 			// Wait for the updated container info
 			// log.WithFields(log.Fields{"info": info}).Debug()

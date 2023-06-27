@@ -590,9 +590,9 @@ func getNvName(id string) *workloadNames {
 	if cache, ok := nvwlCacheMap[id]; ok {
 		wl := cache.workload
 		names := &workloadNames{
-			name:    cache.podName,
-			domain:  wl.Domain,
-			image:   wl.Image,
+			name:   cache.podName,
+			domain: wl.Domain,
+			image:  wl.Image,
 		}
 		return names
 	}
@@ -1853,16 +1853,18 @@ func startWorkerThread(ctx *Context) {
 					if ev.ResourceOld != nil {
 						o = ev.ResourceOld.(*resource.Namespace)
 					}
-					if n != nil {
-						// ignore neuvector domain
-						if n.Name != localDev.Ctrler.Domain {
-							domainAdd(n.Name, n.Labels)
-						} else {
-							// for the upgrade cas
-							domainDelete(n.Name)
+					if isLeader() {
+						if n != nil {
+							// ignore neuvector domain
+							if n.Name != localDev.Ctrler.Domain {
+								domainAdd(n.Name, n.Labels)
+							} else {
+								// for the upgrade case
+								domainDelete(n.Name)
+							}
+						} else if o != nil {
+							domainDelete(o.Name)
 						}
-					} else if o != nil {
-						domainDelete(o.Name)
 					}
 					if n != nil {
 						if skip := atomic.LoadUint32(&nvDeployDeleted); skip == 0 && isLeader() && admission.IsNsSelectorSupported() {

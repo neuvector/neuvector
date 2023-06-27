@@ -83,6 +83,7 @@ func GetDriver(platform, flavor, network string, ver1, ver2 string,
 		driver := &kubernetes{
 			noop: noop{platform: platform, flavor: flavor, network: network},
 			sys:  sys, k8sVer: ver1, ocVer: ver2,
+			envParser: utils.NewEnvironParser(os.Environ()),
 		}
 		return driver
 	case share.PlatformRancher:

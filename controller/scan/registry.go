@@ -47,22 +47,23 @@ type pollContext struct {
 
 // This structure is derived from image summary and scan report. Mostly used for admisssion control
 type imageInfoCache struct {
-	highVuls        int
-	medVuls         int
-	highVulsWithFix int
-	vulScore        float32
-	vulTraits       []*scanUtils.VulTrait
-	vulInfo         map[string]map[string]share.CLUSScannedVulInfo // 1st key is "high"/"medium". 2nd key is "{vul_name}::{package_name}"
-	lowVulInfo      []share.CLUSScannedVulInfoSimple
-	layers          []string
-	envs            []string
-	cmds            []string
-	labels          map[string]string
-	modules         []*share.ScanModule
-	secrets         []*share.ScanSecretLog
-	setIDPerm       []*share.ScanSetIdPermLog
-	filteredTime    time.Time
-	verifiers       []string
+	highVuls                       int
+	medVuls                        int
+	highVulsWithFix                int
+	vulScore                       float32
+	vulTraits                      []*scanUtils.VulTrait
+	vulInfo                        map[string]map[string]share.CLUSScannedVulInfo // 1st key is "high"/"medium". 2nd key is "{vul_name}::{package_name}"
+	lowVulInfo                     []share.CLUSScannedVulInfoSimple
+	layers                         []string
+	envs                           []string
+	cmds                           []string
+	labels                         map[string]string
+	modules                        []*share.ScanModule
+	secrets                        []*share.ScanSecretLog
+	setIDPerm                      []*share.ScanSetIdPermLog
+	filteredTime                   time.Time
+	signatureVerifiers             []string
+	signatureVerificationTimestamp string
 }
 
 type Registry struct {
@@ -479,7 +480,10 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				c.secrets = report.Secrets.Logs
 			}
 			c.setIDPerm = report.SetIdPerms
-			c.verifiers = report.Verifiers
+			if report.SignatureInfo != nil {
+				c.signatureVerifiers = report.SignatureInfo.Verifiers
+				c.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
+			}
 
 			c.layers = make([]string, len(report.Layers))
 			for i, l := range report.Layers {
@@ -803,6 +807,10 @@ func (rs *Registry) getScanImages(sctx *scanContext, drv registryDriver, dryrun 
 					smd.scanLog.WithFields(log.Fields{
 						"repo": itf, "tag": tag, "error": scanUtils.ScanErrorToStr(errCode),
 					}).Debug("Failed to get image info")
+					continue
+				}
+
+				if info.IsSignatureImage {
 					continue
 				}
 
@@ -1362,6 +1370,10 @@ func (rs *Registry) scheduleScanImages(
 
 			total++
 			newImage := false
+
+			if info.IsSignatureImage {
+				continue
+			}
 
 			// Add to the map to be returned
 			image := share.CLUSImage{Domain: itf.Domain, Repo: itf.Repo, Tag: tag, RegMod: itf.RegMod}

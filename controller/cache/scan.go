@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -55,23 +56,24 @@ const (
 )
 
 type scanInfo struct {
-	initStateLoaded bool
-	agentId         string
-	status          int
-	lastResult      share.ScanErrorCode
-	lastScanTime    time.Time
-	baseOS          string
-	priority        scheduler.Priority
-	retry           int
-	objType         share.ScanObjectType
-	version         string
-	cveDBCreateTime string
-	brief           *api.RESTScanBrief    // Stats of filtered entries
-	vulTraits       []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
-	filteredTime    time.Time
-	idns            []api.RESTIDName
-	modules         []*share.ScanModule
-	verifiers       []string
+	initStateLoaded                bool
+	agentId                        string
+	status                         int
+	lastResult                     share.ScanErrorCode
+	lastScanTime                   time.Time
+	baseOS                         string
+	priority                       scheduler.Priority
+	retry                          int
+	objType                        share.ScanObjectType
+	version                        string
+	cveDBCreateTime                string
+	brief                          *api.RESTScanBrief    // Stats of filtered entries
+	vulTraits                      []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	filteredTime                   time.Time
+	idns                           []api.RESTIDName
+	modules                        []*share.ScanModule
+	signatureVerifiers             []string
+	signatureVerificationTimestamp string
 }
 
 type scanTaskInfo struct {
@@ -477,7 +479,10 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
 		info.modules = report.Modules
-		info.verifiers = report.Verifiers
+		if report.SignatureInfo != nil {
+			info.signatureVerifiers = report.SignatureInfo.Verifiers
+			info.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
+		}
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
@@ -512,11 +517,14 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	}
 }
 
-func (m CacheMethod) GetScannerCount(acc *access.AccessControl) int {
+func (m CacheMethod) GetScannerCount(acc *access.AccessControl) (int, string, string) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
+	sdb := scanUtils.GetScannerDB()
+	dbTime := sdb.CVEDBCreateTime
+	dbVers := sdb.CVEDBVersion
 	if acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) {
-		return len(scannerCacheMap)
+		return len(scannerCacheMap), dbTime, dbVers
 	} else {
 		var count int
 		for _, s := range scannerCacheMap {
@@ -525,7 +533,7 @@ func (m CacheMethod) GetScannerCount(acc *access.AccessControl) int {
 			}
 			count++
 		}
-		return count
+		return count, dbTime, dbVers
 	}
 }
 
@@ -952,6 +960,13 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 					currImagesMD5, ok := fedScanResultMD5[fedRegName]
 					if !ok || currImagesMD5 == nil {
 						currImagesMD5 = make(map[string]string, 1)
+					}
+					if report != nil && report.SignatureInfo != nil {
+						if report.SignatureInfo.Verifiers != nil {
+							sort.Strings(report.SignatureInfo.Verifiers)
+						}
+						report.SignatureInfo.VerificationTimestamp = ""
+						report.SignatureInfo.VerificationError = 0
 					}
 					res, _ := json.Marshal(&scanResult)
 					md5Sum := md5.Sum(res)

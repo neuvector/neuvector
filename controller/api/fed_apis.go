@@ -266,7 +266,7 @@ type RESTFedCspSupportReq struct { // for joint clusters to request csp-config d
 
 type RESTFedCspSupportResp struct { // csp-config data returned from master cluster
 	Compliant        bool     `json:"compliant"`
-	ExpireTime       string   `json:"expire_time"`     // the last billing "compliant" state's expiration time
+	ExpireTime       int64    `json:"expire_time"`     // the last billing "compliant" state's expiration time in seconds
 	CspErrors        []string `json:"csp_errors"`      // internal errors from csp-adapter
 	NvError          string   `json:"nv_error"`        // error message for nv to check csp-config
 	CspConfigData    string   `json:"csp_config_data"` // raw csp-config data

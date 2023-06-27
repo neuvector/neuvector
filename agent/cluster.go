@@ -452,7 +452,8 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 	}
 
 	if svc != nil && domain != nil {
-		wl.Service = utils.MakeServiceName(*domain, *svc)
+		// It must be a full service name, like "iperf.demo".
+		wl.Service = *svc
 		wl.Domain = *domain
 	}
 	return &wl
@@ -584,8 +585,13 @@ func clusterStopContainer(ev *ClusterEvent) {
 		if ev.info == nil {
 			return
 		}
+
 		// Container might not be intercepted and reported yet.
 		wl := createWorkload(ev.info, ev.service, ev.domain)
+		if _, ok := getNeuVectorRole(ev.info); ok {
+			// nuVector pod
+			wl.PlatformRole = container.PlatformContainerNeuVector
+		}
 		putWorkload(wl)
 		wlCacheMap[ev.id] = &workloadInfo{wl: wl}
 

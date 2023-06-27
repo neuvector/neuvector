@@ -2746,8 +2746,6 @@ type CLUSSigstoreRootOfTrust struct {
 type CLUSSigstoreVerifier struct {
 	Name         string `json:"name"`
 	VerifierType string `json:"verifier_type"`
-	IgnoreTLog   bool   `json:"ignore_tlog"`
-	IgnoreSCT    bool   `json:"ignore_sct"`
 	PublicKey    string `json:"public_key"`
 	CertIssuer   string `json:"cert_issuer"`
 	CertSubject  string `json:"cert_subject"`

@@ -800,6 +800,13 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	}
 	clusHelper.UpgradeClusterImport(importVer)
 
+	profile := &share.CLUSVulnerabilityProfile{
+		Name:    share.DefaultVulnerabilityProfileName,
+		Entries: make([]*share.CLUSVulnerabilityProfileEntry, 0),
+	}
+	clusHelper.PutVulnerabilityProfileIfNotExist(profile)
+	createDefaultComplianceProfile()
+
 	if len(importInfo.fedRulesRevValue) > 0 {
 		var fedRulesRev share.CLUSFedRulesRevision
 		if err := json.Unmarshal([]byte(importInfo.fedRulesRevValue), &fedRulesRev); err == nil {

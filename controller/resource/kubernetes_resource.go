@@ -582,7 +582,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		},
 	},
 	RscTypeCrdNvCspUsage: k8sResource{
-		apiGroup: constApiGroupNV,
+		apiGroup: "susecloud.net",
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
@@ -1293,8 +1293,8 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		_, err = d.discoverResource(rt)
 	case RscTypeCrdNvCspUsage:
 		d.lock.Lock()
-		k8s.Register("neuvector.com", "v1", NvCspUsagePlural, false, &NvCspUsage{})
-		k8s.RegisterList("neuvector.com", "v1", NvCspUsagePlural, false, &NvCspUsageList{})
+		k8s.Register("susecloud.net", "v1", NvCspUsagePlural, false, &NvCspUsage{})
+		k8s.RegisterList("susecloud.net", "v1", NvCspUsagePlural, false, &NvCspUsageList{})
 		d.lock.Unlock()
 
 		_, err = d.discoverResource(rt)
@@ -1890,7 +1890,7 @@ func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8s
 			name: nvCspUsageRole,
 			rules: []*k8sRbacRoleRuleInfo{
 				&k8sRbacRoleRuleInfo{
-					apiGroup:  constApiGroupNV,
+					apiGroup:  "susecloud.net",
 					resources: utils.NewSet(RscTypeCrdNvCspUsage),
 					verbs:     utils.NewSet("get", "create", "update", "delete"),
 				},

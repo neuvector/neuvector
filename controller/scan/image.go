@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	registryUtils "github.com/neuvector/neuvector/share/scan/registry"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -261,7 +262,7 @@ func (r *base) GetAllImages() (map[share.CLUSImage][]string, error) {
 }
 
 func (r *base) GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode) {
-	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag)
+	rinfo, errCode := r.rc.GetImageInfo(ctx, repo, tag, registryUtils.ManifestRequest_Default)
 	return rinfo, errCode
 }
 
@@ -287,10 +288,8 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 
 		for _, clusVerifier := range clusVerifiers {
 			reqVerifier := &share.SigstoreVerifier{
-				Name:       clusVerifier.Name,
-				Type:       clusVerifier.VerifierType,
-				IgnoreTLog: clusVerifier.IgnoreTLog,
-				IgnoreSCT:  clusVerifier.IgnoreSCT,
+				Name: clusVerifier.Name,
+				Type: clusVerifier.VerifierType,
 			}
 			reqVerifier.KeypairOptions = &share.SigstoreKeypairOptions{
 				PublicKey: clusVerifier.PublicKey,

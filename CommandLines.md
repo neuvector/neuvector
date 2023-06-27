@@ -40,7 +40,7 @@ CONTAINER_NET_TYPE
 > Options are 'default' and 'macvlan'
 
 NV_SYSTEM_GROUPS
-> Specify the services that match the filters as system contaienr. Only for docker platform (NVSHAS-4394)
+> Specify the services that match the filters as system contaienr.
 > NV_SYSTEM_GROUPS=ucp-*;node
 
 ### Scanner

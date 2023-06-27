@@ -2157,15 +2157,20 @@ type RESTScanReportData struct {
 }
 
 type RESTScanReport struct {
-	Vuls      []*RESTVulnerability `json:"vulnerabilities"`
-	Modules   []*RESTScanModule    `json:"modules,omitempty"`
-	Checks    []*RESTBenchItem     `json:"checks,omitempty"`
-	Secrets   []*RESTScanSecret    `json:"secrets,omitempty"`
-	SetIDs    []*RESTScanSetIdPerm `json:"setid_perms,omitempty"`
-	Envs      []string             `json:"envs,omitempty"`
-	Labels    map[string]string    `json:"labels,omitempty"`
-	Cmds      []string             `json:"cmds,omitempty"`
-	Verifiers []string             `json:"verifiers,omitempty"`
+	Vuls          []*RESTVulnerability   `json:"vulnerabilities"`
+	Modules       []*RESTScanModule      `json:"modules,omitempty"`
+	Checks        []*RESTBenchItem       `json:"checks,omitempty"`
+	Secrets       []*RESTScanSecret      `json:"secrets,omitempty"`
+	SetIDs        []*RESTScanSetIdPerm   `json:"setid_perms,omitempty"`
+	Envs          []string               `json:"envs,omitempty"`
+	Labels        map[string]string      `json:"labels,omitempty"`
+	Cmds          []string               `json:"cmds,omitempty"`
+	SignatureInfo *RESTScanSignatureInfo `json:"signature_data,omitempty"`
+}
+
+type RESTScanSignatureInfo struct {
+	Verifiers             []string `json:"verifiers,omitempty"`
+	VerificationTimestamp string   `json:"verification_timestamp"`
 }
 
 type RESTScanLayer struct {
@@ -3420,6 +3425,7 @@ type RESTAdminCriteriaTemplate struct {
 
 const (
 	ApikeyExpireNever      string = "never"
+	ApikeyExpireOneHour    string = "onehour"
 	ApikeyExpireOneDay     string = "oneday"
 	ApikeyExpireOneMonth   string = "onemonth"
 	ApikeyExpireOneYear    string = "oneyear"
@@ -3507,8 +3513,6 @@ type REST_SigstoreRootOfTrust_PATCH struct {
 type REST_SigstoreVerifier struct {
 	Name         string `json:"name"`
 	VerifierType string `json:"verifier_type"`
-	IgnoreTLog   bool   `json:"ignore_tlog"`
-	IgnoreSCT    bool   `json:"ignore_sct"`
 	PublicKey    string `json:"public_key"`
 	CertIssuer   string `json:"cert_issuer"`
 	CertSubject  string `json:"cert_subject"`
@@ -3517,8 +3521,6 @@ type REST_SigstoreVerifier struct {
 
 type REST_SigstoreVerifier_PATCH struct {
 	VerifierType *string `json:"verifier_type,omitempty"`
-	IgnoreTLog   *bool   `json:"ignore_tlog,omitempty"`
-	IgnoreSCT    *bool   `json:"ignore_sct,omitempty"`
 	PublicKey    *string `json:"public_key,omitempty"`
 	CertIssuer   *string `json:"cert_issuer,omitempty"`
 	CertSubject  *string `json:"cert_subject,omitempty"`

@@ -116,7 +116,13 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	var err error
 	var obj interface{}
 	rscName := resource.RscCspUsageName
-	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", cctx.NvSemanticVersion)
+	nvSemanticVersion := cctx.NvSemanticVersion
+	if strings.HasPrefix(nvSemanticVersion, "v") {
+		nvSemanticVersion = nvSemanticVersion[1:]
+	}
+	// nvSemanticVersion is in the format {major}.{minor}.{patch}
+	// baseProduct is in the format cpe:/o:suse:neuvector:{major}.{minor}.{patch}
+	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", nvSemanticVersion)
 	t := time.Now().Format("2006-01-02T15:04:05.000000-07:00")
 	if obj, err = global.ORCH.GetResource(resource.RscTypeCrdNvCspUsage, "", rscName); err == nil {
 		if crCspUsage, ok := obj.(*resource.NvCspUsage); ok {
@@ -130,7 +136,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	} else if strings.Contains(err.Error(), " 404 ") {
 		if addOnly {
 			kind := resource.NvCspUsageKind
-			apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvCrdV1)
+			apiVersion := "susecloud.net/v1"
 			crCspUsage := &resource.NvCspUsage{
 				Kind:       &kind,
 				ApiVersion: &apiVersion,

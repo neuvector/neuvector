@@ -1250,6 +1250,8 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	switch rapikey.ExpirationType {
 	case api.ApikeyExpireNever:
 		apikey.ExpirationTimestamp = math.MaxInt64
+	case api.ApikeyExpireOneHour:
+		apikey.ExpirationTimestamp = now.Add(time.Duration(1) * time.Hour).UTC().Unix()
 	case api.ApikeyExpireOneDay:
 		apikey.ExpirationTimestamp = now.AddDate(0, 0, 1).UTC().Unix()
 	case api.ApikeyExpireOneMonth:

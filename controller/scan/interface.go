@@ -226,7 +226,7 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			SecretsCnt:      len(s.cache.secrets),
 			SetIDPermCnt:    len(s.cache.setIDPerm),
 			Modules:         s.cache.modules,
-			Verifiers:       s.cache.verifiers,
+			Verifiers:       s.cache.signatureVerifiers,
 		}
 		for _, v := range s.cache.vulTraits {
 			if !v.IsFiltered() {
@@ -345,10 +345,12 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		Status:    api.ScanStatusFinished,
 		Author:    result.Author,
 		ScanFlags: share.ScanFlagCVE,
-		Verifiers: result.Verifiers,
 	}
 	if result.Secrets != nil {
 		sum.ScanFlags |= share.ScanFlagFiles
+	}
+	if result.SignatureInfo != nil {
+		sum.Verifiers = result.SignatureInfo.Verifiers
 	}
 	sum.RunAsRoot, _, _ = scanUtils.ParseImageCmds(result.Cmds)
 	rs.summary[result.ImageID] = sum
@@ -560,9 +562,13 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 				rrpt.Modules[i] = scanUtils.ScanModule2REST(m)
 			}
 
-			rrpt.Verifiers = make([]string, len(c.verifiers))
-			for i, v := range c.verifiers {
-				rrpt.Verifiers[i] = v
+			rrpt.SignatureInfo = &api.RESTScanSignatureInfo{
+				VerificationTimestamp: c.signatureVerificationTimestamp,
+			}
+
+			rrpt.SignatureInfo.Verifiers = make([]string, len(c.signatureVerifiers))
+			for i, v := range c.signatureVerifiers {
+				rrpt.SignatureInfo.Verifiers[i] = v
 			}
 		}
 	}

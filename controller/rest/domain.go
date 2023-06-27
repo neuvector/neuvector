@@ -114,7 +114,7 @@ func handlerDomainConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			return
 		}
 
-		if err := clusHelper.PutDomain(cd, rev); err != nil {
+		if err := clusHelper.PutDomain(cd, &rev); err != nil {
 			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
 			retry++
 		} else {
@@ -131,7 +131,7 @@ func handlerDomainConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 }
 
 func handlerDomainEntryConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -184,8 +184,8 @@ func handlerDomainEntryConfig(w http.ResponseWriter, r *http.Request, ps httprou
 			return
 		}
 
-		if err := clusHelper.PutDomain(cd, rev); err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+		if err := clusHelper.PutDomain(cd, &rev); err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			break
