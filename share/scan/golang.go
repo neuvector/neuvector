@@ -12,6 +12,7 @@ import (
 	"os"
 )
 
+// The function is only for local test
 func parseGolangPackage(file string) {
 	f, err := openExe(file)
 	if err != nil {
