@@ -53,9 +53,9 @@ service ControllerScanService {
 }
 
 message CLUSFilePacket {
-    bytes Data = 1;
-    string Name = 2;
-    uint32 Len = 3;
+	bytes Data = 1;
+	string Name = 2;
+	uint32 Len = 3;
 }
 
 service ControllerUpgradeService {
@@ -77,22 +77,22 @@ message CLUSAdmissionResponse {
 }
 
 message CLUSProcProfileReq {
-    string	GroupName = 1;
-    string	Name      = 2;
-    string	Path      = 3;
-    string	User      = 4;
-    int32   Uid       = 5;
-    bytes   Hash      = 6;
-    string	Action    = 7;
+	string	GroupName = 1;
+	string	Name      = 2;
+	string	Path      = 3;
+	string	User      = 4;
+	int32   Uid       = 5;
+	bytes   Hash      = 6;
+	string	Action    = 7;
 }
 message CLUSProcProfileArray {
     repeated CLUSProcProfileReq Processes = 1;
 }
 
 message CLUSFileAccessRuleReq{
-    string	GroupName = 1;
-    string	Filter    = 2;
-    string	Path      = 3;
+	string	GroupName = 1;
+	string	Filter    = 2;
+	string	Path      = 3;
 }
 
 message CLUSFileAccessRuleArray {
@@ -100,38 +100,38 @@ message CLUSFileAccessRuleArray {
 }
 
 message CLUSConnection {
-    string AgentID = 1;
-    string HostID = 2;
-    string ClientWL = 3;
-    string ServerWL = 4;
-    bytes ClientIP = 5;
+	string AgentID = 1;
+	string HostID = 2;
+	string ClientWL = 3;
+	string ServerWL = 4;
+	bytes ClientIP = 5;
     bytes ServerIP = 6;
-    string Scope = 7;
-    string Network = 8;
-    uint32 ClientPort = 9;
-    uint32 ServerPort = 10;
-    uint32 IPProto = 11;
-    uint32 Application = 12;
-    uint64 Bytes = 13;
-    uint32 Sessions = 14;
-    uint32 FirstSeenAt = 15;
-    uint32 LastSeenAt = 16;
-    uint32 ThreatID = 17;
-    uint32 Severity = 18;
-    uint32 PolicyAction = 19;
-    bool Ingress = 20;
-    bool ExternalPeer = 21;
-    bool LocalPeer = 22;
-    uint32 PolicyId = 23;
-    uint32 Violates = 24;
+	string Scope = 7;
+	string Network = 8;
+	uint32 ClientPort = 9;
+	uint32 ServerPort = 10;
+	uint32 IPProto = 11;
+	uint32 Application = 12;
+	uint64 Bytes = 13;
+	uint32 Sessions = 14;
+	uint32 FirstSeenAt = 15;
+	uint32 LastSeenAt = 16;
+	uint32 ThreatID = 17;
+	uint32 Severity = 18;
+	uint32 PolicyAction = 19;
+	bool Ingress = 20;
+	bool ExternalPeer = 21;
+	bool LocalPeer = 22;
+	uint32 PolicyId = 23;
+	uint32 Violates = 24;
     string LogUID = 25;
-    bool Xff = 26;
-    bool SvcExtIP = 27;
-    bool ToSidecar = 28;
-    bool MeshToSvr = 29;
-    bool LinkLocal = 30;
-    bool TmpOpen = 31;
-    bool UwlIp = 32;
+	bool Xff = 26;
+	bool SvcExtIP = 27;
+	bool ToSidecar = 28;
+	bool MeshToSvr = 29;
+	bool LinkLocal = 30;
+	bool TmpOpen = 31;
+	bool UwlIp = 32;
     string FQDN = 33;
 }
 
@@ -157,20 +157,20 @@ service ControllerAgentService {
 }
 
 message CLUSSyncRequest {
-    string Category = 1;
-    string From = 2;
+	string Category = 1;
+	string From = 2;
 }
 
 message CLUSSyncReply {
-    string Category = 1;
-    bytes  Data = 2;
+	string Category = 1;
+	bytes  Data = 2;
 }
 
 message CLUSControllerCounter {
-    uint32 GraphNodes = 1;
-    uint32 GoRoutines = 2;
-    bytes Lsof = 3;
-    bytes PS = 4;
+	uint32 GraphNodes = 1;
+	uint32 GoRoutines = 2;
+	bytes Lsof = 3;
+	bytes PS = 4;
     uint32 ScanTasks = 5;
 }
 
@@ -225,8 +225,8 @@ enum KickLoginSessionsType {
 message CLUSKickLoginSessionsRequest {
     string CtrlerID = 1;
     KickLoginSessionsType Type = 2;
-    string Server = 3;
-    string UserFullname = 4;
+	string Server = 3;
+	string UserFullname = 4;
     string UserServer = 5;
     string UserName = 6;
 }

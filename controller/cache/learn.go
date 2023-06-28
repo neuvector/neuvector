@@ -304,7 +304,7 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 	}
 
 	gkey := graphKey{ipproto: uint8(conn.IPProto), port: stip.wlPort, application: conn.Application,
-		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP), fqdn: conn.FQDN,}
+		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP), fqdn: conn.FQDN}
 
 	// This is used to create conversations
 	var attr *graphAttr
