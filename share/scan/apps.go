@@ -227,14 +227,12 @@ func isGolang(filename, fullpath string) bool {
 func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 	f, err := openExe(fullpath)
 	if err != nil {
-		log.WithFields(log.Fields{"file": filename}).Error("open error")
 		return
 	}
 	defer f.Close()
 
 	_, mod, err := readRawBuildInfo(f, false)
 	if err != nil {
-		log.WithFields(log.Fields{"file": filename}).Error("read error")
 		return
 	}
 
