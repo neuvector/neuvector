@@ -304,7 +304,7 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 	}
 
 	gkey := graphKey{ipproto: uint8(conn.IPProto), port: stip.wlPort, application: conn.Application,
-		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP)}
+		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP), fqdn: conn.FQDN,}
 
 	// This is used to create conversations
 	var attr *graphAttr
@@ -1306,12 +1306,13 @@ type GraphSyncEntry struct {
 	Last         uint32
 	Xff          uint8
 	ToSidecar    uint8
+	FQDN         string
 }
 
 func graphEntry2Sync(k *graphKey, e *graphEntry) *GraphSyncEntry {
 	return &GraphSyncEntry{Ipproto: k.ipproto,
 		Port: k.port, Application: k.application,
-		CIP: k.cip, SIP: k.sip,
+		CIP: k.cip, SIP: k.sip, FQDN: k.fqdn,
 		MappedPort: e.mappedPort, Bytes: e.bytes,
 		Sessions: e.sessions, Server: e.server,
 		Severity: e.severity, DlpSeverity: e.dlpSeverity, WafSeverity: e.wafSeverity,
@@ -1322,7 +1323,7 @@ func graphEntry2Sync(k *graphKey, e *graphEntry) *GraphSyncEntry {
 
 func graphSync2Entry(e *GraphSyncEntry) (*graphKey, *graphEntry) {
 	gkey := graphKey{ipproto: e.Ipproto, port: e.Port,
-		application: e.Application, cip: e.CIP, sip: e.SIP,
+		application: e.Application, cip: e.CIP, sip: e.SIP, fqdn: e.FQDN,
 	}
 
 	gEntry := graphEntry{mappedPort: e.MappedPort,

@@ -38,6 +38,7 @@ type containerdDriver struct {
 	endpoint      string
 	endpointHost  string
 	nodeHostname  string
+	selfID        string
 	client        *containerd.Client
 	criClient     *grpc.ClientConn
 	version       *containerd.Version
@@ -70,6 +71,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 
 	// optional
 	snapshotter := ""
+	id, _, _ := sys.GetSelfContainerID() // not relaible, could be sandboxID
 	cri, criVer, err := newCriClient(endpoint, ctx)
 	if err == nil {
 		log.WithFields(log.Fields{"version": criVer}).Info("cri")
@@ -82,8 +84,10 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 			log.WithFields(log.Fields{"error": err}).Error("cri info")
 		}
 
-		if id, _, err := sys.GetSelfContainerID(); err == nil {
-			sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
+		id, _ = criGetSelfID(cri, ctx, id)
+		sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
+		if err == nil {
+			log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 		}
 	}
 
@@ -97,7 +101,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 	driver := containerdDriver{
 		sys: sys, client: client, version: &ver, criClient: cri, endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
-		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), snapshotter: snapshotter,
+		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), snapshotter: snapshotter, selfID: id,
 	}
 
 	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim", "containerd-shim-runc-v1", "containerd-shim-runc-v2")
@@ -176,6 +180,10 @@ func (d *containerdDriver) GetHost() (*share.CLUSHost, error) {
 	}
 
 	return &host, nil
+}
+
+func (d *containerdDriver) GetSelfID() string {
+	return d.selfID
 }
 
 func (d *containerdDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtra, error) {

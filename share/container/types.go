@@ -25,6 +25,7 @@ type Runtime interface {
 	MonitorEvent(cb EventCallback, cpath bool) error
 	StopMonitorEvent()
 	GetHost() (*share.CLUSHost, error)
+	GetSelfID() string
 	GetDevice(id string) (*share.CLUSDevice, *ContainerMetaExtra, error)
 	GetContainer(id string) (*ContainerMetaExtra, error)
 	ListContainers(runningOnly bool) ([]*ContainerMeta, error)

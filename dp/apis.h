@@ -346,7 +346,6 @@ uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, 
  * -----------------------------------------
  */
 #define IP_FQDN_STORAGE_ENTRY_TIMEOUT 1800 //sec
-// #define IP_FQDN_STORAGE_ENTRY_TIMEOUT 300 //sec
 typedef struct dpi_ip_fqdn_storage_record_ {
     uint32_t ip;
     char     name[MAX_FQDN_LEN];

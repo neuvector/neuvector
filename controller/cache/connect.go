@@ -72,6 +72,7 @@ type graphKey struct {
 	application uint32
 	cip         uint32 // client ip
 	sip         uint32 // server ip
+	fqdn        string // server fqdn if it is egress direction. otherwise, the fqdn is empty
 }
 
 type graphAttr struct {
@@ -180,6 +181,7 @@ func conn2Violation(conn *share.CLUSConnection, server uint32) *api.Violation {
 		Sessions:      conn.Sessions,
 		ClientIP:      net.IP(conn.ClientIP).String(),
 		ServerIP:      net.IP(conn.ServerIP).String(),
+		FQDN:          conn.FQDN,
 		ClientName:    cwln.name,
 		ClientDomain:  cwln.domain,
 		ClientImage:   cwln.image,
@@ -512,7 +514,7 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"toSidecar":      conn.ToSidecar,
 			"meshToSvr":      conn.MeshToSvr,
 			"linkLocal":      conn.LinkLocal,
-			"fqdn":           conn.Fqdn,
+			"fqdn":           conn.FQDN,
 		}).Debug()
 
 		addConnectToGraph(conn, ca, sa, stip)
@@ -1633,6 +1635,7 @@ func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessCon
 				LastSeenAt:   api.RESTTimeString(time.Unix(int64(entry.last), 0).UTC()),
 				CIP:          utils.Int2IPv4(key.cip).String(),
 				SIP:          utils.Int2IPv4(key.sip).String(),
+				FQDN:         key.fqdn,
 			}
 			c.Application, _ = common.AppNameMap[key.application]
 			c.Server, _ = common.AppNameMap[entry.server]

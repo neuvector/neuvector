@@ -1066,8 +1066,9 @@ type RESTConversationEntry struct {
 	LastSeenAt   string `json:"last_seen_at"`
 	CIP          string `json:"client_ip"`
 	SIP          string `json:"server_ip"`
+	FQDN         string `json:"fqdn"`
 	Xff          bool   `json:"xff"`
-	ToSidecar    bool   `json:"to_sidecar"`
+	ToSidecar    bool   `json:"to_sidecar"`	
 }
 
 type RESTConversationDetail struct {

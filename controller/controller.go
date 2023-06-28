@@ -325,7 +325,7 @@ func main() {
 
 	ctrlEnv.runInContainer = global.SYS.IsRunningInContainer()
 	if ctrlEnv.runInContainer {
-		selfID, _, err = global.SYS.GetSelfContainerID()
+		selfID = global.RT.GetSelfID()
 		if selfID == "" {
 			log.WithFields(log.Fields{"error": err}).Error("Unsupported system. Exit!")
 			os.Exit(-2)
