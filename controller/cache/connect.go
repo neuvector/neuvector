@@ -64,6 +64,7 @@ type graphEntry struct {
 	last         uint32
 	xff          uint8
 	toSidecar    uint8
+	fqdn         string // server fqdn if it is egress direction. otherwise, the fqdn is empty
 }
 
 type graphKey struct {
@@ -72,7 +73,6 @@ type graphKey struct {
 	application uint32
 	cip         uint32 // client ip
 	sip         uint32 // server ip
-	fqdn        string // server fqdn if it is egress direction. otherwise, the fqdn is empty
 }
 
 type graphAttr struct {
@@ -1635,7 +1635,7 @@ func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessCon
 				LastSeenAt:   api.RESTTimeString(time.Unix(int64(entry.last), 0).UTC()),
 				CIP:          utils.Int2IPv4(key.cip).String(),
 				SIP:          utils.Int2IPv4(key.sip).String(),
-				FQDN:         key.fqdn,
+				FQDN:         entry.fqdn,
 			}
 			c.Application, _ = common.AppNameMap[key.application]
 			c.Server, _ = common.AppNameMap[entry.server]

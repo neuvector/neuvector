@@ -304,7 +304,7 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 	}
 
 	gkey := graphKey{ipproto: uint8(conn.IPProto), port: stip.wlPort, application: conn.Application,
-		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP), fqdn: conn.FQDN,}
+		cip: utils.IPv42Int(conn.ClientIP), sip: utils.IPv42Int(conn.ServerIP)}
 
 	// This is used to create conversations
 	var attr *graphAttr
@@ -366,12 +366,14 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 		} else {
 			ge.toSidecar = 0
 		}
+		ge.fqdn = conn.FQDN
 	} else {
 		ge := &graphEntry{
 			bytes:    conn.Bytes,
 			sessions: conn.Sessions,
 			server:   stip.appServer,
 			last:     conn.LastSeenAt,
+			fqdn:     conn.FQDN,
 		}
 		if conn.Xff {
 			ge.xff = 1
@@ -1312,25 +1314,25 @@ type GraphSyncEntry struct {
 func graphEntry2Sync(k *graphKey, e *graphEntry) *GraphSyncEntry {
 	return &GraphSyncEntry{Ipproto: k.ipproto,
 		Port: k.port, Application: k.application,
-		CIP: k.cip, SIP: k.sip, FQDN: k.fqdn,
+		CIP: k.cip, SIP: k.sip,
 		MappedPort: e.mappedPort, Bytes: e.bytes,
 		Sessions: e.sessions, Server: e.server,
 		Severity: e.severity, DlpSeverity: e.dlpSeverity, WafSeverity: e.wafSeverity,
 		ThreatID: e.threatID, DlpID: e.dlpID, WafID: e.wafID, PolicyAction: e.policyAction,
-		PolicyID: e.policyID, Last: e.last, Xff: e.xff, ToSidecar: e.toSidecar,
+		PolicyID: e.policyID, Last: e.last, Xff: e.xff, ToSidecar: e.toSidecar, FQDN: e.fqdn,
 	}
 }
 
 func graphSync2Entry(e *GraphSyncEntry) (*graphKey, *graphEntry) {
 	gkey := graphKey{ipproto: e.Ipproto, port: e.Port,
-		application: e.Application, cip: e.CIP, sip: e.SIP, fqdn: e.FQDN,
+		application: e.Application, cip: e.CIP, sip: e.SIP,
 	}
 
 	gEntry := graphEntry{mappedPort: e.MappedPort,
 		bytes: e.Bytes, sessions: e.Sessions,
 		server: e.Server, severity: e.Severity, dlpSeverity: e.DlpSeverity, wafSeverity: e.WafSeverity,
 		threatID: e.ThreatID, dlpID: e.DlpID, wafID: e.WafID, policyAction: e.PolicyAction,
-		policyID: e.PolicyID, last: e.Last, xff: e.Xff, toSidecar: e.ToSidecar,
+		policyID: e.PolicyID, last: e.Last, xff: e.Xff, toSidecar: e.ToSidecar, fqdn: e.FQDN,
 	}
 	return &gkey, &gEntry
 }

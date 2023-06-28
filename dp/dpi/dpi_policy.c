@@ -12,7 +12,6 @@
 #include <netinet/udp.h>
 #include "urcu.h"
 #include "debug.h"
-#include "apis.h"
 #include "utils/rcu_map.h"
 #include "dpi/dpi_module.h"
 
@@ -2088,7 +2087,7 @@ int sniff_ip_fqdn_storage(char *name, uint32_t *ip, int cnt)
                 add_ip_fqdn_storage_entry(name, ip[i]);
             }
             else {
-                if (ip_fqdn_storage_entry->r->name != name) {
+                if (strcmp(ip_fqdn_storage_entry->r->name, name) != 0) {
                     update_ip_fqdn_storage_entry(ip_fqdn_storage_entry, name);
                 }
             }
