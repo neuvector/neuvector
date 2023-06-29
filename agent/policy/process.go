@@ -599,6 +599,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
 		{"grep", "*"},           // monitor, CIS bench tests
+		{"which", "*"},
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
 		{"cut", "*"},
@@ -683,6 +684,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
 		{"grep", "*"},           // monitor, CIS bench tests
+		{"which", "*"},
 		{"pgrep", "/usr/bin/pgrep"},
 		{"sed", "*"},
 		{"cut", "*"},
