@@ -123,6 +123,7 @@ type RESTFedJoinRespInternal struct { // from master cluster to joining cluster 
 	ClientKey     string                    `json:"client_key"`     // client key for the joint cluster
 	ClientCert    string                    `json:"client_cert"`    // client cert for the joint cluster
 	MasterCluster *RESTFedMasterClusterInfo `json:"master_cluster"` // info about the master cluster
+	CspType       string                    `json:"csp_type"`       // master's billing csp type
 }
 
 type RESTFedLeaveReq struct { // from manager to joint cluster
@@ -206,7 +207,7 @@ type RESTPollFedRulesReq struct {
 	FedKvVersion string            `json:"fed_kv_version"`         // kv version in the code of joint cluster
 	RestVersion  string            `json:"rest_version,omitempty"` // rest version in the code of joint cluster
 	Revisions    map[string]uint64 `json:"revisions"`              // key is fed rules type, value is the revision
-	CspType      string            `json:"csp_type"`
+	CspType      string            `json:"csp_type"`               // joint cluster's billing csp type
 	Nodes        int               `json:"nodes"`
 }
 
@@ -223,6 +224,7 @@ type RESTPollFedRulesResp struct {
 	Revisions          map[string]uint64   `json:"revisions"`             // key is fed rules type, value is the revision. It contains only revisions of modified settings
 	ScanDataRevs       RESTFedScanDataRevs `json:"scan_data_revs"`        // the latest revisions of all the fed registry/repo scan data on master cluster
 	DeployRepoScanData bool                `json:"deploy_repo_scan_data"` // for informing whether master cluster deploys repo scan data to managed clusters
+	CspType            string              `json:"csp_type"`              // master's billing csp type
 }
 
 type RESTPollFedScanDataReq struct {
