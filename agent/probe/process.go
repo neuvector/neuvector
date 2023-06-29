@@ -2559,6 +2559,8 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup string, proc *procInternal) {
 	var s *ProbeProcess
 
+	p.lockProcMux()
+	defer p.unlockProcMux()
 	proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
 
 	switch uuid {
