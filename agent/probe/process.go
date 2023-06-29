@@ -2560,8 +2560,8 @@ func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup 
 	var s *ProbeProcess
 
 	p.lockProcMux()
-	defer p.unlockProcMux()
 	proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
+	p.unlockProcMux()
 
 	switch uuid {
 	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
