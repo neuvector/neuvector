@@ -2559,7 +2559,9 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup string, proc *procInternal) {
 	var s *ProbeProcess
 
+	p.lockProcMux()
 	proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
+	p.unlockProcMux()
 
 	switch uuid {
 	case share.CLUSReservedUuidAnchorMode:	// zero-drift incident
