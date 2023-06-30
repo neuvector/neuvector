@@ -196,6 +196,9 @@ func updateAgentStats(cpuSystem uint64) {
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 
+		if c.parentNS == "" {
+			continue
+		}
 		// Check for resource stats.
 		// Log the error only if the error the container does not have a parent namespace.
 		// It is likely this is a pause container and sometimes won't have stats populated (nor useful)
@@ -203,15 +206,11 @@ func updateContainerStats(cpuSystem uint64) {
 		var err error
 
 		if mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
-			if c.parentNS != "" {
-				log.WithFields(log.Fields{"name": c.name, "pid": c.pid, "error": err.Error()}).Error("Memory stats error")
-			}
+			log.WithFields(log.Fields{"name": c.name, "pid": c.pid, "error": err.Error()}).Error("Memory stats error")
 		}
 
 		if cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
-			if c.parentNS != "" {
 				log.WithFields(log.Fields{"name": c.name, "pid": c.pid, "error": err.Error()}).Error("CPU stats error")
-			}
 		}
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
