@@ -25,6 +25,7 @@ func (d *dummyRTDriver) MonitorEvent(cb container.EventCallback, cpath bool) err
 }
 func (d *dummyRTDriver) StopMonitorEvent()                 {}
 func (d *dummyRTDriver) GetHost() (*share.CLUSHost, error) { return nil, nil }
+func (d *dummyRTDriver) GetSelfID() string { return "a361929b15729277ed89f11da44b0882e82fe9cc9587f1f5f8ebed49802f8834" }
 func (d *dummyRTDriver) GetDevice(id string) (*share.CLUSDevice, *container.ContainerMetaExtra, error) {
 	return nil, nil, nil
 }

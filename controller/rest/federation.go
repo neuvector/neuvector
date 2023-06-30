@@ -1795,7 +1795,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			User:     login.fullname, // user on joint cluster who issued join-federation request
 			RestInfo: restInfo,
 		},
-		CspType: nvUsage.LocalClusterUsage.CspType,
+		CspType: nvUsage.LocalClusterUsage.CspType, // joint cluster's billing csp type
 		Nodes:   nvUsage.LocalClusterUsage.Nodes,
 	}
 
@@ -2120,7 +2120,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 
 	cspType, _ := common.GetMappedCspType(&reqData.CspType, nil)
 	cspUsage := share.CLUSClusterCspUsage{
-		CspType: cspType,
+		CspType: cspType, // joint cluster's billing csp type
 		Nodes:   reqData.Nodes,
 	}
 	updateClusterState(joinedCluster.ID, "", _fedClusterJoined, &cspUsage, accReadAll)
@@ -2143,6 +2143,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 				RestInfo: masterCluster.RestInfo,
 			},
 		}
+		_, resp.CspType = common.GetMappedCspType(nil, &cctx.CspType) // master cluster's billing csp type
 		msg := fmt.Sprintf("Cluster %s(%s) joins federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
 		cacheFedEvent(share.CLUSEvFedJoin, msg, reqData.User, reqData.Remote, "", reqData.UserRoles)
 		restRespSuccess(w, r, &resp, nil, nil, nil, "Join federation by managed cluster's request")
@@ -2562,7 +2563,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 			FedKvVersion: kv.GetFedKvVer(),
 			RestVersion:  kv.GetRestVer(),
 			Name:         cacher.GetSystemConfigClusterName(accReadAll),
-			CspType:      nvUsage.LocalClusterUsage.CspType,
+			CspType:      nvUsage.LocalClusterUsage.CspType, // joint cluster's billing csp type
 			Nodes:        nvUsage.LocalClusterUsage.Nodes,
 		}
 
@@ -2604,7 +2605,9 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 				}
 				if respTo.Result == _fedSuccess { // success
 					updateClusterState(jointCluster.ID, "", _fedClusterJoined, nil, accReadAll)
-					updateClusterState(masterCluster.ID, masterCluster.ID, _fedClusterConnected, nil, accReadAll)
+					var cspUsage share.CLUSClusterCspUsage
+					cspUsage.CspType, _ = common.GetMappedCspType(&respTo.CspType, nil)
+					updateClusterState(masterCluster.ID, masterCluster.ID, _fedClusterConnected, &cspUsage, accReadAll)
 					status = _fedSuccess
 					fedCfg := cacher.GetFedSettings()
 					if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
@@ -2898,6 +2901,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		PollInterval:       atomic.LoadUint32(&_fedPollInterval),
 		DeployRepoScanData: fedCfg.DeployRepoScanData,
 	}
+	_, resp.CspType = common.GetMappedCspType(nil, &cctx.CspType) // master cluster's billing csp type
 	if kv.IsImporting() {
 		// do not give out master's fed policies when master cluster is importing config
 		resp.Result = _fedClusterImporting
@@ -2935,7 +2939,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 		cspType, _ := common.GetMappedCspType(&req.CspType, nil)
 		cspUsage := share.CLUSClusterCspUsage{
-			CspType: cspType,
+			CspType: cspType, // joint cluster's billing csp type
 			Nodes:   req.Nodes,
 		}
 		updateClusterState(jointCluster.ID, "", status, &cspUsage, accReadAll)
