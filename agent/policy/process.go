@@ -392,6 +392,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ps", "*"},
 		{"lsof", "*"},
 		{"sh", "*"},
+		{"dash", "*"},
 		{"kill", "*"},
 
 		// busybox
@@ -568,6 +569,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ps", "*"},
 		{"lsof", "*"},
 		{"sh", "*"},
+		{"dash", "*"},
 		{"cat", "*"},                     // k8s readiness and openshift operations
 
 		// busybox
@@ -651,6 +653,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ps", "*"},
 		{"lsof", "*"},
 		{"sh", "*"},
+		{"dash", "*"},
 		{"cat", "*"},                     // k8s readiness and openshift operations
 
 		// busybox
@@ -678,6 +681,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"nc", "/bin/busybox"},
 		{"echo", "/bin/busybox"},
 		{"tee", "/usr/bin/tee"},
+		{"stat", "/usr/bin/stat"}, // bench scripts
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
