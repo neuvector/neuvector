@@ -271,6 +271,13 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 		resp.FedConfig = fedConf
 	} else if scope == share.ScopeLocal || scope == share.ScopeAll {
 		_, rconf.CspType = common.GetMappedCspType(nil, &cctx.CspType)
+		if rconf.CspType == "none" || rconf.CspType == "" {
+			if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
+				masterCluster := cacher.GetFedMasterCluster(acc)
+				cached := cacher.GetFedJoinedClusterStatus(masterCluster.ID, acc)
+				_, rconf.CspType = common.GetMappedCspType(nil, &cached.CspType)
+			}
+		}
 		if scope == share.ScopeAll && fedConf != nil && len(fedConf.Webhooks) > 0 {
 			rconf.Webhooks = append(fedConf.Webhooks, rconf.Webhooks...)
 		}
