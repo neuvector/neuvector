@@ -2008,3 +2008,90 @@ int dpi_policy_init() {
     }
     return 0;
 }
+
+/*
+ * -----------------------------------------
+ * --- ip-fqdn storage definition ----------
+ * -----------------------------------------
+ */
+static int ip_fqdn_storage_match(struct cds_lfht_node *ht_node, const void *key)
+{
+    dpi_ip_fqdn_storage_entry_t *s = STRUCT_OF(ht_node, dpi_ip_fqdn_storage_entry_t, node);
+    const uint32_t *k = key;
+    return (s->r->ip == *k);
+}
+
+static uint32_t ip_fqdn_storage_hash(const void *key)
+{
+    const uint32_t *k = key;
+    return sdbm_hash((uint8_t *)k, sizeof(uint32_t));
+}
+
+static void ip_fqdn_storage_release(timer_entry_t *entry)
+{
+    dpi_ip_fqdn_storage_entry_t *c = STRUCT_OF(entry, dpi_ip_fqdn_storage_entry_t, ts_entry);
+    rcu_map_del(&th_ip_fqdn_storage_map, c);    
+    dp_ctrl_release_ip_fqdn_storage(c);
+    free(c);
+}
+
+void dpi_ip_fqdn_storage_init(void)
+{
+    rcu_map_init(&th_ip_fqdn_storage_map, 64, offsetof(dpi_ip_fqdn_storage_entry_t, node), ip_fqdn_storage_match, ip_fqdn_storage_hash);
+}
+
+static void add_ip_fqdn_storage_entry(char *name, uint32_t ip)
+{
+    dpi_ip_fqdn_storage_entry_t *entry = calloc(1, sizeof(*entry));
+    if (!entry) {
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
+        return;
+    }
+
+    dpi_ip_fqdn_storage_record_t *r = calloc(1, sizeof(*r));
+    if (!r) {
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
+        free(entry);
+        return;
+    }
+    r->ip = ip;
+    strlcpy(r->name, name, MAX_FQDN_LEN);
+    uatomic_set(&r->record_updated, 1);
+    entry->r = r;
+    rcu_map_add(&th_ip_fqdn_storage_map, entry, &ip);
+
+    timer_wheel_entry_init(&entry->ts_entry);
+    timer_wheel_entry_start(&th_timer, &entry->ts_entry,
+                            ip_fqdn_storage_release, IP_FQDN_STORAGE_ENTRY_TIMEOUT, th_snap.tick);
+}
+
+static void update_ip_fqdn_storage_entry(dpi_ip_fqdn_storage_entry_t *entry, char *name)
+{
+    strlcpy(entry->r->name, name, MAX_FQDN_LEN);
+    uatomic_set(&entry->r->record_updated, 1);
+
+    timer_wheel_entry_refresh(&th_timer, &entry->ts_entry, th_snap.tick);
+}
+
+// Called from parser, make sure ip not NULL
+int sniff_ip_fqdn_storage(char *name, uint32_t *ip, int cnt)
+{
+    DEBUG_POLICY("name: (%s), ip cnt: (%d)\n", name, cnt);
+
+    int i;
+    for (i = 0; i < cnt; i++)
+    {
+        if (!dpi_is_ip4_internal(ip[i])) {
+            dpi_ip_fqdn_storage_entry_t *ip_fqdn_storage_entry = rcu_map_lookup(&th_ip_fqdn_storage_map, &ip[i]);
+            if (!ip_fqdn_storage_entry) {
+                add_ip_fqdn_storage_entry(name, ip[i]);
+            }
+            else {
+                if (strcmp(ip_fqdn_storage_entry->r->name, name) != 0) {
+                    update_ip_fqdn_storage_entry(ip_fqdn_storage_entry, name);
+                }
+            }
+        }
+    }
+    return 0;
+}

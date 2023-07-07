@@ -2822,6 +2822,48 @@ static void dp_ctrl_update_fqdn_ip(void)
     }
 }
 
+static void dp_ctrl_update_ip_fqdn_storage(void)
+{
+    struct cds_lfht_node *ip_fqdn_storage_node;
+
+    // Iterate through fqdn map
+    RCU_MAP_FOR_EACH(&th_ip_fqdn_storage_map, ip_fqdn_storage_node) {
+        dpi_ip_fqdn_storage_entry_t *entry = STRUCT_OF(ip_fqdn_storage_node, dpi_ip_fqdn_storage_entry_t, node);
+
+        if (uatomic_cmpxchg(&entry->r->record_updated, 1, 0) == 0) {
+            continue;
+        }
+
+        DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;
+        DPMsgIpFqdnStorageUpdateHdr *fh = (DPMsgIpFqdnStorageUpdateHdr *)(g_notify_msg + sizeof(*hdr));
+
+        hdr->Kind = DP_KIND_IP_FQDN_STORAGE_UPDATE;
+        ip4_cpy(fh->IP, (uint8_t *)&entry->r->ip);
+        strlcpy(fh->Name, entry->r->name, DP_POLICY_FQDN_NAME_MAX_LEN);
+        uint16_t len = sizeof(*hdr) + sizeof(*fh);
+        hdr->Length = htons(len);
+
+        DEBUG_CTRL("update ip-fqdn storage, ip=%x name=%s len=%u\n", fh->IP, fh->Name, len);
+
+        dp_ctrl_notify_ctrl(g_notify_msg, len);
+    }
+}
+
+void dp_ctrl_release_ip_fqdn_storage(dpi_ip_fqdn_storage_entry_t *entry)
+{
+    DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;
+    DPMsgIpFqdnStorageReleaseHdr *fh = (DPMsgIpFqdnStorageReleaseHdr *)(g_notify_msg + sizeof(*hdr));
+
+    hdr->Kind = DP_KIND_IP_FQDN_STORAGE_RELEASE;
+    ip4_cpy(fh->IP, (uint8_t *)&entry->r->ip);
+    uint16_t len = sizeof(*hdr) + sizeof(*fh);
+    hdr->Length = htons(len);
+
+    DEBUG_CTRL("release ip-fqdn storage, ip=%x len=%u\n", fh->IP, len);
+    
+    dp_ctrl_notify_ctrl(g_notify_msg, len);
+}
+
 // -- ctrl loop
 
 void dp_ctrl_init_thread_data(void)
@@ -2894,6 +2936,7 @@ void dp_ctrl_loop(void)
             dp_ctrl_update_app(false);
             dp_ctrl_update_fqdn_ip();
             dp_ctrl_consume_threat_log();
+            dp_ctrl_update_ip_fqdn_storage();
 
             // every 6s
             if ((round % 3) == 0) {

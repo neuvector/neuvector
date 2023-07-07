@@ -315,6 +315,7 @@ type Violation struct {
 	PolicyID      uint32   `json:"policy_id"`
 	ClientIP      string   `json:"client_ip"`
 	ServerIP      string   `json:"server_ip"`
+	FQDN          string   `json:"fqdn"`
 	Xff           bool     `json:"xff"`
 }
 
