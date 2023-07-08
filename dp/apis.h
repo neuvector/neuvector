@@ -16,6 +16,7 @@
 #include "urcu/list.h"
 #include "utils/rcu_map.h"
 #include "utils/bitmap.h"
+#include "utils/timer_wheel.h"
 
 #define MAX_THREAD_NAME_LEN 32
 extern __thread int THREAD_ID;
@@ -339,6 +340,25 @@ typedef struct fqdn_iter_ctx_ {
 
 uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, bool vh);
 
+/*
+ * -----------------------------------------
+ * --- ip-fqdn storage definition ----------
+ * -----------------------------------------
+ */
+#define IP_FQDN_STORAGE_ENTRY_TIMEOUT 1800 //sec
+typedef struct dpi_ip_fqdn_storage_record_ {
+    uint32_t ip;
+    char     name[MAX_FQDN_LEN];
+    uint32_t record_updated;
+} dpi_ip_fqdn_storage_record_t;
+
+typedef struct dpi_ip_fqdn_storage_entry_ {
+    struct cds_lfht_node node;
+    timer_entry_t ts_entry;
+
+    dpi_ip_fqdn_storage_record_t *r;
+} dpi_ip_fqdn_storage_entry_t;
+
 //dlp
 #define MAX_DLP_RULE_NAME_LEN DP_DLP_RULE_NAME_MAX_LEN
 #define MAX_DLP_RULE_PATTERN_LEN DP_DLP_RULE_PATTERN_MAX_LEN
@@ -400,5 +420,6 @@ extern int dp_data_wait_ctrl_req_thr(int req, int thr_id);
 extern pthread_cond_t g_dlp_ctrl_req_cond;
 extern pthread_mutex_t g_dlp_ctrl_req_lock;
 extern int dp_dlp_wait_ctrl_req_thr(int req);
+extern void dp_ctrl_release_ip_fqdn_storage(dpi_ip_fqdn_storage_entry_t *entry);
 
 #endif

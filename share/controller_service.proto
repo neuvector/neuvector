@@ -132,6 +132,7 @@ message CLUSConnection {
 	bool LinkLocal = 30;
 	bool TmpOpen = 31;
 	bool UwlIp = 32;
+	string FQDN = 33;
 }
 
 message CLUSConnectionArray {

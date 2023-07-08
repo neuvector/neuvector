@@ -42,6 +42,8 @@ var auditLogCache []*share.CLUSAuditLog
 var auditMutex sync.Mutex
 var fqdnIpCache []*share.CLUSFqdnIp
 var fqdnIpMutex sync.Mutex
+var ipFqdnStorageCache map[string]string = make(map[string]string)
+var ipFqdnStorageMutex sync.Mutex
 
 const reportInterval uint32 = 5
 const statsInterval uint32 = 5
@@ -171,6 +173,17 @@ func dpTaskCallback(task *dp.DPTask) {
 		fqdnIpMutex.Lock()
 		fqdnIpCache = append(fqdnIpCache, task.Fqdns)
 		fqdnIpMutex.Unlock()
+	case dp.DP_TASK_IP_FQDN_STORAGE_UPDATE:
+		ipFqdnStorageMutex.Lock()
+		ip := task.FqdnStorageUpdate.IP.String()
+		name := task.FqdnStorageUpdate.Name
+		ipFqdnStorageCache[ip] = name
+		ipFqdnStorageMutex.Unlock()
+	case dp.DP_TASK_IP_FQDN_STORAGE_RELEASE:
+		ipFqdnStorageMutex.Lock()
+		ip := task.FqdnStorageRelease.String()
+		delete(ipFqdnStorageCache, ip)
+		ipFqdnStorageMutex.Unlock()
 	case dp.DP_TASK_CONNECTION:
 		connsCacheMutex.Lock()
 		connsCache = append(connsCache, task.Connects...)
@@ -528,6 +541,13 @@ func updateHostConnection(conns []*dp.ConnectionData) {
 const connectionListMax int = 2048 * 4
 
 func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
+	fqdn := ""
+	if c.ExternalPeer && len(ipFqdnStorageCache) > 0 {
+		if name, ok := ipFqdnStorageCache[net.IP(c.ServerIP).String()]; ok {
+			fqdn = name
+		}
+	}
+	
 	return &share.CLUSConnection{
 		AgentID:      c.AgentID,
 		HostID:       c.HostID,
@@ -561,6 +581,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		LinkLocal:    c.LinkLocal,
 		TmpOpen:      c.TmpOpen,
 		UwlIp:        c.UwlIp,
+		FQDN:         fqdn,
 	}
 }
 
