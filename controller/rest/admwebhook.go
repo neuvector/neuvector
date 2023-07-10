@@ -33,6 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
+	k8sAppsv1 "github.com/neuvector/k8s/apis/apps/v1"
+	k8sMetav1 "github.com/neuvector/k8s/apis/meta/v1"
+
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -41,6 +44,7 @@ import (
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -584,14 +588,54 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 	return containers, nil
 }
 
-func getOwnerUserGroupLabels(ownerUIDs []string) (string, utils.Set, map[string]string) {
+func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, bool) {
+	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
+		var objectMeta *k8sMetav1.ObjectMeta
+		switch kind {
+		case resource.RscTypeReplicaSet:
+			// support pod -> replicaset -> deployment for now
+			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
+				objectMeta = rsObj.Metadata
+			}
+		}
+		if objectMeta != nil {
+			for _, ownerRef := range objectMeta.OwnerReferences {
+				if ownerRef == nil {
+					continue
+				}
+				admResCacheMutex.RLock()
+				ownerObject, exist := admResCache[ownerRef.GetUid()]
+				admResCacheMutex.RUnlock()
+				if exist {
+					if len(ownerObject.OwnerUIDs) == 0 {
+						// owner is root resource (most likely deployment)
+						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, true
+					} else {
+						log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
+					}
+				} else {
+					// trace up one layer in the owner chain
+					if userName, groups, labels, found := getOwnerUserGroupLabelsFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
+						return userName, groups, labels, true
+					}
+				}
+			}
+		}
+	} else {
+		log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns, "error": err}).Error()
+	}
+
+	return "", utils.NewSet(), nil, false
+}
+
+func getOwnerUserGroupLabels(ownerUIDs []string, ownerReferences []metav1.OwnerReference, ns string) (string, utils.Set, map[string]string) {
 	for _, uid := range ownerUIDs {
 		admResCacheMutex.RLock()
 		ownerObject, exist := admResCache[uid]
 		admResCacheMutex.RUnlock()
 		if exist {
 			ownerObject.ValidUntil = time.Now().Add(time.Minute * 5).Unix()
-			userName, groups, labels := getOwnerUserGroupLabels(ownerObject.OwnerUIDs)
+			userName, groups, labels := getOwnerUserGroupLabels(ownerObject.OwnerUIDs, nil, ns)
 			if userName == "" && groups.Cardinality() == 0 {
 				userName = ownerObject.UserName
 				groups = ownerObject.Groups
@@ -600,6 +644,14 @@ func getOwnerUserGroupLabels(ownerUIDs []string) (string, utils.Set, map[string]
 				labels = ownerObject.Labels
 			}
 			return userName, groups, labels
+		} else {
+			// owner resource is not in cache anymore. query k8s instead
+			for _, ownerRef := range ownerReferences {
+				kind := strings.ToLower(ownerRef.Kind)
+				if userName, groups, labels, found := getOwnerUserGroupLabelsFromK8s(kind, ownerRef.Name, ns); found {
+					return userName, groups, labels
+				}
+			}
 		}
 	}
 
@@ -647,7 +699,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	for _, ref := range objectMeta.OwnerReferences {
 		ownerUIDs = append(ownerUIDs, string(ref.UID))
 	}
-	userName, groups, labels := getOwnerUserGroupLabels(ownerUIDs)
+	userName, groups, labels := getOwnerUserGroupLabels(ownerUIDs, objectMeta.OwnerReferences, objectMeta.Namespace)
 	if userName == "" && groups.Cardinality() == 0 && len(ownerUIDs) == 0 { // only root resource's user/group is used
 		userName = req.UserInfo.Username
 		if len(req.UserInfo.Groups) > 0 {

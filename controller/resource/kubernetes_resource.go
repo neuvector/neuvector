@@ -394,6 +394,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 			},
 		},
 	},
+	RscTypeReplicaSet: k8sResource{
+		apiGroup: "apps",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(appsv1.ReplicaSet) },
+				func() k8s.ResourceList { return new(appsv1.ReplicaSetList) },
+				xlateReplicaSet,
+				nil,
+			},
+		},
+	},
 	RscTypeCronJob: k8sResource{
 		apiGroup: "batch",
 		makers: []*resourceMaker{
@@ -900,6 +912,23 @@ func xlateDaemonSet(obj k8s.Resource) (string, interface{}) {
 			} else if spec.ServiceAccount != nil && *spec.ServiceAccount != "" {
 				r.SA = *spec.ServiceAccount
 			}
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
+func xlateReplicaSet(obj k8s.Resource) (string, interface{}) {
+	if o, ok := obj.(*appsv1.ReplicaSet); ok && o != nil {
+		meta := o.Metadata
+		if meta == nil {
+			return "", nil
+		}
+		r := &ReplicaSet{
+			UID:    meta.GetUid(),
+			Name:   meta.GetName(),
+			Domain: meta.GetNamespace(),
 		}
 		return r.UID, r
 	}
@@ -1588,7 +1617,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeCrdNvCspUsage:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeCrdNvCspUsage:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
