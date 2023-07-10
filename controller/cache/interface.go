@@ -217,6 +217,7 @@ type CacheInterface interface {
 	GetUnusedGroupAging() uint8
 	GetNetServiceStatus() bool
 	GetNetServicePolicyMode() string
+	GetNewServiceProfileBaseline() string
 
 	// Waf rule
 	GetAllWafSensors(acc *access.AccessControl) []*api.RESTWafSensor

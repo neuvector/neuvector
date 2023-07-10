@@ -267,7 +267,8 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 
 			if utils.DoesGroupHavePolicyMode(group.Name) {
 				cg.PolicyMode = cacher.GetNewServicePolicyMode()
-				fmt.Println("New learned svc ", group.Name, "set service as ", cg.PolicyMode)
+				cg.BaselineProfile = cacher.GetNewServiceProfileBaseline()
+				fmt.Printf("New learned svc  %s set service as %s, %s\n", group.Name, cg.PolicyMode, cg.BaselineProfile)
 			}
 
 			cg.Criteria = make([]share.CLUSCriteriaEntry, 0, len(*group.Criteria))
