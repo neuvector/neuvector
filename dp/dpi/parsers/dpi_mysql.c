@@ -7,8 +7,9 @@
 #define MYSQL_SERVER_GREET          0
 #define MYSQL_CLIENT_LOGIN          1
 #define MYSQL_LOGIN_RESPONSE        2
-#define MYSQL_AUTH_SWITCH_RESPONSE  3
-#define MYSQL_REQUEST               4
+#define MYSQL_AUTH_SWITCH_REQUEST   3
+#define MYSQL_AUTH_SWITCH_RESPONSE  4
+#define MYSQL_REQUEST               5
 
 #define MYSQL_CAP1_LONG_PASSWORD                  0x0001
 #define MYSQL_CAP1_FOUND_ROWS                     0x0002
@@ -68,6 +69,7 @@
 #define MYSQL_SET_OPTION          27
 #define MYSQL_STMT_FETCH          28
 
+#define EOF_PACKET                                0xfe
 #define ERR_PACKET                                0xff
 
 #define ER_DBACCESS_DENIED_ERROR                  1044 
@@ -339,11 +341,22 @@ static void mysql_parser(dpi_packet_t *p)
                 }
             }
             if (data->client_cap_ext & MYSQL_CAP2_PLUGIN_AUTH) {
-                data->state = MYSQL_AUTH_SWITCH_RESPONSE;
+                data->state = MYSQL_AUTH_SWITCH_REQUEST;
             } else {
                 data->state = MYSQL_REQUEST;
             }
             ptr += expect; len -= expect;
+            break;
+        case MYSQL_AUTH_SWITCH_REQUEST:
+            ptr += MYSQL_HDR_LEN; len -= MYSQL_HDR_LEN;
+            uint8_t status_tag = ptr[0];
+            if (status_tag == EOF_PACKET) {
+                data->state = MYSQL_AUTH_SWITCH_RESPONSE;
+                ptr += expect; len -= expect;
+            } else {
+                data->state = MYSQL_REQUEST;
+                ptr -= MYSQL_HDR_LEN; len += MYSQL_HDR_LEN;
+            }
             break;
         case MYSQL_AUTH_SWITCH_RESPONSE:
             ptr += MYSQL_HDR_LEN; len -= MYSQL_HDR_LEN;
