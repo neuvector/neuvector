@@ -12905,6 +12905,7 @@ definitions:
       - policy_id
       - client_ip
       - server_ip
+      - fqdn
     properties:
       name:
         type: string
@@ -13006,6 +13007,9 @@ definitions:
       server_ip:
         type: string
         example: 172.17.0.3
+      fqdn:
+        type: string
+        example: www.suse.com
   RESTAdminCustomCriteriaOptions:
     type: object
     required:
