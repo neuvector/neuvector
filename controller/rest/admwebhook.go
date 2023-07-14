@@ -597,6 +597,19 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
 				objectMeta = rsObj.Metadata
 			}
+		case resource.RscTypeDeployment:
+			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
+				if len(deployObj.Metadata.OwnerReferences) == 0 {
+					labels := make(map[string]string, len(deployObj.Metadata.Labels)+len(deployObj.Spec.Template.Metadata.Labels))
+					for k, v := range deployObj.Metadata.Labels {
+						labels[k] = v
+					}
+					for k, v := range deployObj.Spec.Template.Metadata.Labels {
+						labels[k] = v
+					}
+					return "", utils.NewSet(), labels, true
+				}
+			}
 		}
 		if objectMeta != nil {
 			for _, ownerRef := range objectMeta.OwnerReferences {
