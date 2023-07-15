@@ -755,6 +755,7 @@ type CLUSSystemConfig struct {
 	UnusedGroupAging          uint8  `json:"unused_group_aging"`
 	CLUSSyslogConfig
 	SingleCVEPerSyslog   bool                      `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers    bool                      `json:"syslog_cve_in_layers"`
 	AuthOrder            []string                  `json:"auth_order"`
 	AuthByPlatform       bool                      `json:"auth_by_platform"`
 	RancherEP            string                    `json:"rancher_ep"`

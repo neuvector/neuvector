@@ -297,6 +297,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						SyslogCategories:   rconf.SyslogCategories,
 						SyslogInJSON:       rconf.SyslogInJSON,
 						SingleCVEPerSyslog: rconf.SingleCVEPerSyslog,
+						SyslogCVEInLayers:  rconf.SyslogCVEInLayers,
 						SyslogServerCert:   rconf.SyslogServerCert,
 					},
 					Auth: api.RESTSystemConfigAuthV2{
@@ -1223,6 +1224,9 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			if rc.SingleCVEPerSyslog != nil {
 				cconf.SingleCVEPerSyslog = *rc.SingleCVEPerSyslog
 			}
+			if rc.SyslogCVEInLayers != nil {
+				cconf.SyslogCVEInLayers = *rc.SyslogCVEInLayers
+			}
 
 			// Auth order
 			if rc.AuthOrder != nil {
@@ -1501,6 +1505,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.SyslogCategories = configV2.SyslogCfg.SyslogCategories
 				config.SyslogInJSON = configV2.SyslogCfg.SyslogInJSON
 				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
+				config.SyslogCVEInLayers = configV2.SyslogCfg.SyslogCVEInLayers
 				config.SyslogServerCert = configV2.SyslogCfg.SyslogServerCert
 			}
 			if configV2.AuthCfg != nil {

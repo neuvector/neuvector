@@ -101,7 +101,7 @@ func TestLocalRepoScan(t *testing.T) {
 	}
 
 	// Simulate sum update callback
-	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, nil)
+	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// Check image cache
 	c, ok := repoScanRegistry.cache[sr1.ImageID]
@@ -137,7 +137,7 @@ func TestLocalRepoScan(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to retrieve new summary: key=%+v", key)
 	}
-	RegistryImageStateUpdate(common.RegistryRepoScanName, sr2.ImageID, sum, nil)
+	RegistryImageStateUpdate(common.RegistryRepoScanName, sr2.ImageID, sum, false, nil)
 
 	// Get summary for adm. ctrl with registry, should return new image
 	regs = utils.NewSet("https://dockerhub.com")
@@ -174,13 +174,13 @@ func TestRemoteRepoScan(t *testing.T) {
 	smd.StoreRepoScanResult(&sr1)
 	key := share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	sum, _ := mockCluster.ScanSums[key]
-	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, nil)
+	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// store a remote image
 	smd.StoreRepoScanResult(&sr3)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr3.ImageID)
 	sum, _ = mockCluster.ScanSums[key]
-	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, nil)
+	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, false, nil)
 
 	// search image that registry matches
 	regs := utils.NewSet("https://dockerhub.com", "https://docker.io/")
