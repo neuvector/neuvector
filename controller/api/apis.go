@@ -1642,6 +1642,7 @@ type RESTSystemConfigConfig struct {
 	SyslogInJSON              *bool                            `json:"syslog_in_json,omitempty"`
 	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
 	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
+	SyslogCVEInLayers         *bool                            `json:"syslog_cve_in_layers,omitempty"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
 	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
@@ -1713,6 +1714,7 @@ type RESTSystemConfigSyslogCfgV2 struct {
 	SyslogCategories   *[]string `json:"syslog_categories,omitempty"`
 	SyslogInJSON       *bool     `json:"syslog_in_json,omitempty"`
 	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers  *bool     `json:"syslog_cve_in_layers,omitempty"`
 	SyslogServerCert   *string   `json:"syslog_server_cert,omitempty"`
 }
 
@@ -1784,6 +1786,7 @@ type RESTSystemConfig struct {
 	SyslogInJSON              bool                      `json:"syslog_in_json"`
 	SyslogServerCert          string                    `json:"syslog_server_cert"`
 	SingleCVEPerSyslog        bool                      `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers         bool                      `json:"syslog_cve_in_layers,omitempty"`
 	AuthOrder                 []string                  `json:"auth_order"`
 	AuthByPlatform            bool                      `json:"auth_by_platform"`
 	RancherEP                 string                    `json:"rancher_ep"`
@@ -1833,6 +1836,7 @@ type RESTSystemConfigSyslogV2 struct {
 	SyslogCategories   []string `json:"syslog_categories"`
 	SyslogInJSON       bool     `json:"syslog_in_json"`
 	SingleCVEPerSyslog bool     `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers  bool     `json:"syslog_cve_in_layers"`
 	SyslogServerCert   string   `json:"syslog_server_cert"`
 }
 

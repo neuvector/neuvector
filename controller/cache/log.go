@@ -591,6 +591,48 @@ func logAudit(arg interface{}) {
 		} else {
 			go sendSyslog(rlog, rlog.Level, api.CategoryAudit, "audit")
 		}
+
+		if systemConfigCache.SyslogCVEInLayers &&
+			(rlog.Name == api.EventNameContainerScanReport ||
+				rlog.Name == api.EventNameHostScanReport ||
+				rlog.Name == api.EventNameRegistryScanReport ||
+				rlog.Name == api.EventNamePlatformScanReport) {
+			go func() {
+				for _, llog := range rlog.Layers {
+					if len(llog.HighVuls) > 0 || len(llog.MediumVuls) > 0 {
+						// copy the fields of the layer
+						rlog.ImageLayerDigest = llog.ImageLayerDigest
+						rlog.HighVuls = llog.HighVuls
+						rlog.MediumVuls = llog.MediumVuls
+						rlog.HighCnt = llog.HighCnt
+						rlog.MediumCnt = llog.MediumCnt
+						rlog.PackageMap = llog.PackageMap
+						if systemConfigCache.SingleCVEPerSyslog {
+							for _, v := range rlog.HighVuls {
+								l := *rlog
+								l.HighVuls = []string{v}
+								l.MediumVuls = []string{}
+								l.HighCnt = 1
+								l.MediumCnt = 0
+								fillAuditPackages(&l, v)
+								sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
+							}
+							for _, v := range rlog.MediumVuls {
+								l := *rlog
+								l.HighVuls = []string{}
+								l.MediumVuls = []string{v}
+								l.HighCnt = 0
+								l.MediumCnt = 1
+								fillAuditPackages(&l, v)
+								sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
+							}
+						} else {
+							sendSyslog(rlog, rlog.Level, api.CategoryAudit, "audit")
+						}
+					}
+				}
+			}()
+		}
 	}
 }
 
@@ -1765,7 +1807,7 @@ func scanReport2BenchLog(id string, objType share.ScanObjectType, report *share.
 	return &clog
 }
 
-func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, highs, meds []string, regName string) *api.Audit {
+func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, highs, meds []string, layerHighs, layerMeds map[string][]string, regName string) *api.Audit {
 	clog := api.Audit{
 		LogCommon: api.LogCommon{
 			ReportedAt:        api.RESTTimeString(report.ScannedAt),
@@ -1822,6 +1864,8 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	clog.HighCnt = len(highs)
 	clog.MediumCnt = len(meds)
 	if systemConfigCache.SingleCVEPerSyslog {
+		// if only reporting one cve per rule, we will add the vulnerabile package info.
+		// PackageMap is used to keep the info, it will not be included in the log
 		clog.PackageMap = make(map[string][]string)
 		for _, reportvuln := range report.Vuls {
 			val, ok := clog.PackageMap[reportvuln.Name]
@@ -1830,6 +1874,33 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 			} else {
 				clog.PackageMap[reportvuln.Name] = []string{reportvuln.PackageName}
 			}
+		}
+	}
+	if systemConfigCache.SyslogCVEInLayers {
+		clog.Layers = make([]api.Audit, len(report.Layers))
+		for i, l := range report.Layers {
+			var lc api.Audit
+			lc.ImageLayerDigest = l.Digest
+			if h, ok := layerHighs[l.Digest]; ok {
+				lc.HighVuls = h
+				lc.HighCnt = len(h)
+			}
+			if m, ok := layerMeds[l.Digest]; ok {
+				lc.MediumVuls = m
+				lc.MediumCnt = len(m)
+			}
+			if systemConfigCache.SingleCVEPerSyslog {
+				lc.PackageMap = make(map[string][]string)
+				for _, reportvuln := range l.Vuls {
+					val, ok := lc.PackageMap[reportvuln.Name]
+					if ok {
+						lc.PackageMap[reportvuln.Name] = append(val, reportvuln.PackageName)
+					} else {
+						lc.PackageMap[reportvuln.Name] = []string{reportvuln.PackageName}
+					}
+				}
+			}
+			clog.Layers[i] = lc
 		}
 	}
 
