@@ -434,7 +434,7 @@ func RegistryStateUpdate(name string, state *share.CLUSRegistryState) {
 	}
 }
 
-func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string) {
+func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, calculateLayers bool, vpf scanUtils.VPFInterface) (utils.Set, []string, []string, map[string][]string, map[string][]string) {
 	smd.scanLog.WithFields(log.Fields{"registry": name, "id": id}).Debug()
 
 	var rs *Registry
@@ -445,12 +445,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	} else if name == common.RegistryFedRepoScanName {
 		rs = repoFedScanRegistry
 	} else if rs, _ = regMapLookup(name); rs == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	var c *imageInfoCache
 	var highs, meds []string
 	var alives utils.Set // vul names that are not filtered
+	layerHighMap := make(map[string][]string, 0)
+	layerMedMap := make(map[string][]string, 0)
 
 	if sum != nil && sum.Status == api.ScanStatusFinished {
 		key := share.CLUSRegistryImageDataKey(name, id)
@@ -488,6 +490,37 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			c.layers = make([]string, len(report.Layers))
 			for i, l := range report.Layers {
 				c.layers[i] = l.Digest
+
+				if calculateLayers {
+					// calculate highs and meds in layers
+					layerHighs := make([]string, 0)
+					layerMeds := make([]string, 0)
+					var layerAlives utils.Set // vul names that are not filtered
+
+					if vpf != nil {
+						layerAlives = vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
+					} else {
+						layerAlives = utils.NewSet()
+						for _, t := range c.vulTraits {
+							layerAlives.Add(t.Name)
+						}
+					}
+
+					for _, v := range l.Vuls {
+						if !layerAlives.Contains(v.Name) {
+							continue
+						}
+
+						if v.Severity == share.VulnSeverityHigh {
+							layerHighs = append(layerHighs, v.Name)
+						} else if v.Severity == share.VulnSeverityMedium {
+							layerMeds = append(layerMeds, v.Name)
+						}
+					}
+
+					layerHighMap[l.Digest] = layerHighs
+					layerMedMap[l.Digest] = layerMeds
+				}
 			}
 		}
 	}
@@ -514,7 +547,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 		delete(rs.cache, id)
 	}
 
-	return alives, highs, meds
+	return alives, highs, meds, layerHighMap, layerMedMap
 }
 
 func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {

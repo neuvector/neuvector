@@ -511,7 +511,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 	// all controller should call auditUpdate to record the log, the leader will take action
 	if alives != nil {
-		clog := scanReport2ScanLog(id, objType, report, highs, meds, "")
+		clog := scanReport2ScanLog(id, objType, report, highs, meds, nil, nil, "")
 		auditUpdate(id, share.EventCVEReport, objType, clog, alives)
 	}
 }
@@ -932,7 +932,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		}
 
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		alives, highs, meds := scan.RegistryImageStateUpdate(name, id, &sum, vpf)
+		alives, highs, meds, layerHighs, layerMeds := scan.RegistryImageStateUpdate(name, id, &sum, systemConfigCache.SyslogCVEInLayers, vpf)
 
 		if sum.Status == api.ScanStatusFinished && sum.Result == share.ScanErrorCode_ScanErrNone {
 			var report *share.CLUSScanReport
@@ -942,7 +942,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				// for any scan report on master/standalone cluster & non-fed scan report on managed cluster
 				if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
 					if alives != nil {
-						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, name)
+						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, layerHighs, layerMeds, name)
 						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
 					}
 
@@ -979,7 +979,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		}
 
 	case cluster.ClusterNotifyDelete:
-		scan.RegistryImageStateUpdate(name, id, nil, nil)
+		scan.RegistryImageStateUpdate(name, id, nil, false, nil)
 		if fedRegName != "" {
 			fedScanDataCacheMutexLock()
 			if currImagesMD5, ok := fedScanResultMD5[fedRegName]; ok {
