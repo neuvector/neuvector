@@ -128,14 +128,14 @@ var sidecarImages = []*ContainerImage{
 }
 
 /*
-func init() {
-	_ = corev1.AddToScheme(runtimeScheme)
-	_ = admissionregistrationv1beta1.AddToScheme(runtimeScheme)
-	// defaulting with webhooks:
-	// https://github.com/kubernetes/kubernetes/issues/57982
-	_ = appsv1.AddToScheme(runtimeScheme)
-	_ = batchv1beta1.AddToScheme(runtimeScheme)
-}
+	func init() {
+		_ = corev1.AddToScheme(runtimeScheme)
+		_ = admissionregistrationv1beta1.AddToScheme(runtimeScheme)
+		// defaulting with webhooks:
+		// https://github.com/kubernetes/kubernetes/issues/57982
+		_ = appsv1.AddToScheme(runtimeScheme)
+		_ = batchv1beta1.AddToScheme(runtimeScheme)
+	}
 */
 func checkAggrLogsCache(alwaysFlush bool) {
 	var err error
@@ -588,7 +588,7 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 	return containers, nil
 }
 
-func mergeLabels(labels1, labels2 map[string]string) map[string]string {
+func mergeMaps(labels1, labels2 map[string]string) map[string]string {
 	labels := make(map[string]string, len(labels1)+len(labels2))
 	for k, v := range labels1 {
 		labels[k] = v
@@ -600,7 +600,7 @@ func mergeLabels(labels1, labels2 map[string]string) map[string]string {
 }
 
 // kind, name, ns are owner's attributes
-func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, bool) {
+func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, bool) {
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
 		var objectMeta *k8sMetav1.ObjectMeta
 		switch kind {
@@ -608,7 +608,7 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 			// support pod -> statefulset
 			if ssObj := obj.(*k8sAppsv1.StatefulSet); ssObj != nil {
 				if len(ssObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeLabels(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), true
+					return "", utils.NewSet(), mergeMaps(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), mergeMaps(ssObj.Metadata.Annotations, ssObj.Spec.Template.Metadata.Annotations), true
 				}
 			}
 		case resource.RscTypeReplicaSet:
@@ -619,7 +619,7 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 		case resource.RscTypeDeployment:
 			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
 				if len(deployObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeLabels(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), true
+					return "", utils.NewSet(), mergeMaps(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), mergeMaps(deployObj.Metadata.Annotations, deployObj.Spec.Template.Metadata.Annotations), true
 				}
 			}
 		}
@@ -634,14 +634,14 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 				if exist {
 					if len(ownerObject.OwnerUIDs) == 0 {
 						// owner is root resource (most likely deployment)
-						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, true
+						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
 					} else {
 						log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
 					}
 				} else {
 					// trace up one layer in the owner chain
-					if userName, groups, labels, found := getOwnerUserGroupLabelsFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
-						return userName, groups, labels, true
+					if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
+						return userName, groups, labels, annotations, true
 					}
 				}
 			}
@@ -650,17 +650,17 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 		log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns, "error": err}).Error()
 	}
 
-	return "", utils.NewSet(), nil, false
+	return "", utils.NewSet(), nil, nil, false
 }
 
-func getOwnerUserGroupLabels(ownerUIDs []string, ownerReferences []metav1.OwnerReference, ns string) (string, utils.Set, map[string]string) {
+func getOwnerUserGroupMetadata(ownerUIDs []string, ownerReferences []metav1.OwnerReference, ns string) (string, utils.Set, map[string]string, map[string]string) {
 	for _, uid := range ownerUIDs {
 		admResCacheMutex.RLock()
 		ownerObject, exist := admResCache[uid]
 		admResCacheMutex.RUnlock()
 		if exist {
 			ownerObject.ValidUntil = time.Now().Add(time.Minute * 5).Unix()
-			userName, groups, labels := getOwnerUserGroupLabels(ownerObject.OwnerUIDs, nil, ns)
+			userName, groups, labels, annotations := getOwnerUserGroupMetadata(ownerObject.OwnerUIDs, nil, ns)
 			if userName == "" && groups.Cardinality() == 0 {
 				userName = ownerObject.UserName
 				groups = ownerObject.Groups
@@ -668,19 +668,22 @@ func getOwnerUserGroupLabels(ownerUIDs []string, ownerReferences []metav1.OwnerR
 			if len(labels) == 0 {
 				labels = ownerObject.Labels
 			}
-			return userName, groups, labels
+			if len(annotations) == 0 {
+				annotations = ownerObject.Annotations
+			}
+			return userName, groups, labels, annotations
 		} else {
 			// owner resource is not in cache anymore. query k8s instead
 			for _, ownerRef := range ownerReferences {
 				kind := strings.ToLower(ownerRef.Kind)
-				if userName, groups, labels, found := getOwnerUserGroupLabelsFromK8s(kind, ownerRef.Name, ns); found {
-					return userName, groups, labels
+				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(kind, ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations
 				}
 			}
 		}
 	}
 
-	return "", utils.NewSet(), nil
+	return "", utils.NewSet(), nil, nil
 }
 
 func isRootOwnerCacheAvailable(ownerUIDs []string) bool {
@@ -705,6 +708,7 @@ func isRootOwnerCacheAvailable(ownerUIDs []string) bool {
 
 func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.ObjectMeta, podSpec interface{}) (*nvsysadmission.AdmResObject, error) {
 	var specLabels map[string]string
+	var specAnnotations map[string]string
 	var containers []*nvsysadmission.AdmContainerInfo
 	if podSpec != nil {
 		switch podSpec.(type) {
@@ -712,6 +716,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 			podTemplateSpec, _ := podSpec.(*corev1.PodTemplateSpec)
 			containers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
 			specLabels = podTemplateSpec.ObjectMeta.Labels
+			specAnnotations = podTemplateSpec.ObjectMeta.Annotations
 		case *corev1.PodSpec:
 			podSpec, _ := podSpec.(*corev1.PodSpec)
 			containers, _ = parsePodSpec(objectMeta, podSpec)
@@ -724,7 +729,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	for _, ref := range objectMeta.OwnerReferences {
 		ownerUIDs = append(ownerUIDs, string(ref.UID))
 	}
-	userName, groups, labels := getOwnerUserGroupLabels(ownerUIDs, objectMeta.OwnerReferences, objectMeta.Namespace)
+	userName, groups, labels, annotations := getOwnerUserGroupMetadata(ownerUIDs, objectMeta.OwnerReferences, objectMeta.Namespace)
 	if userName == "" && groups.Cardinality() == 0 && len(ownerUIDs) == 0 { // only root resource's user/group is used
 		userName = req.UserInfo.Username
 		if len(req.UserInfo.Groups) > 0 {
@@ -734,19 +739,23 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 		}
 	}
 	if labels == nil && len(ownerUIDs) == 0 {
-		labels = mergeLabels(objectMeta.Labels, specLabels)
+		labels = mergeMaps(objectMeta.Labels, specLabels)
+	}
+	if annotations == nil && len(ownerUIDs) == 0 {
+		annotations = mergeMaps(objectMeta.Annotations, specAnnotations)
 	}
 
 	resObject := &nvsysadmission.AdmResObject{
-		ValidUntil: time.Now().Add(time.Minute * 5).Unix(),
-		Kind:       req.Kind.Kind,
-		Name:       objectMeta.Name,
-		Namespace:  objectMeta.Namespace,
-		UserName:   userName,
-		Groups:     groups,
-		OwnerUIDs:  ownerUIDs,
-		Labels:     labels,
-		Containers: containers,
+		ValidUntil:  time.Now().Add(time.Minute * 5).Unix(),
+		Kind:        req.Kind.Kind,
+		Name:        objectMeta.Name,
+		Namespace:   objectMeta.Namespace,
+		UserName:    userName,
+		Groups:      groups,
+		OwnerUIDs:   ownerUIDs,
+		Labels:      labels,
+		Annotations: annotations,
+		Containers:  containers,
 		// AdmResults: make(map[string]*nvsysadmission.AdmResult), // comment out because we do not re-use the matching result of owners anymore.
 	}
 	admResCacheMutex.Lock()
@@ -876,14 +885,14 @@ func logUnmarshallError(kind *string, uid *types.UID, err *error) *admissionv1be
 }
 
 // returns (alog aggregated, alog to be added to auditQueue)
-// 1. The first occurrence of a 'denied' audit for a key({owner_uid}.{image}} is always added to auditQueue without aggregation
-//    Then a {key, dummy log} entry is added to aggrLogsCache so we start aggregation for the following 'denied' audits of same key({owner_uid}.{image})
-// 2. For the next 'denied' audit of the same key in 8 minutes, {key, real alog} is updated in aggrLogsCache
-// 3. For the following 'denied' audits of the same key in 8 minutes, occurrences for the same key's alog is increased(1 for each log) in aggrLogsCache
-// 4. In CleanupSessCfgCache(), it periodically checks if there are audit logs that have been aggregated for 8(+) minutes.
-//	  If yes, add them to auditQueue and delete their entries from aggrLogsCache
-//    If it's the dummy log entry sitting in aggrLogsCache for 8(+) minutes, delete it as well.
-// 5. The next 'denied' audit for the same key starts over from step 1
+//  1. The first occurrence of a 'denied' audit for a key({owner_uid}.{image}} is always added to auditQueue without aggregation
+//     Then a {key, dummy log} entry is added to aggrLogsCache so we start aggregation for the following 'denied' audits of same key({owner_uid}.{image})
+//  2. For the next 'denied' audit of the same key in 8 minutes, {key, real alog} is updated in aggrLogsCache
+//  3. For the following 'denied' audits of the same key in 8 minutes, occurrences for the same key's alog is increased(1 for each log) in aggrLogsCache
+//  4. In CleanupSessCfgCache(), it periodically checks if there are audit logs that have been aggregated for 8(+) minutes.
+//     If yes, add them to auditQueue and delete their entries from aggrLogsCache
+//     If it's the dummy log entry sitting in aggrLogsCache for 8(+) minutes, delete it as well.
+//  5. The next 'denied' audit for the same key starts over from step 1
 func aggregateDenyLogs(result *nvsysadmission.AdmResult, ownerUID string, alog *share.CLUSAuditLog) (bool, *share.CLUSAuditLog) {
 	if result == nil || result.Image == "" || ownerUID == "" {
 		return false, alog

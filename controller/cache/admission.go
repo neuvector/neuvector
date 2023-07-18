@@ -50,6 +50,8 @@ const (
 	_matchedSrcImageEnvVars    = "image environment variables"
 	_matchedSrcResourceEnvVars = "resource environment variables"
 	_matchedSrcBothEnvVars     = "resource and image environment variables"
+
+	_matchedSrcResourceAnnotations = "resource annotations"
 )
 
 var admUriStates map[string]*nvsysadmission.AdmUriState // key is uri for admission request
@@ -1323,6 +1325,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			if met {
 				matchedSource = dataSrc
 			}
+		case share.CriteriaKeyAnnotations:
+			met, positive = isMapCriterionMet(crt, admResObject.Annotations)
 		case share.CriteriaKeyImage:
 			met, positive = isImageCriterionMet(crt, c)
 		case share.CriteriaKeyImageRegistry:
