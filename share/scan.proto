@@ -50,7 +50,7 @@ message ScanVulnerability {
     float Score = 2;
     string Severity = 3;
     string Description = 4;
-    string PackageName = 5;
+    string PackageNameDeprecated = 5; // Keep this for backward compatibility. Return filename for app vulnerabilities.
     string PackageVersion = 6;
     string FixedVersion = 7;
     string Link = 8;
@@ -65,6 +65,7 @@ message ScanVulnerability {
     bool InBase = 17;
     string DBKey = 18;
     string FileName = 19;
+    string PackageName = 20;
 }
 
 message ScanLayerResult {
