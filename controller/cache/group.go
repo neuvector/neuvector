@@ -1220,6 +1220,35 @@ func hostWorkloadDelete(id string, param interface{}) {
 	}
 }
 
+func addImageRelatedContainer2group(cache *groupCache, wlc *workloadCache) {
+	for _, ct := range cache.group.Criteria {
+		if ct.Key != share.CriteriaKeyImage {
+			return
+		}
+	}
+	if cache.group.CfgType != share.Learned {
+		if wlc.workload.ShareNetNS != "" {
+			if pwlc, ok := wlCacheMap[wlc.workload.ShareNetNS]; ok {
+				cache.members.Add(pwlc.workload.ID)
+				pwlc.groups.Add(cache.group.Name)
+				for child := range pwlc.children.Iter() {
+					if childCache, ok1 := wlCacheMap[child.(string)]; ok1 {
+						cache.members.Add(childCache.workload.ID)
+						childCache.groups.Add(cache.group.Name)
+					}
+				}
+			}
+		} else {
+			for child := range wlc.children.Iter() {
+				if childCache, ok := wlCacheMap[child.(string)]; ok {
+					cache.members.Add(childCache.workload.ID)
+					childCache.groups.Add(cache.group.Name)
+				}
+			}
+		}
+	}
+}
+
 func groupWorkloadJoin(id string, param interface{}) {
 	wlc := param.(*workloadCache)
 	wl := wlc.workload
@@ -1286,7 +1315,8 @@ func groupWorkloadJoin(id string, param interface{}) {
 				memberUpdated = true
 				log.WithFields(log.Fields{"group": cache.group.Name}).Debug("Join group")
 			}
-
+			//NVSHAS-8136, container is selected based on image=xxx criteria, add related containers to group
+			addImageRelatedContainer2group(cache, wlc)
 			if bHasGroupProfile {
 				dptCustomGrpAdds.Add(cache.group.Name)
 			}
@@ -1395,6 +1425,8 @@ func refreshGroupMember(cache *groupCache) {
 		if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) {
 			cache.members.Add(wlc.workload.ID)
 			wlc.groups.Add(cache.group.Name)
+			//NVSHAS-8136, container is selected based on image=xxx criteria, add related containers to group
+			addImageRelatedContainer2group(cache, wlc)
 
 			if cache.group.CfgType == share.Learned && common.OEMIgnoreWorkload(wlc.workload) {
 				cache.oemHide = true
