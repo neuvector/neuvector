@@ -588,10 +588,29 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 	return containers, nil
 }
 
+func mergeLabels(labels1, labels2 map[string]string) map[string]string {
+	labels := make(map[string]string, len(labels1)+len(labels2))
+	for k, v := range labels1 {
+		labels[k] = v
+	}
+	for k, v := range labels2 {
+		labels[k] = v
+	}
+	return labels
+}
+
+// kind, name, ns are owner's attributes
 func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, bool) {
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
 		var objectMeta *k8sMetav1.ObjectMeta
 		switch kind {
+		case resource.RscTypeStatefulSet:
+			// support pod -> statefulset
+			if ssObj := obj.(*k8sAppsv1.StatefulSet); ssObj != nil {
+				if len(ssObj.Metadata.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeLabels(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), true
+				}
+			}
 		case resource.RscTypeReplicaSet:
 			// support pod -> replicaset -> deployment for now
 			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
@@ -600,14 +619,7 @@ func getOwnerUserGroupLabelsFromK8s(kind, name, ns string) (string, utils.Set, m
 		case resource.RscTypeDeployment:
 			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
 				if len(deployObj.Metadata.OwnerReferences) == 0 {
-					labels := make(map[string]string, len(deployObj.Metadata.Labels)+len(deployObj.Spec.Template.Metadata.Labels))
-					for k, v := range deployObj.Metadata.Labels {
-						labels[k] = v
-					}
-					for k, v := range deployObj.Spec.Template.Metadata.Labels {
-						labels[k] = v
-					}
-					return "", utils.NewSet(), labels, true
+					return "", utils.NewSet(), mergeLabels(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), true
 				}
 			}
 		}
@@ -722,13 +734,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 		}
 	}
 	if labels == nil && len(ownerUIDs) == 0 {
-		labels = make(map[string]string, len(objectMeta.Labels)+len(specLabels))
-		for k, v := range objectMeta.Labels {
-			labels[k] = v
-		}
-		for k, v := range specLabels {
-			labels[k] = v
-		}
+		labels = mergeLabels(objectMeta.Labels, specLabels)
 	}
 
 	resObject := &nvsysadmission.AdmResObject{
