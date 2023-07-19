@@ -51,6 +51,7 @@ var severityID2String = map[int8]string{
 // other info can get from cvedb
 type VulTrait struct {
 	Name     string
+	fileName string
 	pkgName  string
 	pkgVer   string
 	fixVer   string
@@ -86,6 +87,7 @@ func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) 
 		Vectors:        vul.Vectors,
 		Description:    vul.Description,
 		PackageName:    vul.PackageName,
+		FileName:       vul.FileName,
 		PackageVersion: vul.PackageVersion,
 		FixedVersion:   vul.FixedVersion,
 		Link:           vul.Link,
@@ -419,19 +421,19 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
-			Envs:      result.Envs,
-			Labels:    result.Labels,
-			Vuls:      rvuls,
-			Modules:   rmods,
-			Secrets:   rsecrets,
-			SetIDs:    ridperms,
-			Checks:    checks,
-			Cmds:      result.Cmds,
+			Envs:    result.Envs,
+			Labels:  result.Labels,
+			Vuls:    rvuls,
+			Modules: rmods,
+			Secrets: rsecrets,
+			SetIDs:  ridperms,
+			Checks:  checks,
+			Cmds:    result.Cmds,
 		},
 	}
 	if result.SignatureInfo != nil {
 		report.RESTScanReport.SignatureInfo = &api.RESTScanSignatureInfo{
-			Verifiers: result.SignatureInfo.Verifiers,
+			Verifiers:             result.SignatureInfo.Verifiers,
 			VerificationTimestamp: result.SignatureInfo.VerificationTimestamp,
 		}
 	} else {
@@ -505,6 +507,7 @@ func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag stri
 		vul := &api.RESTVulnerability{
 			Name:           vt.Name,
 			PackageName:    vt.pkgName,
+			FileName:       vt.fileName,
 			PackageVersion: vt.pkgVer,
 			FixedVersion:   vt.fixVer,
 		}
@@ -568,6 +571,7 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 			severity: s,
 			dbKey:    v.DBKey,
 			pubTS:    pubTS,
+			fileName: v.FileName,
 			pkgName:  v.PackageName, pkgVer: v.PackageVersion, fixVer: v.FixedVersion,
 		}
 	}

@@ -2110,6 +2110,7 @@ type RESTVulnerability struct {
 	Severity       string   `json:"severity"`
 	Vectors        string   `json:"vectors"`
 	Description    string   `json:"description"`
+	FileName       string   `json:"file_name"`
 	PackageName    string   `json:"package_name"`
 	PackageVersion string   `json:"package_version"`
 	FixedVersion   string   `json:"fixed_version"`
