@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.2'
+  version: '5.2.1'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -8201,6 +8201,9 @@ definitions:
       single_cve_per_syslog:
         type: boolean
         example: true
+      syslog_cve_in_layers:
+        type: boolean
+        example: true
       syslog_server_cert:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
@@ -10249,6 +10252,7 @@ definitions:
       - syslog_categories
       - syslog_in_json
       - single_cve_per_syslog
+      - syslog_cve_in_layers
       - auth_order
       - auth_by_platform
       - rancher_ep
@@ -10310,6 +10314,9 @@ definitions:
         type: boolean
         example: true
       single_cve_per_syslog:
+        type: boolean
+        example: false
+      syslog_cve_in_layers:
         type: boolean
         example: false
       syslog_server_cert:
@@ -10579,6 +10586,7 @@ definitions:
       - syslog_categories
       - syslog_in_json
       - single_cve_per_syslog
+      - syslog_cve_in_layers
       - syslog_server_cert
     properties:
       syslog_ip:
@@ -10607,6 +10615,9 @@ definitions:
         type: boolean
         example: true
       single_cve_per_syslog:
+        type: boolean
+        example: false
+      syslog_cve_in_layers:
         type: boolean
         example: false
       syslog_server_cert:
@@ -10705,6 +10716,9 @@ definitions:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
       single_cve_per_syslog:
+        type: boolean
+        example: true
+      syslog_cve_in_layers:
         type: boolean
         example: true
       auth_order:
@@ -11309,6 +11323,7 @@ definitions:
       - severity
       - vectors
       - description
+      - file_name
       - package_name
       - package_version
       - fixed_version
@@ -11336,6 +11351,9 @@ definitions:
       description:
         type: string
         example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
+      file_name:
+        type: string
+        example: "usr/lib/python3.9" 
       package_name:
         type: string
         example: openssh
