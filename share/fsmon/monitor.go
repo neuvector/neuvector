@@ -578,7 +578,7 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 	// get files and dirs from all filters
 	for _, filter := range profile.Filters {
 		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
+		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s", flt.path))
 		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
 		bUserAdded := filter.CustomerAdd
 		if strings.Contains(filter.Path, "*") {
@@ -596,7 +596,7 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 	// get files and dirs from all filters
 	for _, filter := range profile.FiltersCRD {
 		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
+		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s", flt.path))
 		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
 		bUserAdded := filter.CustomerAdd
 		if strings.Contains(filter.Path, "*") {
