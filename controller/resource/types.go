@@ -43,6 +43,7 @@ const (
 	RscTypeCronJob                        = "cronjob"
 	RscTypeDaemonSet                      = "daemonset"
 	RscTypeReplicaSet                     = "replicaset"
+	RscTypeStatefulSet                    = "statefulset"
 )
 
 const (
@@ -140,6 +141,12 @@ type DaemonSet struct {
 }
 
 type ReplicaSet struct {
+	UID    string
+	Name   string
+	Domain string
+}
+
+type StatefulSet struct {
 	UID    string
 	Name   string
 	Domain string
