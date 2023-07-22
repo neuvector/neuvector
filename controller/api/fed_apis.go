@@ -29,6 +29,7 @@ const (
 	FedStatusLicenseDisallowed     = "license_disallow"        // for describing clusters in fed
 	FedStatusClusterPinging        = "pinging"                 // for describing joint cluster only. short-lived (between license update and the immediate ping)
 	FedStatusClusterSyncing        = "syncing"                 // for describing joint cluster only. short-lived (when joint cluster is applying fed rules)
+	FedStatusClusterPending        = "pending"                 // for describing joint cluster only. when master cluster is not sure joint cluster has finished the joining fed operation
 )
 
 // master cluster: a promoted cluster. One per-federation
