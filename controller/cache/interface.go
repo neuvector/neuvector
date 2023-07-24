@@ -214,6 +214,7 @@ type CacheInterface interface {
 	GetDlpRuleNames() *[]string
 	GetDlpRuleSensorGroupById(id uint32) (string, string, *[]string)
 	GetNewServicePolicyMode() string
+	GetNewServiceProfileBaseline() string
 	GetUnusedGroupAging() uint8
 	GetNetServiceStatus() bool
 	GetNetServicePolicyMode() string
