@@ -196,6 +196,20 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 
+		if ar.Request.Name == "" {
+			req := ar.Request
+			if req != nil && req.Operation == admissionv1beta1.Delete && req.Name == "" {
+				var secRulePartial resource.NvSecurityRulePartial
+				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
+					req.Name = secRulePartial.Metadata.GetName()
+				} else {
+					recordName := fmt.Sprintf("%s-%s-%s", req.Kind.Kind, req.Namespace, req.Name)
+					msg := fmt.Sprintf("CRD %s(%s) Error", recordName, req.Operation)
+					k8sResourceLog(share.CLUSEvCrdErrDetected, msg, []string{err.Error()})
+				}
+			}
+		}
+
 		var sizeErrMsg string
 		if len(body) > cluster.KVValueSizeMax {
 			crdRecord := share.CLUSCrdRecord{CrdRecord: &ar}
