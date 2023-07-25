@@ -52,7 +52,9 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 						resp.CspErrors = cspConfig.Errors
 						resp.CspConfigFrom = "local cluster"
 						if tExpire, err = time.Parse("2006-01-02T15:04:05.000000-07:00", cspConfig.Expire); err == nil {
-							resp.ExpireTime = tExpire.Unix()
+							if tExpire.Before(now) {
+								resp.ExpireTime = tExpire.Unix()
+							}
 							if cspConfig.BillingApiAccessOk && tExpire.After(now) {
 								resp.Compliant = true
 							} else {
