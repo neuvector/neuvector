@@ -1020,6 +1020,7 @@ func addrWorkloadAdd(id string, param interface{}) {
 	defer cacheMutexUnlock()
 
 	// Update workload_ip-to-workload map
+	hostip_reused := false
 	for _, addrs := range wl.Ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {
@@ -1039,6 +1040,14 @@ func addrWorkloadAdd(id string, param interface{}) {
 					ipWLMap[key] = &workloadDigest{wlID: id, ipnet: addr.IPNet, alive: true, managed: true, node: wl.HostName}
 				}
 
+				//NVSHAS-8155, previous host ip reused by POD, remove it from iphost cache
+				if _, ok1 := ipHostMap[key]; ok1 {
+					delete(ipHostMap, key)
+					hostip_reused = true
+					log.WithFields(log.Fields{
+						"ip": key, "workload": container.ShortContainerId(wl.ID),
+					}).Debug("Remove host ip reused by workload")
+				}
 				log.WithFields(log.Fields{
 					"ip": key, "workload": container.ShortContainerId(wl.ID),
 				}).Debug("ip-workload map")
@@ -1046,6 +1055,10 @@ func addrWorkloadAdd(id string, param interface{}) {
 				updateInternalIPNet(&addr.IPNet, addr.Scope, true)
 			}
 		}
+	}
+
+	if hostip_reused {
+		refreshInternalIPNet()
 	}
 
 	if cache, ok := hostCacheMap[wl.HostID]; ok {
@@ -1144,6 +1157,14 @@ func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 	log.WithFields(log.Fields{"ip": key}).Debug("ip-workload map")
 
 	updateInternalIPNet(ipnet, share.CLUSIPAddrScopeGlobal, true)
+
+	//NVSHAS-8155, previous host ip reused by POD, remove it from iphost cache
+	if _, ok1 := ipHostMap[key]; ok1 {
+		delete(ipHostMap, key)
+		refreshInternalIPNet()
+		log.WithFields(log.Fields{"ip": key}).Debug("Remove host ip reused by workload")
+	}
+
 }
 
 func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
