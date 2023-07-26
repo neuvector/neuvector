@@ -337,11 +337,12 @@ func refreshGroupMembers(grpCache *groupProfileData) {
 	gInfoRLock()
 	for _, c := range gInfo.activeContainers {
 		if isContainerSelected(c, grpCache.group) {
-			if c.parentNS == "" { // docker-native or k8s pod-level
-				if strings.HasPrefix(c.name, "k8s_POD_") { // k8s pod-level
-					grpCache.members = grpCache.members.Union(c.pods)
-				}
-				grpCache.members.Add(c.id)
+			grpCache.members.Add(c.id)
+
+			// pod-level inclusion
+			if pod, ok := gInfo.activeContainers[c.parentNS]; ok {
+				grpCache.members = grpCache.members.Union(pod.pods)
+				grpCache.members.Add(c.parentNS)
 			}
 		}
 	}
@@ -856,7 +857,7 @@ func uppdateFileGroupAccess(c *containerData) bool {
 }
 
 /////// "host" is not an actual workload, will NOT enter this function
-func workloadJoinGroup(c *containerData) {
+func workloadJoinGroup(c, parent *containerData) {
 	if !agentEnv.systemProfiles {
 		return
 	}
@@ -881,23 +882,17 @@ func workloadJoinGroup(c *containerData) {
 		if utils.IsGroupNodes(name) {
 			continue
 		}
-		if !grpCache.members.Contains(c.id) {
-			if isContainerSelected(c, grpCache.group) {
-				if c.parentNS == "" { // docker-native or k8s pod-level
-					if strings.HasPrefix(c.name, "k8s_POD_") { // k8s pod-level
-						grpCache.members = grpCache.members.Union(c.pods)
-						grpNotifyProc = grpNotifyProc.Union(c.pods)
-						grpNotifyFile = grpNotifyFile.Union(c.pods)
-					}
-					grpCache.members.Add(c.id)
-					groups.Add(name) // reference
-				} else { // k8s child-level
-					// patch: the joined pod was not filled with previous pod's members.
-					if grpCache.members.Contains(c.parentNS) {
-						grpCache.members.Add(c.id)
-						groups.Add(name) // reference
-					}
-				}
+
+		if isContainerSelected(c, grpCache.group) {
+			grpCache.members.Add(c.id)
+			groups.Add(name) // reference
+
+			// pod-level inclusion
+			if parent != nil {
+				grpCache.members = grpCache.members.Union(parent.pods)
+				grpCache.members.Add(c.parentNS)
+				grpNotifyProc = grpNotifyProc.Union(parent.pods)
+				grpNotifyFile = grpNotifyFile.Union(parent.pods)
 			}
 		}
 	}
