@@ -1877,7 +1877,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		gInfoUnlock()
 	}
 	// entry to apply group policies
-	workloadJoinGroup(c)
+	workloadJoinGroup(c, parent)
 	updateAppPorts(c, parent)
 	notifyContainerChanges(c, parent, changeInit)
 }
