@@ -267,7 +267,8 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 
 			if utils.DoesGroupHavePolicyMode(group.Name) {
 				cg.PolicyMode = cacher.GetNewServicePolicyMode()
-				fmt.Println("New learned svc ", group.Name, "set service as ", cg.PolicyMode)
+				cg.BaselineProfile = cacher.GetNewServiceProfileBaseline()
+				fmt.Printf("New learned svc  %s set service as %s, %s\n", group.Name, cg.PolicyMode, cg.BaselineProfile)
 			}
 
 			cg.Criteria = make([]share.CLUSCriteriaEntry, 0, len(*group.Criteria))
@@ -2594,7 +2595,7 @@ func (h *nvCrdHandler) crdGFwRuleHandler(req *admissionv1beta1.AdmissionRequest)
 			k8sResourceLog(share.CLUSEvCrdErrDetected, e, detail)
 			log.WithFields(log.Fields{"crdName": recordName}).Error("Failed to add CRD")
 		} else {
-			e := fmt.Sprintf("CRD %s Processed", recordName)
+			e := fmt.Sprintf("CRD(%s) %s Processed", req.Operation, recordName)
 			detail = append(detail, recordName)
 			k8sResourceLog(share.CLUSEvCrdImported, e, detail)
 			log.WithFields(log.Fields{"crdName": recordName}).Info("CRD processed")
@@ -2709,7 +2710,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		tgroup := group2RESTConfig(group)
-		kindName := utils.Dns1123NameChg(gname)
+		kindName := utils.Dns1123NameChg(strings.ToLower(gname))
 		targetNs := ""
 		targetKind := resource.NvClusterSecurityRuleKind
 		apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvClusterSecurityRuleVersion)

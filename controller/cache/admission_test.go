@@ -2,9 +2,11 @@ package cache
 
 import (
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+
+	"github.com/stretchr/testify/assert"
 
 	"strings"
 	"testing"
@@ -1522,6 +1524,183 @@ func TestIsLabelCriterionMet5(t *testing.T) {
 				}*/
 				tag++
 			}
+		}
+	}
+
+	postTest()
+}
+
+func TestIsAnnotationCriterionMet(t *testing.T) {
+	preTest()
+
+	expected := []struct {
+		rule []*share.CLUSAdmRuleCriterion
+		tcs  []struct {
+			obj     nvsysadmission.AdmResObject
+			matched bool
+		}
+	}{
+		{
+			rule: []*share.CLUSAdmRuleCriterion{
+				{
+					Name: share.CriteriaKeyAnnotations, Op: share.CriteriaOpContainsAny, Value: "owner,app", ValueSlice: strings.Split("owner,app", ","),
+				},
+			},
+			tcs: []struct {
+				obj     nvsysadmission.AdmResObject
+				matched bool
+			}{
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+						},
+					},
+					matched: true,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"neighbor": "joe",
+						},
+					},
+					matched: false,
+				},
+			},
+		},
+		{
+			rule: []*share.CLUSAdmRuleCriterion{
+				{
+					Name: share.CriteriaKeyAnnotations, Op: share.CriteriaOpContainsAll, Value: "owner,app", ValueSlice: strings.Split("owner,app", ","),
+				},
+			},
+			tcs: []struct {
+				obj     nvsysadmission.AdmResObject
+				matched bool
+			}{
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+						},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"neighbor": "joe",
+						},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+							"app":   "ubuntu",
+						},
+					},
+					matched: true,
+				},
+			},
+		},
+		{
+			rule: []*share.CLUSAdmRuleCriterion{
+				{
+					Name: share.CriteriaKeyAnnotations, Op: share.CriteriaOpNotContainsAny, Value: "owner,app", ValueSlice: strings.Split("owner,app", ","),
+				},
+			},
+			tcs: []struct {
+				obj     nvsysadmission.AdmResObject
+				matched bool
+			}{
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+						},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{},
+					},
+					matched: true,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"neighbor": "joe",
+						},
+					},
+					matched: true,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+							"app":   "ubuntu",
+						},
+					},
+					matched: false,
+				},
+			},
+		},
+		{
+			rule: []*share.CLUSAdmRuleCriterion{
+				{
+					Name: share.CriteriaKeyAnnotations, Op: share.CriteriaOpContainsOtherThan, Value: "owner,app", ValueSlice: strings.Split("owner,app", ","),
+				},
+			},
+			tcs: []struct {
+				obj     nvsysadmission.AdmResObject
+				matched bool
+			}{
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"owner": "joe",
+						},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{},
+					},
+					matched: false,
+				},
+				{
+					obj: nvsysadmission.AdmResObject{
+						Annotations: map[string]string{
+							"neighbor": "joe",
+						},
+					},
+					matched: true,
+				},
+			},
+		},
+	}
+	cs := []*nvsysadmission.AdmContainerInfo{&nvsysadmission.AdmContainerInfo{}}
+	for _, rule_tcs := range expected {
+		for _, tc := range rule_tcs.tcs {
+			matched, _ := isAdmissionRuleMet(&tc.obj, cs[0], nil, rule_tcs.rule, false, nil, 0)
+			t.Log(rule_tcs, rule_tcs.rule[0].Name, rule_tcs.rule[0].Op, tc.obj)
+			assert.Equal(t, tc.matched, matched)
 		}
 	}
 

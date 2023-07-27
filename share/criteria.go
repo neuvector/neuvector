@@ -50,6 +50,7 @@ const (
 	CriteriaKeyCustomPath          string = "customPath"
 	CriteriaKeySaBindRiskyRole     string = "saBindRiskyRole"
 	CriteriaKeyImageVerifiers      string = "imageVerifiers"
+	CriteriaKeyAnnotations         string = "annotations"
 )
 
 const (
@@ -170,7 +171,9 @@ func IsGroupMember(group *CLUSGroup, workload *CLUSWorkload, domain *CLUSDomain)
 }
 
 // For criteria of same type, apply 'or' if there is at least one positive match;
-//                            apply 'and' if all are negative match;
+//
+//	apply 'and' if all are negative match;
+//
 // For different criteria type, apply 'and'
 func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, domain *CLUSDomain) bool {
 	var ret, positive bool

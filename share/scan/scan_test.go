@@ -46,6 +46,52 @@ func TestParseImageCmds(t *testing.T) {
 			t.Errorf("Should not report ADD is used for remote download\n")
 		}
 	}
+
+	// runAsRoot
+	{
+		cmds := []string{
+			"USER 1000",
+			"CMD [\"/bin/sh\"]",
+		}
+		runAsRoot, _, _ := ParseImageCmds(cmds)
+		if runAsRoot {
+			t.Errorf("Should not report runAsRoot\n")
+			t.Errorf("  %s\n", cmds)
+		}
+	}
+	{
+		cmds := []string{
+			"CMD [\"/bin/sh\"]",
+		}
+		runAsRoot, _, _ := ParseImageCmds(cmds)
+		if !runAsRoot {
+			t.Errorf("Should report runAsRoot\n")
+			t.Errorf("  %s\n", cmds)
+		}
+	}
+	{
+		cmds := []string{
+			"USER root",
+			"CMD [\"/bin/sh\"]",
+		}
+		runAsRoot, _, _ := ParseImageCmds(cmds)
+		if !runAsRoot {
+			t.Errorf("Should report runAsRoot\n")
+			t.Errorf("  %s\n", cmds)
+		}
+	}
+	{
+		cmds := []string{
+			"USER 0",
+			"CMD [\"/bin/sh\"]",
+		}
+		runAsRoot, _, _ := ParseImageCmds(cmds)
+		if !runAsRoot {
+			t.Errorf("Should report runAsRoot\n")
+			t.Errorf("  %s\n", cmds)
+		}
+	}
+
 }
 
 func TestNormalizeImageCmds(t *testing.T) {

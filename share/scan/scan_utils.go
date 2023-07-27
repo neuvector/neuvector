@@ -824,7 +824,7 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 
 // --
 
-var userRegexp = regexp.MustCompile(`USER \[([a-zA-Z0-9_\-\.]+)\]`)
+var userRegexp = regexp.MustCompile(`USER ([a-zA-Z0-9_\-.]+)`)
 
 func NormalizeImageCmd(cmd string) string {
 	if s := strings.Index(cmd, "/bin/sh -c "); s != -1 {
@@ -847,7 +847,7 @@ func ParseImageCmds(cmds []string) (bool, bool, bool) {
 		if !hasUser {
 			r := userRegexp.FindStringSubmatch(cmd)
 			if len(r) == 2 {
-				if r[1] == "root" {
+				if r[1] == "root" || r[1] == "0" {
 					runAsRoot = true
 				} else {
 					runAsRoot = false

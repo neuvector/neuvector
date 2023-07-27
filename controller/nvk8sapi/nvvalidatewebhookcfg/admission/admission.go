@@ -162,15 +162,16 @@ type AdmResult struct { // AdmResult is per-image
 }
 
 type AdmResObject struct {
-	ValidUntil int64 // seconds since the epoch
-	Kind       string
-	Name       string
-	Namespace  string
-	UserName   string
-	Groups     utils.Set
-	OwnerUIDs  []string
-	Labels     map[string]string
-	Containers []*AdmContainerInfo // related containers info in this resource object
+	ValidUntil  int64 // seconds since the epoch
+	Kind        string
+	Name        string
+	Namespace   string
+	UserName    string
+	Groups      utils.Set
+	OwnerUIDs   []string
+	Labels      map[string]string
+	Annotations map[string]string
+	Containers  []*AdmContainerInfo // related containers info in this resource object
 	//AdmResults map[string]*AdmResult // key is image repo. comment out because we do not re-use the matching result of owners anymore
 }
 
@@ -275,6 +276,11 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Name:     share.CriteriaKeyLabels,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
+			},
+			share.CriteriaKeyAnnotations: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyAnnotations,
+				Ops:      allSetOps,
+				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyMountVolumes: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyMountVolumes,
@@ -486,6 +492,11 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Name:     share.CriteriaKeyLabels,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
+			},
+			share.CriteriaKeyAnnotations: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyAnnotations,
+				Ops:      allSetOps,
+				MatchSrc: api.MatchSrcYaml,
 			},
 			share.CriteriaKeyMountVolumes: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyMountVolumes,
