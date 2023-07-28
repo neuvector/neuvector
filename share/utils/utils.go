@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/aes"
@@ -1340,4 +1341,66 @@ func RandomString(length int) string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func CompressToZipFile(source, targetFile string) error {
+	if _, err := os.Stat(filepath.Dir(targetFile)); os.IsNotExist(err) {
+		if err = os.MkdirAll(filepath.Dir(targetFile), 0775); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to create profile folder")
+			return err
+		}
+	}
+
+    // create a zip file and zip.Writer
+	f, err := os.Create(targetFile)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    writer := zip.NewWriter(f)
+    defer writer.Close()
+
+    // go through all the files of the source
+    return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+
+        // create a local file header
+        header, err := zip.FileInfoHeader(info)
+        if err != nil {
+            return err
+        }
+
+        // set compression
+        header.Method = zip.Deflate
+
+        // set relative path of a file as the header name
+        header.Name, err = filepath.Rel(filepath.Dir(source), path)
+        if err != nil {
+            return err
+        }
+        if info.IsDir() {
+            header.Name += "/"
+        }
+
+        // create writer for the file header and save content of the file
+        headerWriter, err := writer.CreateHeader(header)
+        if err != nil {
+            return err
+        }
+
+        if info.IsDir() {
+            return nil
+        }
+
+        f, err := os.Open(path)
+        if err != nil {
+            return err
+        }
+        defer f.Close()
+        _, err = io.Copy(headerWriter, f)
+        return err
+    })
 }

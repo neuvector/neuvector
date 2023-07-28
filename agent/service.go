@@ -1174,6 +1174,6 @@ func (rs *RPCService) GetContainerIntercept(ctx context.Context, f *share.CLUSFi
 }
 
 func (rs *RPCService) ProfilingCmd(ctx context.Context, req *share.CLUSProfilingRequest) (*share.RPCVoid, error) {
-	go utils.PerfProfile(req, "enf.")
+	go utils.PerfProfile(req, share.ProfileFolder, "enf.")
 	return &share.RPCVoid{}, nil
 }

@@ -46,6 +46,10 @@ type ctrlEnvInfo struct {
 	cgroupCPUAcct  string
 	runInContainer bool
 	debugCPath     bool
+	autoProfieCapture bool
+	memoryLimit     uint64
+	peakMemoryUsage uint64
+	snapshotMemStep uint64
 }
 
 var ctrlEnv ctrlEnvInfo
@@ -63,8 +67,8 @@ var k8sResLog *log.Logger
 const statsInterval uint32 = 5
 const controllerStartGapThreshold = time.Duration(time.Minute * 2)
 const memoryRecyclePeriod uint32 = 10                      // minutes
-const memControllerTopPeak uint64 = 4 * 1024 * 1024 * 1024 // 4 GB (inc. allinone case)
-const memSafeGap uint64 = 64 * 1024 * 1024                 // 64 MB
+const memoryCheckPeriod uint32 = 5                         // minutes
+const memControllerTopPeak uint64 = 6 * 1024 * 1024 * 1024 // 6 GB (inc. allinone case)
 
 // Unlike in enforcer, only read host IPs in host mode, so no need to enter host network namespace
 func getHostModeHostIPs() {
@@ -246,6 +250,7 @@ func main() {
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
+	autoProfile := flag.Bool("apc", false, "Enable auto profile collection")
 	flag.Parse()
 
 	if *debug {
@@ -277,6 +282,10 @@ func main() {
 	if *restPort > 65535 || *fedPort > 65535 || *rpcPort > 65535 || *lanPort > 65535 {
 		log.Error("Invalid port value. Exit!")
 		os.Exit(-2)
+	}
+	if *autoProfile {
+		ctrlEnv.autoProfieCapture = *autoProfile
+		log.WithFields(log.Fields{"auto-profile": ctrlEnv.autoProfieCapture}).Info()
 	}
 
 	// Set global objects at the very first
@@ -749,18 +758,25 @@ func main() {
 	cache.PopulateDefRiskyRules()
 
 	go func() {
-		var memStatsControllerResetMark uint64 = memControllerTopPeak - memSafeGap
-
 		ticker := time.Tick(time.Second * time.Duration(5))
 		memStatTicker := time.Tick(time.Minute * time.Duration(memoryRecyclePeriod))
+		memCheckTicker := time.NewTicker(time.Minute * time.Duration(memoryCheckPeriod))
 		statsTicker := time.Tick(time.Second * time.Duration(statsInterval))
 
-		if limit, err := global.SYS.GetContainerMemoryLimitUsage(ctrlEnv.cgroupMemory); err == nil {
-			if limit/2 > memSafeGap {
-				memStatsControllerResetMark = limit/2 - memSafeGap
-			}
-			log.WithFields(log.Fields{"Limit": limit, "Controlled_At": memStatsControllerResetMark}).Info("Memory Resource")
+		ctrlEnv.memoryLimit = memControllerTopPeak
+		if limit, err := global.SYS.GetContainerMemoryLimitUsage(ctrlEnv.cgroupMemory); err == nil && limit > 0 {
+			ctrlEnv.memoryLimit = limit
 		}
+		ctrlEnv.snapshotMemStep = ctrlEnv.memoryLimit/10
+		memSnapshotMark := ctrlEnv.memoryLimit*3/5			// 60% as starting point
+		memStatsControllerResetMark := ctrlEnv.memoryLimit*3/4	// 75% as starting point
+
+		if ctrlEnv.autoProfieCapture {
+			log.WithFields(log.Fields{"Step": ctrlEnv.snapshotMemStep, "Snapshot_At": memSnapshotMark}).Info("Memory Snapshots")
+		} else {
+			memCheckTicker.Stop()
+		}
+		log.WithFields(log.Fields{"Controlled_Limit": ctrlEnv.memoryLimit, "Controlled_At": memStatsControllerResetMark}).Info("Memory Resource")
 
 		// for allinone and controller
 		go global.SYS.MonitorMemoryPressureEvents(memStatsControllerResetMark, memoryPressureNotification)
@@ -774,7 +790,13 @@ func main() {
 			case <-statsTicker:
 				updateStats()
 			case <-memStatTicker:
-				global.SYS.ReCalculateMemoryMetrics(memStatsControllerResetMark)
+				if mStats, err := global.SYS.GetContainerMemoryStats(); err == nil && mStats.WorkingSet > memStatsControllerResetMark {
+					global.SYS.ReCalculateMemoryMetrics(memStatsControllerResetMark)
+				}
+			case <-memCheckTicker.C:
+				if mStats, err := global.SYS.GetContainerMemoryStats(); err == nil && mStats.WorkingSet > memSnapshotMark {
+					memorySnapshot(mStats.WorkingSet)
+				}
 			case <-c_sig:
 				logController(share.CLUSEvControllerStop)
 				flushEventQueue()

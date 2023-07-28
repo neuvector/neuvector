@@ -55,6 +55,7 @@
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
 #define ENV_CSP_ENV            "CSP_ENV"
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
+#define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -413,6 +414,11 @@ static pid_t fork_exec(int i)
             args[a++] = "-csp_pause_interval";
             args[a++] = csp_pause_interval;
         }
+        if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-apc";
+            }
+        }
         args[a] = NULL;
         break;
     case PROC_AGENT:
@@ -492,7 +498,11 @@ static pid_t fork_exec(int i)
             args[a ++] = "-policy_puller";
             args[a ++] = policy_pull_period;
         }
-
+        if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-apc";
+            }
+        }
         args[a] = NULL;
         break;
 
