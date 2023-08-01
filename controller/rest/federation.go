@@ -1663,6 +1663,7 @@ func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles)
+	evqueue.Flush()
 	revertFedRoles(acc)
 	cleanFedRules()
 
@@ -1947,6 +1948,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 			if err := clusHelper.PutFedMembership(m); err == nil {
 				cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles)
+				evqueue.Flush()
 				go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
 				restRespSuccess(w, r, nil, acc, login, nil, "Leave federation")
 				return
@@ -2287,6 +2289,7 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
 	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles)
+	evqueue.Flush()
 	go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
 
 	// after being kicked out of federation, standalone NV reports its usage to CSP
