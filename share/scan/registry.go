@@ -70,25 +70,36 @@ func IsQuayRegistry(rc *RegClient) bool {
 	return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
 }
 
-func (rc *RegClient) copyV2LayerAndHistory(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
+func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
 	allLayersAreCosignPayloads := true
 
 	// In the history list from container image config spec, only the layer that has no empty_layer flag
 	// has a digest in the manifest layer list.
 	// The following section bring the layer list in imageInfo to the same size as history (cmd)
-	j := len(manV2.Layers) - 1
-	for i := 0; i < len(ccmi.Cmds); i++ {
-		if (ccmi != nil && ccmi.EmptyLayers[i]) || j < 0 {
-			imageInfo.Layers = append(imageInfo.Layers, "")
-		} else {
+	if ccmi != nil {
+		j := len(manV2.Layers) - 1
+		for i := 0; i < len(ccmi.Cmds); i++ {
+			if ccmi.EmptyLayers[i] || j < 0 {
+				imageInfo.Layers = append(imageInfo.Layers, "")
+			} else {
+				layer := manV2.Layers[j]
+				imageInfo.Layers = append(imageInfo.Layers, string(layer.Digest))
+				imageInfo.Sizes[string(layer.Digest)] = layer.Size
+				if layer.MediaType != mediaTypeCosign {
+					allLayersAreCosignPayloads = false
+				}
+
+				j--
+			}
+		}
+	} else {
+		for j := len(manV2.Layers) - 1; j >= 0; j-- {
 			layer := manV2.Layers[j]
 			imageInfo.Layers = append(imageInfo.Layers, string(layer.Digest))
 			imageInfo.Sizes[string(layer.Digest)] = layer.Size
 			if layer.MediaType != mediaTypeCosign {
 				allLayersAreCosignPayloads = false
 			}
-
-			j--
 		}
 	}
 
@@ -119,7 +130,7 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 		}
 	}
 
-	imageInfo.IsSignatureImage = rc.copyV2LayerAndHistory(imageInfo, &manV2, ccmi)
+	imageInfo.IsSignatureImage = copyV2Layers(imageInfo, &manV2, ccmi)
 
 	log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg, "cmds": len(imageInfo.Cmds)}).Debug("v2 manifest")
 	return manV2.SchemaVersion, nil
@@ -145,6 +156,14 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 			_, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
 			if err == nil {
 				isQuaySpecialCase = true
+			} else {
+				imageInfo = &ImageInfo{
+					Layers: make([]string, 0),
+					Envs:   make([]string, 0),
+					Cmds:   make([]string, 0),
+					Labels: make(map[string]string),
+					Sizes:  make(map[string]int64),
+				}
 			}
 		}
 	}
