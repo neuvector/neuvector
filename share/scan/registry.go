@@ -70,52 +70,79 @@ func IsQuayRegistry(rc *RegClient) bool {
 	return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
 }
 
-func BuildV2ImageInfo(dg string, body []byte) (imageInfo ImageInfo, parsedSchemaVersion int, err error) {
+func (rc *RegClient) copyV2LayerAndHistory(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
+	allLayersAreCosignPayloads := true
+
+	// In the history list from container image config spec, only the layer that has no empty_layer flag
+	// has a digest in the manifest layer list.
+	// The following section bring the layer list in imageInfo to the same size as history (cmd)
+	j := len(manV2.Layers) - 1
+	for i := 0; i < len(ccmi.Cmds); i++ {
+		if (ccmi != nil && ccmi.EmptyLayers[i]) || j < 0 {
+			imageInfo.Layers = append(imageInfo.Layers, "")
+		} else {
+			layer := manV2.Layers[j]
+			imageInfo.Layers = append(imageInfo.Layers, string(layer.Digest))
+			imageInfo.Sizes[string(layer.Digest)] = layer.Size
+			if layer.MediaType != mediaTypeCosign {
+				allLayersAreCosignPayloads = false
+			}
+
+			j--
+		}
+	}
+
+	return allLayersAreCosignPayloads
+}
+
+func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context, name, dg string, body []byte) (parsedSchemaVersion int, err error) {
 	var manV2 manifestV2.Manifest
+
 	err = json.Unmarshal(body, &manV2)
 	if err != nil {
-		return ImageInfo{}, manV2.SchemaVersion, err
+		return manV2.SchemaVersion, err
 	}
 	if manV2.SchemaVersion != 2 {
-		return ImageInfo{}, manV2.SchemaVersion, fmt.Errorf("unexpected manifest schema version: %d", manV2.SchemaVersion)
+		return manV2.SchemaVersion, fmt.Errorf("unexpected manifest schema version: %d", manV2.SchemaVersion)
 	}
-	log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg}).Debug("v2 manifest request")
+
 	// use v2 config.Digest as repo id
 	imageInfo.ID = string(manV2.Config.Digest)
 	imageInfo.Digest = dg
-	if len(manV2.Layers) > 0 {
-		layerLen := len(manV2.Layers)
-		imageInfo.Layers = make([]string, layerLen)
-		imageInfo.Envs = make([]string, 0)
-		imageInfo.Cmds = make([]string, layerLen)
-		imageInfo.Labels = make(map[string]string, 0)
-		imageInfo.Sizes = make(map[string]int64, 0)
-		allLayersAreCosignPayloads := true
-		for i, des := range manV2.Layers {
-			// reverse the order for v2
-			imageInfo.Layers[layerLen-i-1] = string(des.Digest)
-			imageInfo.Sizes[string(des.Digest)] = des.Size
-			if des.MediaType != mediaTypeCosign {
-				allLayersAreCosignPayloads = false
-			}
-			// log.WithFields(log.Fields{"layer": string(des.Digest)}).Debug("v2 manifest request ====")
+
+	var ccmi *registry.ManifestInfo
+	if manV2.Config.MediaType == registry.MediaTypeContainerImage {
+		if ccmi, err = rc.ImageConfigSpecV1(ctx, name, manV2.Config.Digest); err == nil {
+			imageInfo.Cmds = ccmi.Cmds
+			imageInfo.Envs = ccmi.Envs
+			imageInfo.Labels = ccmi.Labels
 		}
-		imageInfo.IsSignatureImage = allLayersAreCosignPayloads
 	}
-	return imageInfo, manV2.SchemaVersion, nil
+
+	imageInfo.IsSignatureImage = rc.copyV2LayerAndHistory(imageInfo, &manV2, ccmi)
+
+	log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg, "cmds": len(imageInfo.Cmds)}).Debug("v2 manifest")
+	return manV2.SchemaVersion, nil
 }
 
 func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
-	var imageInfo ImageInfo
 	var dg string
 	var body []byte
 	var err error
 	var isQuaySpecialCase = false
 
+	imageInfo := &ImageInfo{
+		Layers: make([]string, 0),
+		Envs:   make([]string, 0),
+		Cmds:   make([]string, 0),
+		Labels: make(map[string]string),
+		Sizes:  make(map[string]int64),
+	}
+
 	if IsPotentialCosignSignatureTag(tag) && IsQuayRegistry(rc) {
 		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, registry.ManifestRequest_CosignSignature)
 		if err == nil {
-			imageInfo, _, err = BuildV2ImageInfo(dg, body)
+			_, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
 			if err == nil {
 				isQuaySpecialCase = true
 			}
@@ -124,40 +151,40 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 
 	if !isQuaySpecialCase {
 		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
-	}
 
-	if err == nil && !isQuaySpecialCase {
-		// check if response is manifest list
-		var ml manifestList.DeserializedManifestList
-		if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
-			(ml.MediaType == manifestList.MediaTypeManifestList || ml.MediaType == registry.MediaTypeOCIIndex) {
-			// prefer to scan linux/amd64 image
-			sort.Slice(ml.Manifests, func(i, j int) bool {
-				if ml.Manifests[i].Platform.OS == "linux" && ml.Manifests[i].Platform.Architecture == "amd64" {
-					return true
-				} else if ml.Manifests[j].Platform.OS == "linux" && ml.Manifests[j].Platform.Architecture == "amd64" {
-					return false
-				} else if ml.Manifests[i].Platform.OS == "linux" {
-					return true
-				} else {
-					return false
-				}
-			})
+		if err == nil {
+			// check if response is manifest list
+			var ml manifestList.DeserializedManifestList
+			if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
+				(ml.MediaType == manifestList.MediaTypeManifestList || ml.MediaType == registry.MediaTypeOCIIndex) {
+				// prefer to scan linux/amd64 image
+				sort.Slice(ml.Manifests, func(i, j int) bool {
+					if ml.Manifests[i].Platform.OS == "linux" && ml.Manifests[i].Platform.Architecture == "amd64" {
+						return true
+					} else if ml.Manifests[j].Platform.OS == "linux" && ml.Manifests[j].Platform.Architecture == "amd64" {
+						return false
+					} else if ml.Manifests[i].Platform.OS == "linux" {
+						return true
+					} else {
+						return false
+					}
+				})
 
-			tag = string(ml.Manifests[0].Digest)
-			dg = tag
-			log.WithFields(log.Fields{"os": ml.Manifests[0].Platform.OS, "arch": ml.Manifests[0].Platform.Architecture, "tag": tag}).Debug("manifest list")
+				tag = string(ml.Manifests[0].Digest)
+				dg = tag
+				log.WithFields(log.Fields{"os": ml.Manifests[0].Platform.OS, "arch": ml.Manifests[0].Platform.Architecture, "tag": tag}).Debug("manifest list")
 
-			_, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
+				_, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
+			}
 		}
-	}
 
-	// get schema v2 first
-	if err == nil && !isQuaySpecialCase {
-		var parsedSchemaVersion int
-		imageInfo, parsedSchemaVersion, err = BuildV2ImageInfo(dg, body)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
+		// get schema v2 first
+		if err == nil {
+			var parsedSchemaVersion int
+			parsedSchemaVersion, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
+			}
 		}
 	}
 
@@ -177,7 +204,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 				imageInfo.Layers = make([]string, len(manV1.SignedManifest.FSLayers))
 				for i, des := range manV1.SignedManifest.FSLayers {
 					imageInfo.Layers[i] = string(des.BlobSum)
-					// log.WithFields(log.Fields{"layer": string(des.BlobSum)}).Debug("v1 manifest request ====")
+					// log.WithFields(log.Fields{"i": i, "layer": string(des.BlobSum)}).Debug("v1 manifest")
 				}
 			}
 
@@ -192,19 +219,23 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 				imageInfo.Digest = manV1.Digest
 			}
 
-			for i, cmd := range manV1.Cmds {
-				manV1.Cmds[i] = NormalizeImageCmd(cmd)
-			}
-
 			// comment out because it's not an accurate way to tell it's signed
 			/*if sigs, err := manV1.Signatures(); err == nil && len(sigs) > 0 {
 				signed = true
 			}*/
-			imageInfo.RunAsRoot = manV1.RunAsRoot
-			imageInfo.Envs = manV1.Envs
-			imageInfo.Cmds = manV1.Cmds
-			imageInfo.Labels = manV1.Labels
-			imageInfo.Author = manV1.Author
+
+			if len(manV1.Envs) > 0 {
+				imageInfo.Envs = manV1.Envs
+			}
+			if len(manV1.Cmds) > 0 {
+				imageInfo.Cmds = manV1.Cmds
+			}
+			if len(manV1.Labels) > 0 {
+				imageInfo.Labels = manV1.Labels
+			}
+			if manV1.Author != "" {
+				imageInfo.Author = manV1.Author
+			}
 		}
 	}
 
@@ -215,19 +246,15 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	}
 	if imageInfo.ID == "" || len(imageInfo.Layers) == 0 {
 		log.WithFields(log.Fields{"imageInfo": imageInfo}).Error("Get metadata fail")
-		return &imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
+		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
 	}
 
-	if imageInfo.Labels == nil {
-		imageInfo.Labels = make(map[string]string)
-	}
-	if imageInfo.Envs == nil {
-		imageInfo.Envs = make([]string, 0)
-	}
+	runAsRoot, _, _ := ParseImageCmds(imageInfo.Cmds)
+	imageInfo.RunAsRoot = runAsRoot
 
 	imageInfo.RawManifest = body
 
-	return &imageInfo, share.ScanErrorCode_ScanErrNone
+	return imageInfo, share.ScanErrorCode_ScanErrNone
 }
 
 //this function will be called at scanner side
