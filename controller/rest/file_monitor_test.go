@@ -38,6 +38,8 @@ func TestNormalizeForURL(t *testing.T) {
 		"/test/../ab/*":         share.CLUSFileMonitorFilter{Path: "/ab", Regex: ".*"},
 		"/test/./ab/*":          share.CLUSFileMonitorFilter{Path: "/test/ab", Regex: ".*"},
 		"/lib/":                 share.CLUSFileMonitorFilter{Path: "/lib", Regex: ".*"},
+		"/tmp/":                 share.CLUSFileMonitorFilter{Path: "/tmp", Regex: ".*"},
+		"/tmp":                  share.CLUSFileMonitorFilter{Path: "/tmp", Regex: ""},
 	}
 	badFilters := map[string]share.CLUSFileMonitorFilter{
 		"/test/./<ab>/*": share.CLUSFileMonitorFilter{Path: "", Regex: ""},
