@@ -290,7 +290,7 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 	return "", false, false
 }
 
-func getCgroupPathReaderV2(file io.ReadSeeker) string {
+func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
@@ -303,11 +303,11 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
 			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-				return filepath.Join("/sys/fs/cgroup", tokens[2])
+				return filepath.Join("/sys/fs/cgroup", tokens[2]), nil
 			}
 		}
 	}
-	return "/sys/fs/cgroup"
+	return "/sys/fs/cgroup", errors.New("cgroup file not supported")
 }
 
 // cgroup v2 is collected inside an unified file folder
@@ -326,10 +326,44 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	}
 	defer 	f.Close()
 
-	cpath := getCgroupPathReaderV2(f)
-
+	cpath, cerr := getCgroupPathReaderV2(f)
+	// cgroup file wasn't parsed - fallback to /proc/pid/root if possible
+	if cerr != nil {
+		cpath = getFallbackCgroupV2Path(pid)
+	}
 	return cpath, nil
 
+}
+
+// getFallbackCgroupV2Path - Takes a pid and creates a path in /proc/<pid>/root
+// and checks the cgroup path if cpu/mem files exist there
+func getFallbackCgroupV2Path(pid int) string {
+	// Check if the path is actually /proc/<pid>>/root/sys/fs/cgroup
+	newCpath := filepath.Join("/proc", strconv.Itoa(pid), "root/sys/fs/cgroup")
+	newCpathCpu := filepath.Join(newCpath, "cpu.stat")
+	newCpathMemory := filepath.Join(newCpath, "memory.stat")
+	cpath := newCpath
+	_, err := os.Stat(newCpathCpu)
+	if err != nil {
+		log.WithFields(log.Fields{"pid": pid, "err": err,
+			"cpath": cpath,
+			"newCpathCpu":newCpathCpu,
+			"newCpathMemory": newCpathMemory,
+		}).Warning("cgroup cpu file does not exist")
+
+		// fallback
+		cpath = "/sys/fs/cgroup"
+	}
+	_, err = os.Stat(newCpathMemory)
+	if err != nil {
+		log.WithFields(log.Fields{"pid": pid, "err": err,
+			"cpath": cpath,
+			"newCpathCpu":newCpathCpu,
+			"newCpathMemory": newCpathMemory,}).Warning("cgroup memory file does not exist")
+		// fallback
+		cpath = "/sys/fs/cgroup"
+	}
+	return cpath
 }
 
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
