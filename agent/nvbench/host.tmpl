@@ -81,7 +81,6 @@ docker_daemon_configuration() {
   check_2_15
   check_2_16
   check_2_17
-  check_2_18
   check_2_end
 }
 
@@ -484,7 +483,7 @@ if [ -n "$nocolor" ] && [ "$nocolor" = "nocolor" ]; then
 fi
 
 logit () {
-  printf "%b\n" "$1" | tee -a "$logger"
+  printf "%b\n" "$1"
 }
 
 info () {
@@ -498,11 +497,11 @@ info () {
     esac
   done
   if [ "$infoCountCheck" = "true" ]; then
-    printf "%b\n" "${bldblu}[INFO]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldblu}[INFO]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     return
   fi
-  printf "%b\n" "${bldblu}[INFO]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldblu}[INFO]${txtrst} $1"
 }
 
 pass () {
@@ -518,14 +517,14 @@ pass () {
     esac
   done
   if [ "$passScored" = "true" ] || [ "$passCountCheck" = "true" ]; then
-    printf "%b\n" "${bldgrn}[PASS]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
   fi
   if [ "$passScored" = "true" ]; then
     currentScore=$((currentScore + 1))
   fi
   if [ "$passScored" != "true" ] && [ "$passCountCheck" != "true" ]; then
-    printf "%b\n" "${bldgrn}[PASS]${txtrst} $1" | tee -a "$logger"
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $1"
   fi
 }
 
@@ -540,12 +539,12 @@ warn () {
     esac
   done
   if [ "$warnScored" = "true" ]; then
-    printf "%b\n" "${bldred}[WARN]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldred}[WARN]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     currentScore=$((currentScore - 1))
     return
   fi
-  printf "%b\n" "${bldred}[WARN]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldred}[WARN]${txtrst} $1"
 }
 
 note () {
@@ -559,11 +558,11 @@ note () {
     esac
   done
   if [ "$noteCountCheck" = "true" ]; then
-    printf "%b\n" "${bldylw}[NOTE]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldylw}[NOTE]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     return
   fi
-  printf "%b\n" "${bldylw}[NOTE]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldylw}[NOTE]${txtrst} $1"
 }
 
 yell () {
@@ -571,42 +570,42 @@ yell () {
 }
 
 beginjson () {
-  printf "{\n  \"dockerbenchsecurity\": \"%s\",\n  \"start\": %s,\n  \"tests\": [" "$1" "$2" | tee "$logger.json" 2>/dev/null 1>&2
+  printf "{\n  \"dockerbenchsecurity\": \"%s\",\n  \"start\": %s,\n  \"tests\": [" "$1" "$2" 2>/dev/null 1>&2
 }
 
 endjson (){
-  printf "\n  ],\n  \"checks\": %s,\n  \"score\": %s,\n  \"end\": %s\n}" "$1" "$2" "$3" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n  ],\n  \"checks\": %s,\n  \"score\": %s,\n  \"end\": %s\n}" "$1" "$2" "$3" 2>/dev/null 1>&2
 }
 
 logjson (){
-  printf "\n  \"%s\": \"%s\"," "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n  \"%s\": \"%s\"," "$1" "$2" 2>/dev/null 1>&2
 }
 
 SSEP=
 SEP=
 startsectionjson() {
-  printf "%s\n    {\n      \"id\": \"%s\",\n      \"desc\": \"%s\",\n      \"results\": [" "$SSEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "%s\n    {\n      \"id\": \"%s\",\n      \"desc\": \"%s\",\n      \"results\": [" "$SSEP" "$1" "$2" 2>/dev/null 1>&2
   SEP=
   SSEP=","
 }
 
 endsectionjson() {
-  printf "\n      ]\n    }" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n      ]\n    }" 2>/dev/null 1>&2
 }
 
 starttestjson() {
-  printf "%s\n        {\n          \"id\": \"%s\",\n          \"desc\": \"%s\",\n          " "$SEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "%s\n        {\n          \"id\": \"%s\",\n          \"desc\": \"%s\",\n          " "$SEP" "$1" "$2" 2>/dev/null 1>&2
   SEP=","
 }
 
 log_to_json() {
   if [ $# -eq 1 ]; then
-    printf "\"result\": \"%s\"" "$1" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf "\"result\": \"%s\"" "$1" 2>/dev/null 1>&2
     return
   fi
   if [ $# -eq 2 ] && [ $# -ne 1 ]; then
     # Result also contains details
-    printf "\"result\": \"%s\",\n          \"details\": \"%s\"" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf "\"result\": \"%s\",\n          \"details\": \"%s\"" "$1" "$2" 2>/dev/null 1>&2
     return
   fi
   # Result also includes details and a list of items. Add that directly to details and to an array property "items"
@@ -625,7 +624,7 @@ log_to_json() {
     done
   fi
   itemsJson=$(printf "[\n            "; ISEP=""; ITEMCOUNT=0; for item in $truncItems; do printf "%s\"%s\"" "$ISEP" "$item"; ISEP=","; done; printf "\n          ]")
-  printf "\"result\": \"%s\",\n          \"details\": \"%s: %s\",\n          \"items\": %s" "$1" "$2" "$truncItems" "$itemsJson" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\"result\": \"%s\",\n          \"details\": \"%s: %s\",\n          \"items\": %s" "$1" "$2" "$truncItems" "$itemsJson" 2>/dev/null 1>&2
 }
 
 logcheckresult() {
@@ -634,12 +633,12 @@ logcheckresult() {
 
   # Log remediation measure to JSON
   if [ -n "$remediation" ] && [ "$1" != "PASS" ] && [ "$printremediation" = "1" ]; then
-    printf ",\n          \"remediation\": \"%s\"" "$remediation" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf ",\n          \"remediation\": \"%s\"" "$remediation" 2>/dev/null 1>&2
     if [ -n "$remediationImpact" ]; then
-      printf ",\n          \"remediation-impact\": \"%s\"" "$remediationImpact" | tee -a "$logger.json" 2>/dev/null 1>&2
+      printf ",\n          \"remediation-impact\": \"%s\"" "$remediationImpact" 2>/dev/null 1>&2
     fi
   fi
-  printf "\n        }" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n        }" 2>/dev/null 1>&2
 
   # Save remediation measure for print log to stdout
   if [ -n "$remediation" ] && [ "$1" != "PASS" ]; then
@@ -709,7 +708,7 @@ check_1_1_2() {
   if command -v getent >/dev/null 2>&1; then
     docker_users=$(getent group docker)
   fi
-  docker_users=$(printf "%s" "$docker_users" | awk -F: '{print $4}')
+  docker_users=$(printf "%s" "$docker_users" | cut -d ":" -f4)
 
   local doubtfulusers=""
   if [ -n "$dockertrustusers" ]; then
@@ -1301,7 +1300,7 @@ check_1_2_2() {
   starttestjson "$id" "$desc"
 
   docker_version=$(docker version | grep -i -A2 '^server' | grep ' Version:' \
-    | awk '{print $NF; exit}' | tr -d '[:alpha:]-,')
+    | cut -d ":" -f2 | tr -d '[:alpha:][:space:]-,')
   docker_current_version="$(date +%y.%m.0 -d @$(( $(date +%s) - 2592000)))"
   do_version_check "$docker_current_version" "$docker_version"
   if [ $? -eq 11 ]; then
@@ -1715,33 +1714,6 @@ check_2_17() {
     return
   fi
   info -c "$check"
-  logcheckresult "INFO"
-}
-
-check_2_18() {
-  docker_version=$(docker version | grep -i -A2 '^server' | grep ' Version:' \
-    | awk '{print $NF; exit}' | tr -d '[:alpha:]-,.' | cut -c 1-4)
-
-  local id="2.18"
-  local desc="Ensure that experimental features are not implemented in production (Scored)"
-  local remediation="You should not pass --experimental as a runtime parameter to the Docker daemon on production systems."
-  local remediationImpact="None."
-  local check="$id - $desc"
-  starttestjson "$id" "$desc"
-
-  if [ "$docker_version" -le 1903 ]; then
-    if docker version -f '{{.Server.Experimental}}' | grep false 2>/dev/null 1>&2; then
-      pass -s "$check"
-      logcheckresult "PASS"
-      return
-    fi
-    warn -s "$check"
-    logcheckresult "WARN"
-    return
-  fi
-  local desc="$desc (Deprecated)"
-  local check="$id - $desc"
-  info -c "$desc"
   logcheckresult "INFO"
 }
 
@@ -2673,7 +2645,7 @@ check_6_1() {
   local check="$id - $desc"
   starttestjson "$id" "$desc"
 
-  images=$(docker images -q | sort -u | wc -l | awk '{print $1}')
+  images=$(docker images -q | sort -u | wc -l | cut -d " " -f 1)
   active_images=0
 
   for c in $(docker inspect --format "{{.Image}}" "$(docker ps -qa)" 2>/dev/null); do
@@ -2699,8 +2671,8 @@ check_6_2() {
   local check="$id - $desc"
   starttestjson "$id" "$desc"
 
-  total_containers=$(docker info 2>/dev/null | grep "Containers" | awk '{print $2}')
-  running_containers=$(docker ps -q | wc -l | awk '{print $1}')
+  total_containers=$(docker info 2>/dev/null | grep "Containers" | cut -d " " -f 2)
+  running_containers=$(docker ps -q | wc -l | cut -d " " -f 1)
   diff="$((total_containers - running_containers))"
   info -c "$check"
   if [ "$diff" -gt 25 ]; then
