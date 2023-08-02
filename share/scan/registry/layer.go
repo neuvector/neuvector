@@ -17,7 +17,7 @@ const retryTimes = 3
 
 func (registry *Registry) DownloadLayer(ctx context.Context, repository string, digest digest.Digest) (io.ReadCloser, int64, error) {
 	url := registry.url("/v2/%s/blobs/%s", repository, digest)
-	log.WithFields(log.Fields{"url": url, "repository": repository, "digest": digest}).Debug()
+	log.WithFields(log.Fields{"digest": digest}).Debug()
 
 	registry.Client.SetTimeout(dataTimeout)
 

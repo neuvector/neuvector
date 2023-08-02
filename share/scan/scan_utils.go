@@ -997,7 +997,7 @@ func downloadLayers(ctx context.Context, layers []string, sizes map[string]int64
 	// remove duplicate layers
 	layerMap := make(map[string]int64)
 	for _, layer := range layers {
-		if _, ok := layerMap[layer]; !ok {
+		if _, ok := layerMap[layer]; !ok && layer != "" {
 			layerMap[layer] = 0 // no decision
 			if bHasSizeInfo {
 				if size, ok := sizes[layer]; ok {
@@ -1039,7 +1039,7 @@ func downloadLayers(ctx context.Context, layers []string, sizes map[string]int64
 			var retry int
 
 			layerPath := filepath.Join(imgPath, ml)
-			if bHasSizeInfo && sl == 0 { // aws registry: some layers in v1 but does not in v2
+			if bHasSizeInfo && sl == 0 {
 				log.WithFields(log.Fields{"layer": ml}).Debug("skip")
 				os.MkdirAll(layerPath, 0755) // empty folder
 				done <- &downloadLayerResult{layer: ml, err: nil, Size: 0, TarSize: 0}
