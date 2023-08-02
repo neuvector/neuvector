@@ -81,7 +81,6 @@ docker_daemon_configuration() {
   check_2_15
   check_2_16
   check_2_17
-  check_2_18
   check_2_end
 }
 

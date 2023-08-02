@@ -397,33 +397,6 @@ check_2_17() {
   logcheckresult "INFO"
 }
 
-check_2_18() {
-  docker_version=$(docker version | grep -i -A2 '^server' | grep ' Version:' \
-    | awk '{print $NF; exit}' | tr -d '[:alpha:]-,.' | cut -c 1-4)
-
-  local id="2.18"
-  local desc="Ensure that experimental features are not implemented in production (Scored)"
-  local remediation="You should not pass --experimental as a runtime parameter to the Docker daemon on production systems."
-  local remediationImpact="None."
-  local check="$id - $desc"
-  starttestjson "$id" "$desc"
-
-  if [ "$docker_version" -le 1903 ]; then
-    if docker version -f '{{.Server.Experimental}}' | grep false 2>/dev/null 1>&2; then
-      pass -s "$check"
-      logcheckresult "PASS"
-      return
-    fi
-    warn -s "$check"
-    logcheckresult "WARN"
-    return
-  fi
-  local desc="$desc (Deprecated)"
-  local check="$id - $desc"
-  info -c "$desc"
-  logcheckresult "INFO"
-}
-
 check_2_end() {
   endsectionjson
 }

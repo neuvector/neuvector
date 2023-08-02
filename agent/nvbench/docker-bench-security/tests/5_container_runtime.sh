@@ -255,7 +255,7 @@ check_5_6() {
   printcheck=0
   for c in $containers; do
 
-    processes=$(docker exec "$c" ps -el 2>/dev/null | grep -c sshd | awk '{print $1}')
+    processes=$(docker exec "$c" ps -el 2>/dev/null | grep -c sshd | cut -d " " -f 1)
     if [ "$processes" -ge 1 ]; then
       # If it's the first container, fail the test
       if [ $fail -eq 0 ]; then
@@ -307,7 +307,7 @@ check_5_7() {
   privileged_port_containers=""
   for c in $containers; do
     # Port format is private port -> ip: public port
-    ports=$(docker port "$c" | awk '{print $0}' | cut -d ':' -f2)
+    ports=$(docker port "$c" | cut -d ':' -f2)
 
     # iterate through port range (line delimited)
     for port in $ports; do
@@ -349,7 +349,7 @@ check_5_8() {
   fail=0
   open_port_containers=""
   for c in $containers; do
-    ports=$(docker port "$c" | awk '{print $0}' | cut -d ':' -f2)
+    ports=$(docker port "$c" | cut -d ':' -f2)
 
     for port in $ports; do
       if [ -n "$port" ]; then
@@ -553,7 +553,7 @@ check_5_13() {
   fail=0
   incoming_unbound_containers=""
   for c in $containers; do
-    for ip in $(docker port "$c" | awk '{print $3}' | cut -d ':' -f1); do
+    for ip in $(docker port "$c" | cut -d ' ' -f3 | cut -d ':' -f1); do
       if [ "$ip" = "0.0.0.0" ]; then
         # If it's the first container, fail the test
         if [ $fail -eq 0 ]; then
