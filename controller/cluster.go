@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -227,11 +228,29 @@ func logController(ev share.TLogEvent) {
 	evqueue.Append(&clog)
 }
 
+var snapshotIndex int
+func memorySnapshot(usage uint64) {
+	if ctrlEnv.autoProfieCapture {
+		log.WithFields(log.Fields{"usage": usage}).Debug()
+		if usage > ctrlEnv.peakMemoryUsage {
+			ctrlEnv.peakMemoryUsage = usage + ctrlEnv.snapshotMemStep  // level up
+			label := "p"  // peak
+			if snapshotIndex < 4 {	// keep atmost 4 copies + an extra peak copy
+				snapshotIndex++
+				label = strconv.Itoa(snapshotIndex)
+			}
+			log.WithFields(log.Fields{"label": label, "next": ctrlEnv.peakMemoryUsage}).Debug()
+			utils.PerfSnapshot(1, ctrlEnv.memoryLimit, usage, share.SnaphotFolder, Ctrler.ID, "ctl.", label)
+		}
+	}
+}
+
 var curMemoryPressure uint64
 func memoryPressureNotification(rpt *system.MemoryPressureReport) {
 	log.WithFields(log.Fields{"rpt": rpt}).Info()
-	if rpt.Level > 2 {  // cap its maximum
+	if rpt.Level >= 2 {  // cap its maximum
 		rpt.Level = 2
+		memorySnapshot(rpt.Stats.WorkingSet)
 	}
 
 	if rpt.Level == curMemoryPressure {

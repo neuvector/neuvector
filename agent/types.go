@@ -22,6 +22,10 @@ type AgentEnvInfo struct {
 	autoBenchmark        bool
 	systemProfiles       bool
 	netPolicyPuller      int
+	autoProfieCapture    bool
+	memoryLimit          uint64
+	peakMemoryUsage      uint64
+	snapshotMemStep      uint64
 }
 
 const (
