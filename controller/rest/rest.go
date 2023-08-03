@@ -1449,6 +1449,7 @@ func StartRESTServer() {
 	r.GET("/v1/token_auth_server", handlerTokenAuthServerList)             // Skip API document
 	r.GET("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)  // Skip API document
 	r.POST("/v1/token_auth_server/:server", handlerTokenAuthServerRequest) // Skip API document
+	r.GET("/v1/token_auth_server/:server/slo", handlerGenerateSLORequest)  // Skip API document
 	r.GET("/v1/server", handlerServerList)
 	r.GET("/v1/server/:name", handlerServerShow)
 	r.GET("/v1/server/:name/user", handlerServerUserList)

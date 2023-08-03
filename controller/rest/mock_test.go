@@ -486,7 +486,7 @@ func mockLoginUser(name, role, fedRole string, roleDomains map[string][]string) 
 		RoleDomains: roleDomains,
 	}
 
-	login, _ := loginUser(user, nil, "", _interactiveSessionID, "", fedRole)
+	login, _ := loginUser(user, nil, "", _interactiveSessionID, "", fedRole, nil)
 	return login
 }
 

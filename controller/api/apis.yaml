@@ -9704,6 +9704,15 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTX509CertInfo'
+      slo_enabled:
+        type: boolean
+        example: true
+      slo_url:
+        type: string
+        example: https://dev.oktapreview.com/app/examplesamlapp_1/exjlpo0/slo/saml
+      signing_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
   RESTServer:
     type: object
     required:
@@ -9837,6 +9846,18 @@ definitions:
         items:
           type: string
         example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
+      slo_enabled:
+        type: boolean
+        example: true
+      slo_url:
+        type: string
+        example: https://dev.oktapreview.com/app/examplesamlapp_1/exjlpo0/slo/saml
+      signing_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      signing_key:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
   RESTServerConfig:
     type: object
     required:

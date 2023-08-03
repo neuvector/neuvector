@@ -61,11 +61,11 @@ func (a *mockRemoteAuth) LDAPAuth(ldap *share.CLUSServerLDAP, username, password
 	}
 }
 
-func (a *mockRemoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (map[string][]string, error) {
+func (a *mockRemoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (string, string, map[string][]string, error) {
 	if user, ok := a.samlUsers[tokenData.Token]; ok {
-		return user.attrs, nil
+		return "", "", user.attrs, nil
 	} else {
-		return nil, errors.New("Authentication failed")
+		return "", "", nil, errors.New("Authentication failed")
 	}
 }
 
@@ -1017,7 +1017,7 @@ func TestJWTSignValidate(t *testing.T) {
 	}
 	remote := "10.1.2.3"
 
-	_, tokenString, _ := jwtGenerateToken(user, roles, remote, "", "")
+	_, tokenString, _ := jwtGenerateToken(user, roles, remote, "", "", nil)
 
 	token, _ := jwtValidateToken(tokenString, "", nil)
 	if token.Fullname != user.Fullname {

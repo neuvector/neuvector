@@ -1,0 +1,155 @@
+swagger: '2.0'
+
+################################################################################
+#                     Internal API Information                                 #
+################################################################################
+info:
+  description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
+  title: NeuVector Internal API
+  version: '1.0'
+schemes:
+  - https
+
+################################################################################
+#                                   Tags                                       #
+################################################################################
+tags:
+  - name: Authentication
+    description: Authenticates login or logout
+
+################################################################################
+#                                  Paths                                       #
+################################################################################
+paths:
+  /v1/token_auth_server/{server}:
+    get:
+      summary: Generate login request for integration, e.g., OIDC or SAML.
+      tags:
+        - Authentication
+      parameters:
+        - in: body
+          name: body
+          description: OIDC/SAML login data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLoginRequest'
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLoginResponse'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/RESTError'
+    post:
+      summary: Create login token via integration, e.g., OIDC or SAML.
+      tags:
+        - Authentication
+      parameters:
+        - in: body
+          name: body
+          description: OIDC/SAML login data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLoginRequest'
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLoginResponse'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/RESTError'
+  /v1/token_auth_server/{server}/slo:
+    get:
+      summary: Create redirect url for Single Signout request.  Currently only SAML is supported.
+      tags:
+        - Authentication
+      security:
+        - TokenAuth: []
+      parameters:
+        - in: body
+          name: body
+          description: OIDC/SAML logout data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLogoutRequest'
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTGenerateServerLogoutResponse'
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/RESTError'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/RESTError'
+################################################################################
+#                                 Definitions                                  #
+################################################################################
+definitions:
+  RESTGenerateServerLoginRequest:
+    required:
+      - 'redirect_endpoint'
+    type: object
+    properties:
+      redirect_endpoint:
+        description: 'The URL used in redirect request, e.g., SAML Authn request.'
+        type: string
+        example: 'https://<server>/token_auth_server'
+      issuer:
+        description: 'The issuer of the login request.  When absent, redirect_endpoint will be used.'
+        type: string
+        example: 'https://<server>/token_auth_server'
+  RESTGenerateServerLoginResponse:
+    required:
+      - 'redirect_endpoint'
+    type: object
+    properties:
+      redirect:
+        type: object
+        properties:
+          redirect_url:
+            description: 'The URL to be used by browser to make redirect request.'
+            type: string
+            example: 'https://login.microsoftonline.com/xxx/saml2?SAMLRequest=lFLLbt...'
+          server_name:
+            description: 'The server resource name used to generate this redirect request'
+            type: string
+            example: 'saml1'
+          server_type:
+            description: 'Type of this redirect request.'
+            type: string
+            enum: [oidc, saml]
+            example: 'saml'
+  RESTGenerateServerLogoutRequest:
+    $ref: '#/definitions/RESTGenerateServerLoginRequest'
+  RESTGenerateServerLogoutResponse:
+    $ref: '#/definitions/RESTGenerateServerLoginResponse'
+  RESTError:
+    type: object
+    required:
+      - code
+      - error
+      - message
+    properties:
+      code:
+        type: integer
+        example: 6
+      error:
+        type: string
+        example: 'Request in wrong format'
+      message:
+        type: string
+        example: 'Get redirect URL request error'

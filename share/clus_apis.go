@@ -863,11 +863,15 @@ type CLUSServerLDAP struct {
 
 type CLUSServerSAML struct {
 	CLUSServerAuth
-	SSOURL        string   `json:"sso_url"`
-	Issuer        string   `json:"issuer"`
-	X509Cert      string   `json:"x509_cert,cloak"`
-	GroupClaim    string   `json:"group_claim"`
-	X509CertExtra []string `json:"x509_cert_extra"`
+	SSOURL         string   `json:"sso_url"`
+	Issuer         string   `json:"issuer"`
+	X509Cert       string   `json:"x509_cert,cloak"`
+	GroupClaim     string   `json:"group_claim"`
+	X509CertExtra  []string `json:"x509_cert_extra"`
+	SLOEnabled     bool     `json:"slo_enabled,omitempty"`
+	SLOURL         string   `json:"slo_url,omitempty"`
+	SLOSigningCert string   `json:"slo_signing_cert,omitempty"`
+	SLOSigningKey  string   `json:"slo_signing_key,omitempty"`
 }
 
 type CLUSServerOIDC struct {

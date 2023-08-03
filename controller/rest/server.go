@@ -107,6 +107,9 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			Enable:           cs.Enable,
 			DefaultRole:      cs.SAML.DefaultRole,
 			GroupMappedRoles: cs.SAML.GroupMappedRoles,
+			SLOEnabled:       cs.SAML.SLOEnabled,
+			SLOURL:           cs.SAML.SLOURL,
+			SLOSigningCert:   cs.SAML.SLOSigningCert,
 		}
 		rs.SAML.X509Certs = parseX509CertInfo(cs.SAML)
 
@@ -132,23 +135,23 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 	return nil
 }
 
-func parseX509CertInfo(csaml *share.CLUSServerSAML)[]api.RESTX509CertInfo {
+func parseX509CertInfo(csaml *share.CLUSServerSAML) []api.RESTX509CertInfo {
 	certsInfo := make([]api.RESTX509CertInfo, 0)
 
 	var certs []string
 	certs = append(certs, csaml.X509Cert)
 	certs = append(certs, csaml.X509CertExtra...)
 
-	for _,c := range certs {
+	for _, c := range certs {
 		block, _ := pem.Decode([]byte(c))
 		if block != nil {
 			cert, err := x509.ParseCertificate(block.Bytes)
 			if err == nil {
-				oneCert := api.RESTX509CertInfo {
-					X509Cert: c,
-					IssuerCommonName: cert.Issuer.CommonName,
+				oneCert := api.RESTX509CertInfo{
+					X509Cert:          c,
+					IssuerCommonName:  cert.Issuer.CommonName,
 					SubjectCommonName: cert.Subject.CommonName,
-					ValidityNotAfter: uint64(cert.NotAfter.UTC().Unix()),
+					ValidityNotAfter:  uint64(cert.NotAfter.UTC().Unix()),
 				}
 
 				certsInfo = append(certsInfo, oneCert)
@@ -418,6 +421,72 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 }
 
+func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	var resp api.RESTTokenAuthServersRedirectData
+	var url string
+	var err error
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// Read body
+	var data api.RESTTokenRedirect
+	err = json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		e := "Get redirect URL request error"
+		log.WithFields(log.Fields{"error": err, "redirect": data.Redirect}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
+
+	// Handle SAML SLO
+	if login.nameid == "" {
+		restRespSuccess(w, r, &resp, acc, login, nil, "")
+		return
+	}
+	cs, _, err := clusHelper.GetServerRev(login.server, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("failed to get saml server info")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	if !cs.SAML.SLOEnabled {
+		restRespSuccess(w, r, &resp, acc, login, nil, "")
+		return
+	}
+
+	sp, err := remoteAuther.GenerateSamlSP(cs.SAML, data.Redirect)
+	if err != nil {
+		log.WithError(err).Warn("failed to generate saml service provider")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	doc, err := sp.BuildLogoutRequestDocument(login.nameid, login.sessionIndex)
+	if err != nil {
+		log.WithError(err).Warn("failed to build saml slo document")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	if url, err = sp.BuildLogoutURLRedirect("", doc); err != nil {
+		log.WithError(err).Warn("failed to generate saml logout url")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	log.WithField("url", url).Info("Generating SAML SLO request")
+	resp.Redirect = &api.RESTTokenAuthServerRedirect{Name: login.server, Type: api.ServerTypeSAML, RedirectURL: url}
+	restRespSuccess(w, r, &resp, nil, nil, nil, "")
+	return
+}
+
 func handlerTokenAuthServerList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -678,9 +747,16 @@ func validateSAMLServer(cs *share.CLUSServer) error {
 	if _, err := url.Parse(csaml.SSOURL); err != nil {
 		return errors.New("Invalid SAML Single-sign-on URL format")
 	}
+	if csaml.SLOURL != "" {
+		if _, err := url.Parse(csaml.SLOURL); err != nil {
+			return errors.New("Invalid SAML Single-sign-on URL format")
+		}
+	}
+
+	// TODO: Verify encryption key/certs
 
 	var certs []string
-	certs = append(certs, csaml.X509Cert)	// original one
+	certs = append(certs, csaml.X509Cert) // original one
 	certs = append(certs, csaml.X509CertExtra...)
 
 	for _, c := range certs {
@@ -742,6 +818,18 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 		for _, c := range *saml.X509CertExtra {
 			csaml.X509CertExtra = append(csaml.X509CertExtra, c)
 		}
+	}
+	if saml.SLOEnabled != nil {
+		csaml.SLOEnabled = *saml.SLOEnabled
+	}
+	if saml.SLOURL != nil {
+		csaml.SLOURL = *saml.SLOURL
+	}
+	if saml.SLOSigningKey != nil {
+		csaml.SLOSigningKey = *saml.SLOSigningKey
+	}
+	if saml.SLOSigningCert != nil {
+		csaml.SLOSigningCert = *saml.SLOSigningCert
 	}
 
 	var err error
@@ -1541,8 +1629,10 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 
 // parameter 'groupRoleMappings': the server's group role mapping data
 // parameter 'groups': provided by caller for requesting which groups should be moved forward (with restrictions, see below)
-//   [*] if any group in groupRoleMappings has fedAdmin/fedReader as the mapped role for global domain, it can be moved only if the caller is fedAdmin role!
-//       besides, the sorting must follow the following rules
+//
+//	[*] if any group in groupRoleMappings has fedAdmin/fedReader as the mapped role for global domain, it can be moved only if the caller is fedAdmin role!
+//	    besides, the sorting must follow the following rules
+//
 // The priority of sorting rules: ("requested groups" means the 'groups' parameter from caller)
 // 1. requested groups from 'groups' list(in order) that have fedAdmin/fedReader role mapped for global domain
 // 2. unrequested groups from 'groupRoleMappings' list(in order) that have fedAdmin/fedReader role mapped for global domain
@@ -1550,12 +1640,12 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 // 4. unrequested groups from 'groupRoleMappings' list(in order) that do not have fedAdmin/fedReader role mapped for global domain
 //
 // error is returned for any of the following cases:
-// 1. duplicate group in 'groups' parameter
-// 2. a group in 'groups' parameter is not configured to have any role mapping yet
-// 3. non-fedAdmin user tries to move any group that has fedAdmin/fedReader mapped role for global domain
-//    Q: how to detect non-fedAdmin user tries to move any group that have fedAdmin/fedReader mapped role for global domain?
-//    A: 1. we sort groupRoleMappings based on the above 4 rules and get a new 'sortedList'
-//       2. we compare 'groupRoleMappings' with 'sortedList' to see whether any group that has fedAdmin/fedReader mapped role for global domain is moved
+//  1. duplicate group in 'groups' parameter
+//  2. a group in 'groups' parameter is not configured to have any role mapping yet
+//  3. non-fedAdmin user tries to move any group that has fedAdmin/fedReader mapped role for global domain
+//     Q: how to detect non-fedAdmin user tries to move any group that have fedAdmin/fedReader mapped role for global domain?
+//     A: 1. we sort groupRoleMappings based on the above 4 rules and get a new 'sortedList'
+//  2. we compare 'groupRoleMappings' with 'sortedList' to see whether any group that has fedAdmin/fedReader mapped role for global domain is moved
 func sortGroupRoleMappings(groups []string, groupRoleMappings []*share.GroupRoleMapping, acc *access.AccessControl) ([]*share.GroupRoleMapping, error) {
 	groupRoleMappingsMap := make(map[string]*share.GroupRoleMapping, len(groupRoleMappings))
 	sortedList := make([]*share.GroupRoleMapping, 0, len(groupRoleMappings))

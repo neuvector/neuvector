@@ -346,6 +346,12 @@ type RESTServerSAML struct {
 	DefaultRole      string                    `json:"default_role"`
 	RoleGroups       map[string][]string       `json:"role_groups,omitempty"`        // role -> groups
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+
+	SLOEnabled     bool   `json:"slo_enabled,omitempty"`      // Optional.
+	SLOURL         string `json:"slo_url,omitempty"`          // Optional.
+	SLOSigningCert string `json:"slo_signing_cert,omitempty"` // Optional. Used as signing cert by default.
+	//SLOSigningKey  string `json:"slo_signing_key,omitempty"`  // Optional. Used as signing key by default.
+
 }
 
 type RESTServerOIDC struct {
@@ -420,6 +426,12 @@ type RESTServerSAMLConfig struct {
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 	X509CertExtra    *[]string                  `json:"x509_cert_extra,omitempty"`
+
+	SLOEnabled     *bool   `json:"slo_enabled,omitempty"`      // Optional.
+	SLOURL         *string `json:"slo_url,omitempty"`          // Optional.
+	SLOSigningCert *string `json:"slo_signing_cert,omitempty"` // Optional. Used as signing cert by default.
+	SLOSigningKey  *string `json:"slo_signing_key,omitempty"`  // Optional. Used as signing key by default.
+
 }
 
 type RESTServerSAMLConfigCfgMap struct {
