@@ -35,7 +35,7 @@ import (
 
 const defaultHostProc string = "/proc/"
 const mappedHostProc string = "/host/proc/"
-const defaultHostCgroup string = "/sys/fs/cgroup/"
+const defaultHostCgroup string = "/sys/fs/cgroup"
 const mappedHostCgroup string = "/host/cgroup/"
 const maxStatCmdLen = 15
 const (
@@ -87,19 +87,24 @@ func NewSystemTools() *SystemTools {
 
 	s := &SystemTools{
 		bEnable: true,
-		procDir: procDir, cgroupDir: cgroupDir,
+		procDir: procDir,
+		cgroupDir: cgroupDir,
 		clockTicksPerSecond: uint64(getClockTicks()),
 	}
 
+	log.WithFields(log.Fields{"system tools": s}).Errorf("Jayu dummping mount info")
 	s.info.SetRootPathPrefix(fmt.Sprintf("%s1/root/", procDir))
 	s.info.GetSysInfo()
+	log.WithFields(log.Fields{"system tools": s}).Errorf("Jayu dummping sys info")
 
-	// fill cgroup info
-	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
+	//// fill cgroup info
+	//// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
+	//// Use this to determine cgroup type
+	//// https://lists.freedesktop.org/archives/systemd-devel/2018-November/041644.html
 	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err == nil {
 		s.cgroupVersion = cgroup_v2
 		// update cgroup v2 path
-		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
+		if path, err := getCgroupPath_cgroup_v2(0, defaultHostCgroup); err == nil {
 			s.cgroupMemoryDir = path
 		} else {
 			s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
@@ -108,7 +113,75 @@ func NewSystemTools() *SystemTools {
 		s.cgroupVersion = cgroup_v1
 		s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
 	}
+	log.WithFields(log.Fields{"s": s}).Error("JAYU Dumping original cgroup selection")
+
+	s.DetermineCgroupPath()
+
+	switch(s.cgroupVersion) {
+	case cgroup_v1:
+		s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
+	case cgroup_v2:
+		s.cgroupVersion = cgroup_v2
+		s.cgroupMemoryDir = "/sys/fs/cgroup"
+		fallthrough
+	case cgroup_v2_hybrid:
+		// update cgroup v2 path
+		s.cgroupMemoryDir = "/proc/self/cgroup"
+	}
+
+	log.WithFields(log.Fields{"s": s}).Error("JAYU Dumping cgroup selection")
 	return s
+}
+
+func (s *SystemTools) DetermineCgroupPath() (int, string) {
+
+	// fill cgroup info
+	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
+	// Use this to determine cgroup type
+	log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir}).Errorf("Jayu getting cgroup dir")
+
+	// check root path
+	// Check cgroup version using cgroup.controllers and if v2 pure, hybrid, legacy
+	// https://lists.freedesktop.org/archives/systemd-devel/2018-November/041644.html
+	cgroupPath := s.cgroupDir // filepath.Join(s.cgroupDir, CgroupDefaultPath)
+	cgroupControllerPath := filepath.Join(cgroupPath, "/cgroup.controllers")
+	if _, err := os.Stat(cgroupControllerPath); err == nil {
+		s.cgroupVersion = cgroup_v2
+		log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
+			"cgroupPath": cgroupPath,
+		"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 mode")
+
+	} else {
+		s.cgroupVersion = cgroup_v1
+		log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
+			"cgroupPath": cgroupPath,
+			"cgroupControllerPath": cgroupControllerPath,
+		"err": err.Error()}).Errorf("v1 mode")
+		// check if in cgroup v2 hybrid mode
+		if cgroupIsHybridMode(s.cgroupDir) {
+			s.cgroupVersion = cgroup_v2_hybrid
+			log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
+				"cgroupPath": cgroupPath,
+				"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 hybrid")
+		}
+	}
+	return s.cgroupVersion, s.cgroupMemoryDir
+}
+
+func (s *SystemTools) SetCgroupV2Path() {
+	if path, err := getCgroupPath_cgroup_v2(0, s.cgroupDir); err == nil {
+		s.cgroupMemoryDir = path
+	} else {
+		s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
+	}
+}
+
+func cgroupIsHybridMode(cgroupdir string) bool {
+	path := filepath.Join(cgroupdir, "/unified")
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
 }
 
 func (s *SystemTools) GetCgroupsVersion() int {

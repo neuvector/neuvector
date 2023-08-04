@@ -31,7 +31,11 @@ const (
 const (
 	cgroup_v1 = 1
 	cgroup_v2 = 2
+	cgroup_v2_hybrid = 3
 )
+
+const CgroupHybridPath = "/sys/fs/cgroup/unified"
+const CgroupDefaultPath = "/sys/fs/cgroup/"
 
 var errUnsupported = errors.New("not supported")
 
@@ -311,7 +315,7 @@ func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 }
 
 // cgroup v2 is collected inside an unified file folder
-func getCgroupPath_cgroup_v2(pid int) (string, error) {
+func getCgroupPath_cgroup_v2(pid int, cgroupHostPath string) (string, error) {
 	var path string
 	if pid == 0 { // self
 		path = "/proc/self/cgroup"
@@ -326,13 +330,9 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	}
 	defer 	f.Close()
 
-	cpath, cerr := getCgroupPathReaderV2(f)
-	// cgroup file wasn't parsed - fallback to /proc/pid/root if possible
-	if cerr != nil {
-		cpath = getFallbackCgroupV2Path(pid)
-	}
-	return cpath, nil
+	cpath, _ := getCgroupPathReaderV2(f)
 
+	return cpath, nil
 }
 
 // getFallbackCgroupV2Path - Takes a pid and creates a path in /proc/<pid>/root
@@ -365,7 +365,87 @@ func getFallbackCgroupV2Path(pid int) string {
 	}
 	return cpath
 }
+func getStatsPathFromCgroupFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
+	}
+	defer 	f.Close()
 
+	//subsystemMap := make(map[string]string, 0)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+
+		tokens := strings.Split(scanner.Text(), ":")
+		log.WithFields(log.Fields{"path": path, "text": scanner.Text(), "tokens": tokens}).Error("JAYU Dummping text")
+
+		if len(tokens) > 2 {
+			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
+			// For k8s, we're looking for kubepods
+			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
+			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
+			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
+			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
+			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
+			//if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
+			//	return filepath.Join("/sys/fs/cgroup", tokens[2]), nil
+			//}
+			// No subsystem to dump
+			//if tokens[1] == "" {
+			//	return filepath.Join(tokens[2]), nil
+			//} else { // There are multiple subsystems available
+				// In other impls, its possible the subsystems are stored in different places
+				//subsystemMap[tokens[1]] = tokens[2]
+
+			// Noticed that if ../ are in the cgroup file, it is because the /host/cgroup and /host/proc map is wrong
+			// And tries to link back to the wrong place
+			if strings.Contains(tokens[2], "/..") {
+				path  := strings.ReplaceAll(tokens[2], "/..","")
+				if strings.Contains(path, "kubepods-pod") {
+					path = filepath.Join("/kubepods.slice", path)
+				} else if strings.Contains(path, "kubepods-besteffort") {
+					path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
+				} else if strings.Contains(path, "kubepods-burstable") {
+					path = filepath.Join("/kubepods.slice", path)
+				} else {
+					path = "/sys/fs/cgroup"
+				}
+				return path, nil
+			}
+			return tokens[2], nil
+			//}
+
+		}
+	}
+
+	return "", errors.New("cgroup file not supported")
+}
+// cgroup v2 is collected inside an unified file folder
+func (s *SystemTools) getCgroupMetricsPath(pid int) (string, error) {
+	var path string
+
+	if pid == 0 { // self
+		path = "/proc/self/cgroup"
+	} else {
+		path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
+	}
+
+	// shouldn't reuse path, doesn't make sense
+	path, err := getStatsPathFromCgroupFile(path)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "error": err.Error()}).
+			Error("Falling back to /proc/<pid>/sys/fs/cgroup")
+		return filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup"), nil
+	}
+
+	log.WithFields(log.Fields{"path": path, "s": s}).
+		Error("Created path to metrics")
+
+	return path, nil
+
+}
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
 	/*
 		mnt, err := FindCgroupMountpoint(subsystem)
@@ -373,6 +453,20 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 			return "", nil
 		}
 	*/
+
+	subsystemPath := ""
+	mpath, _ := s.getCgroupMetricsPath(pid)
+	switch s.cgroupVersion {
+	case cgroup_v1:
+		subsystemPath = filepath.Join(s.cgroupDir, subsystem, mpath)
+	case cgroup_v2:
+		subsystemPath = filepath.Join(s.cgroupDir, mpath)
+	case cgroup_v2_hybrid:
+		subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
+	}
+	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid, "subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
+	return subsystemPath, nil
+	log.Error("JAYU Should not get here.")
 
 	// Alternative: it might not be necessary to obtain cgroup path as before
 	var path string
@@ -388,7 +482,7 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 
 	case cgroup_v2:
 		// unified file structure
-		return getCgroupPath_cgroup_v2(pid)
+		return getCgroupPath_cgroup_v2(pid, s.cgroupDir)
 	}
 
 	// However, the k8s POD does not have those subsystem folders
