@@ -263,6 +263,9 @@ func isScanner() bool {
 func ScannerChangeNotify(isScanner bool) {
 	log.WithFields(log.Fields{"isScanner": isScanner}).Info()
 
+	if cacher.isScanner != isScanner {
+		autoScaleHistory = tAutoScaleHistory{}
+	}
 	cacher.isScanner = isScanner
 	if isScanner {
 		scanBecomeScanner()

@@ -153,6 +153,7 @@ const (
 	EventNameK8sNvRBAC                   = "Kubenetes.NeuVector.RBAC"
 	EventNameGroupAutoPromote            = "Group.Auto.Promote"
 	EventNameAuthDefAdminPwdUnchanged    = "User.Password.Alert"
+	EventNameScannerAutoScaleDisabled    = "Configuration.ScannerAutoScale.Disabled"
 )
 
 // TODO: these are not events but incidents

@@ -257,6 +257,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 		if !k8sPlatform && scope == share.ScopeLocal {
 			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
 			rconf.ScannerAutoscale.Strategy = api.AutoScaleNA
+			rconf.ScannerAutoscale.DisabledByOthers = false
 		}
 		if rconf.ScannerAutoscale.MinPods == 0 {
 			rconf.ScannerAutoscale.MinPods = 1
@@ -1410,6 +1411,8 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 							if max == 0 {
 								max = 3
 							}
+							// always reset DisabledByOthers when user intentionally enable autoscale
+							cconf.ScannerAutoscale.DisabledByOthers = false
 						}
 						strategy = *autoscale.Strategy
 						allowed := utils.NewSet(api.AutoScaleNone, api.AutoScaleImmediate, api.AutoScaleDelayed)

@@ -786,9 +786,10 @@ type CLUSSystemConfig struct {
 }
 
 type CLUSSystemConfigAutoscale struct {
-	Strategy string `json:"strategy"`
-	MinPods  uint32 `json:"min_pods"`
-	MaxPods  uint32 `json:"max_pods"`
+	Strategy         string `json:"strategy"`
+	MinPods          uint32 `json:"min_pods"`
+	MaxPods          uint32 `json:"max_pods"`
+	DisabledByOthers bool   `json:"disabled_by_others"` // true when autoscale is disabled because controller detects 3rd-party tool keeps reverting our autoscale
 }
 
 type CLUSEULA struct {
@@ -1289,6 +1290,7 @@ const (
 	CLUSEvK8sNvRBAC
 	CLUSEvGroupAutoPromote
 	CLUSEvAuthDefAdminPwdUnchanged // default admin's password is not changed yet. reported every 24 hours
+	CLUSEvScannerAutoScaleDisabled // when scanner autoscale is disabled by controller
 )
 
 const (
