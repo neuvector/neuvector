@@ -307,19 +307,20 @@ func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
 			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-				return filepath.Join("/sys/fs/cgroup", tokens[2]), nil
+				return filepath.Join(defaultHostCgroup, tokens[2]), nil
 			}
 		}
 	}
-	return "/sys/fs/cgroup", errors.New("cgroup file not supported")
+	return defaultHostCgroup, errors.New("cgroup file not supported")
 }
 
 // cgroup v2 is collected inside an unified file folder
-func getCgroupPath_cgroup_v2(pid int, cgroupHostPath string) (string, error) {
+func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	var path string
 	if pid == 0 { // self
 		path = "/proc/self/cgroup"
 	} else {
+		// Note that this is /proc and not /host/proc
 		path = filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
 	}
 
@@ -447,13 +448,6 @@ func (s *SystemTools) getCgroupMetricsPath(pid int) (string, error) {
 
 }
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
-	/*
-		mnt, err := FindCgroupMountpoint(subsystem)
-		if err != nil {
-			return "", nil
-		}
-	*/
-
 	subsystemPath := ""
 	mpath, _ := s.getCgroupMetricsPath(pid)
 	switch s.cgroupVersion {
@@ -467,70 +461,9 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 	default:
 		subsystemPath = filepath.Join(s.cgroupDir, subsystem, mpath)
 	}
-	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid, "subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
+	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid,
+		"subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
 	return subsystemPath, nil
-	log.Error("JAYU Should not get here.")
-
-	// Alternative: it might not be necessary to obtain cgroup path as before
-	var path string
-	switch s.cgroupVersion {
-	case cgroup_v1:
-		// It is a well-known path: /proc/<pid>/root/sys/fs/cgroup/<subsystem>
-		if pid == 0 { // self
-			path = filepath.Join("/sys/fs/cgroup", subsystem)
-		} else {
-			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
-		}
-		return path, nil
-
-	case cgroup_v2:
-		// unified file structure
-		return getCgroupPath_cgroup_v2(pid, s.cgroupDir)
-	}
-
-	// However, the k8s POD does not have those subsystem folders
-	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), subsystem) {
-			tokens := strings.Split(scanner.Text(), ":")
-			length := len(tokens)
-			if length == 3 {
-				path := filepath.Join(s.cgroupDir, subsystem, tokens[2])
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					// Rancher on RancherOS, tokens[2] is /docker/xxxx/docker/yyyy
-					dirs := strings.Split(tokens[2], "/")
-					if n := len(dirs); n > 2 {
-						return filepath.Join(s.cgroupDir, subsystem, dirs[n-2], dirs[n-1]), nil
-					}
-				} else {
-					// Most other systems
-					return path, nil
-				}
-			} else if length > 3 {
-				// containerd 1.4.4: it uses ":" as separators.
-				// 4:memory:/system.slice/containerd.service/kubepods-besteffort-pod2105e389_7471_476e_a50f_6074cef29bbd.slice:cri-containerd:76b9bfe6d5506......
-				path := filepath.Join(s.cgroupDir, subsystem)
-				for i := 2; i < len(tokens); i++ {
-					if i == 2 {
-						path += tokens[i]
-					} else {
-						path += ":" + tokens[i]
-					}
-				}
-				return path, nil
-			}
-			break
-		}
-	}
-
-	return "", fmt.Errorf("Unable to find subsystem in container cgroup file")
 }
 
 // Copied from: github.com/opencontainers/runc/libcontainer/cgroups/fs/utils.go
