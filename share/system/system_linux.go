@@ -157,13 +157,14 @@ func (s *SystemTools) DetermineCgroupPath() (int, string) {
 			"cgroupPath": cgroupPath,
 			"cgroupControllerPath": cgroupControllerPath,
 		"err": err.Error()}).Errorf("v1 mode")
+		// unsupported -- tested on ubuntu 18.04 and it's missing files we need.
 		// check if in cgroup v2 hybrid mode
-		if cgroupIsHybridMode(s.cgroupDir) {
-			s.cgroupVersion = cgroup_v2_hybrid
-			log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
-				"cgroupPath": cgroupPath,
-				"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 hybrid")
-		}
+		//if cgroupIsHybridMode(s.cgroupDir) {
+		//	s.cgroupVersion = cgroup_v2_hybrid
+		//	log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
+		//		"cgroupPath": cgroupPath,
+		//		"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 hybrid")
+		//}
 	}
 	return s.cgroupVersion, s.cgroupMemoryDir
 }

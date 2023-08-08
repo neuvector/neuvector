@@ -457,12 +457,15 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 	subsystemPath := ""
 	mpath, _ := s.getCgroupMetricsPath(pid)
 	switch s.cgroupVersion {
-	case cgroup_v1:
-		subsystemPath = filepath.Join(s.cgroupDir, subsystem, mpath)
 	case cgroup_v2:
 		subsystemPath = filepath.Join(s.cgroupDir, mpath)
-	case cgroup_v2_hybrid:
-		subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
+	// unsupported
+	//case cgroup_v2_hybrid:
+	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
+	case cgroup_v1:
+		fallthrough
+	default:
+		subsystemPath = filepath.Join(s.cgroupDir, subsystem, mpath)
 	}
 	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid, "subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
 	return subsystemPath, nil
