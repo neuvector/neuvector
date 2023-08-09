@@ -65,14 +65,10 @@ func userRoleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []b
 		var role share.CLUSUserRole
 		json.Unmarshal(value, &role)
 		if roleInternal := parseUserRolePermissions(&role); roleInternal != nil {
-			cacheMutexLock()
 			access.AddRole(name, roleInternal)
-			cacheMutexUnlock()
 		}
 	case cluster.ClusterNotifyDelete:
-		cacheMutexLock()
 		access.DeleteRole(name)
-		cacheMutexUnlock()
 	}
 }
 

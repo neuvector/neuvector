@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
@@ -350,6 +351,8 @@ var allRoles = map[string]*share.CLUSUserRoleInternal{                          
 	},
 }
 
+var rolesMutex sync.RWMutex
+
 func clusUserRoleToREST(name string, r *share.CLUSUserRoleInternal) *api.RESTUserRole {
 	var permissions []*api.RESTRolePermission
 	if name == api.UserRoleFedAdmin || name == api.UserRoleFedReader || name == api.UserRoleAdmin || name == api.UserRoleReader {
@@ -385,6 +388,9 @@ func clusUserRoleToREST(name string, r *share.CLUSUserRoleInternal) *api.RESTUse
 }
 
 func getRolePermitValues(roleName, domain string) (uint64, uint64) {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	if role, ok := allRoles[roleName]; ok {
 		if roleName == api.UserRoleIBMSA || roleName == api.UserRoleImportStatus {
 			if domain == AccessDomainGlobal {
@@ -404,6 +410,9 @@ func getRolePermitValues(roleName, domain string) (uint64, uint64) {
 }
 
 func getRestRolePermitValues(roleName, domain string) []*api.RESTRolePermission {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	//rolePermits := map[string]*api.RESTRolePermission	// key is permission id
 	var pList []*api.RESTRolePermission
 	if role, ok := allRoles[roleName]; ok {
@@ -1047,6 +1056,9 @@ func CompileUriPermitsMapping() {
 }
 
 func IsValidRole(role string, usage int) bool {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	switch usage {
 	case CONST_VISIBLE_USER_ROLE:
 		return visibleRoles.Contains(role)
@@ -1059,6 +1071,9 @@ func IsValidRole(role string, usage int) bool {
 }
 
 func GetValidRoles(usage int) []string {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	var rolesSet utils.Set
 	switch usage {
 	case CONST_VISIBLE_USER_ROLE:
@@ -1089,6 +1104,9 @@ func GetValidRoles(usage int) []string {
 }
 
 func AddRole(name string, role *share.CLUSUserRoleInternal) {
+	rolesMutex.Lock()
+	defer rolesMutex.Unlock()
+
 	visibleRoles.Add(name)
 	mappableServerDefaultRoles.Add(name)
 	mappableDomainRoles.Add(name)
@@ -1102,6 +1120,9 @@ func AddRole(name string, role *share.CLUSUserRoleInternal) {
 }
 
 func DeleteRole(name string) {
+	rolesMutex.Lock()
+	defer rolesMutex.Unlock()
+
 	if role, ok := allRoles[name]; ok {
 		if !role.Reserved {
 			visibleRoles.Remove(name)
@@ -1113,6 +1134,9 @@ func DeleteRole(name string) {
 }
 
 func UpdateUserRoleForFedRoleChange(fedRole string) {
+	rolesMutex.Lock()
+	defer rolesMutex.Unlock()
+
 	roles := []string{api.UserRoleFedAdmin, api.UserRoleFedReader}
 	for _, role := range roles {
 		if fedRole == api.FedRoleMaster {
@@ -1126,6 +1150,9 @@ func UpdateUserRoleForFedRoleChange(fedRole string) {
 }
 
 func GetRoleList() []*api.RESTUserRole {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	names := GetValidRoles(CONST_VISIBLE_USER_ROLE)
 	roles := make([]*api.RESTUserRole, 0, len(names))
 	for _, name := range names {
@@ -1144,6 +1171,9 @@ func GetRoleList() []*api.RESTUserRole {
 }
 
 func GetRoleDetails(name string) *api.RESTUserRole {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	if visibleRoles.Contains(name) {
 		if role, ok := allRoles[name]; ok {
 			return clusUserRoleToREST(name, role)
@@ -1153,6 +1183,9 @@ func GetRoleDetails(name string) *api.RESTUserRole {
 }
 
 func GetReservedRoleNames() utils.Set {
+	rolesMutex.RLock()
+	defer rolesMutex.RUnlock()
+
 	names := utils.NewSet()
 	for _, role := range allRoles {
 		if role.Reserved {
