@@ -548,13 +548,19 @@ func logIncident(arg interface{}) {
 	}
 }
 
-func fillAuditPackages(l *api.Audit, cve string) {
-	if !systemConfigCache.SingleCVEPerSyslog {
-		return
-	}
-	val, ok := l.PackageMap[cve]
+func fillVulAudit(l *api.Audit, cve string) {
+	v, ok := l.Vuls[cve]
 	if ok {
-		l.Packages = val
+		l.Packages = []string{v.PackageName}
+		l.PackageVersion = v.PackageVersion
+		l.FixedVersion = v.FixedVersion
+		l.Link = v.Link
+		l.Score = v.Score
+		l.ScoreV3 = v.ScoreV3
+		l.Vectors = v.Vectors
+		l.VectorsV3 = v.VectorsV3
+		l.Published = v.PublishedDate
+		l.LastMod = v.FixedVersion
 	}
 }
 
@@ -575,7 +581,7 @@ func logAudit(arg interface{}) {
 					l.MediumVuls = []string{}
 					l.HighCnt = 1
 					l.MediumCnt = 0
-					fillAuditPackages(&l, v)
+					fillVulAudit(&l, v)
 					sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 				}
 				for _, v := range rlog.MediumVuls {
@@ -584,7 +590,7 @@ func logAudit(arg interface{}) {
 					l.MediumVuls = []string{v}
 					l.HighCnt = 0
 					l.MediumCnt = 1
-					fillAuditPackages(&l, v)
+					fillVulAudit(&l, v)
 					sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 				}
 			}()
@@ -602,11 +608,11 @@ func logAudit(arg interface{}) {
 					if len(llog.HighVuls) > 0 || len(llog.MediumVuls) > 0 {
 						// copy the fields of the layer
 						rlog.ImageLayerDigest = llog.ImageLayerDigest
+						rlog.Cmds = llog.Cmds
 						rlog.HighVuls = llog.HighVuls
 						rlog.MediumVuls = llog.MediumVuls
 						rlog.HighCnt = llog.HighCnt
 						rlog.MediumCnt = llog.MediumCnt
-						rlog.PackageMap = llog.PackageMap
 						if systemConfigCache.SingleCVEPerSyslog {
 							for _, v := range rlog.HighVuls {
 								l := *rlog
@@ -614,7 +620,7 @@ func logAudit(arg interface{}) {
 								l.MediumVuls = []string{}
 								l.HighCnt = 1
 								l.MediumCnt = 0
-								fillAuditPackages(&l, v)
+								fillVulAudit(&l, v)
 								sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 							}
 							for _, v := range rlog.MediumVuls {
@@ -623,7 +629,7 @@ func logAudit(arg interface{}) {
 								l.MediumVuls = []string{v}
 								l.HighCnt = 0
 								l.MediumCnt = 1
-								fillAuditPackages(&l, v)
+								fillVulAudit(&l, v)
 								sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
 							}
 						} else {
@@ -1864,16 +1870,11 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	clog.HighCnt = len(highs)
 	clog.MediumCnt = len(meds)
 	if systemConfigCache.SingleCVEPerSyslog {
-		// if only reporting one cve per rule, we will add the vulnerabile package info.
-		// PackageMap is used to keep the info, it will not be included in the log
-		clog.PackageMap = make(map[string][]string)
-		for _, reportvuln := range report.Vuls {
-			val, ok := clog.PackageMap[reportvuln.Name]
-			if ok {
-				clog.PackageMap[reportvuln.Name] = append(val, reportvuln.PackageName)
-			} else {
-				clog.PackageMap[reportvuln.Name] = []string{reportvuln.PackageName}
-			}
+		// if only reporting one cve per event, we will add the vulnerabile info.
+		// the vul. list will not be included in the log
+		clog.Vuls = make(map[string]*share.ScanVulnerability)
+		for _, v := range report.Vuls {
+			clog.Vuls[v.Name] = v
 		}
 	}
 	if systemConfigCache.SyslogCVEInLayers {
@@ -1881,6 +1882,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		for i, l := range report.Layers {
 			var lc api.Audit
 			lc.ImageLayerDigest = l.Digest
+			lc.Cmds = l.Cmds
 			if h, ok := layerHighs[l.Digest]; ok {
 				lc.HighVuls = h
 				lc.HighCnt = len(h)
@@ -1890,14 +1892,9 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 				lc.MediumCnt = len(m)
 			}
 			if systemConfigCache.SingleCVEPerSyslog {
-				lc.PackageMap = make(map[string][]string)
-				for _, reportvuln := range l.Vuls {
-					val, ok := lc.PackageMap[reportvuln.Name]
-					if ok {
-						lc.PackageMap[reportvuln.Name] = append(val, reportvuln.PackageName)
-					} else {
-						lc.PackageMap[reportvuln.Name] = []string{reportvuln.PackageName}
-					}
+				lc.Vuls = make(map[string]*share.ScanVulnerability)
+				for _, v := range report.Vuls {
+					lc.Vuls[v.Name] = v
 				}
 			}
 			clog.Layers[i] = lc
