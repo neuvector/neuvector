@@ -318,9 +318,10 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 
 	autoscale := systemConfigCache.ScannerAutoscale
 	rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{
-		Strategy: autoscale.Strategy,
-		MinPods:  autoscale.MinPods,
-		MaxPods:  autoscale.MaxPods,
+		Strategy:         autoscale.Strategy,
+		MinPods:          autoscale.MinPods,
+		MaxPods:          autoscale.MaxPods,
+		DisabledByOthers: autoscale.DisabledByOthers,
 	}
 
 	return &rconf

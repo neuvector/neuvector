@@ -1866,9 +1866,10 @@ type RESTSystemConfigAutoscaleConfig struct {
 }
 
 type RESTSystemConfigAutoscale struct {
-	Strategy string `json:"strategy"`
-	MinPods  uint32 `json:"min_pods"`
-	MaxPods  uint32 `json:"max_pods"`
+	Strategy         string `json:"strategy"`
+	MinPods          uint32 `json:"min_pods"`
+	MaxPods          uint32 `json:"max_pods"`
+	DisabledByOthers bool   `json:"disabled_by_others"` // true when autoscale is disabled because controller detects 3rd-party tool keeps reverting our autoscale
 }
 
 type RESTSystemConfigProxyV2 struct {
