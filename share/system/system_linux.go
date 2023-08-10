@@ -37,7 +37,7 @@ const defaultHostProc string = "/proc/"
 const mappedHostProc string = "/host/proc/"
 const defaultHostCgroup string = "/sys/fs/cgroup"
 const defaultHostCgroupMemory string = "/sys/fs/cgroup/memory"
-const mappedHostCgroup string = "/host/cgroup/"
+const mappedHostCgroup string = "/host/cgroup"
 const maxStatCmdLen = 15
 const (
 	ExecNSTool string = "/usr/local/bin/nstools"
@@ -61,6 +61,7 @@ type SystemTools struct {
 	clockTicksPerSecond uint64
 	cgroupVersion       int
 	cgroupMemoryDir     string
+
 }
 
 func getClockTicks() int {
@@ -96,85 +97,49 @@ func NewSystemTools() *SystemTools {
 	s.info.SetRootPathPrefix(fmt.Sprintf("%s1/root/", procDir))
 	s.info.GetSysInfo()
 
-	//// fill cgroup info
-	//// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
-	//// Use this to determine cgroup type
-	//// https://lists.freedesktop.org/archives/systemd-devel/2018-November/041644.html
-	//if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err == nil {
-	//	s.cgroupVersion = cgroup_v2
-	//	// update cgroup v2 path
-	//	if path, err := getCgroupPath_cgroup_v2(0); err == nil {
-	//		s.cgroupMemoryDir = path
-	//	} else {
-	//		s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
-	//	}
-	//} else {
-	//	s.cgroupVersion = cgroup_v1
-	//	s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
-	//}
+	version := s.DetermineCgroupVersion()
+	s.SetCgroupInfo(version)
 
-	s.DetermineCgroupPath()
+	return s
+}
 
-	switch(s.cgroupVersion) {
+// SetCgroupInfo - Sets the cgroup path and version for SystemTools based on version number
+
+func (s *SystemTools) SetCgroupInfo(version int) {
+	switch version {
 	case cgroup_v2:
 		s.cgroupVersion = cgroup_v2
-		s.cgroupMemoryDir = defaultHostCgroup
+		s.cgroupMemoryDir = s.cgroupDir
 	case cgroup_v1:
 		fallthrough
 	default:
 		s.cgroupVersion = cgroup_v1
-		s.cgroupMemoryDir = defaultHostCgroupMemory
+		//s.cgroupMemoryDir = defaultHostCgroupMemory
+		s.cgroupMemoryDir = filepath.Join(s.cgroupDir, "memory")
+		// cgroup v2 hybrid is not supported
 	}
 
 	log.WithFields(log.Fields{"cgroupVersion": s.cgroupVersion,
 		"cgroupMemory": s.cgroupMemoryDir,
 		"cgroupdir": s.cgroupDir,
 		"procdir": s.procDir,
-		}).Error("cgroup configuration")
-	return s
+	}).Debug("filled in cgroup configuration")
 }
 
-func (s *SystemTools) DetermineCgroupPath() (int, string) {
-
-	// fill cgroup info
-	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
-	// Use this to determine cgroup type
-	log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir}).Errorf("Jayu getting cgroup dir")
-
-	// check root path
+// DetermineCgroupVersion - Determines the cgroup version by checking for known files in the cgroup directory
+func (s *SystemTools) DetermineCgroupVersion() (int) {
 	// Check cgroup version using cgroup.controllers and if v2 pure, hybrid, legacy
-	// https://lists.freedesktop.org/archives/systemd-devel/2018-November/041644.html
+	// We will use the group.controller to determine cgroup version
+	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
+	version := cgroup_v1
 	cgroupPath := s.cgroupDir // filepath.Join(s.cgroupDir, CgroupDefaultPath)
 	cgroupControllerPath := filepath.Join(cgroupPath, "/cgroup.controllers")
 	if _, err := os.Stat(cgroupControllerPath); err == nil {
-		log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
-			"cgroupPath": cgroupPath,
-		"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 mode")
-
-	} else {
-		log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
-			"cgroupPath": cgroupPath,
-			"cgroupControllerPath": cgroupControllerPath,
-		"err": err.Error()}).Errorf("v1 mode")
-		// unsupported -- tested on ubuntu 18.04 and it's missing files we need.
-		// check if in cgroup v2 hybrid mode
-		//if cgroupIsHybridMode(s.cgroupDir) {
-		//	s.cgroupVersion = cgroup_v2_hybrid
-		//	log.WithFields(log.Fields{"s.cgroupDir": s.cgroupDir,
-		//		"cgroupPath": cgroupPath,
-		//		"cgroupControllerPath": cgroupControllerPath}).Errorf("v2 hybrid")
-		//}
+		version = cgroup_v2
 	}
-	return s.cgroupVersion, s.cgroupMemoryDir
-}
+	// Else we just assume cgroup v1.
 
-// Note supported. Default to v1 for now
-func cgroupIsHybridMode(cgroupdir string) bool {
-	path := filepath.Join(cgroupdir, "/unified")
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	return false
+	return version
 }
 
 func (s *SystemTools) GetCgroupsVersion() int {

@@ -314,117 +314,67 @@ func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 	return defaultHostCgroup, errors.New("cgroup file not supported")
 }
 
-// cgroup v2 is collected inside an unified file folder
-func getCgroupPath_cgroup_v2(pid int) (string, error) {
-	var path string
-	if pid == 0 { // self
-		path = "/proc/self/cgroup"
-	} else {
-		// Note that this is /proc and not /host/proc
-		path = filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
-	}
 
-	f, err := os.Open(path)
-	if err != nil {
-		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
-		return "", err
-	}
-	defer 	f.Close()
 
-	cpath, _ := getCgroupPathReaderV2(f)
-
-	return cpath, nil
-}
-
-// getFallbackCgroupV2Path - Takes a pid and creates a path in /proc/<pid>/root
-// and checks the cgroup path if cpu/mem files exist there
-func getFallbackCgroupV2Path(pid int) string {
-	// Check if the path is actually /proc/<pid>>/root/sys/fs/cgroup
-	newCpath := filepath.Join("/proc", strconv.Itoa(pid), "root/sys/fs/cgroup")
-	newCpathCpu := filepath.Join(newCpath, "cpu.stat")
-	newCpathMemory := filepath.Join(newCpath, "memory.stat")
-	cpath := newCpath
-	_, err := os.Stat(newCpathCpu)
-	if err != nil {
-		log.WithFields(log.Fields{"pid": pid, "err": err,
-			"cpath": cpath,
-			"newCpathCpu":newCpathCpu,
-			"newCpathMemory": newCpathMemory,
-		}).Warning("cgroup cpu file does not exist")
-
-		// fallback
-		cpath = "/sys/fs/cgroup"
-	}
-	_, err = os.Stat(newCpathMemory)
-	if err != nil {
-		log.WithFields(log.Fields{"pid": pid, "err": err,
-			"cpath": cpath,
-			"newCpathCpu":newCpathCpu,
-			"newCpathMemory": newCpathMemory,}).Warning("cgroup memory file does not exist")
-		// fallback
-		cpath = "/sys/fs/cgroup"
-	}
-	return cpath
-}
-func getStatsPathFromCgroupFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
-		return "", err
-	}
-	defer 	f.Close()
-
-	//subsystemMap := make(map[string]string, 0)
-
+func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
+	subsystemMap := make(map[string]string, 0)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 
 		tokens := strings.Split(scanner.Text(), ":")
-		log.WithFields(log.Fields{"path": path, "text": scanner.Text(), "tokens": tokens}).Error("JAYU Dummping text")
+		log.WithFields(log.Fields{"line": scanner.Text(), "tokens": tokens}).Error("JAYU Dummping text")
 
 		if len(tokens) > 2 {
-			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
-			// For k8s, we're looking for kubepods
-			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
 			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
 			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
-			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
-			//if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-			//	return filepath.Join("/sys/fs/cgroup", tokens[2]), nil
-			//}
-			// No subsystem to dump
-			//if tokens[1] == "" {
-			//	return filepath.Join(tokens[2]), nil
-			//} else { // There are multiple subsystems available
-				// In other impls, its possible the subsystems are stored in different places
-				//subsystemMap[tokens[1]] = tokens[2]
 
-			// Noticed that if ../ are in the cgroup file, it is because the /host/cgroup and /host/proc map is wrong
-			// And tries to link back to the wrong place
-			if strings.Contains(tokens[2], "/..") {
-				path  := strings.ReplaceAll(tokens[2], "/..","")
-				if strings.Contains(path, "kubepods-pod") {
-					path = filepath.Join("/kubepods.slice", path)
-				} else if strings.Contains(path, "kubepods-besteffort") {
-					path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
-				} else if strings.Contains(path, "kubepods-burstable") {
-					path = filepath.Join("/kubepods.slice", path)
-				} else {
-					path = "/sys/fs/cgroup"
-				}
-				return path, nil
+			// The subsystem is the second item in the line
+			//if tokens[1] == subsystem {
+			path := tokens[2]
+
+			// handle multiple keys eg:  7:cpu,cpuacct:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+			subs := strings.Split(tokens[1], ",")
+
+			for _, sub := range subs {
+				subsystemMap[sub] = path
 			}
-			return tokens[2], nil
-			//}
-
 		}
 	}
 
-	return "", errors.New("cgroup file not supported")
+	// On docker k8s, it only returns a single line and we will return the first item
+	if len(subsystemMap) == 1 {
+		for _, val := range subsystemMap {
+			return CgroupRelativePathFix(val), nil
+		}
+	}
+
+	// check if we can find it
+	if cpath, ok := subsystemMap[subsystem]; ok {
+		return CgroupRelativePathFix(cpath), nil
+	}
+
+	return "", fmt.Errorf("[%s] subsystem not found in tokens: %+v", subsystem, subsystemMap)
 }
+
+func CgroupRelativePathFix(path string) (string) {
+	if strings.Contains(path, "/..") {
+		// Noticed that if ../ are in the cgroup file, it is because the /host/cgroup and /host/proc map is wrong
+		// And tries to link back to the wrong place
+		path  = strings.ReplaceAll(path, "/..","")
+		if strings.Contains(path, "kubepods-pod") {
+			path = filepath.Join("/kubepods.slice", path)
+		} else if strings.Contains(path, "kubepods-besteffort") {
+			path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
+		} else if strings.Contains(path, "kubepods-burstable") {
+			path = filepath.Join("/kubepods.slice", path)
+		}
+	}
+	return path
+}
+
 // cgroup v2 is collected inside an unified file folder
-func (s *SystemTools) getCgroupMetricsPath(pid int) (string, error) {
+func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, error) {
 	var path string
 
 	if pid == 0 { // self
@@ -433,37 +383,54 @@ func (s *SystemTools) getCgroupMetricsPath(pid int) (string, error) {
 		path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
 	}
 
-	// shouldn't reuse path, doesn't make sense
-	path, err := getStatsPathFromCgroupFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		log.WithFields(log.Fields{"path": path, "error": err.Error()}).
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
+	}
+	defer 	f.Close()
+
+	// shouldn't reuse path, doesn't make sense
+	cpath, err := getStatsPathFromCgroupFile(f, subsystem)
+	if err != nil {
+		log.WithFields(log.Fields{"path": cpath, "error": err.Error()}).
 			Error("Falling back to /proc/<pid>/sys/fs/cgroup")
-		return filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup"), nil
+		return cpath, fmt.Errorf("Fallback to /proc/<pid>/sys/fs/cgroup")
 	}
 
-	log.WithFields(log.Fields{"path": path, "s": s}).
+	log.WithFields(log.Fields{"path": cpath, "s": s}).
 		Error("Created path to metrics")
 
-	return path, nil
+	return cpath, nil
 
 }
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
 	subsystemPath := ""
-	mpath, _ := s.getCgroupMetricsPath(pid)
+	mpath, err  := s.getCgroupMetricsPath(pid, subsystem)
+	if err != nil {
+		// Just return the fallback
+		return mpath, nil
+	}
+	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
+	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid,
+		"subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
+	return subsystemPath, nil
+}
+
+func (s *SystemTools) JoinToCgroupPath(path string, subsystem string) string {
+	subsystemPath := ""
 	switch s.cgroupVersion {
 	case cgroup_v2:
-		subsystemPath = filepath.Join(s.cgroupDir, mpath)
+		subsystemPath = filepath.Join(s.cgroupDir, path)
 	// unsupported
 	//case cgroup_v2_hybrid:
 	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
 	case cgroup_v1:
 		fallthrough
 	default:
-		subsystemPath = filepath.Join(s.cgroupDir, subsystem, mpath)
+		subsystemPath = filepath.Join(s.cgroupDir, subsystem, path)
 	}
-	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid,
-		"subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
-	return subsystemPath, nil
+	return subsystemPath
 }
 
 // Copied from: github.com/opencontainers/runc/libcontainer/cgroups/fs/utils.go

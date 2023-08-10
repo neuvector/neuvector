@@ -1,7 +1,11 @@
 package system
 
 import (
+	"io"
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseSharedNetNS(t *testing.T) {
@@ -10,4 +14,72 @@ func TestParseSharedNetNS(t *testing.T) {
 	if pid != 11217 {
 		t.Errorf("Incorrect pid: %v\n", pid)
 	}
+}
+
+func TestCgroupSelector(t *testing.T) {
+
+	var sys SystemTools
+
+	sys.cgroupVersion = -1
+	sys.cgroupDir = "/host/cgroup"
+	sys.cgroupMemoryDir = "/"
+	sys.SetCgroupInfo(cgroup_v1)
+	assert.Equal(t,
+		"/host/cgroup/memory",
+		sys.cgroupMemoryDir, "For v1, we should use the memory directory")
+
+	sys.cgroupVersion = -1
+	sys.cgroupDir = "/host/cgroup"
+	sys.cgroupMemoryDir = "/"
+	sys.SetCgroupInfo(cgroup_v2)
+	assert.Equal(t,
+		"/host/cgroup",
+		sys.cgroupMemoryDir, "For v2, we should use the base directory")
+
+
+	sys.cgroupVersion = -1
+	sys.cgroupDir = "/host/cgroup"
+	sys.cgroupMemoryDir = "/"
+	sys.SetCgroupInfo(-1)
+	assert.Equal(t,
+		"/host/cgroup/memory",
+		sys.cgroupMemoryDir, "For unsupported, we should default to v1")
+}
+
+func TestCgroupVersion(t *testing.T) {
+
+	var sys SystemTools
+	// When we upgrade golang, use TempDir
+	//sys.cgroupDir = T.TempDir()
+	sys.cgroupDir = "/tmp"
+	tmpcontrollerpath := "/tmp/cgroup.controllers"
+	// Make sure there isn't one here
+	os.Remove(tmpcontrollerpath) // Best effort
+	version := sys.DetermineCgroupVersion()
+	assert.Equal(t, cgroup_v1, version, "Should be cgroup v1")
+
+	cgroupcontroller := tmpcontrollerpath
+	fp, err := os.Create(cgroupcontroller)
+	if err != nil {
+		t.Fatalf("Could not create tmp file for testing: %s", err.Error())
+	}
+	fp.Close() // We don't need
+
+	version2 := sys.DetermineCgroupVersion()
+	assert.Equal(t, cgroup_v2, version2, "Should be cgroup v1")
+
+	os.Remove(tmpcontrollerpath) // best effort
+}
+
+type file interface {
+	io.Closer
+	io.Reader
+	io.ReaderAt
+	io.Seeker
+	Stat() (os.FileInfo, error)
+}
+
+type fileSystem interface {
+	Open(name string) (file, error)
+	Close()
 }
