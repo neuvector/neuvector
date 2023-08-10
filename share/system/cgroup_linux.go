@@ -322,7 +322,6 @@ func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 	for scanner.Scan() {
 
 		tokens := strings.Split(scanner.Text(), ":")
-		log.WithFields(log.Fields{"line": scanner.Text(), "tokens": tokens}).Error("JAYU Dummping text")
 
 		if len(tokens) > 2 {
 			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
@@ -342,7 +341,9 @@ func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 		}
 	}
 
-	// On docker k8s, it only returns a single line and we will return the first item
+	log.WithFields(log.Fields{"subsystemMap": subsystemMap}).Debug("Cgroup Subsystem map")
+
+	// On docker k8s (or a host cgroup file), it only returns a single line and we will return the first item
 	if len(subsystemMap) == 1 {
 		for _, val := range subsystemMap {
 			return CgroupRelativePathFix(val), nil
@@ -357,11 +358,13 @@ func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 	return "", fmt.Errorf("[%s] subsystem not found in tokens: %+v", subsystem, subsystemMap)
 }
 
+// CgroupRelativePathFix - Applies fixes for cgroup files with certain types of paths
 func CgroupRelativePathFix(path string) (string) {
 	if strings.Contains(path, "/..") {
-		// Noticed that if ../ are in the cgroup file, it is because the /host/cgroup and /host/proc map is wrong
-		// And tries to link back to the wrong place
-		path  = strings.ReplaceAll(path, "/..","")
+		// I can't find the documentation why the cgroup file will hold relative paths. For now, I'm applying these
+		// fixes as we encounter them. Documentation on this behaviour would make this code more robust.
+
+		path  = filepath.Clean(path)
 		if strings.Contains(path, "kubepods-pod") {
 			path = filepath.Join("/kubepods.slice", path)
 		} else if strings.Contains(path, "kubepods-besteffort") {
@@ -393,12 +396,13 @@ func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, e
 	// shouldn't reuse path, doesn't make sense
 	cpath, err := getStatsPathFromCgroupFile(f, subsystem)
 	if err != nil {
-		log.WithFields(log.Fields{"path": cpath, "error": err.Error()}).
-			Error("Falling back to /proc/<pid>/sys/fs/cgroup")
 		return cpath, fmt.Errorf("Fallback to /proc/<pid>/sys/fs/cgroup")
 	}
 
-	log.WithFields(log.Fields{"path": cpath, "s": s}).
+	log.WithFields(log.Fields{"path": cpath,
+		"s.cgroupDir": s.cgroupDir,
+	"s.procDir": s.procDir,
+	"s.cgroupVersion": s.cgroupVersion,}).
 		Error("Created path to metrics")
 
 	return cpath, nil
