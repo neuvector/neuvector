@@ -2438,4 +2438,3 @@ func cbGetAllContainerList() utils.Set {
 	defer gInfoRUnlock()
 	return gInfo.allContainers.Clone()
 }
-                                                                                                                                     
