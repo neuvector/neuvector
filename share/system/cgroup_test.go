@@ -1495,18 +1495,6 @@ func CgroupFileTestTemplate(t *testing.T, testcase cgroupTestCase) {
 	}
 	assert.Equal(t, testcase.expected,
 		path,  "Path is wrong")
-	//
-	//r = strings.NewReader(testcase.contents)
-	//path, err = getStatsPathFromCgroupFile(r, "cpuset")
-	//assert.Nil(t, err, "should have no errors")
-	//assert.Equal(t,"/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce",
-	//	path, "Path is wrong")
-	//
-	//r = strings.NewReader(testcase.contents)
-	//path, err = getStatsPathFromCgroupFile(r, "doesnotexist")
-	//assert.NotNil(t, err, "should have have error")
-	//assert.Equal(t,"",
-	//	path, "Path is wrong")
 }
 
 func TestCgroupFile(t *testing.T) {
@@ -1630,56 +1618,56 @@ func TestCgroupFile(t *testing.T) {
 		{"ubuntu18_04", ubuntu18_04, "cpuacct", true,
 		"/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce"},
 		{"ubuntu18_04", ubuntu18_04, "doesnotexist", false,
-		""},
+		"/sys/fs/cgroup"},
 		// Debian
 		{"debian", debian, "memory", true,
 			"/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970"},
 		{"debian", debian, "cpuacct", true,
 			"/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970"},
 		{"debian", debian, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// centos
 		{"centos", centos, "memory", true,
 			"/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope"},
 		{"centos", centos, "cpuacct", true,
 			"/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope"},
 		{"centos", centos, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// rancher
 		{"rancher", rancher, "memory", true,
 			"/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a"},
 		{"rancher", rancher, "cpuacct", true,
 			"/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a"},
 		{"rancher", rancher, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// kubepods
 		{"kubepods", kubepods, "memory", true,
 			"/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c"},
 		{"kubepods", kubepods, "cpuacct", true,
 			"/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c"},
 		{"kubepods", kubepods, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// kubepods2
 		{"kubepods2", kubepods2, "memory", true,
 			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope"},
 		{"kubepods2", kubepods2, "cpuacct", true,
 			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope"},
 		{"kubepods2", kubepods2, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// kubepod3
 		{"kubepod3", kubepod3, "memory", true,
 			"/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d"},
 		{"kubepod3", kubepod3, "cpuacct", true,
 			"/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d"},
 		{"kubepod3", kubepod3, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// hostCgroup
 		{"hostCgroup", hostCgroup, "memory", true,
 			"/"},
 		{"hostCgroup", hostCgroup, "cpuacct", true,
 			"/"},
 		{"hostCgroup", hostCgroup, "doesnotexist", false,
-			""},
+			"/sys/fs/cgroup"},
 		// dockerK8s Best effort
 		{"dockerK8s", dockerK8sBestEffort, "memory", true,
 			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope"},
@@ -1708,4 +1696,41 @@ func TestCgroupFile(t *testing.T) {
 		t.Logf("Testing %s suubsystem %s", test.name, test.subsystem)
 		CgroupFileTestTemplate(t, test)
 	}
+}
+
+func TestCgroupPathJoin(t *testing.T) {
+	sys := SystemTools{}
+	sys.cgroupDir = "/sys/fs/cgroup"
+
+	path := "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"
+
+	// Test v1
+	sys.cgroupVersion = cgroup_v1
+	fpath := sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope")
+
+	// Test v1 bad subsystem
+	sys.cgroupVersion = cgroup_v1
+	path = "/"
+	fpath = sys.JoinToCgroupPath(path, "memory")
+	assert.Equal(t, fpath, "/sys/fs/cgroup/memory")
+
+
+	// Test v2
+	// In v2 - it is a flat directory structure so the subsystem doesn't actually matter
+	path = "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"
+	sys.cgroupVersion = cgroup_v2
+	fpath = sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope")
+
+	// Test v2
+	// if the path is /, we just want to return the cgroup directory root
+	path = "/"
+	sys.cgroupVersion = cgroup_v2
+	fpath = sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup")
+
 }

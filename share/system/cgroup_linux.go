@@ -31,11 +31,7 @@ const (
 const (
 	cgroup_v1 = 1
 	cgroup_v2 = 2
-	cgroup_v2_hybrid = 3
 )
-
-const CgroupHybridPath = "/sys/fs/cgroup/unified"
-const CgroupDefaultPath = "/sys/fs/cgroup/"
 
 var errUnsupported = errors.New("not supported")
 
@@ -337,7 +333,7 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 }
 
 
-
+// getStatsPathFromCgroupFile - Opens the proc/<pid>/cgroup file and parses it for the subsystem and paths
 func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 	subsystemMap := make(map[string]string, 0)
 	scanner := bufio.NewScanner(f)
@@ -346,15 +342,16 @@ func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 		tokens := strings.Split(scanner.Text(), ":")
 
 		if len(tokens) > 2 {
-			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
 			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
+			// cgroup path is defined by <index>:<subsystem(s)>:<path>
+			// example: 2:cpuset,cpu,cpuacct,memory,net_cls,net_prio,hugetlb:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
 
 			// The subsystem is the second item in the line
-			//if tokens[1] == subsystem {
 			path := tokens[2]
 
-			// handle multiple keys eg:  7:cpu,cpuacct:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+			// handle multiple subsytem keys that use the same path
+			// eg:  7:cpu,cpuacct:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
 			subs := strings.Split(tokens[1], ",")
 
 			for _, sub := range subs {
@@ -363,21 +360,20 @@ func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
 		}
 	}
 
-	log.WithFields(log.Fields{"subsystemMap": subsystemMap}).Debug("Cgroup Subsystem map")
-
-	// On docker k8s (or a host cgroup file), it only returns a single line and we will return the first item
+	// On docker k8s (or a host cgroup file), it only returns a single line so we will return the first item
 	if len(subsystemMap) == 1 {
 		for _, val := range subsystemMap {
 			return CgroupRelativePathFix(val), nil
 		}
 	}
 
-	// check if we can find it
+	// Match the subsystem we're interested in.
 	if cpath, ok := subsystemMap[subsystem]; ok {
 		return CgroupRelativePathFix(cpath), nil
 	}
 
-	return "", fmt.Errorf("[%s] subsystem not found in tokens: %+v", subsystem, subsystemMap)
+	// If the subsystem is not available, then we will have to fallback
+	return defaultHostCgroup, fmt.Errorf("[%s] subsystem not found in tokens: %+v", subsystem, subsystemMap)
 }
 
 // CgroupRelativePathFix - Applies fixes for cgroup files with certain types of paths
@@ -385,6 +381,7 @@ func CgroupRelativePathFix(path string) (string) {
 	if strings.Contains(path, "/..") {
 		// I can't find the documentation why the cgroup file will hold relative paths. For now, I'm applying these
 		// fixes as we encounter them. Documentation on this behaviour would make this code more robust.
+		// Example: 0::/../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope
 
 		path  = filepath.Clean(path)
 		if strings.Contains(path, "kubepods-pod") {
@@ -418,7 +415,13 @@ func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, e
 	// shouldn't reuse path, doesn't make sense
 	cpath, err := getStatsPathFromCgroupFile(f, subsystem)
 	if err != nil {
-		return cpath, err
+		log.WithFields(log.Fields{
+			"pid": pid,
+			"path": cpath,
+			"s.cgroupDir": s.cgroupDir,
+			"s.procDir": s.procDir,
+			"s.cgroupVersion": s.cgroupVersion,}).
+			Error("Cgroup file could not be parsed, fallback used")
 	}
 
 	log.WithFields(log.Fields{
@@ -432,24 +435,32 @@ func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, e
 	return cpath, nil
 
 }
+
+// GetContainerCgroupPath - Gets a PID's cgroup path for a subsystem
+// PIDs can share containers so we can derive the pid's cgroup path by parsing proc/<pid>/cgroup
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
 	subsystemPath := ""
 	mpath, err  := s.getCgroupMetricsPath(pid, subsystem)
 	if err != nil {
-		// Just return the fallback
+		// Just return the fallback, callers don't care about the error!
 		return mpath, nil
 	}
+
+	// Join to the system's path for host's cgroup
 	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
 
 	return subsystemPath, nil
 }
 
+// JoinToCgroupPath - Join to the system's path for host's cgroup
+// For cgroup v1, the subsystems are directories in the root and then the namespaces are within them
+// For cgroup v2, a flat directory structure is used and the namespace's directory now holds all the subsystems files
 func (s *SystemTools) JoinToCgroupPath(path string, subsystem string) string {
 	subsystemPath := ""
 	switch s.cgroupVersion {
 	case cgroup_v2:
 		subsystemPath = filepath.Join(s.cgroupDir, path)
-	// unsupported
+	// unsupported - Found issues in ubuntu 18.04 and missing subsystem in the unified directories
 	//case cgroup_v2_hybrid:
 	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
 	case cgroup_v1:

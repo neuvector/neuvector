@@ -54,9 +54,12 @@ func TestCgroupVersion(t *testing.T) {
 	tmpcontrollerpath := "/tmp/cgroup.controllers"
 	// Make sure there isn't one here
 	os.Remove(tmpcontrollerpath) // Best effort
+
+	// Test v1
 	version := sys.DetermineCgroupVersion()
 	assert.Equal(t, cgroup_v1, version, "Should be cgroup v1")
 
+	// Test V2
 	cgroupcontroller := tmpcontrollerpath
 	fp, err := os.Create(cgroupcontroller)
 	if err != nil {
