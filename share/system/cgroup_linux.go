@@ -589,10 +589,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
-		}
 		return err
 	}
 	defer statsFile.Close()
@@ -1270,4 +1266,7 @@ func (s *SystemTools) ReCalculateMemoryMetrics(threshold uint64) {
 }
 
 // verify the cgroup's memory controller
-// cgroup v2 is a un
+// cgroup v2 is a unified file system, it does not have the memory folder
+func (s *SystemTools) GetCgroupVersion() int {
+	return s.cgroupVersion
+}
