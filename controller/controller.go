@@ -46,7 +46,7 @@ type ctrlEnvInfo struct {
 	cgroupCPUAcct  string
 	runInContainer bool
 	debugCPath     bool
-	autoProfieCapture bool
+	autoProfieCapture uint64
 	memoryLimit     uint64
 	peakMemoryUsage uint64
 	snapshotMemStep uint64
@@ -250,7 +250,7 @@ func main() {
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
-	autoProfile := flag.Bool("apc", false, "Enable auto profile collection")
+	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	flag.Parse()
 
 	if *debug {
@@ -283,8 +283,14 @@ func main() {
 		log.Error("Invalid port value. Exit!")
 		os.Exit(-2)
 	}
-	if *autoProfile {
-		ctrlEnv.autoProfieCapture = *autoProfile
+	ctrlEnv.autoProfieCapture = 1 // default
+	if *autoProfile != 1 {
+		if *autoProfile < 0 {
+			ctrlEnv.autoProfieCapture = 0	// no auto profile
+			log.WithFields(log.Fields{"auto-profile": *autoProfile}).Error("Invalid value, disable auto-profile")
+		} else {
+			ctrlEnv.autoProfieCapture = (uint64)(*autoProfile)
+		}
 		log.WithFields(log.Fields{"auto-profile": ctrlEnv.autoProfieCapture}).Info()
 	}
 
@@ -770,8 +776,13 @@ func main() {
 		ctrlEnv.snapshotMemStep = ctrlEnv.memoryLimit/10
 		memSnapshotMark := ctrlEnv.memoryLimit*3/5			// 60% as starting point
 		memStatsControllerResetMark := ctrlEnv.memoryLimit*3/4	// 75% as starting point
+		if ctrlEnv.autoProfieCapture > 1 {
+			var mark uint64 = (uint64)(ctrlEnv.autoProfieCapture * 1024 * 1024) // into mega bytes
+			memSnapshotMark = mark * 3/5
+			ctrlEnv.snapshotMemStep = mark/10
+		}
 
-		if ctrlEnv.autoProfieCapture {
+		if ctrlEnv.autoProfieCapture > 0 {
 			log.WithFields(log.Fields{"Step": ctrlEnv.snapshotMemStep, "Snapshot_At": memSnapshotMark}).Info("Memory Snapshots")
 		} else {
 			memCheckTicker.Stop()
