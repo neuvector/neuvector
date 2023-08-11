@@ -332,6 +332,42 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 }
 
+// GetContainerCgroupPath - Gets a PID's cgroup path for a subsystem
+// PIDs can share containers so we can derive the pid's cgroup path by parsing proc/<pid>/cgroup
+func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
+	subsystemPath := ""
+	mpath, err  := s.getCgroupMetricsPath(pid, subsystem)
+	if err != nil {
+		// Just return the fallback, callers don't care about the error!
+		return mpath, nil
+	}
+
+	// Join to the system's path for host's cgroup
+	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
+
+	return subsystemPath, nil
+}
+
+// JoinToCgroupPath - Join to the system's path for host's cgroup
+// For cgroup v1, the subsystems are directories in the root and then the namespaces are within them
+// For cgroup v2, a flat directory structure is used and the namespace's directory now holds all the subsystems files
+func (s *SystemTools) JoinToCgroupPath(path string, subsystem string) string {
+	subsystemPath := ""
+	switch s.cgroupVersion {
+	case cgroup_v2:
+		subsystemPath = filepath.Join(s.cgroupDir, path)
+	// unsupported - Found issues in ubuntu 18.04 and missing subsystem in the unified directories
+	//case cgroup_v2_hybrid:
+	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
+	case cgroup_v1:
+		fallthrough
+	default:
+		subsystemPath = filepath.Join(s.cgroupDir, subsystem, path)
+	}
+	return subsystemPath
+}
+
+
 
 // getStatsPathFromCgroupFile - Opens the proc/<pid>/cgroup file and parses it for the subsystem and paths
 func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
@@ -436,40 +472,6 @@ func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, e
 
 }
 
-// GetContainerCgroupPath - Gets a PID's cgroup path for a subsystem
-// PIDs can share containers so we can derive the pid's cgroup path by parsing proc/<pid>/cgroup
-func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
-	subsystemPath := ""
-	mpath, err  := s.getCgroupMetricsPath(pid, subsystem)
-	if err != nil {
-		// Just return the fallback, callers don't care about the error!
-		return mpath, nil
-	}
-
-	// Join to the system's path for host's cgroup
-	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
-
-	return subsystemPath, nil
-}
-
-// JoinToCgroupPath - Join to the system's path for host's cgroup
-// For cgroup v1, the subsystems are directories in the root and then the namespaces are within them
-// For cgroup v2, a flat directory structure is used and the namespace's directory now holds all the subsystems files
-func (s *SystemTools) JoinToCgroupPath(path string, subsystem string) string {
-	subsystemPath := ""
-	switch s.cgroupVersion {
-	case cgroup_v2:
-		subsystemPath = filepath.Join(s.cgroupDir, path)
-	// unsupported - Found issues in ubuntu 18.04 and missing subsystem in the unified directories
-	//case cgroup_v2_hybrid:
-	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
-	case cgroup_v1:
-		fallthrough
-	default:
-		subsystemPath = filepath.Join(s.cgroupDir, subsystem, path)
-	}
-	return subsystemPath
-}
 
 // Copied from: github.com/opencontainers/runc/libcontainer/cgroups/fs/utils.go
 
