@@ -121,7 +121,7 @@ func (s *SystemTools) SetCgroupInfo(version int) {
 		"cgroupMemory": s.cgroupMemoryDir,
 		"cgroupdir": s.cgroupDir,
 		"procdir": s.procDir,
-	}).Debug("filled in cgroup configuration")
+	}).Debug("Setup up system tools cgroup configuration")
 }
 
 // DetermineCgroupVersion - Determines the cgroup version by checking for known files in the cgroup directory
