@@ -1270,7 +1270,4 @@ func (s *SystemTools) ReCalculateMemoryMetrics(threshold uint64) {
 }
 
 // verify the cgroup's memory controller
-// cgroup v2 is a unified file system, it does not have the memory folder
-func (s *SystemTools) GetCgroupVersion() int {
-	return s.cgroupVersion
-}
+// cgroup v2 is a un
