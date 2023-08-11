@@ -114,9 +114,7 @@ func (s *SystemTools) SetCgroupInfo(version int) {
 		fallthrough
 	default:
 		s.cgroupVersion = cgroup_v1
-		//s.cgroupMemoryDir = defaultHostCgroupMemory
 		s.cgroupMemoryDir = filepath.Join(s.cgroupDir, "memory")
-		// cgroup v2 hybrid is not supported
 	}
 
 	log.WithFields(log.Fields{"cgroupVersion": s.cgroupVersion,
@@ -132,8 +130,7 @@ func (s *SystemTools) DetermineCgroupVersion() (int) {
 	// We will use the group.controller to determine cgroup version
 	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
 	version := cgroup_v1
-	cgroupPath := s.cgroupDir // filepath.Join(s.cgroupDir, CgroupDefaultPath)
-	cgroupControllerPath := filepath.Join(cgroupPath, "/cgroup.controllers")
+	cgroupControllerPath := filepath.Join(s.cgroupDir, "/cgroup.controllers")
 	if _, err := os.Stat(cgroupControllerPath); err == nil {
 		version = cgroup_v2
 	}

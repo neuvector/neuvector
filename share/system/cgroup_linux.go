@@ -294,7 +294,7 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 	return "", false, false
 }
 
-func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
+func getCgroupPathReaderV2(file io.ReadSeeker) string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
@@ -307,11 +307,33 @@ func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
 			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-				return filepath.Join(defaultHostCgroup, tokens[2]), nil
+				return filepath.Join("/sys/fs/cgroup", tokens[2])
 			}
 		}
 	}
-	return defaultHostCgroup, errors.New("cgroup file not supported")
+	return "/sys/fs/cgroup"
+}
+
+// cgroup v2 is collected inside an unified file folder
+func getCgroupPath_cgroup_v2(pid int) (string, error) {
+	var path string
+	if pid == 0 { // self
+		path = "/proc/self/cgroup"
+	} else {
+		path = filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
+	}
+	defer 	f.Close()
+
+	cpath := getCgroupPathReaderV2(f)
+
+	return cpath, nil
+
 }
 
 
@@ -396,14 +418,16 @@ func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, e
 	// shouldn't reuse path, doesn't make sense
 	cpath, err := getStatsPathFromCgroupFile(f, subsystem)
 	if err != nil {
-		return cpath, fmt.Errorf("Fallback to /proc/<pid>/sys/fs/cgroup")
+		return cpath, err
 	}
 
-	log.WithFields(log.Fields{"path": cpath,
+	log.WithFields(log.Fields{
+		"pid": pid,
+		"path": cpath,
 		"s.cgroupDir": s.cgroupDir,
-	"s.procDir": s.procDir,
-	"s.cgroupVersion": s.cgroupVersion,}).
-		Error("Created path to metrics")
+		"s.procDir": s.procDir,
+		"s.cgroupVersion": s.cgroupVersion,}).
+		Debug("Created path to metrics")
 
 	return cpath, nil
 
@@ -416,8 +440,7 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		return mpath, nil
 	}
 	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
-	log.WithFields(log.Fields{"s.cgroupVersion": s.cgroupVersion,"pid": pid,
-		"subsystem": subsystem, "subsystemPath": subsystemPath}).Error("JAYU Susystem path created")
+
 	return subsystemPath, nil
 }
 

@@ -1033,7 +1033,7 @@ func TestCrio_CPath_Cgroupv2(t *testing.T) {
 0::/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod042efd86_1f3b_4f2f_8736_f31c58e95bbc.slice/crio-f33f47b0db740bb647cb3e7ac62d96c74966dbb99cbfaf4563bfd42d387e8b44.scope
 	`
 	r := strings.NewReader(cgroup)
-	path,_ := getCgroupPathReaderV2(r)
+	path := getCgroupPathReaderV2(r)
 	if path != "/sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod042efd86_1f3b_4f2f_8736_f31c58e95bbc.slice/crio-f33f47b0db740bb647cb3e7ac62d96c74966dbb99cbfaf4563bfd42d387e8b44.scope" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
@@ -1047,7 +1047,7 @@ func TestDockerK8s_CPath_SelfProbe_Cgroupv2(t *testing.T) {
 	0::/
 	`
 	r := strings.NewReader(cgroup)
-	path,_ := getCgroupPathReaderV2(r)
+	path := getCgroupPathReaderV2(r)
 	if path != "/sys/fs/cgroup" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
@@ -1061,7 +1061,7 @@ func TestDockerK8s_CPath_Container_Cgroupv2(t *testing.T) {
 0::/../../kubepods-besteffort-podfd698699_eabf_4c23_92ef_cf0bbdb78261.slice/docker-2cc65c162ca1388b6b8d5ccfb701d22fc96675ccf8b2f1590c490c2c4039547f.scope
 	`
 	r := strings.NewReader(cgroup)
-	path,_ := getCgroupPathReaderV2(r) // it is not inside the container
+	path := getCgroupPathReaderV2(r) // it is not inside the container
 	if path != "/sys/fs/cgroup" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}

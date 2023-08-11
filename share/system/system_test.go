@@ -1,7 +1,6 @@
 package system
 
 import (
-	"io"
 	"os"
 	"testing"
 
@@ -69,17 +68,4 @@ func TestCgroupVersion(t *testing.T) {
 	assert.Equal(t, cgroup_v2, version2, "Should be cgroup v1")
 
 	os.Remove(tmpcontrollerpath) // best effort
-}
-
-type file interface {
-	io.Closer
-	io.Reader
-	io.ReaderAt
-	io.Seeker
-	Stat() (os.FileInfo, error)
-}
-
-type fileSystem interface {
-	Open(name string) (file, error)
-	Close()
 }
