@@ -35,8 +35,9 @@ import (
 
 const defaultHostProc string = "/proc/"
 const mappedHostProc string = "/host/proc/"
-const defaultHostCgroup string = "/sys/fs/cgroup/"
-const mappedHostCgroup string = "/host/cgroup/"
+const defaultHostCgroup string = "/sys/fs/cgroup"
+const defaultHostCgroupMemory string = "/sys/fs/cgroup/memory"
+const mappedHostCgroup string = "/host/cgroup"
 const maxStatCmdLen = 15
 const (
 	ExecNSTool string = "/usr/local/bin/nstools"
@@ -60,6 +61,7 @@ type SystemTools struct {
 	clockTicksPerSecond uint64
 	cgroupVersion       int
 	cgroupMemoryDir     string
+
 }
 
 func getClockTicks() int {
@@ -87,28 +89,54 @@ func NewSystemTools() *SystemTools {
 
 	s := &SystemTools{
 		bEnable: true,
-		procDir: procDir, cgroupDir: cgroupDir,
+		procDir: procDir,
+		cgroupDir: cgroupDir,
 		clockTicksPerSecond: uint64(getClockTicks()),
 	}
 
 	s.info.SetRootPathPrefix(fmt.Sprintf("%s1/root/", procDir))
 	s.info.GetSysInfo()
 
-	// fill cgroup info
-	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
-	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err == nil {
-		s.cgroupVersion = cgroup_v2
-		// update cgroup v2 path
-		if path, err := getCgroupPath_cgroup_v2(0); err == nil {
-			s.cgroupMemoryDir = path
-		} else {
-			s.cgroupMemoryDir = "/sys/fs/cgroup" // last resort
-		}
-	} else {
-		s.cgroupVersion = cgroup_v1
-		s.cgroupMemoryDir = "/sys/fs/cgroup/memory"
-	}
+	version := s.DetermineCgroupVersion()
+	s.SetCgroupInfo(version)
+
 	return s
+}
+
+// SetCgroupInfo - Sets the cgroup path and version for SystemTools based on version number
+
+func (s *SystemTools) SetCgroupInfo(version int) {
+	switch version {
+	case cgroup_v2:
+		s.cgroupVersion = cgroup_v2
+		s.cgroupMemoryDir = s.cgroupDir
+	case cgroup_v1:
+		fallthrough
+	default:
+		s.cgroupVersion = cgroup_v1
+		s.cgroupMemoryDir = filepath.Join(s.cgroupDir, "memory")
+	}
+
+	log.WithFields(log.Fields{"cgroupVersion": s.cgroupVersion,
+		"cgroupMemory": s.cgroupMemoryDir,
+		"cgroupdir": s.cgroupDir,
+		"procdir": s.procDir,
+	}).Debug("Setup up system tools cgroup configuration")
+}
+
+// DetermineCgroupVersion - Determines the cgroup version by checking for known files in the cgroup directory
+func (s *SystemTools) DetermineCgroupVersion() (int) {
+	// Check cgroup version using cgroup.controllers and if v2 pure, hybrid, legacy
+	// We will use the group.controller to determine cgroup version
+	// https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md
+	version := cgroup_v1
+	cgroupControllerPath := filepath.Join(s.cgroupDir, "/cgroup.controllers")
+	if _, err := os.Stat(cgroupControllerPath); err == nil {
+		version = cgroup_v2
+	}
+	// Else we just assume cgroup v1.
+
+	return version
 }
 
 func (s *SystemTools) GetCgroupsVersion() int {

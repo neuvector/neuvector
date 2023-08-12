@@ -23,6 +23,7 @@ import (
 )
 
 const neuvectorContainer = "/usr/local/bin/.nvcontainer"
+const defaultCgroupStatsPathNotFound = ""
 const (
 	from_cgroup = iota
 	from_fscgroup
@@ -332,75 +333,163 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 }
 
+// GetContainerCgroupPath - Gets a PID's cgroup path for a subsystem
+// PIDs can share containers so we can derive the pid's cgroup path by parsing proc/<pid>/cgroup
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
-	/*
-		mnt, err := FindCgroupMountpoint(subsystem)
-		if err != nil {
-			return "", nil
-		}
-	*/
-
-	// Alternative: it might not be necessary to obtain cgroup path as before
-	var path string
-	switch s.cgroupVersion {
-	case cgroup_v1:
-		// It is a well-known path: /proc/<pid>/root/sys/fs/cgroup/<subsystem>
-		if pid == 0 { // self
-			path = filepath.Join("/sys/fs/cgroup", subsystem)
-		} else {
-			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
-		}
-		return path, nil
-
-	case cgroup_v2:
-		// unified file structure
-		return getCgroupPath_cgroup_v2(pid)
-	}
-
-	// However, the k8s POD does not have those subsystem folders
-	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
-	f, err := os.Open(path)
+	subsystemPath := ""
+	mpath, err  := s.getCgroupMetricsPath(pid, subsystem)
 	if err != nil {
-		return "", err
+		// Just return the fallback, callers don't care about the error!
+		return mpath, nil
 	}
-	defer f.Close()
 
+	// Join to the system's path for host's cgroup
+	subsystemPath = s.JoinToCgroupPath(mpath, subsystem)
+
+	// Check that the subsystem exist
+	if subsystem == "memory" {
+		// Attempt to confirm the directory are working, if not fall back
+		if _, err := s.GetContainerMemoryUsage(subsystemPath); err != nil {
+			log.WithFields(log.Fields{"error": err.Error(), "subsystemPath": subsystemPath, "pid": pid, "s.procDir": s.procDir,
+				"s.cgroupVersion": s.cgroupVersion,}).Warning("Could not get Memory stats")
+			return defaultCgroupStatsPathNotFound, err
+		}
+	}
+
+	if subsystem == "cpu" {
+		if _, err := s.GetContainerCPUUsage(subsystemPath); err != nil {
+			log.WithFields(log.Fields{"error": err.Error(), "cpath": subsystemPath, "pid": pid, "s.procDir": s.procDir,
+				"s.cgroupVersion": s.cgroupVersion,}).Warning("Could not get CPU stats")
+			return defaultCgroupStatsPathNotFound, err
+		}
+	}
+
+	return subsystemPath, nil
+}
+
+// JoinToCgroupPath - Join to the system's path for host's cgroup
+// For cgroup v1, the subsystems are directories in the root and then the namespaces are within them
+// For cgroup v2, a flat directory structure is used and the namespace's directory now holds all the subsystems files
+func (s *SystemTools) JoinToCgroupPath(path string, subsystem string) string {
+	subsystemPath := ""
+	switch s.cgroupVersion {
+	case cgroup_v2:
+		subsystemPath = filepath.Join(s.cgroupDir, path)
+	// unsupported - Found issues in ubuntu 18.04 and missing subsystem in the unified directories
+	//case cgroup_v2_hybrid:
+	//	subsystemPath = filepath.Join(s.cgroupDir, "/unified", mpath)
+	case cgroup_v1:
+		fallthrough
+	default:
+		subsystemPath = filepath.Join(s.cgroupDir, subsystem, path)
+	}
+	return subsystemPath
+}
+
+
+
+// getStatsPathFromCgroupFile - Opens the proc/<pid>/cgroup file and parses it for the subsystem and paths
+func getStatsPathFromCgroupFile(f io.Reader, subsystem string) (string, error) {
+	subsystemMap := make(map[string]string, 0)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), subsystem) {
-			tokens := strings.Split(scanner.Text(), ":")
-			length := len(tokens)
-			if length == 3 {
-				path := filepath.Join(s.cgroupDir, subsystem, tokens[2])
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					// Rancher on RancherOS, tokens[2] is /docker/xxxx/docker/yyyy
-					dirs := strings.Split(tokens[2], "/")
-					if n := len(dirs); n > 2 {
-						return filepath.Join(s.cgroupDir, subsystem, dirs[n-2], dirs[n-1]), nil
-					}
-				} else {
-					// Most other systems
-					return path, nil
-				}
-			} else if length > 3 {
-				// containerd 1.4.4: it uses ":" as separators.
-				// 4:memory:/system.slice/containerd.service/kubepods-besteffort-pod2105e389_7471_476e_a50f_6074cef29bbd.slice:cri-containerd:76b9bfe6d5506......
-				path := filepath.Join(s.cgroupDir, subsystem)
-				for i := 2; i < len(tokens); i++ {
-					if i == 2 {
-						path += tokens[i]
-					} else {
-						path += ":" + tokens[i]
-					}
-				}
-				return path, nil
+
+		tokens := strings.Split(scanner.Text(), ":")
+
+		if len(tokens) > 2 {
+			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
+			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
+			// cgroup path is defined by <index>:<subsystem(s)>:<path>
+			// example: 2:cpuset,cpu,cpuacct,memory,net_cls,net_prio,hugetlb:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+
+			// The subsystem is the second item in the line
+			path := tokens[2]
+
+			// handle multiple subsytem keys that use the same path
+			// eg:  7:cpu,cpuacct:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+			subs := strings.Split(tokens[1], ",")
+
+			for _, sub := range subs {
+				subsystemMap[sub] = path
 			}
-			break
 		}
 	}
 
-	return "", fmt.Errorf("Unable to find subsystem in container cgroup file")
+	// On docker k8s (or a host cgroup file), it only returns a single line so we will return the first item
+	if len(subsystemMap) == 1 {
+		for _, val := range subsystemMap {
+			return CgroupRelativePathFix(val), nil
+		}
+	}
+
+	// Match the subsystem we're interested in.
+	if cpath, ok := subsystemMap[subsystem]; ok {
+		return CgroupRelativePathFix(cpath), nil
+	}
+
+	// If the subsystem is not available, then we will have to fallback
+	return defaultCgroupStatsPathNotFound, fmt.Errorf("[%s] subsystem not found in tokens: %+v", subsystem, subsystemMap)
 }
+
+// CgroupRelativePathFix - Applies fixes for cgroup files with certain types of paths
+func CgroupRelativePathFix(path string) (string) {
+	if strings.Contains(path, "/..") {
+		// I can't find the documentation why the cgroup file will hold relative paths. For now, I'm applying these
+		// fixes as we encounter them. Documentation on this behaviour would make this code more robust.
+		// Example: 0::/../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope
+
+		path  = filepath.Clean(path)
+		if strings.Contains(path, "kubepods-pod") {
+			path = filepath.Join("/kubepods.slice", path)
+		} else if strings.Contains(path, "kubepods-besteffort") {
+			path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
+		} else if strings.Contains(path, "kubepods-burstable") {
+			path = filepath.Join("/kubepods.slice", path)
+		}
+	}
+	return path
+}
+
+// cgroup v2 is collected inside an unified file folder
+func (s *SystemTools) getCgroupMetricsPath(pid int, subsystem string) (string, error) {
+	var path string
+
+	if pid == 0 { // self
+		path = "/proc/self/cgroup"
+	} else {
+		path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
+	}
+	defer 	f.Close()
+
+	cpath, err := getStatsPathFromCgroupFile(f, subsystem)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"pid": pid,
+			"path": cpath,
+			"s.cgroupDir": s.cgroupDir,
+			"s.procDir": s.procDir,
+			"s.cgroupVersion": s.cgroupVersion,}).
+			Warning("Cgroup file could not be parsed")
+	}
+
+
+	log.WithFields(log.Fields{
+		"pid": pid,
+		"path": cpath,
+		"s.procDir": s.procDir,
+		"s.cgroupVersion": s.cgroupVersion,}).
+		Debug("Created path to metrics for pid")
+
+	return cpath, nil
+
+}
+
 
 // Copied from: github.com/opencontainers/runc/libcontainer/cgroups/fs/utils.go
 
@@ -520,10 +609,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
-		}
 		return err
 	}
 	defer statsFile.Close()
@@ -538,7 +623,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		mStats.Stats[t] = v
 	}
 	mStats.Cache = mStats.Stats["cache"]
-	var inactiveFileKeyName string
 
 	switch s.cgroupVersion {
 	case cgroup_v1:
@@ -562,7 +646,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 				}
 			}
 		}
-		inactiveFileKeyName = "total_inactive_file"
 	case cgroup_v2:
 		if usage, err := getCgroupParamUint(path, "memory.current"); err == nil {
 			mStats.Usage.Usage = usage
@@ -573,23 +656,11 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		if usageMax, err := getCgroupParamUint(path, "memory.max"); err == nil {
 			mStats.Usage.Limit = usageMax
 		}
-		inactiveFileKeyName = "inactive_file"
 	default:
 		return errUnsupported
 	}
 
-	// update working set data
-	// from cAdvisor: The amount of working set memory, this includes recently accessed memory,
-	// dirty memory, and kernel memory. Working set is <= "usage". (Bytes)
-	workingSet := mStats.Usage.Usage
-	if v, ok := mStats.Stats[inactiveFileKeyName]; ok {
-		if workingSet < v {
-			workingSet = 0
-		} else {
-			workingSet -= v
-		}
-	}
-	mStats.WorkingSet = workingSet
+	mStats.WorkingSet = mStats.Usage.Usage
 	return nil
 }
 

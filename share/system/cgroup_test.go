@@ -1,6 +1,8 @@
 package system
 
 import (
+	"github.com/stretchr/testify/assert"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -1472,4 +1474,333 @@ func TestContainerd_Container_Cgroupv2(t *testing.T) {
 	if id != "f34e6ab6ed679d809c8d4a385777c4f72441f1d3ec7b1334d35c10f4d25e6f40" || !found { // pod ID
 		t.Errorf("detect wrong pod ID, cgroup:  %v, %v\n", id, found)
 	}
+}
+
+type cgroupTestCase struct {
+	name string
+	contents string
+	subsystem string
+	errIsNil bool
+	expected string
+}
+
+func CgroupFileTestTemplate(t *testing.T, testcase cgroupTestCase) {
+
+	r := strings.NewReader(testcase.contents)
+	path, err := getStatsPathFromCgroupFile(r, testcase.subsystem)
+	if testcase.errIsNil {
+		assert.Nil(t, err, "should have no errors")
+	} else {
+		assert.NotNil(t, err, "should have errors")
+	}
+	assert.Equal(t, testcase.expected,
+		path,  "Path is wrong")
+}
+
+func TestCgroupFile(t *testing.T) {
+	log.SetOutput(os.Stderr)
+	// Test multiple variants on distributions. Not standardized
+	/*
+	In the case of cgroups v1, as the maintainer Tejun Heo admits,
+	"design followed implementation,"
+	"different decisions were taken for different controllers,"
+	and "sometimes too much flexibility causes a hindrance."
+	https://www.redhat.com/en/blog/world-domination-cgroups-rhel-8-welcome-cgroups-v2
+	*/
+
+		ubuntu18_04 := `12:hugetlb:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+11:cpuset:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+10:net_cls,net_prio:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+9:perf_event:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+8:pids:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+7:cpu,cpuacct:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+6:freezer:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+5:blkio:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+4:rdma:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+3:memory:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+2:devices:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+1:name=systemd:/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce
+0::/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce`
+
+	debian := `10:net_prio:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+9:perf_event:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+8:blkio:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+7:net_cls:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+6:freezer:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+5:devices:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+4:memory:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+3:cpuacct:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+2:cpu:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
+`
+
+	centos := `10:devices:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+9:blkio:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+8:memory:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+7:freezer:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+6:perf_event:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+5:hugetlb:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+4:net_cls:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+3:cpuset:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+2:cpuacct,cpu:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+1:name=systemd:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
+`
+
+	rancher := `9:name=systemd:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+8:memory:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+7:blkio:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+6:cpu,cpuacct:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+5:cpuset:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+4:perf_event:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+3:net_cls,net_prio:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+2:freezer:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+1:devices:/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a
+`
+
+	kubepods := `11:devices:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+10:memory:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+9:hugetlb:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+8:perf_event:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+7:freezer:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+6:pids:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+5:cpu,cpuacct:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+4:cpuset:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+3:blkio:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+2:net_cls,net_prio:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c
+1:name=systemd:/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c`
+
+	kubepods2 := `
+11:cpuset:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+10:blkio:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+9:devices:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+8:memory:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+7:freezer:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+6:perf_event:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+5:net_prio,net_cls:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+4:hugetlb:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+3:pids:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+2:cpuacct,cpu:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope
+1:name=systemd:/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope`
+
+	kubepod3 := `8:pids:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+7:blkio:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+6:perf_event:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+5:devices:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+4:freezer:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+3:rdma:/
+2:cpuset,cpu,cpuacct,memory,net_cls,net_prio,hugetlb:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d
+1:name=systemd:/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d`
+
+	hostCgroup := `
+14:name=dsystemd:/
+13:name=systemd:/
+12:pids:/
+11:hugetlb:/
+10:net_prio:/
+9:perf_event:/
+8:net_cls:/
+7:freezer:/
+6:devices:/
+5:memory:/
+4:blkio:/
+3:cpuacct:/
+2:cpu:/
+1:cpuset:/`
+
+	dockerK8sBestEffort := `0::/../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope`
+	dockerK8sBurstable := `0::/../../../kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope`
+
+	hostCgroupEmpty := `0::/`
+
+	tests := []cgroupTestCase{
+		// ubunu 18.04
+		{"ubuntu18_04", ubuntu18_04, "memory", true,
+		"/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce"},
+		{"ubuntu18_04", ubuntu18_04, "cpuacct", true,
+		"/docker/b5827d5acf95f5b286ae4aa28718162a3ed2152e7f4d4048dc9d2456540c11ce"},
+		{"ubuntu18_04", ubuntu18_04, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// Debian
+		{"debian", debian, "memory", true,
+			"/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970"},
+		{"debian", debian, "cpuacct", true,
+			"/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970"},
+		{"debian", debian, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// centos
+		{"centos", centos, "memory", true,
+			"/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope"},
+		{"centos", centos, "cpuacct", true,
+			"/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope"},
+		{"centos", centos, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// rancher
+		{"rancher", rancher, "memory", true,
+			"/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a"},
+		{"rancher", rancher, "cpuacct", true,
+			"/docker/a9a5ad238e59234193ee7ec3fcff5e735b3708ea1068826952255b69e3cfa413/docker/ec08435e04266c5ba381fccbb829f626d11d8ddf5f8f547263c7a2d79ab4787a"},
+		{"rancher", rancher, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// kubepods
+		{"kubepods", kubepods, "memory", true,
+			"/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c"},
+		{"kubepods", kubepods, "cpuacct", true,
+			"/kubepods/besteffort/pod74ba62da-1a3d-11e7-bb11-080027cb0e22/cb1eadb7abe3a6545e9856411207073277838e1bdc003337c2f8685faeedc32c"},
+		{"kubepods", kubepods, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// kubepods2
+		{"kubepods2", kubepods2, "memory", true,
+			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope"},
+		{"kubepods2", kubepods2, "cpuacct", true,
+			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod045b1e35_7f13_11e7_ac42_0050568ffca0.slice/docker-b5b6f2da8008be266864f896f93789762b2ce50792114a5c5f2cc3315af0bc70.scope"},
+		{"kubepods2", kubepods2, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// kubepod3
+		{"kubepod3", kubepod3, "memory", true,
+			"/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d"},
+		{"kubepod3", kubepod3, "cpuacct", true,
+			"/kubepods/besteffort/pod1fe19bf5-e8ef-11e8-900c-52daee5a874d/da31e536c8d61304a6d5998d163d12400a7a9a1003e1d86369e8fadb022fc17d"},
+		{"kubepod3", kubepod3, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// hostCgroup
+		{"hostCgroup", hostCgroup, "memory", true,
+			"/"},
+		{"hostCgroup", hostCgroup, "cpuacct", true,
+			"/"},
+		{"hostCgroup", hostCgroup, "doesnotexist", false,
+			defaultCgroupStatsPathNotFound},
+		// dockerK8s Best effort
+		{"dockerK8s", dockerK8sBestEffort, "memory", true,
+			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope"},
+		{"dockerK8s", dockerK8sBestEffort, "cpuacct", true,
+			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope"},
+		{"dockerK8s", dockerK8sBestEffort, "doesnotexist", true, // True because these are exception cases. We assume the one entry is the only one we can use
+			"/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope"},
+		// dockerK8s Burstable
+		{"dockerK8sBurstable", dockerK8sBurstable, "memory", true,
+			"/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"},
+		{"dockerK8sBurstable", dockerK8sBurstable, "cpuacct", true,
+			"/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"},
+		{"dockerK8sBurstable", dockerK8sBurstable, "doesnotexist", true, // True because these are exception cases. We assume the one entry is the only one we can use
+			"/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"},
+		// Pid 0 Host Cgroup
+		{"hostCgroupEmpty", hostCgroupEmpty, "memory", true,
+			"/"},
+		{"hostCgroupEmpty", hostCgroupEmpty, "cpuacct", true,
+			"/"},
+		{"hostCgroupEmpty", hostCgroupEmpty, "doesnotexist", true, // True because these are exception cases. We assume the one entry is the only one we can use
+			"/"},
+
+	}
+
+	for _, test := range tests {
+		t.Logf("Testing %s suubsystem %s", test.name, test.subsystem)
+		CgroupFileTestTemplate(t, test)
+	}
+}
+
+func TestCgroupPathJoin(t *testing.T) {
+	sys := SystemTools{}
+	sys.cgroupDir = "/sys/fs/cgroup"
+
+	path := "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"
+
+	// Test v1
+	sys.cgroupVersion = cgroup_v1
+	fpath := sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope")
+
+	// Test v1 bad subsystem
+	sys.cgroupVersion = cgroup_v1
+	path = "/"
+	fpath = sys.JoinToCgroupPath(path, "memory")
+	assert.Equal(t, fpath, "/sys/fs/cgroup/memory")
+
+
+	// Test v2
+	// In v2 - it is a flat directory structure so the subsystem doesn't actually matter
+	path = "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope"
+	sys.cgroupVersion = cgroup_v2
+	fpath = sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode78d192d_934f_475f_af41_6fe274868dcc.slice/docker-102b2be2d2d712ee08c202e70d1372892f3c20d14771ffa006f7f8c41a30fcc1.scope")
+
+	// Test v2
+	// if the path is /, we just want to return the cgroup directory root
+	path = "/"
+	sys.cgroupVersion = cgroup_v2
+	fpath = sys.JoinToCgroupPath(path, "memory")
+
+	assert.Equal(t, fpath, "/sys/fs/cgroup")
+
+}
+
+// Test the logic to fall back when we can't find the files we need for stats
+func TestGetCgroupMetricsPath(t *testing.T) {
+	sys := SystemTools{}
+	sys.cgroupDir = "/tmp"
+
+	// When we upgrade golang, use TempDir
+	//sys.cgroupDir = T.TempDir()
+	sys.cgroupDir = "/tmp"
+	sys.procDir = "/tmp"
+	tmpcontrollerpath := "/tmp/cgroup.controllers"
+	tmpProcDir := "/tmp/555"
+	tmpProcPath := "/tmp/555/cgroup"
+	MemoryPath := "/tmp/memory"
+	// Make sure there isn't one here
+	os.Remove(tmpcontrollerpath) // Best effort
+	os.Remove(tmpProcPath) // Best effort
+	os.Remove(tmpProcDir) // Best effort
+	os.Remove(MemoryPath) // Best effort
+
+	err := os.Mkdir(tmpProcDir, os.ModePerm)
+	assert.Nilf(t, err, "Could not create Proc dir")
+	err = os.Mkdir(MemoryPath, os.ModePerm)
+	assert.Nilf(t, err, "Could not create Proc dir")
+
+	tmpProcPathfp, err := os.Create(tmpProcPath)
+	assert.Nilf(t, err, "Could not create cgroup in proc dir")
+
+	cgroupFileTest := `8:pids:/
+7:blkio:/
+6:perf_event:/
+5:devices:/
+4:freezer:/
+3:rdma:/
+2:cpuset,cpu,cpuacct,memory,net_cls,net_prio,hugetlb:/
+1:name=systemd:/`
+
+	_, err = tmpProcPathfp.Write([]byte(cgroupFileTest))
+	assert.Nilf(t, err, "Could not write cgroup file for test")
+	tmpProcPathfp.Close()
+
+	// Test v1
+	version := sys.DetermineCgroupVersion()
+	assert.Equal(t, cgroup_v1, version, "Should be cgroup v1")
+
+	path, err := sys.GetContainerCgroupPath(555, "memory")
+	assert.NotNil(t, err)
+	assert.Equal(t, defaultCgroupStatsPathNotFound, path)
+
+	// Test V2
+	cgroupcontroller := tmpcontrollerpath
+	fp, err := os.Create(cgroupcontroller)
+	if err != nil {
+		t.Fatalf("Could not create tmp file for testing: %s", err.Error())
+	}
+	fp.Close() // We don't need
+
+	version2 := sys.DetermineCgroupVersion()
+	assert.Equal(t, cgroup_v2, version2, "Should be cgroup v1")
+
+	path, err = sys.GetContainerCgroupPath(555, "memory")
+	assert.NotNil(t, err)
+	assert.Equal(t, defaultCgroupStatsPathNotFound, path)
+
+	os.Remove(MemoryPath) // best effort
+	os.Remove(tmpcontrollerpath) // best effort
+	os.Remove(tmpProcPath) // best effort
+	os.Remove(tmpProcDir) // best effort
+
 }

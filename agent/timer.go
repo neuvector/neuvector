@@ -224,9 +224,20 @@ func updateAgentStats(cpuSystem uint64) {
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
-		mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-		cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
+		var uc, um uint64
+
+		// If path isn't set, we're not going to bother.
+		if c.cgroupMemory == "" || c.cgroupCPUAcct == "" {
+			return
+		}
+		if mem, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err == nil {
+			um = mem
+		}
+		if cpu, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err == nil {
+			uc = cpu
+		}
+
+		system.UpdateStats(&c.stats, um, uc, cpuSystem)
 	}
 }
 
