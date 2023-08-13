@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -317,9 +318,10 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 
 	autoscale := systemConfigCache.ScannerAutoscale
 	rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{
-		Strategy: autoscale.Strategy,
-		MinPods:  autoscale.MinPods,
-		MaxPods:  autoscale.MaxPods,
+		Strategy:         autoscale.Strategy,
+		MinPods:          autoscale.MinPods,
+		MaxPods:          autoscale.MaxPods,
+		DisabledByOthers: autoscale.DisabledByOthers,
 	}
 
 	return &rconf
@@ -388,14 +390,14 @@ func (m CacheMethod) GetSystemConfigClusterName(acc *access.AccessControl) strin
 }
 
 func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	var cfg share.CLUSSystemConfig
 	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		json.Unmarshal(value, &cfg)
-		log.WithFields(log.Fields{"config": cfg}).Debug("")
+		log.WithFields(log.Fields{"config": cfg}).Debug()
 
 		if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 			if isLeader() {
@@ -436,7 +438,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		scan.UpdateProxy(&cfg.RegistryHttpProxy, &cfg.RegistryHttpsProxy)
 	}
 
+	var oldSyslogCfg share.CLUSSyslogConfig
+
 	cacheMutexLock()
+	oldSyslogCfg = systemConfigCache.CLUSSyslogConfig
 	systemConfigCache = cfg
 	putInternalIPNetToCluseter(true)
 	cacheMutexUnlock()
@@ -462,7 +467,13 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	defer syslogMutexUnlock()
 
 	if systemConfigCache.SyslogEnable {
-		syslogger = common.NewSyslogger(&systemConfigCache.CLUSSyslogConfig)
+		if !reflect.DeepEqual(oldSyslogCfg, cfg.CLUSSyslogConfig) {
+			if syslogger != nil {
+				syslogger.Close()
+			}
+			syslogger = common.NewSyslogger(&systemConfigCache.CLUSSyslogConfig)
+			log.Info("new syslog applied")
+		}
 	} else if syslogger != nil {
 		syslogger.Close()
 		syslogger = nil
@@ -473,6 +484,9 @@ func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
+	if systemConfigCache.SyslogEnable {
+		syslogger = common.NewSyslogger(&systemConfigCache.CLUSSyslogConfig)
+	}
 	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if cctx.RancherSSO {
 			systemConfigCache.AuthByPlatform = true

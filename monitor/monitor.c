@@ -55,6 +55,7 @@
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
 #define ENV_CSP_ENV            "CSP_ENV"
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
+#define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -70,8 +71,7 @@
 #define ENV_SCANNER_CTRL_PASS   "SCANNER_CTRL_API_PASSWORD"
 
 #define DP_MISS_HB_MAX 60
-#define PROC_SHORT_LIVE_SECOND 8
-#define PROC_SHORT_LIVE_LIMIT  10
+#define PROC_EXIT_LIMIT  10
 
 enum {
     PROC_CTRL = 0,
@@ -98,8 +98,8 @@ typedef struct proc_info_ {
     int active  : 1,
         running : 1;
     pid_t pid;
-    int short_live_count;
     struct timeval start;
+    int exit_count;
     int exit_status;
 } proc_info_t;
 
@@ -413,6 +413,11 @@ static pid_t fork_exec(int i)
             args[a++] = "-csp_pause_interval";
             args[a++] = csp_pause_interval;
         }
+        if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-apc";
+            }
+        }
         args[a] = NULL;
         break;
     case PROC_AGENT:
@@ -492,7 +497,11 @@ static pid_t fork_exec(int i)
             args[a ++] = "-policy_puller";
             args[a ++] = policy_pull_period;
         }
-
+        if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-apc";
+            }
+        }
         args[a] = NULL;
         break;
 
@@ -722,6 +731,7 @@ static void proc_exit_handler(int signal)
             }
 
             g_procs[i].exit_status = exit_status;
+            g_procs[i].exit_count ++;
             g_procs[i].running = false;
         }
     }
@@ -898,6 +908,17 @@ int main (int argc, char **argv)
                           g_procs[i].name, g_procs[i].exit_status, g_procs[i].pid);
 
                     g_procs[i].pid = 0;
+
+                    switch (i) {
+                    case PROC_CTRL:
+                    case PROC_AGENT:
+                    case PROC_DP:
+                        if (g_procs[i].exit_count > PROC_EXIT_LIMIT) {
+                            exit_monitor();
+                            exit(g_procs[i].exit_status & 0xff);
+                        }
+                        break;
+                    }
 
                     if (g_exit_monitor_on_proc_exit == 1) {
                         debug("Process %s exit. Monitor Exit.\n",

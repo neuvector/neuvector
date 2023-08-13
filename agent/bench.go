@@ -290,7 +290,7 @@ func (b *Bench) BenchLoop() {
 			for id, name := range containers {
 				if c, ok := gInfo.activeContainers[id]; ok {
 					if Host.Platform == share.PlatformKubernetes && c.parentNS == "" {
-						continue	// skip kubernetes pod
+						continue // skip kubernetes pod
 					}
 
 					// the service name has not the namespace extension
@@ -309,7 +309,7 @@ func (b *Bench) BenchLoop() {
 			gInfoRLock()
 			for _, c := range gInfo.activeContainers {
 				if Host.Platform == share.PlatformKubernetes && c.parentNS == "" {
-					continue	// skip kubernetes pod
+					continue // skip kubernetes pod
 				}
 				wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 			}
@@ -372,8 +372,6 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 			b.putBenchReport(Host.ID, share.BenchKubeWorker, list, share.BenchStatusFinished)
 		}
 	}
-
-
 
 	return errMaster, errWorker
 }
@@ -717,7 +715,7 @@ func (b *Bench) dockerCheckPrerequisites() error {
 		return fmt.Errorf("Docker bench container template not exist")
 	}
 
-	progs := []string{"awk", "grep", "stat", "docker"}
+	progs := []string{"grep", "stat", "docker"}
 	if err := b.checkRequiredHostProgs(progs); err != nil {
 		return err
 	}

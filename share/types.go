@@ -11,10 +11,11 @@ const CompactCVEDBName = "cvedb.compact"
 const RegularCVEDBName = "cvedb.regular"
 const CVEDatabaseFolder = "/etc/neuvector/db/"
 
-const ProfileFolder string = "/var/neuvector/profile/"
-const ProfileMemoryFileFmt string = ProfileFolder + "%smemory.prof"
-const ProfileGoroutineFileFmt string = ProfileFolder + "%sgoroutine.prof"
-const ProfileCPUFileFmt string = ProfileFolder + "%scpu.prof"
+const ProfileFolder string = "/var/neuvector/profile"
+const SnaphotFolder string = "/var/neuvector/snapshot"
+const ProfileMemoryFileFmt string = "%smemory.prof"
+const ProfileGoroutineFileFmt string = "%sgoroutine.prof"
+const ProfileCPUFileFmt string = "%scpu.prof"
 
 const CustomScriptFailedPrefix string = "Failed to run the custom check"
 

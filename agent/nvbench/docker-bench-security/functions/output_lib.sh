@@ -15,7 +15,7 @@ if [ -n "$nocolor" ] && [ "$nocolor" = "nocolor" ]; then
 fi
 
 logit () {
-  printf "%b\n" "$1" | tee -a "$logger"
+  printf "%b\n" "$1"
 }
 
 info () {
@@ -29,11 +29,11 @@ info () {
     esac
   done
   if [ "$infoCountCheck" = "true" ]; then
-    printf "%b\n" "${bldblu}[INFO]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldblu}[INFO]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     return
   fi
-  printf "%b\n" "${bldblu}[INFO]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldblu}[INFO]${txtrst} $1"
 }
 
 pass () {
@@ -49,14 +49,14 @@ pass () {
     esac
   done
   if [ "$passScored" = "true" ] || [ "$passCountCheck" = "true" ]; then
-    printf "%b\n" "${bldgrn}[PASS]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
   fi
   if [ "$passScored" = "true" ]; then
     currentScore=$((currentScore + 1))
   fi
   if [ "$passScored" != "true" ] && [ "$passCountCheck" != "true" ]; then
-    printf "%b\n" "${bldgrn}[PASS]${txtrst} $1" | tee -a "$logger"
+    printf "%b\n" "${bldgrn}[PASS]${txtrst} $1"
   fi
 }
 
@@ -71,12 +71,12 @@ warn () {
     esac
   done
   if [ "$warnScored" = "true" ]; then
-    printf "%b\n" "${bldred}[WARN]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldred}[WARN]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     currentScore=$((currentScore - 1))
     return
   fi
-  printf "%b\n" "${bldred}[WARN]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldred}[WARN]${txtrst} $1"
 }
 
 note () {
@@ -90,11 +90,11 @@ note () {
     esac
   done
   if [ "$noteCountCheck" = "true" ]; then
-    printf "%b\n" "${bldylw}[NOTE]${txtrst} $2" | tee -a "$logger"
+    printf "%b\n" "${bldylw}[NOTE]${txtrst} $2"
     totalChecks=$((totalChecks + 1))
     return
   fi
-  printf "%b\n" "${bldylw}[NOTE]${txtrst} $1" | tee -a "$logger"
+  printf "%b\n" "${bldylw}[NOTE]${txtrst} $1"
 }
 
 yell () {
@@ -102,42 +102,42 @@ yell () {
 }
 
 beginjson () {
-  printf "{\n  \"dockerbenchsecurity\": \"%s\",\n  \"start\": %s,\n  \"tests\": [" "$1" "$2" | tee "$logger.json" 2>/dev/null 1>&2
+  printf "{\n  \"dockerbenchsecurity\": \"%s\",\n  \"start\": %s,\n  \"tests\": [" "$1" "$2" 2>/dev/null 1>&2
 }
 
 endjson (){
-  printf "\n  ],\n  \"checks\": %s,\n  \"score\": %s,\n  \"end\": %s\n}" "$1" "$2" "$3" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n  ],\n  \"checks\": %s,\n  \"score\": %s,\n  \"end\": %s\n}" "$1" "$2" "$3" 2>/dev/null 1>&2
 }
 
 logjson (){
-  printf "\n  \"%s\": \"%s\"," "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n  \"%s\": \"%s\"," "$1" "$2" 2>/dev/null 1>&2
 }
 
 SSEP=
 SEP=
 startsectionjson() {
-  printf "%s\n    {\n      \"id\": \"%s\",\n      \"desc\": \"%s\",\n      \"results\": [" "$SSEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "%s\n    {\n      \"id\": \"%s\",\n      \"desc\": \"%s\",\n      \"results\": [" "$SSEP" "$1" "$2" 2>/dev/null 1>&2
   SEP=
   SSEP=","
 }
 
 endsectionjson() {
-  printf "\n      ]\n    }" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n      ]\n    }" 2>/dev/null 1>&2
 }
 
 starttestjson() {
-  printf "%s\n        {\n          \"id\": \"%s\",\n          \"desc\": \"%s\",\n          " "$SEP" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "%s\n        {\n          \"id\": \"%s\",\n          \"desc\": \"%s\",\n          " "$SEP" "$1" "$2" 2>/dev/null 1>&2
   SEP=","
 }
 
 log_to_json() {
   if [ $# -eq 1 ]; then
-    printf "\"result\": \"%s\"" "$1" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf "\"result\": \"%s\"" "$1" 2>/dev/null 1>&2
     return
   fi
   if [ $# -eq 2 ] && [ $# -ne 1 ]; then
     # Result also contains details
-    printf "\"result\": \"%s\",\n          \"details\": \"%s\"" "$1" "$2" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf "\"result\": \"%s\",\n          \"details\": \"%s\"" "$1" "$2" 2>/dev/null 1>&2
     return
   fi
   # Result also includes details and a list of items. Add that directly to details and to an array property "items"
@@ -156,7 +156,7 @@ log_to_json() {
     done
   fi
   itemsJson=$(printf "[\n            "; ISEP=""; ITEMCOUNT=0; for item in $truncItems; do printf "%s\"%s\"" "$ISEP" "$item"; ISEP=","; done; printf "\n          ]")
-  printf "\"result\": \"%s\",\n          \"details\": \"%s: %s\",\n          \"items\": %s" "$1" "$2" "$truncItems" "$itemsJson" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\"result\": \"%s\",\n          \"details\": \"%s: %s\",\n          \"items\": %s" "$1" "$2" "$truncItems" "$itemsJson" 2>/dev/null 1>&2
 }
 
 logcheckresult() {
@@ -165,12 +165,12 @@ logcheckresult() {
 
   # Log remediation measure to JSON
   if [ -n "$remediation" ] && [ "$1" != "PASS" ] && [ "$printremediation" = "1" ]; then
-    printf ",\n          \"remediation\": \"%s\"" "$remediation" | tee -a "$logger.json" 2>/dev/null 1>&2
+    printf ",\n          \"remediation\": \"%s\"" "$remediation" 2>/dev/null 1>&2
     if [ -n "$remediationImpact" ]; then
-      printf ",\n          \"remediation-impact\": \"%s\"" "$remediationImpact" | tee -a "$logger.json" 2>/dev/null 1>&2
+      printf ",\n          \"remediation-impact\": \"%s\"" "$remediationImpact" 2>/dev/null 1>&2
     fi
   fi
-  printf "\n        }" | tee -a "$logger.json" 2>/dev/null 1>&2
+  printf "\n        }" 2>/dev/null 1>&2
 
   # Save remediation measure for print log to stdout
   if [ -n "$remediation" ] && [ "$1" != "PASS" ]; then

@@ -697,6 +697,16 @@ func (p *Probe) evaluateRuntimeCmd(proc *procInternal) bool {
 	return false
 }
 
+func truncateStrSlices(strs []string, length int) string {
+	str := strings.Join(strs, " ")
+	if length > 0 {
+		if len(str) > length {
+			str = str[:length]
+			str += "..."
+		}
+	}
+	return str
+}
 
 // Debug purpose:
 func (p *Probe) printProcReport(id string, proc *procInternal) {
@@ -724,7 +734,7 @@ func (p *Probe) printProcReport(id string, proc *procInternal) {
 		"ppath":    proc.ppath,
 		"name":     proc.name,
 		"path":     proc.path,
-		"cmd":      proc.cmds,
+		"cmd":      truncateStrSlices(proc.cmds, 32),
 		"action":   proc.action,
 		"riskType": proc.riskType,
 	}).Debug("PROC:")
@@ -1387,8 +1397,8 @@ func (p *Probe) handleProcUIDChange(pid, ruid, euid int) {
 		proc.user = p.getUserName(pid, euid)
 		proc.ruid = ruid
 		proc.euid = euid
-		log.WithFields(log.Fields{"proc": proc}).Debug("PROC:")
 		if c, ok := p.pidContainerMap[pid]; ok {
+			p.printProcReport(c.id, proc)
 			go p.rootEscalationCheck_uidChange(proc, c)
 		}
 	}
@@ -1907,7 +1917,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		if riskInfo != nil {
 			proc.reported |= suspicReported // do it once
 			if bSkipReport {
-				mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "ppid": proc.ppid, "cmds": proc.cmds}).Debug("PROC: Skip report suspicious application")
+				mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "ppid": proc.ppid, "cmds": truncateStrSlices(proc.cmds, 32)}).Debug("PROC: Skip report suspicious application")
 				return
 			}
 
@@ -2387,7 +2397,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 
 	// NV4856
 	if p.isAllowIpRuntimeCommand(proc.cmds) {
-		mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
+		mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": truncateStrSlices(proc.cmds, 32)}).Debug("PROC:")
 		return true
 	}
 
@@ -2419,7 +2429,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 	if group == share.GroupNVProtect {
 		if p.disableNvProtect {
 			// allowed but output the traces
-			log.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds, "path": proc.path}).Info("")
+			log.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": truncateStrSlices(proc.cmds, 32), "path": proc.path}).Info("")
 			return true
 		}
 
@@ -2427,7 +2437,7 @@ func (p *Probe) isProcessException(proc *procInternal, group, id string, bParent
 			if proc.cmds[0] == "tar" && proc.cmds[1] == "cf" {
 				// from "k8s.io/pkg/kubectl/cmd/cp.go" : copyFromPod()
 				// matched to its exact Command:  []string{"tar", "cf", "-", src.File}
-				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": proc.cmds}).Debug("PROC:")
+				mLog.WithFields(log.Fields{"group": group, "name": proc.name, "cmds": truncateStrSlices(proc.cmds, 32)}).Debug("PROC:")
 				return true
 			}
 		}

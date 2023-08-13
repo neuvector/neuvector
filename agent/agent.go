@@ -275,6 +275,7 @@ func main() {
 	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
 	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
+	autoProfile := flag.Bool("apc", false, "Enable auto profile collection")
 	flag.Parse()
 
 	if *debug {
@@ -317,6 +318,11 @@ func main() {
 	agentEnv.netPolicyPuller = *policy_puller
 	if *policy_puller != 0 {
 		log.WithFields(log.Fields{"period": *policy_puller}).Info("policy pull regulator")
+	}
+
+	if *autoProfile {
+		agentEnv.autoProfieCapture = *autoProfile
+		log.WithFields(log.Fields{"auto-profile": agentEnv.autoProfieCapture}).Info()
 	}
 
 	if *join != "" {

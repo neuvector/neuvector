@@ -526,7 +526,7 @@ func (cs *ControllerService) TriggerSyncLearnedPolicy(ctx context.Context, v *sh
 }
 
 func (cs *ControllerService) ProfilingCmd(ctx context.Context, req *share.CLUSProfilingRequest) (*share.RPCVoid, error) {
-	go utils.PerfProfile(req, "ctl.")
+	go utils.PerfProfile(req, share.ProfileFolder, "ctl.")
 	return &share.RPCVoid{}, nil
 }
 

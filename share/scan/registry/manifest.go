@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -17,8 +16,9 @@ import (
 )
 
 const (
-	MediaTypeOCIManifest = "application/vnd.oci.image.manifest.v1+json"
-	MediaTypeOCIIndex    = "application/vnd.oci.image.index.v1+json"
+	MediaTypeOCIManifest    = "application/vnd.oci.image.manifest.v1+json"
+	MediaTypeOCIIndex       = "application/vnd.oci.image.index.v1+json"
+	MediaTypeContainerImage = "application/vnd.docker.container.image.v1+json"
 
 	MediaTypeOCIMissingManifest = "Accept header does not support OCI manifests"
 	MediaTypeOCIMissingIndex    = "Accept header does not support OCI indexes"
@@ -27,11 +27,11 @@ const (
 type ManifestInfo struct {
 	SignedManifest *manifestV1.SignedManifest
 	Digest         string
-	RunAsRoot      bool
 	Author         string
 	Envs           []string
-	Cmds           []string
 	Labels         map[string]string
+	Cmds           []string
+	EmptyLayers    []bool
 }
 
 type ManifestRequestType int
@@ -115,6 +115,8 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 
 	dg, _ := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
 
+	// log.WithFields(log.Fields{"schema": schema, "body": string(body[:])}).Debug()
+
 	return string(dg), body, nil
 }
 
@@ -124,7 +126,7 @@ func (r *Registry) Manifest(ctx context.Context, repository, reference string) (
 		return nil, err
 	}
 
-	mi, err := r.parseHistory(body)
+	mi, err := parseManifestHistory(body)
 	if err != nil {
 		return nil, err
 	}
@@ -211,13 +213,23 @@ type containerConfig2Data struct {
 	} `json:"Cmd"`
 }
 
-var userRegexp = regexp.MustCompile(`USER \[([a-zA-Z0-9_\-\.]+)\]`)
+type imageHistory struct {
+	Created    time.Time `json:"created"`
+	Author     string    `json:"author,omitempty"`
+	CreatedBy  string    `json:"created_by,omitempty"`
+	Comment    string    `json:"comment,omitempty"`
+	EmptyLayer bool      `json:"empty_layer,omitempty"`
+}
 
-func (r *Registry) parseHistory(body []byte) (*ManifestInfo, error) {
+type imageConfigSpec struct {
+	containerConfigData
+	History []imageHistory `json:"history"`
+}
+
+func parseManifestHistory(body []byte) (*ManifestInfo, error) {
 	var manData manifestData
-	var userFound bool
 
-	info := ManifestInfo{RunAsRoot: true, Labels: make(map[string]string)}
+	info := ManifestInfo{Labels: make(map[string]string)}
 	if err := json.Unmarshal(body, &manData); err == nil {
 		for _, comp := range manData.History {
 			v1com := comp.V1Compatibility
@@ -256,20 +268,56 @@ func (r *Registry) parseHistory(body []byte) (*ManifestInfo, error) {
 			}
 
 			info.Cmds = append(info.Cmds, cmd)
-			if !userFound {
-				r := userRegexp.FindStringSubmatch(cmd)
-				if len(r) == 2 {
-					if r[1] == "root" {
-						info.RunAsRoot = true
-					} else {
-						info.RunAsRoot = false
-					}
-					userFound = true
-				}
-			}
 		}
 	} else {
 		return nil, err
 	}
 	return &info, nil
+}
+
+func (r *Registry) ImageConfigSpecV1(ctx context.Context, repository string, reference digest.Digest) (*ManifestInfo, error) {
+	log.WithFields(log.Fields{"digest": reference}).Debug()
+
+	rd, _, err := r.DownloadLayer(ctx, repository, reference)
+	if err == nil {
+		defer rd.Close()
+		if body, err := ioutil.ReadAll(rd); err == nil {
+			// log.WithFields(log.Fields{"body": string(body[:])}).Debug()
+
+			var ics imageConfigSpec
+			if err = json.Unmarshal(body, &ics); err == nil {
+				info := ManifestInfo{Labels: make(map[string]string)}
+
+				if ics.ContainerConfig.Env != nil {
+					info.Envs = append(info.Envs, ics.ContainerConfig.Env...)
+				} else if ics.Config.Env != nil {
+					info.Envs = append(info.Envs, ics.ContainerConfig.Env...)
+				}
+				if ics.ContainerConfig.Labels != nil {
+					for k, v := range ics.ContainerConfig.Labels {
+						info.Labels[k] = v
+					}
+				} else if ics.Config.Labels != nil {
+					for k, v := range ics.Config.Labels {
+						info.Labels[k] = v
+					}
+				}
+
+				// in reverse order
+				for i := len(ics.History) - 1; i >= 0; i-- {
+					h := &ics.History[i]
+
+					if info.Author == "" {
+						info.Author = h.Author
+					}
+					info.Cmds = append(info.Cmds, h.CreatedBy)
+					info.EmptyLayers = append(info.EmptyLayers, h.EmptyLayer)
+				}
+
+				return &info, nil
+			}
+		}
+	}
+
+	return nil, err
 }

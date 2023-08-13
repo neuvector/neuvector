@@ -80,6 +80,12 @@ type scanTaskInfo struct {
 	info *scanInfo
 }
 
+type tAutoScaleHistory struct {
+	oldReplicas    uint32 // the scanners count before autoscale
+	newReplicas    uint32 // the scanners count after autoscale
+	sameScaleTimes uint32 // how many times we continuously scale with the same from/to replicas values
+}
+
 const maxRetry = 5
 
 var scanCfg share.CLUSScanConfig
@@ -95,6 +101,8 @@ const (
 var scannerReplicas uint32
 var lastTaskQState int = task_Q_Unknown
 var contTaskQStateTime time.Time // start time of the time window for scaling up/down calculation
+
+var autoScaleHistory tAutoScaleHistory
 
 // Within scanMutex, cacheMutex can be used; but not the other way around.
 var scanMutex sync.RWMutex
@@ -1190,10 +1198,55 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 		newReplicas = autoscaleCfg.MaxPods
 	}
 	if newReplicas != totalScanners {
-		if err := resource.UpdateDeploymentReplicates("neuvector-scanner-pod", int32(newReplicas)); err == nil {
-			log.WithFields(log.Fields{"from": totalScanners, "to": newReplicas}).Info("autoscale")
+		skipScale := false
+		thisAutoScale := tAutoScaleHistory{
+			oldReplicas:    totalScanners,
+			newReplicas:    newReplicas,
+			sameScaleTimes: 1,
+		}
+		if autoScaleHistory.sameScaleTimes >= 1 {
+			if thisAutoScale.oldReplicas == autoScaleHistory.oldReplicas && thisAutoScale.newReplicas == autoScaleHistory.newReplicas {
+				// this time we scale using the same from/to replicas values like in last auto-scaling
+				// it implies someone reverted scanner replicas after we set it last time
+				log.WithFields(log.Fields{"from": autoScaleHistory.oldReplicas, "to": autoScaleHistory.newReplicas}).Info("same scaling as the last time")
+				autoScaleHistory.sameScaleTimes += 1
+			} else {
+				autoScaleHistory = thisAutoScale
+			}
+		} else {
+			autoScaleHistory = thisAutoScale
+		}
+		if autoScaleHistory.sameScaleTimes > 4 {
+			// someone reverted scanner replicas 4 times continusously.
+			acc := access.NewAdminAccessControl()
+			if cfg := cacher.GetSystemConfig(acc); cfg.ScannerAutoscale.Strategy != api.AutoScaleNone {
+				log.WithFields(log.Fields{"strategy": cfg.ScannerAutoscale.Strategy}).Info("autoscale disabled")
+				if cconf, rev := clusHelper.GetSystemConfigRev(acc); cconf != nil {
+					cconf.ScannerAutoscale.Strategy = api.AutoScaleNone
+					cconf.ScannerAutoscale.DisabledByOthers = true
+					if err := clusHelper.PutSystemConfigRev(cconf, rev); err == nil {
+						clog := share.CLUSEventLog{
+							Event:      share.CLUSEvScannerAutoScaleDisabled,
+							ReportedAt: time.Now().UTC(),
+						}
+						clog.Msg = "Scanner autoscale is disabled because someone reverted the scaling for 3 continous times."
+						cctx.EvQueue.Append(&clog)
+						skipScale = true
+						log.Info(clog.Msg)
+					} else {
+						log.WithFields(log.Fields{"strategy": cfg.ScannerAutoscale.Strategy}).Info("failed to disabl autoscale")
+					}
+				}
+			}
+			autoScaleHistory = tAutoScaleHistory{}
+		}
+		if !skipScale {
+			if err := resource.UpdateDeploymentReplicates("neuvector-scanner-pod", int32(newReplicas)); err == nil {
+				log.WithFields(log.Fields{"from": totalScanners, "history": autoScaleHistory}).Info("autoscale")
+			}
 		}
 	}
+
 	if setTimeWindow {
 		contTaskQStateTime = time.Now().UTC()
 	}

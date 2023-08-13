@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"strconv"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -216,11 +217,28 @@ func logWorkload(ev share.TLogEvent, wl *share.CLUSWorkload, msg *string) {
 	evqueue.Append(&clog)
 }
 
-var curMemoryPressure uint64
+var snapshotIndex int
+func memorySnapshot(usage uint64) {
+	if agentEnv.autoProfieCapture {
+		log.WithFields(log.Fields{"usage": usage}).Debug()
+		if usage > agentEnv.peakMemoryUsage {
+			agentEnv.peakMemoryUsage = usage + agentEnv.snapshotMemStep  // level up
+			label := "p"  // peak
+			if snapshotIndex < 4 { // keep atmost 4 copies + an extra peak copy
+				snapshotIndex++
+				label = strconv.Itoa(snapshotIndex)
+			}
+			log.WithFields(log.Fields{"label": label, "next": agentEnv.peakMemoryUsage}).Debug()
+			utils.PerfSnapshot(Agent.Pid, agentEnv.memoryLimit, usage, share.SnaphotFolder, Agent.ID, "enf.", label)
+		}
+	}
+}
 
+var curMemoryPressure uint64
 func memoryPressureNotification(rpt *system.MemoryPressureReport) {
-	if rpt.Level > 2 { // cap its maximum
+	if rpt.Level >= 2 { // cap its maximum
 		rpt.Level = 2
+		memorySnapshot(rpt.Stats.WorkingSet)
 	}
 
 	if rpt.Level == curMemoryPressure {

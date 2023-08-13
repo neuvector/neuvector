@@ -50,7 +50,7 @@ check_1_1_2() {
   if command -v getent >/dev/null 2>&1; then
     docker_users=$(getent group docker)
   fi
-  docker_users=$(printf "%s" "$docker_users" | awk -F: '{print $4}')
+  docker_users=$(printf "%s" "$docker_users" | cut -d ":" -f4)
 
   local doubtfulusers=""
   if [ -n "$dockertrustusers" ]; then
@@ -642,7 +642,7 @@ check_1_2_2() {
   starttestjson "$id" "$desc"
 
   docker_version=$(docker version | grep -i -A2 '^server' | grep ' Version:' \
-    | awk '{print $NF; exit}' | tr -d '[:alpha:]-,')
+    | cut -d ":" -f2 | tr -d '[:alpha:][:space:]-,')
   docker_current_version="$(date +%y.%m.0 -d @$(( $(date +%s) - 2592000)))"
   do_version_check "$docker_current_version" "$docker_version"
   if [ $? -eq 11 ]; then

@@ -56,6 +56,7 @@ var nextConnectReportTick uint32 = reportInterval
 
 ///
 const memoryRecyclePeriod uint32 = 10                       // minutes
+const memoryCheckPeriod uint32 = 5                          // minutes
 const memEnforcerMediumPeak uint64 = 3 * 512 * 1024 * 1024  // 1.5 GB
 const memEnforcerTopPeak uint64 = 2 * memEnforcerMediumPeak // 3.0 GB
 const memSafeGap uint64 = 64 * 1024 * 1024                  // 64 MB
@@ -64,15 +65,25 @@ var memStatsEnforcerResetMark uint64 = memEnforcerTopPeak - memSafeGap
 func statsLoop(bPassiveContainerDetect bool) {
 	statsTicker := time.Tick(time.Second * time.Duration(statsInterval))
 	memStatsTicker := time.NewTicker(time.Minute * time.Duration(memoryRecyclePeriod))
+	memCheckTicker := time.NewTicker(time.Minute * time.Duration(memoryCheckPeriod))
+
+	agentEnv.memoryLimit = memEnforcerTopPeak
+	if limit, err := global.SYS.GetContainerMemoryLimitUsage(agentEnv.cgroupMemory); err == nil && limit > 0 {
+		agentEnv.memoryLimit = limit
+	}
+	agentEnv.snapshotMemStep = agentEnv.memoryLimit/10
+	memSnapshotMark := agentEnv.memoryLimit*3/5				// 60% as starting point
+	memStatsEnforcerResetMark = agentEnv.memoryLimit*3/4	// 75% as starting point
+
+	if agentEnv.autoProfieCapture {
+		log.WithFields(log.Fields{"Step": agentEnv.snapshotMemStep, "Snapshot_At": memSnapshotMark}).Info("Memory Snapshots")
+	} else {
+		memCheckTicker.Stop()
+	}
 	if agentEnv.runWithController { // effctive by the enforcer alone
 		memStatsTicker.Stop()
 	} else {
-		if limit, err := global.SYS.GetContainerMemoryLimitUsage(agentEnv.cgroupMemory); err == nil {
-			if limit/2 > memSafeGap {
-				memStatsEnforcerResetMark = limit/2 - memSafeGap
-			}
-			log.WithFields(log.Fields{"Limit": limit, "Controlled_At": memStatsEnforcerResetMark}).Info("Memory Resource")
-		}
+		log.WithFields(log.Fields{"Controlled_Limit": agentEnv.memoryLimit, "Controlled_At": memStatsEnforcerResetMark}).Info("Memory Resource")
 		go global.SYS.MonitorMemoryPressureEvents(memStatsEnforcerResetMark, memoryPressureNotification)
 	}
 
@@ -127,14 +138,19 @@ func statsLoop(bPassiveContainerDetect bool) {
 			creates.Clear()
 			gone, creates = nil, nil
 		case <-memStatsTicker.C:
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			agentMem := m.TotalAlloc
-			cgroupMem, _ := global.SYS.GetContainerMemoryUsage(agentEnv.cgroupMemory)
-			if cgroupMem > memEnforcerMediumPeak && ((cgroupMem - agentMem) > 2*agentMem) { // the gap is greater
-				global.SYS.ReCalculateMemoryMetrics(memEnforcerMediumPeak)
-			} else {
-				global.SYS.ReCalculateMemoryMetrics(memStatsEnforcerResetMark)
+			if mStats, err := global.SYS.GetContainerMemoryStats(); err == nil && mStats.WorkingSet > memStatsEnforcerResetMark {
+				var m runtime.MemStats
+				runtime.ReadMemStats(&m)
+				agentMem := m.TotalAlloc
+				if mStats.WorkingSet > memEnforcerMediumPeak && ((mStats.WorkingSet - agentMem) > 2*agentMem) { // the gap is greater
+					global.SYS.ReCalculateMemoryMetrics(memEnforcerMediumPeak)
+				} else {
+					global.SYS.ReCalculateMemoryMetrics(memStatsEnforcerResetMark)
+				}
+			}
+		case <-memCheckTicker.C:
+			if mStats, err := global.SYS.GetContainerMemoryStats(); err == nil && mStats.WorkingSet > memSnapshotMark {
+				memorySnapshot(mStats.WorkingSet)
 			}
 		}
 	}
@@ -547,7 +563,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 			fqdn = name
 		}
 	}
-	
+
 	return &share.CLUSConnection{
 		AgentID:      c.AgentID,
 		HostID:       c.HostID,
