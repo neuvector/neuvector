@@ -1996,7 +1996,11 @@ func auditSuppressSetIdRpts(rlog *api.Audit) {
 func checkDefAdminPwd(throttleMinutes uint) {
 	acc := access.NewReaderAccessControl()
 	if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, acc); u != nil {
-		if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
+		defaultPass := false
+		if common.IsBootstrapAdminPassHash(u.PasswordHash) {
+			defaultPass = true
+		}
+		if defaultPass {
 			var evtsTime share.CLUSThrottledEvents
 			id := share.CLUSEvAuthDefAdminPwdUnchanged
 			key := share.CLUSThrottledEventStore + "events"
