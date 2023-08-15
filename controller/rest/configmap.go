@@ -411,7 +411,7 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		return
 	}
 
-	if user.PasswordHash != utils.HashPassword(common.DefaultAdminPass) {
+	if !common.IsBootstrapAdminPassHash(user.PasswordHash) {
 		e := "already updated"
 		log.WithFields(log.Fields{"Password of": common.DefaultAdminUser}).Error(e)
 		return
@@ -471,7 +471,10 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 	}
 
 	if profile.EnablePwdHistory && profile.PwdHistoryCount > 0 {
-		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil, &profile); weak {
+		if common.IsBootstrapAdminPass(ruser.Password) {
+			log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error("default admin pass is used.")
+			return
+		} else if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, "", nil, &profile); weak {
 			log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
 			return
 		} else {

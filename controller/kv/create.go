@@ -12,7 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -39,7 +39,7 @@ func createDefaultAdminUser() {
 	admin := share.CLUSUser{
 		Fullname:     common.DefaultAdminUser,
 		Username:     common.DefaultAdminUser,
-		PasswordHash: utils.HashPassword(common.DefaultAdminPass),
+		PasswordHash: utils.HashPassword(common.GetBootstrapAdminPass()),
 		Domain:       "",
 		Role:         api.UserRoleAdmin,
 		Timeout:      common.DefaultIdleTimeout,
@@ -873,7 +873,7 @@ func CreateDefaultFedGroups() {
 	}
 }
 
-//compress for existing rulelist pre-3.2.1 and 3.2.1
+// compress for existing rulelist pre-3.2.1 and 3.2.1
 func CompressPolicyRuleList() {
 	//since 3.2.1 rulelist key is changed to
 	//CLUSPolicyZipRuleListKey from

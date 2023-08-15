@@ -1135,8 +1135,10 @@ func rsaReadKeys(certFile, keyFile string) (error, *rsa.PublicKey, *rsa.PrivateK
 
 func jwtReadKeys() error {
 	var err error
-	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
+	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultJWTCertFile, defaultJWTKeyFile)
 	if err != nil {
+		log.WithError(err).Info("failed to open default jwt keys, falling back...")
+		err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
 		return err
 	}
 
@@ -2056,7 +2058,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 		if role == "admin" || role == "fedAdmin" {
 			if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll); u != nil {
-				if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
+				if common.IsBootstrapAdminPassHash(u.PasswordHash) {
 					defaultPW = true
 				}
 			}
@@ -2187,7 +2189,8 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			}
 		}
 
-		if username == common.DefaultAdminUser && auth.Password.Password == common.DefaultAdminPass {
+		if username == common.DefaultAdminUser &&
+			common.IsBootstrapAdminPass(auth.Password.Password) {
 			defaultPW = true
 		}
 		mainSessionID = _interactiveSessionID
@@ -2430,7 +2433,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 			return
 		}
 
-		if username == common.DefaultAdminUser && data.Password.Password == common.DefaultAdminPass {
+		if username == common.DefaultAdminUser && common.IsBootstrapAdminPass(data.Password.Password) {
 			defaultPW = true
 		}
 	} else if data.Token != nil {

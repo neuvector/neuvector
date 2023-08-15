@@ -215,7 +215,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 func user2REST(user *share.CLUSUser) *api.RESTUser {
 	var defaultPW bool
-	if user.Fullname == common.DefaultAdminUser && user.PasswordHash == utils.HashPassword(common.DefaultAdminPass) {
+	if user.Fullname == common.DefaultAdminUser && common.IsBootstrapAdminPassHash(user.PasswordHash) {
 		defaultPW = true
 	}
 	return &api.RESTUser{
