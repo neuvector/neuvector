@@ -82,7 +82,7 @@ int count_cpu(void)
     }
 
     ret = fscanf(fp, "%d", &n);
-    fclose(fp);
+    pclose(fp);
 
     return ret > 0 ? n : 1;
 }
