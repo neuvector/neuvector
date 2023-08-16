@@ -43,7 +43,7 @@ check_6_2() {
   local check="$id - $desc"
   starttestjson "$id" "$desc"
 
-  total_containers=$(docker info 2>/dev/null | grep "Containers" | cut -d " " -f 2)
+  total_containers=$(docker info 2>/dev/null | grep "Containers" | trimspaces | cut -d " " -f 2)
   running_containers=$(docker ps -q | wc -l | cut -d " " -f 1)
   diff="$((total_containers - running_containers))"
   info -c "$check"
