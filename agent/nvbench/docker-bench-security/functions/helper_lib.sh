@@ -148,3 +148,16 @@ yell "# ------------------------------------------------------------------------
 # Based on the CIS Docker Benchmark 1.3.1.
 # --------------------------------------------------------------------------------------------"
 }
+
+trimspaces() {
+	local in=$1; if [ -z "$in" ]; then read in; fi
+	# Strip leading spaces.
+    while [[ $in == ' '* ]]; do
+       in="${in## }"
+    done
+    # Strip trailing spaces.
+    while [[ $in == *' ' ]]; do
+        in="${in%% }"
+    done
+	echo $in
+}
