@@ -74,8 +74,13 @@ func statsLoop(bPassiveContainerDetect bool) {
 	agentEnv.snapshotMemStep = agentEnv.memoryLimit/10
 	memSnapshotMark := agentEnv.memoryLimit*3/5				// 60% as starting point
 	memStatsEnforcerResetMark = agentEnv.memoryLimit*3/4	// 75% as starting point
+	if agentEnv.autoProfieCapture > 1 {
+		var mark uint64 = (uint64)(agentEnv.autoProfieCapture * 1024 * 1024) // into mega bytes
+		memSnapshotMark = mark * 3/5
+		agentEnv.snapshotMemStep = mark/10
+	}
 
-	if agentEnv.autoProfieCapture {
+	if agentEnv.autoProfieCapture > 0 {
 		log.WithFields(log.Fields{"Step": agentEnv.snapshotMemStep, "Snapshot_At": memSnapshotMark}).Info("Memory Snapshots")
 	} else {
 		memCheckTicker.Stop()
