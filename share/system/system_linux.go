@@ -712,14 +712,6 @@ func (s *SystemTools) IsOpenshift() (bool, error) {
 	return false, nil
 }
 
-func (s *SystemTools) KillCommandSubtree(pgid int, info string) {
-	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-		log.WithFields(log.Fields{"pgid": pgid, "error": err}).Debug("TOOLP: can not signal")
-	} else {
-		log.WithFields(log.Fields{"pgid": pgid}).Debug("TOOLP:")
-	}
-}
-
 //return true if file size over limit
 func (s *SystemTools) NsGetFile(filePath string, pid int, binary bool, start, len int) ([]byte, error) {
 	var errb bytes.Buffer
