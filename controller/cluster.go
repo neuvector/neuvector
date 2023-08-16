@@ -230,7 +230,7 @@ func logController(ev share.TLogEvent) {
 
 var snapshotIndex int
 func memorySnapshot(usage uint64) {
-	if ctrlEnv.autoProfieCapture {
+	if ctrlEnv.autoProfieCapture > 0 {
 		log.WithFields(log.Fields{"usage": usage}).Debug()
 		if usage > ctrlEnv.peakMemoryUsage {
 			ctrlEnv.peakMemoryUsage = usage + ctrlEnv.snapshotMemStep  // level up
@@ -240,7 +240,7 @@ func memorySnapshot(usage uint64) {
 				label = strconv.Itoa(snapshotIndex)
 			}
 			log.WithFields(log.Fields{"label": label, "next": ctrlEnv.peakMemoryUsage}).Debug()
-			utils.PerfSnapshot(1, ctrlEnv.memoryLimit, usage, share.SnaphotFolder, Ctrler.ID, "ctl.", label)
+			utils.PerfSnapshot(1, ctrlEnv.memoryLimit, ctrlEnv.autoProfieCapture, usage, share.SnaphotFolder, Ctrler.ID, "ctl.", label)
 		}
 	}
 }

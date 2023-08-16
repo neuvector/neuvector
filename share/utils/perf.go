@@ -77,15 +77,17 @@ func PerfProfile(req *share.CLUSProfilingRequest, folder, prefix string) {
 ////////////////////////////////////////////////////////////
 var lastSnapshot time.Time
 const snapshotWindow = time.Duration(time.Minute * 5)
-func PerfSnapshot(pid int, memLimit, usage uint64, folder, cid, prefix, label string) {
+func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, prefix, label string) {
 	type snapshotData struct {
-		RecordedAt      time.Time
-		MemoryLimit     uint64
-		WorkingMemory   uint64
-		MemPercentage   int
-		Cid             string
-		Lsof            []string
-		Ps              []string
+		RecordedAt        time.Time
+		MemoryLimit       uint64
+		WorkingMemory     uint64
+		MemPercentage     int
+		ProfileLimit      uint64
+		ProfilePercentage int
+		Cid               string
+		Lsof              []string
+		Ps                []string
 	}
 
 	if time.Since(lastSnapshot) < snapshotWindow {
@@ -96,23 +98,35 @@ func PerfSnapshot(pid int, memLimit, usage uint64, folder, cid, prefix, label st
 	lastSnapshot = time.Now()
 	go func() {
 		workFolder := filepath.Join(folder, cid) // add cid to avoid the collision in the PV
-		log.WithFields(log.Fields{"pid": pid, "memLimit": memLimit, "workingSet": usage, "workFolder": workFolder, "prefix": prefix, "label": label, "at": lastSnapshot}).Info()
+		log.WithFields(log.Fields{"pid": pid, "memLimit": memLimit, "profileLimit": profileLimit, "workingSet": usage, "workFolder": workFolder, "prefix": prefix, "label": label, "at": lastSnapshot}).Info()
 		mem_percentage := -1
 		if memLimit > 0 {
 			mem_percentage = (int)(usage * 100 / memLimit)
+		}
+
+		var pLimit uint64
+		var profile_percentage int
+		if profileLimit <= 1 { // sync with the memLimit
+			pLimit = profileLimit
+			profile_percentage = mem_percentage
+		} else {
+			pLimit = profileLimit * 1024 * 1024
+			profile_percentage = (int)(usage * 100 / pLimit)
 		}
 
 		// get auxiliary data
 		lsof, _ := sh.Command("lsof", "+D", "/usr/local/bin").Output()
 		ps, _ := sh.Command("ps", "-o", "%cpu,pid,ppid,pgid,vsz,rss,ni,comm", "-g", strconv.Itoa(pid)).Output()
 		data := snapshotData {
-			RecordedAt:    lastSnapshot,
-			MemoryLimit:   memLimit,
-			WorkingMemory: usage,
-			MemPercentage: mem_percentage,
-			Cid:           cid,
-			Lsof:          strings.Split(string(lsof), "\n"),
-			Ps:            strings.Split(string(ps), "\n"),
+			RecordedAt:        lastSnapshot,
+			MemoryLimit:       memLimit,
+			WorkingMemory:     usage,
+			MemPercentage:     mem_percentage,
+			ProfileLimit:      pLimit,
+			ProfilePercentage: profile_percentage,
+			Cid:               cid,
+			Lsof:              strings.Split(string(lsof), "\n"),
+			Ps:                strings.Split(string(ps), "\n"),
 		}
 		file, _ := json.MarshalIndent(data, "", " ")
 
