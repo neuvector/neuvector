@@ -325,7 +325,7 @@ func (h *nvCrdHandler) crdDeleteRules(delRules map[string]uint32) {
 			crhsNew = append(crhsNew, crh)
 		}
 	}
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
+	clusHelper.PutPolicyRuleListTxn(txn, crhsNew)
 	txn.Apply()
 }
 
