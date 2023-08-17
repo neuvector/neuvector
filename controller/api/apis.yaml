@@ -7582,8 +7582,8 @@ definitions:
         items:
           type: integer
           format: uint32
-          example:
-            - 1234
+        example:
+          - 1234
   RESTPolicyRuleConfig:
     type: object
     required:
@@ -8271,7 +8271,7 @@ definitions:
         type: boolean
         example: false
       no_telemetry_report:
-        type: string
+        type: boolean
         example: false
   RESTPwdProfile:
     type: object
