@@ -243,15 +243,17 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 				signed = true
 			}*/
 
-			if len(manV1.Envs) > 0 {
+			// Prefer data from manifest v2, in some image, cmds in manV1 has incomplete data
+			if len(imageInfo.Envs) == 0 {
 				imageInfo.Envs = manV1.Envs
 			}
-			if len(manV1.Cmds) > 0 {
+			if len(imageInfo.Cmds) == 0 {
 				imageInfo.Cmds = manV1.Cmds
 			}
-			if len(manV1.Labels) > 0 {
+			if len(imageInfo.Labels) == 0 {
 				imageInfo.Labels = manV1.Labels
 			}
+			// Prefer Author from manifest v1
 			if manV1.Author != "" {
 				imageInfo.Author = manV1.Author
 			}
@@ -268,6 +270,9 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
 	}
 
+	for i, c := range imageInfo.Cmds {
+		imageInfo.Cmds[i] = NormalizeImageCmd(c)
+	}
 	runAsRoot, _, _ := ParseImageCmds(imageInfo.Cmds)
 	imageInfo.RunAsRoot = runAsRoot
 
