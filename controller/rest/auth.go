@@ -137,6 +137,16 @@ const loginTypeApikey int = 1
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
 
+var installID *string
+
+func GetInstallationID() string {
+	if installID == nil {
+		id, _ := clusHelper.GetInstallationID()
+		installID = &id
+	}
+	return *installID
+}
+
 // With userMutex locked when calling this because it does loginSession lookup first
 func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (*loginSession, int) {
 	s := &loginSession{
@@ -671,7 +681,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	if !ok {
 		if claims.MainSessionID == "" || strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) { // meaning it's not a master token issued by master cluster
 			// Check if the token is from the same "installation"
-			installID, _ := clusHelper.GetInstallationID()
+			installID := GetInstallationID()
 			if installID != claims.Subject {
 				log.Debug("Token from different installation")
 				return nil, userTimeout, rsessToken
@@ -1227,7 +1237,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var tokenString string
 	var publicKey *rsa.PublicKey
 
-	installID, _ := clusHelper.GetInstallationID()
+	installID := GetInstallationID()
 
 	if secret == "" {
 		tokenString = utils.DecryptUserToken(encryptedToken, []byte(installID))
@@ -1306,7 +1316,7 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 
 func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (string, string, *tokenClaim) {
 	id := utils.GetRandomID(idLength, "")
-	installID, _ := clusHelper.GetInstallationID()
+	installID := GetInstallationID()
 	now := time.Now()
 	c := tokenClaim{
 		Remote:          remote,
