@@ -137,6 +137,16 @@ const loginTypeApikey int = 1
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
 
+var installID *string
+
+func GetInstallationID() string {
+	if installID == nil {
+		id, _ := clusHelper.GetInstallationID()
+		installID = &id
+	}
+	return *installID
+}
+
 // With userMutex locked when calling this because it does loginSession lookup first
 func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (*loginSession, int) {
 	s := &loginSession{
@@ -671,7 +681,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	if !ok {
 		if claims.MainSessionID == "" || strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) { // meaning it's not a master token issued by master cluster
 			// Check if the token is from the same "installation"
-			installID, _ := clusHelper.GetInstallationID()
+			installID := GetInstallationID()
 			if installID != claims.Subject {
 				log.Debug("Token from different installation")
 				return nil, userTimeout, rsessToken
@@ -1217,13 +1227,18 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 	}
 }
 
+// Validate a JWT token.
+// If secret is not specified, default secret and default JWT key will be used.
+// If secret is specified, specified secret and rsaPublicKey/FedJoint JWT key will be used.
 func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey) (*tokenClaim, error) {
 	// rsaPublicKey being non-nil is for validating new public/private keys purpose
 	var tokenString string
 	var publicKey *rsa.PublicKey
 
+	installID := GetInstallationID()
+
 	if secret == "" {
-		tokenString = utils.DecryptUserToken(encryptedToken)
+		tokenString = utils.DecryptUserToken(encryptedToken, []byte(installID))
 	} else {
 		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
@@ -1299,7 +1314,7 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 
 func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (string, string, *tokenClaim) {
 	id := utils.GetRandomID(idLength, "")
-	installID, _ := clusHelper.GetInstallationID()
+	installID := GetInstallationID()
 	now := time.Now()
 	c := tokenClaim{
 		Remote:          remote,
@@ -1329,9 +1344,11 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 		}
 	}
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
+
+	// Validate token
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, _ := token.SignedString(jwtPrivateKey)
-	return id, utils.EncryptUserToken(tokenString), &c
+	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
