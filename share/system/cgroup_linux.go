@@ -623,6 +623,7 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		mStats.Stats[t] = v
 	}
 	mStats.Cache = mStats.Stats["cache"]
+	var inactiveFileKeyName string
 
 	switch s.cgroupVersion {
 	case cgroup_v1:
@@ -646,6 +647,7 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 				}
 			}
 		}
+		inactiveFileKeyName = "total_inactive_file"
 	case cgroup_v2:
 		if usage, err := getCgroupParamUint(path, "memory.current"); err == nil {
 			mStats.Usage.Usage = usage
@@ -656,11 +658,23 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 		if usageMax, err := getCgroupParamUint(path, "memory.max"); err == nil {
 			mStats.Usage.Limit = usageMax
 		}
+		inactiveFileKeyName = "inactive_file"
 	default:
 		return errUnsupported
 	}
 
-	mStats.WorkingSet = mStats.Usage.Usage
+	// update working set data
+	// from cAdvisor: The amount of working set memory, this includes recently accessed memory,
+	// dirty memory, and kernel memory. Working set is <= "usage". (Bytes)
+	workingSet := mStats.Usage.Usage
+	if v, ok := mStats.Stats[inactiveFileKeyName]; ok {
+		if workingSet < v {
+			workingSet = 0
+		} else {
+			workingSet -= v
+		}
+	}
+	mStats.WorkingSet = workingSet
 	return nil
 }
 
