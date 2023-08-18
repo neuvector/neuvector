@@ -1219,13 +1219,18 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 	}
 }
 
+// Validate a JWT token.
+// If secret is not specified, default secret and default JWT key will be used.
+// If secret is specified, specified secret and rsaPublicKey/FedJoint JWT key will be used.
 func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey) (*tokenClaim, error) {
 	// rsaPublicKey being non-nil is for validating new public/private keys purpose
 	var tokenString string
 	var publicKey *rsa.PublicKey
 
+	installID, _ := clusHelper.GetInstallationID()
+
 	if secret == "" {
-		tokenString = utils.DecryptUserToken(encryptedToken)
+		tokenString = utils.DecryptUserToken(encryptedToken, []byte(installID))
 	} else {
 		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
@@ -1331,9 +1336,11 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 		}
 	}
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
+
+	// Validate token
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, _ := token.SignedString(jwtPrivateKey)
-	return id, utils.EncryptUserToken(tokenString), &c
+	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
