@@ -81,6 +81,7 @@ type NvSecurityParse struct {
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
+	Uid               string                         // Metadata.Uid from AdmissionReview request
 }
 
 type NvSecurityTarget struct {
