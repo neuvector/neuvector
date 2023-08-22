@@ -1762,13 +1762,12 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		// 4. Delete all existing policies that refer to the target group and import all policies.
 		// ---------------------------------------------------
 		// [1]: parse all security rules in the yaml file
-		for i, secRule := range secRules {
+		for _, secRule := range secRules {
 			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
 				continue
 			}
 			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
-				err = fmt.Errorf("Break from document #%d(target group %s) in the yaml because of parsing error.\n%s",
-					i, grpCfgRet.TargetName, errMsg)
+				err = fmt.Errorf(errMsg)
 				break
 			} else {
 				log.WithFields(log.Fields{"target": grpCfgRet.TargetName, "len": len(grpCfgRet.GroupCfgs)}).Debug()
