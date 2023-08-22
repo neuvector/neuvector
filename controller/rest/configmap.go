@@ -814,7 +814,11 @@ func k8sResourceLog(ev share.TLogEvent, msg string, detail []string) {
 		Event:      ev,
 		ReportedAt: time.Now().UTC(),
 	}
-	clog.Msg = fmt.Sprintf("%s :\n %s", msg, strings.Join(detail[:], "\n."))
+	if len(detail) > 0 {
+		clog.Msg = fmt.Sprintf("%s :\n.  %s", msg, strings.Join(detail[:], "\n.  "))
+	} else {
+		clog.Msg = msg
+	}
 	evqueue.Append(&clog)
 }
 
