@@ -1211,14 +1211,25 @@ func fillContainerProperties(c *containerData, parent *containerData,
 
 	if _, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
 		log.WithFields(log.Fields{"cgroupMemory": c.cgroupMemory, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get memory stats.")
+		c.cgroupMemory, _ = global.SYS.FallbackContainerStatsPaths(info.Pid, "memory")
 
-		c.cgroupMemory = ""
-
+		// Try the fallback
+		if _, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
+			log.WithFields(log.Fields{"cgroupMemory": c.cgroupMemory, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get memory stats using fallback.")
+			c.cgroupMemory = ""
+		}
 	}
 	if _, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
-		log.WithFields(log.Fields{"cgroupMemory": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get CPU stats.")
-		c.cgroupCPUAcct = ""
+		log.WithFields(log.Fields{"cgroupCPUAcct": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get CPU stats.")
+		c.cgroupCPUAcct, _ = global.SYS.FallbackContainerStatsPaths(info.Pid, "cpuacct")
+
+		// Try the fallback
+		if _, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
+			log.WithFields(log.Fields{"cgroupCPUAcct": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get CPU stats using fallback.")
+			c.cgroupCPUAcct = ""
+		}
 	}
+	log.WithFields(log.Fields{"pid": info.Pid, "cgroupMemory": c.cgroupMemory, "c.cgroupCPUAcct": c.cgroupCPUAcct}).Debug("Cgroup path is complete")
 
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true

@@ -321,8 +321,8 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		message := log.WithFields(log.Fields{"path": path, "pid": pid, "error": err}).Message
-		return message, nil
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
 	}
 	defer f.Close()
 
@@ -516,9 +516,9 @@ func getMemoryData(path, name string) (MemoryData, error) {
 
 //
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
-
 	if path == "" {
-		return nil
+		// Skip because its not a valid path and we'll throw a lot of logs
+		return errors.New("Unsupported path")
 	}
 
 	// Set stats from memory.stat.
@@ -1209,4 +1209,65 @@ func (s *SystemTools) ReCalculateMemoryMetrics(threshold uint64) {
 // cgroup v2 is a unified file system, it does not have the memory folder
 func (s *SystemTools) GetCgroupVersion() int {
 	return s.cgroupVersion
+}
+
+
+// CgroupRelativePathFix - Applies fixes for cgroup files with certain types of paths
+func CgroupRelativePathFix(path string) (string) {
+
+	if strings.Contains(path, "/..") {
+		// I can't find the documentation why the cgroup file will hold relative paths. For now, I'm applying these
+		// fixes as we encounter them. Documentation on this behaviour would make this code more robust.
+		// Example: 0::/../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope
+
+		path  = filepath.Clean(path)
+		if strings.Contains(path, "kubepods-pod") {
+			path = filepath.Join("/kubepods.slice", path)
+		} else if strings.Contains(path, "kubepods-besteffort") {
+			path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
+		} else if strings.Contains(path, "kubepods-burstable") {
+			path = filepath.Join("/kubepods.slice", path)
+		}
+	}
+	return path
+}
+
+// If the normal way to resolve the path doesn't work, fallback to this emergency mode
+func  (s *SystemTools) FallbackContainerStatsPaths(pid int, subsystem string) (string, error) {
+	var path string
+	path = filepath.Join("/proc/1/root/proc/", strconv.Itoa(pid), "cgroup")
+	log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "path": path}).Error("Checking cgroup file")
+
+
+	// Open cgroup file
+	f, err := os.Open(path)
+	if err != nil {
+		message := log.WithFields(log.Fields{"path": path, "pid": pid, "error": err}).Message
+		return message, err
+	}
+	defer f.Close()
+
+	cpath := ""
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		tokens := strings.Split(scanner.Text(), ":")
+		// Note that we're ignoring the subsystem, just grab the first valid line
+		if len(tokens) > 2 {
+			cpath = CgroupRelativePathFix(tokens[2])
+			switch s.cgroupVersion{
+			case cgroup_v2:
+				cpath = filepath.Join("/proc/1/root/sys/fs/cgroup", cpath)
+				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Error("Created fallback path v2")
+				return cpath, nil
+			case cgroup_v1:
+				fallthrough
+			default:
+				cpath = filepath.Join("/proc/1/root/sys/fs/cgroup",subsystem, cpath)
+				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Error("Created fallback path v2")
+				return cpath, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf(log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Message)
 }
