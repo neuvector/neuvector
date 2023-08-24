@@ -229,8 +229,22 @@ func updateAgentStats(cpuSystem uint64) {
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
-		mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-		cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+		var mem, cpu uint64 = 0, 0
+		var err error
+
+		if c.cgroupMemory != "" {
+			mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
+			if err != nil {
+				log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "cgroupMemory": c.cgroupMemory, "error": err}).Warning("Memory stats not found")
+			}
+		}
+		if c.cgroupCPUAcct != "" {
+			cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+			if err != nil {
+				log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "cgroupCPUAcct": c.cgroupCPUAcct, "error": err}).Warning("CPU stats not found")
+			}
+		}
+
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
 }
