@@ -521,8 +521,8 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
+			message := log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Message
+			return fmt.Errorf(message)
 		}
 		return err
 	}
