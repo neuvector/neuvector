@@ -1232,42 +1232,47 @@ func CgroupRelativePathFix(path string) (string) {
 	return path
 }
 
-// If the normal way to resolve the path doesn't work, fallback to this emergency mode
-func  (s *SystemTools) FallbackContainerStatsPaths(pid int, subsystem string) (string, error) {
-	var path string
-	path = filepath.Join("/proc/1/root/proc/", strconv.Itoa(pid), "cgroup")
-	log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "path": path}).Error("Checking cgroup file")
-
-
-	// Open cgroup file
-	f, err := os.Open(path)
-	if err != nil {
-		message := log.WithFields(log.Fields{"path": path, "pid": pid, "error": err}).Message
-		return message, err
-	}
-	defer f.Close()
-
+// Parses the proc/pid/cgroup file and determines the paths for stats
+func (s *SystemTools)  parseFallbackProcCgroupFileStats(f io.ReadSeeker, pid int, subsystem string) (string, error) {
 	cpath := ""
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
 		// Note that we're ignoring the subsystem, just grab the first valid line
 		if len(tokens) > 2 {
+			// Fix the paths for exceptional cases
 			cpath = CgroupRelativePathFix(tokens[2])
 			switch s.cgroupVersion{
 			case cgroup_v2:
 				cpath = filepath.Join("/proc/1/root/sys/fs/cgroup", cpath)
-				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Error("Created fallback path v2")
+				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Debug("Created fallback path v2")
 				return cpath, nil
 			case cgroup_v1:
 				fallthrough
 			default:
 				cpath = filepath.Join("/proc/1/root/sys/fs/cgroup",subsystem, cpath)
-				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Error("Created fallback path v2")
+				log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Debug("Created fallback path v2")
 				return cpath, nil
 			}
 		}
 	}
-
 	return "", fmt.Errorf(log.WithFields(log.Fields{"pid": pid, "subsystem": subsystem, "cpath": cpath}).Message)
+}
+
+// If the normal way to resolve the path doesn't work, fallback to this emergency mode
+func  (s *SystemTools) FallbackContainerStatsPaths(pid int, subsystem string) (string, error) {
+	var path string
+
+	// Container must be using host's pid 1
+	path = filepath.Join("/proc/1/root/proc/", strconv.Itoa(pid), "cgroup")
+
+	// Open cgroup file
+	f, err := os.Open(path)
+	if err != nil {
+		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		return "", err
+	}
+	defer f.Close()
+
+	return s.parseFallbackProcCgroupFileStats(f, pid, subsystem)
 }
