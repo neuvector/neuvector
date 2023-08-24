@@ -1046,7 +1046,7 @@ func TestDockerK8s_CPath_SelfProbe_Cgroupv2(t *testing.T) {
 	`
 	r := strings.NewReader(cgroup)
 	path := getCgroupPathReaderV2(r)
-	if path != "/sys/fs/cgroup" {
+	if path != "" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
 }
@@ -1060,7 +1060,7 @@ func TestDockerK8s_CPath_Container_Cgroupv2(t *testing.T) {
 	`
 	r := strings.NewReader(cgroup)
 	path := getCgroupPathReaderV2(r) // it is not inside the container
-	if path != "/sys/fs/cgroup" {
+	if path != "" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
 }

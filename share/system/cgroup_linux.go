@@ -307,7 +307,7 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			}
 		}
 	}
-	return "/sys/fs/cgroup"
+	return ""
 }
 
 // cgroup v2 is collected inside an unified file folder
@@ -321,10 +321,10 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
-		return "", err
+		message := log.WithFields(log.Fields{"path": path, "pid": pid, "error": err}).Message
+		return message, nil
 	}
-	defer 	f.Close()
+	defer f.Close()
 
 	cpath := getCgroupPathReaderV2(f)
 
@@ -516,6 +516,11 @@ func getMemoryData(path, name string) (MemoryData, error) {
 
 //
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
+
+	if path == "" {
+		return nil
+	}
+
 	// Set stats from memory.stat.
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
