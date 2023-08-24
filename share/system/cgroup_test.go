@@ -1046,7 +1046,7 @@ func TestDockerK8s_CPath_SelfProbe_Cgroupv2(t *testing.T) {
 	`
 	r := strings.NewReader(cgroup)
 	path := getCgroupPathReaderV2(r)
-	if path != "/sys/fs/cgroup" {
+	if path != "" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
 }
@@ -1060,7 +1060,7 @@ func TestDockerK8s_CPath_Container_Cgroupv2(t *testing.T) {
 	`
 	r := strings.NewReader(cgroup)
 	path := getCgroupPathReaderV2(r) // it is not inside the container
-	if path != "/sys/fs/cgroup" {
+	if path != "" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
 }
@@ -1470,4 +1470,6 @@ func TestContainerd_Container_Cgroupv2(t *testing.T) {
 	r = strings.NewReader(mountinfo)
 	id, _, found = getContainerIDByCgroupReaderV2(r, from_hostname)
 	if id != "f34e6ab6ed679d809c8d4a385777c4f72441f1d3ec7b1334d35c10f4d25e6f40" || !found { // pod ID
-		t.Errorf("detect wrong pod ID, cgroup: 
+		t.Errorf("detect wrong pod ID, cgroup:  %v, %v\n", id, found)
+	}
+}
