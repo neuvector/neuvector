@@ -1208,6 +1208,16 @@ func fillContainerProperties(c *containerData, parent *containerData,
 	}
 	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
 	c.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+
+	if _, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
+		log.WithFields(log.Fields{"cgroupMemory": c.cgroupMemory, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get memory stats.")
+		c.cgroupMemory = ""
+
+	}
+	if _, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
+		log.WithFields(log.Fields{"cgroupMemory": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get CPU stats.")
+		c.cgroupCPUAcct = ""
+	}
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()

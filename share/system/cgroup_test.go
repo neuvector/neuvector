@@ -1060,7 +1060,7 @@ func TestDockerK8s_CPath_Container_Cgroupv2(t *testing.T) {
 	`
 	r := strings.NewReader(cgroup)
 	path := getCgroupPathReaderV2(r) // it is not inside the container
-	if path != "/sys/fs/cgroup" {
+	if path != "/sys/fs/cgroup/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-podfd698699_eabf_4c23_92ef_cf0bbdb78261.slice/docker-2cc65c162ca1388b6b8d5ccfb701d22fc96675ccf8b2f1590c490c2c4039547f.scope" {
 		t.Errorf("incorrect cgroup path: %v\n", path)
 	}
 }

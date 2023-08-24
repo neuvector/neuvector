@@ -226,13 +226,19 @@ func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 		var mem, cpu uint64 = 0, 0
 		var err error
-		mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-		if err != nil {
-			log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "error": err}).Warning("Memory stats not found")
+		if c.cgroupMemory != "" {
+			mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
+			if err != nil && c.parentNS != "" {
+				// Ignore if pod holder
+				log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "error": err}).Warning("Memory stats not found")
+			}
 		}
-		cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-		if err != nil {
-			log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "error": err}).Warning("CPU stats not found")
+		if c.cgroupCPUAcct != "" {
+			cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+			if err != nil && c.parentNS != "" {
+				// Ignore if pod holder
+				log.WithFields(log.Fields{"pid": c.pid, "id": c.id, "error": err}).Warning("CPU stats not found")
+			}
 		}
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}

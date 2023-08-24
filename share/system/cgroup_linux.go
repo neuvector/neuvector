@@ -290,21 +290,34 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 	return "", false, false
 }
 
+// CgroupRelativePathFix - Applies fixes for cgroup files with certain types of paths
+func CgroupRelativePathFix(path string) (string) {
+
+	if strings.Contains(path, "/..") {
+		// I can't find the documentation why the cgroup file will hold relative paths. For now, I'm applying these
+		// fixes as we encounter them. Documentation on this behaviour would make this code more robust.
+		// Example: 0::/../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-a737350ff4843bb79debc4e2dc98f0b1b11d40f814ea4303d9167dd70c314b95.scope
+
+		path  = filepath.Clean(path)
+		if strings.Contains(path, "kubepods-pod") {
+			path = filepath.Join("/kubepods.slice", path)
+		} else if strings.Contains(path, "kubepods-besteffort") {
+			path = filepath.Join("/kubepods.slice/kubepods-besteffort.slice", path)
+		} else if strings.Contains(path, "kubepods-burstable") {
+			path = filepath.Join("/kubepods.slice", path)
+		}
+	}
+	return path
+}
+
 func getCgroupPathReaderV2(file io.ReadSeeker) string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
+		// Note that we're ignoring the subsystem, just grab the first valid line
 		if len(tokens) > 2 {
-			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
-			// For k8s, we're looking for kubepods
-			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
-			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
-			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
-			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
-			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
-			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-				return filepath.Join("/sys/fs/cgroup", tokens[2])
-			}
+			path := CgroupRelativePathFix(tokens[2])
+			return filepath.Join("/sys/fs/cgroup", path)
 		}
 	}
 	return "/sys/fs/cgroup"
@@ -327,6 +340,7 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	defer 	f.Close()
 
 	cpath := getCgroupPathReaderV2(f)
+	cpath = filepath.Join("/proc", strconv.Itoa(pid), "root/", cpath)
 
 	return cpath, nil
 
@@ -516,6 +530,9 @@ func getMemoryData(path, name string) (MemoryData, error) {
 
 //
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
+	if path == "" {
+		return fmt.Errorf("Path is empty")
+	}
 	// Set stats from memory.stat.
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
