@@ -36,6 +36,7 @@ type configMapHandlerContext struct {
 	gotAllCustomRoles bool
 	platform          string
 	pwdProfile        *share.CLUSPwdProfile
+	subDetail         string
 }
 
 func handleeulacfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
@@ -660,6 +661,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		return err
 	}
 
+	var badPwdUsers []string
 	for _, ruser := range rconf.Users {
 		if ruser == nil {
 			continue
@@ -721,6 +723,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 
 		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, user.PasswordHash, user.PwdHashHistory, profile); weak {
 			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
+			badPwdUsers = append(badPwdUsers, username)
 			continue
 		} else {
 			if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
@@ -775,6 +778,12 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			}
 		}
 	}
+	if len(badPwdUsers) == 1 {
+		context.subDetail = fmt.Sprintf("password for user %s does not meet password profile requirements", badPwdUsers[0])
+	} else if len(badPwdUsers) > 1 {
+		context.subDetail = fmt.Sprintf("passwords for users %s do not meet password profile requirements", strings.Join(badPwdUsers, ", "))
+	}
+
 	return nil
 }
 
@@ -853,19 +862,23 @@ func LoadInitCfg(load bool, platform string) {
 	context.platform = platform
 	for _, configMap := range configMaps {
 		var errMsg string
+		context.subDetail = ""
 		if _, err := os.Stat(configMap.FileName); err == nil {
 			if yaml_data, err := ioutil.ReadFile(configMap.FileName); err == nil {
 				skip = false
 				err = configMap.HandlerFunc(yaml_data, load, &skip, &context)
 				log.WithFields(log.Fields{"cfg": configMap.Type, "skip": skip, "error": err}).Debug()
 				if err == nil {
-					msg := fmt.Sprintf("    %s init configmap loaded", configMap.Type)
+					msg := fmt.Sprintf("%s init configmap loaded", configMap.Type)
+					if context.subDetail != "" {
+						msg = fmt.Sprintf("%s partially:\n   %s", msg, context.subDetail)
+					}
 					loaded = append(loaded, msg)
 				} else {
-					errMsg = fmt.Sprintf("    %s init configmap failed: %s ", configMap.Type, err.Error())
+					errMsg = fmt.Sprintf("%s init configmap failed: %s ", configMap.Type, err.Error())
 				}
 			} else {
-				errMsg = fmt.Sprintf("    %s init configmap read error: %s ", configMap.Type, err.Error())
+				errMsg = fmt.Sprintf("%s init configmap read error: %s ", configMap.Type, err.Error())
 			}
 		}
 		if errMsg != "" {
