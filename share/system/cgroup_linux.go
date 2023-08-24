@@ -295,7 +295,6 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
 		if len(tokens) > 2 {
-			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
 			// For k8s, we're looking for kubepods
 			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
 			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
@@ -307,7 +306,8 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			}
 		}
 	}
-	return "/sys/fs/cgroup"
+	// Return empty path so values are zero'd out.
+	return ""
 }
 
 // cgroup v2 is collected inside an unified file folder
