@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.2.1'
+  version: '5.2.2'
   title: NeuVector API
   contact:
     email: support@neuvector.com
