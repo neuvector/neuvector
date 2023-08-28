@@ -414,9 +414,8 @@ static pid_t fork_exec(int i)
             args[a++] = csp_pause_interval;
         }
         if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-apc";
-            }
+            args[a++] = "-apc";
+            args[a++] = enable;
         }
         args[a] = NULL;
         break;
@@ -498,9 +497,8 @@ static pid_t fork_exec(int i)
             args[a ++] = policy_pull_period;
         }
         if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-apc";
-            }
+            args[a++] = "-apc";
+            args[a++] = enable;
         }
         args[a] = NULL;
         break;

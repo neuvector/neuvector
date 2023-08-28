@@ -25,13 +25,14 @@ func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
 	switch req.Kind.Kind {
 	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind, resource.NvAdmCtrlSecurityRuleKind,
 		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind:
-		h.crdGFwRuleHandler(req)
+		h.crdSecRuleHandler(req)
 	}
 	return
 }
 
 func writeCrdFailedLog(req *admissionv1beta1.AdmissionRequest, errMsg string) {
 	if req != nil {
+		uid := ""
 		reqName := req.Name
 		var err error = common.ErrUnsupported
 		var secRulePartial resource.NvSecurityRulePartial
@@ -41,10 +42,13 @@ func writeCrdFailedLog(req *admissionv1beta1.AdmissionRequest, errMsg string) {
 		case "CREATE", "UPDATE":
 			err = json.Unmarshal(req.Object.Raw, &secRulePartial)
 		}
-		if err == nil && reqName == "" && secRulePartial.Metadata != nil {
-			reqName = secRulePartial.Metadata.GetName()
+		if err == nil && secRulePartial.Metadata != nil {
+			if reqName == "" {
+				reqName = secRulePartial.Metadata.GetName()
+			}
+			uid = secRulePartial.Metadata.GetUid()
 		}
-		e := fmt.Sprintf("CRD request(%s %s %s) Failed", req.Operation, req.Kind.Kind, reqName)
+		e := fmt.Sprintf("CRD request(%s %s %s %s) Failed", req.Operation, req.Kind.Kind, reqName, uid)
 		k8sResourceLog(share.CLUSEvCrdErrDetected, e, []string{errMsg})
 	}
 }
@@ -185,26 +189,30 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	} else {
-		if whsvr.dumpRequestObj && ar.Request.Operation != admissionv1beta1.Delete {
+        var reqOp admissionv1beta1.Operation
+		if ar.Request != nil {
+			reqOp = ar.Request.Operation
+		}
+		if whsvr.dumpRequestObj && reqOp != admissionv1beta1.Delete {
 			if b, err := json.Marshal(ar); err == nil {
 				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug()
 			}
 		}
-		if (ar.Request == nil || len(ar.Request.Object.Raw) == 0) && (ar.Request.Operation != admissionv1beta1.Delete) {
-			log.Warn("disallow because of no request/raw data")
+		if (ar.Request == nil || len(ar.Request.Object.Raw) == 0) && (reqOp != admissionv1beta1.Delete) {
+			log.WithFields(log.Fields{"reqOp": reqOp}).Warn("disallow because of no request/raw data")
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
 
 		if ar.Request.Name == "" {
 			req := ar.Request
-			if req != nil && req.Operation == admissionv1beta1.Delete && req.Name == "" {
+			if req != nil && reqOp == admissionv1beta1.Delete && req.Name == "" {
 				var secRulePartial resource.NvSecurityRulePartial
 				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
 					req.Name = secRulePartial.Metadata.GetName()
 				} else {
 					recordName := fmt.Sprintf("%s-%s-%s", req.Kind.Kind, req.Namespace, req.Name)
-					msg := fmt.Sprintf("CRD %s(%s) Error", recordName, req.Operation)
+					msg := fmt.Sprintf("CRD request(%s %s) Error", recordName, reqOp)
 					k8sResourceLog(share.CLUSEvCrdErrDetected, msg, []string{err.Error()})
 				}
 			}
@@ -227,7 +235,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 
-		if len(sizeErrMsg) == 0 && ar.Request.Operation == admissionv1beta1.Create && ar.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
+		if len(sizeErrMsg) == 0 && reqOp == admissionv1beta1.Create && ar.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
 			var admCtrlSecRule resource.NvAdmCtrlSecurityRule
 			if err := json.Unmarshal(ar.Request.Object.Raw, &admCtrlSecRule); err == nil {
 				name := ""
@@ -245,14 +253,14 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		var resultMsg string
 		if len(sizeErrMsg) > 0 {
 			skip = true
-			resultMsg = fmt.Sprintf(" %s denied: %s", ar.Request.Operation, sizeErrMsg)
+			resultMsg = fmt.Sprintf(" %s denied: %s", reqOp, sizeErrMsg)
 		} else {
 			if ar.Request.DryRun != nil && *ar.Request.DryRun {
 				skip = true
-				resultMsg = fmt.Sprintf(" %s denied in dry-run", ar.Request.Operation)
+				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
 			} else {
 				allowed = true
-				resultMsg = fmt.Sprintf(" %s done", ar.Request.Operation)
+				resultMsg = fmt.Sprintf(" %s done", reqOp)
 			}
 		}
 

@@ -1991,6 +1991,7 @@ type CLUSCrdSecurityRule struct {
 	AdmCtrlRules    map[string]uint32     `json:"admctrl_rules"`     // map key is the generated name of admission control rule, valud is assigned rule id
 	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
+	Uid             string                `json:"uid"`               // metadata.uid in admissionreview CREATE request
 }
 
 // Multi-Clusters (Federation)

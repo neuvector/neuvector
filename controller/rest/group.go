@@ -1766,7 +1766,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
 				continue
 			}
-			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdContent(secRule, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
+			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break
 			} else {
@@ -1827,7 +1827,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						}
 					}
 
-					//  do same job as crdHandleRules(crdCfgRet.RuleCfgs, crdRecord)
+					//  do same job as crdHandleNetworkRules(crdCfgRet.RuleCfgs, crdRecord)
 					importGroupNetworkRules(grpCfgRet.RuleCfgs)
 
 					if crdRecord.ProfileName != "" {

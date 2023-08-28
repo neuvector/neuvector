@@ -384,7 +384,8 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		}
 
 		// CRD group cannot change mode but it is scorable
-		capChgMode := utils.DoesGroupHavePolicyMode(group.Name) && (group.CfgType == share.Learned || group.Name == api.AllHostGroup)
+		capChgMode := utils.DoesGroupHavePolicyMode(group.Name) &&
+			(group.CfgType == share.Learned || (group.Name == api.AllHostGroup && group.CfgType != share.GroundCfg))
 		capScorable := utils.DoesGroupHavePolicyMode(group.Name)
 
 		cache := initGroupCache(group.CfgType, group.Name)
@@ -1088,7 +1089,7 @@ func scheduleGroupRemoval(cache *groupCache) {
 	//NVSHAS-7791, because our timer-wheel’s one round duration is 1 hour
 	//task may not be scheduled into current slot which cause it to wait
 	//for 1 more hour to expire. Add additional 10sec to avoid this.
-	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge) + groupsRemovalAdditionalDelay
+	groupRemovalDelay := time.Duration(time.Hour*unusedGrpAge) + groupsRemovalAdditionalDelay
 
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
