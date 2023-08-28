@@ -1258,7 +1258,13 @@ func startPolicyThread() {
 				newIPRules := calculateIPPolicyFromCache()
 				cacheMutexRUnlock()
 				policyCalculated = false
-				putPolicyIPRulesToClusterScale(newIPRules)
+				if policyApplyIngress {
+					reorgPolicyIPRulesPerNodePAI(newIPRules)
+				} else {
+					reorgPolicyIPRulesPerNode(newIPRules)
+				}
+				putPolicyIPRulesToClusterScaleNode(newIPRules)
+				resetNodePolicy()
 			case <-vulProfUpdateTimer.C:
 				scanVulProfUpdate()
 			case <-syncCheckTicker:
