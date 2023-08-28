@@ -4367,7 +4367,7 @@ paths:
           description: Apikey information
           required: true
           schema:
-            $ref: '#/definitions/RESTApikeyCreation'
+            $ref: '#/definitions/RESTApikeyCreationData'
       responses:
         '200':
           description: Success
@@ -4697,15 +4697,12 @@ definitions:
         example: admin
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-            example: ["domain1", "domain2"]
+          example: ["domain1", "domain2"]
   Incident:
     type: object
     required:
@@ -10748,15 +10745,12 @@ definitions:
         default: false
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-            example: ["domain1", "domain2"]
+          example: ["domain1", "domain2"]
       last_login_timestamp:
         type: integer
         format: int64
@@ -10847,15 +10841,12 @@ definitions:
         description: If the password should be modified
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-            example: ["domain1", "domain2"]
+          example: ["domain1", "domain2"]
       last_login_timestamp:
         type: integer
         format: int64
@@ -11018,15 +11009,12 @@ definitions:
         example: en
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-            example: ["domain1", "domain2"]
+          example: ["domain1", "domain2"]
   RESTUserConfigData:
     type: object
     required:
@@ -12858,15 +12846,12 @@ definitions:
         example: admin
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-            example: ["domain1", "domain2"]
+          example: ["domain1", "domain2"]
       expiration_timestamp:
         type: integer
         format: int64
@@ -12906,6 +12891,13 @@ definitions:
         items:
           type: string
         example: ["role1", "role2"]
+  RESTApikeyCreationData:
+    type: object
+    required:
+      - apikey
+    properties:
+      apikey:
+        $ref: '#/definitions/RESTApikeyCreation'
   RESTApikeyCreation:
     type: object
     required:
@@ -12931,15 +12923,12 @@ definitions:
         example: admin
       role_domains:
         type: object
-        properties:
-          role:
+        description: Object key is role and value is array of domains
+        additionalProperties:
+          type: array
+          items:
             type: string
-            example: admin
-          domains:
-            type: array
-            items:
-              type: string
-              example: ["domain1", "domain2"]  
+          example: ["domain1", "domain2"]
   RESTApikeyGeneratedData:
     type: object
     required:
