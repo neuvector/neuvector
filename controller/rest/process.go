@@ -240,13 +240,6 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		}
 	}
 
-	if conf.ProcessRepList != nil {
-		if err := validateProcessProfileConfig(*conf.ProcessRepList); err != nil {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
-			return
-		}
-	}
-
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
@@ -320,92 +313,63 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		rule_cfg = share.FederalCfg
 	}
 
-	// process_replace_list
-	if conf.ProcessRepList != nil {
+	// commom path from UI
+	// Handle delete first so that UI can do a replacement within one call
+	// We handle replace by deleting first then add
+	deleted := make(map[string]*share.CLUSProcessProfileEntry)
+	if conf.ProcessDelList != nil {
+		for _, proc := range *conf.ProcessDelList {
+			var found bool = false
+			p := &share.CLUSProcessProfileEntry{
+				Name:    proc.Name,
+				Path:    proc.Path,
+				Action:  proc.Action,
+				CfgType: rule_cfg,
+			}
+
+			idx, found := common.FindProcessInProfile(profile.Process, p)
+			if found {
+				key := proc.Name + ":" + proc.Path
+				deleted[key] = profile.Process[idx]
+			} else {
+				log.WithFields(log.Fields{"group": group, "rule": p}).Error("Cannot find rule")
+				restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
+				return
+			}
+		}
+
 		list := make([]*share.CLUSProcessProfileEntry, 0)
-		for _, proc := range *conf.ProcessRepList {
+		for _, p := range profile.Process {
+			key := p.Name + ":" + p.Path
+			if d, ok := deleted[key]; ok && (d.CfgType == p.CfgType) {
+				// meet all comparing criteria
+				continue
+			}
+			list = append(list, p)
+		}
+		profile.Process = list
+	}
+
+	// add (update : del then add)
+	if conf.ProcessChgList != nil {
+		for _, proc := range *conf.ProcessChgList {
+			var created time.Time
+			key := proc.Name + ":" + proc.Path
+			if d, ok := deleted[key]; ok {
+				log.WithFields(log.Fields{"rule": d}).Debug("precedent")
+				created = d.CreatedAt
+			}
 			p := share.CLUSProcessProfileEntry{
 				Name:            proc.Name,
 				Path:            proc.Path,
 				CfgType:         rule_cfg,
 				Action:          proc.Action,
-				UpdatedAt:       time.Now().UTC(),
 				Uuid:            ruleid.NewUuid(),
+				CreatedAt:       created,
 				AllowFileUpdate: proc.AllowFileUpdate,
 			}
-
-			idx, found := common.FindProcessInProfile(profile.Process, &p)
-			if profile.HashEnable {
-				if found {
-					p.Hash = profile.Process[idx].Hash
-				} else {
-					log.WithFields(log.Fields{"group": group, "rule": p}).Error("Cannot find rule!")
-					restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-					return
-				}
-			}
-			list, _ = common.MergeProcess(list, &p, true)
-		}
-		profile.Process = list
-	} else { // commom path from UI
-		// Handle delete first so that UI can do a replacement within one call
-		// We handle replace by deleting first then add
-		deleted := make(map[string]*share.CLUSProcessProfileEntry)
-		if conf.ProcessDelList != nil {
-			for _, proc := range *conf.ProcessDelList {
-				var found bool = false
-				p := &share.CLUSProcessProfileEntry{
-					Name:    proc.Name,
-					Path:    proc.Path,
-					Action:  proc.Action,
-					CfgType: rule_cfg,
-				}
-
-				idx, found := common.FindProcessInProfile(profile.Process, p)
-				if found {
-					key := proc.Name + ":" + proc.Path
-					deleted[key] = profile.Process[idx]
-				} else {
-					log.WithFields(log.Fields{"group": group, "rule": p}).Error("Cannot find rule")
-					restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-					return
-				}
-			}
-
-			list := make([]*share.CLUSProcessProfileEntry, 0)
-			for _, p := range profile.Process {
-				key := p.Name + ":" + p.Path
-				if d, ok := deleted[key]; ok && (d.CfgType == p.CfgType) {
-					// meet all comparing criteria
-					continue
-				}
-				list = append(list, p)
-			}
-			profile.Process = list
-		}
-
-		// add (update : del then add)
-		if conf.ProcessChgList != nil {
-			for _, proc := range *conf.ProcessChgList {
-				var created time.Time
-				key := proc.Name + ":" + proc.Path
-				if d, ok := deleted[key]; ok {
-					log.WithFields(log.Fields{"rule": d}).Debug("precedent")
-					created = d.CreatedAt
-				}
-
-				p := share.CLUSProcessProfileEntry{
-					Name:            proc.Name,
-					Path:            proc.Path,
-					CfgType:         rule_cfg,
-					Action:          proc.Action,
-					Uuid:            ruleid.NewUuid(),
-					CreatedAt:       created,
-					AllowFileUpdate: proc.AllowFileUpdate,
-				}
-				if ret, ok := common.MergeProcess(profile.Process, &p, true); ok {
-					profile.Process = ret
-				}
+			if ret, ok := common.MergeProcess(profile.Process, &p, true); ok {
+				profile.Process = ret
 			}
 		}
 	}

@@ -2683,7 +2683,6 @@ type RESTProcessProfileConfig struct {
 	Baseline       *string                          `json:"baseline,omitempty"`
 	ProcessChgList *[]RESTProcessProfileEntryConfig `json:"process_change_list,omitempty"`
 	ProcessDelList *[]RESTProcessProfileEntryConfig `json:"process_delete_list,omitempty"`
-	ProcessRepList *[]RESTProcessProfileEntryConfig `json:"process_replace_list,omitempty"`
 }
 
 type RESTProcessProfileConfigData struct {
