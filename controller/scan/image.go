@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -26,6 +27,7 @@ type imageMeta struct {
 	signed    bool
 	runAsRoot bool
 	images    utils.Set // share.CLUSImage
+	created   time.Time
 }
 
 // --
@@ -443,6 +445,7 @@ func getImageMeta(ctx context.Context, drv registryDriver, itf *share.CLUSImage,
 					digest:    info.Digest,
 					signed:    info.Signed,
 					runAsRoot: info.RunAsRoot,
+					created:   info.Created,
 					images:    utils.NewSet(),
 				}
 				meta.images.Add(img)

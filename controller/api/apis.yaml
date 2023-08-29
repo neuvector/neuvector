@@ -7778,6 +7778,7 @@ definitions:
       - result
       - scanned_timestamp
       - scanned_at
+      - created_at
       - base_os
       - scanner_version
     properties:
@@ -7843,6 +7844,10 @@ definitions:
         format: int64
         example: 1516561253
       scanned_at:
+        type: string
+        format: date-time
+        example: 2018-01-21T19:00:53Z
+      created_at:
         type: string
         format: date-time
         example: 2018-01-21T19:00:53Z
@@ -8624,6 +8629,7 @@ definitions:
       - result
       - scanned_timestamp
       - scanned_at
+      - created_at
       - base_os
       - scanner_version
       - cvedb_create_time
@@ -8654,6 +8660,9 @@ definitions:
         format: int64
         example: 1593130227
       scanned_at:
+        type: string
+        example: 2020-06-26T00:10:27Z
+      created_at:
         type: string
         example: 2020-06-26T00:10:27Z
       base_os:
@@ -8980,6 +8989,7 @@ definitions:
       - size
       - author
       - base_os
+      - created_at
       - cvedb_version
       - cvedb_create_time
       - layers
@@ -9016,6 +9026,10 @@ definitions:
       base_os:
         type: string
         example: ubuntu:16.04
+      created_at:
+        type: string
+        format: date-time
+        example: 2018-01-21T19:00:53Z
       cvedb_version:
         type: string
         example: "1.00"

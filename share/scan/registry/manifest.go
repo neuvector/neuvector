@@ -32,6 +32,7 @@ type ManifestInfo struct {
 	Labels         map[string]string
 	Cmds           []string
 	EmptyLayers    []bool
+	Created        time.Time
 }
 
 type ManifestRequestType int
@@ -239,6 +240,9 @@ func parseManifestHistory(body []byte) (*ManifestInfo, error) {
 				if info.Author == "" {
 					info.Author = confData.Author
 				}
+				if confData.Created.After(info.Created) {
+					info.Created = confData.Created
+				}
 				if len(confData.ContainerConfig.Cmd) > 0 {
 					cmd = strings.Join(confData.ContainerConfig.Cmd, " ")
 				} else if len(confData.Config.Cmd) > 0 {
@@ -286,7 +290,7 @@ func (r *Registry) ImageConfigSpecV1(ctx context.Context, repository string, ref
 
 			var ics imageConfigSpec
 			if err = json.Unmarshal(body, &ics); err == nil {
-				info := ManifestInfo{Labels: make(map[string]string)}
+				info := ManifestInfo{Labels: make(map[string]string), Created: ics.Created}
 
 				if ics.ContainerConfig.Env != nil {
 					info.Envs = append(info.Envs, ics.ContainerConfig.Env...)

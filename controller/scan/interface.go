@@ -274,6 +274,7 @@ func image2RESTSummary(rs *Registry, id string, sum *share.CLUSRegistryImageSumm
 	if !sum.ScannedAt.IsZero() {
 		s.ScannedTimeStamp = sum.ScannedAt.Unix()
 		s.ScannedAt = api.RESTTimeString(sum.ScannedAt)
+		s.CreatedAt = api.RESTTimeString(sum.CreatedAt)
 		s.Result = scanUtils.ScanErrorToStr(sum.Result)
 		s.Size = sum.Size
 		s.Author = sum.Author
@@ -345,6 +346,9 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		Status:    api.ScanStatusFinished,
 		Author:    result.Author,
 		ScanFlags: share.ScanFlagCVE,
+	}
+	if c, err := time.Parse(time.RFC3339, result.Created); err == nil {
+		sum.CreatedAt = c
 	}
 	if result.Secrets != nil {
 		sum.ScanFlags |= share.ScanFlagFiles

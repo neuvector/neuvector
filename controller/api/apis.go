@@ -2070,9 +2070,10 @@ type RESTScanPlatformSummaryData struct {
 }
 
 type RESTScanImageSummary struct {
-	Image   string `json:"image"`
-	ImageID string `json:"image_id"`
-	Author  string `json:"author"`
+	Image     string `json:"image"`
+	ImageID   string `json:"image_id"`
+	Author    string `json:"author"`
+	CreatedAt string `json:"created_at"`
 	RESTScanBrief
 }
 
@@ -2205,6 +2206,7 @@ type RESTScanRepoReport struct {
 	Size            int64            `json:"size"`
 	Author          string           `json:"author"`
 	BaseOS          string           `json:"base_os"`
+	CreatedAt       string           `json:"created_at"`
 	CVEDBVersion    string           `json:"cvedb_version"`
 	CVEDBCreateTime string           `json:"cvedb_create_time"`
 	Layers          []*RESTScanLayer `json:"layers"`
@@ -3088,6 +3090,7 @@ type RESTRegistryImageSummary struct {
 	Size       int64             `json:"size"`
 	Author     string            `json:"author"`
 	RunAsRoot  bool              `json:"run_as_root"`
+	CreatedAt  string            `json:"created_at"`
 	Envs       []string          `json:"envs"`
 	Labels     map[string]string `json:"labels"`
 	Layers     []string          `json:"layers"`
