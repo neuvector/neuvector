@@ -418,6 +418,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		Digest:          result.Digest,
 		Size:            result.Size,
 		Author:          result.Author,
+		CreatedAt:       result.Created,
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
