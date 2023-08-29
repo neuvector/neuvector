@@ -1673,6 +1673,7 @@ type CLUSRegistryImageSummary struct {
 	Images    []CLUSImage   `json:"repo_tag"`
 	Digest    string        `json:"digest"`
 	ScannedAt time.Time     `json:"scanned_at"`
+	CreatedAt time.Time     `json:"created_at"`
 	BaseOS    string        `json:"base_os"`
 	Version   string        `json:"version"`
 	Result    ScanErrorCode `json:"result"`

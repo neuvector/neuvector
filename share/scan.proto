@@ -134,6 +134,7 @@ message ScanResult {
     ScanProvider Provider = 23;
     int64 Size = 24;
     ScanSignatureInfo SignatureInfo = 25;
+    string Created = 26;
 }
 
 message ScanSignatureInfo {
