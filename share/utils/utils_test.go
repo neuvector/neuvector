@@ -186,8 +186,8 @@ func TestPlatformEnv(t *testing.T) {
 
 func TestBase64Encrypt(t *testing.T) {
 	token := "123456"
-	encrypt := EncryptUserToken(token)
-	decrypt := DecryptUserToken(encrypt)
+	encrypt := EncryptUserToken(token, nil)
+	decrypt := DecryptUserToken(encrypt, nil)
 	if decrypt != token {
 		t.Errorf("Token encrypt error: token=%v decrypt=%v\n", token, decrypt)
 	}
