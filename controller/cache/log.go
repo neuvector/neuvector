@@ -1872,6 +1872,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	if systemConfigCache.SingleCVEPerSyslog {
 		// if only reporting one cve per event, we will add the vulnerabile info.
 		// the vul. list will not be included in the log
+		scanUtils.FillVuls(&report.ScanResult)
 		clog.Vuls = make(map[string]*share.ScanVulnerability)
 		for _, v := range report.Vuls {
 			clog.Vuls[v.Name] = v
