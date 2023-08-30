@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -162,108 +163,93 @@ const (
 
 /////
 func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
-	key, uniqeKey := genFsMonReportKey(PROBE_REPORT_FILE_MODIFIED, pmsg) // borrow
+	key1, uniqeKey := genFsMonReportKey(PROBE_REPORT_FILE_MODIFIED, pmsg) // borrow
+	pmsg.Package = pmsg.Package || pkgCmds.Contains(pmsg.ProcName) || pkgCmds.Contains(filepath.Base(pmsg.ProcPath))
+	mLog.WithFields(log.Fields{"pmsg": pmsg, "key1": key1}).Debug()
 
 	// localized mutex to reduce the interactions with others
 	p.msgAggregatesMux.Lock()
 	defer p.msgAggregatesMux.Unlock()
-
-	if pmsga, ok := p.pMsgAggregates[key]; ok {
-		pmsga.expireCnt = expireCountdown
-
-		if pmsg.ProcPid != 0 && pmsga.pid == 0 {
-			pmsga.expireCnt = 1
-			pmsg.ProcPid = pmsg.ProcPid
-			pmsga.fsMsg = pmsg // updated
+	bUpdated := false
+	if pmsga, ok := p.pMsgAggregates[key1]; ok {
+		pmsga.expireCnt = expireCountdown // extend expiration
+		if pmsg.ProcPid > 0 {	// fanotify
+			if pmsga.pid == 0 { // inotify before
+				pmsga.expireCnt = 2 // quick response: update the process information
+				pmsga.pid = pmsg.ProcPid
+				pmsga.fsMsg = pmsg // updated
+				bUpdated = true
+				mLog.WithFields(log.Fields{"fsMsg": pmsga.fsMsg, "pid": pmsga.pid}).Debug("updated")
+			}
 		} else {
-			pmsga.fsMsg.Path = pmsg.Path // restored
+			mLog.WithFields(log.Fields{"pmsg": pmsg}).Debug("ignored")
+			return false
 		}
-		pmsga.count++
-		mLog.WithFields(log.Fields{"report_a": pmsga, "msg": pmsga.fsMsg, "pmsg": pmsg}).Debug("PROC: accumulated")
-		return false // hold the event for further events
 	}
 
-	// aggregare reports with the same Pid but could be different operations
-	// searching the installation event with the same container ID
-	bHasPackageInstalled := false
 	for key, pmsga := range p.pMsgAggregates {
-		if pmsga.bFsMonMsg {
-			if pmsga.fsMsg.ID != pmsg.ID { // excludes other containers
+		if !pmsga.bFsMonMsg || pmsga.fsMsg.ID != pmsg.ID { // excludes other containers
+			continue
+		}
+
+		// package installation in progress
+		if pmsga.fsMsg.Package || pmsg.Package {
+			pmsga.fsMsg.Package = pmsga.fsMsg.Package || pmsg.Package
+
+			// aggregare file package operations
+			if pmsga.fsMsg.Path == "" {
+				// previous report has sent
+				pmsga.fsMsg.Path = pmsg.Path
+			} else if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
+				pmsga.fsMsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
+			}
+
+			// reset counters: wait longer
+			pmsga.expireCnt = expireCountdown + 7
+			if key1 != key {
+				delete(p.pMsgAggregates, key1) // removed, keep one existing entry
+			}
+			mLog.WithFields(log.Fields{"report_a": pmsga, "fsMsg": pmsga.fsMsg}).Debug("package update")
+			bUpdated = true
+			continue
+		}
+
+		if pmsg.ProcPid > 0 {
+			// aggregare file paths
+			if pmsga.pid == pmsg.ProcPid {
+				pmsga.count++
+				// aggregare file operations
+				if pmsga.fsMsg.Msg != fsComboAction && pmsga.fsMsg.Msg != pmsg.Msg {
+					pmsga.fsMsg.Msg = fsComboAction
+				}
+
+				if pmsga.fsMsg.Path == "" {
+					// previous report has sent
+					pmsga.fsMsg.Path = pmsg.Path
+				} else if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
+					pmsga.fsMsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
+				}
+
+				pmsga.count++
+				pmsga.expireCnt = expireCountdown
+				if key1 != key {
+					delete(p.pMsgAggregates, key1) // removed, keep one existing entry
+				}
+				mLog.WithFields(log.Fields{"report_a": pmsga}).Debug("accumulated")
+				bUpdated = true
 				continue
 			}
-
-			// make a predition
-			bPackageOpInProgress := pkgCmds.Contains(pmsga.fsMsg.ProcName)
-			bPackageOp := pkgCmds.Contains(pmsg.ProcName)
-			if !bHasPackageInstalled {
-				bHasPackageInstalled = bPackageOpInProgress
-			}
-
-			if pmsga.pid == 0 && pmsga.fsMsg.Package && bPackageOp {
-				// An inotify event at first:
-				// (1) Periodically scanning for package installation (Package=true)
-				// (2) Unreliable timing: the report could be either at the start or the end
-				// (3) Looking any non-expired installation event by processes (bPackageOpInProgress)
-				if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
-					pmsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
-				}
-				pmsga.pid = pmsg.ProcPid
-				pmsga.fsMsg = nil
-				pmsga.fsMsg = pmsg // replaced
-				pmsga.fsMsg.Package = true
-				// log.WithFields(log.Fields{"Path": pmsga.fsMsg.Path}).Debug("PROC: update")
-				p.pMsgAggregates[key] = pmsga
-				return false
-			} else {
-				if pmsga.pid == pmsg.ProcPid && pmsg.ProcPid != 0 { // same process
-					if pmsga.fsMsg.Msg != fsComboAction && pmsga.fsMsg.Msg != pmsg.Msg {
-						pmsga.fsMsg.Msg = fsComboAction
-					}
-
-					// reset counters
-					if bPackageOpInProgress {
-						// wait longer
-						pmsga.triggerCnt = triggerCountdown + 7
-						pmsga.expireCnt = expireCountdown + 7
-					} else {
-						pmsga.count += 1
-						pmsga.triggerCnt = triggerCountdown
-						pmsga.expireCnt = expireCountdown
-					}
-
-					// update Package Installation status
-					if pmsg.Package {
-						pmsga.fsMsg.Package = true
-					}
-
-					if pmsga.fsMsg.Path == "" {
-						// previous report has sent
-						pmsga.fsMsg.Path = pmsg.Path
-					} else if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
-						pmsga.fsMsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
-					}
-
-					///
-					p.pMsgAggregates[key] = pmsga
-					mLog.WithFields(log.Fields{"Path": pmsga.fsMsg.Path}).Debug("PROC: add")
-					return false
-				} else {
-					// not the same Pid, but possible in the same operation
-					if bPackageOpInProgress && (bPackageOp || pmsg.Package) {
-						if pmsg.Package {
-							pmsga.fsMsg.Package = true
-						}
-
-						if !strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
-							pmsga.fsMsg.Path = fmt.Sprintf("%s, %s", pmsga.fsMsg.Path, pmsg.Path)
-						}
-						// log.WithFields(log.Fields{"Path": pmsga.fsMsg.Path}).Debug("PROC: append")
-						p.pMsgAggregates[key] = pmsga
-						return false
-					}
-				}
+		} else { // pid == 0
+			if strings.Contains(pmsga.fsMsg.Path, pmsg.Path) {
+				mLog.WithFields(log.Fields{"path": pmsg.Path}).Debug("no pid, duplicated")
+				bUpdated = true
+				continue
 			}
 		}
+	}
+
+	if bUpdated {
+		return false
 	}
 
 	/// new message store into hostory and send it immediately
@@ -278,13 +264,13 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 		fsMsg:      pmsg,
 	}
 
-	log.WithFields(log.Fields{"key": pNewMsgA.eventKey, "msg": pmsg}).Debug("PROC: new entry")
+	mLog.WithFields(log.Fields{"key1": key1, "msg": pmsg}).Debug("new entry")
 	if pNewMsgA.pid != 0 && !pkgCmds.Contains(pNewMsgA.fsMsg.ProcName) {
 		go p.sendFsMonReport(*pmsg, 1, pNewMsgA.startTime)
 		// Reset: erase the path to accumulate other files
 		pNewMsgA.fsMsg.Path = ""
 	}
-	p.pMsgAggregates[key] = pNewMsgA
+	p.pMsgAggregates[key1] = pNewMsgA
 	return true // send immediately
 }
 
@@ -300,16 +286,13 @@ func (p *Probe) processAggregateProbeReports() int {
 		pmsga.triggerCnt--
 		pmsga.expireCnt--
 		if pmsga.expireCnt == 0 {
-			if pmsga.count > 1 {
-				go p.sendReport(*pmsga)
-				cnt++
-			} else if pmsga.bFsMonMsg && pmsga.count > 1 {	// no more adding entry
+			if pmsga.count > 1 || (pmsga.bFsMonMsg && pmsga.count != 0) {
 				go p.sendReport(*pmsga)
 				cnt++
 			}
 
 			// delete the entry
-			mLog.WithFields(log.Fields{"key": pmsga.eventKey, "trigger": pmsga.triggerCnt, "expire": pmsga.expireCnt, "count": pmsga.count}).Debug("PROC: delete entry")
+			mLog.WithFields(log.Fields{"key": key, "trigger": pmsga.triggerCnt, "expire": pmsga.expireCnt, "count": pmsga.count}).Debug("delete entry")
 			delete(p.pMsgAggregates, key)
 			continue
 		}
