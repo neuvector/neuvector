@@ -1217,8 +1217,6 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		log.WithFields(log.Fields{"cgroupCPUAcct": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get CPU stats.")
 	}
 
-	log.WithFields(log.Fields{"cgroupMemory": c.cgroupMemory, "cgroupCPUAcct": c.cgroupCPUAcct, "pid": c.pid, "id": c.id, "name": c.name}).Debug("cgroup paths are set.")
-
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()
