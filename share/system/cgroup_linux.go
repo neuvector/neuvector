@@ -379,10 +379,7 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 	case cgroup_v2:
 		// unified file structure
 		cpathv2, err := getCgroupPath_cgroup_v2(pid)
-		if err != nil {
-			return "", err
-		}
-		if cpathv2 == "" {
+		if err != nil || cpathv2 == "" {
 			// path wasn't parsed, so we'll default to v1 style for best effort
 			cpathv2 = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup")
 		}
