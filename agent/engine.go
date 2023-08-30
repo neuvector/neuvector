@@ -1206,8 +1206,10 @@ func fillContainerProperties(c *containerData, parent *containerData,
 			parent.hasDatapath = false
 		}
 	}
+
 	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
 	c.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()

@@ -307,7 +307,7 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			}
 		}
 	}
-	return "/sys/fs/cgroup"
+	return ""
 }
 
 // cgroup v2 is collected inside an unified file folder
@@ -332,6 +332,30 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 }
 
+// VerifyContainerCgroupPath - Checks if a cgroup path for a subsystem is valid
+// We only support checking "memory" and "cpuacct" cgroup subsystems.
+// If not valid, return empty string to avoid getting stats for it.
+func (s *SystemTools) VerifyContainerCgroupPath(path string, subsystem string) (string, error) {
+	switch subsystem {
+	case "memory":
+		if _, err := s.GetContainerMemoryUsage(path); err != nil {
+			return "", err
+		}
+	case "cpuacct":
+		if _, err := s.GetContainerCPUUsage(path); err != nil {
+			return "", err
+		}
+	default:
+		// For everything else, just check if the directory/file exists
+		if _, err := os.Stat(path); err != nil {
+			return "", err
+		}
+	}
+
+	// No issues with paths, we can continue
+	return path, nil
+}
+
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
 	/*
 		mnt, err := FindCgroupMountpoint(subsystem)
@@ -350,11 +374,17 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		} else {
 			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
 		}
-		return path, nil
+		return s.VerifyContainerCgroupPath(path, subsystem)
 
 	case cgroup_v2:
 		// unified file structure
-		return getCgroupPath_cgroup_v2(pid)
+		cpathv2, err := getCgroupPath_cgroup_v2(pid)
+		if err != nil || cpathv2 == "" {
+			// path wasn't parsed, so we'll default to v1 style for best effort
+			cpathv2 = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup")
+		}
+		// Now verify and return
+		return s.VerifyContainerCgroupPath(cpathv2, subsystem)
 	}
 
 	// However, the k8s POD does not have those subsystem folders
@@ -516,14 +546,15 @@ func getMemoryData(path, name string) (MemoryData, error) {
 
 //
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
+
+	if path == "" {
+		return fmt.Errorf("empty path not supported")
+	}
+
 	// Set stats from memory.stat.
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
-		}
 		return err
 	}
 	defer statsFile.Close()
@@ -595,6 +626,9 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 
 // https://github.com/opencontainers/runc/blob/master/libcontainer/cgroups/fs2/cpu.go
 func (s *SystemTools) statCpu(path string, stats *CpuStats) error {
+	if path == "" {
+		return fmt.Errorf("empty path not supported")
+	}
 	f, err := os.Open(filepath.Join(path, "cpu.stat"))
 	if err != nil {
 		return err
