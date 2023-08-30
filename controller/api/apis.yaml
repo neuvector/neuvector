@@ -7613,10 +7613,6 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTProcessProfileEntryConfig'
-      process_replace_list:
-        type: array
-        items:
-          $ref: '#/definitions/RESTProcessProfileEntryConfig'
   RESTProcessProfileConfigData:
     type: object
     required:
