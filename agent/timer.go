@@ -71,13 +71,13 @@ func statsLoop(bPassiveContainerDetect bool) {
 	if limit, err := global.SYS.GetContainerMemoryLimitUsage(agentEnv.cgroupMemory); err == nil && limit > 0 {
 		agentEnv.memoryLimit = limit
 	}
-	agentEnv.snapshotMemStep = agentEnv.memoryLimit/10
-	memSnapshotMark := agentEnv.memoryLimit*3/5				// 60% as starting point
-	memStatsEnforcerResetMark = agentEnv.memoryLimit*3/4	// 75% as starting point
+	agentEnv.snapshotMemStep = agentEnv.memoryLimit / 10
+	memSnapshotMark := agentEnv.memoryLimit * 3 / 5          // 60% as starting point
+	memStatsEnforcerResetMark = agentEnv.memoryLimit * 3 / 4 // 75% as starting point
 	if agentEnv.autoProfieCapture > 1 {
 		var mark uint64 = (uint64)(agentEnv.autoProfieCapture * 1024 * 1024) // into mega bytes
-		memSnapshotMark = mark * 3/5
-		agentEnv.snapshotMemStep = mark/10
+		memSnapshotMark = mark * 3 / 5
+		agentEnv.snapshotMemStep = mark / 10
 	}
 
 	if agentEnv.autoProfieCapture > 0 {
@@ -222,22 +222,25 @@ func dpTaskCallback(task *dp.DPTask) {
 }
 
 func updateAgentStats(cpuSystem uint64) {
-	mem, _ := global.SYS.GetContainerMemoryUsage(agentEnv.cgroupMemory)
-	cpu, _ := global.SYS.GetContainerCPUUsage(agentEnv.cgroupCPUAcct)
+	var mem, cpu uint64 = 0, 0
+	if agentEnv.cgroupMemory != "" {
+		mem, _ = global.SYS.GetContainerMemoryUsage(agentEnv.cgroupMemory)
+	}
+	if agentEnv.cgroupCPUAcct != "" {
+		cpu, _ = global.SYS.GetContainerCPUUsage(agentEnv.cgroupCPUAcct)
+	}
 	system.UpdateStats(&gInfo.agentStats, mem, cpu, cpuSystem)
 }
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 		var mem, cpu uint64 = 0, 0
-
 		if c.cgroupMemory != "" {
 			mem, _ = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
 		}
 		if c.cgroupCPUAcct != "" {
 			cpu, _ = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
 		}
-
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
 }
@@ -524,7 +527,7 @@ func updateHostConnection(conns []*dp.ConnectionData) {
 				continue
 			}
 		}
-		if c.pid !=0 && !c.hasDatapath {
+		if c.pid != 0 && !c.hasDatapath {
 			gInfoRUnlock()
 			continue
 		}

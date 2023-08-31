@@ -239,12 +239,12 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 			if len(elements) > 2 {
 				// log.WithFields(log.Fields{"path": elements[2]}).Debug()
 				tokens := strings.Split(elements[2], "/")
-				for i := len(tokens) - 1; i > 0; i-- {	// the last item is most possible target
+				for i := len(tokens) - 1; i > 0; i-- { // the last item is most possible target
 					token := tokens[i]
 					//token = strings.TrimPrefix(token, "docker-") // TODO: other runtimes
 					//token = strings.TrimPrefix(token, "crio-")
 					//token = strings.TrimPrefix(token, "cri-containerd-")
-					if index := strings.LastIndex(token, "-");  index != -1 {
+					if index := strings.LastIndex(token, "-"); index != -1 {
 						token = token[index+1:]
 					}
 					token = strings.TrimSuffix(token, ".scope")
@@ -261,7 +261,7 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 					tokens := strings.Split(fstab[3], "/")
 					for i := len(tokens) - 1; i > 0; i-- {
 						token := tokens[i]
-						if index := strings.LastIndex(token, "-");  index != -1 {
+						if index := strings.LastIndex(token, "-"); index != -1 {
 							token = token[index+1:]
 						}
 						token = strings.TrimSuffix(token, ".scope")
@@ -324,7 +324,7 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
 		return "", err
 	}
-	defer 	f.Close()
+	defer f.Close()
 
 	cpath := getCgroupPathReaderV2(f)
 
@@ -332,104 +332,71 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 
 }
 
-// VerifyContainerCgroupPath - Checks if a cgroup path for a subsystem is valid
+// verifyContainerCgroupPath - Checks if a cgroup path for a subsystem is valid
 // We only support checking "memory" and "cpuacct" cgroup subsystems.
-// If not valid, return empty string to avoid getting stats for it.
-func (s *SystemTools) VerifyContainerCgroupPath(path string, subsystem string) (string, error) {
+func (s *SystemTools) verifyContainerCgroupPath(path string, subsystem string) error {
 	switch subsystem {
 	case "memory":
 		if _, err := s.GetContainerMemoryUsage(path); err != nil {
-			return "", err
+			return err
 		}
 	case "cpuacct":
 		if _, err := s.GetContainerCPUUsage(path); err != nil {
-			return "", err
+			return err
 		}
 	default:
 		// For everything else, just check if the directory/file exists
 		if _, err := os.Stat(path); err != nil {
-			return "", err
+			return err
 		}
 	}
 
-	// No issues with paths, we can continue
-	return path, nil
+	return nil
 }
 
 func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string, error) {
-	/*
-		mnt, err := FindCgroupMountpoint(subsystem)
-		if err != nil {
-			return "", nil
-		}
-	*/
-
-	// Alternative: it might not be necessary to obtain cgroup path as before
-	var path string
 	switch s.cgroupVersion {
 	case cgroup_v1:
+		var path string
 		// It is a well-known path: /proc/<pid>/root/sys/fs/cgroup/<subsystem>
-		if pid == 0 { // self
+		if pid == 0 {
 			path = filepath.Join("/sys/fs/cgroup", subsystem)
 		} else {
 			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
 		}
-		return s.VerifyContainerCgroupPath(path, subsystem)
+		if err := s.verifyContainerCgroupPath(path, subsystem); err != nil {
+			log.WithFields(log.Fields{
+				"path": path, "cgroup": s.cgroupVersion, "subsystem": subsystem, "err": err,
+			}).Warning("Unable to get cgroup path")
+			return "", err
+		} else {
+			return path, nil
+		}
 
 	case cgroup_v2:
 		// unified file structure
-		cpathv2, err := getCgroupPath_cgroup_v2(pid)
-		if err != nil || cpathv2 == "" {
+		path, err := getCgroupPath_cgroup_v2(pid)
+		if err != nil || path == "" {
 			// path wasn't parsed, so we'll default to v1 style for best effort
-			cpathv2 = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup")
-		}
-		// Now verify and return
-		return s.VerifyContainerCgroupPath(cpathv2, subsystem)
-	}
-
-	// However, the k8s POD does not have those subsystem folders
-	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), subsystem) {
-			tokens := strings.Split(scanner.Text(), ":")
-			length := len(tokens)
-			if length == 3 {
-				path := filepath.Join(s.cgroupDir, subsystem, tokens[2])
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					// Rancher on RancherOS, tokens[2] is /docker/xxxx/docker/yyyy
-					dirs := strings.Split(tokens[2], "/")
-					if n := len(dirs); n > 2 {
-						return filepath.Join(s.cgroupDir, subsystem, dirs[n-2], dirs[n-1]), nil
-					}
-				} else {
-					// Most other systems
-					return path, nil
-				}
-			} else if length > 3 {
-				// containerd 1.4.4: it uses ":" as separators.
-				// 4:memory:/system.slice/containerd.service/kubepods-besteffort-pod2105e389_7471_476e_a50f_6074cef29bbd.slice:cri-containerd:76b9bfe6d5506......
-				path := filepath.Join(s.cgroupDir, subsystem)
-				for i := 2; i < len(tokens); i++ {
-					if i == 2 {
-						path += tokens[i]
-					} else {
-						path += ":" + tokens[i]
-					}
-				}
-				return path, nil
+			if pid == 0 {
+				path = filepath.Join("/sys/fs/cgroup")
+			} else {
+				path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup")
 			}
-			break
 		}
-	}
+		if err := s.verifyContainerCgroupPath(path, subsystem); err != nil {
+			log.WithFields(log.Fields{
+				"path": path, "cgroup": s.cgroupVersion, "subsystem": subsystem, "err": err,
+			}).Warning("Unable to get cgroup path")
+			return "", err
+		} else {
+			return path, nil
+		}
 
-	return "", fmt.Errorf("Unable to find subsystem in container cgroup file")
+	default:
+		log.WithFields(log.Fields{"cgroup": s.cgroupVersion, "subsystem": subsystem}).Warning("Unable to get cgroup path")
+		return "", fmt.Errorf("Unable to find subsystem in container cgroup file")
+	}
 }
 
 // Copied from: github.com/opencontainers/runc/libcontainer/cgroups/fs/utils.go
@@ -546,11 +513,6 @@ func getMemoryData(path, name string) (MemoryData, error) {
 
 //
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
-
-	if path == "" {
-		return fmt.Errorf("empty path not supported")
-	}
-
 	// Set stats from memory.stat.
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
@@ -658,36 +620,6 @@ func (s *SystemTools) statCpu(path string, stats *CpuStats) error {
 	}
 	return nil
 }
-
-/*
-// Copied from: github.com/opencontainers/runc/libcontainer/cgroups/utils.go
-func FindCgroupMountpoint(subsystem string) (string, error) {
-	// We are not using mount.GetMounts() because it's super-inefficient,
-	// parsing it directly sped up x10 times because of not using Sscanf.
-	// It was one of two major performance drawbacks in container start.
-	f, err := os.Open(filepath.Join(share.MountProcDir, "self/mountinfo"))
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if opt == subsystem {
-				return fields[4], nil
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-
-	return "", fmt.Errorf("Unable to find subsystem")
-}
-*/
 
 func (s *SystemTools) GetContainerMemoryUsage(cgroupPath string) (uint64, error) {
 	mStats := CgroupMemoryStats{Stats: make(map[string]uint64)}
@@ -941,12 +873,12 @@ func readUppperLayerPath(file io.ReadSeeker, id string) (string, string, error) 
 						}
 						break
 					}
-				}	// the last entry of the overlay could be a good target, too
-				break	// discard following fields
+				} // the last entry of the overlay could be a good target, too
+				break // discard following fields
 			}
 		}
 
-		if found {	// skip scanning other entries
+		if found { // skip scanning other entries
 			break
 		}
 	}
