@@ -239,12 +239,12 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 			if len(elements) > 2 {
 				// log.WithFields(log.Fields{"path": elements[2]}).Debug()
 				tokens := strings.Split(elements[2], "/")
-				for i := len(tokens) - 1; i > 0; i-- {	// the last item is most possible target
+				for i := len(tokens) - 1; i > 0; i-- { // the last item is most possible target
 					token := tokens[i]
 					//token = strings.TrimPrefix(token, "docker-") // TODO: other runtimes
 					//token = strings.TrimPrefix(token, "crio-")
 					//token = strings.TrimPrefix(token, "cri-containerd-")
-					if index := strings.LastIndex(token, "-");  index != -1 {
+					if index := strings.LastIndex(token, "-"); index != -1 {
 						token = token[index+1:]
 					}
 					token = strings.TrimSuffix(token, ".scope")
@@ -261,7 +261,7 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 					tokens := strings.Split(fstab[3], "/")
 					for i := len(tokens) - 1; i > 0; i-- {
 						token := tokens[i]
-						if index := strings.LastIndex(token, "-");  index != -1 {
+						if index := strings.LastIndex(token, "-"); index != -1 {
 							token = token[index+1:]
 						}
 						token = strings.TrimSuffix(token, ".scope")
@@ -324,7 +324,7 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
 		return "", err
 	}
-	defer 	f.Close()
+	defer f.Close()
 
 	cpath := getCgroupPathReaderV2(f)
 
@@ -520,10 +520,6 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	filePath := filepath.Join(path, "memory.stat")
 	statsFile, err := os.Open(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
-		}
 		return err
 	}
 	defer statsFile.Close()
@@ -907,12 +903,12 @@ func readUppperLayerPath(file io.ReadSeeker, id string) (string, string, error) 
 						}
 						break
 					}
-				}	// the last entry of the overlay could be a good target, too
-				break	// discard following fields
+				} // the last entry of the overlay could be a good target, too
+				break // discard following fields
 			}
 		}
 
-		if found {	// skip scanning other entries
+		if found { // skip scanning other entries
 			break
 		}
 	}
