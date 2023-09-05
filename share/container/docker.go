@@ -247,6 +247,7 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 
 	if info, err := d.client.InspectImage(meta.ImageID); err == nil {
 		meta.Author = info.Author
+		meta.ImgCreateAt = info.Created
 	}
 
 	meta.isChild, _ = d.GetParent(meta, nil)

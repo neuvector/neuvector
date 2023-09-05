@@ -431,6 +431,7 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 		HostID:       Host.ID,
 		Image:        info.Image,
 		ImageID:      info.ImageID,
+		ImgCreateAt:  info.ImgCreateAt,
 		Author:       info.Author,
 		NetworkMode:  info.NetMode,
 		Privileged:   info.Privileged,
