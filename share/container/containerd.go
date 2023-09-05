@@ -257,8 +257,9 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 	return &info, spec, rootpid, status, attempts, nil
 }
 
-func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, pid int, attempt int) (*ContainerMeta, string) {
+func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, pid int, attempt int) (*ContainerMeta, string, time.Time) {
 	var author string
+	var imgCreateAt time.Time
 
 	meta := &ContainerMeta{
 		ID:       info.ID,
@@ -270,6 +271,7 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, p
 	}
 	if image, err := d.GetImage(info.Image); err == nil {
 		author = image.Author
+		imgCreateAt = image.CreatedAt
 		for k, v := range image.Labels {
 			// Not to overwrite container labels when merging
 			if _, ok := meta.Labels[k]; !ok {
@@ -329,7 +331,7 @@ func (d *containerdDriver) getMeta(info *containers.Container, spec *oci.Spec, p
 			meta.NetMode = "host"
 		}
 	}
-	return meta, author
+	return meta, author, imgCreateAt
 }
 
 func (d *containerdDriver) isPrivileged(spec *oci.Spec, id string, bSandBox bool) bool {
@@ -373,7 +375,7 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 			continue
 		}
 
-		meta, _ := d.getMeta(info, spec, pid, attempt)
+		meta, _, _ := d.getMeta(info, spec, pid, attempt)
 		metas = append(metas, meta)
 	}
 
@@ -400,10 +402,11 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 		bSandBox = true
 	}
 
-	cmeta, author := d.getMeta(info, spec, pid, attempt)
+	cmeta, author, imgCreatedAt := d.getMeta(info, spec, pid, attempt)
 	meta := &ContainerMetaExtra{
 		ContainerMeta: *cmeta,
 		Author:        author,
+		ImgCreateAt:   imgCreatedAt,
 		Privileged:    d.isPrivileged(spec, c.ID(), bSandBox),
 		Networks:      utils.NewSet(),
 	}

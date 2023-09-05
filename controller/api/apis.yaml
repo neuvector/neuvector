@@ -12003,6 +12003,7 @@ definitions:
       - pod_name
       - image
       - image_id
+      - image_created_at
       - platform_role
       - domain
       - state
@@ -12040,6 +12041,10 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_created_at:
+        type: string
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       platform_role:
         type: string
         example: core
@@ -12110,6 +12115,7 @@ definitions:
       - host_id
       - image
       - image_id
+      - image_created_at
       - domain
       - state
       - service
@@ -12137,6 +12143,10 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_created_at:
+        type: string
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       domain:
         type: string
         example: ""

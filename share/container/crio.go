@@ -459,6 +459,7 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 		if image, _ := d.GetImage(meta.Image); image != nil {
 			meta.ImageID = image.ID
 			meta.Author = image.Author
+			meta.ImgCreateAt = image.CreatedAt
 			for k, v := range image.Labels {
 				// Not to overwrite container labels when merging
 				if _, ok := meta.Labels[k]; !ok {
@@ -471,6 +472,7 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 				if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
 					meta.ImageID = image.ID
 					meta.Author = image.Author
+					meta.ImgCreateAt = image.CreatedAt
 					for k, v := range image.Labels {
 						// Not to overwrite container labels when merging
 						if _, ok := meta.Labels[k]; !ok {
