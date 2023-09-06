@@ -243,7 +243,6 @@ func pruneGroupsByNamespace() {
 	domainMutex.Lock()
 	for name, t := range domainRemoveMap {
 		if now.Sub(t) >= PruneGroupDelay {
-			delete(domainRemoveMap, name)
 			domains.Add(name)
 		}
 	}
@@ -257,16 +256,6 @@ func pruneGroupsByNamespace() {
 	if isLeader() {
 		var groups []string
 		log.WithFields(log.Fields{"domains": domains}).Debug()
-
-		/*
-			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
-			if err != nil {
-				// wait for next turn
-				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-				return
-			}
-			defer clusHelper.ReleaseLock(lock)
-		*/
 
 		cacheMutexRLock()
 		for name, groupCache := range groupCacheMap {
@@ -282,7 +271,6 @@ func pruneGroupsByNamespace() {
 				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
 				return
 			}
-			defer clusHelper.ReleaseLock(lock)
 
 			log.WithFields(log.Fields{"groups": groups}).Debug()
 			for _, name := range groups {
@@ -290,6 +278,14 @@ func pruneGroupsByNamespace() {
 				kv.DeleteResponseRuleByGroup(name)
 				clusHelper.DeleteGroup(name)
 			}
+			clusHelper.ReleaseLock(lock)
 		}
 	}
+
+	// remove the domain entries here, in case that it failed to acquire the policy lock
+	domainMutex.Lock()
+	for itr := range domains.Iter() {
+		delete(domainRemoveMap, itr.(string))
+	}
+	domainMutex.Unlock()
 }
