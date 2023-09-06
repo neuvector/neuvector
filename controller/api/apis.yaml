@@ -4498,6 +4498,9 @@ definitions:
       workload_service:
         type: string
         example: ""
+      image:
+        type: string
+        example: "alpine:3.16.1"
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
@@ -4567,6 +4570,35 @@ definitions:
         items:
           type: string
           example: ""
+      package_ver:
+        type: string
+      fixed_ver:
+        type: string
+      score:
+        type: number
+        format: float32
+        example: 7.3
+      score_v3:
+        type: number
+        format: float32
+        example: 7.3
+      vectors:
+        type: string
+      vectors_v3:
+        type: string
+      link:
+        type: string
+      description:
+        type: string
+      pub_date:
+        type: string
+      last_mod_date:
+        type: string
+      image_layer_digest:
+        type: string
+        example: "sha256:08614570918e6832c44397cc7bce8037f07a8e2b87aec19d57a3da5eff274c7b"
+      cmds:
+        type: string
   Event:
     type: object
     required:
@@ -12003,6 +12035,7 @@ definitions:
       - pod_name
       - image
       - image_id
+      - image_created_at
       - platform_role
       - domain
       - state
@@ -12040,6 +12073,10 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_created_at:
+        type: string
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       platform_role:
         type: string
         example: core
@@ -12110,6 +12147,7 @@ definitions:
       - host_id
       - image
       - image_id
+      - image_created_at
       - domain
       - state
       - service
@@ -12137,6 +12175,10 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_created_at:
+        type: string
+        format: date-time
+        example: 2018-01-18T00:44:02Z
       domain:
         type: string
         example: ""

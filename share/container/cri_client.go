@@ -194,7 +194,8 @@ func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*
 	type criImageInfo struct {
 		Info struct {
 			ImageSpec struct {
-				Author string `json:"author"`
+				Author    string     `json:"author"`
+				CreatedAt time.Time  `json:"created"`
 				Config struct {
 					Enrtrypoint []string          `json:"Entrypoint"`
 					Labels      map[string]string `json:"Labels"`
@@ -227,6 +228,7 @@ func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*
 		}
 
 		meta.Author = res.Info.ImageSpec.Author
+		meta.CreatedAt = res.Info.ImageSpec.CreatedAt
 		if res.Info.ImageSpec.Config.Labels != nil {
 			meta.Labels = res.Info.ImageSpec.Config.Labels
 		}

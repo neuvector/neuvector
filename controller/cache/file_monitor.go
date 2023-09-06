@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -547,21 +548,33 @@ func updateFileAccessRule(group string, conf *monitorProfile) {
 }
 
 // a dedicated service for reporting system with serialized in the occuring sequence
-var chanFileRules = make(chan []*share.CLUSFileAccessRuleReq, 256)
+var fileRuleEntries []*share.CLUSFileAccessRuleReq = make([]*share.CLUSFileAccessRuleReq, 0)
+var fileRuleEntryMux sync.Mutex
 
 func FileReportBkgSvc() {
 	for {
-		if len(chanFileRules) > 0 {
+		fileRuleEntryMux.Lock()
+		length := len(fileRuleEntries)
+		fileRuleEntryMux.Unlock()
+
+		if length > 0 {
 			if kv.IsImporting() {
-				for i := 0; i < len(chanFileRules); i++ {
-					<-chanFileRules
-				}
+				fileRuleEntryMux.Lock()
+				fileRuleEntries = make([]*share.CLUSFileAccessRuleReq, 0) // reset
+				fileRuleEntryMux.Unlock()
 			} else {
 				if lock, _ := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait); lock != nil {
-					for i := 0; i < len(chanFileRules) && i < 16; i++ {
-						rules := <-chanFileRules
-						updateFileMonitorProfile(rules)
+					var rules []*share.CLUSFileAccessRuleReq
+					index := length
+					if index > 32 { // 32 entries
+						index = 32
 					}
+
+					fileRuleEntryMux.Lock()
+					rules, fileRuleEntries = fileRuleEntries[:index], fileRuleEntries[index:]
+					fileRuleEntryMux.Unlock()
+
+					updateFileMonitorProfile(rules)
 					clusHelper.ReleaseLock(lock)
 				}
 			}
@@ -572,10 +585,8 @@ func FileReportBkgSvc() {
 }
 
 func AddFileRuleReport(rules []*share.CLUSFileAccessRuleReq) bool {
-	if len(chanFileRules) == cap(chanFileRules) {
-		log.Error("Full")
-		return false
-	}
-	chanFileRules <- rules
+	fileRuleEntryMux.Lock()
+	fileRuleEntries = append(fileRuleEntries, rules...)
+	fileRuleEntryMux.Unlock()
 	return true
 }
