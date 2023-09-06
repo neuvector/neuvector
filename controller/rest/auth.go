@@ -1145,8 +1145,10 @@ func rsaReadKeys(certFile, keyFile string) (error, *rsa.PublicKey, *rsa.PrivateK
 
 func jwtReadKeys() error {
 	var err error
-	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
+	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultJWTCertFile, defaultJWTKeyFile)
 	if err != nil {
+		log.WithError(err).Info("failed to open default jwt keys, falling back...")
+		err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
 		return err
 	}
 
