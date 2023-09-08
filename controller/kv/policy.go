@@ -152,11 +152,66 @@ func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfg
 	return delCount
 }
 
+func deleteResponseRuleByGroupsTxn(txn *cluster.ClusterTransact, names []string) int {
+	delCount := 0
+	policyNames := []string{share.DefaultPolicyName, share.FedPolicyName}
+	for _, policyName := range policyNames {
+		dels := utils.NewSet()
+		keeps := make([]*share.CLUSRuleHead, 0)
+		crhs := clusHelper.GetResponseRuleList(policyName)
+		for _, crh := range crhs {
+			var found bool
+			var getFromKvCalled bool
+			var r *share.CLUSResponseRule
+
+			rhCfgType := share.UserCreated
+			if crh.ID > api.StartingFedAdmRespRuleID {
+				rhCfgType = share.FederalCfg
+			}
+			for _, name := range names {
+				isFedGroup := strings.HasPrefix(name, api.FederalGroupPrefix)
+				if (isFedGroup && policyName != share.FedPolicyName) || (!isFedGroup && policyName == share.FedPolicyName) {
+					continue
+				}
+				if (isFedGroup && rhCfgType == share.FederalCfg) || (!isFedGroup && rhCfgType != share.FederalCfg) {
+					if r == nil {
+						r, _ = clusHelper.GetResponseRule(policyName, crh.ID)
+						getFromKvCalled = true
+					}
+					if r != nil && r.Group == name {
+						// found the responsible rule to be deleted
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				dels.Add(crh.ID)
+			} else if !getFromKvCalled || r != nil {
+				keeps = append(keeps, crh)
+			}
+		}
+		// Write updated rules to the cluster by transaction
+		if dels.Cardinality() > 0 {
+			clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+			for id := range dels.Iter() {
+				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+			}
+			delCount += dels.Cardinality()
+		}
+	}
+	return delCount
+}
+
 func DeleteResponseRuleByGroup(name string) int {
+	return DeleteResponseRuleByGroups([]string{name})
+}
+
+func DeleteResponseRuleByGroups(names []string) int {
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	delCount := deleteResponseRuleByGroupTxn(txn, name, nil)
+	delCount := deleteResponseRuleByGroupsTxn(txn, names)
 	if delCount > 0 {
 		if ok, err := txn.Apply(); err != nil || !ok {
 			log.WithFields(log.Fields{"error": err, "ok": ok}).Error("Atomic write failed")
