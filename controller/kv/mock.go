@@ -415,7 +415,7 @@ func (m *MockCluster) DeleteServer(name string) error {
 	return nil
 }
 
-func (m *MockCluster) DeleteProcessProfile(group string) error {
+func (m *MockCluster) DeleteProcessProfileTxn(txn *cluster.ClusterTransact, group string) error {
 	return nil
 }
 

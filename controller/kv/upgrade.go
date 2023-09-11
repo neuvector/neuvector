@@ -1528,9 +1528,11 @@ func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 		return false, false
 	}
 	var upd bool
-	if cfg.ProcessProfile.Baseline != share.ProfileBasic && cfg.ProcessProfile.Baseline != share.ProfileZeroDrift {
-		cfg.ProcessProfile.Baseline = share.ProfileZeroDrift
-		upd = true
+	if utils.DoesGroupHavePolicyMode(cfg.ProfileName) {
+		if cfg.ProcessProfile.Baseline != share.ProfileBasic && cfg.ProcessProfile.Baseline != share.ProfileZeroDrift {
+			cfg.ProcessProfile.Baseline = share.ProfileZeroDrift
+			upd = true
+		}
 	}
 	return upd, upd
 }

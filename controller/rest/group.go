@@ -403,7 +403,7 @@ func validateLearnGroupConfig(rg *api.RESTGroupConfig) (int, string) {
 				}
 			} else {
 				if isNvIpGroup {
-					// only domain criterion(if exists) will be kept. All other criteria will br dropped for crd nv.ip.xxx groups
+					// only domain criterion(if exists) will be kept. All other criteria will be dropped for crd nv.ip.xxx groups
 				} else {
 					e = "Learned group can only have key as service and domain"
 				}
@@ -959,18 +959,22 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 func configPolicyMode(grp *share.CLUSGroup) error {
 	if pp := clusHelper.GetProcessProfile(grp.Name); pp != nil {
-		pp.Mode = grp.ProfileMode
-		pp.Baseline = grp.BaselineProfile
-		if err := clusHelper.PutProcessProfile(grp.Name, pp); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
-			return err
+		if pp.Mode != grp.ProfileMode || pp.Baseline != grp.BaselineProfile {
+			pp.Mode = grp.ProfileMode
+			pp.Baseline = grp.BaselineProfile
+			if err := clusHelper.PutProcessProfile(grp.Name, pp); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+				return err
+			}
 		}
 	}
 	if pp, rev := clusHelper.GetFileMonitorProfile(grp.Name); pp != nil {
-		pp.Mode = grp.ProfileMode
-		if err := clusHelper.PutFileMonitorProfile(grp.Name, pp, rev); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
-			return err
+		if pp.Mode != grp.ProfileMode {
+			pp.Mode = grp.ProfileMode
+			if err := clusHelper.PutFileMonitorProfile(grp.Name, pp, rev); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+				return err
+			}
 		}
 	}
 	return nil
@@ -1766,7 +1770,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
 				continue
 			}
-			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
+			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break
 			} else {
@@ -1813,14 +1817,19 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 				// [4]: import network policy rules/process profile/file access rules/group policy mode
 				for i, grpCfgRet := range parsedGrpCfg {
 					var crdRecord share.CLUSCrdSecurityRule // leverage CLUSCrdSecurityRule but we don't save it in kv
-					var profile_mode string
+					var policyMode string
+					var profileMode string
 					var baseline string
+					if grpCfgRet.PolicyModeCfg != nil && grpCfgRet.PolicyModeCfg.PolicyMode != nil {
+						policyMode = *grpCfgRet.PolicyModeCfg.PolicyMode
+						crdRecord.PolicyMode = policyMode
+					}
 					if grpCfgRet.ProcessProfileCfg != nil {
 						// nodes, containers, service or user-defined groups
-						profile_mode = grpCfgRet.ProcessProfileCfg.Mode
+						profileMode = grpCfgRet.ProcessProfileCfg.Mode
 						crdRecord = share.CLUSCrdSecurityRule{
 							ProfileName:    grpCfgRet.TargetName,
-							ProfileMode:    profile_mode,
+							ProfileMode:    profileMode,
 							ProcessProfile: share.CLUSCrdProcessProfile{Baseline: grpCfgRet.ProcessProfileCfg.Baseline},
 							ProcessRules:   crdHandler.crdGetProcessRules(grpCfgRet.ProcessProfileCfg),
 							FileRules:      crdHandler.crdGetFileRules(grpCfgRet.FileProfileCfg),
@@ -1830,11 +1839,12 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 					//  do same job as crdHandleNetworkRules(crdCfgRet.RuleCfgs, crdRecord)
 					importGroupNetworkRules(grpCfgRet.RuleCfgs)
 
-					if crdRecord.ProfileName != "" {
+					if crdRecord.ProfileName != "" && utils.HasGroupProfiles(crdRecord.ProfileName) {
 						secRuleName := fmt.Sprintf("group-import-%d", i)
-						profile_mode, baseline = crdHandler.crdRebuildGroupProfiles(crdRecord.ProfileName, map[string]*share.CLUSCrdSecurityRule{secRuleName: &crdRecord}, share.ReviewTypeImportGroup)
+						profileMode, baseline = crdHandler.crdRebuildGroupProfiles(crdRecord.ProfileName, map[string]*share.CLUSCrdSecurityRule{secRuleName: &crdRecord}, share.ReviewTypeImportGroup)
 					}
-					crdHandler.crdHandlePolicyMode(grpCfgRet.PolicyModeCfg, profile_mode, baseline)
+					//policyMode = h.crdGetProfileSecurityLevel(profileName, "policyMode", recordList)
+					crdHandler.crdHandlePolicyMode(grpCfgRet.TargetName, policyMode, profileMode, baseline)
 
 					if hasDlpWafSetting, ok := targetGroupDlpWAF[grpCfgRet.TargetName]; ok && hasDlpWafSetting {
 						if grpCfgRet.DlpGroupCfg == nil {
@@ -1843,10 +1853,14 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						if grpCfgRet.WafGroupCfg == nil {
 							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
 						}
+
+						txn := cluster.Transact()
 						// [4]: import dlp group data
-						crdHandler.crdHandleDlpGroup(grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
+						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
 						// [5]: import waf group data
-						crdHandler.crdHandleWafGroup(grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
+						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
+						txn.Apply()
+						txn.Close()
 					}
 
 					progress += inc
