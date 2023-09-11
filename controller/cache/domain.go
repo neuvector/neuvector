@@ -273,11 +273,17 @@ func pruneGroupsByNamespace() {
 			}
 
 			log.WithFields(log.Fields{"groups": groups}).Debug()
+			kv.DeletePolicyByGroups(groups)
+			kv.DeleteResponseRuleByGroups(groups)
+
+			txn := cluster.Transact()
 			for _, name := range groups {
-				kv.DeletePolicyByGroup(name)
-				kv.DeleteResponseRuleByGroup(name)
-				clusHelper.DeleteGroup(name)
+				clusHelper.DeleteGroupTxn(txn, name)
 			}
+			if ok, err1 := txn.Apply(); err1 != nil || !ok {
+				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
+			}
+			txn.Close()
 			clusHelper.ReleaseLock(lock)
 		}
 	}
