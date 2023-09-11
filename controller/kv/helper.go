@@ -114,7 +114,6 @@ type ClusterHelper interface {
 	PutProcessProfile(group string, pg *share.CLUSProcessProfile) error
 	PutProcessProfileTxn(txn *cluster.ClusterTransact, group string, pg *share.CLUSProcessProfile) error
 	PutProcessProfileIfNotExist(group string, pg *share.CLUSProcessProfile) error
-	DeleteProcessProfile(group string) error
 	DeleteProcessProfileTxn(txn *cluster.ClusterTransact, group string) error
 	GetAllProcessProfileSubKeys(scope string) utils.Set
 
@@ -162,7 +161,6 @@ type ClusterHelper interface {
 	PutFileMonitorProfile(name string, conf *share.CLUSFileMonitorProfile, rev uint64) error
 	PutFileMonitorProfileIfNotExist(name string, conf *share.CLUSFileMonitorProfile) error
 	PutFileMonitorProfileTxn(txn *cluster.ClusterTransact, name string, conf *share.CLUSFileMonitorProfile) error
-	DeleteFileMonitor(name string) error
 	DeleteFileMonitorTxn(txn *cluster.ClusterTransact, name string) error
 
 	GetAdmissionCertRev(svcName string) (*share.CLUSAdmissionCertCloaked, uint64) // obsolete
@@ -221,7 +219,7 @@ type ClusterHelper interface {
 	GetDlpGroup(group string) *share.CLUSDlpGroup
 	PutDlpGroup(group *share.CLUSDlpGroup, create bool) error
 	PutDlpGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSDlpGroup) error
-	DeleteDlpGroup(group string) error
+	DeleteDlpGroup(txn *cluster.ClusterTransact, group string) error
 
 	GetWafSensor(name string) *share.CLUSWafSensor
 	GetAllWafSensors() []*share.CLUSWafSensor
@@ -232,18 +230,19 @@ type ClusterHelper interface {
 	GetWafGroup(group string) *share.CLUSWafGroup
 	PutWafGroup(group *share.CLUSWafGroup, create bool) error
 	PutWafGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSWafGroup) error
-	DeleteWafGroup(group string) error
+	DeleteWafGroup(txn *cluster.ClusterTransact, group string) error
 
 	GetCustomCheckConfig(name string) (*share.CLUSCustomCheckGroup, uint64)
 	GetAllCustomCheckConfig() map[string]*share.CLUSCustomCheckGroup
 	PutCustomCheckConfig(name string, conf *share.CLUSCustomCheckGroup, rev uint64) error
-	DeleteCustomCheckConfig(name string) error
+	DeleteCustomCheckConfig(txn *cluster.ClusterTransact, name string) error
 
-	GetCrdRecord(string) *share.CLUSCrdRecord
-	PutCrdRecord(*share.CLUSCrdRecord, string) error
+	GetCrdRecord(name string) *share.CLUSCrdRecord
+	PutCrdRecord(record *share.CLUSCrdRecord, name string) error
 	DeleteCrdRecord(string) error
 	GetCrdEventQueue() *share.CLUSCrdEventRecord
-	PutCrdEventQueue(*share.CLUSCrdEventRecord) error
+	PutCrdEventQueue(record *share.CLUSCrdEventRecord) error
+	GetCrdEventQueueCount() int
 
 	GetAwsCloudResource(projectName string) (*share.CLUSAwsResource, error)
 	PutAwsCloudResource(project *share.CLUSAwsResource) error
@@ -418,7 +417,7 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	}
 }
 
-func (m clusterHelper) putSizeAware(key string, value []byte) error {
+func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, value []byte) error {
 	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
 		zb := utils.GzipBytes(value)
 		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
@@ -426,9 +425,19 @@ func (m clusterHelper) putSizeAware(key string, value []byte) error {
 			log.WithFields(log.Fields{"key": key}).Error(err)
 			return err
 		}
-		return cluster.PutBinary(key, zb)
+		if txn != nil {
+			txn.PutBinary(key, zb)
+			return nil
+		} else {
+			return cluster.PutBinary(key, zb)
+		}
 	} else {
-		return cluster.Put(key, value)
+		if txn != nil {
+			txn.Put(key, value)
+			return nil
+		} else {
+			return cluster.Put(key, value)
+		}
 	}
 }
 
@@ -1146,15 +1155,17 @@ func (m clusterHelper) PutProcessProfileIfNotExist(group string, pg *share.CLUSP
 	return cluster.PutIfNotExist(key, value, true)
 }
 
-func (m clusterHelper) DeleteProcessProfile(group string) error {
-	cluster.Delete(share.CLUSProfileConfigKey(group))
-	return cluster.Delete(share.CLUSProfileKey(group))
-}
-
 func (m clusterHelper) DeleteProcessProfileTxn(txn *cluster.ClusterTransact, group string) error {
-	txn.Delete(share.CLUSProfileConfigKey(group))
-	txn.Delete(share.CLUSProfileKey(group))
-	return nil
+	key1 := share.CLUSProfileConfigKey(group)
+	key2 := share.CLUSProfileKey(group)
+	if txn == nil {
+		cluster.Delete(key1)
+		return cluster.Delete(key2)
+	} else {
+		txn.Delete(key1)
+		txn.Delete(key2)
+		return nil
+	}
 }
 
 func (m clusterHelper) GetAllProcessProfileSubKeys(scope string) utils.Set {
@@ -1791,15 +1802,17 @@ func (m clusterHelper) PutFileMonitorProfileTxn(txn *cluster.ClusterTransact, na
 	return nil
 }
 
-func (m clusterHelper) DeleteFileMonitor(name string) error {
-	cluster.Delete(share.CLUSFileMonitorKey(name))
-	return cluster.Delete(share.CLUSFileMonitorNetworkKey(name))
-}
-
 func (m clusterHelper) DeleteFileMonitorTxn(txn *cluster.ClusterTransact, name string) error {
-	txn.Delete(share.CLUSFileMonitorKey(name))
-	txn.Delete(share.CLUSFileMonitorNetworkKey(name))
-	return nil
+	key1 := share.CLUSFileMonitorKey(name)
+	key2 := share.CLUSFileMonitorNetworkKey(name)
+	if txn == nil {
+		cluster.Delete(key1)
+		return cluster.Delete(key2)
+	} else {
+		txn.Delete(key1)
+		txn.Delete(key2)
+		return nil
+	}
 }
 
 func (m clusterHelper) GetFileAccessRule(name string) (*share.CLUSFileAccessRule, uint64) {
@@ -2105,7 +2118,7 @@ func (m clusterHelper) GetCrdSecurityRuleRecord(crdKind, crdName string) *share.
 func (m clusterHelper) PutCrdSecurityRuleRecord(crdKind, crdName string, rules *share.CLUSCrdSecurityRule) error {
 	key := share.CLUSCrdKey(crdKind, crdName)
 	value, _ := json.Marshal(rules)
-	return m.putSizeAware(key, value)
+	return m.putSizeAware(nil, key, value)
 }
 
 func (m clusterHelper) DeleteCrdSecurityRuleRecord(crdKind, crdName string) error {
@@ -2115,18 +2128,19 @@ func (m clusterHelper) DeleteCrdSecurityRuleRecord(crdKind, crdName string) erro
 
 func (m clusterHelper) GetCrdSecurityRuleRecordList(crdKind string) map[string]*share.CLUSCrdSecurityRule {
 	records := make(map[string]*share.CLUSCrdSecurityRule, 0)
-	store := share.CLUSConfigCrdStore
-	keys, _ := cluster.GetStoreKeys(store)
-	for _, key := range keys {
-		id := share.CLUSKeyNthToken(key, 3)
-		if id == crdKind {
-			if value, _, _ := m.get(key); value != nil {
+	key := fmt.Sprintf("%s%s/", share.CLUSConfigCrdStore, crdKind)
+	if kvPairs, err := cluster.List(key); err == nil {
+		records = make(map[string]*share.CLUSCrdSecurityRule, len(kvPairs))
+		for _, kv := range kvPairs {
+			if kv != nil {
+				// kv.ModifyIndex is the rev returned from cluster.GetRev()
 				var secRule share.CLUSCrdSecurityRule
-				json.Unmarshal(value, &secRule)
+				json.Unmarshal(kv.Value, &secRule)
 				records[secRule.Name] = &secRule
 			}
 		}
 	}
+
 	return records
 }
 
@@ -2441,9 +2455,14 @@ func (m clusterHelper) PutDlpGroupTxn(txn *cluster.ClusterTransact, group *share
 	return nil
 }
 
-func (m clusterHelper) DeleteDlpGroup(group string) error {
+func (m clusterHelper) DeleteDlpGroup(txn *cluster.ClusterTransact, group string) error {
 	key := share.CLUSDlpGroupConfigKey(group)
-	return cluster.Delete(key)
+	if txn == nil {
+		return cluster.Delete(key)
+	} else {
+		txn.Delete(key)
+		return nil
+	}
 }
 
 // waf sensor
@@ -2526,9 +2545,14 @@ func (m clusterHelper) PutWafGroupTxn(txn *cluster.ClusterTransact, group *share
 	return nil
 }
 
-func (m clusterHelper) DeleteWafGroup(group string) error {
+func (m clusterHelper) DeleteWafGroup(txn *cluster.ClusterTransact, group string) error {
 	key := share.CLUSWafGroupConfigKey(group)
-	return cluster.Delete(key)
+	if txn == nil {
+		return cluster.Delete(key)
+	} else {
+		txn.Delete(key)
+		return nil
+	}
 }
 
 func (m clusterHelper) GetCustomCheckConfig(group string) (*share.CLUSCustomCheckGroup, uint64) {
@@ -2564,9 +2588,17 @@ func (m clusterHelper) PutCustomCheckConfig(group string, conf *share.CLUSCustom
 	return cluster.Put(key, value)
 }
 
-func (m clusterHelper) DeleteCustomCheckConfig(group string) error {
-	cluster.Delete(share.CLUSCustomCheckConfigKey(group))
-	return cluster.Delete(share.CLUSCustomCheckNetworkKey(group))
+func (m clusterHelper) DeleteCustomCheckConfig(txn *cluster.ClusterTransact, group string) error {
+	key1 := share.CLUSCustomCheckConfigKey(group)
+	key2 := share.CLUSCustomCheckNetworkKey(group)
+	if txn == nil {
+		cluster.Delete(key1)
+		return cluster.Delete(key2)
+	} else {
+		txn.Delete(key1)
+		txn.Delete(key2)
+		return nil
+	}
 }
 
 func (m clusterHelper) GetCrdRecord(name string) *share.CLUSCrdRecord {
@@ -2582,7 +2614,7 @@ func (m clusterHelper) GetCrdRecord(name string) *share.CLUSCrdRecord {
 func (m clusterHelper) PutCrdRecord(record *share.CLUSCrdRecord, name string) error {
 	key := share.CLUSCrdQueueKey(name)
 	value, _ := json.Marshal(record)
-	return m.putSizeAware(key, value)
+	return m.putSizeAware(nil, key, value)
 }
 
 func (m clusterHelper) DeleteCrdRecord(name string) error {
@@ -2591,9 +2623,9 @@ func (m clusterHelper) DeleteCrdRecord(name string) error {
 }
 
 func (m clusterHelper) GetCrdEventQueue() *share.CLUSCrdEventRecord {
-	var records share.CLUSCrdEventRecord
 	key := share.CLUSCrdProcStore
 	if value, _, _ := m.get(key); value != nil {
+		var records share.CLUSCrdEventRecord
 		json.Unmarshal(value, &records)
 		return &records
 	}
@@ -2601,9 +2633,35 @@ func (m clusterHelper) GetCrdEventQueue() *share.CLUSCrdEventRecord {
 }
 
 func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error {
+	txn := cluster.Transact()
+
 	key := share.CLUSCrdProcStore
 	value, _ := json.Marshal(record)
-	return m.putSizeAware(key, value)
+	if err := m.putSizeAware(txn, key, value); err != nil {
+		txn.Close()
+		return err
+	}
+
+	queueInfo := share.CLUSCrdEventQueueInfo{Count: len(record.CrdEventRecord)}
+	key = key + "count"
+	value, _ = json.Marshal(&queueInfo)
+	txn.Put(key, value)
+
+	_, err := txn.Apply()
+	txn.Close()
+
+	return err
+}
+
+func (m clusterHelper) GetCrdEventQueueCount() int {
+	key := share.CLUSCrdProcStore
+	key = key + "count"
+	if value, _ := cluster.Get(key); value != nil {
+		var queueInfo share.CLUSCrdEventQueueInfo
+		json.Unmarshal(value, &queueInfo)
+		return queueInfo.Count
+	}
+	return 0
 }
 
 func (m clusterHelper) DeleteAwsProjectCfg(projectName string) error {

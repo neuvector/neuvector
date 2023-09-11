@@ -5,55 +5,42 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func (h *nvCrdHandler) crdvalidate(ar *admissionv1beta1.AdmissionReview) {
-	req := ar.Request
-
-	switch req.Kind.Kind {
-	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind, resource.NvAdmCtrlSecurityRuleKind,
-		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind:
-		h.crdSecRuleHandler(req)
-	}
-	return
-}
-
-func writeCrdFailedLog(req *admissionv1beta1.AdmissionRequest, errMsg string) {
-	if req != nil {
-		uid := ""
-		reqName := req.Name
-		var err error = common.ErrUnsupported
+func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) {
+	if detail, err := crdProcEnqueueInternal(ar); err != nil {
+		crUid := ""
+		req := ar.Request
+		var raw []byte
 		var secRulePartial resource.NvSecurityRulePartial
-		switch req.Operation {
-		case "DELETE":
-			err = json.Unmarshal(req.OldObject.Raw, &secRulePartial)
-		case "CREATE", "UPDATE":
-			err = json.Unmarshal(req.Object.Raw, &secRulePartial)
+		if req.Operation == "DELETE" {
+			raw = req.OldObject.Raw
+		} else {
+			raw = req.Object.Raw
 		}
-		if err == nil && secRulePartial.Metadata != nil {
-			if reqName == "" {
-				reqName = secRulePartial.Metadata.GetName()
-			}
-			uid = secRulePartial.Metadata.GetUid()
+		if err := json.Unmarshal(raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
+			crUid = secRulePartial.Metadata.GetUid()
 		}
-		e := fmt.Sprintf("CRD request(%s %s %s %s) Failed", req.Operation, req.Kind.Kind, reqName, uid)
-		k8sResourceLog(share.CLUSEvCrdErrDetected, e, []string{errMsg})
+		msg := fmt.Sprintf("CRD request(%s %s %s %s) Failed", req.Operation, req.Kind.Kind, req.Name, crUid)
+		k8sResourceLog(share.CLUSEvCrdErrDetected, msg, []string{detail})
+		log.WithFields(log.Fields{"error": err}).Error(detail)
 	}
 }
 
-func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
+func crdProcEnqueueInternal(ar *admissionv1beta1.AdmissionReview) (string, error) {
 	if clusHelper == nil {
 		clusHelper = kv.GetClusterHelper()
 	}
@@ -72,18 +59,17 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	// This lock is shared between goroutines handle this queue only, so it is ok to wait long
 	lock, err := clusHelper.AcquireLock(share.CLUSLockCrdQueueKey, time.Minute*5)
 	if err != nil {
-		writeCrdFailedLog(ar.Request, err.Error())
-		log.WithFields(log.Fields{"error": err}).Error("Crd enqueue Acquire crd lock error")
-		return err
+		return "Crd enqueue Acquire crd lock error", err
 	}
 	defer clusHelper.ReleaseLock(lock)
 	// first save the whole content of crd, key is the unique name contain UID
 	var crdQueue share.CLUSCrdRecord
 	crdQueue.CrdRecord = ar
+	if req.Operation == "UPDATE" { // there is no need to save OldObject.Raw because we only check Object.Raw for UPDATE requests
+		crdQueue.CrdRecord.Request.OldObject.Raw = nil
+	}
 	if err := clusHelper.PutCrdRecord(&crdQueue, name); err != nil {
-		writeCrdFailedLog(ar.Request, err.Error())
-		log.WithFields(log.Fields{"Enqueu crd put error": err}).Error()
-		return err
+		return "Enqueu crd put error", err
 	}
 
 	// second save the unique name of the crd event in the queue for orderly process
@@ -93,12 +79,80 @@ func crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) error {
 	}
 	crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
 	if err := clusHelper.PutCrdEventQueue(crdEventQueue); err != nil {
+		errStr := err.Error()
+		if strings.HasPrefix(errStr, "zip data(") && strings.HasSuffix(errStr, ") too big") {
+			if req.Operation == "DELETE" && len(crdEventQueue.CrdEventRecord) > 0 {
+				// failed to queue CRD DELETE request because crdEventQueue.CrdEventRecord is full(by kv key size limitation).
+				j := 0 // new index
+				found := false
+				namePrefix := fmt.Sprintf("%s-%s-%s-", req.Kind.Kind, ruleNs, req.Name)
+				// 1. remove this request from the queue
+				crdEventQueue.CrdEventRecord = crdEventQueue.CrdEventRecord[:len(crdEventQueue.CrdEventRecord)-1]
+				// 2. go thru the queue entries & delete those that have the same CR name (i.e. the prior CREATE/UPDATE requests for this DELETE request are not processed yet)
+				for i, n := range crdEventQueue.CrdEventRecord {
+					// the last entity in the name is req.UID which is different in each request for the same CR object
+					if strings.HasPrefix(n, namePrefix) && ((len(namePrefix) + 36) == len(n)) {
+						found = true
+					} else {
+						crdEventQueue.CrdEventRecord[j] = crdEventQueue.CrdEventRecord[i]
+						j += 1
+					}
+				}
+				if found {
+					// 3. if any queue entry is deleted, append this DELETE request to the queue.
+					crdEventQueue.CrdEventRecord = crdEventQueue.CrdEventRecord[:j]
+					crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
+					err = clusHelper.PutCrdEventQueue(crdEventQueue)
+					// => TODO : what if it fails again because the key value size is still too big?
+				} else {
+					// => TODO: what if no queue entry is deleted?
+				}
+				if err == nil {
+					return "", nil
+				}
+			}
+		}
 		clusHelper.DeleteCrdRecord(name)
-		writeCrdFailedLog(ar.Request, err.Error())
-		log.WithFields(log.Fields{"Enqueu crd event put error": err}).Error()
-		return err
+		return fmt.Sprintf("Enqueu crd event put error(%d entries)", len(crdEventQueue.CrdEventRecord)), err
 	}
-	return nil
+	return "", nil
+}
+
+func deleteCrInK8s(kind, recordName string, crdSecRule interface{}) {
+	if crdSecRule == nil {
+		return
+	}
+
+	var err error
+
+	switch kind {
+	case resource.NvSecurityRuleKind:
+		err = global.ORCH.DeleteResource(resource.RscTypeCrdSecurityRule, crdSecRule)
+	case resource.NvClusterSecurityRuleKind:
+		if gfwrule, ok := crdSecRule.(*resource.NvSecurityRule); ok && gfwrule != nil {
+			r := resource.NvClusterSecurityRule(*gfwrule)
+			err = global.ORCH.DeleteResource(resource.RscTypeCrdClusterSecurityRule, &r)
+		}
+	case resource.NvAdmCtrlSecurityRuleKind:
+		err = global.ORCH.DeleteResource(resource.RscTypeCrdAdmCtrlSecurityRule, crdSecRule)
+	case resource.NvDlpSecurityRuleKind:
+		err = global.ORCH.DeleteResource(resource.RscTypeCrdDlpSecurityRule, crdSecRule)
+	case resource.NvWafSecurityRuleKind:
+		err = global.ORCH.DeleteResource(resource.RscTypeCrdWafSecurityRule, crdSecRule)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"kind": kind, "error": err}).Error(recordName)
+	}
+}
+
+func writeCrOpEvent(kind, recordName, uid string, ev share.TLogEvent, msg string, subMsgs []string) {
+	detail := make([]string, 0, len(subMsgs))
+	for _, subMsg := range subMsgs {
+		if subMsg != "" {
+			detail = append(detail, subMsg)
+		}
+	}
+	k8sResourceLog(ev, msg, detail)
 }
 
 // The process thread do it periodically every 10s
@@ -112,8 +166,9 @@ func CrdQueueProc() {
 			// after wake-up the thread will try to drain crd event queue
 		NEXT_CRD:
 			// add peek at beginning to avoid lock everytime.
-			crdEventQueue := clusHelper.GetCrdEventQueue()
-			if crdEventQueue == nil || len(crdEventQueue.CrdEventRecord) == 0 {
+			crdEventsCount := clusHelper.GetCrdEventQueueCount()
+			if crdEventsCount == 0 {
+				time.Sleep(time.Second)
 				continue
 			}
 			lock, err := clusHelper.AcquireLock(share.CLUSLockCrdQueueKey, time.Minute*5)
@@ -123,7 +178,7 @@ func CrdQueueProc() {
 			}
 			// reread the kv after lock
 			// First get the name of the crd in event queue, this queue keep the event order
-			crdEventQueue = clusHelper.GetCrdEventQueue()
+			crdEventQueue := clusHelper.GetCrdEventQueue()
 			if crdEventQueue == nil || len(crdEventQueue.CrdEventRecord) == 0 {
 				// never have crd event so the store key never extablished
 				clusHelper.ReleaseLock(lock)
@@ -161,22 +216,122 @@ func CrdQueueProc() {
 			}
 			crdHandler.Init(lockKey)
 			retryCount := 0
+			req := record.Request // *admissionv1beta1.AdmissionRequest
+			crdEventsCount = len(crdEventQueue.CrdEventRecord)
 
-		RETRY_POLICY_LOCK:
-			if !crdHandler.AcquireLock(2 * clusterLockWait) {
-				if retryCount > 3 {
-					log.Printf("Crd dequeu proc Plicy lock FAILED")
-					continue
+			var kind string
+			var secRulePartial resource.NvSecurityRulePartial
+			var gfwrule resource.NvSecurityRule
+			var admCtrlSecRule resource.NvAdmCtrlSecurityRule
+			var dlpSecRule resource.NvDlpSecurityRule
+			var wafSecRule resource.NvWafSecurityRule
+			var crdSecRule interface{}
+			var errCount, cachedRecords int
+			var errMsg string
+			var crInfo, crWarning string
+			var usedTime int64
+
+			err = nil
+			kind = req.Kind.Kind
+			ruleNs := req.Namespace
+			if req.Namespace == "" {
+				ruleNs = "default"
+			}
+			recordName := fmt.Sprintf("%s-%s-%s", kind, ruleNs, req.Name)
+			switch req.Operation {
+			case "DELETE":
+				if err = json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
+					kind = *secRulePartial.Kind
+					if req.Name == "" {
+						req.Name = secRulePartial.Metadata.GetName()
+					}
+					crdHandler.crUid = secRulePartial.Metadata.GetUid()
+					crdHandler.mdName = req.Name
 				} else {
-					retryCount++
-					log.Printf("Policy lock retry on proc crd %d", retryCount)
-					goto RETRY_POLICY_LOCK
+					errCount = 1
+					errMsg = fmt.Sprintf("CRD Rule format error")
+				}
+			case "CREATE", "UPDATE":
+				switch kind {
+				case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
+					err = json.Unmarshal(req.Object.Raw, &gfwrule)
+					crdSecRule = &gfwrule
+				case resource.NvAdmCtrlSecurityRuleKind:
+					err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule)
+					crdSecRule = &admCtrlSecRule
+				case resource.NvDlpSecurityRuleKind:
+					err = json.Unmarshal(req.Object.Raw, &dlpSecRule)
+					crdSecRule = &dlpSecRule
+				case resource.NvWafSecurityRuleKind:
+					err = json.Unmarshal(req.Object.Raw, &wafSecRule)
+					crdSecRule = &wafSecRule
+				default:
+					err = fmt.Errorf("unsupported Kubernetese resource kind")
+				}
+				if err != nil {
+					errCount = 1
+					errMsg = fmt.Sprintf("CRD Rule format error")
 				}
 			}
-			crdHandler.crdvalidate(record)
-			crdHandler.ReleaseLock()
+
+		RETRY_POLICY_LOCK:
+			if errCount == 0 {
+				if !crdHandler.AcquireLock(2 * clusterLockWait) {
+					if retryCount > 3 {
+						log.Printf("Crd dequeu proc Plicy lock FAILED")
+						continue
+					} else {
+						retryCount++
+						log.Printf("Policy lock retry on proc crd %d", retryCount)
+						goto RETRY_POLICY_LOCK
+					}
+				}
+				var recordNameNew string
+				before := time.Now()
+				recordNameNew, crInfo, crWarning, errMsg, errCount, cachedRecords = crdHandler.crdSecRuleHandler(req, kind, crdSecRule)
+				usedTime = time.Since(before).Milliseconds()
+				crdHandler.ReleaseLock()
+
+				if recordNameNew != "" && recordNameNew != recordName {
+					recordName = recordNameNew
+				}
+				if errMsg != "" {
+					errMsg = fmt.Sprintf("Error: %s", errMsg)
+				}
+			}
+
+			logFields := log.Fields{
+				"crdName":        recordName,
+				"op":             req.Operation,
+				"queued":         crdEventsCount,
+				"cached_records": cachedRecords,
+				"used_time":      usedTime,
+			}
+			// write event about handling result
+			detail := []string{fmt.Sprintf("%s %s", req.Operation, crdHandler.crUid), crInfo, crWarning, errMsg}
+			if crWarning != "" {
+				log.WithFields(log.Fields{"recordName": recordName}).Warn(crWarning)
+			}
+			switch req.Operation {
+			case "DELETE":
+				msg := fmt.Sprintf("CRD %s", recordName)
+				writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdRemoved, msg, detail)
+				log.WithFields(logFields).Info("CRD deleted")
+			case "CREATE", "UPDATE":
+				if errCount > 0 {
+					deleteCrInK8s(kind, recordName, crdSecRule)
+					msg := fmt.Sprintf("CRD %s Removed", recordName)
+					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdErrDetected, msg, detail)
+					log.WithFields(logFields).Error("Failed to add CRD")
+				} else {
+					msg := fmt.Sprintf("CRD %s Processed", recordName)
+					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdImported, msg, detail)
+					log.WithFields(logFields).Info("CRD processed")
+				}
+			}
+
 			// For multiple controller, need give other controller a chance
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Second)
 			goto NEXT_CRD
 		}
 	}
@@ -189,14 +344,9 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	} else {
-        var reqOp admissionv1beta1.Operation
+		var reqOp admissionv1beta1.Operation
 		if ar.Request != nil {
 			reqOp = ar.Request.Operation
-		}
-		if whsvr.dumpRequestObj && reqOp != admissionv1beta1.Delete {
-			if b, err := json.Marshal(ar); err == nil {
-				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug()
-			}
 		}
 		if (ar.Request == nil || len(ar.Request.Object.Raw) == 0) && (reqOp != admissionv1beta1.Delete) {
 			log.WithFields(log.Fields{"reqOp": reqOp}).Warn("disallow because of no request/raw data")
@@ -260,7 +410,12 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
 			} else {
 				allowed = true
-				resultMsg = fmt.Sprintf(" %s done", reqOp)
+				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
+					log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name}).Debug("unsupported operation")
+					skip = true
+				} else {
+					resultMsg = fmt.Sprintf(" %s done", reqOp)
+				}
 			}
 		}
 
