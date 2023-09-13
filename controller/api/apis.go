@@ -2044,6 +2044,7 @@ const ScanStatusScheduled string = "scheduled"
 const ScanStatusScanning string = "scanning"
 const ScanStatusFinished string = "finished"
 const ScanStatusFailed string = "failed"
+const ScanStatusFailed_SignatureScan string = "failed_signature_scan"
 const ScanStatusUnsupported string = "unsupported"
 
 type RESTScanBrief struct {

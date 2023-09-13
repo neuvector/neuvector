@@ -50,6 +50,7 @@ type ImageInfo struct {
 	RepoTags         []string
 	IsSignatureImage bool
 	RawManifest      []byte
+	SignatureDigest  string
 }
 
 // SignatureData represents signature image data retrieved from the registry to be
@@ -137,6 +138,9 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 }
 
 func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
+	if manifestReqType == registry.ManifestRequest_CosignSignature {
+		log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("retrieving signature information")
+	}
 	var dg string
 	var body []byte
 	var err error
@@ -272,6 +276,15 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	imageInfo.RunAsRoot = runAsRoot
 
 	imageInfo.RawManifest = body
+
+	if manifestReqType != registry.ManifestRequest_CosignSignature {
+		signatureTag := GetCosignSignatureTagFromDigest(imageInfo.Digest)
+		signatureImageInfo, errCode := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
+		if errCode != share.ScanErrorCode_ScanErrNone && errCode != share.ScanErrorCode_ScanErrImageNotFound {
+			return nil, errCode
+		}
+		imageInfo.SignatureDigest = signatureImageInfo.Digest
+	}
 
 	return imageInfo, share.ScanErrorCode_ScanErrNone
 }
