@@ -137,6 +137,7 @@ type ContainerMetaExtra struct {
 	ContainerMeta
 	ImageID     string
 	ImageDigest string
+	ImgCreateAt time.Time
 	Author      string
 	Privileged  bool
 	ExitCode    int

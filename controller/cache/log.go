@@ -29,6 +29,7 @@ import (
 
 const logCacheSize int = 4096
 const maxSyslogMsg int32 = 256
+const logDescriptionLength int = 256
 
 var syslogMutex sync.RWMutex
 var syslogMsgCount int32
@@ -561,6 +562,11 @@ func fillVulAudit(l *api.Audit, cve string) {
 		l.VectorsV3 = v.VectorsV3
 		l.Published = v.PublishedDate
 		l.LastMod = v.FixedVersion
+		if len(v.Description) > logDescriptionLength {
+			l.Description = fmt.Sprintf("%s...", v.Description[:logDescriptionLength])
+		} else {
+			l.Description = v.Description
+		}
 	}
 }
 
@@ -1838,6 +1844,8 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		clog.WorkloadImage = wln.image
 		clog.WorkloadService = wln.service
 		if c := getWorkloadCache(id); c != nil {
+			clog.Image = c.workload.Image
+			clog.ImageID = c.workload.ImageID
 			clog.HostName = c.workload.HostName
 			clog.HostID = c.workload.HostID
 			clog.AgentID = c.workload.AgentID
@@ -1872,6 +1880,9 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	if systemConfigCache.SingleCVEPerSyslog {
 		// if only reporting one cve per event, we will add the vulnerabile info.
 		// the vul. list will not be included in the log
+		for _, v := range report.Vuls {
+			scanUtils.FillVul(v)
+		}
 		clog.Vuls = make(map[string]*share.ScanVulnerability)
 		for _, v := range report.Vuls {
 			clog.Vuls[v.Name] = v
@@ -1892,8 +1903,11 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 				lc.MediumCnt = len(m)
 			}
 			if systemConfigCache.SingleCVEPerSyslog {
+				for _, v := range lc.Vuls {
+					scanUtils.FillVul(v)
+				}
 				lc.Vuls = make(map[string]*share.ScanVulnerability)
-				for _, v := range report.Vuls {
+				for _, v := range lc.Vuls {
 					lc.Vuls[v.Name] = v
 				}
 			}

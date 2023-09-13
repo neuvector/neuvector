@@ -71,7 +71,7 @@ func (lc *LDAPClient) Close() {
 }
 
 // Authenticate authenticates the user against the ldap backend.
-func (lc *LDAPClient) Authenticate(username, password string) (string, map[string]string, error) {
+func (lc *LDAPClient) Authenticate(password string) (string, map[string]string, error) {
 	err := lc.Connect()
 	if err != nil {
 		return "", nil, err

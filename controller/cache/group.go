@@ -384,7 +384,8 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		}
 
 		// CRD group cannot change mode but it is scorable
-		capChgMode := utils.DoesGroupHavePolicyMode(group.Name) && (group.CfgType == share.Learned || group.Name == api.AllHostGroup)
+		capChgMode := utils.DoesGroupHavePolicyMode(group.Name) &&
+			(group.CfgType == share.Learned || (group.Name == api.AllHostGroup && group.CfgType != share.GroundCfg))
 		capScorable := utils.DoesGroupHavePolicyMode(group.Name)
 
 		cache := initGroupCache(group.CfgType, group.Name)
@@ -551,22 +552,24 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
 		}
 
-		err1 := clusHelper.DeleteProcessProfile(name)
-		err2 := clusHelper.DeleteFileMonitor(name)
-		if cache != nil && cache.group != nil {
-			if isLeader() && cache.group.CfgType == share.FederalCfg && (err1 == nil || err2 == nil) {
-				fedRole := fedMembershipCache.FedRole
-				if fedRole != api.FedRoleNone {
-					// it's not demote/leave/kicked from fed
-					clusHelper.UpdateFedRulesRevision([]string{share.FedProcessProfilesType, share.FedFileMonitorProfilesType})
-				}
-			}
-			if cache.group.Kind == share.GroupKindContainer {
-				clusHelper.DeleteDlpGroup(name)
-				clusHelper.DeleteWafGroup(name)
+		var err error
+		txn := cluster.Transact()
+		clusHelper.DeleteProcessProfileTxn(txn, name)
+		clusHelper.DeleteFileMonitorTxn(txn, name)
+		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
+			clusHelper.DeleteDlpGroup(txn, name)
+			clusHelper.DeleteWafGroup(txn, name)
+		}
+		clusHelper.DeleteCustomCheckConfig(txn, name)
+		_, err = txn.Apply()
+		txn.Close()
+
+		if isLeader() && fedMembershipCache.FedRole != api.FedRoleNone && err == nil {
+			if cache != nil && cache.group != nil && cache.group.CfgType == share.FederalCfg {
+				// it's not demote/leave/kicked from fed
+				clusHelper.UpdateFedRulesRevision([]string{share.FedProcessProfilesType, share.FedFileMonitorProfilesType})
 			}
 		}
-		clusHelper.DeleteCustomCheckConfig(name)
 	}
 }
 
@@ -1088,7 +1091,7 @@ func scheduleGroupRemoval(cache *groupCache) {
 	//NVSHAS-7791, because our timer-wheel’s one round duration is 1 hour
 	//task may not be scheduled into current slot which cause it to wait
 	//for 1 more hour to expire. Add additional 10sec to avoid this.
-	groupRemovalDelay := time.Duration(time.Hour * unusedGrpAge) + groupsRemovalAdditionalDelay
+	groupRemovalDelay := time.Duration(time.Hour*unusedGrpAge) + groupsRemovalAdditionalDelay
 
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
@@ -1747,16 +1750,21 @@ func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) er
 		delete(groupCacheMap, name)
 	}
 	cacheMutexUnlock()
+
+	txn := cluster.Transact()
 	//delete group related policy
-	clusHelper.DeleteProcessProfile(name)
-	clusHelper.DeleteFileMonitor(name)
+	clusHelper.DeleteProcessProfileTxn(txn, name)
+	clusHelper.DeleteFileMonitorTxn(txn, name)
 	if cache != nil && cache.group != nil {
 		if cache.group.Kind == share.GroupKindContainer {
-			clusHelper.DeleteDlpGroup(name)
-			clusHelper.DeleteWafGroup(name)
+			clusHelper.DeleteDlpGroup(txn, name)
+			clusHelper.DeleteWafGroup(txn, name)
 		}
 	}
-	clusHelper.DeleteCustomCheckConfig(name)
+	clusHelper.DeleteCustomCheckConfig(txn, name)
+	txn.Apply()
+	txn.Close()
+
 	return nil
 }
 

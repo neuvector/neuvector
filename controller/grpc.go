@@ -335,7 +335,9 @@ func (sas *ScanAdapterService) ScanImage(ctx context.Context, req *share.Adapter
 	scanner.StoreRepoScanResult(result)
 
 	// Fill the detail and filter the result
-	scanUtils.FillVuls(result)
+	for _, v := range result.Vuls {
+		scanUtils.FillVul(v)
+	}
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	result.Vuls = vpf.FilterVuls(result.Vuls, []api.RESTIDName{api.RESTIDName{DisplayName: fmt.Sprintf("%s:%s", result.Repository, result.Tag)}})
 

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"sort"
 	"strings"
+	"time"
 
 	manifestList "github.com/docker/distribution/manifest/manifestlist"
 	manifestV1 "github.com/docker/distribution/manifest/schema1"
@@ -43,6 +44,7 @@ type ImageInfo struct {
 	Author           string
 	Signed           bool
 	RunAsRoot        bool
+	Created          time.Time
 	Envs             []string
 	Cmds             []string
 	Labels           map[string]string
@@ -127,12 +129,15 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 			imageInfo.Cmds = ccmi.Cmds
 			imageInfo.Envs = ccmi.Envs
 			imageInfo.Labels = ccmi.Labels
+			imageInfo.Created = ccmi.Created
 		}
 	}
 
 	imageInfo.IsSignatureImage = copyV2Layers(imageInfo, &manV2, ccmi)
 
-	log.WithFields(log.Fields{"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg, "cmds": len(imageInfo.Cmds)}).Debug("v2 manifest")
+	log.WithFields(log.Fields{
+		"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg, "cmds": len(imageInfo.Cmds), "created": imageInfo.Created,
+	}).Debug("v2 manifest")
 	return manV2.SchemaVersion, nil
 }
 
@@ -214,7 +219,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	} else {
 		log.WithFields(log.Fields{
 			"layers": len(manV1.SignedManifest.FSLayers), "cmds": len(manV1.Cmds), "digest": manV1.Digest,
-			"version": manV1.SignedManifest.SchemaVersion,
+			"version": manV1.SignedManifest.SchemaVersion, "created": manV1.Created,
 		}).Debug("v1 manifest request")
 
 		// in Harbor registry, even we send request with accept v1 manifest, we still get v2 format back
@@ -243,17 +248,22 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 				signed = true
 			}*/
 
-			if len(manV1.Envs) > 0 {
+			// Prefer data from manifest v2, in some image, cmds in manV1 has incomplete data
+			if len(imageInfo.Envs) == 0 {
 				imageInfo.Envs = manV1.Envs
 			}
-			if len(manV1.Cmds) > 0 {
+			if len(imageInfo.Cmds) == 0 {
 				imageInfo.Cmds = manV1.Cmds
 			}
-			if len(manV1.Labels) > 0 {
+			if len(imageInfo.Labels) == 0 {
 				imageInfo.Labels = manV1.Labels
 			}
+			// Prefer Author from manifest v1
 			if manV1.Author != "" {
 				imageInfo.Author = manV1.Author
+			}
+			if manV1.Created.After(imageInfo.Created) {
+				imageInfo.Created = manV1.Created
 			}
 		}
 	}
@@ -268,6 +278,9 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
 	}
 
+	for i, c := range imageInfo.Cmds {
+		imageInfo.Cmds[i] = NormalizeImageCmd(c)
+	}
 	runAsRoot, _, _ := ParseImageCmds(imageInfo.Cmds)
 	imageInfo.RunAsRoot = runAsRoot
 

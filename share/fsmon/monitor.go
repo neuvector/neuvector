@@ -452,6 +452,12 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, eve
 
 	if event != fileEventAccessed ||
 		(mode == share.PolicyModeEnforce || mode == share.PolicyModeEvaluate) {
+		if fmod.finfo.Link != "" {
+			path = fmod.finfo.Link
+			if index := strings.Index(path, "/root/"); index > 0 {
+				path = path[index+5:]
+			}
+		}
 		w.sendMsg(fmod.finfo.ContainerId, path, event, fmod.pInfo, mode)
 	}
 }

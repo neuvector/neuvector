@@ -2824,6 +2824,12 @@ static void dp_ctrl_update_fqdn_ip(void)
 
 static void dp_ctrl_update_ip_fqdn_storage(void)
 {
+    //this function is called in ctrl thread, but th_ip_fqdn_storage_map is initialized
+    //in data thread, no guarantee th_ip_fqdn_storage_map is already initialized when ctrl
+    //thread reach here during dp start, so we check null value here
+    if (th_ip_fqdn_storage_map.map == NULL) {
+        return;
+    }
     struct cds_lfht_node *ip_fqdn_storage_node;
 
     // Iterate through fqdn map

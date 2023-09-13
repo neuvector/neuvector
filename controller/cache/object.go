@@ -256,6 +256,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		HostID:             wl.HostID,
 		Image:              wl.Image,
 		ImageID:            wl.ImageID,
+		ImgCreateAt:        api.RESTTimeString(wl.ImgCreateAt),
 		PlatformRole:       cache.platformRole,
 		Domain:             wl.Domain,
 		Author:             wl.Author,

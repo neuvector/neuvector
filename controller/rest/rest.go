@@ -82,6 +82,9 @@ var _teleFreq uint
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
 
+const defaultJWTCertFile = "/etc/neuvector/certs/jwt-signing.pem"
+const defaultJWTKeyFile = "/etc/neuvector/certs/jwt-signing.key"
+
 const defFedSSLCertFile = "/etc/neuvector/certs/fed-ssl-cert.pem"
 const defFedSSLKeyFile = "/etc/neuvector/certs/fed-ssl-cert.key"
 

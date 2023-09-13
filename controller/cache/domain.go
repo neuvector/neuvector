@@ -243,7 +243,6 @@ func pruneGroupsByNamespace() {
 	domainMutex.Lock()
 	for name, t := range domainRemoveMap {
 		if now.Sub(t) >= PruneGroupDelay {
-			delete(domainRemoveMap, name)
 			domains.Add(name)
 		}
 	}
@@ -257,16 +256,6 @@ func pruneGroupsByNamespace() {
 	if isLeader() {
 		var groups []string
 		log.WithFields(log.Fields{"domains": domains}).Debug()
-
-		/*
-			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
-			if err != nil {
-				// wait for next turn
-				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-				return
-			}
-			defer clusHelper.ReleaseLock(lock)
-		*/
 
 		cacheMutexRLock()
 		for name, groupCache := range groupCacheMap {
@@ -282,14 +271,27 @@ func pruneGroupsByNamespace() {
 				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
 				return
 			}
-			defer clusHelper.ReleaseLock(lock)
 
 			log.WithFields(log.Fields{"groups": groups}).Debug()
+			kv.DeletePolicyByGroups(groups)
+			kv.DeleteResponseRuleByGroups(groups)
+
+			txn := cluster.Transact()
 			for _, name := range groups {
-				kv.DeletePolicyByGroup(name)
-				kv.DeleteResponseRuleByGroup(name)
-				clusHelper.DeleteGroup(name)
+				clusHelper.DeleteGroupTxn(txn, name)
 			}
+			if ok, err1 := txn.Apply(); err1 != nil || !ok {
+				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
+			}
+			txn.Close()
+			clusHelper.ReleaseLock(lock)
 		}
 	}
+
+	// remove the domain entries here, in case that it failed to acquire the policy lock
+	domainMutex.Lock()
+	for itr := range domains.Iter() {
+		delete(domainRemoveMap, itr.(string))
+	}
+	domainMutex.Unlock()
 }

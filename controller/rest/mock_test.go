@@ -467,6 +467,14 @@ func (m *mockCache) GetAllControllerRPCEndpoints(acc *access.AccessControl) []*c
 	return []*common.RPCEndpoint{}
 }
 
+func (m *mockCache) GetNewServicePolicyMode() string {
+	return share.PolicyModeLearn
+}
+
+func (m *mockCache) GetNewServiceProfileBaseline() string {
+	return share.ProfileZeroDrift
+}
+
 // --
 
 func mockLoginUser(name, role, fedRole string, roleDomains map[string][]string) *loginSession {

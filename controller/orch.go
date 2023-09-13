@@ -97,14 +97,14 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
 					if event == resource.WatchEventDelete {
 						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
-						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey, nil)
+						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey)
 					}
 				}
 			} else if crd, ok := res.(*apiextv1.CustomResourceDefinition); ok {
 				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
 					if event == resource.WatchEventDelete {
 						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
-						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey, nil)
+						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey)
 					}
 				}
 			}

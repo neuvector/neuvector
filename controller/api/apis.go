@@ -856,6 +856,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	HostID             string               `json:"host_id"`
 	Image              string               `json:"image"`
 	ImageID            string               `json:"image_id"`
+	ImgCreateAt        string               `json:"image_created_at"`
 	PlatformRole       string               `json:"platform_role"`
 	Domain             string               `json:"domain"`
 	State              string               `json:"state"`
@@ -918,6 +919,7 @@ type RESTWorkloadBriefV2 struct {
 	HostID       string `json:"host_id"`
 	Image        string `json:"image"`
 	ImageID      string `json:"image_id"`
+	ImgCreateAt  string `json:"image_created_at"`
 	Domain       string `json:"domain"`
 	State        string `json:"state"`
 	Service      string `json:"service"`
@@ -2070,9 +2072,10 @@ type RESTScanPlatformSummaryData struct {
 }
 
 type RESTScanImageSummary struct {
-	Image   string `json:"image"`
-	ImageID string `json:"image_id"`
-	Author  string `json:"author"`
+	Image     string `json:"image"`
+	ImageID   string `json:"image_id"`
+	Author    string `json:"author"`
+	CreatedAt string `json:"created_at"`
 	RESTScanBrief
 }
 
@@ -2205,6 +2208,7 @@ type RESTScanRepoReport struct {
 	Size            int64            `json:"size"`
 	Author          string           `json:"author"`
 	BaseOS          string           `json:"base_os"`
+	CreatedAt       string           `json:"created_at"`
 	CVEDBVersion    string           `json:"cvedb_version"`
 	CVEDBCreateTime string           `json:"cvedb_create_time"`
 	Layers          []*RESTScanLayer `json:"layers"`
@@ -2683,7 +2687,6 @@ type RESTProcessProfileConfig struct {
 	Baseline       *string                          `json:"baseline,omitempty"`
 	ProcessChgList *[]RESTProcessProfileEntryConfig `json:"process_change_list,omitempty"`
 	ProcessDelList *[]RESTProcessProfileEntryConfig `json:"process_delete_list,omitempty"`
-	ProcessRepList *[]RESTProcessProfileEntryConfig `json:"process_replace_list,omitempty"`
 }
 
 type RESTProcessProfileConfigData struct {
@@ -3088,6 +3091,7 @@ type RESTRegistryImageSummary struct {
 	Size       int64             `json:"size"`
 	Author     string            `json:"author"`
 	RunAsRoot  bool              `json:"run_as_root"`
+	CreatedAt  string            `json:"created_at"`
 	Envs       []string          `json:"envs"`
 	Labels     map[string]string `json:"labels"`
 	Layers     []string          `json:"layers"`

@@ -67,6 +67,8 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	}
 	defer client.Close()
 
+	username = ldap.EscapeFilter(username)
+
 	if cldap.Type == api.ServerLDAPTypeMSAD {
 		client.UserFilter = fmt.Sprintf(adUserFilter, cldap.UserNameAttr, username)
 	} else {
@@ -74,7 +76,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	}
 
 	log.WithFields(log.Fields{"filter": client.UserFilter}).Debug("user query")
-	dn, attrs, err := client.Authenticate(username, password)
+	dn, attrs, err := client.Authenticate(password)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,10 +84,12 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 		return nil, nil, errors.New("Authentication failed")
 	}
 
+	dn = ldap.EscapeFilter(dn)
+
 	if cldap.Type == api.ServerLDAPTypeMSAD {
-		client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(dn))
+		client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, dn)
 	} else {
-		client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(username))
+		client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, username)
 	}
 
 	groups, _ := client.GetGroupsOfUser()
@@ -93,7 +97,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 
 	// add nested group query for MSAD
 	if cldap.Type == api.ServerLDAPTypeMSAD {
-		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, ldap.EscapeFilter(dn))
+		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, dn)
 
 		groups2, _ := client.GetGroupsOfUser()
 		log.WithFields(log.Fields{"filter": client.GroupFilter, "groups": groups2}).Debug("nested group member query")
@@ -106,9 +110,9 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	// we try the other way again.
 	if len(groups) == 0 {
 		if cldap.Type == api.ServerLDAPTypeMSAD {
-			client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(username))
+			client.GroupFilter = fmt.Sprintf(adGroupFilter, cldap.GroupMemberAttr, username)
 		} else {
-			client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, ldap.EscapeFilter(dn))
+			client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, dn)
 		}
 
 		log.WithFields(log.Fields{"filter": client.GroupFilter}).Debug("group member query")
@@ -148,7 +152,7 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 		}
 
 		err = r.Validate(&sp, true)
-		if err != nil{
+		if err != nil {
 			log.WithFields(log.Fields{"samlCertIndex": i, "error": err}).Debug("saml cert failed")
 		} else {
 			log.WithFields(log.Fields{"samlCertIndex": i}).Debug("saml cert succeed")
@@ -156,7 +160,7 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 		}
 	}
 
-	return nil, err		// err will be the last r.Validate() result
+	return nil, err // err will be the last r.Validate() result
 }
 
 func (a *remoteAuth) OIDCDiscover(issuer string) (string, string, string, string, error) {

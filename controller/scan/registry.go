@@ -895,7 +895,6 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		} else {
 			sum.Status = api.ScanStatusFailed
 		}
-		sum.Author = result.Author
 		sum.Size = result.Size
 
 		if sum.Status == api.ScanStatusFinished {
@@ -1479,7 +1478,9 @@ func (rs *Registry) scheduleScanImages(
 					RegName:  rs.config.Name,
 					Digest:   info.Digest,
 					// Signed:    info.Signed, [2019.Apr] comment out until we can accurately tell it
+					Author:    info.Author,
 					RunAsRoot: info.RunAsRoot,
+					CreatedAt: info.Created,
 					Status:    api.ScanStatusScheduled,
 					Images:    []share.CLUSImage{image},
 				}

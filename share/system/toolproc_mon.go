@@ -2,8 +2,11 @@ package system
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"sync"
+	"syscall"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 /////////////////////////////////////////////////////////////
@@ -38,8 +41,14 @@ func (s *SystemTools) RemoveToolProcess(pgid int, bKill bool) {
 	defer toolProc.mutex.Unlock()
 	info, ok := toolProc.pMap[pgid]
 	if ok {
-		delete(toolProc.pMap, pgid)
-		//	log.WithFields(log.Fields{"pgid": pgid, "info": info}).Debug("TOOLP: removed")
+		// log.WithFields(log.Fields{"pgid": pgid, "info": info}).Debug("TOOLP: removing")
+		go func() {
+			time.Sleep(time.Second * 5) // keep a temporary record for the probe reference
+			toolProc.mutex.Lock()
+			delete(toolProc.pMap, pgid)
+			toolProc.mutex.Unlock()
+			// log.WithFields(log.Fields{"pgid": pgid}).Debug("TOOLP: removed")
+		}()
 	}
 
 	if bKill {
@@ -77,4 +86,8 @@ func (s *SystemTools) IsToolProcess(sid, pgid int) bool {
 
 	_, ok := toolProc.pMap[sid]
 	return ok
+}
+
+func (s *SystemTools) KillCommandSubtree(pgid int, info string) {
+	syscall.Kill(-pgid, syscall.SIGKILL)
 }

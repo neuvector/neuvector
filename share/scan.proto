@@ -140,7 +140,8 @@ message ScanResult {
     ScanProvider Provider = 23;
     int64 Size = 24;
     ScanSignatureInfo SignatureInfo = 25;
-    ScanTypeMap ScanTypesRequested = 26;
+    string Created = 26;
+    ScanTypeMap ScanTypesRequested = 27;
 }
 
 message ScanSignatureInfo {

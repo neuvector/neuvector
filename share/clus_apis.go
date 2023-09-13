@@ -986,6 +986,7 @@ type CLUSWorkload struct {
 	HostID       string                    `json:"host_id"`
 	Image        string                    `json:"image"`
 	ImageID      string                    `json:"image_id"`
+	ImgCreateAt  time.Time                 `json:"image_created_at"`
 	Privileged   bool                      `json:"privileged"`
 	RunAsRoot    bool                      `json:"run_as_root"`
 	NetworkMode  string                    `json:"network_mode"`
@@ -1673,6 +1674,7 @@ type CLUSRegistryImageSummary struct {
 	Images    []CLUSImage   `json:"repo_tag"`
 	Digest    string        `json:"digest"`
 	ScannedAt time.Time     `json:"scanned_at"`
+	CreatedAt time.Time     `json:"created_at"`
 	BaseOS    string        `json:"base_os"`
 	Version   string        `json:"version"`
 	Result    ScanErrorCode `json:"result"`
@@ -1958,13 +1960,15 @@ type CLUSCrdFileRule struct {
 }
 
 type CLUSCrdProcessProfile struct {
-	Baseline string `json:"baseline"` // "default" or "shield", for process profile
+	Baseline string `json:"baseline"` // "basic" & "zero-drift" for process profile. "default"/"shield" are obsolete and both mean "zero-drift"
 }
 
 type CLUSCrdSecurityRule struct {
-	Name            string                `json:"name"`
+	Name            string                `json:"name"` // crd record name in the format {crd kind}-{ns}-{metadata.name}
+	MetadataName    string                `json:"metadata_name"`
 	Groups          []string              `json:"groups"`
 	Rules           map[string]uint32     `json:"rules"`
+	PolicyMode      string                `json:"policy_mode"`
 	ProfileName     string                `json:"profile_name"`
 	ProfileMode     string                `json:"profile_mode"`
 	ProcessProfile  CLUSCrdProcessProfile `json:"process_profile"`
@@ -1975,6 +1979,7 @@ type CLUSCrdSecurityRule struct {
 	AdmCtrlRules    map[string]uint32     `json:"admctrl_rules"`     // map key is the generated name of admission control rule, valud is assigned rule id
 	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
+	Uid             string                `json:"uid"`               // metadata.uid in admissionreview CREATE request
 }
 
 // Multi-Clusters (Federation)
@@ -2392,6 +2397,10 @@ type CLUSCrdRecord struct {
 
 type CLUSCrdEventRecord struct {
 	CrdEventRecord []string
+}
+
+type CLUSCrdEventQueueInfo struct {
+	Count int `json:"count"`
 }
 
 // //// Process UUID Rules

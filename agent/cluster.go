@@ -219,7 +219,7 @@ func logWorkload(ev share.TLogEvent, wl *share.CLUSWorkload, msg *string) {
 
 var snapshotIndex int
 func memorySnapshot(usage uint64) {
-	if agentEnv.autoProfieCapture {
+	if agentEnv.autoProfieCapture > 0 {
 		log.WithFields(log.Fields{"usage": usage}).Debug()
 		if usage > agentEnv.peakMemoryUsage {
 			agentEnv.peakMemoryUsage = usage + agentEnv.snapshotMemStep  // level up
@@ -229,7 +229,7 @@ func memorySnapshot(usage uint64) {
 				label = strconv.Itoa(snapshotIndex)
 			}
 			log.WithFields(log.Fields{"label": label, "next": agentEnv.peakMemoryUsage}).Debug()
-			utils.PerfSnapshot(Agent.Pid, agentEnv.memoryLimit, usage, share.SnaphotFolder, Agent.ID, "enf.", label)
+			utils.PerfSnapshot(Agent.Pid, agentEnv.memoryLimit, agentEnv.autoProfieCapture, usage, share.SnaphotFolder, Agent.ID, "enf.", label)
 		}
 	}
 }
@@ -431,6 +431,7 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 		HostID:       Host.ID,
 		Image:        info.Image,
 		ImageID:      info.ImageID,
+		ImgCreateAt:  info.ImgCreateAt,
 		Author:       info.Author,
 		NetworkMode:  info.NetMode,
 		Privileged:   info.Privileged,

@@ -345,19 +345,17 @@ func ImageBench2REST(cmds []string, secrets []*api.RESTScanSecret, setids []*api
 */
 
 // This is use when grpc structure is returned
-func FillVuls(result *share.ScanResult) {
+func FillVul(vul *share.ScanVulnerability) {
 	sdb := GetScannerDB()
 
-	for _, vul := range result.Vuls {
-		if vul.DBKey != "" {
-			if vr, ok := sdb.CVEDB[vul.DBKey]; ok {
-				vul.Score = vr.Score
-				vul.Vectors = vr.Vectors
-				vul.ScoreV3 = vr.ScoreV3
-				vul.VectorsV3 = vr.VectorsV3
-				vul.Description = vr.Description
-				vul.Link = vr.Link
-			}
+	if vul.DBKey != "" {
+		if vr, ok := sdb.CVEDB[vul.DBKey]; ok {
+			vul.Score = vr.Score
+			vul.Vectors = vr.Vectors
+			vul.ScoreV3 = vr.ScoreV3
+			vul.VectorsV3 = vr.VectorsV3
+			vul.Description = vr.Description
+			vul.Link = vr.Link
 		}
 	}
 }
@@ -418,6 +416,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		Digest:          result.Digest,
 		Size:            result.Size,
 		Author:          result.Author,
+		CreatedAt:       result.Created,
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{

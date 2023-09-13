@@ -600,7 +600,6 @@ func (s *ScanUtil) LoadLocalImage(ctx context.Context, repository, tag, rtSock, 
 	lenML := len(meta.Layers)
 	for i, h := range histories {
 		cmds[i] = NormalizeImageCmd(h.Cmd)
-		// log.WithFields(log.Fields{"size": h.Size, "cmd": cmds[i]}).Info("======================")
 		if h.Size > 0 {
 			// Some layer size is 0, remove them from layerFiles and layers, otherwise, layers won't match with history
 			for ml < lenML {
