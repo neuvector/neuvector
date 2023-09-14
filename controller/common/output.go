@@ -75,6 +75,10 @@ func (s *Syslogger) Close() {
 	}
 }
 
+func (s *Syslogger) Identifier() string {
+	return s.proto + ":" + s.addr + ":" + s.serverCert  // a string to identify its connection criteria
+}
+
 func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 	if !s.catSet.Contains(cat) {
 		return nil
