@@ -304,6 +304,7 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvCrdImported:                 {api.EventNameCrdImported, api.EventCatCrd, api.LogLevelINFO},
 	share.CLUSEvCrdRemoved:                  {api.EventNameCrdRemoved, api.EventCatCrd, api.LogLevelINFO},
 	share.CLUSEvCrdErrDetected:              {api.EventNameCrdErrDetected, api.EventCatCrd, api.LogLevelERR},
+	share.CLUSEvCrdSkipped:                  {api.EventNameCrdSkipped, api.EventCatConfig, api.LogLevelNOTICE},
 	share.CLUSEvFedPromote:                  {api.EventNameFedPromote, api.EventCatFed, api.LogLevelINFO},    // for multi-clusters
 	share.CLUSEvFedDemote:                   {api.EventNameFedDemote, api.EventCatFed, api.LogLevelINFO},     // for multi-clusters
 	share.CLUSEvFedJoin:                     {api.EventNameFedJoin, api.EventCatFed, api.LogLevelINFO},       // for multi-clusters

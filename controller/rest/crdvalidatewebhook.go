@@ -230,6 +230,7 @@ func CrdQueueProc() {
 			var errMsg string
 			var crInfo, crWarning string
 			var usedTime int64
+			var processed bool
 
 			err = nil
 			kind = req.Kind.Kind
@@ -256,15 +257,19 @@ func CrdQueueProc() {
 				case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
 					err = json.Unmarshal(req.Object.Raw, &gfwrule)
 					crdSecRule = &gfwrule
+					crdHandler.crUid = gfwrule.Metadata.GetUid()
 				case resource.NvAdmCtrlSecurityRuleKind:
 					err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule)
 					crdSecRule = &admCtrlSecRule
+					crdHandler.crUid = admCtrlSecRule.Metadata.GetUid()
 				case resource.NvDlpSecurityRuleKind:
 					err = json.Unmarshal(req.Object.Raw, &dlpSecRule)
 					crdSecRule = &dlpSecRule
+					crdHandler.crUid = dlpSecRule.Metadata.GetUid()
 				case resource.NvWafSecurityRuleKind:
 					err = json.Unmarshal(req.Object.Raw, &wafSecRule)
 					crdSecRule = &wafSecRule
+					crdHandler.crUid = wafSecRule.Metadata.GetUid()
 				default:
 					err = fmt.Errorf("unsupported Kubernetese resource kind")
 				}
@@ -288,7 +293,7 @@ func CrdQueueProc() {
 				}
 				var recordNameNew string
 				before := time.Now()
-				recordNameNew, crInfo, crWarning, errMsg, errCount, cachedRecords = crdHandler.crdSecRuleHandler(req, kind, crdSecRule)
+				recordNameNew, crInfo, crWarning, errMsg, errCount, cachedRecords, processed = crdHandler.crdSecRuleHandler(req, kind, crdSecRule)
 				usedTime = time.Since(before).Milliseconds()
 				crdHandler.ReleaseLock()
 
@@ -323,6 +328,10 @@ func CrdQueueProc() {
 					msg := fmt.Sprintf("CRD %s Removed", recordName)
 					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdErrDetected, msg, detail)
 					log.WithFields(logFields).Error("Failed to add CRD")
+				} else if !processed {
+					msg := fmt.Sprintf("CRD %s Skipped", recordName)
+					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdSkipped, msg, detail)
+					log.WithFields(logFields).Info("CRD skipped")
 				} else {
 					msg := fmt.Sprintf("CRD %s Processed", recordName)
 					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdImported, msg, detail)
