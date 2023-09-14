@@ -2647,12 +2647,16 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind string, crdSecRule interface{}) (
 	string, string, string, string, int, int, bool) {
 
+	var processed bool
+	var recordName string
+	var crInfo, crWarning, errMsg string
+	var errCount int
+	var recordsCount int
+
 	switch req.Operation {
 	case "DELETE":
-		var recordName string
 		var ruleNs string = "default"
 		var kvCrdKind string = req.Kind.Kind
-		var recordsCount int
 
 		if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
 			kvCrdKind = resource.NvSecurityRuleKind
@@ -2682,24 +2686,17 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdHandleGroupRecordDel(crdRecord, crdRecord.Groups, false, recordList)
 				h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, crdRecord.ProfileName, recordList)
 			}
-			return recordName, "", "", "", 0, recordsCount, true
+			processed = true
+		} else {
+			crInfo = "cached record not found"
 		}
 	case "CREATE", "UPDATE":
-		var errCount int
-		var errMsg, recordName, crInfo, crWarning string
 		var crdCfgRet *resource.NvSecurityParse
 		var recordList map[string]*share.CLUSCrdSecurityRule
-		var recordsCount int
 
 		log.WithFields(log.Fields{"name": req.Name, "kind": kind, "ns": req.Namespace}).Info("processing CRD ...")
 		// First parse the crd content, validate for error and generate final list if no error
 		if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
-			if req.Namespace != "" {
-				if _, err := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace); err != nil && strings.Contains(err.Error(), " 404 ") {
-					log.WithFields(log.Fields{"name": req.Name, "namespace": req.Namespace, "err": err}).Info("skipped")
-					return "", "", "", "", 0, 0, false
-				}
-			}
 			recordList = clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
 			recordsCount = len(recordList)
 		}
@@ -2719,9 +2716,9 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdWafSensorRecord(crdCfgRet, kind, recordName)
 			}
 		}
-		return recordName, crInfo, crWarning, errMsg, errCount, recordsCount, true
+		processed = true
 	}
-	return "", "", "", "", 0, 0, true
+	return recordName, crInfo, crWarning, errMsg, errCount, recordsCount, processed
 }
 
 func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.RESTGroup) {

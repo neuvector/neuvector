@@ -239,6 +239,7 @@ func CrdQueueProc() {
 				ruleNs = "default"
 			}
 			recordName := fmt.Sprintf("%s-%s-%s", kind, ruleNs, req.Name)
+
 			switch req.Operation {
 			case "DELETE":
 				if err = json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
@@ -258,6 +259,15 @@ func CrdQueueProc() {
 					err = json.Unmarshal(req.Object.Raw, &gfwrule)
 					crdSecRule = &gfwrule
 					crdHandler.crUid = gfwrule.Metadata.GetUid()
+
+					if req.Namespace != "" {
+						// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
+						_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
+						if err2 != nil && strings.Contains(err2.Error(), " 404 ") {
+							crInfo = "namespace not found"
+							goto SKIP_CRD_HANDLER
+						}
+					}
 				case resource.NvAdmCtrlSecurityRuleKind:
 					err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule)
 					crdSecRule = &admCtrlSecRule
@@ -291,20 +301,18 @@ func CrdQueueProc() {
 						goto RETRY_POLICY_LOCK
 					}
 				}
-				var recordNameNew string
+
 				before := time.Now()
-				recordNameNew, crInfo, crWarning, errMsg, errCount, cachedRecords, processed = crdHandler.crdSecRuleHandler(req, kind, crdSecRule)
+				_, crInfo, crWarning, errMsg, errCount, cachedRecords, processed = crdHandler.crdSecRuleHandler(req, kind, crdSecRule)
 				usedTime = time.Since(before).Milliseconds()
 				crdHandler.ReleaseLock()
 
-				if recordNameNew != "" && recordNameNew != recordName {
-					recordName = recordNameNew
-				}
 				if errMsg != "" {
 					errMsg = fmt.Sprintf("Error: %s", errMsg)
 				}
 			}
 
+		SKIP_CRD_HANDLER:
 			logFields := log.Fields{
 				"crdName":        recordName,
 				"op":             req.Operation,
@@ -317,30 +325,36 @@ func CrdQueueProc() {
 			if crWarning != "" {
 				log.WithFields(log.Fields{"recordName": recordName}).Warn(crWarning)
 			}
-			switch req.Operation {
-			case "DELETE":
-				msg := fmt.Sprintf("CRD %s", recordName)
-				writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdRemoved, msg, detail)
-				log.WithFields(logFields).Info("CRD deleted")
-			case "CREATE", "UPDATE":
-				if errCount > 0 {
-					deleteCrInK8s(kind, recordName, crdSecRule)
-					msg := fmt.Sprintf("CRD %s Removed", recordName)
-					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdErrDetected, msg, detail)
-					log.WithFields(logFields).Error("Failed to add CRD")
-				} else if !processed {
-					msg := fmt.Sprintf("CRD %s Skipped", recordName)
-					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdSkipped, msg, detail)
-					log.WithFields(logFields).Info("CRD skipped")
-				} else {
-					msg := fmt.Sprintf("CRD %s Processed", recordName)
-					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdImported, msg, detail)
-					log.WithFields(logFields).Info("CRD processed")
+			if !processed {
+				msg := fmt.Sprintf("CRD %s Skipped", recordName)
+				writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdSkipped, msg, detail)
+				log.WithFields(logFields).Info("CRD skipped")
+			} else {
+				switch req.Operation {
+				case "DELETE":
+					msg := fmt.Sprintf("CRD %s", recordName)
+					writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdRemoved, msg, detail)
+					log.WithFields(logFields).Info("CRD deleted")
+				case "CREATE", "UPDATE":
+					if errCount > 0 {
+						deleteCrInK8s(kind, recordName, crdSecRule)
+						msg := fmt.Sprintf("CRD %s Removed", recordName)
+						writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdErrDetected, msg, detail)
+						log.WithFields(logFields).Error("Failed to add CRD")
+					} else {
+						msg := fmt.Sprintf("CRD %s Processed", recordName)
+						writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdImported, msg, detail)
+						log.WithFields(logFields).Info("CRD processed")
+					}
 				}
 			}
 
-			// For multiple controller, need give other controller a chance
-			time.Sleep(time.Second)
+			if !processed {
+				time.Sleep(time.Millisecond * 100)
+			} else {
+				// For multiple controller, need give other controller a chance
+				time.Sleep(time.Second)
+			}
 			goto NEXT_CRD
 		}
 	}
