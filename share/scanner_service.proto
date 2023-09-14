@@ -17,6 +17,7 @@ message ScanImageRequest {
     string BaseImage = 9;
     repeated SigstoreRootOfTrust RootsOfTrust  = 10;
     string Token = 11;
+    ScanTypeMap ScanTypesRequested = 12;
 }
 
 message SigstoreRootOfTrust {

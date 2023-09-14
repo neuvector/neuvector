@@ -23,6 +23,7 @@ enum ScanErrorCode {
 	ScanErrImageNotFound = 17;
 	ScanErrAwsDownloadErr = 18;
 	ScanErrArgument = 19;
+    ScanErrSignatureScanError = 20;
 }
 
 enum ScanObjectType {
@@ -43,6 +44,11 @@ enum ScanVulStatus {
     FixExists = 1;
     WillNotFix = 2;
     Unaffected = 3;
+}
+
+message  ScanTypeMap {
+  bool Vulnerability = 1;
+  bool Signature = 2;
 }
 
 message ScanVulnerability {
@@ -135,6 +141,7 @@ message ScanResult {
     int64 Size = 24;
     ScanSignatureInfo SignatureInfo = 25;
     string Created = 26;
+    ScanTypeMap ScanTypesRequested = 27;
 }
 
 message ScanSignatureInfo {
