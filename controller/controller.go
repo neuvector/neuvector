@@ -46,6 +46,7 @@ type ctrlEnvInfo struct {
 	cgroupCPUAcct     string
 	runInContainer    bool
 	debugCPath        bool
+	customBenchmark   bool
 	autoProfieCapture uint64
 	memoryLimit       uint64
 	peakMemoryUsage   uint64
@@ -251,6 +252,7 @@ func main() {
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
+	enable_custom_bench := flag.Bool("cbench", false, "enable custom benchmarks")
 	flag.Parse()
 
 	if *debug {
@@ -292,6 +294,10 @@ func main() {
 			ctrlEnv.autoProfieCapture = (uint64)(*autoProfile)
 		}
 		log.WithFields(log.Fields{"auto-profile": ctrlEnv.autoProfieCapture}).Info()
+	}
+	if *enable_custom_bench {
+		ctrlEnv.customBenchmark = true
+		log.Info("Enable custom benchmark")
 	}
 
 	// Set global objects at the very first

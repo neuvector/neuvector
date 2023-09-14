@@ -303,8 +303,14 @@ func (b *Bench) BenchLoop() {
 			}
 			gInfoRUnlock()
 
-			b.doContainerCustomCheck(wls)
+			if agentEnv.customBenchmark {
+				b.doContainerCustomCheck(wls)
+			}
 		case <-b.customConTimer.C:
+			if !agentEnv.customBenchmark {
+				break
+			}
+
 			wls := make([]*share.CLUSWorkload, 0)
 			gInfoRLock()
 			for _, c := range gInfo.activeContainers {
