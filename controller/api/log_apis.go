@@ -136,6 +136,7 @@ const (
 	EventNameCrdImported                 = "Crd.Import"                     // for crd Config import
 	EventNameCrdRemoved                  = "Crd.Remove"                     // for crd Config remove due to k8s miss
 	EventNameCrdErrDetected              = "Crd.Error"                      // for remove error crd
+	EventNameCrdSkipped                  = "Crd.Skipped"                    // for crd skip ('kubectl create -f' on existing crd resource)
 	EventNameFedPromote                  = "Federation.Promote"             // for multi-clusters
 	EventNameFedDemote                   = "Federation.Demote"              // for multi-clusters
 	EventNameFedJoin                     = "Federation.Join"                // for joint cluster in multi-clusters

@@ -2645,7 +2645,7 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 
 // policy/admCtrl lock is acquired by caller
 func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind string, crdSecRule interface{}) (
-	string, string, string, string, int, int) {
+	string, string, string, string, int, int, bool) {
 
 	switch req.Operation {
 	case "DELETE":
@@ -2682,7 +2682,7 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdHandleGroupRecordDel(crdRecord, crdRecord.Groups, false, recordList)
 				h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, crdRecord.ProfileName, recordList)
 			}
-			return recordName, "", "", "", 0, recordsCount
+			return recordName, "", "", "", 0, recordsCount, true
 		}
 	case "CREATE", "UPDATE":
 		var errCount int
@@ -2694,6 +2694,12 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 		log.WithFields(log.Fields{"name": req.Name, "kind": kind, "ns": req.Namespace}).Info("processing CRD ...")
 		// First parse the crd content, validate for error and generate final list if no error
 		if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
+			if req.Namespace != "" {
+				if _, err := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace); err != nil && strings.Contains(err.Error(), " 404 ") {
+					log.WithFields(log.Fields{"name": req.Name, "namespace": req.Namespace, "err": err}).Info("skipped")
+					return "", "", "", "", 0, 0, false
+				}
+			}
 			recordList = clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
 			recordsCount = len(recordList)
 		}
@@ -2713,9 +2719,9 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdWafSensorRecord(crdCfgRet, kind, recordName)
 			}
 		}
-		return recordName, crInfo, crWarning, errMsg, errCount, recordsCount
+		return recordName, crInfo, crWarning, errMsg, errCount, recordsCount, true
 	}
-	return "", "", "", "", 0, 0
+	return "", "", "", "", 0, 0, true
 }
 
 func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.RESTGroup) {
