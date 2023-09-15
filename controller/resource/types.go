@@ -68,6 +68,7 @@ var NvAdmMutatingName = "neuvector-mutating-admission-webhook"     // Validating
 var NvAdmValidatingName = "neuvector-validating-admission-webhook" // ValidatingWebhookConfiguration resource instance metadata name
 var NvCrdValidatingName = "neuvector-validating-crd-webhook"       // ValidatingWebhookConfiguration resource instance metadata name
 var nvStatusValidatingName = "neuvector-validating-status-webhook" // for composing webhook name only, not for ValidatingWebhookConfiguration resource instance metadata name
+var NvPruneValidatingName = "neuvector-prune-orphan-crd-groups"    // for manually pruning orphan crd groups only
 
 const (
 	WatchEventAdd    = "ResourceAdd"
