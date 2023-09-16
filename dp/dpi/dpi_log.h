@@ -34,12 +34,14 @@ enum {
     DPI_THRT_SQL_INJECTION,
     DPI_THRT_APACHE_STRUTS_RCE,
     DPI_THRT_K8S_EXTIP_MITM,
+    DPI_THRT_SSL_TLS_1DOT1,
     DPI_THRT_MAX,
 };
 
 void dpi_log_init(void);
 uint8_t dpi_threat_action(uint32_t idx);
 bool dpi_threat_status(uint32_t idx);
+void dpi_set_threat_status(uint32_t idx, bool enable);
 void dpi_threat_trigger(uint32_t idx, dpi_packet_t *p, const char *format, ...);
 void dpi_threat_trigger_flip(uint32_t idx, dpi_packet_t *p, const char *format, ...);
 void dpi_threat_log_by_session(uint32_t idx, dpi_session_t *s, const char *format, ...);

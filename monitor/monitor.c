@@ -70,6 +70,9 @@
 #define ENV_SCANNER_CTRL_USER   "SCANNER_CTRL_API_USERNAME"
 #define ENV_SCANNER_CTRL_PASS   "SCANNER_CTRL_API_PASSWORD"
 
+#define ENV_THRT_SSL_TLS_1DOT0  "THRT_SSL_TLS_1DOT0"
+#define ENV_THRT_SSL_TLS_1DOT1  "THRT_SSL_TLS_1DOT1"
+
 #define DP_MISS_HB_MAX 60
 #define PROC_EXIT_LIMIT  10
 
@@ -223,9 +226,20 @@ static pid_t fork_exec(int i)
             args[a ++] = "-i";
             args[a ++] = iface;
         }
-
         if (g_pipe_driver == RC_CONFIG_NOTC) {
             args[a ++] = "-c";
+        }
+        if ((enable = getenv(ENV_THRT_SSL_TLS_1DOT0)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-v";
+                args[a ++] = "thrt_tls_1dot0";
+            }
+        }
+        if ((enable = getenv(ENV_THRT_SSL_TLS_1DOT1)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-v";
+                args[a ++] = "thrt_tls_1dot1";
+            }
         }
 
         args[a] = NULL;

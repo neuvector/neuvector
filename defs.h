@@ -138,7 +138,8 @@
 #define THRT_ID_DNS_TUNNELING        2024
 #define THRT_ID_TCP_SMALL_MSS        2025
 #define THRT_ID_K8S_EXTIP_MITM       2026
-#define THRT_ID_MAX                  2027
+#define THRT_ID_SSL_TLS_1DOT1        2027
+#define THRT_ID_MAX                  2028
 
 
 // --- messages
