@@ -418,7 +418,7 @@ func addLearnedRules(grp *groupInfo, flt share.CLUSFileMonitorFilter, pInfo []*P
 	}
 }
 
-func (w *FileWatch) learnFromEvents(rootPid int, fmod *fileMod, path string, event uint32) {
+func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, event uint32) {
 	// mLog.WithFields(log.Fields{"rootpid": rootPid, "path": path, "event": event}).Debug()
 	w.mux.Lock()
 	grp, ok := w.groups[rootPid]
@@ -519,14 +519,14 @@ func (w *FileWatch) cbNotify(filePath string, mask uint32, params interface{}, p
 		fm.delay = 0
 		fm.pInfo = append(fm.pInfo, pInfo)
 	} else {
-		pi := make([]*ProcInfo, 1)
-		pi[0] = pInfo
-		w.fileEvents[filePath] = &fileMod{
+		fmod := &fileMod {
 			mask:  mask,
-			delay: 0,
 			finfo: params.(*osutil.FileInfoExt),
-			pInfo: pi,
 		}
+		if pInfo != nil {
+			fmod.pInfo = append(fmod.pInfo, pInfo)
+		}
+		w.fileEvents[filePath] = fmod
 	}
 }
 
@@ -721,14 +721,14 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 }
 
 func (w *FileWatch) HandleWatchedFiles() {
-	events := make(map[string]*fileMod)
+	events := make(map[string]fileMod)
 
 	// clone events
 	w.mux.Lock()
 	for filePath, fmod := range w.fileEvents {
-		events[filePath] = fmod
-		delete(w.fileEvents, filePath)
+		events[filePath] = *fmod
 	}
+	w.fileEvents = make(map[string]*fileMod) // reset
 	w.mux.Unlock()
 
 	for fullPath, fmod := range events {
@@ -754,7 +754,7 @@ func (w *FileWatch) HandleWatchedFiles() {
 }
 
 // Decide the directory event priority here
-func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, path string, pid int) uint32 {
+func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, path string, pid int) uint32 {
 	var event uint32
 	// handle files inside directory
 	// log.WithFields(log.Fields{"info": info, "fullPath": fullPath, "path": path, "fmod": fmod}).Debug()
@@ -796,7 +796,8 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 							}
 						}
 					} else {
-						event = fileEventCreate
+						w.addFile(false, fmod.finfo)
+						return fileEventCreate
 					}
 				}
 			}
@@ -852,7 +853,7 @@ func (w *FileWatch) handleDirEvents(fmod *fileMod, info os.FileInfo, fullPath, p
 }
 
 // Decide the file event priority here
-func (w *FileWatch) handleFileEvents(fmod *fileMod, info os.FileInfo, fullPath string, pid int) uint32 {
+func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath string, pid int) uint32 {
 	var event uint32
 	if info != nil {
 		log.WithFields(log.Fields{"fullPath": fullPath, "fmod": fmod, "finfo": fmod.finfo}).Debug()
@@ -895,8 +896,14 @@ func (w *FileWatch) ContainerCleanup(rootPid int) {
 	}
 	w.fanotifier.ContainerCleanup(rootPid)
 	w.inotifier.ContainerCleanup(rootPid)
+
 	w.mux.Lock()
 	defer w.mux.Unlock()
+	for path, _ := range w.fileEvents {
+		if pid, _ := global.SYS.ParseContainerFilePath(path); pid == rootPid {
+			delete( w.fileEvents, path)
+		}
+	}
 	delete(w.groups, rootPid)
 }
 
