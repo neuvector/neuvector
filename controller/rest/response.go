@@ -156,7 +156,7 @@ func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTRespon
 			share.EventCVEReport: &api.RESTResponseRuleOptions{
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel,
 					share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium,
-					share.EventCondTypeCVEName},
+					share.EventCondTypeCVEName, share.EventCondTypeCVEHighWithFix},
 				Name:  getCVEReportNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING}),
 			},
@@ -303,6 +303,18 @@ func validateResponseRule(r *api.RESTResponseRule, acc *access.AccessControl) er
 					id, err := strconv.Atoi(cd.CondValue)
 					if err != nil || id <= 0 {
 						return fmt.Errorf("Invalid cve-high value:n %s", cd.CondValue)
+					}
+				} else if cd.CondType == share.EventCondTypeCVEHighWithFix {
+					invalid := false
+					ss := strings.Split(cd.CondValue, "/")
+					for _, n := range ss {
+						if id, err := strconv.Atoi(n); err != nil || id <= 0 {
+							invalid = true
+							break
+						}
+					}
+					if len(ss) > 2 || invalid {
+						return fmt.Errorf("Invalid cve-high-with-fix value:n %s", cd.CondValue)
 					}
 				} else if cd.CondType == share.EventCondTypeCVEName {
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)

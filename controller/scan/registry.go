@@ -434,7 +434,9 @@ func RegistryStateUpdate(name string, state *share.CLUSRegistryState) {
 	}
 }
 
-func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, calculateLayers bool, vpf scanUtils.VPFInterface) (utils.Set, []string, []string, map[string][]string, map[string][]string) {
+func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, calculateLayers bool, vpf scanUtils.VPFInterface) (
+	utils.Set, []string, []string, []scanUtils.FixedVulInfo, map[string][]string, map[string][]string) {
+
 	smd.scanLog.WithFields(log.Fields{"registry": name, "id": id}).Debug()
 
 	var rs *Registry
@@ -445,7 +447,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	} else if name == common.RegistryFedRepoScanName {
 		rs = repoFedScanRegistry
 	} else if rs, _ = regMapLookup(name); rs == nil {
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil
 	}
 
 	var c *imageInfoCache
@@ -453,6 +455,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	var alives utils.Set // vul names that are not filtered
 	layerHighMap := make(map[string][]string, 0)
 	layerMedMap := make(map[string][]string, 0)
+	fixedHighsInfo := make([]scanUtils.FixedVulInfo, 0) // fixed high vul info
 
 	if sum != nil && sum.Status == api.ScanStatusFinished {
 		key := share.CLUSRegistryImageDataKey(name, id)
@@ -471,7 +474,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				}
 			}
 
-			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, alives)
+			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
+			if info, ok := c.vulInfo[share.VulnSeverityHigh]; ok {
+				fixedHighsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
+				for _, v := range info {
+					// ks is in format "{vul name}::{package name}"
+					fixedHighsInfo = append(fixedHighsInfo, scanUtils.FixedVulInfo{PubTS: v.PublishDate})
+				}
+			}
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.envs = report.Envs
@@ -547,7 +557,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 		delete(rs.cache, id)
 	}
 
-	return alives, highs, meds, layerHighMap, layerMedMap
+	return alives, highs, meds, fixedHighsInfo, layerHighMap, layerMedMap
 }
 
 func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
