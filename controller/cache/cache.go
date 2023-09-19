@@ -2066,6 +2066,12 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 		return
 	}
 	log.WithFields(log.Fields{"name": config.Name, "old": oldConfig, "new": newConfig}).Info("ValidatingWebhookConfiguration is changed")
+	if isLeader() && config.Name == resource.NvPruneValidatingName {
+		// for manually fixing orphan crd groups only
+		if oldConfig != nil && newConfig == nil {
+			pruneOrphanGroups()
+		}
+	}
 	if config.Name != resource.NvAdmValidatingName {
 		return
 	}

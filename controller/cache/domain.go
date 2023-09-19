@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -12,8 +13,10 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -24,6 +27,8 @@ type domainCache struct {
 var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
 var domainMutex sync.RWMutex
 var domainRemoveMap map[string]time.Time = make(map[string]time.Time)
+
+var _pruningOrphanGroups uint32
 
 func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
 	return &share.CLUSDomain{Name: name, Labels: nsLabels}
@@ -234,7 +239,7 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 	return domains, tagPerDomain
 }
 
-const PruneGroupDelay time.Duration = time.Minute * time.Duration(1)
+const pruneGroupDelay time.Duration = time.Minute * time.Duration(1)
 
 func pruneGroupsByNamespace() {
 	domains := utils.NewSet()
@@ -242,7 +247,7 @@ func pruneGroupsByNamespace() {
 
 	domainMutex.Lock()
 	for name, t := range domainRemoveMap {
-		if now.Sub(t) >= PruneGroupDelay {
+		if now.Sub(t) >= pruneGroupDelay {
 			domains.Add(name)
 		}
 	}
@@ -294,4 +299,95 @@ func pruneGroupsByNamespace() {
 		delete(domainRemoveMap, itr.(string))
 	}
 	domainMutex.Unlock()
+}
+
+func pruneOrphanGroups() {
+	// called on demand for k8s only
+	if localDev.Host.Platform != share.PlatformKubernetes {
+		return
+	}
+
+	doPrune := atomic.CompareAndSwapUint32(&_pruningOrphanGroups, 0, 1)
+	if doPrune {
+		defer atomic.StoreUint32(&_pruningOrphanGroups, 0)
+
+		log.Info()
+		domains := utils.NewSet()
+		cacheMutexRLock()
+		for _, groupCache := range groupCacheMap {
+			g := groupCache.group
+			if g.CfgType == share.GroundCfg && !domains.Contains(g.Domain) && g.Domain != "" && !g.Reserved {
+				domains.Add(g.Domain)
+			}
+		}
+		cacheMutexRUnlock()
+		// now domains contains those k8s namespaces for all groups in nv
+
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
+			k8sNSs := utils.NewSet()
+			for _, obj := range objs {
+				if nsObj := obj.(*resource.Namespace); nsObj != nil {
+					k8sNSs.Add(nsObj.Name)
+				}
+			}
+			// now k8sNSs contains all k8s namespaces
+			for domain := range domains.Iter() {
+				name := domain.(string)
+				if k8sNSs.Contains(name) {
+					// this domain/namespace still exists in k8s
+					domains.Remove(name)
+				}
+			}
+		} else {
+			log.WithFields(log.Fields{"err": err}).Error()
+			return
+		}
+		// now domains contains those non-existing k8s namespaces
+
+		domainMutex.Lock()
+		for domain := range domains.Iter() {
+			name := domain.(string)
+			if _, ok := domainRemoveMap[name]; ok {
+				// this non-existing domain will be handled by pruneGroupsByNamespace()
+				domains.Remove(name)
+			}
+		}
+		domainMutex.Unlock()
+		// now domains contains those non-existing k8s namespaces but some groups for them still exist in nv
+
+		var groups []string
+		if domains.Cardinality() > 0 {
+			log.WithFields(log.Fields{"domains": domains}).Info()
+			cacheMutexRLock()
+			for name, groupCache := range groupCacheMap {
+				if domains.Contains(groupCache.group.Domain) {
+					groups = append(groups, name)
+				}
+			}
+			cacheMutexRUnlock()
+		}
+		// now groups are those orphan groups (whose k8s namespace doesn't exist anymore)
+
+		if len(groups) > 0 {
+			lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+				return
+			}
+
+			log.WithFields(log.Fields{"groups": groups}).Debug()
+			kv.DeletePolicyByGroups(groups)
+			kv.DeleteResponseRuleByGroups(groups)
+
+			txn := cluster.Transact()
+			for _, name := range groups {
+				clusHelper.DeleteGroupTxn(txn, name)
+			}
+			if ok, err1 := txn.Apply(); err1 != nil || !ok {
+				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
+			}
+			txn.Close()
+			clusHelper.ReleaseLock(lock)
+		}
+	}
 }
