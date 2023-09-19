@@ -33,7 +33,7 @@ const logDescriptionLength int = 256
 
 var syslogMutex sync.RWMutex
 var syslogMsgCount int32
-var syslogLastConnKey string  // a string to identify the connection criteria
+var syslogLastConnKey string // a string to identify the connection criteria
 var syslogOverflowAt, syslogLastFailAt time.Time
 
 func syslogMutexLock() {
@@ -1012,10 +1012,10 @@ func admCtrlUpdate(event string, clog *api.Audit) {
 	responseRuleLookup(&desc)
 }
 
-func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set) {
+func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set, fixedHighsInfo []scanUtils.FixedVulInfo) {
 	desc := eventDesc{id: id, event: event,
 		name: clog.Name, level: clog.Level, vuls: vuls,
-		cve_high: clog.HighCnt, cve_med: clog.MediumCnt,
+		cve_high: clog.HighCnt, cve_med: clog.MediumCnt, cve_high_fixed_info: fixedHighsInfo,
 		items: clog.Items, arg: clog}
 	if objType != share.ScanObjectType_CONTAINER {
 		desc.noQuar = true

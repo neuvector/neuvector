@@ -473,6 +473,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	}).Debug("")
 
 	var highs, meds []string
+	var fixedHighsInfo []scanUtils.FixedVulInfo
 	var alives utils.Set // vul names that are not filtered
 
 	scanMutexLock()
@@ -495,7 +496,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		info.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
 		alives = vpf.FilterVulTraits(info.vulTraits, info.idns)
-		highs, meds = scanUtils.GatherVulTrait(info.vulTraits)
+		highs, meds, fixedHighsInfo = scanUtils.GatherVulTrait(info.vulTraits)
 		brief := fillScanBrief(info, len(highs), len(meds))
 		info.brief = brief
 		info.filteredTime = time.Now()
@@ -520,7 +521,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	// all controller should call auditUpdate to record the log, the leader will take action
 	if alives != nil {
 		clog := scanReport2ScanLog(id, objType, report, highs, meds, nil, nil, "")
-		auditUpdate(id, share.EventCVEReport, objType, clog, alives)
+		auditUpdate(id, share.EventCVEReport, objType, clog, alives, fixedHighsInfo)
 	}
 }
 
@@ -940,7 +941,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		}
 
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		alives, highs, meds, layerHighs, layerMeds := scan.RegistryImageStateUpdate(name, id, &sum, systemConfigCache.SyslogCVEInLayers, vpf)
+		alives, highs, meds, fixedHighsInfo, layerHighs, layerMeds := scan.RegistryImageStateUpdate(name, id, &sum, systemConfigCache.SyslogCVEInLayers, vpf)
 
 		if sum.Status == api.ScanStatusFinished && sum.Result == share.ScanErrorCode_ScanErrNone {
 			var report *share.CLUSScanReport
@@ -951,7 +952,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
 					if alives != nil {
 						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, layerHighs, layerMeds, name)
-						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives)
+						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives, fixedHighsInfo)
 					}
 
 					clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)

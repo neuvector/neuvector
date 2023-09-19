@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -52,7 +53,10 @@ func isScanner() bool {
 }
 
 // count vul. with the consideration of vul. profile (alives)
-func countVuln(vuls []*share.ScanVulnerability, alives utils.Set) ([]string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
+// requirement: entries in 'vts' are in the same order as in 'vuls'
+func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alives utils.Set) (
+	[]string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
+
 	highs := make([]string, 0)
 	meds := make([]string, 0)
 	var highWithFix, others int
@@ -83,8 +87,21 @@ func countVuln(vuls []*share.ScanVulnerability, alives utils.Set) ([]string, []s
 	var low bool
 	var idxLow int
 	var score float32
-	for _, v := range vuls {
+	// j is the current index in vts
+	// entries in 'vts' are in the same order as in 'vuls'
+	//	see RegistryImageStateUpdate()/ExtractVulnerability()
+	j := 0
+	for i, v := range vuls {
+		foundInVts := false
+		if len(vts) > i && vts[j].Name == v.Name {
+			foundInVts = true
+		}
 		if !alives.Contains(v.Name) {
+			// this vul is filtered by profile. so skip this entry by moving vuls index(i) & vts index(j) by 1
+			if foundInVts {
+				j += 1
+			}
+			i += 1
 			continue
 		}
 
@@ -112,6 +129,13 @@ func countVuln(vuls []*share.ScanVulnerability, alives utils.Set) ([]string, []s
 				// if vul's publish date is unavailable, treat it as 2 years ago
 				n = time.Now().UTC().AddDate(-2, 0, 0).Unix()
 			}
+			if foundInVts && vts[j].Name == v.Name {
+				// found a same-vul-name entry in vts but with different publishDate value.
+				// vul info in vts(from scannerDB) is more accurate than in vuls(from scanResult)
+				if vtPubTS := vts[j].GetPubTS(); vtPubTS != n {
+					n = vtPubTS
+				}
+			}
 
 			name := fmt.Sprintf("%s::%s", v.Name, v.PackageName)
 			targetMap[name] = share.CLUSScannedVulInfo{
@@ -123,6 +147,10 @@ func countVuln(vuls []*share.ScanVulnerability, alives utils.Set) ([]string, []s
 			otherVuls[idxLow] = share.CLUSScannedVulInfoSimple{Score: score}
 			idxLow++
 		}
+		if foundInVts {
+			j += 1
+		}
+		i += 1
 	}
 	vulPublishDate := map[string]map[string]share.CLUSScannedVulInfo{
 		share.VulnSeverityHigh:   highVulPublishDate,
