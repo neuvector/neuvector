@@ -56,6 +56,7 @@
 #define ENV_CSP_ENV            "CSP_ENV"
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
+#define ENV_SET_CUSTOM_BENCH   "ENABLE_CUSTOM_CHECK"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -431,6 +432,11 @@ static pid_t fork_exec(int i)
             args[a++] = "-apc";
             args[a++] = enable;
         }
+        if ((enable = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-cbench";
+            }
+        }
         args[a] = NULL;
         break;
     case PROC_AGENT:
@@ -513,6 +519,11 @@ static pid_t fork_exec(int i)
         if ((enable = getenv(ENV_AUTOPROFILE_CLT)) != NULL) {
             args[a++] = "-apc";
             args[a++] = enable;
+        }
+        if ((enable = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-cbench";
+            }
         }
         args[a] = NULL;
         break;
