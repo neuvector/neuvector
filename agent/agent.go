@@ -276,6 +276,7 @@ func main() {
 	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
+	enable_custom_bench := flag.Bool("cbench", false, "enable custom benchmarks")
 	flag.Parse()
 
 	if *debug {
@@ -329,6 +330,11 @@ func main() {
 			agentEnv.autoProfieCapture = (uint64)(*autoProfile)
 		}
 		log.WithFields(log.Fields{"auto-profile": agentEnv.autoProfieCapture}).Info()
+	}
+
+	if *enable_custom_bench {
+		agentEnv.customBenchmark = true
+		log.Info("Enable custom benchmark")
 	}
 
 	if *join != "" {
