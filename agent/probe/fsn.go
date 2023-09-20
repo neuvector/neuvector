@@ -18,7 +18,7 @@ import (
 )
 
 const hostRootMountPoint = "/proc/1/root"
-const waitFileActionCompleteSteps int = 32 // total: 1056 ms((528*2)
+const waitFileActionCompleteSteps int = 16
 
 const (
 	drv_overlayfs = iota
@@ -260,7 +260,7 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 		}
 		size = fi.Size()                            // wait for the next run
 		if i == (waitFileActionCompleteSteps - 1) { // still ongoing, give up, it reports anyway.
-			log.WithFields(log.Fields{"file": file, "id": root.id, "error": err, "size": size}).Error("FSN: incomplete file")
+			log.WithFields(log.Fields{"file": file, "id": root.id, "error": err, "size": size}).Debug("FSN: incomplete file")
 		}
 	}
 
@@ -347,6 +347,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 		} else if fi.Mode().IsRegular() {
 			go fsn.updateFileInfo(index, file, path)
 			// log.WithFields(log.Fields{"file": file, "path": path}).Debug("FSN: new file")
+			return
 		}
 	}
 
@@ -372,7 +373,7 @@ func (fsn *FileNotificationCtr) monitorEvents() {
 			if !ok {
 				return
 			}
-			go fsn.handleEvent(event)
+			fsn.handleEvent(event)
 		case err, ok := <-fsn.watcher.Errors:
 			if !ok && err == nil {
 				// exited
