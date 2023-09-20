@@ -6091,6 +6091,12 @@ definitions:
       script:
         type: string
         example: "uname -r "
+      enabled:
+        type: boolean
+        example: false
+      configurable:
+        type: boolean
+        example: false
   RESTCustomCheckConfig:
     type: object
     required:

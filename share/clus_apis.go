@@ -1536,6 +1536,12 @@ const (
 	BenchProfileL2  = "Level 2"
 )
 
+const (
+	CustomCheckControl_Disable = "disable"
+	CustomCheckControl_Strict  = "strict"
+	CustomCheckControl_Loose   = "loose"
+)
+
 type CLUSCustomCheck struct {
 	Name   string `json:"name"`
 	Script string `json:"script"`

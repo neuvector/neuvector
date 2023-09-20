@@ -282,6 +282,13 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
+	if cctx.CustomCheckControl == share.CustomCheckControl_Disable ||
+		(cctx.CustomCheckControl == share.CustomCheckControl_Strict && !acc.CanWriteCluster()) {
+		// only admin/fedAdmin-role users can configure custom check scripts in "strict" control
+		restRespAccessDenied(w, login)
+		return
+	}
+
 	group := ps.ByName("group")
 
 	if !cacher.AuthorizeCustomCheck(group, acc) {
@@ -410,14 +417,27 @@ func handlerCustomCheckShow(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
+	var enabled bool      // custom check script can run on enforcer or not
+	var configurable bool // custom check script can be configured by this user or not
+	if cctx.CustomCheckControl != share.CustomCheckControl_Disable {
+		// in "loose"  control, users with compliance(w) permission on the group can configure the group's custom check scripts
+		// in "strict" control, only admin/fedAdmin-role users can configure custom check scripts
+		if cacher.AuthorizeCustomCheck(group, acc.NewWithOp(access.AccessOPWrite)) {
+			configurable = true
+		}
+		enabled = true
+	}
+
 	oldConfig, _ := clusHelper.GetCustomCheckConfig(group)
 
 	config := api.RESTCustomChecks{Group: group}
 	if oldConfig != nil {
 		for _, script := range oldConfig.Scripts {
 			scp := &api.RESTCustomCheck{
-				Name:   script.Name,
-				Script: script.Script,
+				Name:         script.Name,
+				Script:       script.Script,
+				Enabled:      enabled,
+				Configurable: configurable,
 			}
 			config.Scripts = append(config.Scripts, scp)
 		}
@@ -437,16 +457,37 @@ func handlerCustomCheckList(w http.ResponseWriter, r *http.Request, ps httproute
 
 	scripts := clusHelper.GetAllCustomCheckConfig()
 
+	var enabled bool // custom check script can run on enforcer or not
+	if cctx.CustomCheckControl != share.CustomCheckControl_Disable {
+		enabled = true
+	}
+
+	// only for checking whether this user can configure custom check for determining the 'configurable' value
+	// do not use it for other authorization checking !!
+	accTemp := acc.NewWithOp(access.AccessOPWrite)
+
 	configs := make([]*api.RESTCustomChecks, 0)
 	for group, script := range scripts {
 		if !cacher.AuthorizeCustomCheck(group, acc) {
 			continue
 		}
+
+		var configurable bool // custom check script can be configured by this user or not
+		if cctx.CustomCheckControl != share.CustomCheckControl_Disable {
+			// in "loose"  control, users with compliance(w) permission on the group can configure the group's custom check scripts
+			// in "strict" control, only admin/fedAdmin-role users can configure custom check scripts
+			if cacher.AuthorizeCustomCheck(group, accTemp) {
+				configurable = true
+			}
+		}
+
 		config := api.RESTCustomChecks{Group: group}
 		for _, scr := range script.Scripts {
 			scp := &api.RESTCustomCheck{
-				Name:   scr.Name,
-				Script: scr.Script,
+				Name:         scr.Name,
+				Script:       scr.Script,
+				Enabled:      enabled,
+				Configurable: configurable,
 			}
 			config.Scripts = append(config.Scripts, scp)
 		}

@@ -2551,8 +2551,10 @@ type RESTVulnerabilityProfileEntryConfigData struct {
 
 // Custom check
 type RESTCustomCheck struct {
-	Name   string `json:"name"`
-	Script string `json:"script"`
+	Name         string `json:"name"`
+	Script       string `json:"script"`
+	Enabled      bool   `json:"enabled"`
+	Configurable bool   `json:"configurable"`
 }
 
 type RESTCustomChecks struct {
