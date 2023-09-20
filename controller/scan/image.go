@@ -171,7 +171,7 @@ type registryDriver interface {
 	GetTagList(doamin, repo, tag string) ([]string, error)
 	GetAllImages() (map[share.CLUSImage][]string, error)
 	GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode)
-	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult
+	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult
 	SetConfig(cfg *share.CLUSRegistryConfig)
 	SetTracer(tracer httptrace.HTTPTrace)
 	GetTracer() httptrace.HTTPTrace
@@ -309,17 +309,18 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 	return reqRootsOfTrust, nil
 }
 
-func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult {
+func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult {
 	var result *share.ScanResult
 	req := &share.ScanImageRequest{
-		Registry:    r.regURL,
-		Username:    r.username,
-		Password:    r.password,
-		Repository:  repo,
-		Tag:         tag,
-		Proxy:       r.proxy,
-		ScanLayers:  r.scanLayers,
-		ScanSecrets: r.scanSecrets,
+		Registry:           r.regURL,
+		Username:           r.username,
+		Password:           r.password,
+		Repository:         repo,
+		Tag:                tag,
+		Proxy:              r.proxy,
+		ScanLayers:         r.scanLayers,
+		ScanSecrets:        r.scanSecrets,
+		ScanTypesRequested: &scanTypesRequired,
 	}
 	rootsOfTrust, err := makeSigstoreScanRequestObj()
 	if err != nil {
