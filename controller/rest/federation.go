@@ -31,7 +31,7 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -2090,7 +2090,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	// update kv
 	var caCertData, privKeyData, certData []byte
 	_, privKeyPath, certPath := kv.GetFedTlsKeyCertPath("", reqData.JointCluster.ID)
-	if kv.GenTlsKeyCert(reqData.JointCluster.ID, privKeyPath, certPath, x509.ExtKeyUsageClientAuth) {
+	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath, kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
 		masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
 		caCertData, err = ioutil.ReadFile(masterCaCertPath)
 		if err == nil {
@@ -2776,7 +2776,8 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 // cachedScanResultMD5: contains only the images md5 for fed registry/repo that are remembered by managed clusters & have different scan data revision from what master cluster has.
 // upToDateRegs: contains names of those fed registry/repo whose scan result is up-to-date
 // in each pollFedScanData(), some scan results are returned & their image md5 entries in cachedScanResultMD5 are updated.
-//   upToDateRegs is updated as well when a fed registry/repo's scab result becomes up-to-date
+//
+//	upToDateRegs is updated as well when a fed registry/repo's scab result becomes up-to-date
 func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]map[string]string,
 	upToDateRegs utils.Set, fedCfg share.CLUSFedSettings, tryTimes int) (int64, uint32, uint32, uint32, bool) {
 

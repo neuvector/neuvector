@@ -1866,6 +1866,7 @@ const (
 
 const (
 	CLUSRootCAKey = "rootCA"
+	CLUSJWTKey    = "neuvector-jwt-signing"
 )
 
 func CLUSObjectCertKey(cn string) string {

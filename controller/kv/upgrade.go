@@ -2,6 +2,7 @@ package kv
 
 import (
 	"crypto/md5"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -309,7 +310,7 @@ func upgradeProcessProfile(cfg *share.CLUSProcessProfile) (bool, bool) {
 		}
 	}
 
-	for i, _ := range cfg.Process {
+	for i := range cfg.Process {
 		if cfg.Process[i].CreatedAt.IsZero() {
 			cfg.Process[i].CreatedAt = tm
 			upd = true
@@ -913,10 +914,10 @@ const (
 
 // check if the request handling cluster can handle request from the requesting cluster
 // for "fed kv version":
-// 1. the request handling cluster & requesting cluster have the same "fed kv version", it means they can handle requests from each other in the same federation
-// 2. if not, it means they shouldn't handle requests from each other
-//	  2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
-//	  2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
+//  1. the request handling cluster & requesting cluster have the same "fed kv version", it means they can handle requests from each other in the same federation
+//  2. if not, it means they shouldn't handle requests from each other
+//     2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
+//     2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
 func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 	ver := getControlVersion()
 	if ver.KVVersion != latestKVVersion() {
@@ -1180,6 +1181,12 @@ func ValidateWebhookCert() {
 			store:        share.CLUSConfigCrdStore,
 			k8sEnvOnly:   true,
 		},
+		&keyCertInfo{
+			cn:           share.CLUSJWTKey,
+			svcName:      share.CLUSJWTKey,
+			certSvcNames: []string{},
+			k8sEnvOnly:   false,
+		},
 	}
 	// don't know why: after rolling upgrade(replicas/maxSurge=3), there could be a short period that controller cannot get/put kv
 	// (get returns "Key not found" error & put gets "CAS put error" & PutIfNotExist returns nil : is it because kv is not syned yet?)
@@ -1199,11 +1206,35 @@ func ValidateWebhookCert() {
 						log.WithFields(log.Fields{"cn": certInfo.cn}).Info("regen")
 						switch certInfo.svcName {
 						case share.CLUSRootCAKey:
-							createCA()
+							if err := CreateCAFilesAndStoreInKv(AdmCACertPath, AdmCAKeyPath); err != nil {
+								// Make it retry.
+								log.WithError(err).Error("failed to create CA file")
+								continue
+							}
+
 						case resource.NvAdmSvcName, resource.NvCrdSvcName:
 							if orchPlatform == share.PlatformKubernetes {
-								signWebhookTlsCert(certInfo.svcName, resource.NvAdmSvcNamespace, certInfo.cn)
+								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn,
+									tlsCertPath, tlsKeyPath,
+									AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10}); err != nil {
+									// Make it retry.
+									log.WithError(err).Error("failed to generate Webhook certs")
+									continue
+								}
 							}
+
+						case share.CLUSJWTKey:
+							// TODO: Make validity period configurable.
+							// Create a self-signed certificate.
+							cert, key, err := GenTlsKeyCert(certInfo.cn, "", "", ValidityPeriod{Day: 90}, x509.ExtKeyUsageServerAuth)
+							if err != nil {
+								// Make it retry.
+								log.WithError(err).Error("failed to generate Webhook certs")
+								continue
+							}
+							StoreKeyCertMemoryInKV(certInfo.cn, string(cert), string(key))
 						}
 					} else {
 						certInfo.verified = true
@@ -1216,7 +1247,11 @@ func ValidateWebhookCert() {
 								os.Remove(certInfo.keyPath)
 								os.Remove(certInfo.certPath)
 								log.WithFields(log.Fields{"cn": certInfo.cn}).Info("invalid cert")
-								signWebhookTlsCert(certInfo.svcName, resource.NvAdmSvcNamespace, certInfo.cn)
+								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
+									log.WithError(err).Error("failed to generate Webhook certs in ValidateWebhookCert()")
+								}
 								cert, _, _ = clusHelper.GetObjectCertRev(certInfo.cn)
 							}
 						}
@@ -1249,7 +1284,7 @@ func ValidateWebhookCert() {
 			err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
 			err2 := ioutil.WriteFile(certInfo.certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
-				if certInfo.cn != share.CLUSRootCAKey {
+				if certInfo.cn != share.CLUSRootCAKey && certInfo.cn != share.CLUSJWTKey {
 					if orchPlatform == share.PlatformKubernetes {
 						admission.SetCABundle(certInfo.svcName, certData)
 					}

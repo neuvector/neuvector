@@ -1122,35 +1122,27 @@ func changeTimeoutLoginSessions(user *share.CLUSUser) {
 	}
 }
 
-func rsaReadKeys(certFile, keyFile string) (error, *rsa.PublicKey, *rsa.PrivateKey) {
+func jwtReadKeys() error {
 	var rsaPublicKey *rsa.PublicKey
 	var rsaPrivateKey *rsa.PrivateKey
-	if certFile != "" {
-		if key, err := ioutil.ReadFile(certFile); err != nil {
-			return err, nil, nil
-		} else if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM(key); err != nil {
-			return err, nil, nil
-		}
-	}
-	if keyFile != "" {
-		if key, err := ioutil.ReadFile(keyFile); err != nil {
-			return err, nil, nil
-		} else if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(key); err != nil {
-			return err, nil, nil
-		}
-	}
-
-	return nil, rsaPublicKey, rsaPrivateKey
-}
-
-func jwtReadKeys() error {
-	var err error
-	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultJWTCertFile, defaultJWTKeyFile)
+	cert, _, err := clusHelper.GetObjectCertRev(share.CLUSJWTKey)
 	if err != nil {
-		log.WithError(err).Info("failed to open default jwt keys, falling back...")
-		err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
+		log.WithError(err).Error("failed to read jwt keys.")
 		return err
 	}
+
+	if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.Cert)); err != nil {
+		log.WithError(err).Error("failed to parse jwt cert.")
+		return err
+	}
+
+	if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cert.Key)); err != nil {
+		log.WithError(err).Error("failed to parse jwt key.")
+		return err
+	}
+
+	jwtPublicKey = rsaPublicKey
+	jwtPrivateKey = rsaPrivateKey
 
 	return nil
 }
