@@ -296,9 +296,9 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 	bBuildLocalGroup := dpt.refreshServiceGroup2Nodes(group, node, id, false)
 	// dpt.dump()
 
+	txn := cluster.Transact()
+	dpt.buildCustomGroups(node, customGrps, txn)
 	if bLeader {
-		txn := cluster.Transact()
-		dpt.buildCustomGroups(node, customGrps, txn)
 		if bBuildLocalGroup || bNewGroup || bNewNode {       // add a group on the node
 			// log.WithFields(log.Fields{"group": group, "node": node}).Debug("DPT: local group")
 			dpt.copyProfileKeys(node, group, txn)
@@ -307,8 +307,8 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 		if ok, err := txn.Apply(); err != nil || !ok {
 			log.WithFields(log.Fields{"ok": ok, "error": err, "group": group, "node": node}).Error("write failed")
 		}
-		txn.Close()
 	}
+	txn.Close()
 }
 
 // from cacher

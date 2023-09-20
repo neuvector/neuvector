@@ -336,7 +336,7 @@ func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*sc
 	return rinfo, errCode
 }
 
-func (r *jfrog) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult {
+func (r *jfrog) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult {
 	newURL := r.regURL
 	if r.mode == share.JFrogModeSubdomain && r.isSubdomain {
 		sub, subRepo := getSubdomainFromRepo(repo)
@@ -348,14 +348,15 @@ func (r *jfrog) ScanImage(scanner string, ctx context.Context, id, digest, repo,
 		repo = subRepo
 	}
 	req := &share.ScanImageRequest{
-		Registry:    newURL,
-		Username:    r.username,
-		Password:    r.password,
-		Repository:  repo,
-		Tag:         tag,
-		Proxy:       r.proxy,
-		ScanLayers:  r.scanLayers,
-		ScanSecrets: r.scanSecrets,
+		Registry:           newURL,
+		Username:           r.username,
+		Password:           r.password,
+		Repository:         repo,
+		Tag:                tag,
+		Proxy:              r.proxy,
+		ScanLayers:         r.scanLayers,
+		ScanSecrets:        r.scanSecrets,
+		ScanTypesRequested: &scanTypesRequired,
 	}
 	result, err := rpc.ScanImage(scanner, ctx, req)
 	if result == nil {

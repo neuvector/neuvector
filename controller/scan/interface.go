@@ -55,7 +55,7 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 		if report := clusHelper.GetScanReport(key); report != nil {
 			var highs, meds []string
 			alives := vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
-			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, alives)
+			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.filteredTime = time.Now()
