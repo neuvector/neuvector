@@ -207,6 +207,9 @@ func (fn *FaNotify) ContainerCleanup(rootPid int) {
 	defer fn.mux.Unlock()
 	if r, ok := fn.roots[rootPid]; ok {
 		fn.removeMarks(r)
+		r.paths = nil
+		r.dirs = nil
+		r.dirMonitorMap = nil
 		delete(fn.roots, rootPid)
 	}
 

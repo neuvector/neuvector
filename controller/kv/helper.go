@@ -289,6 +289,8 @@ type ClusterHelper interface {
 	GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error)
 	DeleteSigstoreVerifier(rootName string, verifierName string) error
 	GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error)
+	PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error
+	GetSigstoreTimestamp() (string, *uint64, error)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -3204,4 +3206,45 @@ func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) ([]*share
 		}
 	}
 	return verifiers, nil
+}
+
+func (m clusterHelper) PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error {
+	timestampKey := share.CLUSSigstoreTimestampKey()
+	timestamp := time.Now().Unix()
+
+	value, err := json.Marshal(timestamp)
+	if err != nil {
+		return err
+	}
+
+	if txn != nil {
+		if rev != nil {
+			txn.PutRev(timestampKey, value, *rev)
+		} else {
+			txn.Put(timestampKey, value)
+		}
+	} else {
+		if rev != nil {
+			cluster.PutRev(timestampKey, value, *rev)
+		} else {
+			cluster.Put(timestampKey, value)
+		}
+	}
+
+	return nil
+}
+
+func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
+	timestampKey := share.CLUSSigstoreTimestampKey()
+
+	if !cluster.Exist(timestampKey) {
+		return "", nil, common.ErrObjectNotFound
+	}
+
+	configData, rev, err := m.get(timestampKey)
+	if err != nil || configData == nil {
+		return "", nil, err
+	}
+
+	return string(configData), &rev, nil
 }
