@@ -56,7 +56,7 @@
 #define ENV_CSP_ENV            "CSP_ENV"
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
-#define ENV_SET_CUSTOM_BENCH   "ENABLE_CUSTOM_CHECK"
+#define ENV_SET_CUSTOM_BENCH   "CUSTOM_CHECK_CONTROL"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -211,6 +211,7 @@ static pid_t fork_exec(int i)
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
+    char *custom_check_control;
     int a;
 
     switch (i) {
@@ -418,10 +419,9 @@ static pid_t fork_exec(int i)
             args[a++] = "-apc";
             args[a++] = enable;
         }
-        if ((enable = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-cbench";
-            }
+        if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
+            args[a++] = "-cbench";
+            args[a++] = custom_check_control;
         }
         args[a] = NULL;
         break;
@@ -506,10 +506,9 @@ static pid_t fork_exec(int i)
             args[a++] = "-apc";
             args[a++] = enable;
         }
-        if ((enable = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-cbench";
-            }
+        if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
+            args[a++] = "-cbench";
+            args[a++] = custom_check_control;
         }
         args[a] = NULL;
         break;
