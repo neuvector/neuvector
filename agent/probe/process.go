@@ -1626,6 +1626,10 @@ func (p *Probe) addContainerCandidate(proc *procInternal, scanMode bool) (*procC
 		}
 		return nil, -1 // not ready
 	}
+	if err != nil {
+		log.WithFields(log.Fields{"id": id, "containerInContainer": containerInContainer,
+			"err": err}).Warning("Container ID by PID failed")
+	}
 
 	// In container-in-container enviroment, the id should be container-in-container type.
 	if p.containerInContainer && !containerInContainer {
@@ -1900,13 +1904,42 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 			risky = false
 		}
 	}
-	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
+
+	mLog.WithFields(log.Fields{
+		"id": id,
+		"name": proc.name,
+		"pid": proc.pid,
+		"path": proc.path,
+		"action": action,
+		"risky": risky,
+		"riskyReported": riskyReported,
+		"bSkipReport": bSkipReport,
+		"proc.riskType": proc.riskType,
+		"suspicReported": proc.reported & suspicReported,
+		"profileReported": proc.reported & profileReported,
+	}).Debug("PROC: Result")
 	if risky && !riskyReported {
 
 		proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
+
+		// If the ID is empty, lets make sure it is not because we missed the info
+		if id == "" {
+			c, found := p.pidContainerMap[proc.pid]
+			if found && c.id != "" {
+				id = c.id
+				mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "c": c}).Debug("PROC: Patched empty proc ID with updated container info")
+			} else {
+				if procID, _, err, found := global.SYS.GetContainerIDByPID(proc.pid); err != nil && found {
+					id = procID
+					mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "procId": procID}).Debug("PROC: Patched empty proc ID with Container info thru PID")
+				} else {
+					mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "procId": procID, "err": err, "found": found}).Warning("PROC: Could not find PID's ID")
+				}
+			}
+		}
 
 		riskInfo := suspicProcMap[proc.riskType]
 		if riskInfo == nil {
