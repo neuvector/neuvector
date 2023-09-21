@@ -560,7 +560,9 @@ static void ssl_parser(dpi_packet_t *p)
                 if (rec.ver == SSL_3_0) {
                     dpi_threat_trigger(DPI_THRT_SSL_VER_2OR3, p, "SSL version: SSLv3");
                 } else if (rec.ver == TLS_1_0) {
-                    dpi_threat_trigger(DPI_THRT_SSL_TLS_1DOT0, p, NULL);
+                    dpi_threat_trigger(DPI_THRT_SSL_TLS_1DOT0, p, "TLS version: TLS1.0");
+                } else if (rec.ver == TLS_1_1) {
+                    dpi_threat_trigger(DPI_THRT_SSL_TLS_1DOT1, p, "TLS version: TLS1.1");
                 }
                 break;
             case SSL_2_2BYTE:

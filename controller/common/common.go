@@ -225,6 +225,7 @@ var LogThreatMap = map[uint32]LogThreatInfo{
 	C.THRT_ID_SSL_CIPHER_OVF:    {"SSL.Cipher.Overflow"},
 	C.THRT_ID_SSL_VER_2OR3:      {"SSL.Version.2or3"},
 	C.THRT_ID_SSL_TLS_1DOT0:     {"SSL.TLS1.0"},
+	C.THRT_ID_SSL_TLS_1DOT1:     {"SSL.TLS1.1"},
 	C.THRT_ID_HTTP_NEG_LEN:      {"HTTP.Negative.Body.Length"},
 	C.THRT_ID_HTTP_SMUGGLING:    {"HTTP.Request.Smuggling"},
 	C.THRT_ID_HTTP_SLOWLORIS:    {"HTTP.Request.Slowloris"},
