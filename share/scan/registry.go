@@ -124,7 +124,8 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 	imageInfo.Digest = dg
 
 	var ccmi *registry.ManifestInfo
-	if manV2.Config.MediaType == registry.MediaTypeContainerImage {
+	if manV2.Config.MediaType == registry.MediaTypeContainerImage ||
+		manV2.Config.MediaType == registry.MediaTypeOCIImageConfig {
 		if ccmi, err = rc.ImageConfigSpecV1(ctx, name, manV2.Config.Digest); err == nil {
 			imageInfo.Cmds = ccmi.Cmds
 			imageInfo.Envs = ccmi.Envs

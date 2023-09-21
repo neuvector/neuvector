@@ -18,6 +18,7 @@ import (
 const (
 	MediaTypeOCIManifest    = "application/vnd.oci.image.manifest.v1+json"
 	MediaTypeOCIIndex       = "application/vnd.oci.image.index.v1+json"
+	MediaTypeOCIImageConfig = "application/vnd.oci.image.config.v1+json"
 	MediaTypeContainerImage = "application/vnd.docker.container.image.v1+json"
 
 	MediaTypeOCIMissingManifest = "Accept header does not support OCI manifests"
