@@ -279,6 +279,10 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		}
 	}
 	if imageInfo.ID == "" || len(imageInfo.Layers) == 0 {
+		if manifestReqType == registry.ManifestRequest_CosignSignature {
+			log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("Signature information could not be found")
+			return imageInfo, share.ScanErrorCode_ScanErrNone
+		}
 		log.WithFields(log.Fields{"imageInfo": imageInfo}).Error("Get metadata fail")
 		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
 	}
@@ -296,6 +300,9 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		signatureImageInfo, errCode := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
 		if errCode != share.ScanErrorCode_ScanErrNone && errCode != share.ScanErrorCode_ScanErrImageNotFound {
 			return nil, errCode
+		}
+		if signatureImageInfo == nil {
+			signatureImageInfo = &ImageInfo{}
 		}
 		imageInfo.SignatureDigest = signatureImageInfo.Digest
 	}
