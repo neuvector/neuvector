@@ -766,7 +766,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	return resObject, nil
 }
 
-func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) *nvsysadmission.AdmResult {
+func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview, forTesting bool) *nvsysadmission.AdmResult {
 	matchData := &nvsysadmission.AdmMatchData{}
 	if len(admResObject.OwnerUIDs) > 0 {
 		// If there is owner for this resource, check if the root owner's cache is still available.
@@ -814,7 +814,7 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	for _, c := range admResObject.Containers {
 		var thisStamp api.AdmCtlTimeStamps
 		perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
-		result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar)
+		result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, forTesting)
 		if !licenseAllowed {
 			continue
 		}
@@ -1177,7 +1177,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		var subMsg, ruleScope, msgHeader string
 		// check if the containers are allowed
-		admResult = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar)
+		admResult = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, forTesting)
 		if req.DryRun != nil && *req.DryRun {
 			msgHeader = "<Server Dry Run> "
 		} else if forTesting {
