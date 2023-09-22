@@ -1784,10 +1784,12 @@ type CLUSAdmissionCertCloaked struct { // a superset of CLUSAdmissionCert
 }
 
 type CLUSX509Cert struct {
-	CN      string        `json:"cn"`
-	Key     string        `json:"key,cloak"`
-	Cert    string        `json:"cert,cloak"`
-	OldCert *CLUSX509Cert `json:"oldcert,omitempty"`
+	CN            string        `json:"cn"`
+	Key           string        `json:"key,cloak"`
+	Cert          string        `json:"cert,cloak"`
+	OldCert       *CLUSX509Cert `json:"oldcert,omitempty"`
+	GeneratedTime string        `json:"generated_time,omitempty"`
+	ExpiredTime   string        `json:"expired_time,omitempty"`
 }
 
 func (c *CLUSX509Cert) IsEmpty() bool {

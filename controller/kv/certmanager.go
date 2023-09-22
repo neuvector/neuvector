@@ -2,6 +2,7 @@ package kv
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"sync"
@@ -13,10 +14,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Due to consul's design, synchronization between clients using CAS() would easily make some clients starving.
+// It's important to avoid this in the first place, but if you couldn't, change these variables when the scenario is too extreme.
 const (
-	DefaultRetryNumber   = 5
+	DefaultRetryNumber   = 10
 	DefaultSleepTime     = time.Millisecond * 10
-	DefaultBackoffFactor = 5.0
+	DefaultMaxSleepTime  = time.Second * 3
+	DefaultBackoffFactor = 2.0
 )
 
 type CertManagerCallback struct {
@@ -27,7 +31,11 @@ type CertManagerCallback struct {
 }
 
 type CertManagerConfig struct {
-	CertCheckPeriod time.Duration
+	// How often the certificate will be checked.
+	ExpiryCheckPeriod time.Duration
+
+	// When NotAfter - now < RenewThreshold, renew will be triggered.
+	RenewThreshold time.Duration
 }
 
 func isValidCallback(callback *CertManagerCallback) bool {
@@ -57,7 +65,7 @@ func (c *CertManager) Run(ctx context.Context) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	ticker := time.NewTicker(c.config.CertCheckPeriod)
+	ticker := time.NewTicker(c.config.ExpiryCheckPeriod)
 	for {
 		select {
 		case <-ticker.C:
@@ -78,6 +86,9 @@ func RetryOnCASError(retry int, fn func() error) error {
 		steps++
 		if err := fn(); err != cluster.ErrPutCAS {
 			return err
+		}
+		if sleeptime > DefaultMaxSleepTime {
+			sleeptime = DefaultMaxSleepTime
 		}
 		time.Sleep(sleeptime)
 		sleeptime *= DefaultBackoffFactor
@@ -100,6 +111,7 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 	//
 	// For detail about how CAS works, see https://developer.hashicorp.com/consul/api-docs/kv
 	return RetryOnCASError(DefaultRetryNumber, func() error {
+		logctx := log.WithField("cn", cn)
 		var block *pem.Block
 		var x509Cert *x509.Certificate
 		shouldrenew := false
@@ -111,6 +123,7 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 
 		if data == nil {
 			// Key not found.
+			logctx.Info("certificate is not found.  Create it.")
 			shouldrenew = true
 			goto end
 		}
@@ -119,26 +132,35 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		block, _ = pem.Decode([]byte(data.Cert))
 		x509Cert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			// Invalid certificate.  Try to renew it...
-			log.WithError(err).WithField("cn", cn).Info("failed to parse certificate")
+			logctx.WithError(err).Info("failed to parse certificate. Try to create a new one.")
 			shouldrenew = true
 			goto end
 		}
 
-		if x509Cert.NotAfter.After(time.Now().Add(time.Hour * 24 * -30)) {
-			log.WithField("cn", cn).Info("certificate is near expiration date.  renew it.")
+		if time.Now().After(x509Cert.NotAfter.Add(-c.config.RenewThreshold)) {
+			logctx.WithFields(log.Fields{
+				"validity":  x509Cert.NotAfter.Format(time.RFC3339),
+				"threshold": c.config.RenewThreshold.String(),
+			}).Info("certificate is near expiration date.  Renewing it.")
 			shouldrenew = true
 			goto end
 		}
 
 		if callback.IsCertValid != nil {
 			if !callback.IsCertValid(data) {
+				logctx.WithFields(log.Fields{
+					"validity":  x509Cert.NotAfter,
+					"threshold": c.config.RenewThreshold.String(),
+				}).Info("certificate is deemed invalid. Renewing.")
 				shouldrenew = true
 				goto end
 			}
 		}
 	end:
 		if !shouldrenew {
+			logctx.WithFields(log.Fields{
+				"validity": x509Cert.NotAfter.Format(time.RFC3339),
+			}).Info("certificate is up-to-date.")
 			if callback.lastModifyIndex != index {
 				callback.lastModifyIndex = index
 				// Changed by others or initial start
@@ -150,25 +172,61 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		// CreateCert is confirmed not null during Register().
 		newcert, err := callback.NewCert(data)
 		if err != nil {
-			log.WithField("cn", cn).Warn("failed to create new cert for rotation")
-			return err
+			logctx.WithError(err).Warn("failed to create new cert for rotation")
+			return errors.Wrap(err, "failed to create new cert for rotation")
 		}
 
-		newcert.OldCert = data
+		tlscert, err := tls.X509KeyPair([]byte(newcert.Cert), []byte(newcert.Key))
+		if err != nil {
+			logctx.WithError(err).Error("failed to load key pair")
+			return errors.Wrap(err, "failed to load ca key pair")
+		}
+
+		if len(tlscert.Certificate) == 0 {
+			logctx.Warn("no certificate generated found")
+			return errors.New("no certificate generated found")
+		}
+
+		x509cert, err := x509.ParseCertificate([]byte(tlscert.Certificate[0]))
+		if err != nil {
+			logctx.WithError(err).Warn("failed to parse certificate generated")
+			return errors.Wrap(err, "failed to parse certificate generated")
+		}
+
+		// We only want to keep one old cert, so remove data.OldCert.
+		if data != nil {
+			data.OldCert = nil
+			newcert.OldCert = data
+		}
+
+		newcert.GeneratedTime = time.Now().Format(time.RFC3339)
+		newcert.ExpiredTime = x509cert.NotAfter.Format(time.RFC3339)
 		if err := clusHelper.PutObjectCertMemory(cn, newcert, newcert, index); err != nil {
+			// While it's possible that it returns cluster.ErrPutCAS, we return all error for RetryOnCASError() to handle.
+			logctx.WithError(err).Debug("failed to write certificate to consul kv")
 			return err
 		}
 
 		// Notify caller
 		callback.NotifyNewCert(data, newcert)
+
+		logctx.WithFields(
+			log.Fields{
+				"generated_time": newcert.GeneratedTime,
+				"validity":       x509cert.NotAfter.Format(time.RFC3339),
+			},
+		).Info("Certificate renewed.")
 		return nil
 	})
 }
 
 func (c *CertManager) CheckAndRenewCerts() error {
+	log.Info("CheckAndRenewCerts() starts.")
 	for cn, callback := range c.callbacks {
 		c.checkAndRotateCert(cn, callback)
 	}
+
+	log.Info("CheckAndRenewCerts() completes.")
 
 	return nil
 }

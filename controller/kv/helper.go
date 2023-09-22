@@ -1965,13 +1965,13 @@ func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, ou
 		return err
 	}
 
-	if certExisting, _, _ := clusHelper.GetObjectCertRev(cn); !certExisting.IsEmpty() {
+	if certExisting, _, err := clusHelper.GetObjectCertRev(cn); !certExisting.IsEmpty() {
 		if out != nil {
 			*out = *certExisting
 		}
 		return nil
 	} else {
-		return errors.New("cert is not there after PutIfNotExist")
+		return errors.Wrap(err, "cert is not there after PutIfNotExist")
 	}
 }
 

@@ -222,7 +222,7 @@ func GetDefaultCACertTemplate() *x509.Certificate {
 			Province:           []string{"CA"},
 		},
 		NotBefore:             time.Now().Add(time.Hour * -1), // Give it some room for timing skew.
-		NotAfter:              time.Now().AddDate(10, 0, 0),   // Default 1 years. Change it if it's necessary.
+		NotAfter:              time.Now().AddDate(10, 0, 0),   // Default 10 years. Change it if it's necessary.
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
@@ -412,17 +412,17 @@ func GenTlsCertWithCaAndStoreInFiles(cn string, certPath string, privKeyPath str
 			"keypath":  privKeyPath,
 			"cn":       cn,
 		}).Debug("found existing key files")
-		return nil
+	} else {
+		cert, key, err := GenTlsKeyCert(cn, caCertPath, caKeyPath, validityPeriod, usage)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate tls key/cert")
+		}
+
+		if err := savePrivKeyCert(cert, key, certPath, privKeyPath); err != nil {
+			return errors.Wrap(err, "failed to save key/cert")
+		}
 	}
 
-	cert, key, err := GenTlsKeyCert(cn, caCertPath, caKeyPath, validityPeriod, usage)
-	if err != nil {
-		return errors.Wrap(err, "failed to generate tls key/cert")
-	}
-
-	if err := savePrivKeyCert(cert, key, certPath, privKeyPath); err != nil {
-		return errors.Wrap(err, "failed to save key/cert")
-	}
 	return nil
 }
 

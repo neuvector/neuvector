@@ -1260,12 +1260,45 @@ type Context struct {
 var cctx *Context
 
 func initJWTSignKey() error {
+	ExpiryCheckPeriod := time.Minute * 5
+	RenewThreshold := time.Hour * 24 * 30
+	JWTCertValidityPeriodDay := 90 // 90 days.
+
+	if envvar := os.Getenv("CERT_EXPIRY_CHECK_PERIOD"); envvar != "" {
+		if v, err := time.ParseDuration(envvar); err == nil {
+			ExpiryCheckPeriod = v
+		} else {
+			log.WithError(err).Warn("failed to load ExpiryCheckPeriod")
+		}
+	}
+	if envvar := os.Getenv("CERT_RENEW_THRESHOLD"); envvar != "" {
+		if v, err := time.ParseDuration(envvar); err == nil {
+			RenewThreshold = v
+		} else {
+			log.WithError(err).Warn("failed to load RenewThreshold")
+		}
+	}
+	if envvar := os.Getenv("JWTCERT_VALIDITY_PERIOD_DAY"); envvar != "" {
+		if v, err := strconv.Atoi(envvar); err == nil {
+			JWTCertValidityPeriodDay = v
+		} else {
+			log.WithError(err).Warn("failed to load JWTCertValidityPeriodDay")
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"period":              ExpiryCheckPeriod,
+		"threshold":           RenewThreshold,
+		"validity_length_day": JWTCertValidityPeriodDay,
+	}).Info("cert manager is configured.")
+
 	CertManager = kv.NewCertManager(kv.CertManagerConfig{
-		CertCheckPeriod: time.Hour * 12,
+		RenewThreshold:    RenewThreshold,
+		ExpiryCheckPeriod: ExpiryCheckPeriod,
 	})
-	CertManager.Register(share.CLUSJWTKey, kv.CertManagerCallback{
+	CertManager.Register(share.CLUSJWTKey, &kv.CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
-			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{}, x509.ExtKeyUsageAny)
+			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to generate tls key/cert")
 			}

@@ -20,7 +20,7 @@ func TestCertManager(t *testing.T) {
 	cert_verified := false
 	var olddata *share.CLUSX509Cert
 	cm := NewCertManager(CertManagerConfig{
-		CertCheckPeriod: time.Second * 10,
+		ExpiryCheckPeriod: time.Second * 10,
 	})
 	cm.Register(CN, &CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
