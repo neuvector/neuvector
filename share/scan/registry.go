@@ -70,7 +70,10 @@ func IsPotentialCosignSignatureTag(tag string) bool {
 }
 
 func IsQuayRegistry(rc *RegClient) bool {
-	return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
+	if len(rc.URL) >= len(quayRegistryURL) {
+		return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
+	}
+	return false
 }
 
 func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
