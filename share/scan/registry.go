@@ -300,14 +300,14 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 
 	if manifestReqType != registry.ManifestRequest_CosignSignature {
 		signatureTag := GetCosignSignatureTagFromDigest(imageInfo.Digest)
-		signatureImageInfo, errCode := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
-		if errCode != share.ScanErrorCode_ScanErrNone && errCode != share.ScanErrorCode_ScanErrImageNotFound {
-			return nil, errCode
+		if signatureTag != "" {
+			signatureImageInfo, _ := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
+			// failed to get signature image info doesn't block vulnerability scan
+			if signatureImageInfo == nil {
+				signatureImageInfo = &ImageInfo{}
+			}
+			imageInfo.SignatureDigest = signatureImageInfo.Digest
 		}
-		if signatureImageInfo == nil {
-			signatureImageInfo = &ImageInfo{}
-		}
-		imageInfo.SignatureDigest = signatureImageInfo.Digest
 	}
 
 	return imageInfo, share.ScanErrorCode_ScanErrNone
@@ -351,8 +351,13 @@ func (rc *RegClient) Alive() (uint, error) {
 // Resulting Signature Tag: sha256-5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16.sig
 func GetCosignSignatureTagFromDigest(digest string) string {
 	signatureTag := []rune(digest)
-	signatureTag[strings.Index(digest, ":")] = '-'
-	return string(signatureTag) + ".sig"
+	if i := strings.Index(digest, ":"); i > 0 {
+		signatureTag[i] = '-'
+		return string(signatureTag) + ".sig"
+	} else {
+		log.WithFields(log.Fields{"digest": digest}).Warn("unrecongnized image digest")
+		return ""
+	}
 }
 
 // GetSignatureDataForImage fetches the signature image's maniest and layers for the
