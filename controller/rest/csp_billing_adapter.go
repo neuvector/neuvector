@@ -21,14 +21,14 @@ import (
 type tCspAdapterErrors struct {
 	CspErrors      []string `json:"csp_errors,omitempty"`
 	NvError        *string  `json:"nv_error,omitempty"`
-	DataExpireTime *int64   `json:"billing_data_expire_time,omitempty"`  // in seconds
+	DataExpireTime *int64   `json:"billing_data_expire_time,omitempty"` // in seconds
 }
 
 func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	acc, _ := getAccessControl(w, r, access.AccessOPRead)
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
 	if acc == nil {
 		return
 	}
@@ -78,6 +78,12 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 	} else {
 		resp = resource.GetCspConfig()
+	}
+
+	query := restParseQuery(r)
+	if f, ok := query.pairs["data"]; ok && f == "adapter_versions" {
+		restRespSuccess(w, r, &api.RESTCspAdapterInfo{AdapterVersions: resp.AdapterVersions}, acc, login, nil, "Get csp adapter versions")
+		return
 	}
 
 	var cspAdapterErrors tCspAdapterErrors
