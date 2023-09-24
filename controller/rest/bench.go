@@ -430,13 +430,12 @@ func handlerCustomCheckShow(w http.ResponseWriter, r *http.Request, ps httproute
 
 	oldConfig, _ := clusHelper.GetCustomCheckConfig(group)
 
-	config := api.RESTCustomChecks{Group: group}
+	config := api.RESTCustomChecks{Group: group, Enabled: enabled}
 	if oldConfig != nil {
 		for _, script := range oldConfig.Scripts {
 			scp := &api.RESTCustomCheck{
 				Name:         script.Name,
 				Script:       script.Script,
-				Enabled:      enabled,
 				Configurable: configurable,
 			}
 			config.Scripts = append(config.Scripts, scp)
@@ -481,12 +480,11 @@ func handlerCustomCheckList(w http.ResponseWriter, r *http.Request, ps httproute
 			}
 		}
 
-		config := api.RESTCustomChecks{Group: group}
+		config := api.RESTCustomChecks{Group: group, Enabled: enabled}
 		for _, scr := range script.Scripts {
 			scp := &api.RESTCustomCheck{
 				Name:         scr.Name,
 				Script:       scr.Script,
-				Enabled:      enabled,
 				Configurable: configurable,
 			}
 			config.Scripts = append(config.Scripts, scp)

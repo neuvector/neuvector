@@ -270,6 +270,13 @@ func handlerGroupShow(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	resp.Group = group
+	if cctx.CustomCheckControl != share.CustomCheckControl_Disable {
+		// in "loose"  control, users with compliance(w) permission on the group can configure the group's custom check scripts
+		// in "strict" control, only admin/fedAdmin-role users can configure custom check scripts
+		if cacher.AuthorizeCustomCheck(name, acc.NewWithOp(access.AccessOPWrite)) {
+			resp.CanCreateCustomScripts = true
+		}
+	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get group detail")
 }

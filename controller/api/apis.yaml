@@ -6091,9 +6091,6 @@ definitions:
       script:
         type: string
         example: "uname -r "
-      enabled:
-        type: boolean
-        example: false
       configurable:
         type: boolean
         example: false
@@ -6142,6 +6139,9 @@ definitions:
       group:
         type: string
         example: containers
+      enabled:
+        type: boolean
+        example: false
       scripts:
         type: array
         items:
@@ -6741,6 +6741,9 @@ definitions:
     properties:
       group:
         $ref: '#/definitions/RESTGroupDetail'
+      can_create_custom_scripts:
+        type: boolean
+        example: false
   RESTGroupDetail:
     type: object
     required:

@@ -1177,7 +1177,8 @@ type RESTGroupsBriefData struct {
 }
 
 type RESTGroupData struct {
-	Group *RESTGroupDetail `json:"group"`
+	Group                  *RESTGroupDetail `json:"group"`
+	CanCreateCustomScripts bool             `json:"can_create_custom_scripts"`
 }
 
 type RESTGroupConfigData struct {
@@ -2553,12 +2554,12 @@ type RESTVulnerabilityProfileEntryConfigData struct {
 type RESTCustomCheck struct {
 	Name         string `json:"name"`
 	Script       string `json:"script"`
-	Enabled      bool   `json:"enabled"`
 	Configurable bool   `json:"configurable"`
 }
 
 type RESTCustomChecks struct {
 	Group   string             `json:"group"`
+	Enabled bool               `json:"enabled"`
 	Scripts []*RESTCustomCheck `json:"scripts"`
 }
 
