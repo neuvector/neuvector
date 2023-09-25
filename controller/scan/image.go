@@ -321,21 +321,34 @@ func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, 
 		ScanLayers:         r.scanLayers,
 		ScanSecrets:        r.scanSecrets,
 		ScanTypesRequested: &scanTypesRequired,
-	}
-	rootsOfTrust, err := makeSigstoreScanRequestObj()
-	if err != nil {
-		smd.scanLog.WithFields(log.Fields{"error": err}).Error()
-		result = &share.ScanResult{Error: share.ScanErrorCode_ScanErrArgument}
-		return result
+		RootsOfTrust:       []*share.SigstoreRootOfTrust{},
 	}
 
-	req.RootsOfTrust = rootsOfTrust
+	var sigstoreScanObjErr error
+	if scanTypesRequired.Signature {
+		req.RootsOfTrust, sigstoreScanObjErr = makeSigstoreScanRequestObj()
+		if sigstoreScanObjErr != nil {
+			smd.scanLog.WithFields(log.Fields{"rootsOfTrust": req.RootsOfTrust}).Error("Could not generate sigstore scan request object, cancelling signature scan.")
+			scanTypesRequired.Signature = false
+			if !scanTypesRequired.Vulnerability {
+				// no vuln scan necessary, just return error
+				return &share.ScanResult{
+					SignatureInfo: &share.ScanSignatureInfo{
+						VerificationError: share.ScanErrorCode_ScanErrArgument,
+					}}
+			}
+		}
+	}
 
-	result, err = rpc.ScanImage(scanner, ctx, req)
+	result, err := rpc.ScanImage(scanner, ctx, req)
 	if result == nil || err != nil {
 		// rpc request not made
 		smd.scanLog.WithFields(log.Fields{"error": err}).Error()
 		result = &share.ScanResult{Error: share.ScanErrorCode_ScanErrNetwork}
+	}
+
+	if sigstoreScanObjErr != nil {
+		result.SignatureInfo.VerificationError = share.ScanErrorCode_ScanErrArgument
 	}
 
 	return result
