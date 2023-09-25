@@ -162,7 +162,7 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 		cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 		result, err = rpc.ScanPlatform(scanner, cctx.k8sVersion, cctx.ocVersion, scanReqTimeout)
 	}
-	if result == nil || result.Error == share.ScanErrorCode_ScanErrNetwork || err != nil {
+	if result == nil || result.Error == share.ScanErrorCode_ScanErrNetwork || result.Error == share.ScanErrorCode_ScanErrInProgress || err != nil {
 		// rpc request not made
 		cctx.ScanLog.WithFields(log.Fields{"id": t.id, "error": err}).Error()
 
