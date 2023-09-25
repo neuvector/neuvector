@@ -103,6 +103,7 @@ const syncTokenTimerTimeout = time.Duration(120) * time.Second
 var jwtPublicKey *rsa.PublicKey
 var jwtPrivateKey *rsa.PrivateKey
 var jwtOldPublicKey *rsa.PublicKey // Only used in transition period
+var jwtKeyMutex sync.RWMutex
 
 var jwtLastExpiredTokenSession cluster.SessionInterface
 var jwtLastExpiredTokenSessionCreatedAt time.Time
@@ -141,6 +142,12 @@ var rancherCookieMutex sync.RWMutex
 
 var installID *string
 
+func GetJWTSigningKey() (*rsa.PublicKey, *rsa.PrivateKey, *rsa.PublicKey) {
+	jwtKeyMutex.RLock()
+	defer jwtKeyMutex.RUnlock()
+	return jwtPublicKey, jwtPrivateKey, jwtOldPublicKey
+}
+
 func GetInstallationID() string {
 	if installID == nil {
 		id, _ := clusHelper.GetInstallationID()
@@ -174,11 +181,7 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 }
 
 func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (*loginSession, int) {
-	if jwtPrivateKey == nil || jwtPublicKey == nil {
-		if err := jwtReadKeys(); err != nil {
-			return nil, userKeyError
-		}
-	}
+	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
 
 	id, token, claims := jwtGenerateToken(user, roles, remote, mainSessionID, mainSessionUser)
 	now := user.LastLoginAt // Already updated
@@ -544,6 +547,8 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 
 // with userMutex locked when calling this
 func restReq2User(r *http.Request) (*loginSession, int, string) {
+	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
+
 	var rsessToken string
 	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if header, ok := r.Header[api.RESTRancherTokenHeader]; ok && len(header) == 1 {
@@ -604,12 +609,6 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 		}
 
 		return nil, userInvalidRequest, rsessToken
-	}
-
-	if jwtPrivateKey == nil || jwtPublicKey == nil {
-		if err := jwtReadKeys(); err != nil {
-			return nil, userKeyError, rsessToken
-		}
 	}
 
 	// Validate token
@@ -1123,41 +1122,6 @@ func changeTimeoutLoginSessions(user *share.CLUSUser) {
 		}
 	}
 }
-
-func jwtReadKeys() error {
-	var rsaPublicKey *rsa.PublicKey
-	var rsaOldPublicKey *rsa.PublicKey
-	var rsaPrivateKey *rsa.PrivateKey
-	cert, _, err := clusHelper.GetObjectCertRev(share.CLUSJWTKey)
-	if err != nil {
-		log.WithError(err).Error("failed to read jwt keys.")
-		return err
-	}
-
-	if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.Cert)); err != nil {
-		log.WithError(err).Error("failed to parse jwt cert.")
-		return err
-	}
-
-	if cert.OldCert != nil {
-		if rsaOldPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.OldCert.Cert)); err != nil {
-			log.WithError(err).Warn("failed to parse old jwt cert.")
-			// Ignore the error
-		}
-	}
-
-	if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cert.Key)); err != nil {
-		log.WithError(err).Error("failed to parse jwt key.")
-		return err
-	}
-
-	jwtPublicKey = rsaPublicKey
-	jwtPrivateKey = rsaPrivateKey
-	jwtOldPublicKey = rsaOldPublicKey
-
-	return nil
-}
-
 func resetFedJointKeys() {
 	_httpClientMutex.Lock()
 	v, ok := _proxyOptionHistory["rancher"]
@@ -1252,8 +1216,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		return nil, fmt.Errorf("unrecognized token")
 	}
 	if secret == "" {
+		jwtPublicKey, _, jwtAlterKey := GetJWTSigningKey()
 		publicKey = jwtPublicKey
-		alternativeKey = jwtOldPublicKey
+		alternativeKey = jwtAlterKey
 	} else {
 		if rsaPublicKey == nil {
 			if publicKey = _getFedJointPublicKey(); publicKey == nil {
@@ -1365,8 +1330,9 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 
 	// Validate token
+	_, jwtPrivKey, _ := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	tokenString, _ := token.SignedString(jwtPrivateKey)
+	tokenString, _ := token.SignedString(jwtPrivKey)
 	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 

@@ -3,6 +3,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/gob"
@@ -21,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 
 	"github.com/hashicorp/go-version"
@@ -1274,7 +1276,34 @@ func initJWTSignKey() error {
 			}, nil
 		},
 		NotifyNewCert: func(oldcert *share.CLUSX509Cert, newcert *share.CLUSX509Cert) {
+			jwtKeyMutex.Lock()
+			defer jwtKeyMutex.Unlock()
 
+			var rsaPublicKey *rsa.PublicKey
+			var rsaOldPublicKey *rsa.PublicKey
+			var rsaPrivateKey *rsa.PrivateKey
+			var err error
+			if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(newcert.Cert)); err != nil {
+				log.WithError(err).Error("failed to parse jwt cert.")
+				return
+			}
+
+			if newcert.OldCert != nil {
+				if rsaOldPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(newcert.OldCert.Cert)); err != nil {
+					log.WithError(err).Warn("failed to parse old jwt cert.")
+					// Ignore the error
+				}
+			}
+
+			if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(newcert.Key)); err != nil {
+				log.WithError(err).Error("failed to parse jwt key.")
+				return
+			}
+
+			// Here we replace pointers directly, so it's safe to continue using the original pointers in GetJWTSigningKey().
+			jwtPublicKey = rsaPublicKey
+			jwtPrivateKey = rsaPrivateKey
+			jwtOldPublicKey = rsaOldPublicKey
 		},
 	})
 	// Create and setup certificate.
@@ -1327,10 +1356,6 @@ func StartRESTServer() {
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		k8sPlatform = true
-	}
-
-	if err := jwtReadKeys(); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to read certificates for JWT")
 	}
 
 	r := httprouter.New()

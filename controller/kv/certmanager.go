@@ -20,16 +20,17 @@ const (
 )
 
 type CertManagerCallback struct {
-	NewCert       func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error)
-	NotifyNewCert func(*share.CLUSX509Cert, *share.CLUSX509Cert)
-	IsCertValid   func(*share.CLUSX509Cert) bool // optional
+	lastModifyIndex uint64
+	NewCert         func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error)
+	NotifyNewCert   func(*share.CLUSX509Cert, *share.CLUSX509Cert)
+	IsCertValid     func(*share.CLUSX509Cert) bool // optional
 }
 
 type CertManagerConfig struct {
 	CertCheckPeriod time.Duration
 }
 
-func isValidCallback(callback CertManagerCallback) bool {
+func isValidCallback(callback *CertManagerCallback) bool {
 	if callback.NewCert == nil {
 		return false
 	}
@@ -40,14 +41,14 @@ func isValidCallback(callback CertManagerCallback) bool {
 }
 
 type CertManager struct {
-	callbacks map[string]CertManagerCallback
+	callbacks map[string]*CertManagerCallback
 	mutex     sync.RWMutex
 	config    CertManagerConfig
 }
 
 func NewCertManager(config CertManagerConfig) *CertManager {
 	return &CertManager{
-		callbacks: make(map[string]CertManagerCallback),
+		callbacks: make(map[string]*CertManagerCallback),
 		config:    config,
 	}
 }
@@ -84,7 +85,7 @@ func RetryOnCASError(retry int, fn func() error) error {
 	return errors.New("RetryOnCASError timed out")
 }
 
-func (c *CertManager) checkAndRotateCert(cn string, callback CertManagerCallback) error {
+func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallback) error {
 	// The flow here makes sure the data is consistent across cluster.
 	// 1. Try to read certificate from consul.
 	// 		KeyNotFound => The cert is not created yet.  Try to create it.
@@ -138,6 +139,11 @@ func (c *CertManager) checkAndRotateCert(cn string, callback CertManagerCallback
 		}
 	end:
 		if !shouldrenew {
+			if callback.lastModifyIndex != index {
+				callback.lastModifyIndex = index
+				// Changed by others or initial start
+				callback.NotifyNewCert(nil, data)
+			}
 			return nil
 		}
 
@@ -167,7 +173,7 @@ func (c *CertManager) CheckAndRenewCerts() error {
 	return nil
 }
 
-func (c *CertManager) Register(cn string, callback CertManagerCallback) error {
+func (c *CertManager) Register(cn string, callback *CertManagerCallback) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if !isValidCallback(callback) {

@@ -41,6 +41,7 @@ func VerifyCert(t *testing.T, cn string, cacertfile string, certfile string, key
 	assert.Nil(t, err)
 }
 
+// Generate CA cert.  The key should be loadable.
 func TestGenerateCA(t *testing.T) {
 	cert, key, err := generateCAWithRSAKey(nil, 1024)
 	assert.Nil(t, err)
@@ -62,6 +63,7 @@ func TestGenerateCA(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+// Save private key to filesystem.  The cert/key should be loadable.
 func TestSavePrivKeyCert(t *testing.T) {
 	// Self-signed certs
 	cert, key, err := generateTLSCertWithRSAKey(nil, 1024, nil, nil)
@@ -84,6 +86,7 @@ func TestSavePrivKeyCert(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+// Create CA and create TLS certs using a CA.  Certificates should be able to be verified.
 func TestCASignTLSCert(t *testing.T) {
 	var mockCluster MockCluster
 	mockCluster.Init(nil, nil)
@@ -112,6 +115,7 @@ func TestCASignTLSCert(t *testing.T) {
 	VerifyCert(t, "www.google.com", cacertfile, certfile, keyfile)
 }
 
+// Create self-signed TLS certs.  Certificates should be able to be verified.
 func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	var mockCluster MockCluster
 	mockCluster.Init(nil, nil)
@@ -153,6 +157,8 @@ func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	assert.Equal(t, certdata, certdata2)
 }
 
+// Create CA and create TLS certs using that CA.  Certificates should be able to be verified.
+// Also it shouldn't overwrite existing certs.
 func TestGenTlsCertWithCaAndStoreInKv_WithCA(t *testing.T) {
 	var mockCluster MockCluster
 	mockCluster.Init(nil, nil)
@@ -197,6 +203,7 @@ func TestGenTlsCertWithCaAndStoreInKv_WithCA(t *testing.T) {
 	assert.Equal(t, cacertdata, cacertdata2)
 }
 
+// Make sure that StoreKeyCertMemoryInKV() will not overwrite existing certs.
 func TestStoreKeyCertMemoryInKV(t *testing.T) {
 	var mockCluster MockCluster
 	mockCluster.Init(nil, nil)
@@ -228,4 +235,44 @@ func TestStoreKeyCertMemoryInKV(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Greater(t, index, uint64(0))
 	assert.Equal(t, &expected, data)
+}
+
+// Verify that CreateCAFilesAndStoreInKv will honor existing user-supplied certs.
+func TestExistingCAFiles(t *testing.T) {
+	var mockCluster MockCluster
+	mockCluster.Init(nil, nil)
+	clusHelper = &mockCluster
+
+	// Generate CA
+	dir, err := ioutil.TempDir("", "test-cert")
+	assert.Nil(t, err)
+	defer os.RemoveAll(dir)
+
+	cacertfile := filepath.Join(dir, "cacert.pem")
+	cakeyfile := filepath.Join(dir, "cakey.pem")
+
+	// Create cacert first to simulate users create their own cert.
+	cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
+	assert.Nil(t, err)
+	err = savePrivKeyCert(cert, key, cacertfile, cakeyfile)
+	assert.Nil(t, err)
+
+	kvcert, _, err := clusHelper.GetObjectCertRev(share.CLUSRootCAKey)
+	assert.NotNil(t, err)
+	assert.Nil(t, kvcert)
+
+	// 2. Make sure the data is consistent among kv and fs after rerun CreateCAFilesAndStoreInKv().
+	cakeydata, err := ioutil.ReadFile(cakeyfile)
+	assert.Nil(t, err)
+	cacertdata, err := ioutil.ReadFile(cacertfile)
+	assert.Nil(t, err)
+
+	err = CreateCAFilesAndStoreInKv(cacertfile, cakeyfile)
+	assert.Nil(t, err)
+
+	// User-supplied CA should be used.
+	kvcert, _, err = clusHelper.GetObjectCertRev(share.CLUSRootCAKey)
+	assert.Nil(t, err)
+	assert.Equal(t, string(cacertdata), kvcert.Cert)
+	assert.Equal(t, string(cakeydata), kvcert.Key)
 }

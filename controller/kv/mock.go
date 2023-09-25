@@ -564,7 +564,7 @@ func (m *MockCluster) DeleteApikey(name string) error {
 }
 
 func (m MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
-	value, _ := enc.Marshal(cert)
+	value, _ := json.Marshal(cert)
 	m.kv[cn] = string(value)
 	return nil
 }

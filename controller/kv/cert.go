@@ -173,6 +173,7 @@ func StoreKeyCertMemoryInKV(kvkey string, certData string, keyData string) (*sha
 }
 
 // Create CA files using default template and store in specified path.
+// If cert file already exists, it should be loaded and stored in kv instead if creating a new one.
 func CreateCAFilesAndStoreInKv(certpath, keypath string) error {
 	notfound := false
 	if _, err := os.Stat(certpath); err != nil && os.IsNotExist(err) {
@@ -190,17 +191,17 @@ func CreateCAFilesAndStoreInKv(certpath, keypath string) error {
 			"certpath": certpath,
 			"keypath":  keypath,
 		}).Debug("found existing CA files")
-		return nil
+	} else {
+		// Only RSA is supported for now.
+		cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create ca certificate")
+		}
+		if err := savePrivKeyCert(cert, key, certpath, keypath); err != nil {
+			return errors.Wrap(err, "Failed to save key/cert")
+		}
 	}
 
-	// Only RSA is supported for now.
-	cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create ca certificate")
-	}
-	if err := savePrivKeyCert(cert, key, certpath, keypath); err != nil {
-		return errors.Wrap(err, "Failed to save key/cert")
-	}
 	// cert.IsEmpty() is checked in if condition above.
 	if err := StoreKeyCertFilesInKV(share.CLUSRootCAKey, certpath, keypath); err != nil {
 		return errors.Wrap(err, "failed to store key into KV")
