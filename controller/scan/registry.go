@@ -1544,16 +1544,33 @@ func (rs *Registry) scheduleScanImages(
 					scanTypesRequired.Vulnerability = true
 				}
 
-				signatureInfoChanged := info.SignatureDigest != sum.SignatureDigest || sigstoreTimestamp != sum.SigstoreTimestamp
+				signatureInfoChanged := info.SignatureDigest != sum.SignatureDigest
+				sigstoreConfigurationChanged := sigstoreTimestamp != sum.SigstoreTimestamp
+
 				if signatureInfoChanged {
-					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Signature Info Changed")
 					sum.SignatureDigest = info.SignatureDigest
-					sum.SigstoreTimestamp = sigstoreTimestamp
 					imageChanged = true
 					scanTypesRequired.Signature = true
-				} else if sum.SignatureStatus == api.ScanStatusFailed {
+					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Signature Info Changed")
+				}
+
+				if sigstoreConfigurationChanged {
+					sum.SigstoreTimestamp = sigstoreTimestamp
+					imageChanged = true
+					if info.SignatureDigest != "" {
+						// image is signed, rescan with new sigstore configuration
+						smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Sigstore Config Changed")
+						scanTypesRequired.Signature = true
+					}
+				}
+
+				if sum.SignatureStatus == api.ScanStatusFailed {
 					scanTypesRequired.Signature = true
-				} else {
+				} else if newImage && info.SignatureDigest != "" {
+					scanTypesRequired.Signature = true
+				}
+
+				if !scanTypesRequired.Signature {
 					smd.scanLog.WithFields(log.Fields{
 						"image":                     image,
 						"sum.Version":               sum.Version,
@@ -1562,7 +1579,6 @@ func (rs *Registry) scheduleScanImages(
 						"previousSigstoreTimestamp": sum.SigstoreTimestamp,
 						"currentSigstoreTimestamp":  sigstoreTimestamp,
 					}).Debug("Skip signature scan for image")
-					scanTypesRequired.Signature = false
 				}
 
 				if scanTypesRequired.Vulnerability {
