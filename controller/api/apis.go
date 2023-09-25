@@ -1177,8 +1177,7 @@ type RESTGroupsBriefData struct {
 }
 
 type RESTGroupData struct {
-	Group                  *RESTGroupDetail `json:"group"`
-	CanCreateCustomScripts bool             `json:"can_create_custom_scripts"`
+	Group *RESTGroupDetail `json:"group"`
 }
 
 type RESTGroupConfigData struct {
@@ -2558,9 +2557,10 @@ type RESTCustomCheck struct {
 }
 
 type RESTCustomChecks struct {
-	Group   string             `json:"group"`
-	Enabled bool               `json:"enabled"`
-	Scripts []*RESTCustomCheck `json:"scripts"`
+	Group    string             `json:"group"`
+	Enabled  bool               `json:"enabled"`
+	Writable bool               `json:"writable"`
+	Scripts  []*RESTCustomCheck `json:"scripts"`
 }
 
 type RESTCustomCheckConfig struct {
