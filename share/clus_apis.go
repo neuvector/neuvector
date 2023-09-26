@@ -650,6 +650,10 @@ func CLUSSigstoreVerifierKey(rootName string, verifierName string) string {
 	return fmt.Sprintf("%s/%s", CLUSSigstoreRootOfTrustKey(rootName), verifierName)
 }
 
+func CLUSSigstoreTimestampKey() string {
+	return fmt.Sprintf("%s%s", CLUSConfigStore, "sigstore_timestamp")
+}
+
 type CLUSDistLocker struct {
 	LockedBy string    `json:"locked_by"`
 	LockedAt time.Time `json:"locked_at"`
@@ -1532,6 +1536,12 @@ const (
 	BenchProfileL2  = "Level 2"
 )
 
+const (
+	CustomCheckControl_Disable = "disable"
+	CustomCheckControl_Strict  = "strict"
+	CustomCheckControl_Loose   = "loose"
+)
+
 type CLUSCustomCheck struct {
 	Name   string `json:"name"`
 	Script string `json:"script"`
@@ -1669,24 +1679,28 @@ const (
 )
 
 type CLUSRegistryImageSummary struct {
-	ImageID   string        `json:"image_id"`
-	Registry  string        `json:"registry"`
-	RegName   string        `json:"reg_name"`
-	Images    []CLUSImage   `json:"repo_tag"`
-	Digest    string        `json:"digest"`
-	ScannedAt time.Time     `json:"scanned_at"`
-	CreatedAt time.Time     `json:"created_at"`
-	BaseOS    string        `json:"base_os"`
-	Version   string        `json:"version"`
-	Result    ScanErrorCode `json:"result"`
-	Status    string        `json:"status"`
-	Author    string        `json:"author"`
-	RunAsRoot bool          `json:"run_as_root"`
-	Signed    bool          `json:"signed"` // [2019.Apr] comment out until we can accurately tell it
-	ScanFlags uint32        `json:"scan_flags"`
-	Provider  ScanProvider  `json:"provider"`
-	Size      int64         `json:"size"`
-	Verifiers []string      `json:"verifiers"`
+	ImageID           string        `json:"image_id"`
+	Registry          string        `json:"registry"`
+	RegName           string        `json:"reg_name"`
+	Images            []CLUSImage   `json:"repo_tag"`
+	Digest            string        `json:"digest"`
+	ScannedAt         time.Time     `json:"scanned_at"`
+	CreatedAt         time.Time     `json:"created_at"`
+	BaseOS            string        `json:"base_os"`
+	Version           string        `json:"version"`
+	Result            ScanErrorCode `json:"result"`
+	Status            string        `json:"status"`
+	Author            string        `json:"author"`
+	RunAsRoot         bool          `json:"run_as_root"`
+	Signed            bool          `json:"signed"` // [2019.Apr] comment out until we can accurately tell it
+	ScanFlags         uint32        `json:"scan_flags"`
+	Provider          ScanProvider  `json:"provider"`
+	Size              int64         `json:"size"`
+	Verifiers         []string      `json:"verifiers"`
+	SignatureDigest   string        `json:"signature_digest"`
+	SigstoreTimestamp string        `json:"sigstore_timestamp"`
+	SignatureResult   ScanErrorCode `json:"signature_result"`
+	SignatureStatus   string        `json:"signature_status"`
 }
 
 type CLUSScanner struct {

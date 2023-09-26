@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
 
     memset(&g_config, 0, sizeof(g_config));
     while (arg != -1) {
-        arg = getopt(argc, argv, "hcd:i:j:n:p:s");
+        arg = getopt(argc, argv, "hcd:i:j:n:p:s:v:");
 
         switch (arg) {
         case -1:
@@ -381,6 +381,14 @@ int main(int argc, char *argv[])
             break;
         case 's':
             standalone = true;
+            break;
+        case 'v':
+            if (strcasecmp(optarg, "thrt_tls_1dot0") == 0) {
+                g_config.thrt_ssl_tls_1dot0 = true;
+            }
+            else if (strcasecmp(optarg, "thrt_tls_1dot1") == 0) {
+                g_config.thrt_ssl_tls_1dot1 = true;
+            }
             break;
         case 'h':
         default:

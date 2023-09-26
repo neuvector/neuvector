@@ -103,17 +103,17 @@ type localSystemInfo struct {
 	localSubnetMap map[string]share.CLUSSubnet
 	// all subnets that all containers in the cluster connect to, including
 	// local subnets and subnets populated from controller
-	internalSubnets map[string]share.CLUSSubnet
-	containerConfig map[string]*share.CLUSWorkloadConfig
-	policyMode      string
-	agentConfig     share.CLUSAgentConfig
-	agentStats      share.ContainerStats
-	hostIPs         utils.Set
-	tapProxymesh    bool
-	jumboFrameMTU   bool
-	xffEnabled      bool
-	ciliumCNI       bool
-	disableNetPolicy bool
+	internalSubnets   map[string]share.CLUSSubnet
+	containerConfig   map[string]*share.CLUSWorkloadConfig
+	policyMode        string
+	agentConfig       share.CLUSAgentConfig
+	agentStats        share.ContainerStats
+	hostIPs           utils.Set
+	tapProxymesh      bool
+	jumboFrameMTU     bool
+	xffEnabled        bool
+	ciliumCNI         bool
+	disableNetPolicy  bool
 	detectUnmanagedWl bool
 }
 
@@ -1245,7 +1245,8 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 			epname := fmt.Sprintf("%s-endpoint", n.Name)
 			if _, ok = gInfo.networkLBs[netID]; !ok {
 				if ep, err := global.RT.GetNetworkEndpoint(netID, cname, epname); err != nil {
-					log.WithFields(log.Fields{"error": err, "container": cname, "endpoint": epname}).Error("Error reading container network endpoint")
+					// Lower the debug level. We see repeated log on this.
+					log.WithFields(log.Fields{"error": err, "container": cname, "endpoint": epname}).Debug("Error reading container network endpoint")
 				} else {
 					gInfo.networkLBs[netID] = ep
 
@@ -1666,7 +1667,6 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// since the same policy might be shared by several same-kind instances in a node
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
 
-
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
 
@@ -2052,7 +2052,7 @@ func taskStopContainer(id string, pid int) {
 			// log.WithFields(log.Fields{"info": info}).Debug()
 			return
 		}
-		info.Running = false	// update
+		info.Running = false // update
 	}
 
 	if info.FinishedAt.IsZero() {

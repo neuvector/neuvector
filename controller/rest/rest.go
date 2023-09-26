@@ -1248,7 +1248,8 @@ type Context struct {
 	NvAppFullVersion   string
 	NvSemanticVersion  string
 	CspType            share.TCspType
-	CspPauseInterval   uint // in minutes
+	CspPauseInterval   uint   // in minutes
+	CustomCheckControl string // disable / strict / loose
 	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
 }
 

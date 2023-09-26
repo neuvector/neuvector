@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -13,22 +14,24 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
 type eventDesc struct {
-	id        string
-	event     string
-	name      string
-	groupName string
-	level     string
-	proc      string
-	cve_high  int
-	cve_med   int
-	items     []string
-	vuls      utils.Set
-	arg       interface{}
-	noQuar    bool
+	id                  string
+	event               string
+	name                string
+	groupName           string
+	level               string
+	proc                string
+	cve_high            int
+	cve_med             int
+	cve_high_fixed_info []scanUtils.FixedVulInfo
+	items               []string
+	vuls                utils.Set
+	arg                 interface{}
+	noQuar              bool
 }
 
 type actionDesc struct {
@@ -219,6 +222,36 @@ func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
 			count, err := strconv.Atoi(d.CondValue)
 			if err != nil || desc.cve_high < count {
 				return false
+			}
+		case share.EventCondTypeCVEHighWithFix:
+			ss := strings.Split(d.CondValue, "/")
+			cveCountInRule, err := strconv.Atoi(ss[0]) // high vul with fix count configured in response rule
+			// get settings from response rule
+			if err != nil {
+				return false
+			}
+			if len(ss) >= 1 && len(desc.cve_high_fixed_info) < cveCountInRule {
+				// it's configured like: ( high_vul_with_fix:X ) meaning "# of high vul(with fix) >= X"
+				return false
+			}
+			if len(ss) == 2 {
+				// it's configured like: ( high_vul_with_fix:X/Y ) meaning "# of (high vul that are reported Y days ago AND have fix) >= X"
+				daysReported, err := strconv.Atoi(ss[1])
+				if err != nil {
+					return false
+				}
+				hoursReported := float64(24 * daysReported) // "reported before N hours" that is configured in response rule
+				reportedBeforeNDays := 0
+				// calculate how many high cve(with fix) that are reported before <daysReported> days
+				for _, info := range desc.cve_high_fixed_info {
+					dur := time.Since(time.Unix(info.PubTS, 0))
+					if dur.Hours() >= hoursReported { // found high cve that is reported before <daysReported> days ago
+						reportedBeforeNDays += 1
+					}
+				}
+				if reportedBeforeNDays == 0 {
+					return false
+				}
 			}
 		case share.EventCondTypeCVEMedium:
 			count, err := strconv.Atoi(d.CondValue)

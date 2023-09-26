@@ -136,6 +136,14 @@ type AdmUriState struct {
 	DefaultAction int // AdmCtrlActionAllow or AdmCtrlActionDeny
 }
 
+type AdmAssessResult struct {
+	RuleID        uint32
+	AdmRule       string
+	RuleMode      string
+	MatchedSource string
+	DenyRuleMsg   string
+}
+
 type AdmResult struct { // AdmResult is per-image
 	MatchDeny       bool
 	FinalDeny       bool

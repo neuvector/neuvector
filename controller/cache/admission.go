@@ -1670,7 +1670,15 @@ func isApiPathAvailable(ctrlStates map[string]*share.CLUSAdmCtrlState) bool {
 
 // matchCfgType being 0 means to compare with default(critical) rules only
 func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmResult, ar *admissionv1beta1.AdmissionReview) bool { // return true means mtach
+	matchData *nvsysadmission.AdmMatchData, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmResult,
+	ar *admissionv1beta1.AdmissionReview, globalMode string, forTesting bool) (bool, []*nvsysadmission.AdmAssessResult) { // return true means match
+
+	var isDenyRuleType bool
+	var assessDenyResults []*nvsysadmission.AdmAssessResult // for matched deny rules in assessment only
+
+	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
+		isDenyRuleType = true
+	}
 	admPolicyCache := selectAdminPolicyCache(admType, ruleType)
 	if admPolicyCache != nil {
 		cacheMutexRLock()
@@ -1680,37 +1688,67 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
 					for _, scannedImage := range scannedImages {
 						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, matchData.RootAvail, ar, rule.ID); matched {
-							//populateAdmResult(c, result, scannedImage, rule, ruleType, dataSource)
-							result.RuleID = rule.ID
-							result.RuleCfgType = rule.CfgType
-							if (ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType) && rule.RuleMode != "" {
-								result.RuleMode = rule.RuleMode
+							var ruleMode string
+							var admRuleDetails string
+							var denyRuleMsg string
+
+							admRuleDetails = ruleToString(rule)
+							if isDenyRuleType {
+								ruleMode = rule.RuleMode
+								denyRuleMsg = fillDenyMessageFromRule(c, rule, scannedImage)
 							}
-							result.AdmRule = ruleToString(rule)
-							result.Image = c.Image
-							result.MatchedSource = matchedSource
-							if !result.ImageNotScanned {
-								result.ImageID = scannedImage.ImageID
-								result.Registry = scannedImage.Registry
-								result.Repository = c.ImageRepo
-								result.Tag = c.ImageTag
-								result.BaseOS = scannedImage.BaseOS
-								result.HighVulsCnt = scannedImage.HighVuls
-								result.MedVulsCnt = scannedImage.MedVuls
+
+							if len(assessDenyResults) == 0 {
+								result.RuleID = rule.ID
+								result.RuleCfgType = rule.CfgType
+								if isDenyRuleType {
+									result.RuleMode = ruleMode
+									result.Msg = denyRuleMsg
+								}
+								result.AdmRule = admRuleDetails
+								result.Image = c.Image
+								result.MatchedSource = matchedSource
+								if !result.ImageNotScanned {
+									result.ImageID = scannedImage.ImageID
+									result.Registry = scannedImage.Registry
+									result.Repository = c.ImageRepo
+									result.Tag = c.ImageTag
+									result.BaseOS = scannedImage.BaseOS
+									result.HighVulsCnt = scannedImage.HighVuls
+									result.MedVulsCnt = scannedImage.MedVuls
+								}
 							}
-							// denied condition
-							if ruleType == api.ValidatingDenyRuleType || ruleType == share.FedAdmCtrlDenyRulesType {
-								result.Msg = fillDenyMessageFromRule(c, rule, scannedImage)
+							if forTesting && isDenyRuleType && (ruleMode == share.AdmCtrlModeProtect || (ruleMode == "" && globalMode == share.AdmCtrlModeProtect)) {
+								assessResult := &nvsysadmission.AdmAssessResult{
+									RuleID:        rule.ID,
+									AdmRule:       admRuleDetails,
+									MatchedSource: matchedSource,
+									DenyRuleMsg:   denyRuleMsg,
+									RuleMode:      ruleMode,
+								}
+								assessDenyResults = append(assessDenyResults, assessResult)
 							}
-							log.WithFields(log.Fields{"id": head.ID, "image": c.Image, "type": ruleType}).Debug("matched a rule")
-							return true
+							if !forTesting {
+								// return(no need to keep matching) when it's not for assessment
+								log.WithFields(log.Fields{"id": head.ID, "image": c.Image, "type": ruleType}).Debug("matched a rule")
+								return true, nil
+							} else if !isDenyRuleType || ruleMode == share.AdmCtrlModeMonitor || (ruleMode == "" && globalMode == share.AdmCtrlModeMonitor) {
+								// break from the matching loop(no need to keep matching for assessment) under any of the following conditions
+								// 1. an allow rule is matched.
+								// 2. a deny rule with 'monitor' per-rule action is matched.
+								// 3. a deny rule without per-rule action is matched but global mode is "monitor".
+								return true, assessDenyResults
+							}
 						}
 					}
 				}
 			}
 		}
 	}
-	return false
+	if forTesting && isDenyRuleType && len(assessDenyResults) > 0 {
+		return true, assessDenyResults
+	}
+	return false, nil
 }
 
 // Admission control - non-UI
@@ -1829,7 +1867,10 @@ func (m CacheMethod) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, i
 }
 
 func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) (*nvsysadmission.AdmResult, bool) {
+	matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
+	globalMode string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult, bool) {
+
+	var assessDenyResults []*nvsysadmission.AdmAssessResult
 	result := &nvsysadmission.AdmResult{}
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	stamps.GonnaFetch = time.Now()
@@ -1858,27 +1899,36 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 
 	// we compare with default allow rules first when this container doesn't match any rule yet
 	if matchData.MatchState == nvsysadmission.MatchedNone {
-		if matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, _criticalRulesOnly,
-			admResObject, c, matchData, scannedImages, result, ar) {
-			return result, true
+		if matched, _ := matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, _criticalRulesOnly,
+			admResObject, c, matchData, scannedImages, result, ar, globalMode, forTesting); matched {
+			return result, nil, true
 		}
 	}
 
 	// if we are in federation, compare with fed admission rules(i.e. fed_admctrl_exception/fed_admctrl_deny rules) before crd/local user-defined rules
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
 		if matchData.MatchState == nvsysadmission.MatchedNone {
-			if matchK8sAdmissionRules(admType, share.FedAdmCtrlExceptRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result, ar) {
+			if matched, _ := matchK8sAdmissionRules(admType, share.FedAdmCtrlExceptRulesType, share.FederalCfg,
+				admResObject, c, matchData, scannedImages, result, ar, globalMode, forTesting); matched {
 				result.MatchFedRule = true
-				return result, true
+				return result, nil, true
 			}
 		}
-		if matchData.MatchState != nvsysadmission.MatchedDeny {
-			if matchK8sAdmissionRules(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result, ar) {
+		// 1. if it's not assessment, keep matching fed deny rules when we don't match a deny rule yet (for reducing unnecessary matching)
+		// 2. if it's assessment, keep matching fed deny rules when we don't match an allow rule yet (for collecting all matched deny rules)
+		if (!forTesting && matchData.MatchState != nvsysadmission.MatchedDeny) ||
+			(forTesting && matchData.MatchState != nvsysadmission.MatchedAllow) {
+			if matched, denyResults := matchK8sAdmissionRules(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
+				admResObject, c, matchData, scannedImages, result, ar, globalMode, forTesting); matched {
 				result.MatchDeny = true
 				result.MatchFedRule = true
-				return result, true
+				if !forTesting {
+					// it's not assessment. simply return the matched result
+					return result, nil, true
+				} else {
+					// when it's assessment, keep matching unless an allow rule is matched first later
+					assessDenyResults = append(assessDenyResults, denyResults...)
+				}
 			}
 		}
 	}
@@ -1890,19 +1940,35 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 	// 4. user-defined deny rules
 	for _, matchScope := range []int{share.GroundCfg, share.UserCreated} {
 		// we compare with allow rules when this container doesn't match any rule yet
-		if matchData.MatchState == nvsysadmission.MatchedNone {
-			if matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result, ar) {
-				return result, true
+		// 1. if it's not assessment, keep matching crd/user-defined allow rules when we don't match a deny rule yet (for reducing unnecessary matching)
+		// 2. if it's assessment, keep matching crd/user-defined allow rules when we don't match an allow rule yet (for collecting all matched deny rules)
+		if (!forTesting && matchData.MatchState == nvsysadmission.MatchedNone) ||
+			(forTesting && matchData.MatchState != nvsysadmission.MatchedAllow) {
+			if matched, _ := matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, matchScope,
+				admResObject, c, matchData, scannedImages, result, ar, globalMode, forTesting); matched {
+				if !forTesting {
+					// it's not assessment. simply return the matched result
+					return result, nil, true
+				} else {
+					// the aeeseement is done when an allow rule is matched
+					break
+				}
 			}
 		}
-
-		// we compare with deny rules when this container doesn't match any deny rule yet
-		if matchData.MatchState != nvsysadmission.MatchedDeny {
-			if matchK8sAdmissionRules(admType, api.ValidatingDenyRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result, ar) {
+		// 1. if it's not assessment, keep matching crd/user-defined deny rules when we don't match a deny rule yet (for reducing unnecessary matching)
+		// 2. if it's assessment, keep matching crd/user-defined deny rules when we don't match an allow rule yet (for collecting all matched deny rules)
+		if (!forTesting && matchData.MatchState != nvsysadmission.MatchedDeny) ||
+			(forTesting && matchData.MatchState != nvsysadmission.MatchedAllow) {
+			if matched, denyResults := matchK8sAdmissionRules(admType, api.ValidatingDenyRuleType, matchScope,
+				admResObject, c, matchData, scannedImages, result, ar, globalMode, forTesting); matched {
 				result.MatchDeny = true
-				return result, true
+				if !forTesting {
+					// it's not assessment. simply return the matched result
+					return result, nil, true
+				} else {
+					// it's assessment
+					assessDenyResults = append(assessDenyResults, denyResults...)
+				}
 			}
 		}
 	}
@@ -1923,7 +1989,7 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 	result.HighVulsCnt = highVuls
 	result.MedVulsCnt = medVuls
 
-	return result, true
+	return result, assessDenyResults, true
 }
 
 func (m CacheMethod) IsAdmControlEnabled(uri *string) (bool, string, int, string, string) {
