@@ -165,7 +165,8 @@ type CacheInterface interface {
 	WaitUntilApiPathReady() bool
 	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview, forTesting bool) (*nvsysadmission.AdmResult, bool)
+		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
+		globalMode string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()
