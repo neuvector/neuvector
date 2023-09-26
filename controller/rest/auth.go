@@ -100,10 +100,19 @@ const jwtIbmSaTokenLife = time.Minute * 30
 const jwtImportStatusTokenLife = time.Minute * 10
 const syncTokenTimerTimeout = time.Duration(120) * time.Second
 
-var jwtPublicKey *rsa.PublicKey
-var jwtPrivateKey *rsa.PrivateKey
-var jwtOldPublicKey *rsa.PublicKey // Only used in transition period
-var jwtKeyMutex sync.RWMutex
+// JWT token related
+type JWTCertificateState struct {
+	jwtPublicKey            *rsa.PublicKey
+	jwtPublicKeyNotAfter    *time.Time
+	jwtPrivateKey           *rsa.PrivateKey
+	jwtOldPublicKey         *rsa.PublicKey // Only used in transition period
+	jwtOldPublicKeyNotAfter *time.Time
+}
+
+var (
+	jwtCertState JWTCertificateState
+	jwtKeyMutex  sync.RWMutex
+)
 
 var jwtLastExpiredTokenSession cluster.SessionInterface
 var jwtLastExpiredTokenSessionCreatedAt time.Time
@@ -142,10 +151,10 @@ var rancherCookieMutex sync.RWMutex
 
 var installID *string
 
-func GetJWTSigningKey() (*rsa.PublicKey, *rsa.PrivateKey, *rsa.PublicKey) {
+func GetJWTSigningKey() JWTCertificateState {
 	jwtKeyMutex.RLock()
 	defer jwtKeyMutex.RUnlock()
-	return jwtPublicKey, jwtPrivateKey, jwtOldPublicKey
+	return jwtCertState
 }
 
 func GetInstallationID() string {
@@ -1205,6 +1214,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var publicKey *rsa.PublicKey
 	var alternativeKey *rsa.PublicKey
 
+	jwtCert := GetJWTSigningKey()
 	installID := GetInstallationID()
 
 	if secret == "" {
@@ -1216,9 +1226,8 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		return nil, fmt.Errorf("unrecognized token")
 	}
 	if secret == "" {
-		jwtPublicKey, _, jwtAlterKey := GetJWTSigningKey()
-		publicKey = jwtPublicKey
-		alternativeKey = jwtAlterKey
+		publicKey = jwtCert.jwtPublicKey
+		alternativeKey = jwtCert.jwtOldPublicKey
 	} else {
 		if rsaPublicKey == nil {
 			if publicKey = _getFedJointPublicKey(); publicKey == nil {
@@ -1240,6 +1249,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
+		if jwtCert.jwtPublicKeyNotAfter != nil && time.Now().After(*jwtCert.jwtPublicKeyNotAfter) {
+			return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtPublicKeyNotAfter)
+		}
 		return publicKey, nil
 	})
 
@@ -1250,6 +1262,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		token, err = jwt.ParseWithClaims(tokenString, &tokenClaim{}, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			if jwtCert.jwtOldPublicKeyNotAfter != nil && time.Now().After(*jwtCert.jwtOldPublicKeyNotAfter) {
+				return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtOldPublicKeyNotAfter)
 			}
 			return alternativeKey, nil
 		})
@@ -1330,9 +1345,9 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 
 	// Validate token
-	_, jwtPrivKey, _ := GetJWTSigningKey()
+	jwtCert := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	tokenString, _ := token.SignedString(jwtPrivKey)
+	tokenString, _ := token.SignedString(jwtCert.jwtPrivateKey)
 	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 

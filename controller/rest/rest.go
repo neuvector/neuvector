@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/gob"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"os"
@@ -1259,6 +1260,15 @@ type Context struct {
 
 var cctx *Context
 
+func getExpiryDate(certPEM []byte) (time.Time, error) {
+	block, _ := pem.Decode(certPEM)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return cert.NotAfter, nil
+}
+
 func initJWTSignKey() error {
 	ExpiryCheckPeriod := time.Minute * 5
 	RenewThreshold := time.Hour * 24 * 30
@@ -1334,9 +1344,23 @@ func initJWTSignKey() error {
 			}
 
 			// Here we replace pointers directly, so it's safe to continue using the original pointers in GetJWTSigningKey().
-			jwtPublicKey = rsaPublicKey
-			jwtPrivateKey = rsaPrivateKey
-			jwtOldPublicKey = rsaOldPublicKey
+			jwtCertState.jwtPublicKey = rsaPublicKey
+			jwtCertState.jwtPrivateKey = rsaPrivateKey
+			jwtCertState.jwtOldPublicKey = rsaOldPublicKey
+
+			if t, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+				log.WithError(err).Error("failed to get jwt cert's expiry time.")
+			} else {
+				jwtCertState.jwtPublicKeyNotAfter = &t
+			}
+
+			if newcert.OldCert != nil {
+				if t, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+					log.WithError(err).Error("failed to get jwt cert's expiry time.")
+				} else {
+					jwtCertState.jwtOldPublicKeyNotAfter = &t
+				}
+			}
 		},
 	})
 	// Create and setup certificate.
