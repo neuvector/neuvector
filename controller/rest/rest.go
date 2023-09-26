@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
@@ -96,6 +98,8 @@ var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
 var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
+
+var CertManager *kv.CertManager
 
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
@@ -1248,9 +1252,35 @@ type Context struct {
 	CspPauseInterval   uint   // in minutes
 	CustomCheckControl string // disable / strict / loose
 	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
+	CertManager        *kv.CertManager
 }
 
 var cctx *Context
+
+func initJWTSignKey() error {
+	CertManager = kv.NewCertManager(kv.CertManagerConfig{
+		CertCheckPeriod: time.Hour * 12,
+	})
+	CertManager.Register(share.CLUSJWTKey, kv.CertManagerCallback{
+		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
+			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{}, x509.ExtKeyUsageAny)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+			}
+			return &share.CLUSX509Cert{
+				CN:   share.CLUSJWTKey,
+				Key:  string(key),
+				Cert: string(cert),
+			}, nil
+		},
+		NotifyNewCert: func(oldcert *share.CLUSX509Cert, newcert *share.CLUSX509Cert) {
+
+		},
+	})
+	CertManager.CheckAndRenewCerts()
+	go CertManager.Run(context.TODO())
+	return nil
+}
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
 func InitContext(ctx *Context) {
@@ -1282,6 +1312,9 @@ func InitContext(ctx *Context) {
 		_teleFreq = 60
 	}
 
+	if err := initJWTSignKey(); err != nil {
+		log.WithError(err).Error("failed to initialize JWT sign key.")
+	}
 	initHttpClients()
 }
 

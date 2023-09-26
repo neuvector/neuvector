@@ -569,9 +569,11 @@ func (m MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLU
 	return nil
 }
 
-func (m MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert) error {
+func (m MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
 	v, ok := m.kv[cn]
-	if ok {
+	// Only use existing value when index = 0.
+	// When index > 0 => force write.
+	if ok && index == 0 {
 		if out != nil {
 			err := json.Unmarshal([]byte(v), &out)
 			if err != nil {
@@ -595,7 +597,7 @@ func (m MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, e
 	out := share.CLUSX509Cert{}
 	v, ok := m.kv[cn]
 	if !ok {
-		return nil, 0, errors.New("not found")
+		return nil, 0, cluster.ErrKeyNotFound
 	}
 	err := json.Unmarshal([]byte(v), &out)
 	if err != nil {

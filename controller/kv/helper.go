@@ -167,7 +167,7 @@ type ClusterHelper interface {
 	GetAdmissionCertRev(svcName string) (*share.CLUSAdmissionCertCloaked, uint64) // obsolete
 	GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error)
 	PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error
-	PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert) error
+	PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error
 	GetAdmissionStateRev(svcName string) (*share.CLUSAdmissionState, uint64)
 	PutAdmissionRule(admType, ruleType string, rule *share.CLUSAdmissionRule) error
 	PutAdmissionStateRev(svcName string, state *share.CLUSAdmissionState, rev uint64) error
@@ -1956,10 +1956,11 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 
 // Store the key/cert into kv and return the result.
 // This function, unlike PutObjectCert(), doesn't overwrite the existing cert file.
-func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert) error {
+// If index == 0, it will not overwrite the data. (PutIfNotExist)
+func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
 	key := share.CLUSObjectCertKey(cn)
 	value, _ := enc.Marshal(in)
-	err := cluster.PutIfNotExist(key, value, true)
+	err := cluster.PutRev(key, value, index)
 	if err != nil {
 		return err
 	}

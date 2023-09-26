@@ -2,7 +2,6 @@ package kv
 
 import (
 	"crypto/md5"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -1181,12 +1180,6 @@ func ValidateWebhookCert() {
 			store:        share.CLUSConfigCrdStore,
 			k8sEnvOnly:   true,
 		},
-		&keyCertInfo{
-			cn:           share.CLUSJWTKey,
-			svcName:      share.CLUSJWTKey,
-			certSvcNames: []string{},
-			k8sEnvOnly:   false,
-		},
 	}
 	// don't know why: after rolling upgrade(replicas/maxSurge=3), there could be a short period that controller cannot get/put kv
 	// (get returns "Key not found" error & put gets "CAS put error" & PutIfNotExist returns nil : is it because kv is not syned yet?)
@@ -1224,17 +1217,6 @@ func ValidateWebhookCert() {
 									continue
 								}
 							}
-
-						case share.CLUSJWTKey:
-							// TODO: Make validity period configurable.
-							// Create a self-signed certificate.
-							cert, key, err := GenTlsKeyCert(certInfo.cn, "", "", ValidityPeriod{Day: 90}, x509.ExtKeyUsageServerAuth)
-							if err != nil {
-								// Make it retry.
-								log.WithError(err).Error("failed to generate Webhook certs")
-								continue
-							}
-							StoreKeyCertMemoryInKV(certInfo.cn, string(cert), string(key))
 						}
 					} else {
 						certInfo.verified = true
@@ -1284,7 +1266,7 @@ func ValidateWebhookCert() {
 			err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
 			err2 := ioutil.WriteFile(certInfo.certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
-				if certInfo.cn != share.CLUSRootCAKey && certInfo.cn != share.CLUSJWTKey {
+				if certInfo.cn != share.CLUSRootCAKey {
 					if orchPlatform == share.PlatformKubernetes {
 						admission.SetCABundle(certInfo.svcName, certData)
 					}

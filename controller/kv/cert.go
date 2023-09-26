@@ -165,7 +165,7 @@ func StoreKeyCertMemoryInKV(kvkey string, certData string, keyData string) (*sha
 		Key:  string(keyData),
 		Cert: string(certData),
 	}
-	if err := clusHelper.PutObjectCertMemory(kvkey, &cert, &cert); err != nil {
+	if err := clusHelper.PutObjectCertMemory(kvkey, &cert, &cert, 0); err != nil {
 		return nil, err
 	}
 
