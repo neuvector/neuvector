@@ -230,7 +230,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 			"version": manV1.SignedManifest.SchemaVersion, "created": manV1.Created,
 		}).Debug("v1 manifest request")
 
-		// in Harbor registry, even we send request with accept v1 manifest, we still get v2 format back
+		// Even we send request with accept v1 manifest, we still get v2 format back
 		if manV1.SignedManifest.SchemaVersion <= 1 {
 			if len(manV1.SignedManifest.FSLayers) > 0 {
 				imageInfo.Layers = make([]string, len(manV1.SignedManifest.FSLayers))
