@@ -102,6 +102,8 @@ const syncTokenTimerTimeout = time.Duration(120) * time.Second
 
 var jwtPublicKey *rsa.PublicKey
 var jwtPrivateKey *rsa.PrivateKey
+var jwtOldPublicKey *rsa.PublicKey // Only used in transition period
+
 var jwtLastExpiredTokenSession cluster.SessionInterface
 var jwtLastExpiredTokenSessionCreatedAt time.Time
 
@@ -1124,6 +1126,7 @@ func changeTimeoutLoginSessions(user *share.CLUSUser) {
 
 func jwtReadKeys() error {
 	var rsaPublicKey *rsa.PublicKey
+	var rsaOldPublicKey *rsa.PublicKey
 	var rsaPrivateKey *rsa.PrivateKey
 	cert, _, err := clusHelper.GetObjectCertRev(share.CLUSJWTKey)
 	if err != nil {
@@ -1136,6 +1139,13 @@ func jwtReadKeys() error {
 		return err
 	}
 
+	if cert.OldCert != nil {
+		if rsaOldPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(cert.OldCert.Cert)); err != nil {
+			log.WithError(err).Warn("failed to parse old jwt cert.")
+			// Ignore the error
+		}
+	}
+
 	if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cert.Key)); err != nil {
 		log.WithError(err).Error("failed to parse jwt key.")
 		return err
@@ -1143,6 +1153,7 @@ func jwtReadKeys() error {
 
 	jwtPublicKey = rsaPublicKey
 	jwtPrivateKey = rsaPrivateKey
+	jwtOldPublicKey = rsaOldPublicKey
 
 	return nil
 }
@@ -1228,6 +1239,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	// rsaPublicKey being non-nil is for validating new public/private keys purpose
 	var tokenString string
 	var publicKey *rsa.PublicKey
+	var alternativeKey *rsa.PublicKey
 
 	installID := GetInstallationID()
 
@@ -1241,6 +1253,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	}
 	if secret == "" {
 		publicKey = jwtPublicKey
+		alternativeKey = jwtOldPublicKey
 	} else {
 		if rsaPublicKey == nil {
 			if publicKey = _getFedJointPublicKey(); publicKey == nil {
@@ -1264,6 +1277,18 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		}
 		return publicKey, nil
 	})
+
+	// Try with old cert if it's available.
+	// Note: Ideally we should use extra info stored in claims to do a lookup below.
+	//       Luckily jwt verification normally only takes a few ms.  We can revisit when we see abnormal performance impact here.
+	if err != nil && alternativeKey != nil {
+		token, err = jwt.ParseWithClaims(tokenString, &tokenClaim{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return alternativeKey, nil
+		})
+	}
 
 	if err != nil {
 		// if it's a joint cluster and rsa verfication of the token from master cluster fails,

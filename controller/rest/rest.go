@@ -1277,6 +1277,7 @@ func initJWTSignKey() error {
 
 		},
 	})
+	// Create and setup certificate.
 	CertManager.CheckAndRenewCerts()
 	go CertManager.Run(context.TODO())
 	return nil
