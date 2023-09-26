@@ -1674,7 +1674,7 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 	ar *admissionv1beta1.AdmissionReview, globalMode string, forTesting bool) (bool, []*nvsysadmission.AdmAssessResult) { // return true means match
 
 	var isDenyRuleType bool
-	var assessDenyResults []*nvsysadmission.AdmAssessResult
+	var assessDenyResults []*nvsysadmission.AdmAssessResult // for matched deny rules in assessment only
 
 	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
 		isDenyRuleType = true
@@ -1692,9 +1692,9 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 							var admRuleDetails string
 							var denyRuleMsg string
 
+							admRuleDetails = ruleToString(rule)
 							if isDenyRuleType {
 								ruleMode = rule.RuleMode
-								admRuleDetails = ruleToString(rule)
 								denyRuleMsg = fillDenyMessageFromRule(c, rule, scannedImage)
 							}
 
@@ -1705,6 +1705,7 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 									result.RuleMode = ruleMode
 									result.Msg = denyRuleMsg
 								}
+								result.AdmRule = admRuleDetails
 								result.Image = c.Image
 								result.MatchedSource = matchedSource
 								if !result.ImageNotScanned {
