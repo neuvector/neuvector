@@ -102,7 +102,6 @@ var suspicProcMap map[string]*suspicProcInfo = map[string]*suspicProcInfo{
 	"dnscat":     {false, "dns tunneling"},
 	"dns2tcpc":   {false, "dns tunneling"},
 	"dns2tcpd":   {true, "dns tunneling"},
-	"socat":      {false, "socat relay process"},
 }
 
 var kubeProcs map[string]int = map[string]int{
