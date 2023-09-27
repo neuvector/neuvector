@@ -423,7 +423,10 @@ func handlerCustomCheckShow(w http.ResponseWriter, r *http.Request, ps httproute
 		// in "loose"  control, users with compliance(w) permission on the group can configure the group's custom check scripts
 		// in "strict" control, only admin/fedAdmin-role users can configure custom check scripts
 		if cacher.AuthorizeCustomCheck(group, acc.NewWithOp(access.AccessOPWrite)) {
-			writable = true
+			if (cctx.CustomCheckControl == share.CustomCheckControl_Strict && acc.CanWriteCluster()) ||
+				cctx.CustomCheckControl == share.CustomCheckControl_Loose {
+				writable = true
+			}
 		}
 		enabled = true
 	}
@@ -475,7 +478,10 @@ func handlerCustomCheckList(w http.ResponseWriter, r *http.Request, ps httproute
 			// in "loose"  control, users with compliance(w) permission on the group can configure the group's custom check scripts
 			// in "strict" control, only admin/fedAdmin-role users can configure custom check scripts
 			if cacher.AuthorizeCustomCheck(group, accTemp) {
-				writable = true
+				if (cctx.CustomCheckControl == share.CustomCheckControl_Strict && acc.CanWriteCluster()) ||
+					cctx.CustomCheckControl == share.CustomCheckControl_Loose {
+					writable = true
+				}
 			}
 		}
 
