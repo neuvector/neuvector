@@ -193,7 +193,7 @@ func getNetServicePolicyMode() string {
 }
 
 func getDisableNetPolicyStatus() bool {
-	return systemConfigCache.DisableNetPolicy
+	return systemConfigCache.DisableNetPolicy || cctx.NoNetPolicy
 }
 
 func getNewServiceProfileBaseline() string {

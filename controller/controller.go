@@ -51,6 +51,7 @@ type ctrlEnvInfo struct {
 	memoryLimit       uint64
 	peakMemoryUsage   uint64
 	snapshotMemStep   uint64
+	noNetPolicy       bool
 }
 
 var ctrlEnv ctrlEnvInfo
@@ -253,6 +254,7 @@ func main() {
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
+	no_net_policy := flag.Bool("cno_net_rule", false, "Disable Network Policy Enforcement")
 	flag.Parse()
 
 	if *debug {
@@ -300,6 +302,10 @@ func main() {
 		log.WithFields(log.Fields{"custom_check_control": *custom_check_control}).Info("Enable custom benchmark")
 	} else if *custom_check_control != share.CustomCheckControl_Disable {
 		*custom_check_control = share.CustomCheckControl_Disable
+	}
+	if *no_net_policy {
+		ctrlEnv.noNetPolicy = true
+		log.WithFields(log.Fields{"no_net_policy": ctrlEnv.noNetPolicy}).Info("Disable Network Policy Enforcement")
 	}
 
 	// Set global objects at the very first
@@ -662,6 +668,7 @@ func main() {
 		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
+		NoNetPolicy:              ctrlEnv.noNetPolicy,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)

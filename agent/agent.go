@@ -277,6 +277,7 @@ func main() {
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
+	no_net_rule := flag.Bool("ano_net_rule", false, "Disable Network Policy Enforcement")
 	flag.Parse()
 
 	if *debug {
@@ -335,6 +336,12 @@ func main() {
 	if *custom_check_control == share.CustomCheckControl_Loose || *custom_check_control == share.CustomCheckControl_Strict {
 		agentEnv.customBenchmark = true
 		log.Info("Enable custom benchmark")
+	}
+
+	agentEnv.noNetRule = false
+	if *no_net_rule {
+		log.Info("Disable Network Policy Enforcement")
+		agentEnv.noNetRule = true
 	}
 
 	if *join != "" {

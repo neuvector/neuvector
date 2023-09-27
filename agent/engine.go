@@ -2177,7 +2177,7 @@ func taskDPConnect() {
 		}
 	}
 	pe.PushFqdnInfoToDP()
-	if gInfo.disableNetPolicy == false {
+	if gInfo.disableNetPolicy == false && agentEnv.noNetRule == false {
 		pe.PushNetworkPolicyToDP()
 	}
 
@@ -2189,7 +2189,7 @@ func taskDPConnect() {
 	xffenabled := gInfo.xffEnabled
 	dp.DPCtrlSetSysConf(&xffenabled)
 	//set disableNetPolicy
-	dnp := gInfo.disableNetPolicy
+	dnp := gInfo.disableNetPolicy || agentEnv.noNetRule
 	dp.DPCtrlSetDisableNetPolicy(&dnp)
 	//set detectUnmanagedWl
 	duw := gInfo.detectUnmanagedWl

@@ -31,6 +31,7 @@
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
 #define ENV_CTRL_NOT_RM_NSGRPS "CTRL_NOT_PRUNE_NSGROUPS"
+#define ENV_CTRL_NO_NET_RULE   "CTRL_NO_NET_RULE"
 #define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
 #define ENV_TAP_INTERFACE      "TAP_INTERFACE"
 #define ENV_TAP_ALL_CONTAINERS "TAP_ALL_CONTAINERS"
@@ -46,6 +47,7 @@
 #define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
 #define ENV_NO_SYSTEM_PROTECT  "ENF_NO_SYSTEM_PROFILES"
 #define ENV_POLICY_PULLER      "ENF_NETPOLICY_PULL_INTERVAL"
+#define ENV_NO_NET_RULE        "ENF_NO_NET_RULE"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
@@ -437,6 +439,11 @@ static pid_t fork_exec(int i)
             args[a++] = "-cbench";
             args[a++] = custom_check_control;
         }
+        if ((enable = getenv(ENV_CTRL_NO_NET_RULE)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-cno_net_rule";
+            }
+        }
         args[a] = NULL;
         break;
     case PROC_AGENT:
@@ -523,6 +530,11 @@ static pid_t fork_exec(int i)
         if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
             args[a++] = "-cbench";
             args[a++] = custom_check_control;
+        }
+        if ((enable = getenv(ENV_NO_NET_RULE)) != NULL) {
+            if (checkImplicitEnableFlag(enable) == 1) {
+                args[a ++] = "-ano_net_rule";
+            }
         }
         args[a] = NULL;
         break;

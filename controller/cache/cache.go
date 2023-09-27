@@ -204,6 +204,7 @@ type Context struct {
 	NvSemanticVersion        string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
+	NoNetPolicy              bool
 }
 
 type k8sProbeCmd struct {

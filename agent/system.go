@@ -131,7 +131,7 @@ func systemConfigNetPolicy(disableNetPolicy bool) {
 	}
 	gInfo.disableNetPolicy = disableNetPolicy
 	//set disableNetPolicy to dp
-	dnp := gInfo.disableNetPolicy
+	dnp := gInfo.disableNetPolicy || agentEnv.noNetRule
 	dp.DPCtrlSetDisableNetPolicy(&dnp)
 }
 
@@ -358,7 +358,7 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 }
 
 func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
-	if gInfo.disableNetPolicy {
+	if gInfo.disableNetPolicy || agentEnv.noNetRule {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	}
 
@@ -1081,7 +1081,7 @@ func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []b
 	dlprules := dlpUpdateRuleVersion(s)
 	dlpConfigRule(dlprules)
 	//when network policy is disabled, change workload's datapath via dlp
-	if gInfo.disableNetPolicy {
+	if gInfo.disableNetPolicy || agentEnv.noNetRule {
 		for wlid, dlpInfo := range pe.GetNetworkDlpWorkloadRulesInfo() {
 			updateContainerPolicyMode(wlid, dlpInfo.Mode)
 		}
