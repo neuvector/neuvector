@@ -160,7 +160,7 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		if !shouldrenew {
 			logctx.WithFields(log.Fields{
 				"validity": x509Cert.NotAfter.Format(time.RFC3339),
-			}).Info("certificate is up-to-date.")
+			}).Debug("certificate is up-to-date.")
 			if callback.lastModifyIndex != index {
 				callback.lastModifyIndex = index
 				// Changed by others or initial start
