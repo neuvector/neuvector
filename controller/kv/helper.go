@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -166,6 +167,7 @@ type ClusterHelper interface {
 	GetAdmissionCertRev(svcName string) (*share.CLUSAdmissionCertCloaked, uint64) // obsolete
 	GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error)
 	PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error
+	PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error
 	GetAdmissionStateRev(svcName string) (*share.CLUSAdmissionState, uint64)
 	PutAdmissionRule(admType, ruleType string, rule *share.CLUSAdmissionRule) error
 	PutAdmissionStateRev(svcName string, state *share.CLUSAdmissionState, rev uint64) error
@@ -459,6 +461,7 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 	}
 
 // do not consider UpgradeAndConvert yet. if need to do UpgradeAndConvert, value size needs to be considered in UpgradeAndConvert()
+
 	func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
 		value, rev, err := cluster.GetRev(key)
 		if err != nil || value == nil {
@@ -474,7 +477,6 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 			return value, rev, err
 		}
 	}
-
 */
 func (m clusterHelper) PutInstallationID() (string, error) {
 	if id, _ := m.GetInstallationID(); id != "" {
@@ -1950,6 +1952,27 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 	}
 
 	return err
+}
+
+// Store the key/cert into kv and return the result.
+// This function, unlike PutObjectCert(), doesn't overwrite the existing cert file.
+// If index == 0, it will not overwrite the data. (PutIfNotExist)
+func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
+	key := share.CLUSObjectCertKey(cn)
+	value, _ := enc.Marshal(in)
+	err := cluster.PutRev(key, value, index)
+	if err != nil {
+		return err
+	}
+
+	if certExisting, _, err := clusHelper.GetObjectCertRev(cn); !certExisting.IsEmpty() {
+		if out != nil {
+			*out = *certExisting
+		}
+		return nil
+	} else {
+		return errors.Wrap(err, "cert is not there after PutIfNotExist")
+	}
 }
 
 func (m clusterHelper) GetAdmissionStateRev(svcName string) (*share.CLUSAdmissionState, uint64) {

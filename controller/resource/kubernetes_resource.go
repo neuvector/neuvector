@@ -164,7 +164,7 @@ type NvCrdInfo struct {
 	ShortNames        []string
 }
 
-//--- for generic types in admissionregistration v1/vebeta1
+// --- for generic types in admissionregistration v1/vebeta1
 type K8sAdmRegServiceReference struct {
 	Namespace *string
 	Name      *string

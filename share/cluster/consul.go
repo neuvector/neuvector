@@ -704,7 +704,7 @@ func (m *consulMethod) PutRev(key string, value []byte, rev uint64) error {
 	pair := &api.KVPair{Key: key, Value: value, ModifyIndex: rev}
 	success, _, err = kv.CAS(pair, nil)
 	if !success && err == nil {
-		err = errPutCAS
+		err = ErrPutCAS
 	}
 
 	return err
@@ -720,7 +720,7 @@ func (m *consulMethod) PutIfNotExist(key string, value []byte) error {
 	pair := &api.KVPair{Key: key, Value: value, ModifyIndex: 0}
 	success, _, err := kv.CAS(pair, nil)
 	if !success && err == nil {
-		err = errPutCAS
+		err = ErrPutCAS
 	}
 
 	return err
