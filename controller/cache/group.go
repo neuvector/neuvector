@@ -102,6 +102,8 @@ var grpSvcIpByDomainMap map[string]utils.Set = make(map[string]utils.Set) //key 
 var addr2ExtIpMap map[string][]net.IP = make(map[string][]net.IP)         //key svc cluster ip, value is externalIPs
 var extIp2addrMap map[string]net.IP = make(map[string]net.IP)             //key externalIP, value is svc cluster ip
 var addr2ExtIpRefreshMap map[string]bool = make(map[string]bool)          //key svc cluster ip
+var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)          //fqdn->group name(s)
+var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)          //group->fqdn name(s)
 
 func getSvcAddrGroupNameByExtIP(ip net.IP, port uint16) string {
 	if addrip, ok := extIp2addrMap[ip.String()]; ok {
@@ -548,6 +550,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		}
 		cacheMutexUnlock()
 
+		if cache != nil && cache.group.Kind == share.GroupKindAddress {
+			deleteFqdn2Group(cache)
+		}
 		if cache != nil && !isIPSvcGrpHidden(cache) {
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
 		}
@@ -1371,6 +1376,47 @@ func svcipGroupJoin(svcipcache *groupCache) {
 	}
 }
 
+func updateFqdn2Group (cache *groupCache) {
+	deleteFqdn2Group(cache)
+	for _, ct := range cache.group.Criteria {
+		if ct.Key == share.CriteriaKeyAddress {
+			if a := getIPList(ct.Value); a == nil {
+				fqdname := ct.Value
+				if strings.HasPrefix(fqdname, share.CLUSWLFqdnVhPrefix) {
+					fqdname = fqdname[len(share.CLUSWLFqdnVhPrefix):]
+				}
+				if fqdn2GrpMap[fqdname] == nil {
+					fqdn2GrpMap[fqdname] = utils.NewSet()
+				}
+				fqdn2GrpMap[fqdname].Add(cache.group.Name)
+
+				if grp2FqdnMap[cache.group.Name] == nil {
+					grp2FqdnMap[cache.group.Name] = utils.NewSet()
+				}
+				grp2FqdnMap[cache.group.Name].Add(fqdname)
+			}
+		}
+	}
+}
+
+func deleteFqdn2Group (cache *groupCache) {
+	if gfqs, ok := grp2FqdnMap[cache.group.Name]; ok {
+		for fq := range gfqs.Iter() {
+			fqn := fq.(string)
+			if f2gs, ok1 := fqdn2GrpMap[fqn]; ok1 {
+				f2gs.Remove(cache.group.Name)
+				if f2gs.Cardinality() == 0 {
+					delete(fqdn2GrpMap, fqn)
+				}
+			}
+		}
+		if gfqs != nil {
+			gfqs.Clear()
+		}
+		delete(grp2FqdnMap, cache.group.Name)
+	}
+}
+
 func refreshGroupMember(cache *groupCache) {
 	// Remove group from it's members' group list
 	for m := range cache.members.Iter() {
@@ -1385,6 +1431,10 @@ func refreshGroupMember(cache *groupCache) {
 	if cache.group.Kind == share.GroupKindNode {
 		cache.members.Add("") // for all nodes
 		return
+	}
+
+	if cache.group.Kind == share.GroupKindAddress {
+		updateFqdn2Group(cache)
 	}
 
 	if cache.group.Kind != share.GroupKindContainer {
