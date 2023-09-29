@@ -766,7 +766,9 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	return resObject, nil
 }
 
-func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) *nvsysadmission.AdmResult {
+func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps,
+	ar *admissionv1beta1.AdmissionReview, globalMode string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult) {
+
 	matchData := &nvsysadmission.AdmMatchData{}
 	if len(admResObject.OwnerUIDs) > 0 {
 		// If there is owner for this resource, check if the root owner's cache is still available.
@@ -809,12 +811,13 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	var scannedImages strings.Builder
 	var unscannedImages strings.Builder
 	var noMatchedResult nvsysadmission.AdmResult
-	var allowMatchedResult *nvsysadmission.AdmResult // from first allow match
-	var denyMatchedResult *nvsysadmission.AdmResult  // from first deny match
+	var allowMatchedResult *nvsysadmission.AdmResult         // from first allow match
+	var denyMatchedResult *nvsysadmission.AdmResult          // from first deny match
+	var finalAssessResults []*nvsysadmission.AdmAssessResult // for the triggered deny rules before (the 1st allow rule and 1st monitored deny rule) in assessment
 	for _, c := range admResObject.Containers {
 		var thisStamp api.AdmCtlTimeStamps
 		perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
-		result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar)
+		result, assessResults, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, globalMode, forTesting)
 		if !licenseAllowed {
 			continue
 		}
@@ -843,6 +846,7 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 					matchData.MatchState = nvsysadmission.MatchedDeny
 					denyMatchedResult = result
 				}
+				finalAssessResults = append(finalAssessResults, assessResults...)
 			} else {
 				// matches an allow rule. we only cache the 1st allow matching result and keep checking if any container matches deny rule
 				// matching a deny rule overrides matching any allow rule. Still keep collecting unscanned-image info
@@ -856,14 +860,14 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	}
 	if denyMatchedResult != nil {
 		denyMatchedResult.UnscannedImages = unscannedImages.String()
-		return denyMatchedResult
+		return denyMatchedResult, finalAssessResults
 	} else if allowMatchedResult != nil {
 		allowMatchedResult.UnscannedImages = unscannedImages.String()
-		return allowMatchedResult
+		return allowMatchedResult, nil
 	} else {
 		noMatchedResult.Image = scannedImages.String()
 		noMatchedResult.UnscannedImages = unscannedImages.String()
-		return &noMatchedResult // return empty result & will apply defaultAction later
+		return &noMatchedResult, nil // return empty result & will apply defaultAction later
 	}
 }
 
@@ -1163,6 +1167,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 	var allowed = true
 	var statusResult = &metav1.Status{}
 	var admResult *nvsysadmission.AdmResult
+	var assessResults []*nvsysadmission.AdmAssessResult
 	if admResObject != nil && len(admResObject.Containers) > 0 {
 		var requestedBy string
 		if admResObject.UserName != "" {
@@ -1176,8 +1181,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 		}
 		var subMsg, ruleScope, msgHeader string
-		// check if the containers are allowed
-		admResult = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar)
+		// check if the containers are allowed. assessResults is only for the deny rules that are triggered before (the 1st allow rule and 1st monitored deny rule)
+		admResult, assessResults = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, mode, forTesting)
 		if req.DryRun != nil && *req.DryRun {
 			msgHeader = "<Server Dry Run> "
 		} else if forTesting {
@@ -1206,37 +1211,61 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 				subMsg = fmt.Sprintf(" [Notice: the requested image(s) are not scanned: %s]", admResult.UnscannedImages)
 			}
 			if admResult.MatchDeny {
-				msg := admResult.Msg
-				var modeStr string
-				// matches deny rule
-				if admResult.RuleMode != "" {
-					// a deny rule's "rule mode"(if specified) takes precedence over global mode
-					mode = admResult.RuleMode
-					modeStr = "per-rule " + mode
-				} else {
-					modeStr = mode
-				}
-				if mode == share.AdmCtrlModeMonitor {
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr, subMsg)
-					eventID = share.CLUSAuditAdmCtrlK8sReqViolation
-				} else {
-					allowed = false
-					matchedSrcMsg := ""
-					if admResult.MatchedSource != "" {
-						matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
+				var displayMsg strings.Builder
+				// when not in assessment, the 1st entry in assessResults is exactly for the deny rule that denies the admission request
+				if len(assessResults) == 0 {
+					assessResult := nvsysadmission.AdmAssessResult{
+						RuleID:        admResult.RuleID,
+						AdmRule:       admResult.AdmRule,
+						RuleMode:      admResult.RuleMode,
+						MatchedSource: admResult.MatchedSource,
+						DenyRuleMsg:   admResult.Msg,
 					}
-					statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-					admResult.FinalDeny = true
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
-					eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+					assessResults = append(assessResults, &assessResult)
 				}
+				for _, matchResult := range assessResults {
+					var modeStr string
+					var perRuleMsg string
+					// matches deny rule
+					if matchResult.RuleMode != "" {
+						// a deny rule's "rule mode"(if specified) takes precedence over global mode
+						mode = matchResult.RuleMode
+						modeStr = "per-rule " + mode
+					} else {
+						modeStr = mode
+					}
+					if mode == share.AdmCtrlModeMonitor {
+						perRuleMsg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
+							msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, matchResult.RuleID, modeStr, subMsg)
+						eventID = share.CLUSAuditAdmCtrlK8sReqViolation
+					} else {
+						allowed = false
+						matchedSrcMsg := ""
+						if matchResult.MatchedSource != "" {
+							matchedSrcMsg = fmt.Sprintf(" and matched data from %s", matchResult.MatchedSource)
+						}
+						statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+						admResult.FinalDeny = true
+						perRuleMsg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
+							msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, matchResult.RuleID, matchResult.AdmRule, matchedSrcMsg, subMsg)
+						eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+					}
 
-				// appned the causes
-				if len(msg) > 0 {
-					admResult.Msg += ", " + msg
+					// appned the causes
+					if len(matchResult.DenyRuleMsg) > 0 {
+						perRuleMsg = fmt.Sprintf("%s, %s", perRuleMsg, matchResult.DenyRuleMsg)
+					}
+					if displayMsg.Len() > 0 {
+						displayMsg.WriteString("\n")
+					}
+					displayMsg.WriteString(perRuleMsg)
+					if !forTesting {
+						// when not in assessment, the 1st entry in assessResults is exaactly for the deny rule that denies the admission request
+						// so no need to process remaining matched deny entries
+						break
+					}
 				}
+				admResult.Msg = displayMsg.String()
 			} else {
 				if admResult.RuleID != 0 {
 					// matches allow rule

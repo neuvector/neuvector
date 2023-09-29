@@ -171,7 +171,7 @@ type registryDriver interface {
 	GetTagList(doamin, repo, tag string) ([]string, error)
 	GetAllImages() (map[share.CLUSImage][]string, error)
 	GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode)
-	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult
+	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult
 	SetConfig(cfg *share.CLUSRegistryConfig)
 	SetTracer(tracer httptrace.HTTPTrace)
 	GetTracer() httptrace.HTTPTrace
@@ -309,32 +309,46 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 	return reqRootsOfTrust, nil
 }
 
-func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string) *share.ScanResult {
+func (r *base) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult {
 	var result *share.ScanResult
 	req := &share.ScanImageRequest{
-		Registry:    r.regURL,
-		Username:    r.username,
-		Password:    r.password,
-		Repository:  repo,
-		Tag:         tag,
-		Proxy:       r.proxy,
-		ScanLayers:  r.scanLayers,
-		ScanSecrets: r.scanSecrets,
-	}
-	rootsOfTrust, err := makeSigstoreScanRequestObj()
-	if err != nil {
-		smd.scanLog.WithFields(log.Fields{"error": err}).Error()
-		result = &share.ScanResult{Error: share.ScanErrorCode_ScanErrArgument}
-		return result
+		Registry:           r.regURL,
+		Username:           r.username,
+		Password:           r.password,
+		Repository:         repo,
+		Tag:                tag,
+		Proxy:              r.proxy,
+		ScanLayers:         r.scanLayers,
+		ScanSecrets:        r.scanSecrets,
+		ScanTypesRequested: &scanTypesRequired,
+		RootsOfTrust:       []*share.SigstoreRootOfTrust{},
 	}
 
-	req.RootsOfTrust = rootsOfTrust
+	var sigstoreScanObjErr error
+	if scanTypesRequired.Signature {
+		req.RootsOfTrust, sigstoreScanObjErr = makeSigstoreScanRequestObj()
+		if sigstoreScanObjErr != nil {
+			smd.scanLog.WithFields(log.Fields{"rootsOfTrust": req.RootsOfTrust}).Error("Could not generate sigstore scan request object, cancelling signature scan.")
+			scanTypesRequired.Signature = false
+			if !scanTypesRequired.Vulnerability {
+				// no vuln scan necessary, just return error
+				return &share.ScanResult{
+					SignatureInfo: &share.ScanSignatureInfo{
+						VerificationError: share.ScanErrorCode_ScanErrArgument,
+					}}
+			}
+		}
+	}
 
-	result, err = rpc.ScanImage(scanner, ctx, req)
+	result, err := rpc.ScanImage(scanner, ctx, req)
 	if result == nil || err != nil {
 		// rpc request not made
 		smd.scanLog.WithFields(log.Fields{"error": err}).Error()
 		result = &share.ScanResult{Error: share.ScanErrorCode_ScanErrNetwork}
+	}
+
+	if sigstoreScanObjErr != nil {
+		result.SignatureInfo.VerificationError = share.ScanErrorCode_ScanErrArgument
 	}
 
 	return result

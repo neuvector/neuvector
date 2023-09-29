@@ -164,7 +164,7 @@ type NvCrdInfo struct {
 	ShortNames        []string
 }
 
-//--- for generic types in admissionregistration v1/vebeta1
+// --- for generic types in admissionregistration v1/vebeta1
 type K8sAdmRegServiceReference struct {
 	Namespace *string
 	Name      *string
@@ -1212,12 +1212,15 @@ func xlateValidatingWebhookConfiguration(obj k8s.Resource) (string, interface{})
 	} else if o, ok := obj.(*apiv1beta1.ValidatingWebhookConfiguration); ok {
 		meta = o.Metadata
 	}
-	if meta != nil && meta.GetName() == NvAdmValidatingName {
-		r := &AdmissionWebhookConfiguration{
-			AdmType: nvAdmValidateType,
-			Name:    meta.GetName(),
+	if meta != nil {
+		name := meta.GetName()
+		if name == NvAdmValidatingName || name == NvPruneValidatingName {
+			r := &AdmissionWebhookConfiguration{
+				AdmType: nvAdmValidateType,
+				Name:    name,
+			}
+			return meta.GetUid(), r
 		}
-		return meta.GetUid(), r
 	}
 	return "", nil
 }

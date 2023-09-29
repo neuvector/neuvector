@@ -46,6 +46,7 @@ type ctrlEnvInfo struct {
 	cgroupCPUAcct     string
 	runInContainer    bool
 	debugCPath        bool
+	customBenchmark   bool
 	autoProfieCapture uint64
 	memoryLimit       uint64
 	peakMemoryUsage   uint64
@@ -251,6 +252,7 @@ func main() {
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
+	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
 
 	if *debug {
@@ -292,6 +294,12 @@ func main() {
 			ctrlEnv.autoProfieCapture = (uint64)(*autoProfile)
 		}
 		log.WithFields(log.Fields{"auto-profile": ctrlEnv.autoProfieCapture}).Info()
+	}
+	if *custom_check_control == share.CustomCheckControl_Loose || *custom_check_control == share.CustomCheckControl_Strict {
+		ctrlEnv.customBenchmark = true
+		log.WithFields(log.Fields{"custom_check_control": *custom_check_control}).Info("Enable custom benchmark")
+	} else if *custom_check_control != share.CustomCheckControl_Disable {
+		*custom_check_control = share.CustomCheckControl_Disable
 	}
 
 	// Set global objects at the very first
@@ -716,6 +724,7 @@ func main() {
 		NvSemanticVersion:  nvSemanticVersion,
 		CspType:            cspType,
 		CspPauseInterval:   *cspPauseInterval,
+		CustomCheckControl: *custom_check_control,
 		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
 	}
 	rest.InitContext(&rctx)

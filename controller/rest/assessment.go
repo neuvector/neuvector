@@ -146,7 +146,9 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 			continue
 		}
 
+		var tempObj admissionRequestObject
 		i++
+		assessed := false
 		oneResp := api.RESTAdmCtrlRulesTestResult{
 			Index:   i,
 			Allowed: true,
@@ -156,7 +158,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 			msg = fmt.Sprintf("Invalid yaml: %s", err.Error())
 			log.WithFields(log.Fields{"i": i}).Error(msg)
 		} else {
-			var tempObj admissionRequestObject
 			if err := json.Unmarshal(json_data, &tempObj); err != nil {
 				msg = fmt.Sprintf("Invalid yaml: %s", err.Error())
 				log.WithFields(log.Fields{"i": i}).Error(msg)
@@ -182,6 +183,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 					} else {
 						oneResp.Allowed = response.Allowed
 						msg = response.Result.Message
+						assessed = true
 					}
 				default:
 					msg = "skip"
@@ -189,8 +191,20 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 				}
 			}
 		}
-		oneResp.Message = msg
-		resp.Results = append(resp.Results, &oneResp)
+		if oneResp.Allowed || !assessed {
+			oneResp.Message = msg
+			resp.Results = append(resp.Results, &oneResp)
+		} else {
+			for _, ss := range strings.Split(msg, "\n") {
+				oneRuleResp := api.RESTAdmCtrlRulesTestResult{
+					Index:   i,
+					Kind:    tempObj.Kind,
+					Name:    tempObj.ObjectMeta.Name,
+					Message: ss,
+				}
+				resp.Results = append(resp.Results, &oneRuleResp)
+			}
+		}
 	}
 
 	// cleanup, delete opa keys in opaKeys

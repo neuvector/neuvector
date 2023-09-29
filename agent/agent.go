@@ -276,6 +276,7 @@ func main() {
 	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
+	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
 
 	if *debug {
@@ -320,15 +321,20 @@ func main() {
 		log.WithFields(log.Fields{"period": *policy_puller}).Info("policy pull regulator")
 	}
 
-	agentEnv.autoProfieCapture = 1	// default
+	agentEnv.autoProfieCapture = 1 // default
 	if *autoProfile != 1 {
 		if *autoProfile < 0 {
-			agentEnv.autoProfieCapture = 0	// no profile
+			agentEnv.autoProfieCapture = 0 // no profile
 			log.WithFields(log.Fields{"auto-profile": *autoProfile}).Error("Invalid value, disable auto-profile")
 		} else {
 			agentEnv.autoProfieCapture = (uint64)(*autoProfile)
 		}
 		log.WithFields(log.Fields{"auto-profile": agentEnv.autoProfieCapture}).Info()
+	}
+
+	if *custom_check_control == share.CustomCheckControl_Loose || *custom_check_control == share.CustomCheckControl_Strict {
+		agentEnv.customBenchmark = true
+		log.Info("Enable custom benchmark")
 	}
 
 	if *join != "" {

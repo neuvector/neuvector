@@ -74,6 +74,13 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Added verifier \"%s\"", clusRootOfTrust.Name)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
@@ -159,6 +166,13 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Added root of trust \"%s\"", clusRootOfTrust.Name)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
@@ -186,6 +200,14 @@ func handlerSigstoreRootOfTrustDeleteByName(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Deleted root of trust \"%s\"", rootName)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
@@ -289,6 +311,13 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Added verifier \"%s\"", clusVerifier.Name)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
@@ -366,6 +395,13 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Added verifier \"%s\"", clusVerifier.Name)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
@@ -394,6 +430,14 @@ func handlerSigstoreVerifierDeleteByName(w http.ResponseWriter, r *http.Request,
 		}
 		return
 	}
+
+	err = clusHelper.PutSigstoreTimestamp(nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Could not update sigstore timestamp: %s", err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, msg)
+		return
+	}
+
 	msg := fmt.Sprintf("Deleted root of trust \"%s/%s\"", rootName, verifierName)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }

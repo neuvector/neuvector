@@ -260,6 +260,10 @@ type RESTClusterCspUsage struct {
 	Nodes   int    `json:"nodes"` // total nodes count in this cluster
 }
 
+type RESTCspAdapterInfo struct {
+	AdapterVersions string `json:"adapter_versions"`
+}
+
 type RESTFedCspSupportReq struct { // for joint clusters to request csp-config data from master cluster
 	ID           string `json:"id"`                     // id of joint cluster
 	JointTicket  string `json:"joint_ticket"`           // generated using joint cluster's secret
@@ -275,6 +279,7 @@ type RESTFedCspSupportResp struct { // csp-config data returned from master clus
 	CspConfigData    string   `json:"csp_config_data"` // raw csp-config data
 	CspConfigFrom    string   `json:"csp_config_from"` // "master"/"joint"/ "": where is csp-config data from
 	JointReportUsage bool     `json:"joint_report_usage"`
+	AdapterVersions  string   `json:"adapter_versions"`
 }
 
 type RESTFedCspUsage struct {

@@ -61,6 +61,7 @@ type MockCluster struct {
 
 	mockKvRoleConfigUpdateFunc   MockKvConfigUpdateFunc
 	mockKvSystemConfigUpdateFunc MockKvConfigUpdateFunc
+	kv                           map[string]string
 }
 
 func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGroup) {
@@ -101,6 +102,7 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 
 	m.awsCloudResource = make(map[string]*share.CLUSAwsResource)
 	m.awsProjectCfg = make(map[string]*share.CLUSAwsProjectCfg)
+	m.kv = make(map[string]string)
 }
 
 func (m *MockCluster) AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error) {
@@ -415,7 +417,7 @@ func (m *MockCluster) DeleteServer(name string) error {
 	return nil
 }
 
-func (m *MockCluster) DeleteProcessProfile(group string) error {
+func (m *MockCluster) DeleteProcessProfileTxn(txn *cluster.ClusterTransact, group string) error {
 	return nil
 }
 
@@ -559,4 +561,47 @@ func (m *MockCluster) DeleteApikey(name string) error {
 	} else {
 		return common.ErrObjectNotFound
 	}
+}
+
+func (m MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
+	value, _ := json.Marshal(cert)
+	m.kv[cn] = string(value)
+	return nil
+}
+
+func (m MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
+	v, ok := m.kv[cn]
+	// Only use existing value when index = 0.
+	// When index > 0 => force write.
+	if ok && index == 0 {
+		if out != nil {
+			err := json.Unmarshal([]byte(v), &out)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	buf, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	m.kv[cn] = string(buf)
+	if out != nil {
+		*out = *in
+	}
+	return nil
+}
+
+func (m MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error) {
+	out := share.CLUSX509Cert{}
+	v, ok := m.kv[cn]
+	if !ok {
+		return nil, 0, cluster.ErrKeyNotFound
+	}
+	err := json.Unmarshal([]byte(v), &out)
+	if err != nil {
+		return nil, 0, errors.New("failed to unmarshal")
+	}
+	return &out, 1, nil
 }

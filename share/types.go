@@ -11,8 +11,8 @@ const CompactCVEDBName = "cvedb.compact"
 const RegularCVEDBName = "cvedb.regular"
 const CVEDatabaseFolder = "/etc/neuvector/db/"
 
-const ProfileFolder string = "/var/neuvector/profile"
-const SnaphotFolder string = "/var/neuvector/snapshot"
+const ProfileFolder string = "/var/nv_debug/profile"
+const SnaphotFolder string = "/var/nv_debug/snapshot"
 const ProfileMemoryFileFmt string = "%smemory.prof"
 const ProfileGoroutineFileFmt string = "%sgoroutine.prof"
 const ProfileCPUFileFmt string = "%scpu.prof"
@@ -158,13 +158,14 @@ const (
 )
 
 const (
-	EventCondTypeName        string = "name"
-	EventCondTypeCVEName     string = "cve-name"
-	EventCondTypeCVEHigh     string = "cve-high"
-	EventCondTypeCVEMedium   string = "cve-medium"
-	EventCondTypeLevel       string = "level"
-	EventCondTypeProc        string = "process"
-	EventCondTypeBenchNumber string = "number"
+	EventCondTypeName           string = "name"
+	EventCondTypeCVEName        string = "cve-name"
+	EventCondTypeCVEHigh        string = "cve-high"
+	EventCondTypeCVEMedium      string = "cve-medium"
+	EventCondTypeCVEHighWithFix string = "cve-high-with-fix"
+	EventCondTypeLevel          string = "level"
+	EventCondTypeProc           string = "process"
+	EventCondTypeBenchNumber    string = "number"
 )
 
 const (

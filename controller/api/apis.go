@@ -2046,6 +2046,7 @@ const ScanStatusScheduled string = "scheduled"
 const ScanStatusScanning string = "scanning"
 const ScanStatusFinished string = "finished"
 const ScanStatusFailed string = "failed"
+const ScanStatusFailed_SignatureScan string = "failed_signature_scan"
 const ScanStatusUnsupported string = "unsupported"
 
 type RESTScanBrief struct {
@@ -2550,13 +2551,16 @@ type RESTVulnerabilityProfileEntryConfigData struct {
 
 // Custom check
 type RESTCustomCheck struct {
-	Name   string `json:"name"`
-	Script string `json:"script"`
+	Name         string `json:"name"`
+	Script       string `json:"script"`
+	Configurable bool   `json:"configurable"`
 }
 
 type RESTCustomChecks struct {
-	Group   string             `json:"group"`
-	Scripts []*RESTCustomCheck `json:"scripts"`
+	Group    string             `json:"group"`
+	Enabled  bool               `json:"enabled"`
+	Writable bool               `json:"writable"`
+	Scripts  []*RESTCustomCheck `json:"scripts"`
 }
 
 type RESTCustomCheckConfig struct {

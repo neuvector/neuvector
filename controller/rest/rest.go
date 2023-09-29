@@ -3,10 +3,12 @@ package rest
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,6 +22,9 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
 
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
@@ -82,9 +87,6 @@ var _teleFreq uint
 const defaultSSLCertFile = "/etc/neuvector/certs/ssl-cert.pem"
 const defaultSSLKeyFile = "/etc/neuvector/certs/ssl-cert.key"
 
-const defaultJWTCertFile = "/etc/neuvector/certs/jwt-signing.pem"
-const defaultJWTKeyFile = "/etc/neuvector/certs/jwt-signing.key"
-
 const defFedSSLCertFile = "/etc/neuvector/certs/fed-ssl-cert.pem"
 const defFedSSLKeyFile = "/etc/neuvector/certs/fed-ssl-cert.key"
 
@@ -99,6 +101,8 @@ var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
 var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
+
+var CertManager *kv.CertManager
 
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
@@ -1248,11 +1252,122 @@ type Context struct {
 	NvAppFullVersion   string
 	NvSemanticVersion  string
 	CspType            share.TCspType
-	CspPauseInterval   uint // in minutes
+	CspPauseInterval   uint   // in minutes
+	CustomCheckControl string // disable / strict / loose
 	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
+	CertManager        *kv.CertManager
 }
 
 var cctx *Context
+
+func getExpiryDate(certPEM []byte) (time.Time, error) {
+	block, _ := pem.Decode(certPEM)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return cert.NotAfter, nil
+}
+
+func initJWTSignKey() error {
+	ExpiryCheckPeriod := time.Minute * 5
+	RenewThreshold := time.Hour * 24 * 30
+	JWTCertValidityPeriodDay := 90 // 90 days.
+
+	if envvar := os.Getenv("CERT_EXPIRY_CHECK_PERIOD"); envvar != "" {
+		if v, err := time.ParseDuration(envvar); err == nil {
+			ExpiryCheckPeriod = v
+		} else {
+			log.WithError(err).Warn("failed to load ExpiryCheckPeriod")
+		}
+	}
+	if envvar := os.Getenv("CERT_RENEW_THRESHOLD"); envvar != "" {
+		if v, err := time.ParseDuration(envvar); err == nil {
+			RenewThreshold = v
+		} else {
+			log.WithError(err).Warn("failed to load RenewThreshold")
+		}
+	}
+	if envvar := os.Getenv("JWTCERT_VALIDITY_PERIOD_DAY"); envvar != "" {
+		if v, err := strconv.Atoi(envvar); err == nil {
+			JWTCertValidityPeriodDay = v
+		} else {
+			log.WithError(err).Warn("failed to load JWTCertValidityPeriodDay")
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"period":              ExpiryCheckPeriod,
+		"threshold":           RenewThreshold,
+		"validity_length_day": JWTCertValidityPeriodDay,
+	}).Info("cert manager is configured.")
+
+	CertManager = kv.NewCertManager(kv.CertManagerConfig{
+		RenewThreshold:    RenewThreshold,
+		ExpiryCheckPeriod: ExpiryCheckPeriod,
+	})
+	CertManager.Register(share.CLUSJWTKey, &kv.CertManagerCallback{
+		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
+			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+			}
+			return &share.CLUSX509Cert{
+				CN:   share.CLUSJWTKey,
+				Key:  string(key),
+				Cert: string(cert),
+			}, nil
+		},
+		NotifyNewCert: func(oldcert *share.CLUSX509Cert, newcert *share.CLUSX509Cert) {
+			jwtKeyMutex.Lock()
+			defer jwtKeyMutex.Unlock()
+
+			var rsaPublicKey *rsa.PublicKey
+			var rsaOldPublicKey *rsa.PublicKey
+			var rsaPrivateKey *rsa.PrivateKey
+			var err error
+			if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(newcert.Cert)); err != nil {
+				log.WithError(err).Error("failed to parse jwt cert.")
+				return
+			}
+
+			if newcert.OldCert != nil {
+				if rsaOldPublicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(newcert.OldCert.Cert)); err != nil {
+					log.WithError(err).Warn("failed to parse old jwt cert.")
+					// Ignore the error
+				}
+			}
+
+			if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(newcert.Key)); err != nil {
+				log.WithError(err).Error("failed to parse jwt key.")
+				return
+			}
+
+			// Here we replace pointers directly, so it's safe to continue using the original pointers in GetJWTSigningKey().
+			jwtCertState.jwtPublicKey = rsaPublicKey
+			jwtCertState.jwtPrivateKey = rsaPrivateKey
+			jwtCertState.jwtOldPublicKey = rsaOldPublicKey
+
+			if t, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+				log.WithError(err).Error("failed to get jwt cert's expiry time.")
+			} else {
+				jwtCertState.jwtPublicKeyNotAfter = &t
+			}
+
+			if newcert.OldCert != nil {
+				if t, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+					log.WithError(err).Error("failed to get jwt cert's expiry time.")
+				} else {
+					jwtCertState.jwtOldPublicKeyNotAfter = &t
+				}
+			}
+		},
+	})
+	// Create and setup certificate.
+	CertManager.CheckAndRenewCerts()
+	go CertManager.Run(context.TODO())
+	return nil
+}
 
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
 func InitContext(ctx *Context) {
@@ -1284,6 +1399,9 @@ func InitContext(ctx *Context) {
 		_teleFreq = 60
 	}
 
+	if err := initJWTSignKey(); err != nil {
+		log.WithError(err).Error("failed to initialize JWT sign key.")
+	}
 	initHttpClients()
 }
 
@@ -1295,10 +1413,6 @@ func StartRESTServer() {
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		k8sPlatform = true
-	}
-
-	if err := jwtReadKeys(); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to read certificates for JWT")
 	}
 
 	r := httprouter.New()

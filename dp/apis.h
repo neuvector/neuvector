@@ -219,6 +219,8 @@ typedef struct io_callback_ {
 typedef struct dpi_config_ {
     bool enable_cksum;
     bool promisc;
+    bool thrt_ssl_tls_1dot0;
+    bool thrt_ssl_tls_1dot1;
 
     io_mac_t dummy_mac;
     io_ep_t dummy_ep;

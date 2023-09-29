@@ -52,6 +52,7 @@ type ImageInfo struct {
 	RepoTags         []string
 	IsSignatureImage bool
 	RawManifest      []byte
+	SignatureDigest  string
 }
 
 // SignatureData represents signature image data retrieved from the registry to be
@@ -69,7 +70,10 @@ func IsPotentialCosignSignatureTag(tag string) bool {
 }
 
 func IsQuayRegistry(rc *RegClient) bool {
-	return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
+	if len(rc.URL) >= len(quayRegistryURL) {
+		return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
+	}
+	return false
 }
 
 func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
@@ -124,7 +128,8 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 	imageInfo.Digest = dg
 
 	var ccmi *registry.ManifestInfo
-	if manV2.Config.MediaType == registry.MediaTypeContainerImage {
+	if manV2.Config.MediaType == registry.MediaTypeContainerImage ||
+		manV2.Config.MediaType == registry.MediaTypeOCIImageConfig {
 		if ccmi, err = rc.ImageConfigSpecV1(ctx, name, manV2.Config.Digest); err == nil {
 			imageInfo.Cmds = ccmi.Cmds
 			imageInfo.Envs = ccmi.Envs
@@ -142,6 +147,9 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 }
 
 func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
+	if manifestReqType == registry.ManifestRequest_CosignSignature {
+		log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("retrieving signature information")
+	}
 	var dg string
 	var body []byte
 	var err error
@@ -222,7 +230,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 			"version": manV1.SignedManifest.SchemaVersion, "created": manV1.Created,
 		}).Debug("v1 manifest request")
 
-		// in Harbor registry, even we send request with accept v1 manifest, we still get v2 format back
+		// Even we send request with accept v1 manifest, we still get v2 format back
 		if manV1.SignedManifest.SchemaVersion <= 1 {
 			if len(manV1.SignedManifest.FSLayers) > 0 {
 				imageInfo.Layers = make([]string, len(manV1.SignedManifest.FSLayers))
@@ -274,6 +282,10 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		}
 	}
 	if imageInfo.ID == "" || len(imageInfo.Layers) == 0 {
+		if manifestReqType == registry.ManifestRequest_CosignSignature {
+			log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("Signature information could not be found")
+			return imageInfo, share.ScanErrorCode_ScanErrNone
+		}
 		log.WithFields(log.Fields{"imageInfo": imageInfo}).Error("Get metadata fail")
 		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
 	}
@@ -285,6 +297,18 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	imageInfo.RunAsRoot = runAsRoot
 
 	imageInfo.RawManifest = body
+
+	if manifestReqType != registry.ManifestRequest_CosignSignature {
+		signatureTag := GetCosignSignatureTagFromDigest(imageInfo.Digest)
+		if signatureTag != "" {
+			signatureImageInfo, _ := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
+			// failed to get signature image info doesn't block vulnerability scan
+			if signatureImageInfo == nil {
+				signatureImageInfo = &ImageInfo{}
+			}
+			imageInfo.SignatureDigest = signatureImageInfo.Digest
+		}
+	}
 
 	return imageInfo, share.ScanErrorCode_ScanErrNone
 }
@@ -327,8 +351,13 @@ func (rc *RegClient) Alive() (uint, error) {
 // Resulting Signature Tag: sha256-5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16.sig
 func GetCosignSignatureTagFromDigest(digest string) string {
 	signatureTag := []rune(digest)
-	signatureTag[strings.Index(digest, ":")] = '-'
-	return string(signatureTag) + ".sig"
+	if i := strings.Index(digest, ":"); i > 0 {
+		signatureTag[i] = '-'
+		return string(signatureTag) + ".sig"
+	} else {
+		log.WithFields(log.Fields{"digest": digest}).Warn("unrecongnized image digest")
+		return ""
+	}
 }
 
 // GetSignatureDataForImage fetches the signature image's maniest and layers for the

@@ -20,15 +20,16 @@ type tCustomerCspData struct {
 }
 
 type tCspConfig struct {
-	Timestamp          string           `json:"timestamp"`
-	BillingApiAccessOk bool             `json:"billing_api_access_ok"`
-	Expire             string           `json:"expire"`
-	Errors             []string         `json:"errors"`
-	LastBilled         string           `json:"last_billed"`
-	Usage              map[string]int   `json:"usage"`
-	CustomerCspData    tCustomerCspData `json:"customer_csp_data"`
-	BaseProduct        string           `json:"base_product"`
-	XXX_unrecognized   []byte           `json:"-"`
+	Timestamp          string            `json:"timestamp"`
+	BillingApiAccessOk bool              `json:"billing_api_access_ok"`
+	Expire             string            `json:"expire"`
+	Errors             []string          `json:"errors"`
+	LastBilled         string            `json:"last_billed"`
+	Usage              map[string]int    `json:"usage"`
+	CustomerCspData    tCustomerCspData  `json:"customer_csp_data"`
+	BaseProduct        string            `json:"base_product"`
+	Versions           map[string]string `json:"versions"`
+	XXX_unrecognized   []byte            `json:"-"`
 }
 
 func GetCspConfig() api.RESTFedCspSupportResp {
@@ -49,6 +50,9 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 					resp.CspConfigData = value
 					var cspConfig tCspConfig
 					if err = json.Unmarshal([]byte(value), &cspConfig); err == nil {
+						if json_data, e := json.Marshal(cspConfig.Versions); e == nil {
+							resp.AdapterVersions = string(json_data)
+						}
 						resp.CspErrors = cspConfig.Errors
 						resp.CspConfigFrom = "local cluster"
 						if tExpire, err = time.Parse("2006-01-02T15:04:05.000000-07:00", cspConfig.Expire); err == nil {
@@ -61,6 +65,8 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 								dataExpiredErr = fmt.Errorf("Billing data expired on %s", cspConfig.Expire)
 							}
 						}
+					} else {
+						log.WithFields(log.Fields{"err": err}).Error()
 					}
 				}
 			}

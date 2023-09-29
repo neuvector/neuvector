@@ -6136,6 +6136,12 @@ definitions:
       group:
         type: string
         example: containers
+      enabled:
+        type: boolean
+        example: false
+      writable:
+        type: boolean
+        example: false
       scripts:
         type: array
         items:

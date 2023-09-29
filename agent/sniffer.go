@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultPcapDir = "/var/neuvector/pcap/"
+	defaultPcapDir = "/var/nv_debug/pcap/"
 	pcapHeaderLen  = 24
 )
 

@@ -33,6 +33,8 @@ const logDescriptionLength int = 256
 
 var syslogMutex sync.RWMutex
 var syslogMsgCount int32
+var syslogLastConnKey string // a string to identify the connection criteria
+var syslogOverflowAt, syslogLastFailAt time.Time
 
 func syslogMutexLock() {
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Acquire ...")
@@ -490,7 +492,10 @@ func sendSyslog(elog interface{}, level, cat, header string) {
 	defer atomic.AddInt32(&syslogMsgCount, -1)
 
 	if c >= maxSyslogMsg {
-		log.Error("Maximum concurrent syslog message reached. Check syslog server settings.")
+		if time.Since(syslogOverflowAt) > time.Minute*time.Duration(30) {
+			syslogOverflowAt = time.Now()
+			log.Error("Maximum concurrent syslog message reached. Check syslog server settings.")
+		}
 		return
 	}
 
@@ -499,7 +504,15 @@ func sendSyslog(elog interface{}, level, cat, header string) {
 
 	if syslogger != nil {
 		if err := syslogger.Send(elog, level, cat, header); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
+			connKey := syslogger.Identifier()
+			if time.Since(syslogLastFailAt) > time.Minute*time.Duration(30) || syslogLastConnKey != connKey {
+				if syslogLastConnKey != connKey {
+					syslogOverflowAt = time.Time{} // set to zero
+				}
+				syslogLastConnKey = connKey
+				syslogLastFailAt = time.Now()
+				log.WithFields(log.Fields{"error": err}).Error()
+			}
 		}
 	}
 }
@@ -999,10 +1012,10 @@ func admCtrlUpdate(event string, clog *api.Audit) {
 	responseRuleLookup(&desc)
 }
 
-func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set) {
+func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set, fixedHighsInfo []scanUtils.FixedVulInfo) {
 	desc := eventDesc{id: id, event: event,
 		name: clog.Name, level: clog.Level, vuls: vuls,
-		cve_high: clog.HighCnt, cve_med: clog.MediumCnt,
+		cve_high: clog.HighCnt, cve_med: clog.MediumCnt, cve_high_fixed_info: fixedHighsInfo,
 		items: clog.Items, arg: clog}
 	if objType != share.ScanObjectType_CONTAINER {
 		desc.noQuar = true
