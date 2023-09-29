@@ -28,7 +28,7 @@ const DefaultScannerGRPCPort = 18402
 
 const DefaultDataCenter string = "neuvector"
 
-var errPutCAS error = errors.New("CAS put error")
+var ErrPutCAS error = errors.New("CAS put error")
 var errSizeTooBig error = errors.New("size too big")
 
 const putRetryTimes int = 2
@@ -497,12 +497,12 @@ func putBinary(key string, value []byte) error {
 
 func putRev(key string, value []byte, rev uint64) error {
 	err := driver.PutRev(key, value, rev)
-	if err != nil && err != errPutCAS {
+	if err != nil && err != ErrPutCAS {
 		for i := 0; i < putRetryTimes; i++ {
 			time.Sleep(putRetryInterval)
 			log.WithFields(log.Fields{"retry": i}).Debug(err)
 			err = driver.PutRev(key, value, rev)
-			if err == nil || err == errPutCAS {
+			if err == nil || err == ErrPutCAS {
 				break
 			}
 		}
@@ -610,17 +610,17 @@ func PutIfNotExist(key string, value []byte, logKeyOnly bool) error {
 		}
 
 		err = driver.PutIfNotExist(key, value)
-		if err != nil && err != errPutCAS {
+		if err != nil && err != ErrPutCAS {
 			for i := 0; i < putRetryTimes; i++ {
 				time.Sleep(putRetryInterval)
 				log.WithFields(log.Fields{"retry": i}).Debug(err)
 				err = driver.PutIfNotExist(key, value)
-				if err == nil || err == errPutCAS {
+				if err == nil || err == ErrPutCAS {
 					break
 				}
 			}
 		}
-		if err == errPutCAS {
+		if err == ErrPutCAS {
 			// no error but key is already existed, ignore the update.
 			// Suppress log.
 			// log.WithFields(log.Fields{"key": key}).Debug("Put key CAS error")

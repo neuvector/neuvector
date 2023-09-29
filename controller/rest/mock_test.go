@@ -519,8 +519,8 @@ func initTest() {
 	evqueue = &cluster.MockEvQueue{}
 
 	// Fake the jwt key pair
-	jwtPrivateKey, _ = rsa.GenerateKey(rand.Reader, 2048)
-	jwtPublicKey = &jwtPrivateKey.PublicKey
+	jwtCertState.jwtPrivateKey, _ = rsa.GenerateKey(rand.Reader, 2048)
+	jwtCertState.jwtPublicKey = &jwtCertState.jwtPrivateKey.PublicKey
 
 	router = httprouter.New()
 	router.GET("/v1/system/config", handlerSystemGetConfig)

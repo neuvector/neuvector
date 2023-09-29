@@ -249,6 +249,31 @@ func mergeWlPolicyConfig(rules []share.CLUSGroupIPPolicy, ruleslen, wlslots, wle
 	return newGroupIPPolicy
 }
 
+func systemConfigPolicyVersionNode(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
+	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
+
+	//check whether key "recalculate/policy/groupIPRules" exist
+	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
+	if !cluster.Exist(rule_key) {
+		return groupIPPolicy
+	}
+	// indicate network policy version change.
+	newCommonRuleKey := fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
+	newNodeRuleKey := fmt.Sprintf("%s%s/%s/", rule_key, Host.ID, s.PolicyIPRulesVersion)
+
+	//combine group ip rules from separate slots
+	groupIPPolicy = getPolicyConfig(newCommonRuleKey, s.CommonSlotNo, s.CommonRulesLen)
+	groupNodeIPPolicy := getPolicyConfig(newNodeRuleKey, s.SlotNo, s.RulesLen)
+	if groupIPPolicy != nil && groupNodeIPPolicy != nil {
+		groupIPPolicy = append(groupIPPolicy, groupNodeIPPolicy...)
+	}
+	if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
+		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
+	}
+	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
+	return groupIPPolicy
+}
+
 func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
 	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
 
@@ -299,10 +324,23 @@ func systemConfigPolicy(nType cluster.ClusterNotifyType, key string, value []byt
 		nextNetworkPolicyVer = &s // regulator
 	}
 }
+func printOneEnIPPolicy(p *share.CLUSGroupIPPolicy) {
+	/*value, _ := json.Marshal(p)
+	log.WithFields(log.Fields{"value": string(value)}).Debug("")
+	*/
+}
+
+func printEnIPPolicy(groupIPPolicy []share.CLUSGroupIPPolicy) {
+	/*
+	for _, pol := range groupIPPolicy {
+		printOneEnIPPolicy(&pol)
+	}
+	*/
+}
 
 func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
-	// log.WithFields(log.Fields{"ver": s.PolicyIPRulesVersion}).Debug()
-	groupIPPolicy := systemConfigPolicyVersion(s)
+	groupIPPolicy := systemConfigPolicyVersionNode(s)
+	//printEnIPPolicy(groupIPPolicy)
 	if len(groupIPPolicy) == 0 {
 		if pe.NetworkPolicy == nil {
 			log.Error("Empty policy")
@@ -464,12 +502,23 @@ func systemConfigSpecialSubnet(nType cluster.ClusterNotifyType, key string, valu
 	}
 }
 
-func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
-	which := share.CLUSNetworkKey2Subject(key)
+func nodeRuleDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
+	which := share.CLUSNodeRuleKey2Subject(key)
 
 	switch which {
 	case share.PolicyIPRulesVersionID:
 		systemConfigPolicy(nType, key, value)
+	default:
+		log.WithFields(log.Fields{"derived": which}).Debug("Miss handler")
+	}
+}
+
+func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
+	which := share.CLUSNetworkKey2Subject(key)
+
+	switch which {
+	//case share.PolicyIPRulesVersionID:
+		//systemConfigPolicy(nType, key, value)
 	case share.InternalIPNetDefaultName:
 		systemConfigInternalSubnet(nType, key, value)
 	case share.SpecialIPNetDefaultName:
@@ -1096,6 +1145,8 @@ func systemUpdateProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		networkDerivedProc(nType, key, value)
 	case share.CLUSNodeStore:
 		profileDerivedProc(nType, share.CLUSNodeProfileSubkey(key), value)
+	case share.CLUSNodeRuleStore:
+		nodeRuleDerivedProc(nType, key, value)
 	}
 }
 

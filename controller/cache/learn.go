@@ -366,7 +366,11 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 		} else {
 			ge.toSidecar = 0
 		}
-		ge.fqdn = conn.FQDN
+		// No need to update the FQDN field if (ge.fqdn != "" && conn.FQDN == "") for the
+		// same connection. This may be due to the IP-FQDN record has timed out.
+		if ge.fqdn == "" || conn.FQDN != "" {
+			ge.fqdn = conn.FQDN
+		}
 	} else {
 		ge := &graphEntry{
 			bytes:    conn.Bytes,
@@ -1258,7 +1262,13 @@ func startPolicyThread() {
 				newIPRules := calculateIPPolicyFromCache()
 				cacheMutexRUnlock()
 				policyCalculated = false
-				putPolicyIPRulesToClusterScale(newIPRules)
+				if policyApplyIngress {
+					reorgPolicyIPRulesPerNodePAI(newIPRules)
+				} else {
+					reorgPolicyIPRulesPerNode(newIPRules)
+				}
+				putPolicyIPRulesToClusterScaleNode(newIPRules)
+				resetNodePolicy()
 			case <-vulProfUpdateTimer.C:
 				scanVulProfUpdate()
 			case <-syncCheckTicker:
