@@ -1361,6 +1361,12 @@ func initJWTSignKey() error {
 					jwtCertState.jwtOldPublicKeyNotAfter = &t
 				}
 			}
+
+			log.WithFields(log.Fields{
+				"cn":            "neuvector-jwt-signing",
+				"newExpiryDate": jwtCertState.jwtPublicKeyNotAfter,
+				"oldExpiryDate": jwtCertState.jwtOldPublicKeyNotAfter,
+			}).Info("new certificate is loaded")
 		},
 	})
 	// Create and setup certificate.
