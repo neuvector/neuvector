@@ -803,6 +803,7 @@ func clusterLoop(existing utils.Set) {
 		// command, because they can only applied to known objects.
 		cluster.RegisterStoreWatcher(share.CLUSUniconfTargetStore(Host.ID), uniconfHandler, false)
 		cluster.RegisterStoreWatcher(share.CLUSNetworkStore, systemUpdateHandler, false)
+		cluster.RegisterStoreWatcher(share.CLUSNodeRulesKey(Host.ID), systemUpdateHandler, false)
 		cluster.RegisterStoreWatcher(share.CLUSNodeCommonProfileStore, systemUpdateHandler, agentEnv.kvCongestCtrl)
 		cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, agentEnv.kvCongestCtrl)
 		cluster.RegisterStoreWatcher(share.CLUSConfigDomainStore, domainConfigUpdate, false)

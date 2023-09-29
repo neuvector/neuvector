@@ -20,6 +20,7 @@ const CLUSBenchStore string = "bench/"
 const CLUSRecalculateStore string = "recalculate/" //not to be watched by consul
 const CLUSFqdnStore string = "fqdn/"               //not to be watched by consul
 const CLUSNodeStore string = "node/"
+const CLUSNodeRuleStore string = "noderule/"
 
 // lock
 const CLUSLockConfigKey string = CLUSLockStore + "all"
@@ -211,6 +212,14 @@ const CLUSRecalDlpStore string = CLUSRecalculateStore + "dlp/"       //not to be
 
 func CLUSPolicyIPRulesKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSNetworkStore, name)
+}
+
+func CLUSPolicyIPRulesKeyNode(name, nodeid string) string {
+	return fmt.Sprintf("%s%s/%s", CLUSNodeRuleStore, nodeid, name)
+}
+
+func CLUSNodeRulesKey(nodeID string) string {
+	return fmt.Sprintf("%s%s/%s", CLUSNodeRuleStore, nodeID, PolicyIPRulesVersionID)
 }
 
 func CLUSRecalPolicyIPRulesKey(name string) string {
@@ -580,6 +589,10 @@ func CLUSIsPolicyZipRuleListKey(key string) bool {
 
 func CLUSNetworkKey2Subject(key string) string {
 	return CLUSKeyNthToken(key, 1)
+}
+
+func CLUSNodeRuleKey2Subject(key string) string {
+	return CLUSKeyNthToken(key, 2)
 }
 
 func CLUSScannerKey2ID(key string) string {
@@ -1184,6 +1197,9 @@ type CLUSGroupIPPolicy struct {
 type CLUSGroupIPPolicyVer struct {
 	Key                  string `json:"key"`
 	PolicyIPRulesVersion string `json:"pol_version"`
+	NodeId               string `json:"node_id"`
+	CommonSlotNo         int    `json:"common_slot_no"`
+	CommonRulesLen       int    `json:"common_rules_len"`
 	SlotNo               int    `json:"slot_no"`
 	RulesLen             int    `json:"rules_len"`
 	WorkloadSlot         int    `json:"workload_slot,omitempty"`
