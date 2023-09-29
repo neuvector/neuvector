@@ -1719,6 +1719,10 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 		}
 	}
 	tmpNid := make(map[string]string)
+	ver_pushed := make(map[string]bool)
+	for _, nd := range nodNod {
+		ver_pushed[nd] = false
+	}
 	for nid, nodRules := range nodePolicy {
 		node_zbs, _, _, err := preparePolicySlotsNode(nodRules, wlens)
 		if err != nil {
@@ -1757,6 +1761,36 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to write network policy version to the cluster")
 			policyIPRulesCleanupNode(rule_key, verstr, newCommonRuleKey, tmpNid)
 			return
+		}
+		ver_pushed[nid] = true
+	}
+	//although there is no existing policy for some/all nodes,
+	//we still need to let relevant nodes know there are new
+	//workload detected so policy can be learned on workload.
+	if len(common_zbs) > 0 {
+		for _, nid := range nodNod {
+			if pushed, ok := ver_pushed[nid]; ok && !pushed {
+				//new kv to indicate rule change
+				polVer := share.CLUSGroupIPPolicyVer{
+					Key:                  share.PolicyIPRulesVersionID,
+					PolicyIPRulesVersion: verstr,
+					NodeId:               nid,
+					CommonSlotNo:         len(common_zbs),
+					CommonRulesLen:       wlslots,
+					SlotNo:               0,
+					RulesLen:             0,
+					WorkloadSlot:         wlslots,
+					WorkloadLen:          wlens,
+				}
+				log.WithFields(log.Fields{"node": nid, "policyVer": polVer}).Debug("New policy address written")
+
+				clusHelper := kv.GetClusterHelper()
+				if err = clusHelper.PutPolicyVerNode(&polVer); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("Failed to put network policy version to the cluster")
+					policyIPRulesCleanupNode(rule_key, verstr, newCommonRuleKey, tmpNid)
+					return
+				}
+			}
 		}
 	}
 	policyIPRulesCleanup(oldKeys)
