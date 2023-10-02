@@ -1249,6 +1249,9 @@ func isWlRelate2Node(wlid string) bool {
 }
 
 func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
+	if nodePolicy == nil {
+		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
+	}
 	//important: order in rules needs to be preserved
 	for idx, rul := range rules {
 		if idx == 0 {
@@ -1256,9 +1259,6 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 			continue
 		}
 		if isWl4AllNode(rul.To[0].WlID) {
-			if nodePolicy == nil {
-				nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
-			}
 			//push policy to all nodes
 			for _, nid := range nodNod {
 				if nodePolicy[nid] == nil {
@@ -1289,9 +1289,6 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 			//if destination group is not container group
 			//use source group to decide which node
 			if isWl4AllNode(rul.From[0].WlID) {
-				if nodePolicy == nil {
-					nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
-				}
 				//push policy to all nodes
 				for _, nid := range nodNod {
 					if nodePolicy[nid] == nil {
@@ -1325,6 +1322,9 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 }
 
 func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
+	if nodePolicy == nil {
+		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
+	}
 	//important: order in rules needs to be preserved
 	for idx, rul := range rules {
 		if idx == 0 {
@@ -1332,9 +1332,6 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 			continue
 		}
 		if isWl4AllNode(rul.From[0].WlID) {
-			if nodePolicy == nil {
-				nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
-			}
 			//push policy to all nodes
 			for _, nid := range nodNod {
 				if nodePolicy[nid] == nil {
@@ -1365,9 +1362,6 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 			//if destination group is not container group
 			//use source group to decide which node
 			if isWl4AllNode(rul.To[0].WlID) {
-				if nodePolicy == nil {
-					nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
-				}
 				//push policy to all nodes
 				for _, nid := range nodNod {
 					if nodePolicy[nid] == nil {
