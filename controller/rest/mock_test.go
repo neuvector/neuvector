@@ -546,6 +546,7 @@ func initTest() {
 	router.PATCH("/v1/server/:name/group/:group", handlerServerGroupRoleDomainsConfig) // For 4.3(+)
 	router.PATCH("/v1/server/:name/groups", handlerServerGroupsOrderConfig)            // For 4.3(+)
 	router.DELETE("/v1/server/:name", handlerServerDelete)
+	router.GET("/v1/token_auth_server/:server/slo", handlerGenerateSLORequest)
 
 	router.POST("/v1/scan/registry", handlerRegistryCreate)
 	router.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
@@ -739,6 +740,18 @@ func loginServerToken(token, server string) *mockResponseWriter {
 	data := api.RESTAuthData{Token: &api.RESTAuthToken{Token: token}}
 	body, _ := json.Marshal(data)
 	r, _ := http.NewRequest("POST", "/v1/auth/"+server, bytes.NewBuffer(body))
+	router.ServeHTTP(w, r)
+	return w
+}
+
+func loginServerGetSLORedirectURL(token, server string) *mockResponseWriter {
+	w := new(mockResponseWriter)
+	data := api.RESTTokenRedirect{
+		Redirect: "https://localhost/samlslo",
+	}
+	body, _ := json.Marshal(data)
+	r, _ := http.NewRequest("GET", "/v1/token_auth_server/"+server+"/slo", bytes.NewBuffer(body))
+	r.Header.Add("X-Auth-Token", token)
 	router.ServeHTTP(w, r)
 	return w
 }

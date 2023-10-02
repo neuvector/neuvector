@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 type passwordUser struct {
@@ -63,7 +65,7 @@ func (a *mockRemoteAuth) LDAPAuth(ldap *share.CLUSServerLDAP, username, password
 
 func (a *mockRemoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (string, string, map[string][]string, error) {
 	if user, ok := a.samlUsers[tokenData.Token]; ok {
-		return "", "", user.attrs, nil
+		return "nameID", "sessionIndex", user.attrs, nil
 	} else {
 		return "", "", nil, errors.New("Authentication failed")
 	}
@@ -1046,6 +1048,78 @@ func TestGroupMapping(t *testing.T) {
 	if role != api.UserRoleAdmin {
 		t.Errorf("Incorrect role mapping in case of case-insensitive")
 	}*/
+
+	postTest()
+}
+
+func TestSAMLSLO(t *testing.T) {
+	preTest()
+
+	var mockCluster kv.MockCluster
+	mockCluster.Init(nil, nil)
+	clusHelper = &mockCluster
+
+	cacher = &mockCache{}
+
+	// Generate cert/key
+	cert, key, err := kv.GenTlsKeyCert("SAMLSigning", "", "", kv.ValidityPeriod{
+		Year: 1,
+	}, x509.ExtKeyUsageAny)
+
+	// Generate IdP cert/key
+	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
+		Year: 1,
+	}, x509.ExtKeyUsageAny)
+
+	assert.Nil(t, err)
+
+	// Add saml
+	saml := share.CLUSServer{
+		Name: "saml1",
+		SAML: &share.CLUSServerSAML{
+			CLUSServerAuth: share.CLUSServerAuth{
+				GroupMappedRoles: []*share.GroupRoleMapping{
+					&share.GroupRoleMapping{
+						Group:       "group1",
+						GlobalRole:  api.UserRoleReader,
+						RoleDomains: make(map[string][]string),
+					},
+				},
+			},
+			SSOURL:         "sso",
+			Issuer:         "issuer",
+			X509Cert:       string(idpCert),
+			SLOEnabled:     true,
+			SLOURL:         "https://okta.com/slo",
+			SLOSigningCert: string(cert),
+			SLOSigningKey:  string(key),
+		},
+		Enable: true,
+	}
+	clusHelper.PutServerRev(&saml, 0)
+
+	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
+	mockAuther.addSAMLUser("token", map[string][]string{"Email": []string{"joe@example.com"}})
+	remoteAuther = &mockAuther
+
+	// Set default role
+	saml.SAML.DefaultRole = api.UserRoleAdmin
+	w := loginServerToken("token", "saml1")
+	assert.Equal(t, w.status, http.StatusOK)
+
+	assert.Nil(t, checkUserAttrs(w, "saml1", "joe@example.com", api.UserRoleAdmin, 0))
+
+	resp := loginServerGetSLORedirectURL(getLoginToken(w), "saml1")
+	assert.Equal(t, http.StatusOK, resp.status)
+	assert.NotNil(t, resp)
+	// Get SLO redirect URL
+	var respData api.RESTTokenAuthServersRedirectData
+	json.Unmarshal(resp.body, &respData)
+
+	assert.NotNil(t, respData.Redirect)
+	t.Log(respData.Redirect.RedirectURL)
+
+	logout(getLoginToken(w))
 
 	postTest()
 }

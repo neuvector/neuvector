@@ -41,6 +41,8 @@ const (
 type RemoteAuthInterface interface {
 	LDAPAuth(ldap *share.CLUSServerLDAP, username, password string) (map[string]string, []string, error)
 	SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect) (string, error)
+
+	// Return Name ID, session index, and attributes.
 	SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (string, string, map[string][]string, error)
 	OIDCDiscover(issuer string) (string, string, string, string, error)
 	OIDCGetRedirectURL(csaml *share.CLUSServerOIDC, redir *api.RESTTokenRedirect) (string, error)
@@ -129,13 +131,14 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	return attrs, groups, nil
 }
 
-func (a *remoteAuth) GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string) (*saml2.SAMLServiceProvider, error) {
+func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string) (*saml2.SAMLServiceProvider, error) {
 	var keystore dsig.X509KeyStore
 
 	certStore := dsig.MemoryX509CertificateStore{
 		Roots: []*x509.Certificate{},
 	}
 
+	// TODO: fix error handling
 	parseAndStoreCert := func(x509cert string) {
 		var err error
 		defer func() {
@@ -191,7 +194,7 @@ func (a *remoteAuth) GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string
 }
 
 func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect) (string, error) {
-	sp, err := a.GenerateSamlSP(csaml, redir.Redirect)
+	sp, err := GenerateSamlSP(csaml, redir.Redirect)
 	if err != nil {
 		return "", err
 	}
@@ -214,7 +217,7 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 	certs = append(certs, csaml.X509Cert)
 	certs = append(certs, csaml.X509CertExtra...)
 
-	sp, err := a.GenerateSamlSP(csaml, tokenData.Redirect)
+	sp, err := GenerateSamlSP(csaml, tokenData.Redirect)
 	if err != nil {
 		return "", "", map[string][]string{}, err
 	}

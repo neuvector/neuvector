@@ -461,7 +461,7 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	sp, err := remoteAuther.GenerateSamlSP(cs.SAML, data.Redirect)
+	sp, err := auth.GenerateSamlSP(cs.SAML, data.Redirect)
 	if err != nil {
 		log.WithError(err).Warn("failed to generate saml service provider")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
