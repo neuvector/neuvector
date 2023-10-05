@@ -195,7 +195,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 			oneResp.Message = msg
 			resp.Results = append(resp.Results, &oneResp)
 		} else {
-			for _, ss := range strings.Split(msg, "\n") {
+			for _, ss := range strings.Split(msg, assessMsgSep) {
 				oneRuleResp := api.RESTAdmCtrlRulesTestResult{
 					Index:   i,
 					Kind:    tempObj.Kind,
