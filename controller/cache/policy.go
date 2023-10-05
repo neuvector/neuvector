@@ -1268,22 +1268,132 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 			}
 		} else if isWlRelate2Node(rul.To[0].WlID) {
 			//container group
-			var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+			dstHostRelated := false
 			for _, addr := range rul.To {
-				if hid, ok := wlNode[addr.WlID]; ok {
-					t := tmpNodePolicy[hid]
-					t.ID = rul.ID
-					t.From = rul.From
-					t.To = append(t.To, addr)
-					t.Action = rul.Action
-					tmpNodePolicy[hid] = t
+				dstHostRelated = utils.IsHostRelated(addr)
+				if dstHostRelated {
+					break
 				}
 			}
-			for nid, pol := range tmpNodePolicy {
-				if nodePolicy[nid] == nil {
-					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+			if dstHostRelated {
+				if isWl4AllNode(rul.From[0].WlID) {
+					//push policy to all nodes
+					for _, nid := range nodNod {
+						if nodePolicy[nid] == nil {
+							nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+						}
+						nodePolicy[nid] = append(nodePolicy[nid], rul)
+					}
+				} else {
+					if isWlRelate2Node(rul.From[0].WlID) {
+						fromNode := utils.NewSet()
+						toNode := utils.NewSet()
+						for _, addr := range rul.From {
+							if hid, ok := wlNode[addr.WlID]; ok {
+								fromNode.Add(hid)
+							}
+						}
+						for _, addr := range rul.To {
+							if hid, ok := wlNode[addr.WlID]; ok {
+								toNode.Add(hid)
+							}
+						}
+						bothNode := fromNode.Intersect(toNode)
+						onlyFromNode := fromNode.Difference(toNode)
+						onlyToNode := toNode.Difference(fromNode)
+						for nd := range bothNode.Iter() {
+							nid := nd.(string)
+							if nodePolicy[nid] == nil {
+								nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+							}
+							nodePolicy[nid] = append(nodePolicy[nid], rul)
+						}
+						if onlyFromNode.Cardinality() > 0 {
+							var fromNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+							for _, addr := range rul.From {
+								if hid, ok := wlNode[addr.WlID]; ok && onlyFromNode.Contains(hid) {
+									t := fromNodePolicy[hid]
+									t.ID = rul.ID
+									t.From = append(t.From, addr)
+									t.To = rul.To
+									t.Action = rul.Action
+									fromNodePolicy[hid] = t
+								}
+							}
+							for nid, pol := range fromNodePolicy {
+								if nodePolicy[nid] == nil {
+									nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+								}
+								nodePolicy[nid] = append(nodePolicy[nid], pol)
+							}
+						}
+						if onlyToNode.Cardinality() > 0 {
+							var toNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+							for _, addr := range rul.To {
+								if hid, ok := wlNode[addr.WlID]; ok && onlyToNode.Contains(hid) {
+									t := toNodePolicy[hid]
+									t.ID = rul.ID
+									t.From = rul.From
+									t.To = append(t.To, addr)
+									t.Action = rul.Action
+									toNodePolicy[hid] = t
+								}
+							}
+							for nid, pol := range toNodePolicy {
+								if nodePolicy[nid] == nil {
+									nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+								}
+								nodePolicy[nid] = append(nodePolicy[nid], pol)
+							}
+						}
+						fromNode.Clear()
+						toNode.Clear()
+						bothNode.Clear()
+						onlyFromNode.Clear()
+						onlyToNode.Clear()
+						fromNode = nil
+						toNode = nil
+						bothNode = nil
+						onlyFromNode = nil
+						onlyToNode = nil
+					} else {
+						var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+						for _, addr := range rul.To {
+							if hid, ok := wlNode[addr.WlID]; ok {
+								t := tmpNodePolicy[hid]
+								t.ID = rul.ID
+								t.From = rul.From
+								t.To = append(t.To, addr)
+								t.Action = rul.Action
+								tmpNodePolicy[hid] = t
+							}
+						}
+						for nid, pol := range tmpNodePolicy {
+							if nodePolicy[nid] == nil {
+								nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+							}
+							nodePolicy[nid] = append(nodePolicy[nid], pol)
+						}
+					}
 				}
-				nodePolicy[nid] = append(nodePolicy[nid], pol)
+			} else {
+				var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+				for _, addr := range rul.To {
+					if hid, ok := wlNode[addr.WlID]; ok {
+						t := tmpNodePolicy[hid]
+						t.ID = rul.ID
+						t.From = rul.From
+						t.To = append(t.To, addr)
+						t.Action = rul.Action
+						tmpNodePolicy[hid] = t
+					}
+				}
+				for nid, pol := range tmpNodePolicy {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], pol)
+				}
 			}
 		} else {
 			//if destination group is not container group
