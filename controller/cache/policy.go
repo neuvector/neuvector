@@ -823,6 +823,9 @@ func printOneGroupIPPolicy(p *share.CLUSGroupIPPolicy) {
 var wlLearnList []*share.CLUSWorkloadAddr
 var wlEvalList []*share.CLUSWorkloadAddr
 var wlEnforceList []*share.CLUSWorkloadAddr
+var wlNode map[string]string = make(map[string]string) //wlid->nodeid
+var nodNod map[string]string = make(map[string]string) //nodeid->nodeid
+var nodePolicy map[string][]share.CLUSGroupIPPolicy = make(map[string][]share.CLUSGroupIPPolicy)
 
 func getDefaultGroupPolicy() share.CLUSGroupIPPolicy {
 	policy := share.CLUSGroupIPPolicy{
@@ -870,6 +873,16 @@ func getDefaultGroupPolicy() share.CLUSGroupIPPolicy {
 		} else if addr.PolicyMode == share.PolicyModeEnforce {
 			wlEnforceList = append(wlEnforceList, &addr)
 		}
+		if wlNode == nil {
+			wlNode = make(map[string]string)
+		}
+		wlNode[cache.workload.ID] = cache.workload.HostID
+		if nodNod == nil {
+			nodNod = make(map[string]string)
+		}
+		nodNod[cache.workload.HostID] = cache.workload.HostID
+
+		//log.WithFields(log.Fields{"wlid": cache.workload.ID, "hostid": cache.workload.HostID,}).Debug("")
 	}
 
 	printOneGroupIPPolicy(&policy)
@@ -1193,6 +1206,194 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 	return groupIPPolicies
 }
 
+func printOneNodeGroupIPPolicy(p *share.CLUSGroupIPPolicy) {
+	/*value, _ := json.Marshal(p)
+	log.WithFields(log.Fields{"value": string(value)}).Debug("")
+	*/
+}
+
+func printNodeGroupIPPolicy() {
+	/*for _, nid := range nodNod {
+		rules := nodePolicy[nid]
+		for _, rule := range rules {
+			printOneNodeGroupIPPolicy(&rule)
+		}
+	}*/
+}
+
+func resetNodePolicy() {
+	wlNode = nil
+	nodNod = nil
+	nodePolicy = nil
+}
+
+func isWl4AllNode(wlid string) bool {
+	if wlid == share.CLUSWLAllContainer ||
+		wlid == share.CLUSWLModeGroup {
+		return true
+	}
+	return false
+}
+
+func isWlRelate2Node(wlid string) bool {
+	if wlid == share.CLUSWLExternal ||
+		wlid == share.CLUSHostAddrGroup ||
+		wlid == share.CLUSWLAddressGroup ||
+		strings.HasPrefix(wlid, share.CLUSWLFqdnPrefix) ||
+		strings.HasPrefix(wlid, api.LearnedHostPrefix) ||
+		strings.HasPrefix(wlid, api.LearnedWorkloadPrefix) {
+		//specail group not designated to particular node
+		return false
+	}
+	return true
+}
+
+func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
+	if nodePolicy == nil {
+		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
+	}
+	//important: order in rules needs to be preserved
+	for idx, rul := range rules {
+		if idx == 0 {
+			//printOneNodeGroupIPPolicy(&rul)
+			continue
+		}
+		if isWl4AllNode(rul.To[0].WlID) {
+			//push policy to all nodes
+			for _, nid := range nodNod {
+				if nodePolicy[nid] == nil {
+					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+				}
+				nodePolicy[nid] = append(nodePolicy[nid], rul)
+			}
+		} else if isWlRelate2Node(rul.To[0].WlID) {
+			//container group
+			var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+			for _, addr := range rul.To {
+				if hid, ok := wlNode[addr.WlID]; ok {
+					t := tmpNodePolicy[hid]
+					t.ID = rul.ID
+					t.From = rul.From
+					t.To = append(t.To, addr)
+					t.Action = rul.Action
+					tmpNodePolicy[hid] = t
+				}
+			}
+			for nid, pol := range tmpNodePolicy {
+				if nodePolicy[nid] == nil {
+					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+				}
+				nodePolicy[nid] = append(nodePolicy[nid], pol)
+			}
+		} else {
+			//if destination group is not container group
+			//use source group to decide which node
+			if isWl4AllNode(rul.From[0].WlID) {
+				//push policy to all nodes
+				for _, nid := range nodNod {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], rul)
+				}
+			} else {
+				//container group
+				var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+				for _, addr := range rul.From {
+					if hid, ok := wlNode[addr.WlID]; ok {
+						t := tmpNodePolicy[hid]
+						t.ID = rul.ID
+						t.From = append(t.From, addr)
+						t.To = rul.To
+						t.Action = rul.Action
+						tmpNodePolicy[hid] = t
+					}
+				}
+				for nid, pol := range tmpNodePolicy {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], pol)
+				}
+			}
+		}
+	}
+	//printNodeGroupIPPolicy()
+}
+
+func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
+	if nodePolicy == nil {
+		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
+	}
+	//important: order in rules needs to be preserved
+	for idx, rul := range rules {
+		if idx == 0 {
+			//printOneNodeGroupIPPolicy(&rul)
+			continue
+		}
+		if isWl4AllNode(rul.From[0].WlID) {
+			//push policy to all nodes
+			for _, nid := range nodNod {
+				if nodePolicy[nid] == nil {
+					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+				}
+				nodePolicy[nid] = append(nodePolicy[nid], rul)
+			}
+		} else if isWlRelate2Node(rul.From[0].WlID) {
+			//container group
+			var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+			for _, addr := range rul.From {
+				if hid, ok := wlNode[addr.WlID]; ok {
+					t := tmpNodePolicy[hid]
+					t.ID = rul.ID
+					t.From = append(t.From, addr)
+					t.To = rul.To
+					t.Action = rul.Action
+					tmpNodePolicy[hid] = t
+				}
+			}
+			for nid, pol := range tmpNodePolicy {
+				if nodePolicy[nid] == nil {
+					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+				}
+				nodePolicy[nid] = append(nodePolicy[nid], pol)
+			}
+		} else {
+			//if destination group is not container group
+			//use source group to decide which node
+			if isWl4AllNode(rul.To[0].WlID) {
+				//push policy to all nodes
+				for _, nid := range nodNod {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], rul)
+				}
+			} else {
+				//container group
+				var tmpNodePolicy map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+				for _, addr := range rul.To {
+					if hid, ok := wlNode[addr.WlID]; ok {
+						t := tmpNodePolicy[hid]
+						t.ID = rul.ID
+						t.From = rul.From
+						t.To = append(t.To, addr)
+						t.Action = rul.Action
+						tmpNodePolicy[hid] = t
+					}
+				}
+				for nid, pol := range tmpNodePolicy {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], pol)
+				}
+			}
+		}
+	}
+	//printNodeGroupIPPolicy()
+}
+
 func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 	rules := make([]share.CLUSGroupIPPolicy, 0)
 	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
@@ -1220,7 +1421,7 @@ const clusterSmall = 3000
 const clusterMedium = 6000
 const clusterLarge = 9000
 
-func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, error) {
+func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, error) {
 	//total number of workloads
 	wlen := len(rules[0].From)
 	//start from different base to save cpu
@@ -1230,180 +1431,4 @@ func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, er
 	} else if wlen < clusterMedium {
 		beginSlot = beginSlotMedium
 	} else if wlen < clusterLarge {
-		beginSlot = beginSlotLarge
-	} else {
-		beginSlot = beginSlotSuper
-	}
-	log.WithFields(log.Fields{
-			"wlen":           wlen,
-			"beginSlot":      beginSlot,
-			"maxPolicySlots": maxPolicySlots,
-	}).Debug("begin slots")
-	// deal with case that compressed rule size is > max kv value size (512K)
-	for slots := beginSlot; slots <= maxPolicySlots; slots *= 2 {
-		//first rule has address info for all workloads in cluster
-		//the size can be very big so we need to split this rule into
-		//small rules
-		wl_lens := len(rules[0].From)
-		wl_slots := slots
-		if wl_lens < slots {
-			wl_slots = wl_lens
-		}
-		rules_wl := make([]share.CLUSGroupIPPolicy, wl_slots)
-		for i := 0; i < wl_lens; i++ {
-			if i < wl_slots {
-				rules_wl[i].ID = share.DefaultGroupRuleID
-				rules_wl[i].From = make([]*share.CLUSWorkloadAddr, 0)
-				rules_wl[i].From = append(rules_wl[i].From, rules[0].From[i])
-			} else {
-				rules_wl[i%wl_slots].From = append(rules_wl[i%wl_slots].From, rules[0].From[i])
-			}
-		}
-		new_rules := make([]share.CLUSGroupIPPolicy, 0)
-		new_rules = append(new_rules, rules_wl...)
-		new_rules = append(new_rules, rules[1:]...)
-
-		enlarge := false
-		final_slots := slots
-		rule_lens := len(new_rules)
-		if rule_lens < slots {
-			final_slots = rule_lens
-		}
-		log.WithFields(log.Fields{
-			"wl_lens":        wl_lens,
-			"wl_slots":       wl_slots,
-			"slots":          slots,
-			"orig_rule_lens": len(rules),
-			"rule_lens":      rule_lens,
-			"final_slots":    final_slots,
-			"maxPolicySlots": maxPolicySlots,
-		}).Debug("segregate rules to slots")
-
-		//put rules to slots evenly
-		plcs := make([][]share.CLUSGroupIPPolicy, final_slots)
-		for idx, rl := range new_rules {
-			//log.WithFields(log.Fields{"slot_idx": idx%final_slots, "rule_idx": idx, }).Debug("assign rules to slots")
-			plcs[idx%final_slots] = append(plcs[idx%final_slots], rl)
-		}
-
-		//zip each slots
-		zbs := make([][]byte, final_slots)
-		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
-			zb := utils.GzipBytes(value)
-			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
-			if len(zb) >= cluster.KVValueSizeMax {
-				log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules too large")
-				enlarge = true
-				break
-			}
-			zbs[i] = zb
-		}
-
-		//log.WithFields(log.Fields{"enlarge": enlarge}).Debug("")
-		if !enlarge {
-			return zbs, wl_slots, wl_lens, nil
-		}
-	}
-
-	return nil, 0, 0, errors.New("Policy rules are too large")
-}
-
-func policyIPRulesCleanup(ruleKeys []string) {
-	txn := cluster.Transact()
-	defer txn.Close()
-
-	// Remove keys that have been written
-	for _, key := range ruleKeys {
-		txn.Delete(key)
-	}
-	//Ignore failure, missed keys will be removed the next update.
-	txn.Apply()
-}
-
-func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
-	//
-	//GroupIPRules is not directly watched by consul, to improve performance
-	//change key from "network/GroupIPRules/" to "recalculate/policy/GroupIPRules/"
-	//rule_key := fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	oldKeys, _ := cluster.GetStoreKeys(rule_key)
-
-	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
-	newRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
-
-	// separate all rules into slots
-	zbs, wlslots, wlens, err := preparePolicySlots(rules)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error()
-		return
-	}
-
-	//put rules to cluster in separate slot
-	for i, zb := range zbs {
-		key := fmt.Sprintf("%s%d", newRuleKey, i)
-		if err = cluster.PutBinary(key, zb); err != nil {
-			log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
-			newKeys, _ := cluster.GetStoreKeys(newRuleKey)
-			policyIPRulesCleanup(newKeys)
-			return
-		}
-	}
-
-	//new kv to indicate rule change
-	polVer := share.CLUSGroupIPPolicyVer{
-		Key:                  share.PolicyIPRulesVersionID,
-		PolicyIPRulesVersion: verstr,
-		SlotNo:               len(zbs),
-		RulesLen:             len(rules) + wlslots - 1,
-		WorkloadSlot:         wlslots,
-		WorkloadLen:          wlens,
-	}
-	log.WithFields(log.Fields{"PolicyIPRules": newRuleKey, "policyVer": polVer}).Debug("New policy rules written")
-
-	clusHelper := kv.GetClusterHelper()
-	if err = clusHelper.PutPolicyVer(&polVer); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Failed to write network policy to the cluster")
-		newKeys, _ := cluster.GetStoreKeys(newRuleKey)
-		policyIPRulesCleanup(newKeys)
-		return
-	}
-	policyIPRulesCleanup(oldKeys)
-}
-
-func putPolicyIPRulesToCluster(rules []share.CLUSGroupIPPolicy) {
-	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
-	value, _ := json.Marshal(rules)
-	zb := utils.GzipBytes(value)
-	if err := cluster.PutBinary(key, zb); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
-	}
-	//log.WithFields(log.Fields{"value": string(value), "len": len(value), "zb": len(zb)}).Debug("")
-}
-
-func scheduleIPPolicyCalculation(fast bool) {
-	log.WithFields(log.Fields{"fast": fast, "policyCalculated": policyCalculated}).Debug("")
-	//no need to reset timer if network policy is disabled
-	if getDisableNetPolicyStatus() {
-		return
-	}
-
-	if !policyCalculated {
-		policyCalculated = true
-		firstPolicyCalculateAt = time.Now().UTC()
-		if fast {
-			policyCalculatingTimer.Reset(policyCalculatingDelayFast)
-		} else {
-			policyCalculatingTimer.Reset(policyCalculatingDelaySlow)
-		}
-	} else if time.Since(firstPolicyCalculateAt) > policyCalDelayMax {
-		log.Debug("Trigger policy recalculation")
-		policyCalculatingTimer.Reset(0)
-	} else {
-		if fast {
-			policyCalculatingTimer.Reset(policyCalculatingDelayFast)
-		} else {
-			policyCalculatingTimer.Reset(policyCalculatingDelaySlow)
-		}
-	}
-}
+		beginS

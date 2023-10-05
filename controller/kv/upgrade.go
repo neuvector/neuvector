@@ -309,7 +309,7 @@ func upgradeProcessProfile(cfg *share.CLUSProcessProfile) (bool, bool) {
 		}
 	}
 
-	for i, _ := range cfg.Process {
+	for i := range cfg.Process {
 		if cfg.Process[i].CreatedAt.IsZero() {
 			cfg.Process[i].CreatedAt = tm
 			upd = true
@@ -913,10 +913,10 @@ const (
 
 // check if the request handling cluster can handle request from the requesting cluster
 // for "fed kv version":
-// 1. the request handling cluster & requesting cluster have the same "fed kv version", it means they can handle requests from each other in the same federation
-// 2. if not, it means they shouldn't handle requests from each other
-//	  2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
-//	  2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
+//  1. the request handling cluster & requesting cluster have the same "fed kv version", it means they can handle requests from each other in the same federation
+//  2. if not, it means they shouldn't handle requests from each other
+//     2-1: if the requesting cluster's "fed kv version" is in the handler cluster's phases, it means the requesting cluster needs upgrade
+//     2-2: if the requesting cluster's "fed kv version" is not in the handler cluster's phases, it means the handler cluster needs upgrade
 func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 	ver := getControlVersion()
 	if ver.KVVersion != latestKVVersion() {
@@ -1199,10 +1199,23 @@ func ValidateWebhookCert() {
 						log.WithFields(log.Fields{"cn": certInfo.cn}).Info("regen")
 						switch certInfo.svcName {
 						case share.CLUSRootCAKey:
-							createCA()
+							if err := CreateCAFilesAndStoreInKv(AdmCACertPath, AdmCAKeyPath); err != nil {
+								// Make it retry.
+								log.WithError(err).Error("failed to create CA file")
+								continue
+							}
+
 						case resource.NvAdmSvcName, resource.NvCrdSvcName:
 							if orchPlatform == share.PlatformKubernetes {
-								signWebhookTlsCert(certInfo.svcName, resource.NvAdmSvcNamespace, certInfo.cn)
+								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn,
+									tlsCertPath, tlsKeyPath,
+									AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10}); err != nil {
+									// Make it retry.
+									log.WithError(err).Error("failed to generate Webhook certs")
+									continue
+								}
 							}
 						}
 					} else {
@@ -1216,7 +1229,11 @@ func ValidateWebhookCert() {
 								os.Remove(certInfo.keyPath)
 								os.Remove(certInfo.certPath)
 								log.WithFields(log.Fields{"cn": certInfo.cn}).Info("invalid cert")
-								signWebhookTlsCert(certInfo.svcName, resource.NvAdmSvcNamespace, certInfo.cn)
+								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
+									log.WithError(err).Error("failed to generate Webhook certs in ValidateWebhookCert()")
+								}
 								cert, _, _ = clusHelper.GetObjectCertRev(certInfo.cn)
 							}
 						}
@@ -1605,35 +1622,4 @@ func initFedScanRevKey() {
 					continue
 				} else if currName == "" {
 					currName = regName
-					if currName != common.RegistryFedRepoScanName {
-						regConfigRev += 1
-					}
-				} else if regName != currName {
-					if currName == common.RegistryFedRepoScanName {
-						scannedRepoRev = currRev
-					} else {
-						scannedRegRevs[currName] = currRev
-						regConfigRev += 1
-					}
-					currName = regName
-					currRev = 0
-				}
-				currRev += 1
-			}
-			if currName != "" {
-				if currName == common.RegistryFedRepoScanName {
-					scannedRepoRev = currRev
-				} else {
-					scannedRegRevs[currName] = currRev
-				}
-			}
-			clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
-				RegConfigRev:   regConfigRev,
-				ScannedRegRevs: scannedRegRevs,
-				ScannedRepoRev: scannedRepoRev,
-			}, nil)
-		} else if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
-		}
-	}
-}
+					if currName != com

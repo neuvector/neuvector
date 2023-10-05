@@ -100,8 +100,20 @@ const jwtIbmSaTokenLife = time.Minute * 30
 const jwtImportStatusTokenLife = time.Minute * 10
 const syncTokenTimerTimeout = time.Duration(120) * time.Second
 
-var jwtPublicKey *rsa.PublicKey
-var jwtPrivateKey *rsa.PrivateKey
+// JWT token related
+type JWTCertificateState struct {
+	jwtPublicKey            *rsa.PublicKey
+	jwtPublicKeyNotAfter    *time.Time
+	jwtPrivateKey           *rsa.PrivateKey
+	jwtOldPublicKey         *rsa.PublicKey // Only used in transition period
+	jwtOldPublicKeyNotAfter *time.Time
+}
+
+var (
+	jwtCertState JWTCertificateState
+	jwtKeyMutex  sync.RWMutex
+)
+
 var jwtLastExpiredTokenSession cluster.SessionInterface
 var jwtLastExpiredTokenSessionCreatedAt time.Time
 
@@ -139,6 +151,12 @@ var rancherCookieMutex sync.RWMutex
 
 var installID *string
 
+func GetJWTSigningKey() JWTCertificateState {
+	jwtKeyMutex.RLock()
+	defer jwtKeyMutex.RUnlock()
+	return jwtCertState
+}
+
 func GetInstallationID() string {
 	if installID == nil {
 		id, _ := clusHelper.GetInstallationID()
@@ -172,11 +190,7 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 }
 
 func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (*loginSession, int) {
-	if jwtPrivateKey == nil || jwtPublicKey == nil {
-		if err := jwtReadKeys(); err != nil {
-			return nil, userKeyError
-		}
-	}
+	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
 
 	id, token, claims := jwtGenerateToken(user, roles, remote, mainSessionID, mainSessionUser)
 	now := user.LastLoginAt // Already updated
@@ -542,6 +556,8 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 
 // with userMutex locked when calling this
 func restReq2User(r *http.Request) (*loginSession, int, string) {
+	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
+
 	var rsessToken string
 	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
 		if header, ok := r.Header[api.RESTRancherTokenHeader]; ok && len(header) == 1 {
@@ -602,12 +618,6 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 		}
 
 		return nil, userInvalidRequest, rsessToken
-	}
-
-	if jwtPrivateKey == nil || jwtPublicKey == nil {
-		if err := jwtReadKeys(); err != nil {
-			return nil, userKeyError, rsessToken
-		}
 	}
 
 	// Validate token
@@ -1121,40 +1131,6 @@ func changeTimeoutLoginSessions(user *share.CLUSUser) {
 		}
 	}
 }
-
-func rsaReadKeys(certFile, keyFile string) (error, *rsa.PublicKey, *rsa.PrivateKey) {
-	var rsaPublicKey *rsa.PublicKey
-	var rsaPrivateKey *rsa.PrivateKey
-	if certFile != "" {
-		if key, err := ioutil.ReadFile(certFile); err != nil {
-			return err, nil, nil
-		} else if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM(key); err != nil {
-			return err, nil, nil
-		}
-	}
-	if keyFile != "" {
-		if key, err := ioutil.ReadFile(keyFile); err != nil {
-			return err, nil, nil
-		} else if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(key); err != nil {
-			return err, nil, nil
-		}
-	}
-
-	return nil, rsaPublicKey, rsaPrivateKey
-}
-
-func jwtReadKeys() error {
-	var err error
-	err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultJWTCertFile, defaultJWTKeyFile)
-	if err != nil {
-		log.WithError(err).Info("failed to open default jwt keys, falling back...")
-		err, jwtPublicKey, jwtPrivateKey = rsaReadKeys(defaultSSLCertFile, defaultSSLKeyFile)
-		return err
-	}
-
-	return nil
-}
-
 func resetFedJointKeys() {
 	_httpClientMutex.Lock()
 	v, ok := _proxyOptionHistory["rancher"]
@@ -1236,7 +1212,9 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	// rsaPublicKey being non-nil is for validating new public/private keys purpose
 	var tokenString string
 	var publicKey *rsa.PublicKey
+	var alternativeKey *rsa.PublicKey
 
+	jwtCert := GetJWTSigningKey()
 	installID := GetInstallationID()
 
 	if secret == "" {
@@ -1248,7 +1226,8 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		return nil, fmt.Errorf("unrecognized token")
 	}
 	if secret == "" {
-		publicKey = jwtPublicKey
+		publicKey = jwtCert.jwtPublicKey
+		alternativeKey = jwtCert.jwtOldPublicKey
 	} else {
 		if rsaPublicKey == nil {
 			if publicKey = _getFedJointPublicKey(); publicKey == nil {
@@ -1270,8 +1249,26 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
+		if jwtCert.jwtPublicKeyNotAfter != nil && time.Now().After(*jwtCert.jwtPublicKeyNotAfter) {
+			return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtPublicKeyNotAfter)
+		}
 		return publicKey, nil
 	})
+
+	// Try with old cert if it's available.
+	// Note: Ideally we should use extra info stored in claims to do a lookup below.
+	//       Luckily jwt verification normally only takes a few ms.  We can revisit when we see abnormal performance impact here.
+	if err != nil && alternativeKey != nil {
+		token, err = jwt.ParseWithClaims(tokenString, &tokenClaim{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			if jwtCert.jwtOldPublicKeyNotAfter != nil && time.Now().After(*jwtCert.jwtOldPublicKeyNotAfter) {
+				return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtOldPublicKeyNotAfter)
+			}
+			return alternativeKey, nil
+		})
+	}
 
 	if err != nil {
 		// if it's a joint cluster and rsa verfication of the token from master cluster fails,
@@ -1348,8 +1345,9 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
 
 	// Validate token
+	jwtCert := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	tokenString, _ := token.SignedString(jwtPrivateKey)
+	tokenString, _ := token.SignedString(jwtCert.jwtPrivateKey)
 	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 
@@ -2752,21 +2750,4 @@ func handlerDumpAuthData(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			MainSessionID:   login.mainSessionID,
 			MainSessionUser: login.mainSessionUser,
 			Token:           login.token,
-			User:            login.fullname,
-			Role:            login.domainRoles[""],
-		}
-		resp.RegularSessions = append(resp.RegularSessions, d)
-	}
-
-	for mainSessionID, tokenSet := range loginFedSessions {
-		d := &RESTFedAuthTestDataDetail{
-			MainSessionID:   mainSessionID,
-			MainSessionUser: mainSessionUser,
-			Tokens:          tokenSet.ToStringSlice(),
-		}
-		resp.FedSessions = append(resp.FedSessions, d)
-	}
-
-	restRespSuccess(w, r, &resp, acc, login, nil, "Get auth data")
-}
-*/
+			User:

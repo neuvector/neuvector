@@ -102,6 +102,8 @@ var grpSvcIpByDomainMap map[string]utils.Set = make(map[string]utils.Set) //key 
 var addr2ExtIpMap map[string][]net.IP = make(map[string][]net.IP)         //key svc cluster ip, value is externalIPs
 var extIp2addrMap map[string]net.IP = make(map[string]net.IP)             //key externalIP, value is svc cluster ip
 var addr2ExtIpRefreshMap map[string]bool = make(map[string]bool)          //key svc cluster ip
+var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)          //fqdn->group name(s)
+var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)          //group->fqdn name(s)
 
 func getSvcAddrGroupNameByExtIP(ip net.IP, port uint16) string {
 	if addrip, ok := extIp2addrMap[ip.String()]; ok {
@@ -548,6 +550,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		}
 		cacheMutexUnlock()
 
+		if cache != nil && cache.group.Kind == share.GroupKindAddress {
+			deleteFqdn2Group(cache)
+		}
 		if cache != nil && !isIPSvcGrpHidden(cache) {
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
 		}
@@ -1371,6 +1376,47 @@ func svcipGroupJoin(svcipcache *groupCache) {
 	}
 }
 
+func updateFqdn2Group (cache *groupCache) {
+	deleteFqdn2Group(cache)
+	for _, ct := range cache.group.Criteria {
+		if ct.Key == share.CriteriaKeyAddress {
+			if a := getIPList(ct.Value); a == nil {
+				fqdname := ct.Value
+				if strings.HasPrefix(fqdname, share.CLUSWLFqdnVhPrefix) {
+					fqdname = fqdname[len(share.CLUSWLFqdnVhPrefix):]
+				}
+				if fqdn2GrpMap[fqdname] == nil {
+					fqdn2GrpMap[fqdname] = utils.NewSet()
+				}
+				fqdn2GrpMap[fqdname].Add(cache.group.Name)
+
+				if grp2FqdnMap[cache.group.Name] == nil {
+					grp2FqdnMap[cache.group.Name] = utils.NewSet()
+				}
+				grp2FqdnMap[cache.group.Name].Add(fqdname)
+			}
+		}
+	}
+}
+
+func deleteFqdn2Group (cache *groupCache) {
+	if gfqs, ok := grp2FqdnMap[cache.group.Name]; ok {
+		for fq := range gfqs.Iter() {
+			fqn := fq.(string)
+			if f2gs, ok1 := fqdn2GrpMap[fqn]; ok1 {
+				f2gs.Remove(cache.group.Name)
+				if f2gs.Cardinality() == 0 {
+					delete(fqdn2GrpMap, fqn)
+				}
+			}
+		}
+		if gfqs != nil {
+			gfqs.Clear()
+		}
+		delete(grp2FqdnMap, cache.group.Name)
+	}
+}
+
 func refreshGroupMember(cache *groupCache) {
 	// Remove group from it's members' group list
 	for m := range cache.members.Iter() {
@@ -1385,6 +1431,10 @@ func refreshGroupMember(cache *groupCache) {
 	if cache.group.Kind == share.GroupKindNode {
 		cache.members.Add("") // for all nodes
 		return
+	}
+
+	if cache.group.Kind == share.GroupKindAddress {
+		updateFqdn2Group(cache)
 	}
 
 	if cache.group.Kind != share.GroupKindContainer {
@@ -1969,57 +2019,4 @@ func (m CacheMethod) GetService(name string, view string, withCap bool, acc *acc
 
 	gname := api.LearnedGroupPrefix + name
 	if cache, ok := groupCacheMap[gname]; ok {
-		if err := authorizeService(cache, acc); err != nil {
-			return nil, err
-		}
-		return group2Service(cache, view, withCap), nil
-	}
-	return nil, common.ErrObjectNotFound
-}
-
-func isNeuvectorContainerName(name string) bool {
-	if matched, err := regexp.MatchString(`^neuvector-(controller|enforcer|manager|allinone|updater|scanner|csp|registry-adapter)-pod`, name); err == nil {
-		return matched
-	}
-	return false
-}
-
-func domainChange(domain share.CLUSDomain) {
-	log.WithFields(log.Fields{"domain": domain}).Debug()
-
-	var groups []*groupCache
-
-	cacheMutexLock()
-	defer cacheMutexUnlock()
-
-	for _, cache := range groupCacheMap {
-		if utils.IsCustomProfileGroup(cache.group.Name) {
-			for _, crt := range cache.group.Criteria {
-				if strings.HasPrefix(crt.Key, "ns:") {
-					groups = append(groups, cache)
-					break
-				}
-			}
-		}
-	}
-
-	// For every workload, re-calculate its membership
-	dptLearnedGrpAdds := utils.NewSet()
-	for _, cache := range groups {
-		cache.members.Clear() // reset
-		for _, wlc := range wlCacheMap {
-			if !wlc.workload.Running {
-				continue
-			}
-
-			if share.IsGroupMember(cache.group, wlc.workload, getDomainData(wlc.workload.Domain)) {
-				cache.members.Add(wlc.workload.ID)
-				wlc.groups.Add(cache.group.Name)
-				dptLearnedGrpAdds.Add(wlc.learnedGroupName)
-			} else {
-				wlc.groups.Remove(cache.group.Name)
-			}
-		}
-		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
-	}
-}
+		if err := authorizeService(

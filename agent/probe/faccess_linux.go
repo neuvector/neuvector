@@ -751,7 +751,6 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 
 			if res < rule_allowed {
 				// Now get the effective user name
-				username := fa.prober.getUserName(ppid, euid)
 				// the same event with the same pid will come into the routine twice
 				if fa.lastReportPid != ppid { // it solve 80% case, let the aggregater to filter out the same pid's reports
 					go func() {
@@ -771,7 +770,6 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 							Path:   path,
 							Name:   name,
 							PPath:  ppath,
-							EUser:  username,
 							EUid:   euid,
 							PName:  filepath.Base(ppath),
 							Msg:    msg,

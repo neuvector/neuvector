@@ -1506,6 +1506,7 @@ func (rs *Registry) scheduleScanImages(
 				Vulnerability: false,
 				Signature:     false,
 			}
+			isSignedImage := info.SignatureDigest != ""
 			sum, ok := rs.summary[info.ID]
 			if ok {
 				smd.scanLog.WithFields(log.Fields{
@@ -1532,6 +1533,7 @@ func (rs *Registry) scheduleScanImages(
 					}
 				}
 
+				// determine if vuln scan is required
 				if !newImage {
 					scanTypesRequired.Vulnerability = false
 				} else if rs.bSkipVulnScanForImage(sum) {
@@ -1547,26 +1549,21 @@ func (rs *Registry) scheduleScanImages(
 				signatureInfoChanged := info.SignatureDigest != sum.SignatureDigest
 				sigstoreConfigurationChanged := sigstoreTimestamp != sum.SigstoreTimestamp
 
-				if signatureInfoChanged {
+				// determine if signature scan is required
+				if !newImage {
+					scanTypesRequired.Signature = false
+				} else if signatureInfoChanged {
+					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Signature info for image changed, signature scan required.")
+					scanTypesRequired.Signature = true
 					sum.SignatureDigest = info.SignatureDigest
 					imageChanged = true
+				} else if sigstoreConfigurationChanged && isSignedImage {
+					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Sigstore config changed and image is signed, signature scan required.")
 					scanTypesRequired.Signature = true
-					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Signature Info Changed")
-				}
-
-				if sigstoreConfigurationChanged {
 					sum.SigstoreTimestamp = sigstoreTimestamp
 					imageChanged = true
-					if info.SignatureDigest != "" {
-						// image is signed, rescan with new sigstore configuration
-						smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Sigstore Config Changed")
-						scanTypesRequired.Signature = true
-					}
-				}
-
-				if sum.SignatureStatus == api.ScanStatusFailed {
-					scanTypesRequired.Signature = true
-				} else if newImage && info.SignatureDigest != "" {
+				} else if sum.SignatureStatus == api.ScanStatusFailed {
+					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("Previous signature scan failed, signature scan required.")
 					scanTypesRequired.Signature = true
 				}
 
@@ -1578,7 +1575,7 @@ func (rs *Registry) scheduleScanImages(
 						"currentSignatureDigest":    info.SignatureDigest,
 						"previousSigstoreTimestamp": sum.SigstoreTimestamp,
 						"currentSigstoreTimestamp":  sigstoreTimestamp,
-					}).Debug("Skip signature scan for image")
+					}).Debug("Signature scan not required for image, skipping.")
 				}
 
 				if scanTypesRequired.Vulnerability {
@@ -1605,16 +1602,23 @@ func (rs *Registry) scheduleScanImages(
 					Author:            info.Author,
 					Status:            api.ScanStatusScheduled,
 					CreatedAt:         info.Created,
-					SignatureStatus:   api.ScanStatusScheduled,
 					SignatureDigest:   info.SignatureDigest,
 					SigstoreTimestamp: sigstoreTimestamp,
 					Images:            []share.CLUSImage{image},
 				}
 				rs.summary[info.ID] = sum
+				scanTypesRequired.Vulnerability = true
+
+				if isSignedImage {
+					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": image, "status": sum.Status, "imageID": info.ID}).Debug("New signed image detected, signature scan required.")
+					sum.SignatureStatus = api.ScanStatusScheduled
+					scanTypesRequired.Signature = true
+				} else {
+					sum.SignatureStatus = api.ScanStatusFinished
+				}
+
 				// update status in cluster
 				clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
-				scanTypesRequired.Vulnerability = true
-				scanTypesRequired.Signature = true
 			}
 
 			if scanTypesRequired.Vulnerability || scanTypesRequired.Signature {
@@ -1824,21 +1828,4 @@ func (t *regScanTask) Handler(scanner string) scheduler.Action {
 
 		smd.scanLog.WithFields(log.Fields{"scanTypesRequested": result.ScanTypesRequested}).Debug("scan types requested")
 		if left := t.reg.checkAndPutImageResult(t.sctx, id, result, retAction); left < 0 {
-			smd.scanLog.WithFields(log.Fields{"registry": t.reg.config.Registry}).Debug("Registry scan canceled")
-		}
-	}()
-
-	return scheduler.TaskActionWait
-}
-
-func (t *regScanTask) shouldRetry(result *share.ScanResult) bool {
-	return (result.Error == share.ScanErrorCode_ScanErrTimeout ||
-		result.Error == share.ScanErrorCode_ScanErrRegistryAPI ||
-		result.Error == share.ScanErrorCode_ScanErrFileSystem ||
-		result.Error == share.ScanErrorCode_ScanErrNetwork ||
-		result.Error == share.ScanErrorCode_ScanErrContainerAPI) && !t.reachedMaxRetries()
-}
-
-func (t *regScanTask) reachedMaxRetries() bool {
-	return t.retries == maxRetry
-}
+			smd.scanLog.WithFields(log.Fiel

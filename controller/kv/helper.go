@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -79,6 +80,7 @@ type ClusterHelper interface {
 	DeletePolicyRule(id uint32) error
 	DeletePolicyRuleTxn(txn *cluster.ClusterTransact, id uint32) error
 	PutPolicyVer(s *share.CLUSGroupIPPolicyVer) error
+	PutPolicyVerNode(s *share.CLUSGroupIPPolicyVer) error
 	PutDlpVer(s *share.CLUSDlpRuleVer) error
 
 	GetResponseRuleList(policyName string) []*share.CLUSRuleHead
@@ -166,6 +168,7 @@ type ClusterHelper interface {
 	GetAdmissionCertRev(svcName string) (*share.CLUSAdmissionCertCloaked, uint64) // obsolete
 	GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error)
 	PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error
+	PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error
 	GetAdmissionStateRev(svcName string) (*share.CLUSAdmissionState, uint64)
 	PutAdmissionRule(admType, ruleType string, rule *share.CLUSAdmissionRule) error
 	PutAdmissionStateRev(svcName string, state *share.CLUSAdmissionState, rev uint64) error
@@ -459,6 +462,7 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 	}
 
 // do not consider UpgradeAndConvert yet. if need to do UpgradeAndConvert, value size needs to be considered in UpgradeAndConvert()
+
 	func (m clusterHelper) getGzipAware(key string) ([]byte, uint64, error) {
 		value, rev, err := cluster.GetRev(key)
 		if err != nil || value == nil {
@@ -474,7 +478,6 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 			return value, rev, err
 		}
 	}
-
 */
 func (m clusterHelper) PutInstallationID() (string, error) {
 	if id, _ := m.GetInstallationID(); id != "" {
@@ -903,6 +906,12 @@ func (m clusterHelper) DeletePolicyRuleTxn(txn *cluster.ClusterTransact, id uint
 
 func (m clusterHelper) PutPolicyVer(s *share.CLUSGroupIPPolicyVer) error {
 	key := share.CLUSPolicyIPRulesKey(s.Key)
+	value, _ := enc.Marshal(s)
+	return cluster.Put(key, value)
+}
+
+func (m clusterHelper) PutPolicyVerNode(s *share.CLUSGroupIPPolicyVer) error {
+	key := share.CLUSPolicyIPRulesKeyNode(s.Key, s.NodeId)
 	value, _ := enc.Marshal(s)
 	return cluster.Put(key, value)
 }
@@ -1950,6 +1959,27 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 	}
 
 	return err
+}
+
+// Store the key/cert into kv and return the result.
+// This function, unlike PutObjectCert(), doesn't overwrite the existing cert file.
+// If index == 0, it will not overwrite the data. (PutIfNotExist)
+func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
+	key := share.CLUSObjectCertKey(cn)
+	value, _ := enc.Marshal(in)
+	err := cluster.PutRev(key, value, index)
+	if err != nil {
+		return err
+	}
+
+	if certExisting, _, err := clusHelper.GetObjectCertRev(cn); !certExisting.IsEmpty() {
+		if out != nil {
+			*out = *certExisting
+		}
+		return nil
+	} else {
+		return errors.Wrap(err, "cert is not there after PutIfNotExist")
+	}
 }
 
 func (m clusterHelper) GetAdmissionStateRev(svcName string) (*share.CLUSAdmissionState, uint64) {
@@ -3197,54 +3227,4 @@ func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) ([]*share
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve all verifiers, error retrieving \"%s\": %s", key, err.Error())
 			}
-			verifier := &share.CLUSSigstoreVerifier{}
-			err = json.Unmarshal(value, verifier)
-			if err != nil {
-				return nil, err
-			}
-			verifiers = append(verifiers, verifier)
-		}
-	}
-	return verifiers, nil
-}
-
-func (m clusterHelper) PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error {
-	timestampKey := share.CLUSSigstoreTimestampKey()
-	timestamp := time.Now().Unix()
-
-	value, err := json.Marshal(timestamp)
-	if err != nil {
-		return err
-	}
-
-	if txn != nil {
-		if rev != nil {
-			txn.PutRev(timestampKey, value, *rev)
-		} else {
-			txn.Put(timestampKey, value)
-		}
-	} else {
-		if rev != nil {
-			cluster.PutRev(timestampKey, value, *rev)
-		} else {
-			cluster.Put(timestampKey, value)
-		}
-	}
-
-	return nil
-}
-
-func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
-	timestampKey := share.CLUSSigstoreTimestampKey()
-
-	if !cluster.Exist(timestampKey) {
-		return "", nil, common.ErrObjectNotFound
-	}
-
-	configData, rev, err := m.get(timestampKey)
-	if err != nil || configData == nil {
-		return "", nil, err
-	}
-
-	return string(configData), &rev, nil
-}
+	

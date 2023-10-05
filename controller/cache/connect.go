@@ -229,8 +229,17 @@ func isHostOrUnmanagedWorkload(name string) bool {
 		strings.HasPrefix(name, api.LearnedWorkloadPrefix)
 }
 
+func isFqdnGroup(name string) bool {
+	if gfqs, ok := grp2FqdnMap[name]; ok {
+		if gfqs != nil && gfqs.Cardinality() > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func isNonWorkloadLearnedEndpoint(name string) bool {
-	return isHostOrUnmanagedWorkload(name) || name == api.LearnedExternal ||
+	return isHostOrUnmanagedWorkload(name) || isFqdnGroup(name) || name == api.LearnedExternal ||
 		strings.HasPrefix(name, api.LearnedGroupPrefix)
 }
 
@@ -276,6 +285,35 @@ func isAddressGroup(name string) bool {
 		}
 	}
 	return false
+}
+
+func getFqdnAddrGroupName(fqdn string) string {
+	if grps, ok := fqdn2GrpMap[fqdn]; ok {
+		return grps.Any().(string)
+	}
+	//try wildcard
+	fn := strings.Split(fqdn, ".")
+	fqdnlen := len(fn)
+	for i := 0; i < fqdnlen-2; i++ {
+		tfqdn := "*"
+		for j := i+1; j < fqdnlen; j++ {
+			tfqdn = fmt.Sprintf("%s.%s", tfqdn, fn[j])
+		}
+		if fgrps, ok := fqdn2GrpMap[tfqdn]; ok {
+			return fgrps.Any().(string)
+		}
+	}
+	if fqdnlen == 2 {
+		tfqdn := fmt.Sprintf("%s.%s", "www", fqdn)
+		if fgrps, ok := fqdn2GrpMap[tfqdn]; ok {
+			return fgrps.Any().(string)
+		}
+		tfqdn = fmt.Sprintf("%s.%s", "*", fqdn)
+		if fgrps, ok := fqdn2GrpMap[tfqdn]; ok {
+			return fgrps.Any().(string)
+		}
+	}
+	return ""
 }
 
 func getAddrGroupNameFromPolicy(polid uint32, client bool) string {
@@ -1085,6 +1123,16 @@ func preProcessConnect(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *serve
 						if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
 							conn.ServerWL = ep
 							sa.addrgrp = true
+						} else if conn.FQDN != "" && conn.PolicyId == 0 &&
+							conn.PolicyAction <= C.DP_POLICY_ACTION_LEARN {
+							//learn to predefined address group
+							if fqdngrp := getFqdnAddrGroupName(conn.FQDN); fqdngrp != "" {
+								conn.ServerWL = fqdngrp
+								sa.addrgrp = true
+								cctx.ConnLog.WithFields(log.Fields{
+									"ServerWL": conn.ServerWL, "policyaction":conn.PolicyAction,
+								}).Debug("To FQDN address group")
+							}
 						}
 						stip.wlPort = uint16(conn.ServerPort)
 					}
@@ -1948,44 +1996,4 @@ func getEndpointsForGroup(name string) utils.Set {
 }
 
 func deletePolicyLinkByRule(from, to string, cr *share.CLUSPolicyRule) {
-	if a := wlGraph.Attr(from, policyLink, to); a != nil {
-		attr := a.(*polAttr)
-		if len(cr.Applications) > 0 {
-			if attr.apps.Cardinality() > 0 {
-				log.WithFields(log.Fields{"src": from, "dst": to}).Debug("remove app")
-				attr.apps = utils.NewSet()
-			}
-		} else {
-			if attr.ports.Cardinality() > 0 {
-				log.WithFields(log.Fields{"src": from, "dst": to}).Debug("remove port")
-				attr.ports = utils.NewSet()
-			}
-		}
-		if attr.apps.Cardinality() == 0 && attr.ports.Cardinality() == 0 {
-			log.WithFields(log.Fields{"src": from, "dst": to}).Debug("remove policy link")
-			wlGraph.DeleteLink(from, policyLink, to)
-		}
-	}
-}
-
-func deleteConversByPolicyRule(cr *share.CLUSPolicyRule, deleteRule bool) {
-	log.WithFields(log.Fields{"rule": cr}).Debug()
-
-	fromSet := getEndpointsForGroup(cr.From)
-	toSet := getEndpointsForGroup(cr.To)
-	graphMutexLock()
-	defer graphMutexUnlock()
-	for from := range fromSet.Iter() {
-		for to := range toSet.Iter() {
-			log.WithFields(log.Fields{"src": from, "dst": to}).Debug("remove conv")
-			deleteConversationByPolicyId(from.(string), to.(string), cr.ID)
-			if cr.CfgType == share.Learned || cr.CfgType == share.FederalCfg {
-				deletePolicyLinkByRule(from.(string), to.(string), cr)
-			}
-		}
-	}
-
-	if cr.CfgType == share.Learned && deleteRule {
-		deleteRuleFromLprWrapperMap(cr)
-	}
-}
+	if a

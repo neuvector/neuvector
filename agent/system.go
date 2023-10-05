@@ -249,6 +249,31 @@ func mergeWlPolicyConfig(rules []share.CLUSGroupIPPolicy, ruleslen, wlslots, wle
 	return newGroupIPPolicy
 }
 
+func systemConfigPolicyVersionNode(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
+	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
+
+	//check whether key "recalculate/policy/groupIPRules" exist
+	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
+	if !cluster.Exist(rule_key) {
+		return groupIPPolicy
+	}
+	// indicate network policy version change.
+	newCommonRuleKey := fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
+	newNodeRuleKey := fmt.Sprintf("%s%s/%s/", rule_key, Host.ID, s.PolicyIPRulesVersion)
+
+	//combine group ip rules from separate slots
+	groupIPPolicy = getPolicyConfig(newCommonRuleKey, s.CommonSlotNo, s.CommonRulesLen)
+	groupNodeIPPolicy := getPolicyConfig(newNodeRuleKey, s.SlotNo, s.RulesLen)
+	if groupIPPolicy != nil && groupNodeIPPolicy != nil {
+		groupIPPolicy = append(groupIPPolicy, groupNodeIPPolicy...)
+	}
+	if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
+		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
+	}
+	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
+	return groupIPPolicy
+}
+
 func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
 	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
 
@@ -299,10 +324,23 @@ func systemConfigPolicy(nType cluster.ClusterNotifyType, key string, value []byt
 		nextNetworkPolicyVer = &s // regulator
 	}
 }
+func printOneEnIPPolicy(p *share.CLUSGroupIPPolicy) {
+	/*value, _ := json.Marshal(p)
+	log.WithFields(log.Fields{"value": string(value)}).Debug("")
+	*/
+}
+
+func printEnIPPolicy(groupIPPolicy []share.CLUSGroupIPPolicy) {
+	/*
+	for _, pol := range groupIPPolicy {
+		printOneEnIPPolicy(&pol)
+	}
+	*/
+}
 
 func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
-	// log.WithFields(log.Fields{"ver": s.PolicyIPRulesVersion}).Debug()
-	groupIPPolicy := systemConfigPolicyVersion(s)
+	groupIPPolicy := systemConfigPolicyVersionNode(s)
+	//printEnIPPolicy(groupIPPolicy)
 	if len(groupIPPolicy) == 0 {
 		if pe.NetworkPolicy == nil {
 			log.Error("Empty policy")
@@ -464,12 +502,23 @@ func systemConfigSpecialSubnet(nType cluster.ClusterNotifyType, key string, valu
 	}
 }
 
-func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
-	which := share.CLUSNetworkKey2Subject(key)
+func nodeRuleDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
+	which := share.CLUSNodeRuleKey2Subject(key)
 
 	switch which {
 	case share.PolicyIPRulesVersionID:
 		systemConfigPolicy(nType, key, value)
+	default:
+		log.WithFields(log.Fields{"derived": which}).Debug("Miss handler")
+	}
+}
+
+func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
+	which := share.CLUSNetworkKey2Subject(key)
+
+	switch which {
+	//case share.PolicyIPRulesVersionID:
+		//systemConfigPolicy(nType, key, value)
 	case share.InternalIPNetDefaultName:
 		systemConfigInternalSubnet(nType, key, value)
 	case share.SpecialIPNetDefaultName:
@@ -1096,6 +1145,8 @@ func systemUpdateProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		networkDerivedProc(nType, key, value)
 	case share.CLUSNodeStore:
 		profileDerivedProc(nType, share.CLUSNodeProfileSubkey(key), value)
+	case share.CLUSNodeRuleStore:
+		nodeRuleDerivedProc(nType, key, value)
 	}
 }
 
@@ -1246,67 +1297,4 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 func addLearnedProcess(svcGroup string, proc *share.CLUSProcessProfileEntry) {
 	// use the executable as the learned name
 	if proc.Name == "" {
-		index := strings.LastIndexByte(proc.Path, '/')
-		proc.Name = proc.Path[index+1:]
-		//	log.WithFields(log.Fields{"name": proc.Name, "path": proc.Path}).Debug("PROC:")
-	}
-
-	report := &share.CLUSProcProfileReq{
-		GroupName: svcGroup,
-		Name:      proc.Name,
-		Path:      proc.Path,
-		User:      proc.User,
-		Uid:       proc.Uid,
-		Hash:      proc.Hash,
-		Action:    proc.Action,
-	}
-	learnedProcessMtx.Lock()
-	lastReportTime = time.Now()
-	if len(learnedProcess) < maxLearnedProcess {
-		learnedProcess = append(learnedProcess, report)
-	} else {
-		// Should not happen, just in case
-		log.WithFields(log.Fields{"report": *report}).Debug("Too many - drop")
-	}
-	learnedProcessMtx.Unlock()
-}
-
-func getDomainData(name string) *share.CLUSDomain {
-	domainMutex.RLock()
-	defer domainMutex.RUnlock()
-	if domainCache, ok := domainCacheMap[name]; ok {
-		return domainCache.domain
-	}
-	return nil
-}
-
-func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	name := share.CLUSDomainKey2Name(key)
-	switch nType {
-	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		var domain share.CLUSDomain
-		json.Unmarshal(value, &domain)
-
-		domainMutex.Lock()
-		oDomain, _ := domainCacheMap[name]
-		domainCacheMap[name] = &domainCache{domain: &domain}
-		domainMutex.Unlock()
-
-		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
-			domainChange(domain)
-		}
-		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
-
-	case cluster.ClusterNotifyDelete:
-		domainMutex.Lock()
-		defer domainMutex.Unlock()
-
-		if _, ok := domainCacheMap[name]; !ok {
-			log.WithFields(log.Fields{"domain": name}).Error("Unknown domain")
-			return
-		}
-
-		// Shouldn't happen, but have the logic anyway. Not delete kv, only initial the cache
-		domainCacheMap[name] = &domainCache{domain: initDomain(name, nil)}
-	}
-}
+		index := s
