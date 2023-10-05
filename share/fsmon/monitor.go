@@ -517,7 +517,18 @@ func (w *FileWatch) cbNotify(filePath string, mask uint32, params interface{}, p
 	if fm, ok := w.fileEvents[filePath]; ok {
 		fm.mask |= mask
 		fm.delay = 0
-		fm.pInfo = append(fm.pInfo, pInfo)
+		if pInfo != nil {
+			var found bool
+			for _, p := range fm.pInfo {
+				if p.Pid == pInfo.Pid {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fm.pInfo = append(fm.pInfo, pInfo)
+			}
+		}
 	} else {
 		fmod := &fileMod {
 			mask:  mask,
@@ -746,6 +757,7 @@ func (w *FileWatch) HandleWatchedFiles() {
 			} else {
 				event = w.handleFileEvents(fmod, info, fullPath, pid)
 			}
+
 			if event != 0 {
 				w.learnFromEvents(pid, fmod, path, event)
 			}
@@ -828,6 +840,10 @@ func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, pa
 						fmod.finfo.Hash = hash
 					}
 				}
+
+				if (fmod.mask & syscall.IN_MODIFY) > 0 {
+					event = fileEventModified
+				}
 			}
 		} else {
 			log.WithFields(log.Fields{"fullPath": fullPath, "mask": fmod.mask}).Debug("directory event not found")
@@ -872,6 +888,9 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 				if hash != fmod.finfo.Hash {
 					event = fileEventModified
 					fmod.finfo.Hash = hash
+				}
+				if (fmod.mask & syscall.IN_MODIFY) > 0 {
+					event = fileEventModified
 				}
 			}
 		} else {

@@ -286,7 +286,7 @@ func (p *Probe) processAggregateProbeReports() int {
 		pmsga.triggerCnt--
 		pmsga.expireCnt--
 		if pmsga.expireCnt == 0 {
-			if pmsga.count > 1 || (pmsga.bFsMonMsg && pmsga.count != 0) {
+			if pmsga.count > 1  || (pmsga.bFsMonMsg && pmsga.count != 0 && pmsga.fsMsg.Path != "") {
 				go p.sendReport(*pmsga)
 				cnt++
 			}

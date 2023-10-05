@@ -477,6 +477,15 @@ func GetPortRangeLink(ipproto uint8, port uint16, portR uint16) string {
 	}
 }
 
+func IsHostRelated(addr *share.CLUSWorkloadAddr) bool {
+	if strings.HasPrefix(addr.WlID, share.CLUSLearnedHostPrefix) {
+		return true
+	} else if addr.NatPortApp != nil && len(addr.NatPortApp) > 0 {
+		return true
+	}
+	return false
+}
+
 func GetCommonPorts(ports1 string, ports2 string) string {
 	var p, pp string = "", ""
 	var low, high uint16
