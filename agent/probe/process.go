@@ -1932,7 +1932,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 				id = c.id
 				mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "c": c}).Debug("PROC: Patched empty proc ID with updated container info")
 			} else {
-				if procID, _, err, found := global.SYS.GetContainerIDByPID(proc.pid); err != nil && found {
+				if procID, _, err, found := global.SYS.GetContainerIDByPID(proc.pid); err == nil && found {
 					id = procID
 					mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "procId": procID}).Debug("PROC: Patched empty proc ID with Container info thru PID")
 				} else {
