@@ -710,6 +710,20 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 		}
 
 		if path, err = os.Readlink(fmt.Sprintf(procSelfFd, ev.File.Fd())); err == nil {
+			// FA event doesn't provide enough information about the process
+			// The euid is going to be used to get the process' euid and the username.
+			// The parent PID is used to check if it is a root process
+			_, parentPid, _, euid := osutil.GetProcessUIDs(ppid)
+			if parentPid == -1 {
+				log.WithFields(log.Fields{
+					"path": path, "ppid": ppid, "ppath": ppath}).Debug("FA: parentPid is not available")
+			}
+
+			// NVSHAS-8053 - Get the parent pid's path. We need this to determine Parent exception
+			if parentPath, err :=  global.SYS.GetFilePath(parentPid); err == nil && parentPath != "" {
+				ppath = parentPath
+			}
+
 			name := filepath.Base(path) // estimated child executable
 			if fa.isParentProcessException(ppath, path, name) {
 				return bPass
@@ -759,6 +773,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 							Msg:    msg,
 							Group:  svcGroup,
 							RuleID: rule_uuid,
+							EUid:   euid,
 						}
 
 						if fa.prober != nil {
