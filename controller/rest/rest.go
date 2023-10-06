@@ -1385,7 +1385,7 @@ func InitContext(ctx *Context) {
 	auditQueue = ctx.AuditQueue
 	messenger = ctx.Messenger
 
-	remoteAuther = auth.NewRemoteAuther()
+	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 

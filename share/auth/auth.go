@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/beevik/etree"
+	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
@@ -40,8 +42,9 @@ const (
 
 type RemoteAuthInterface interface {
 	LDAPAuth(ldap *share.CLUSServerLDAP, username, password string) (map[string]string, []string, error)
-	SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect) (string, error)
 
+	SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, nameid string, sessionIndex string, overrides map[string]string) (string, error)
+	SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, overrides map[string]string) (string, error)
 	// Return Name ID, session index, and attributes.
 	SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (string, string, map[string][]string, error)
 	OIDCDiscover(issuer string) (string, string, string, string, error)
@@ -49,11 +52,14 @@ type RemoteAuthInterface interface {
 	OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAuthToken) (map[string]interface{}, error)
 }
 
-func NewRemoteAuther() RemoteAuthInterface {
-	return &remoteAuth{}
+func NewRemoteAuther(fakeTime *time.Time) RemoteAuthInterface {
+	return &remoteAuth{
+		fakeTime: fakeTime,
+	}
 }
 
 type remoteAuth struct {
+	fakeTime *time.Time // For unit-tests
 }
 
 const defaultLDAPAuthTimeout = time.Second * 10
@@ -131,7 +137,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	return attrs, groups, nil
 }
 
-func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string) (*saml2.SAMLServiceProvider, error) {
+func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *time.Time) (*saml2.SAMLServiceProvider, error) {
 	var keystore dsig.X509KeyStore
 
 	certStore := dsig.MemoryX509CertificateStore{
@@ -164,12 +170,21 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string) (*saml2.SAMLSe
 		parseAndStoreCert(cert)
 	}
 
+	// If SLO signing cert/key exist, we will sign the request.
+	// Note: This applies to Authn request too.
+	signrequest := false
 	if csaml.SLOSigningCert != "" && csaml.SLOSigningKey != "" {
 		cert, err := tls.X509KeyPair([]byte(csaml.SLOSigningCert), []byte(csaml.SLOSigningKey))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse key pair")
 		}
 		keystore = dsig.TLSCertKeyStore(cert)
+		signrequest = true
+	}
+
+	var clockOverride *dsig.Clock
+	if timeOverride != nil {
+		clockOverride = dsig.NewFakeClock(clockwork.NewFakeClockAt(*timeOverride))
 	}
 
 	return &saml2.SAMLServiceProvider{
@@ -185,16 +200,18 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string) (*saml2.SAMLSe
 		AssertionConsumerServiceURL: redirurl,
 		AudienceURI:                 redirurl,
 
-		// TODO: Should be disabled for backward compatibility.
-		SignAuthnRequests: true,
+		SignAuthnRequests: signrequest,
 
-		// TODO: Seems to be required by Okta. Remove this?
+		// Required by Okta. Otherwise you would get this error message:
+		// Your request resulted in an error. NameIDPolicy '' is not the configured Name ID Format
+		// 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified' for the app
 		NameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+		Clock:        clockOverride,
 	}, nil
 }
 
-func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect) (string, error) {
-	sp, err := GenerateSamlSP(csaml, redir.Redirect)
+func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, overrides map[string]string) (string, error) {
+	sp, err := GenerateSamlSP(csaml, redir.Redirect, a.fakeTime)
 	if err != nil {
 		return "", err
 	}
@@ -205,9 +222,52 @@ func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *ap
 		return "", err
 	}
 
+	if overrides != nil {
+		// Allow unit-tests to override elements
+		for k, v := range overrides {
+			path, err := etree.CompilePath("./samlp:AuthnRequest")
+			if err != nil {
+				return "", errors.Wrap(err, "failed to parse xml path")
+			}
+			for _, e := range doc.FindElementsPath(path) {
+				attr := e.SelectAttr(k)
+				attr.Value = v
+			}
+		}
+	}
+
 	// In our previous version of https://github.com/RobotsAndPencils/go-saml, we don't send relay state.
 	// Keep the same behavior for backward compatibility.
 	return sp.BuildAuthURLRedirect("", doc)
+}
+
+func (a *remoteAuth) SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, nameid string, sessionIndex string, overrides map[string]string) (string, error) {
+	sp, err := GenerateSamlSP(csaml, redir.Redirect, a.fakeTime)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate saml service provider")
+	}
+
+	// Should be no sig in document.
+	doc, err := sp.BuildLogoutRequestDocumentNoSig(nameid, sessionIndex)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to build saml slo document")
+	}
+
+	if overrides != nil {
+		// Allow unit-tests to override elements
+		for k, v := range overrides {
+			path, err := etree.CompilePath("./samlp:LogoutRequest")
+			if err != nil {
+				return "", errors.Wrap(err, "failed to parse xml path")
+			}
+			for _, e := range doc.FindElementsPath(path) {
+				attr := e.SelectAttr(k)
+				attr.Value = v
+			}
+		}
+	}
+
+	return sp.BuildLogoutURLRedirect("", doc)
 }
 
 // Return Name ID, session index, and attributes.
@@ -217,11 +277,12 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 	certs = append(certs, csaml.X509Cert)
 	certs = append(certs, csaml.X509CertExtra...)
 
-	sp, err := GenerateSamlSP(csaml, tokenData.Redirect)
+	sp, err := GenerateSamlSP(csaml, tokenData.Redirect, a.fakeTime)
 	if err != nil {
 		return "", "", map[string][]string{}, err
 	}
 
+	// Token is the whole query parameters.
 	q, err := url.ParseQuery(tokenData.Token)
 	if err != nil {
 		return "", "", nil, errors.New("Invalid URL query format")
