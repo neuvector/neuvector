@@ -910,7 +910,7 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	if scope == share.ScopeFed {
 		policyName = share.ScopeFed
 	} else {
-		policyName = share.ScopeLocal
+		policyName = share.DefaultPolicyName
 	}
 
 	rules := cacher.GetAllResponseRules(scope, acc)
