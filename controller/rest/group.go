@@ -24,6 +24,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/controller/rpc"
 )
 
 func criteria2REST(inEntries []share.CLUSCriteriaEntry) []api.RESTCriteriaEntry {
@@ -2051,4 +2052,138 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"error": err, "ok": ok}).Error("Atomic write failed")
 	}
+}
+
+func updateGroupStats(final *api.RESTStats, data *share.CLUSStats) {
+	final.Interval = data.Interval
+	final.Total.SessionIn += data.Total.SessionIn
+	final.Total.SessionOut += data.Total.SessionOut
+	final.Total.SessionCurIn += data.Total.SessionCurIn
+	final.Total.SessionCurOut += data.Total.SessionCurOut
+	final.Total.PacketIn += data.Total.PacketIn
+	final.Total.PacketOut += data.Total.PacketOut
+	final.Total.ByteIn += data.Total.ByteIn
+	final.Total.ByteOut += data.Total.ByteOut
+
+	final.Span1.CPU += data.Span1.CPU
+	final.Span1.Memory += data.Span1.Memory
+	final.Span1.SessionIn += data.Span1.SessionIn
+	final.Span1.SessionOut += data.Span1.SessionOut
+	final.Span1.PacketIn += data.Span1.PacketIn
+	final.Span1.PacketOut += data.Span1.PacketOut
+	final.Span1.ByteIn += data.Span1.ByteIn
+	final.Span1.ByteOut += data.Span1.ByteOut
+
+	final.Span12.CPU += data.Span12.CPU
+	final.Span12.Memory += data.Span12.Memory
+	final.Span12.SessionIn += data.Span12.SessionIn
+	final.Span12.SessionOut += data.Span12.SessionOut
+	final.Span12.PacketIn += data.Span12.PacketIn
+	final.Span12.PacketOut += data.Span12.PacketOut
+	final.Span12.ByteIn += data.Span12.ByteIn
+	final.Span12.ByteOut += data.Span12.ByteOut
+
+	final.Span60.CPU += data.Span60.CPU
+	final.Span60.Memory += data.Span60.Memory
+	final.Span60.SessionIn += data.Span60.SessionIn
+	final.Span60.SessionOut += data.Span60.SessionOut
+	final.Span60.PacketIn += data.Span60.PacketIn
+	final.Span60.PacketOut += data.Span60.PacketOut
+	final.Span60.ByteIn += data.Span60.ByteIn
+	final.Span60.ByteOut += data.Span60.ByteOut
+}
+
+func handlerGroupStats(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	groupname := ps.ByName("name")
+	if groupname == "" {
+		log.Debug("Empty group name")
+		return
+	}
+
+	if exist, err := cacher.DoesGroupExist(groupname, acc); !exist {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	resp := api.RESTGroupStatsData {
+		Name: groupname,
+		ReadAt: api.RESTTimeString(time.Now()),
+		Stats: &api.RESTStats{
+			Interval: 0,
+			Total: api.RESTMetry{},
+			Span1: api.RESTMetry{},
+			Span12: api.RESTMetry{},
+			Span60: api.RESTMetry{},
+		},
+	}
+
+	host_wl_map := make(map[string]utils.Set)
+	gr, _ := cacher.GetGroup(groupname, "", false, acc)
+	if gr != nil && len(gr.Members) > 0 {
+		for _, wl := range gr.Members {
+			if wl.HasDatapath {
+				if host_wl_map[wl.HostID] == nil {
+					host_wl_map[wl.HostID] = utils.NewSet()
+				}
+				host_wl_map[wl.HostID].Add(wl.ID)
+			}
+		}
+	} else {
+		restRespSuccess(w, r, &resp, acc, login, nil, "Get group network session counter")
+		return
+	}
+
+	agent_wl_map := make(map[string]utils.Set)
+	for _, wls := range host_wl_map {
+		agtid := ""
+		if wls != nil {
+			for wl := range wls.Iter() {
+				wlid := wl.(string)
+				if agtid == "" {
+					agentID, err := cacher.GetAgentbyWorkload(wlid, acc)
+					if err != nil || agentID == "" {
+						//try other workloads in group
+						continue
+					}
+					agtid = agentID
+				}
+				if agtid != "" {
+					if agent_wl_map[agtid] == nil {
+						agent_wl_map[agtid] = utils.NewSet()
+					}
+					agent_wl_map[agtid].Add(wlid)
+				}
+			}
+		}
+	}
+	//log.WithFields(log.Fields{"agent_wl_map": agent_wl_map}).Debug("")
+
+    for agid, wlids := range agent_wl_map {
+		var wla share.CLUSWlIDArray
+		wla.WlID = make([]string, 0)
+		if wlids != nil {
+			for wl := range wlids.Iter() {
+				wlid := wl.(string)
+				wla.WlID = append(wla.WlID, wlid)
+			}
+		}
+		stats, err := rpc.GetGroupStats(agid, &wla)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Fail to make RPC call")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
+			return
+		}
+		updateGroupStats(resp.Stats, stats)
+	}
+	resp.ReadAt = api.RESTTimeString(time.Now())
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get group network session counter")
 }
