@@ -1926,8 +1926,11 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 					// it's not assessment. simply return the matched result
 					return result, nil, true
 				} else {
-					// when it's assessment, keep matching unless an allow rule is matched first later
+					// when it's assessment, do not keep matching when a deny rule is matched & the effective mode is monitor mode
 					assessDenyResults = append(assessDenyResults, denyResults...)
+					if (result.RuleMode == "" && globalMode == share.AdmCtrlModeMonitor) || result.RuleMode == share.AdmCtrlModeMonitor {
+						return result, assessDenyResults, true
+					}
 				}
 			}
 		}
@@ -1968,6 +1971,10 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 				} else {
 					// it's assessment
 					assessDenyResults = append(assessDenyResults, denyResults...)
+					// when it's assessment, do not keep matching when a deny rule is matched & the effective mode is monitor mode
+					if (result.RuleMode == "" && globalMode == share.AdmCtrlModeMonitor) || result.RuleMode == share.AdmCtrlModeMonitor {
+						return result, assessDenyResults, true
+					}
 				}
 			}
 		}
