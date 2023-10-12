@@ -396,7 +396,7 @@ func main() {
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 
 	cspType, _ := common.GetMappedCspType(cspEnv, nil)
-	if cspType != share.CSP_NONE && cspType != share.CSP_EKS && cspType != share.CSP_AKS {
+	if cspType != share.CSP_NONE && cspType != share.CSP_EKS && cspType != share.CSP_AKS && cspType != share.CSP_GCP {
 		cspType = share.CSP_NONE
 	}
 	if *cspPauseInterval == 0 {

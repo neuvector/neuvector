@@ -937,7 +937,7 @@ func GetMappedCspType(pCspType *string, ptCspType *share.TCspType) (share.TCspTy
 	cspMapping := map[string]share.TCspType{
 		"none":   share.CSP_NONE,
 		"aws":    share.CSP_EKS,
-		"gcloud": share.CSP_GKE,
+		"gcloud": share.CSP_GCP,
 		"azure":  share.CSP_AKS,
 		"ibm":    share.CSP_IBM,
 	}
