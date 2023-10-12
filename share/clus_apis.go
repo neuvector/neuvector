@@ -2163,7 +2163,7 @@ type TCspType int
 const (
 	CSP_NONE = iota
 	CSP_EKS
-	CSP_GKE
+	CSP_GCP
 	CSP_AKS
 	CSP_IBM
 )
