@@ -2,6 +2,7 @@ package rest
 
 import (
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -100,16 +101,18 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 		rs.Type = api.ServerTypeSAML
 
 		rs.SAML = &api.RESTServerSAML{
-			SSOURL:           cs.SAML.SSOURL,
-			Issuer:           cs.SAML.Issuer,
-			X509Cert:         cs.SAML.X509Cert,
-			GroupClaim:       cs.SAML.GroupClaim,
-			Enable:           cs.Enable,
-			DefaultRole:      cs.SAML.DefaultRole,
-			GroupMappedRoles: cs.SAML.GroupMappedRoles,
-			SLOEnabled:       cs.SAML.SLOEnabled,
-			SLOURL:           cs.SAML.SLOURL,
-			SLOSigningCert:   cs.SAML.SLOSigningCert,
+			SSOURL:              cs.SAML.SSOURL,
+			Issuer:              cs.SAML.Issuer,
+			X509Cert:            cs.SAML.X509Cert,
+			GroupClaim:          cs.SAML.GroupClaim,
+			Enable:              cs.Enable,
+			DefaultRole:         cs.SAML.DefaultRole,
+			GroupMappedRoles:    cs.SAML.GroupMappedRoles,
+			AuthnSigningEnabled: cs.SAML.AuthnSigningEnabled,
+			SigningCert:         cs.SAML.SigningCert,
+			//SigningKey:          cs.SAML.SigningKey,
+			SLOEnabled: cs.SAML.SLOEnabled,
+			SLOURL:     cs.SAML.SLOURL,
 		}
 		rs.SAML.X509Certs = parseX509CertInfo(cs.SAML)
 
@@ -808,17 +811,25 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 			csaml.X509CertExtra = append(csaml.X509CertExtra, c)
 		}
 	}
+	if saml.AuthnSigningEnabled != nil {
+		csaml.AuthnSigningEnabled = *saml.AuthnSigningEnabled
+	}
+
+	if saml.SigningCert != nil && saml.SigningKey != nil {
+		// Reject invalid certs.  Its caller is expected to return 400 Bad Request
+		_, err := tls.X509KeyPair([]byte(*saml.SigningCert), []byte(*saml.SigningKey))
+		if err != nil {
+			return errors.New("failed to parse key pair")
+		}
+		csaml.SigningKey = *saml.SigningKey
+		csaml.SigningCert = *saml.SigningCert
+	}
+
 	if saml.SLOEnabled != nil {
 		csaml.SLOEnabled = *saml.SLOEnabled
 	}
 	if saml.SLOURL != nil {
 		csaml.SLOURL = *saml.SLOURL
-	}
-	if saml.SLOSigningKey != nil {
-		csaml.SLOSigningKey = *saml.SLOSigningKey
-	}
-	if saml.SLOSigningCert != nil {
-		csaml.SLOSigningCert = *saml.SLOSigningCert
 	}
 
 	var err error

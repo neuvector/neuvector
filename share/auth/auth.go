@@ -137,7 +137,7 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 	return attrs, groups, nil
 }
 
-func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *time.Time) (*saml2.SAMLServiceProvider, error) {
+func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl string, timeOverride *time.Time) (*saml2.SAMLServiceProvider, error) {
 	var keystore dsig.X509KeyStore
 
 	certStore := dsig.MemoryX509CertificateStore{
@@ -170,16 +170,12 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *
 		parseAndStoreCert(cert)
 	}
 
-	// If SLO signing cert/key exist, we will sign the request.
-	// Note: This applies to Authn request too.
-	signrequest := false
-	if csaml.SLOSigningCert != "" && csaml.SLOSigningKey != "" {
-		cert, err := tls.X509KeyPair([]byte(csaml.SLOSigningCert), []byte(csaml.SLOSigningKey))
+	if csaml.SigningCert != "" && csaml.SigningKey != "" {
+		cert, err := tls.X509KeyPair([]byte(csaml.SigningCert), []byte(csaml.SigningKey))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse key pair")
 		}
 		keystore = dsig.TLSCertKeyStore(cert)
-		signrequest = true
 	}
 
 	var clockOverride *dsig.Clock
@@ -191,7 +187,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *
 		IdentityProviderSSOURL: csaml.SSOURL,
 		IdentityProviderSLOURL: csaml.SLOURL,
 
-		ServiceProviderIssuer: redirurl,
+		ServiceProviderIssuer: spissuer,
 		IDPCertificateStore:   &certStore,
 		SPKeyStore:            keystore,
 
@@ -200,7 +196,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *
 		AssertionConsumerServiceURL: redirurl,
 		AudienceURI:                 redirurl,
 
-		SignAuthnRequests: signrequest,
+		SignAuthnRequests: csaml.AuthnSigningEnabled,
 
 		// Required by Okta. Otherwise you would get this error message:
 		// Your request resulted in an error. NameIDPolicy '' is not the configured Name ID Format
@@ -211,7 +207,8 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, redirurl string, timeOverride *
 }
 
 func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, overrides map[string]string) (string, error) {
-	sp, err := GenerateSamlSP(csaml, redir.Redirect, a.fakeTime)
+	// For backward compatibility, use Authn response redirect url as SP issuer. (https://<NV>/token_auth_server)
+	sp, err := GenerateSamlSP(csaml, redir.Redirect, redir.Redirect, a.fakeTime)
 	if err != nil {
 		return "", err
 	}
@@ -242,7 +239,14 @@ func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *ap
 }
 
 func (a *remoteAuth) SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, nameid string, sessionIndex string, overrides map[string]string) (string, error) {
-	sp, err := GenerateSamlSP(csaml, redir.Redirect, a.fakeTime)
+
+	// In Azure AD, SSO and SLO must come from the same issuer.
+	// Caller should specify issuer when it wants to have a different url for SLO response.
+	issuer := redir.Issuer
+	if issuer == "" {
+		issuer = redir.Redirect
+	}
+	sp, err := GenerateSamlSP(csaml, issuer, redir.Redirect, a.fakeTime)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate saml service provider")
 	}
@@ -277,7 +281,8 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 	certs = append(certs, csaml.X509Cert)
 	certs = append(certs, csaml.X509CertExtra...)
 
-	sp, err := GenerateSamlSP(csaml, tokenData.Redirect, a.fakeTime)
+	// For backward compatibility, use Authn response redirect url (AssertionConsumerServiceURL) as SP issuer. (https://<NV>/token_auth_server)
+	sp, err := GenerateSamlSP(csaml, tokenData.Redirect, tokenData.Redirect, a.fakeTime)
 	if err != nil {
 		return "", "", map[string][]string{}, err
 	}
