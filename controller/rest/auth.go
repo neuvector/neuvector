@@ -2609,7 +2609,7 @@ func handlerAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		fedRole, err := cacher.GetFedMembershipRole(acc)
 		if err == nil && fedRole == api.FedRoleMaster {
 			ids := cacher.GetFedJoinedClusterIdMap(acc)
-			for id, _ := range ids {
+			for id := range ids {
 				joinedCluster := cacher.GetFedJoinedCluster(id, acc)
 				if joinedCluster.ID != "" {
 					var token string

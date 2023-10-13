@@ -16,7 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -485,11 +485,11 @@ func (c *configHelper) sections2Endpoints(sections []string) []*cfgEndpoint {
 	return eps
 }
 
-//  1. When import, cluster name is always replaced with the cluster name(if available) specified in the backup file
-//  2. When import, fed rules are always replaced with the fed rules specified in the backup file.
-//  3. For clusters in fed, Import() doesn't change the existing clusters membership.
-//  4. For stand-alone cluster, we allow it to promote to master cluster by importing a master cluster's backup file.
-//     However, joined clusters list is not imported. Customer needs to manually trigger join-fed operation.
+// 1. When import, cluster name is always replaced with the cluster name(if available) specified in the backup file
+// 2. When import, fed rules are always replaced with the fed rules specified in the backup file.
+// 3. For clusters in fed, Import() doesn't change the existing clusters membership.
+// 4. For stand-alone cluster, we allow it to promote to master cluster by importing a master cluster's backup file.
+//	  However, joined clusters list is not imported. Customer needs to manually trigger join-fed operation.
 func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
 	tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, ignoreFed bool) error {
 	log.Debug()

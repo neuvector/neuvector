@@ -243,7 +243,10 @@ type RESTFedAuthData struct {
 type RESTTokenRedirect struct {
 	// The NeuVector URL to redirect after authentication/logout.
 	Redirect string `json:"redirect_endpoint"`
-	// Optional: The redirect url is used as issuer by default. When isser is specified, it will be used instead of redirecturl.
+	// (Optional)
+	// When absent, the redirect url will be used as issuer in SAML request.
+	// When it is specified, the value here will be used as the issuer.
+	// This is for Single Logout where redirect url and issue can be different.
 	Issuer string `json:"issuer"`
 }
 
@@ -351,11 +354,11 @@ type RESTServerSAML struct {
 	RoleGroups       map[string][]string       `json:"role_groups,omitempty"`        // role -> groups
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 
-	AuthnSigningEnabled bool   `json:"authn_signing_enabled,omitempty"`
-	SigningCert         string `json:"signing_cert,omitempty"`
-	SigningKey          string `json:"signing_key,omitempty"`
-	SLOEnabled          bool   `json:"slo_enabled,omitempty"`
-	SLOURL              string `json:"slo_url,omitempty"`
+	AuthnSigningEnabled bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.  Default off.
+	SigningCert         string `json:"signing_cert,omitempty"`          // Optional.
+	//SigningKey          string `json:"signing_key,omitempty"`           // Optional.
+	SLOEnabled bool   `json:"slo_enabled,omitempty"` // Optional.
+	SLOURL     string `json:"slo_url,omitempty"`     // Optional.
 }
 
 type RESTServerOIDC struct {
@@ -431,11 +434,11 @@ type RESTServerSAMLConfig struct {
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 	X509CertExtra    *[]string                  `json:"x509_cert_extra,omitempty"`
 
-	AuthnSigningEnabled *bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.
+	AuthnSigningEnabled *bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.  Default off.
+	SigningCert         *string `json:"signing_cert,omitempty"`          // Optional.
+	SigningKey          *string `json:"signing_key,omitempty"`           // Optional.
 	SLOEnabled          *bool   `json:"slo_enabled,omitempty"`           // Optional.
 	SLOURL              *string `json:"slo_url,omitempty"`               // Optional.
-	SigningCert         *string `json:"signing_cert,omitempty"`          // Optional. Used as signing cert by default.
-	SigningKey          *string `json:"signing_key,omitempty"`           // Optional. Used as signing key by default.
 }
 
 type RESTServerSAMLConfigCfgMap struct {
@@ -1059,14 +1062,14 @@ type RESTConversationEndpointConfigData struct {
 }
 
 type RESTConversationReportEntry struct {
-	Bytes        uint64   `json:"bytes"`
-	Sessions     uint32   `json:"sessions"`
-	Port         string   `json:"port,omitempty"`
-	Application  string   `json:"application,omitempty"`
-	PolicyAction string   `json:"policy_action"`
-	CIP          string   `json:"client_ip,omitempty"`
-	SIP          string   `json:"server_ip,omitempty"`
-	FQDN         string   `json:"fqdn,omitempty"`
+	Bytes        uint64 `json:"bytes"`
+	Sessions     uint32 `json:"sessions"`
+	Port         string `json:"port,omitempty"`
+	Application  string `json:"application,omitempty"`
+	PolicyAction string `json:"policy_action"`
+	CIP          string `json:"client_ip,omitempty"`
+	SIP          string `json:"server_ip,omitempty"`
+	FQDN         string `json:"fqdn,omitempty"`
 }
 
 type RESTConversationReport struct {

@@ -144,30 +144,29 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		Roots: []*x509.Certificate{},
 	}
 
-	// TODO: fix error handling
-	parseAndStoreCert := func(x509cert string) {
+	parseAndStoreCert := func(x509cert string) error {
 		var err error
-		defer func() {
-			if err != nil {
-				log.WithError(err).Warn("failed to decode cert.")
-			}
-		}()
 		block, _ := pem.Decode([]byte(x509cert))
 		if block == nil {
-			err = errors.New("failed to decode pem block")
+			return errors.New("failed to decode pem block")
 		}
 
 		idpCert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			return
+			return err
 		}
 		certStore.Roots = append(certStore.Roots, idpCert)
+		return nil
 	}
 
-	parseAndStoreCert(csaml.X509Cert)
+	if err := parseAndStoreCert(csaml.X509Cert); err != nil {
+		log.WithError(err).Error("failed to parse X509Cert.  Skip this cert.")
+	}
 
 	for _, cert := range csaml.X509CertExtra {
-		parseAndStoreCert(cert)
+		if err := parseAndStoreCert(cert); err != nil {
+			log.WithError(err).Error("failed to parse X509Cert.  Skip this cert.")
+		}
 	}
 
 	if csaml.SigningCert != "" && csaml.SigningKey != "" {
@@ -178,6 +177,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		keystore = dsig.TLSCertKeyStore(cert)
 	}
 
+	// For unit-test
 	var clockOverride *dsig.Clock
 	if timeOverride != nil {
 		clockOverride = dsig.NewFakeClock(clockwork.NewFakeClockAt(*timeOverride))
@@ -275,13 +275,8 @@ func (a *remoteAuth) SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.
 }
 
 // Return Name ID, session index, and attributes.
-// TODO: Check all certs
 func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.RESTAuthToken) (string, string, map[string][]string, error) {
-	var certs []string
-	certs = append(certs, csaml.X509Cert)
-	certs = append(certs, csaml.X509CertExtra...)
-
-	// For backward compatibility, use Authn response redirect url (AssertionConsumerServiceURL) as SP issuer. (https://<NV>/token_auth_server)
+	// Authn response redirect url (AssertionConsumerServiceURL) as SP issuer. (https://<NV>/token_auth_server)
 	sp, err := GenerateSamlSP(csaml, tokenData.Redirect, tokenData.Redirect, a.fakeTime)
 	if err != nil {
 		return "", "", map[string][]string{}, err

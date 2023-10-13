@@ -6,13 +6,14 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -451,6 +452,7 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 
 	// Handle SAML SLO
 	if login.nameid == "" {
+		log.Debug("This user has no nameid associated.  Do not generate SAML SLO request.")
 		restRespSuccess(w, r, &resp, acc, login, nil, "")
 		return
 	}
@@ -462,6 +464,7 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	if !cs.SAML.SLOEnabled {
+		log.Debug("SAML SLO is not enabled.")
 		restRespSuccess(w, r, &resp, acc, login, nil, "")
 		return
 	}
@@ -595,7 +598,7 @@ func validateAuthServer(cas *share.CLUSServerAuth) error {
 		if !access.IsValidRole(mappedRoles.GlobalRole, access.CONST_VISIBLE_USER_ROLE) {
 			return fmt.Errorf("Invalid global role(%s) in group(%s) mapping", mappedRoles.GlobalRole, mappedRoles.Group)
 		}
-		for role, _ := range mappedRoles.RoleDomains {
+		for role := range mappedRoles.RoleDomains {
 			if !access.IsValidRole(role, access.CONST_VISIBLE_DOMAIN_ROLE) {
 				return fmt.Errorf("Invalid domain role(%s) in group(%s) mapping", role, mappedRoles.Group)
 			}
@@ -745,7 +748,11 @@ func validateSAMLServer(cs *share.CLUSServer) error {
 		}
 	}
 
-	// TODO: Verify encryption key/certs
+	if len(csaml.SigningCert) > 0 || len(csaml.SigningKey) > 0 {
+		if _, err := tls.X509KeyPair([]byte(csaml.SigningCert), []byte(csaml.SigningKey)); err != nil {
+			return errors.Wrap(err, "invalid key cert pair")
+		}
+	}
 
 	var certs []string
 	certs = append(certs, csaml.X509Cert) // original one

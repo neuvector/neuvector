@@ -151,12 +151,12 @@ ma7nkie3ORja96UTROAZ77o=
 				},
 			},
 		},
-		SSOURL:         "https://dev.okta.com/app/dev/xxxxx/sso/saml",
-		Issuer:         "https://example.com/token_auth_server",
-		X509Cert:       string(idpCert),
-		SLOEnabled:     false,
-		SLOSigningCert: string(cert),
-		SLOSigningKey:  string(key),
+		SSOURL:      "https://dev.okta.com/app/dev/xxxxx/sso/saml",
+		Issuer:      "https://example.com/token_auth_server",
+		X509Cert:    string(idpCert),
+		SLOEnabled:  false,
+		SigningCert: string(cert),
+		SigningKey:  string(key),
 	}, &reqData,
 		map[string]string{
 			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
@@ -164,7 +164,7 @@ ma7nkie3ORja96UTROAZ77o=
 	)
 
 	// Verify if it's consistent with Authn request for Okta.
-	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D&SigAlg=http%3A%2F%2Fwww.w3.org%2F2001%2F04%2Fxmldsig-more%23rsa-sha256&Signature=MMolrRAjT%2BaWEuh8erz%2B280%2B8pdgAs%2BCeJVEGgDXWo6cLDTjkTCgpP9SkzBpocW6IbjSG9eYcYB0SBTk47vW71Jv16Kq6eVQc6bNMYQVbiXwXEV6ZY0HjLaqeu%2FS0oiE6j6z9SJBSp2U22dYxBhSjrfK6uIorLFvG1mul7XTUTsa5WXQeEF90%2Bu3%2Bh8wJ3GONuWzr6rLOimVbJnqUHFQA8MJLQNWVlIlnv64Me%2FUU25zLSOZ6SKx7%2FxWsAYymoUIOt8%2Ft%2FfFhkulPbxZxVAoLwzjSiJAkLEFIwaRkiRWTZ6Xwi6h7jW37OGN4GjVE25S0fRxR1fMh88u3XRJ0Tr2zw%3D%3D", url)
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
 }
 
 // Verify NV can accept Okta Authn response.
@@ -305,12 +305,12 @@ ma7nkie3ORja96UTROAZ77o=
 		},
 		SSOURL: "https://dev.okta.com/app/dev/xxxxx/sso/saml",
 		// TODO: Make sure issuer and redirect don't conflict.
-		Issuer:         "https://example.com/token_auth_server",
-		X509Cert:       string(idpCert),
-		SLOEnabled:     true,
-		SLOURL:         "https://dev.okta.com/app/dev/xxxxx/slo/saml",
-		SLOSigningCert: string(cert),
-		SLOSigningKey:  string(key),
+		Issuer:      "https://example.com/token_auth_server",
+		X509Cert:    string(idpCert),
+		SLOEnabled:  true,
+		SLOURL:      "https://dev.okta.com/app/dev/xxxxx/slo/saml",
+		SigningCert: string(cert),
+		SigningKey:  string(key),
 	}, &reqData,
 		"aa@bb.cc",
 		"_6d713693-660a-4740-b9e0-c1ac2321fabe",
