@@ -190,7 +190,7 @@ func LeadChangeNotify(leader bool) {
 				cn := fmt.Sprintf("%s.%s.svc", svcName, resource.NvAdmSvcNamespace)
 				if cert, _, err := clusHelper.GetObjectCertRev(cn); !cert.IsEmpty() {
 					admission.ResetCABundle(svcName, []byte(cert.Cert))
-					cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName)
+					cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
 				} else {
 					log.WithFields(log.Fields{"cn": cn, "err": err}).Error("no cert")
 				}

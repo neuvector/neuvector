@@ -1294,9 +1294,10 @@ const (
 	CLUSEvMemoryPressureController
 	CLUSEvK8sNvRBAC
 	CLUSEvGroupAutoPromote
-	CLUSEvAuthDefAdminPwdUnchanged // default admin's password is not changed yet. reported every 24 hours
-	CLUSEvScannerAutoScaleDisabled // when scanner autoscale is disabled by controller
-	CLUSEvCrdSkipped               // for crd Config import
+	CLUSEvAuthDefAdminPwdUnchanged   // default admin's password is not changed yet. reported every 24 hours
+	CLUSEvScannerAutoScaleDisabled   // when scanner autoscale is disabled by controller
+	CLUSEvCrdSkipped                 // for crd Config import
+	CLUSEvK8sAdmissionWebhookCChange // for admission control
 )
 
 const (

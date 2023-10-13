@@ -161,7 +161,7 @@ type CacheInterface interface {
 	GetAllVulnerabilityProfiles(acc *access.AccessControl) []*api.RESTVulnerabilityProfile
 
 	// Admission control - non-UI
-	SyncAdmCtrlStateToK8s(svcName, nvAdmName string) (bool, error)
+	SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDetected bool) (bool, error)
 	WaitUntilApiPathReady() bool
 	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,

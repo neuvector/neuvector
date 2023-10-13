@@ -1222,7 +1222,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 				},
 			},
 		}
-		skip, err := admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
+		skip, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
 		if !skip {
 			alog := share.CLUSEventLog{ReportedAt: time.Now().UTC()}
 			if err == nil {

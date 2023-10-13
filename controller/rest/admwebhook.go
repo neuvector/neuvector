@@ -1504,7 +1504,7 @@ func restartWebhookServer(svcName string) error {
 	}
 	if leader := atomic.LoadUint32(&_isLeader); leader == 1 {
 		if nvAdmName, ok := k8sInfo[svcName]; ok {
-			cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName)
+			cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
 		}
 	}
 

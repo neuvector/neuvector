@@ -55,8 +55,10 @@ type WebhookInfo struct {
 }
 
 type ValidatingWebhookConfigInfo struct {
-	Name         string
-	WebhooksInfo []*WebhookInfo
+	Name                string
+	WebhooksInfo        []*WebhookInfo
+	RevertCount         *uint32
+	UnexpectedMatchExpr string
 }
 
 const (
@@ -147,13 +149,6 @@ func VerifyK8sNs(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
 		resource.NsSelectorKeyStatusNV: &shouldNotExist,
 	}
 	if admCtrlEnabled {
-		if resource.CtrlPlaneOpInWhExpr == resource.NsSelectorOpNotExist {
-			labelKeys[resource.NsSelectorKeyCtrlPlane] = &shouldNotExist
-			if defAllowedNamespaces.Contains(nsName) {
-				labelKeys[resource.NsSelectorKeyCtrlPlane] = nil // could exist or not
-			}
-		}
-
 		if allowedNamespaces.Contains(nsName) {
 			labelKeys[resource.NsSelectorKeySkipNV] = &shouldExist
 		} else {
@@ -213,7 +208,7 @@ func GetAdmissionCtrlTypes(platform string) []string {
 	return admCtrlTypes
 }
 
-func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bool, string, error) { // returns (found, matchedCfg, verRead, error)
+func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, bool, string, error) { // returns (found, matchedCfg, verRead, error)
 	var rt string
 	if k8sResInfo.Name == resource.NvAdmValidatingName || k8sResInfo.Name == resource.NvCrdValidatingName {
 		rt = resource.RscTypeValidatingWebhookConfiguration
@@ -324,6 +319,7 @@ func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bo
 		}
 	}
 	nsSelectorSupported := IsNsSelectorSupported()
+	unexpectedMatchKeys := utils.NewSet()
 
 	// config.Webhooks is from k8s, k8sResInfo.WebhooksInfo is what nv expects
 	for _, wh := range config.Webhooks {
@@ -360,7 +356,7 @@ func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bo
 							if clientInUrlMode {
 								expectedUrl := fmt.Sprintf("https://%s.%s.svc:%d%s", svcName, resource.NvAdmSvcNamespace, whInfo.ClientConfig.Port, whInfo.ClientConfig.Path)
 								if clientCfg.Url != nil && strings.EqualFold(*clientCfg.Url, expectedUrl) {
-									if resource.IsK8sNvWebhookConfigured(whInfo.Name, whInfo.FailurePolicy, wh, nsSelectorSupported) {
+									if resource.IsK8sNvWebhookConfigured(whInfo.Name, whInfo.FailurePolicy, wh, nsSelectorSupported, k8sResInfo.RevertCount, unexpectedMatchKeys) {
 										whMatched = true
 									}
 								}
@@ -368,7 +364,7 @@ func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bo
 								if clientCfg.Service.Namespace != nil && *clientCfg.Service.Namespace == resource.NvAdmSvcNamespace &&
 									clientCfg.Service.Name != nil && *clientCfg.Service.Name == svcName {
 									if clientCfg.Service.Path != nil && strings.EqualFold(*clientCfg.Service.Path, whInfo.ClientConfig.Path) {
-										if resource.IsK8sNvWebhookConfigured(whInfo.Name, whInfo.FailurePolicy, wh, nsSelectorSupported) {
+										if resource.IsK8sNvWebhookConfigured(whInfo.Name, whInfo.FailurePolicy, wh, nsSelectorSupported, k8sResInfo.RevertCount, unexpectedMatchKeys) {
 											whMatched = true
 										}
 									}
@@ -383,6 +379,11 @@ func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bo
 			whFound = whMatched
 			break
 		}
+		if unexpectedMatchKeys.Cardinality() > 0 {
+			// found a webhook with the configurations nv needs + some unexpected entries in namespaceSelector/matchExpressions
+			k8sResInfo.UnexpectedMatchExpr = strings.Join(unexpectedMatchKeys.ToStringSlice(), ", ")
+			return true, false, verRead, nil
+		}
 		if !whFound {
 			return true, false, verRead, nil
 		}
@@ -391,7 +392,7 @@ func isK8sConfiguredAsExpected(k8sResInfo ValidatingWebhookConfigInfo) (bool, bo
 	return true, true, verRead, nil
 }
 
-func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo ValidatingWebhookConfigInfo) error {
+func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *ValidatingWebhookConfigInfo) error {
 	var err error
 	k8sVersionMajor, k8sVersionMinor := resource.GetK8sVersion()
 	if op == K8sResOpDelete {
@@ -616,7 +617,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo Validati
 	return err
 }
 
-func ConfigK8sAdmissionControl(k8sResInfo ValidatingWebhookConfigInfo, ctrlState *share.CLUSAdmCtrlState) (bool, error) { // returns (skip, err)
+func ConfigK8sAdmissionControl(k8sResInfo *ValidatingWebhookConfigInfo, ctrlState *share.CLUSAdmCtrlState) (bool, error) { // returns (skip, err)
 	if ctrlState == nil || ctrlState.Uri == "" {
 		log.WithFields(log.Fields{"name": k8sResInfo.Name}).Error("Empty ctrlState") // should never reach here
 		return true, nil
@@ -655,10 +656,17 @@ func ConfigK8sAdmissionControl(k8sResInfo ValidatingWebhookConfigInfo, ctrlState
 			}
 		}
 		if op != "" {
-			err = configK8sAdmCtrlValidateResource(op, verRead, k8sResInfo)
-			if err == nil {
-				log.WithFields(log.Fields{"name": k8sResInfo.Name, "op": op, "enable": ctrlState.Enable}).Info("Configured admission control in k8s")
-				return false, nil
+			if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil && (k8sResInfo.UnexpectedMatchExpr != "" && *k8sResInfo.RevertCount > 0) {
+				return true, nil
+			} else {
+				err = configK8sAdmCtrlValidateResource(op, verRead, k8sResInfo)
+				if err == nil {
+					if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil {
+						*k8sResInfo.RevertCount = *k8sResInfo.RevertCount + 1
+					}
+					log.WithFields(log.Fields{"name": k8sResInfo.Name, "op": op, "enable": ctrlState.Enable}).Info("Configured admission control in k8s")
+					return false, nil
+				}
 			}
 		}
 		retry++
@@ -671,7 +679,7 @@ func ConfigK8sAdmissionControl(k8sResInfo ValidatingWebhookConfigInfo, ctrlState
 
 func UnregK8sAdmissionControl(admType, nvAdmName string) error {
 	k8sResInfo := ValidatingWebhookConfigInfo{Name: nvAdmName}
-	return configK8sAdmCtrlValidateResource(K8sResOpDelete, "", k8sResInfo)
+	return configK8sAdmCtrlValidateResource(K8sResOpDelete, "", &k8sResInfo)
 }
 
 func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) {
