@@ -309,7 +309,6 @@ var nvCrdInitFunc NvCrdInitFunc
 var nvQueryK8sVerFunc NvQueryK8sVerFunc
 var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
 var isLeader bool
-var CtrlPlaneOpInWhExpr string
 var cspType share.TCspType
 
 var watchFailedFlag int32
@@ -1818,10 +1817,14 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 	return nil
 }
 
-func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool) bool {
+// revertCount: how many times the ValidatingWebhookConfiguration resource has been reverted by this controller.
+//              if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
+func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool, revertCount *uint32,
+	unexpectedMatchKeys utils.Set) bool {
+
 	var nvOpResources []*NvAdmRegRuleSetting // is for what nv expects
 	// key/operator in webhook NamespaceSelector's MatchExpressions.
-	selKeyOps := map[string]string{NsSelectorKeyCtrlPlane: NsSelectorOpNotExist}
+	selKeyOps := map[string]string{}
 	switch whName {
 	case NvAdmValidatingWebhookName:
 		nvOpResources = AdmResForOpsSettings
@@ -1867,37 +1870,21 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 		}
 	}
 	if checkNsSelector {
-		var ctrlPlaneOpInWhExpr string
 		for _, expr := range wh.NamespaceSelector.MatchExpressions {
 			key := expr.GetKey()
-			value := expr.GetOperator()
-			if op, ok := selKeyOps[key]; !ok || op != value {
-				// an unexpected label(key/value) is found in webhook NamespaceSelector's MatchExpressions
-				log.WithFields(log.Fields{"key": key, "value": value}).Info("unexpected label")
-				return false
-			}
-			if key == NsSelectorKeyCtrlPlane { // "control-plane" key is also in MatchExpressions on AKS
-				ctrlPlaneOpInWhExpr = value
-			}
-			delete(selKeyOps, key)
-		}
-		if whName == NvAdmValidatingWebhookName && CtrlPlaneOpInWhExpr != ctrlPlaneOpInWhExpr {
-			CtrlPlaneOpInWhExpr = ctrlPlaneOpInWhExpr
-			log.WithFields(log.Fields{"ctrlPlaneOp": CtrlPlaneOpInWhExpr}).Info()
-			if isLeader && nvVerifyK8sNsFunc != nil {
-				if objs, err := global.ORCH.ListResource(RscTypeNamespace); len(objs) > 0 {
-					for _, obj := range objs {
-						if nsObj := obj.(*Namespace); nsObj != nil {
-							nvVerifyK8sNsFunc(true, nsObj.Name, nsObj.Labels)
-						}
-					}
-				} else {
-					log.WithFields(log.Fields{"err": err}).Error()
+			op := expr.GetOperator()
+			if expectedOp, ok := selKeyOps[key]; !ok || expectedOp != op {
+				// an unexpected label(key/op) is found in webhook NamespaceSelector's MatchExpressions
+				if revertCount != nil && *revertCount <= 1 {
+					unexpectedMatchKeys.Add(key)
+					log.WithFields(log.Fields{"key": key, "op": op}).Info("unexpected label")
 				}
+			} else {
+				delete(selKeyOps, key)
 			}
 		}
-		delete(selKeyOps, NsSelectorKeyCtrlPlane)
 		if len(selKeyOps) > 0 {
+			unexpectedMatchKeys.Clear()
 			return false
 		}
 	}

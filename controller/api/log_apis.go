@@ -157,6 +157,7 @@ const (
 	EventNameGroupAutoPromote            = "Group.Auto.Promote"
 	EventNameAuthDefAdminPwdUnchanged    = "User.Password.Alert"
 	EventNameScannerAutoScaleDisabled    = "Configuration.ScannerAutoScale.Disabled"
+	EventNameK8sAdmissionWebhookChange   = "Kubenetes.Admission.Webhook.Change" // for admission control
 )
 
 // TODO: these are not events but incidents
