@@ -65,6 +65,7 @@ var admFedValidateDenyCache share.CLUSAdmissionRules
 var admCacheMutex sync.RWMutex // only for setting/getting admission control 'enable' state. Notice: cacheMutex could already be held when admCacheMutex.Lock() is called
 var nvDeployStatus map[string]bool
 var nvDeployDeleted uint32 // non-zero means nv deployment is being deleted
+var whRevertCount uint32   // ValidatingWebhookConfiguration neuvector-validating-admission-webhook revert count (because of unknown matchExpressions keys)
 var initFedRole string
 
 var reservedRegs = make(map[string][]string)
@@ -495,6 +496,9 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 						}
 					}
 					setAdmCtrlStateCache(admType, category, &state, ctrlState.Uri, ctrlState.NvStatusUri)
+				}
+				if admStateCache.Enable && !state.Enable {
+					whRevertCount = 0
 				}
 				admStateCache.Enable = state.Enable
 				admStateCache.Mode = state.Mode
@@ -1752,7 +1756,7 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 }
 
 // Admission control - non-UI
-func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string) (bool, error) { // (skip, err)
+func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDetected bool) (bool, error) { // (skip, err)
 	// Configure K8s based on settings in consul in case they are different
 	state, _ := clusHelper.GetAdmissionStateRev(svcName)
 	if state == nil {
@@ -1795,6 +1799,9 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string) (bool, err
 						},
 					},
 				}
+				if updateDetected {
+					k8sResInfo.RevertCount = &whRevertCount
+				}
 			case resource.NvCrdValidatingName:
 				k8sResInfo = admission.ValidatingWebhookConfigInfo{
 					WebhooksInfo: []*admission.WebhookInfo{
@@ -1812,7 +1819,18 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string) (bool, err
 				}
 			}
 			k8sResInfo.Name = nvAdmName
-			return admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
+			skip, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+			if !skip && err == nil && k8sResInfo.UnexpectedMatchExpr != "" {
+				msg := fmt.Sprintf("Kubernetes %s %s is modified with unexpected key(s) %s", resource.RscKindValidatingWebhookConfiguration,
+					resource.NvAdmValidatingName, k8sResInfo.UnexpectedMatchExpr)
+				alog := share.CLUSEventLog{
+					Event:      share.CLUSEvK8sAdmissionWebhookCChange,
+					Msg:        msg,
+					ReportedAt: time.Now().UTC(),
+				}
+				cctx.EvQueue.Append(&alog)
+			}
+			return skip, err
 		}
 	}
 	return true, nil

@@ -2301,7 +2301,7 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 	var msgToken string
 	switch importType {
 	case share.IMPORT_TYPE_CONFIG:
-		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName)
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 		msgToken = "configurations"
 	case share.IMPORT_TYPE_GROUP_POLICY:
 		msgToken = "group policy"

@@ -753,7 +753,7 @@ func main() {
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)
 		if Ctrler.Leader {
-			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName)
+			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 		}
 		go rest.CleanupSessCfgCache()
 		go rest.AdmissionRestServer(*admctrlPort, false, *debug)

@@ -2058,6 +2058,7 @@ func startWorkerThread(ctx *Context) {
 // [2021-02-15] CRD-related resource changes do not call this function.
 //              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
+	updateDetected := false
 	config := newConfig
 	if oldConfig != nil && newConfig == nil {
 		config = oldConfig
@@ -2065,7 +2066,10 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 	if config == nil {
 		return
 	}
-	log.WithFields(log.Fields{"name": config.Name, "old": oldConfig, "new": newConfig}).Info("ValidatingWebhookConfiguration is changed")
+	if oldConfig != nil && newConfig != nil {
+		updateDetected = true
+	}
+	log.WithFields(log.Fields{"name": config.Name, "old": oldConfig, "new": newConfig}).Debug("ValidatingWebhookConfiguration is changed")
 	if isLeader() && config.Name == resource.NvPruneValidatingName {
 		// for manually fixing orphan crd groups only
 		if oldConfig != nil && newConfig == nil {
@@ -2077,7 +2081,7 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 	}
 
 	if isLeader() {
-		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name)
+		skip, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, config.Name, updateDetected)
 		if skip && err == nil {
 			// meaning nv resource in k8s sync with nv's cluster status. do nothing
 		} else if !skip {

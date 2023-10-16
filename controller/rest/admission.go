@@ -527,7 +527,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 				},
 			},
 		}
-		skip, err := admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
+		skip, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
 		if !skip {
 			alog := share.CLUSEventLog{ReportedAt: time.Now().UTC()}
 			if err == nil {
