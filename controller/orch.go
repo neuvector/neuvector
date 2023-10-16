@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/neuvector/k8s"
 	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
@@ -27,22 +28,52 @@ type orchConn struct {
 	leader   bool
 }
 
+var OrchConnStatus string
+var OrchConnLastError string
+
+var connStatusLock sync.RWMutex
+
+func GetOrchConnStatus() (string, string) {
+	connStatusLock.RLock()
+	defer connStatusLock.RUnlock()
+
+	return OrchConnStatus, OrchConnLastError
+}
+
 func (c *orchConn) cbWatcherState(state string, err error) {
 	var lastError string
 	if err != nil {
 		lastError = err.Error()
 	}
 
-	// FIXME: both lead change and here modify Ctrler and write to the cluster, should we lock?
-	if state != Ctrler.OrchConnStatus || lastError != Ctrler.OrchConnLastError {
-		Ctrler.OrchConnStatus = state
-		Ctrler.OrchConnLastError = lastError
-		value, _ := json.Marshal(Ctrler)
+	connStatusLock.Lock()
+	defer connStatusLock.Unlock()
+	if state != OrchConnStatus || lastError != OrchConnLastError {
+		log.WithFields(log.Fields{
+			"status":    state,
+			"lastError": lastError,
+		}).Info("updating conn status")
+
+		OrchConnStatus = state
+		OrchConnLastError = lastError
+		value, err := json.Marshal(share.CLUSController{
+			CLUSDevice:        Ctrler.CLUSDevice,
+			Leader:            Ctrler.Leader,
+			OrchConnStatus:    OrchConnStatus,
+			OrchConnLastError: OrchConnLastError,
+		})
+
+		if err != nil {
+			log.WithError(err).Error("failed to marshal cluster structure in cbWatcherState()")
+			return
+		}
+
 		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
 		if err := cluster.Put(key, value); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
+	return
 }
 
 func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, old interface{}) {
