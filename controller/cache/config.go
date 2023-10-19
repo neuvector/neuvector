@@ -265,6 +265,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		SingleCVEPerSyslog:        systemConfigCache.SingleCVEPerSyslog,
 		SyslogCVEInLayers:         systemConfigCache.SyslogCVEInLayers,
 		SyslogServerCert:          systemConfigCache.SyslogServerCert,
+		OutputEventToLogs:         systemConfigCache.OutputEventToLogs,
 		AuthOrder:                 systemConfigCache.AuthOrder,
 		AuthByPlatform:            systemConfigCache.AuthByPlatform,
 		RancherEP:                 systemConfigCache.RancherEP,
@@ -466,7 +467,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	syslogMutexLock()
 	defer syslogMutexUnlock()
 
-	if systemConfigCache.SyslogEnable {
+	if systemConfigCache.SyslogEnable || systemConfigCache.OutputEventToLogs {
 		if !reflect.DeepEqual(oldSyslogCfg, cfg.CLUSSyslogConfig) {
 			if syslogger != nil {
 				syslogger.Close()
@@ -484,7 +485,7 @@ func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	systemConfigCache = *cfg
-	if systemConfigCache.SyslogEnable {
+	if systemConfigCache.SyslogEnable || systemConfigCache.OutputEventToLogs {
 		syslogger = common.NewSyslogger(&systemConfigCache.CLUSSyslogConfig)
 	}
 	if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher {
