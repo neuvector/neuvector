@@ -401,11 +401,16 @@ message CLUSMeterArray {
     repeated CLUSMeter Meters = 1;
 }
 
+message CLUSWlIDArray {
+    repeated string WlID = 1;
+}
+
 service EnforcerService {
   rpc Kick(CLUSKick) returns (RPCVoid);
   rpc GetSessionList(CLUSFilter) returns (stream CLUSSessionArray);
   rpc ClearSession(CLUSFilter) returns (RPCVoid);
   rpc GetStats(CLUSFilter) returns (CLUSStats);
+  rpc GetGroupStats(CLUSWlIDArray) returns (CLUSStats);
   rpc GetSessionCounter(RPCVoid) returns (CLUSSessionCounter);
   rpc GetDatapathCounter(RPCVoid) returns (CLUSDatapathCounter);
   rpc GetDerivedPolicyRules(CLUSFilter) returns (CLUSDerivedPolicyRuleMap);
