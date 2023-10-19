@@ -1841,7 +1841,8 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 					if crdRecord.ProfileName != "" && utils.HasGroupProfiles(crdRecord.ProfileName) {
 						secRuleName := fmt.Sprintf("group-import-%d", i)
-						profileMode, baseline = crdHandler.crdRebuildGroupProfiles(crdRecord.ProfileName, map[string]*share.CLUSCrdSecurityRule{secRuleName: &crdRecord}, share.ReviewTypeImportGroup)
+						profileMode, baseline = crdHandler.crdRebuildGroupProfiles(crdRecord.ProfileName,
+							map[string]*share.CLUSCrdSecurityRule{secRuleName: &crdRecord}, share.ReviewTypeImportGroup)
 					}
 					//policyMode = h.crdGetProfileSecurityLevel(profileName, "policyMode", recordList)
 					crdHandler.crdHandlePolicyMode(grpCfgRet.TargetName, policyMode, profileMode, baseline)

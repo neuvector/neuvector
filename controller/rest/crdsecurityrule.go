@@ -2,6 +2,8 @@ package rest
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -44,9 +46,6 @@ type nvCrdHandler struct {
 	mdName     string // metadata.name in the CR object
 	lock       cluster.LockInterface
 	acc        *access.AccessControl
-}
-
-type nvCrdParser struct {
 }
 
 func (h *nvCrdHandler) Init(lockKey string) {
@@ -229,7 +228,7 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 				// existing nv.ip.xxx group(learned or crd) found. promote it to crd if necessary
 				if cg.CfgType != share.GroundCfg {
 					if cg.CfgType == share.FederalCfg {
-						log.WithFields(log.Fields{"group": group.Name, "cfgType": cg.CfgType}).Error()
+						log.WithFields(log.Fields{"name": group.Name, "cfgType": cg.CfgType}).Error()
 					} else {
 						cg.CfgType = share.GroundCfg
 						updateKV = true
@@ -563,7 +562,7 @@ LOOPALLDEL:
 			if recordName == cacheRecord.Name {
 				continue
 			}
-			// if the group find on another CRD, then do nothing
+			// if the group is found on another CRD, do nothing
 			for _, gwgroup := range record.Groups {
 				if cur == gwgroup {
 					continue LOOPALLDEL
@@ -884,6 +883,55 @@ func (h *nvCrdHandler) crdHandlePolicyMode(groupName, policyMode, profileMode, b
 	}
 }
 
+func (h *nvCrdHandler) isSameFwRuleContent(cr *share.CLUSPolicyRule, ruleConf *api.RESTPolicyRuleConfig) bool {
+	if ruleConf.Applications != nil {
+		if len(*ruleConf.Applications) == 1 && (*ruleConf.Applications)[0] == "any" && len(cr.Applications) == 0 {
+			// it's expected that ruleConf.Applications being []{"any"} is converteded to empty cr.Applications
+		} else {
+			ruleConfApps := appNames2IDs(*ruleConf.Applications)
+			if len(cr.Applications) != len(ruleConfApps) {
+				return false
+			}
+			for i, app := range cr.Applications {
+				if app != ruleConfApps[i] {
+					return false
+				}
+			}
+		}
+	} else if len(cr.Applications) > 0 {
+		return false
+	}
+
+	var rule share.CLUSPolicyRule
+	if ruleConf.From != nil {
+		rule.From = *ruleConf.From
+	}
+	if ruleConf.To != nil {
+		rule.To = *ruleConf.To
+	}
+	if ruleConf.Ports != nil {
+		rule.Ports = *ruleConf.Ports
+	}
+	if ruleConf.Action != nil {
+		rule.Action = *ruleConf.Action
+	}
+	if ruleConf.Comment != nil {
+		rule.Comment = *ruleConf.Comment
+	}
+	if ruleConf.Disable != nil {
+		rule.Disable = *ruleConf.Disable
+	}
+	if (cr.From == rule.From) && (cr.To == rule.To) && (cr.Ports == rule.Ports) && (cr.Action == rule.Action) &&
+		(cr.Comment == rule.Comment) && (cr.Priority == ruleConf.Priority) && (cr.Disable == rule.Disable) {
+		if cfgType, _ := cfgTypeMapping[ruleConf.CfgType]; cr.CfgType != cfgType {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
+}
+
 func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, cacheRecord *share.CLUSCrdSecurityRule) *map[string]uint32 {
 	if len(rules) == 0 && len(cacheRecord.Rules) == 0 {
 		// when there is no network rule in this crd record & we don't remember any network rule for this crd record as well,
@@ -895,7 +943,8 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 	crhs := clusHelper.GetPolicyRuleList()
 	ids := utils.NewSet()
 	ruleHead := make(map[uint32]*share.CLUSRuleHead)
-	startIdx := 0 // the idx of first non-fed rule in crhs
+	ruleSame := make(map[uint32]bool) // for the rules with same rule content & rule head
+	startIdx := 0                     // the idx of first non-fed rule in crhs
 	startFind := false
 	endIdx := 0 // the idx of first non-fed/non-crd in crhs
 	endFind := false
@@ -944,6 +993,14 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 				Priority: ruleConf.Priority,
 			})
 		} else {
+			if h.isSameFwRuleContent(cr, &ruleConf) {
+				if rh, ok := ruleHead[ruleConf.ID]; ok {
+					if cfgType, _ := cfgTypeMap2Api[rh.CfgType]; cfgType == ruleConf.CfgType && rh.Priority == ruleConf.Priority {
+						// same rule content & rule head found
+						ruleSame[ruleConf.ID] = true
+					}
+				}
+			}
 			if _, ok := ruleHead[ruleConf.ID]; ok {
 				ruleHead[ruleConf.ID].Priority = ruleConf.Priority
 			} else {
@@ -956,32 +1013,40 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 			}
 		}
 
-		if ruleConf.From != nil {
-			cr.From = *ruleConf.From
-		}
-		if ruleConf.To != nil {
-			cr.To = *ruleConf.To
-		}
-		if ruleConf.Ports != nil {
-			cr.Ports = *ruleConf.Ports
-		}
-		if ruleConf.Applications != nil {
-			cr.Applications = appNames2IDs(*ruleConf.Applications)
-		}
-		if ruleConf.Action != nil {
-			cr.Action = *ruleConf.Action
-		}
-		if ruleConf.Comment != nil {
-			cr.Comment = *ruleConf.Comment
-		}
-		cr.LastModAt = time.Now().UTC()
-		cr.Priority = ruleConf.Priority
+		if same, ok := ruleSame[ruleConf.ID]; ok && same {
+			// no update
+		} else {
+			if ruleConf.From != nil {
+				cr.From = *ruleConf.From
+			}
+			if ruleConf.To != nil {
+				cr.To = *ruleConf.To
+			}
+			if ruleConf.Ports != nil {
+				cr.Ports = *ruleConf.Ports
+			}
+			if ruleConf.Applications != nil {
+				cr.Applications = appNames2IDs(*ruleConf.Applications)
+			}
+			if ruleConf.Action != nil {
+				cr.Action = *ruleConf.Action
+			}
+			if ruleConf.Comment != nil {
+				cr.Comment = *ruleConf.Comment
+			}
+			cr.LastModAt = time.Now().UTC()
+			cr.Priority = ruleConf.Priority
 
-		if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
-			continue
+			if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+				continue
+			}
 		}
 		newRules[*ruleConf.Comment] = ruleConf.ID
+	}
+	if len(ruleSame) == len(rules) && len(ruleSame) == len(cacheRecord.Rules) {
+		// all rules are found in policy list with exactly the same rule id/content/head
+		return &newRules
 	}
 
 	// Check if the rules in the cacheRecord not in the newRules added, if so delete it.
@@ -1253,23 +1318,43 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 
 func (h *nvCrdHandler) crdHandleDlpGroup(txn *cluster.ClusterTransact, name string, dlpGroupCfg *api.RESTCrdDlpGroupConfig, cfgType share.TCfgType) []string {
 	if dlpGroupCfg != nil {
-		sensors := make([]string, len(dlpGroupCfg.RepSensors))
-		settings := make([]*share.CLUSDlpSetting, len(dlpGroupCfg.RepSensors))
-		for idx, setting := range dlpGroupCfg.RepSensors {
-			sensors[idx] = setting.Name
-			settings[idx] = &share.CLUSDlpSetting{
-				Name:   setting.Name,
-				Action: setting.Action,
+		changed := false
+		if dlpGroup := clusHelper.GetDlpGroup(name); dlpGroup != nil && dlpGroup.CfgType == cfgType && dlpGroup.Status == dlpGroupCfg.Status &&
+			len(dlpGroupCfg.RepSensors) == len(dlpGroup.Sensors) {
+			for idx, settingCfg := range dlpGroupCfg.RepSensors {
+				if dlpGroup.Sensors[idx] == nil || dlpGroup.Sensors[idx].Name != settingCfg.Name || dlpGroup.Sensors[idx].Action != settingCfg.Action {
+					changed = true
+					break
+				}
 			}
+		} else if dlpGroup == nil {
+			changed = true
 		}
-		dlpGroup := &share.CLUSDlpGroup{
-			Name:    name,
-			Sensors: settings,
-			CfgType: cfgType,
+		if changed {
+			sensors := make([]string, len(dlpGroupCfg.RepSensors))
+			settings := make([]*share.CLUSDlpSetting, len(dlpGroupCfg.RepSensors))
+			for idx, setting := range dlpGroupCfg.RepSensors {
+				sensors[idx] = setting.Name
+				settings[idx] = &share.CLUSDlpSetting{
+					Name:   setting.Name,
+					Action: setting.Action,
+				}
+			}
+			dlpGroup := &share.CLUSDlpGroup{
+				Name:    name,
+				Sensors: settings,
+				CfgType: cfgType,
+			}
+			dlpGroup.Status = dlpGroupCfg.Status
+			clusHelper.PutDlpGroupTxn(txn, dlpGroup)
+			return sensors
+		} else {
+			sensors := make([]string, len(dlpGroupCfg.RepSensors))
+			for idx, setting := range dlpGroupCfg.RepSensors {
+				sensors[idx] = setting.Name
+			}
+			return sensors
 		}
-		dlpGroup.Status = dlpGroupCfg.Status
-		clusHelper.PutDlpGroupTxn(txn, dlpGroup)
-		return sensors
 	}
 	return nil
 }
@@ -1321,23 +1406,43 @@ func (h *nvCrdHandler) crdHandleDlpSensor(scope string, dlpSensorConf *api.RESTD
 
 func (h *nvCrdHandler) crdHandleWafGroup(txn *cluster.ClusterTransact, name string, wafGroupCfg *api.RESTCrdWafGroupConfig, cfgType share.TCfgType) []string {
 	if wafGroupCfg != nil {
-		sensors := make([]string, len(wafGroupCfg.RepSensors))
-		settings := make([]*share.CLUSWafSetting, len(wafGroupCfg.RepSensors))
-		for idx, setting := range wafGroupCfg.RepSensors {
-			sensors[idx] = setting.Name
-			settings[idx] = &share.CLUSWafSetting{
-				Name:   setting.Name,
-				Action: setting.Action,
+		changed := false
+		if wafGroup := clusHelper.GetWafGroup(name); wafGroup != nil && wafGroup.CfgType == cfgType && wafGroup.Status == wafGroupCfg.Status &&
+			len(wafGroupCfg.RepSensors) == len(wafGroup.Sensors) {
+			for idx, settingCfg := range wafGroupCfg.RepSensors {
+				if wafGroup.Sensors[idx] == nil || wafGroup.Sensors[idx].Name != settingCfg.Name || wafGroup.Sensors[idx].Action != settingCfg.Action {
+					changed = true
+					break
+				}
 			}
+		} else if wafGroup == nil {
+			changed = true
 		}
-		wafGroup := &share.CLUSWafGroup{
-			Name:    name,
-			Sensors: settings,
-			CfgType: cfgType,
+		if changed {
+			sensors := make([]string, len(wafGroupCfg.RepSensors))
+			settings := make([]*share.CLUSWafSetting, len(wafGroupCfg.RepSensors))
+			for idx, setting := range wafGroupCfg.RepSensors {
+				sensors[idx] = setting.Name
+				settings[idx] = &share.CLUSWafSetting{
+					Name:   setting.Name,
+					Action: setting.Action,
+				}
+			}
+			wafGroup := &share.CLUSWafGroup{
+				Name:    name,
+				Sensors: settings,
+				CfgType: cfgType,
+			}
+			wafGroup.Status = wafGroupCfg.Status
+			clusHelper.PutWafGroupTxn(txn, wafGroup)
+			return sensors
+		} else {
+			sensors := make([]string, len(wafGroupCfg.RepSensors))
+			for idx, setting := range wafGroupCfg.RepSensors {
+				sensors[idx] = setting.Name
+			}
+			return sensors
 		}
-		wafGroup.Status = wafGroupCfg.Status
-		clusHelper.PutWafGroupTxn(txn, wafGroup)
-		return sensors
 	}
 	return nil
 }
@@ -1671,12 +1776,14 @@ func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail re
 		Applications: &ruleDetail.Applications,
 		Action:       &ruleDetail.Action,
 		Comment:      &ruleDetail.Name,
+		CfgType:      api.CfgTypeUserCreated,
 	}
 	ruleCfg.From = &from
 	ruleCfg.To = &to
 
 	ownerStr := fmt.Sprintf("(under %s section)", owner)
 	if reviewType == share.ReviewTypeCRD {
+		ruleCfg.CfgType = api.CfgTypeGround
 		if ruleCfg.Comment == nil || *ruleCfg.Comment == "" {
 			err := fmt.Sprintf("Rule needs name%s", ownerStr)
 			buffer.WriteString(err)
@@ -2439,8 +2546,8 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 }
 
 // Process the group and network rule list get from the crd. caller must own CLUSLockPolicyKey lock
-func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string,
-	recordList map[string]*share.CLUSCrdSecurityRule) (string, string) {
+func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string,
+	recordList map[string]*share.CLUSCrdSecurityRule, crossCheckRecord *share.CLUSCrdSecurityRule) (string, string) {
 
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
@@ -2454,6 +2561,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
+	crdRecord.CrdMD5 = crdMD5
 
 	var crInfo string
 	var crWarning string
@@ -2504,8 +2612,10 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	}
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
 	// when it's CrossCheck(), all cached records(i.e. recordList) should be the same.
-	if !h.crossCheck {
+	if !h.crossCheck || crossCheckRecord == nil {
 		recordList[recordName] = crdRecord
+	} else if crossCheckRecord != nil {
+		recordList[recordName] = crossCheckRecord
 	}
 	if utils.HasGroupProfiles(crdCfgRet.TargetName) {
 		profileMode, baseline = h.crdRebuildGroupProfiles(crdRecord.ProfileName, recordList, share.ReviewTypeCRD)
@@ -2520,7 +2630,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 }
 
 // Process the admission control rule list get from the crd. caller must own CLUSLockAdmCtrlKey lock
-func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string) (string, string) {
+func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string) (string, string) {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -2532,13 +2642,14 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
+	crdRecord.CrdMD5 = crdMD5
 
 	var crInfo string
 	var crWarning string
 	var subMsgs []string = make([]string, 0, 2)
 
 	if !h.crossCheck && crdRecord.Uid != "" && crdRecord.Uid != h.crUid {
-		crWarning = fmt.Sprintf("UID in the record is %s", crdRecord.Uid)
+		crWarning = fmt.Sprintf("UID in record is %s but UID in request is %s", crdRecord.Uid, h.crUid)
 	}
 
 	log.WithFields(log.Fields{"name": recordName}).Debug()
@@ -2559,7 +2670,7 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 }
 
 // Process DLP sensor get from the crd. caller must own CLUSLockPolicyKey lock
-func (h *nvCrdHandler) crdDlpSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string) {
+func (h *nvCrdHandler) crdDlpSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string) string {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -2571,15 +2682,24 @@ func (h *nvCrdHandler) crdDlpSensorRecord(crdCfgRet *resource.NvSecurityParse, k
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
+	crdRecord.CrdMD5 = crdMD5
+
+	var crWarning string
+
+	if !h.crossCheck && crdRecord.Uid != "" && crdRecord.Uid != h.crUid {
+		crWarning = fmt.Sprintf("UID in record is %s but UID in request is %s", crdRecord.Uid, h.crUid)
+	}
 
 	log.WithFields(log.Fields{"name": recordName}).Debug()
 	// handle dlp part of crd (dlp sensor definition, not per-group's sensors association)
 	h.crdHandleDlpSensor(share.ScopeLocal, crdCfgRet.DlpSensorCfg, crdRecord, share.ReviewTypeCRD)
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+
+	return crWarning
 }
 
 // Process WAF sensor get from the crd. caller must own CLUSLockPolicyKey lock
-func (h *nvCrdHandler) crdWafSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string) {
+func (h *nvCrdHandler) crdWafSensorRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string) string {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -2591,11 +2711,20 @@ func (h *nvCrdHandler) crdWafSensorRecord(crdCfgRet *resource.NvSecurityParse, k
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
+	crdRecord.CrdMD5 = crdMD5
+
+	var crWarning string
+
+	if !h.crossCheck && crdRecord.Uid != "" && crdRecord.Uid != h.crUid {
+		crWarning = fmt.Sprintf("UID in record is %s but UID in request is %s", crdRecord.Uid, h.crUid)
+	}
 
 	log.WithFields(log.Fields{"name": recordName}).Debug()
 	// handle waf part of crd (waf sensor definition, not per-group's sensors association)
 	h.crdHandleWafSensor(share.ScopeLocal, crdCfgRet.WafSensorCfg, crdRecord, share.ReviewTypeCRD)
 	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+
+	return crWarning
 }
 
 // for CRD only
@@ -2644,8 +2773,8 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 }
 
 // policy/admCtrl lock is acquired by caller
-func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind string, crdSecRule interface{}) (
-	string, string, string, string, int, int, bool) {
+func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind, crdMD5 string, crdSecRule interface{},
+	recordList map[string]*share.CLUSCrdSecurityRule) (string, string, string, int, int, bool) {
 
 	var processed bool
 	var recordName string
@@ -2681,7 +2810,6 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdDeleteRecord(kind, recordName)
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
 				h.crdDeleteNetworkRules(crdRecord.Rules)
-				recordList := clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
 				recordsCount = len(recordList)
 				h.crdHandleGroupRecordDel(crdRecord, crdRecord.Groups, false, recordList)
 				h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, crdRecord.ProfileName, recordList)
@@ -2692,12 +2820,10 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 		}
 	case "CREATE", "UPDATE":
 		var crdCfgRet *resource.NvSecurityParse
-		var recordList map[string]*share.CLUSCrdSecurityRule
 
 		log.WithFields(log.Fields{"name": req.Name, "kind": kind, "ns": req.Namespace}).Info("processing CRD ...")
 		// First parse the crd content, validate for error and generate final list if no error
 		if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
-			recordList = clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
 			recordsCount = len(recordList)
 		}
 		crdCfgRet, errCount, errMsg, recordName = h.parseCrdContent(kind, crdSecRule, recordList)
@@ -2705,20 +2831,20 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 			// process the parse result.
 			switch kind {
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-				crInfo, crWarning = h.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, recordList)
+				crInfo, crWarning = h.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdMD5, recordList, nil)
 			case resource.NvAdmCtrlSecurityRuleKind:
 				if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
-					crInfo, crWarning = h.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName)
+					crInfo, crWarning = h.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdMD5)
 				}
 			case resource.NvDlpSecurityRuleKind:
-				h.crdDlpSensorRecord(crdCfgRet, kind, recordName)
+				h.crdDlpSensorRecord(crdCfgRet, kind, recordName, crdMD5)
 			case resource.NvWafSecurityRuleKind:
-				h.crdWafSensorRecord(crdCfgRet, kind, recordName)
+				h.crdWafSensorRecord(crdCfgRet, kind, recordName, crdMD5)
 			}
 		}
 		processed = true
 	}
-	return recordName, crInfo, crWarning, errMsg, errCount, recordsCount, processed
+	return crInfo, crWarning, errMsg, errCount, recordsCount, processed
 }
 
 func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.RESTGroup) {
@@ -3159,8 +3285,7 @@ func (h *nvCrdHandler) crdGetProfileSecurityLevel(profileName, securityName stri
 }
 
 // rebuild group policyMode & process and file profiles from CRD recordList
-func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[string]*share.CLUSCrdSecurityRule,
-	reviewType share.TReviewType) (string, string) {
+func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[string]*share.CLUSCrdSecurityRule, reviewType share.TReviewType) (string, string) {
 
 	if grp, _, err := clusHelper.GetGroup(groupName, h.acc); grp == nil || err != nil {
 		log.WithFields(log.Fields{"groupName": groupName}).Debug("not existed")
@@ -3259,6 +3384,50 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[
 	return profileMode, baseline
 }
 
+// for calculating md5, we need to set those variant fields in metadata.
+// that's why we need to backup those fields
+func prepareForMd5(metadata *cmetav1.ObjectMeta) cmetav1.ObjectMeta {
+	mdBackup := cmetav1.ObjectMeta{
+		CreationTimestamp: metadata.CreationTimestamp,
+		ResourceVersion:   metadata.ResourceVersion,
+		Generation:        metadata.Generation,
+		Uid:               metadata.Uid,
+	}
+	metadata.CreationTimestamp = nil
+	metadata.ResourceVersion = nil
+	metadata.Generation = nil
+	metadata.Uid = nil
+
+	return mdBackup
+}
+
+// calculate md5 of the crd security rule(cr resource)
+// ater md5 is calculated, we need to revert those variant fields in metadata to their original values.
+// parameter recordList: non-nil means it's for CrossCheckCrd()
+// returns (crdMd5, skip)
+func calcCrdSecRuleMD5(metadata *cmetav1.ObjectMeta, mdBackup cmetav1.ObjectMeta, ruleJsonValue []byte,
+	recordList map[string]*share.CLUSCrdSecurityRule, recordName string) (string, bool) {
+
+	metadata.CreationTimestamp = mdBackup.CreationTimestamp
+	metadata.ResourceVersion = mdBackup.ResourceVersion
+	metadata.Generation = mdBackup.Generation
+	metadata.Uid = mdBackup.Uid
+
+	crdMd5Temp := md5.Sum(ruleJsonValue)
+	crdMd5 := hex.EncodeToString(crdMd5Temp[:])
+	if recordList != nil {
+		if record, ok := recordList[recordName]; ok {
+			if record.CrdMD5 != "" && record.CrdMD5 == crdMd5 {
+				// cr is the same as before
+				delete(recordList, recordName)
+				return crdMd5, true
+			}
+		}
+	}
+
+	return crdMd5, false
+}
+
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
 func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error {
 	if clusHelper == nil {
@@ -3282,7 +3451,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		return nil
 	}
 	crdHandler.crossCheck = true
-	log.WithFields(log.Fields{"rscType": rscType, "kvCrdKind": kvCrdKind, "kvOnly": kvOnly, "len": len(recordList)}).Info()
+	log.WithFields(log.Fields{"rscType": rscType, "kvCrdKind": kvCrdKind, "kvOnly": kvOnly, "len(recordList)": len(recordList), "len(objs)": len(objs)}).Info()
 
 	acc := access.NewAdminAccessControl()
 	switch kind {
@@ -3326,74 +3495,102 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 
 	for _, obj := range objs {
 		var crdCfgRet *resource.NvSecurityParse
-		var err, recordname, crInfo string
+		var err, recordName, crInfo string
 		var errCount int
+		var skip bool
+		var crdMd5 string
+		var metadataName string
 
-		if !crdHandler.AcquireLock(clusterLockWait) {
-			continue
-		}
-
-		if kind == resource.NvSecurityRuleKind {
-			r := obj.(*resource.NvSecurityRule)
-			metadataName := fmt.Sprintf("%s in namespace %s", *r.Metadata.Name, *r.Metadata.Namespace)
-			crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdGfwContent(r, recordList, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
-			if errCount > 0 {
-				log.WithFields(log.Fields{"error": err}).Error()
-				e := fmt.Sprintf("%s deleted due to error: %s", metadataName, err)
-				deleted = append(deleted, e)
-				global.ORCH.DeleteResource(resource.RscTypeCrdSecurityRule, r)
+		switch kind {
+		case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
+			var r *resource.NvSecurityRule
+			var ruleNs string
+			if kind == resource.NvSecurityRuleKind {
+				r = obj.(*resource.NvSecurityRule)
+				metadataName = fmt.Sprintf("%s in namespace %s", *r.Metadata.Name, *r.Metadata.Namespace)
+				ruleNs = *r.Metadata.Namespace
 			} else {
-				delete(recordList, recordname)
-				crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordname, recordList)
-				e := fmt.Sprintf("%s (%s)", metadataName, crInfo)
-				imported = append(imported, e)
-			}
-		} else {
-			var metadataName string
-			switch kind {
-			case resource.NvClusterSecurityRuleKind:
 				r1 := obj.(*resource.NvClusterSecurityRule)
 				metadataName = *r1.Metadata.Name
-				r := resource.NvSecurityRule(*r1)
-				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdGfwContent(&r, recordList, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+				rObj := resource.NvSecurityRule(*r1)
+				r = &rObj
+				ruleNs = "default"
+			}
+			mdBackup := prepareForMd5(r.Metadata)
+			ruleJsonValue, _ := json.Marshal(&r)
+			recordName = fmt.Sprintf("%s-%s-%s", *r.Kind, ruleNs, *r.Metadata.Name)
+			if crdMd5, skip = calcCrdSecRuleMD5(r.Metadata, mdBackup, ruleJsonValue, recordList, recordName); skip {
+				continue
+			}
+			if !crdHandler.AcquireLock(clusterLockWait) {
+				continue
+			}
+			crdCfgRet, errCount, err, _ = crdHandler.parseCurCrdGfwContent(r, recordList, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+		case resource.NvAdmCtrlSecurityRuleKind:
+			r := obj.(*resource.NvAdmCtrlSecurityRule)
+			mdBackup := prepareForMd5(r.Metadata)
+			ruleJsonValue, _ := json.Marshal(&r)
+			recordName = fmt.Sprintf("%s-default-%s", *r.Kind, *r.Metadata.Name)
+			if crdMd5, skip = calcCrdSecRuleMD5(r.Metadata, mdBackup, ruleJsonValue, recordList, recordName); skip {
+				continue
+			}
+			metadataName = *r.Metadata.Name
+			if !crdHandler.AcquireLock(clusterLockWait) {
+				continue
+			}
+			crdCfgRet, errCount, err, _ = crdHandler.parseCurCrdAdmCtrlContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+		case resource.NvDlpSecurityRuleKind:
+			r := obj.(*resource.NvDlpSecurityRule)
+			mdBackup := prepareForMd5(r.Metadata)
+			ruleJsonValue, _ := json.Marshal(&r)
+			recordName = fmt.Sprintf("%s-default-%s", *r.Kind, *r.Metadata.Name)
+			if crdMd5, skip = calcCrdSecRuleMD5(r.Metadata, mdBackup, ruleJsonValue, recordList, recordName); skip {
+				continue
+			}
+			metadataName = *r.Metadata.Name
+			if !crdHandler.AcquireLock(clusterLockWait) {
+				continue
+			}
+			crdCfgRet, errCount, err, _ = crdHandler.parseCurCrdDlpContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+		case resource.NvWafSecurityRuleKind:
+			r := obj.(*resource.NvWafSecurityRule)
+			mdBackup := prepareForMd5(r.Metadata)
+			ruleJsonValue, _ := json.Marshal(&r)
+			recordName = fmt.Sprintf("%s-default-%s", *r.Kind, *r.Metadata.Name)
+			if crdMd5, skip = calcCrdSecRuleMD5(r.Metadata, mdBackup, ruleJsonValue, recordList, recordName); skip {
+				continue
+			}
+			metadataName = *r.Metadata.Name
+			if !crdHandler.AcquireLock(clusterLockWait) {
+				continue
+			}
+			crdCfgRet, errCount, err, _ = crdHandler.parseCurCrdWafContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+		}
+		if errCount > 0 {
+			if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
+				log.WithFields(log.Fields{"error": err, "name": metadataName}).Error()
+				e := fmt.Sprintf("%s deleted due to error: %s", metadataName, err)
+				deleted = append(deleted, e)
+				global.ORCH.DeleteResource(rscType, obj)
+			}
+		} else {
+			switch kind {
+			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
+				crossCheckRecord, _ := recordList[recordName]
+				delete(recordList, recordName)
+				crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdMd5, recordList, crossCheckRecord)
 			case resource.NvAdmCtrlSecurityRuleKind:
-				r := obj.(*resource.NvAdmCtrlSecurityRule)
-				metadataName = *r.Metadata.Name
-				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdAdmCtrlContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+				if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
+					crInfo, _ = crdHandler.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdMd5)
+				}
 			case resource.NvDlpSecurityRuleKind:
-				r := obj.(*resource.NvDlpSecurityRule)
-				metadataName = *r.Metadata.Name
-				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdDlpContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+				crdHandler.crdDlpSensorRecord(crdCfgRet, kind, recordName, crdMd5)
 			case resource.NvWafSecurityRuleKind:
-				r := obj.(*resource.NvWafSecurityRule)
-				metadataName = *r.Metadata.Name
-				crdCfgRet, errCount, err, recordname = crdHandler.parseCurCrdWafContent(r, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+				crdHandler.crdWafSensorRecord(crdCfgRet, kind, recordName, crdMd5)
 			}
-			if errCount > 0 {
-				if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind || metadataName == "" {
-					// for admission control crd resource, if metaname is empty, delete the crd resource
-					log.WithFields(log.Fields{"error": err, "name": metadataName}).Error()
-					e := fmt.Sprintf("%s deleted due to error: %s", metadataName, err)
-					deleted = append(deleted, e)
-					global.ORCH.DeleteResource(rscType, obj)
-				}
-			} else {
-				switch kind {
-				case resource.NvClusterSecurityRuleKind:
-					crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordname, recordList)
-				case resource.NvAdmCtrlSecurityRuleKind:
-					if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
-						crInfo, _ = crdHandler.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordname)
-					}
-				case resource.NvDlpSecurityRuleKind:
-					crdHandler.crdDlpSensorRecord(crdCfgRet, kind, recordname)
-				case resource.NvWafSecurityRuleKind:
-					crdHandler.crdWafSensorRecord(crdCfgRet, kind, recordname)
-				}
-				e := fmt.Sprintf("%s (%s)", metadataName, crInfo)
-				imported = append(imported, e)
-				delete(recordList, recordname)
-			}
+			e := fmt.Sprintf("%s (%s)", metadataName, crInfo)
+			imported = append(imported, e)
+			delete(recordList, recordName)
 		}
 		crdHandler.ReleaseLock()
 		time.Sleep(1 * time.Second)

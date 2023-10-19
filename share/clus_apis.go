@@ -1936,8 +1936,15 @@ func CLUSPolicyKey2AdmCfgSubkey(key string) string {
 }
 
 func CLUSCrdKey(crdType, name string) string {
-
 	return fmt.Sprintf("%s%s/%s", CLUSConfigCrdStore, crdType, name)
+}
+
+const (
+	CLUSCrdContentCount = "crdcontent_count"
+)
+
+func CLUSCrdContentCountKey() string {
+	return fmt.Sprintf("%sdefault/%s", CLUSConfigCrdStore, CLUSCrdContentCount)
 }
 
 func CLUSPolicyRuleKey2AdmRuleType(key, cfgType string) (string, string) {
@@ -2016,6 +2023,8 @@ type CLUSCrdSecurityRule struct {
 	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
 	Uid             string                `json:"uid"`               // metadata.uid in admissionreview CREATE request
+	CrdMD5          string                `json:"md5"`               // md5 of k8s crd resource, for metadata, only include name/namespace
+
 }
 
 // Multi-Clusters (Federation)
@@ -2066,6 +2075,7 @@ const (
 	StopFedRestServer
 	UpdateProxyInfo
 	ReportTelemetryData
+	ProcessCrdQueue
 )
 
 const (

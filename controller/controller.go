@@ -747,7 +747,7 @@ func main() {
 	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
-	go rest.CrdQueueProc()
+	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
 
 	if platform == share.PlatformKubernetes {
