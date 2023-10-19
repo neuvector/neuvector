@@ -257,6 +257,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		Image:              wl.Image,
 		ImageID:            wl.ImageID,
 		ImgCreateAt:        api.RESTTimeString(wl.ImgCreateAt),
+		ImgRegScand:        scan.IsRegistryImageScanned(wl.ImageID),
 		PlatformRole:       cache.platformRole,
 		Domain:             wl.Domain,
 		Author:             wl.Author,

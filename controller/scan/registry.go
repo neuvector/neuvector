@@ -1846,3 +1846,25 @@ func (t *regScanTask) shouldRetry(result *share.ScanResult) bool {
 func (t *regScanTask) reachedMaxRetries() bool {
 	return t.retries == maxRetry
 }
+
+func IsRegistryImageScanned(id string) bool {
+	var scanned bool
+
+	regReadLock()
+	for _, rs := range regMap {
+		rs.stateLock()
+		if sum, ok := rs.summary[id]; ok {
+			// smd.scanLog.WithFields(log.Fields{"img": id, "summary": sum}).Debug("found")
+			scanned = (sum.Status == api.ScanStatusFinished)
+		}
+		rs.stateUnlock()
+
+		if scanned {
+			break
+		}
+	}
+	regReadUnlock()
+
+	// smd.scanLog.WithFields(log.Fields{"img": id, "scanned": scanned}).Debug()
+	return scanned
+}

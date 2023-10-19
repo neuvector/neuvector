@@ -273,9 +273,7 @@ func ScannerDBChange(db *share.CLUSScannerDB) {
 	}
 }
 
-func Init(ctx *Context, leader bool) ScanInterface {
-	log.Info()
-
+func InitContext(ctx *Context, leader bool) {
 	if smd == nil {
 		smd = &scanMethod{
 			auditQueue: ctx.AuditQueue,
@@ -295,6 +293,12 @@ func Init(ctx *Context, leader bool) ScanInterface {
 		smd.isLeader = leader
 		smd.fedRole = ctx.FedRole
 	}
+}
+
+func Init(ctx *Context, leader bool) ScanInterface {
+	log.Info()
+
+	InitContext(ctx, leader)
 
 	clusHelper = kv.GetClusterHelper()
 
