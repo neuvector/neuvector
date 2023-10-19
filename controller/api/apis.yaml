@@ -12083,6 +12083,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-01-18T00:44:02Z
+      image_reg_scanned:
+        type: boolean
+        example: false
       platform_role:
         type: string
         example: core
@@ -12185,6 +12188,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-01-18T00:44:02Z
+      image_reg_scanned:
+        type: boolean
+        example: false
       domain:
         type: string
         example: ""

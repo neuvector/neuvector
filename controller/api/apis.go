@@ -857,6 +857,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	Image              string               `json:"image"`
 	ImageID            string               `json:"image_id"`
 	ImgCreateAt        string               `json:"image_created_at"`
+	ImgRegScand        bool                 `json:"image_reg_scanned"`
 	PlatformRole       string               `json:"platform_role"`
 	Domain             string               `json:"domain"`
 	State              string               `json:"state"`
@@ -920,6 +921,7 @@ type RESTWorkloadBriefV2 struct {
 	Image        string `json:"image"`
 	ImageID      string `json:"image_id"`
 	ImgCreateAt  string `json:"image_created_at"`
+	ImgRegScand  bool   `json:"image_reg_scanned"`
 	Domain       string `json:"domain"`
 	State        string `json:"state"`
 	Service      string `json:"service"`
