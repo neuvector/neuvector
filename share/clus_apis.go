@@ -694,15 +694,16 @@ type CLUSCtrlVersion struct {
 }
 
 type CLUSSyslogConfig struct {
-	SyslogIP         net.IP   `json:"syslog_ip"`
-	SyslogServer     string   `json:"syslog_server"`
-	SyslogIPProto    uint8    `json:"syslog_ip_proto"`
-	SyslogPort       uint16   `json:"syslog_port"`
-	SyslogLevel      string   `json:"syslog_level"`
-	SyslogEnable     bool     `json:"syslog_enable"`
-	SyslogCategories []string `json:"syslog_categories"`
-	SyslogInJSON     bool     `json:"syslog_in_json"`
-	SyslogServerCert string   `json:"syslog_server_cert"`
+	SyslogIP          net.IP   `json:"syslog_ip"`
+	SyslogServer      string   `json:"syslog_server"`
+	SyslogIPProto     uint8    `json:"syslog_ip_proto"`
+	SyslogPort        uint16   `json:"syslog_port"`
+	SyslogLevel       string   `json:"syslog_level"`
+	SyslogEnable      bool     `json:"syslog_enable"`
+	SyslogCategories  []string `json:"syslog_categories"`
+	SyslogInJSON      bool     `json:"syslog_in_json"`
+	SyslogServerCert  string   `json:"syslog_server_cert"`
+	OutputEventToLogs bool     `json:"output_event_to_logs"`
 }
 
 type CLUSSystemUsageReport struct {
