@@ -2280,9 +2280,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 		if name != share.ScopeLocal { // for crd, metadata name must be "local". if it's not, ignore it
 			return nil, 0, "", ""
 		}
-	}
-
-	if reviewType == share.ReviewTypeImportAdmCtrl {
+	} else if reviewType == share.ReviewTypeImportAdmCtrl {
 		if name != share.ScopeLocal {
 			errMsg := fmt.Sprintf("%s file format error: invalid metadata name \"%s\"", reviewTypeDisplay, name)
 			return nil, 1, errMsg, ""
