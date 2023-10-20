@@ -26,7 +26,7 @@ func crdInit() {
 }
 
 func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.Debug("")
+	log.Debug()
 
 	cfgType := share.CLUSPolicyKey2AdmCfgSubkey(key)
 
@@ -72,7 +72,15 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							},
 						},
 					}
-					admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
+					admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+				}
+			}
+		case share.CLUSCrdContentCount:
+			if isLeader() {
+				var queueInfo share.CLUSCrdEventQueueInfo
+				json.Unmarshal(value, &queueInfo)
+				if queueInfo.Count > 0 {
+					cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil)
 				}
 			}
 		}

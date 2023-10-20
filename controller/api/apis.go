@@ -857,6 +857,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	Image              string               `json:"image"`
 	ImageID            string               `json:"image_id"`
 	ImgCreateAt        string               `json:"image_created_at"`
+	ImgRegScand        bool                 `json:"image_reg_scanned"`
 	PlatformRole       string               `json:"platform_role"`
 	Domain             string               `json:"domain"`
 	State              string               `json:"state"`
@@ -865,6 +866,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	ServiceGroup       string               `json:"service_group"`
 	ShareNSWith        string               `json:"share_ns_with,omitempty"`
 	CapSniff           bool                 `json:"cap_sniff"`
+	HasDatapath        bool                 `json:"has_datapath"`
 	CapQuar            bool                 `json:"cap_quarantine"`
 	CapChgMode         bool                 `json:"cap_change_mode"`
 	PolicyMode         string               `json:"policy_mode"`
@@ -920,6 +922,7 @@ type RESTWorkloadBriefV2 struct {
 	Image        string `json:"image"`
 	ImageID      string `json:"image_id"`
 	ImgCreateAt  string `json:"image_created_at"`
+	ImgRegScand  bool   `json:"image_reg_scanned"`
 	Domain       string `json:"domain"`
 	State        string `json:"state"`
 	Service      string `json:"service"`
@@ -1318,6 +1321,12 @@ type RESTWorkloadStatsData struct {
 	Stats  *RESTStats `json:"stats"`
 }
 
+type RESTGroupStatsData struct {
+	Name   string     `json:"name"`
+	ReadAt string     `json:"read_at"`
+	Stats  *RESTStats `json:"stats"`
+}
+
 type RESTAgentStatsData struct {
 	ID     string     `json:"id"`
 	ReadAt string     `json:"read_at"`
@@ -1646,6 +1655,7 @@ type RESTSystemConfigConfig struct {
 	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
 	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
 	SyslogCVEInLayers         *bool                            `json:"syslog_cve_in_layers,omitempty"`
+	OutputEventToLogs         *bool                            `json:"output_event_to_log,omitempty"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
 	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
@@ -1719,6 +1729,7 @@ type RESTSystemConfigSyslogCfgV2 struct {
 	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
 	SyslogCVEInLayers  *bool     `json:"syslog_cve_in_layers,omitempty"`
 	SyslogServerCert   *string   `json:"syslog_server_cert,omitempty"`
+	OutputEventToLogs  *bool     `json:"output_event_to_log,omitempty"`
 }
 
 type RESTSystemConfigAuthCfgV2 struct {
@@ -1789,7 +1800,8 @@ type RESTSystemConfig struct {
 	SyslogInJSON              bool                      `json:"syslog_in_json"`
 	SyslogServerCert          string                    `json:"syslog_server_cert"`
 	SingleCVEPerSyslog        bool                      `json:"single_cve_per_syslog"`
-	SyslogCVEInLayers         bool                      `json:"syslog_cve_in_layers,omitempty"`
+	SyslogCVEInLayers         bool                      `json:"syslog_cve_in_layers"`
+	OutputEventToLogs         bool                      `json:"output_event_to_logs"`
 	AuthOrder                 []string                  `json:"auth_order"`
 	AuthByPlatform            bool                      `json:"auth_by_platform"`
 	RancherEP                 string                    `json:"rancher_ep"`
@@ -1841,6 +1853,7 @@ type RESTSystemConfigSyslogV2 struct {
 	SingleCVEPerSyslog bool     `json:"single_cve_per_syslog"`
 	SyslogCVEInLayers  bool     `json:"syslog_cve_in_layers"`
 	SyslogServerCert   string   `json:"syslog_server_cert"`
+	OutputEventToLogs  bool     `json:"output_event_to_logs"`
 }
 
 type RESTSystemConfigAuthV2 struct {

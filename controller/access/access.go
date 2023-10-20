@@ -665,6 +665,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_GROUP: []string{
 				"v1/group",
 				"v1/group/*",
+				"v1/group/*/stats",
 				"v1/service",
 				"v1/service/*",
 				"v1/file/group",

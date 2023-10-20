@@ -694,15 +694,16 @@ type CLUSCtrlVersion struct {
 }
 
 type CLUSSyslogConfig struct {
-	SyslogIP         net.IP   `json:"syslog_ip"`
-	SyslogServer     string   `json:"syslog_server"`
-	SyslogIPProto    uint8    `json:"syslog_ip_proto"`
-	SyslogPort       uint16   `json:"syslog_port"`
-	SyslogLevel      string   `json:"syslog_level"`
-	SyslogEnable     bool     `json:"syslog_enable"`
-	SyslogCategories []string `json:"syslog_categories"`
-	SyslogInJSON     bool     `json:"syslog_in_json"`
-	SyslogServerCert string   `json:"syslog_server_cert"`
+	SyslogIP          net.IP   `json:"syslog_ip"`
+	SyslogServer      string   `json:"syslog_server"`
+	SyslogIPProto     uint8    `json:"syslog_ip_proto"`
+	SyslogPort        uint16   `json:"syslog_port"`
+	SyslogLevel       string   `json:"syslog_level"`
+	SyslogEnable      bool     `json:"syslog_enable"`
+	SyslogCategories  []string `json:"syslog_categories"`
+	SyslogInJSON      bool     `json:"syslog_in_json"`
+	SyslogServerCert  string   `json:"syslog_server_cert"`
+	OutputEventToLogs bool     `json:"output_event_to_logs"`
 }
 
 type CLUSSystemUsageReport struct {
@@ -1310,9 +1311,10 @@ const (
 	CLUSEvMemoryPressureController
 	CLUSEvK8sNvRBAC
 	CLUSEvGroupAutoPromote
-	CLUSEvAuthDefAdminPwdUnchanged // default admin's password is not changed yet. reported every 24 hours
-	CLUSEvScannerAutoScaleDisabled // when scanner autoscale is disabled by controller
-	CLUSEvCrdSkipped               // for crd Config import
+	CLUSEvAuthDefAdminPwdUnchanged   // default admin's password is not changed yet. reported every 24 hours
+	CLUSEvScannerAutoScaleDisabled   // when scanner autoscale is disabled by controller
+	CLUSEvCrdSkipped                 // for crd Config import
+	CLUSEvK8sAdmissionWebhookCChange // for admission control
 )
 
 const (
@@ -1935,8 +1937,15 @@ func CLUSPolicyKey2AdmCfgSubkey(key string) string {
 }
 
 func CLUSCrdKey(crdType, name string) string {
-
 	return fmt.Sprintf("%s%s/%s", CLUSConfigCrdStore, crdType, name)
+}
+
+const (
+	CLUSCrdContentCount = "crdcontent_count"
+)
+
+func CLUSCrdContentCountKey() string {
+	return fmt.Sprintf("%sdefault/%s", CLUSConfigCrdStore, CLUSCrdContentCount)
 }
 
 func CLUSPolicyRuleKey2AdmRuleType(key, cfgType string) (string, string) {
@@ -2015,6 +2024,8 @@ type CLUSCrdSecurityRule struct {
 	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
 	Uid             string                `json:"uid"`               // metadata.uid in admissionreview CREATE request
+	CrdMD5          string                `json:"md5"`               // md5 of k8s crd resource, for metadata, only include name/namespace
+
 }
 
 // Multi-Clusters (Federation)
@@ -2065,6 +2076,7 @@ const (
 	StopFedRestServer
 	UpdateProxyInfo
 	ReportTelemetryData
+	ProcessCrdQueue
 )
 
 const (
@@ -2179,7 +2191,7 @@ type TCspType int
 const (
 	CSP_NONE = iota
 	CSP_EKS
-	CSP_GKE
+	CSP_GCP
 	CSP_AKS
 	CSP_IBM
 )

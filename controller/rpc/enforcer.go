@@ -148,6 +148,18 @@ func GetStats(agentID string, f *share.CLUSFilter) (*share.CLUSStats, error) {
 	return client.GetStats(ctx, f)
 }
 
+func GetGroupStats(agentID string, f *share.CLUSWlIDArray) (*share.CLUSStats, error) {
+	client, err := findEnforcerServiceClient(agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
+	defer cancel()
+
+	return client.GetGroupStats(ctx, f)
+}
+
 func GetSessionCounter(agentID string) (*share.CLUSSessionCounter, error) {
 	client, err := findEnforcerServiceClient(agentID)
 	if err != nil {

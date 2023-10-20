@@ -126,10 +126,6 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) error {
 
 	admitted = true
 	selfAddr = cluster.GetSelfAddress()
-
-	// Remove host relative data: let enforcer report them again
-	// workload: object/workload/<host-id>
-	cluster.DeleteTree(fmt.Sprintf("%s%s", share.CLUSWorkloadStore, Host.ID))
 	return nil
 }
 
@@ -755,14 +751,18 @@ func getLeadGRPCEndpoint() string {
 
 func clusterLoop(existing utils.Set) {
 	// Remove non-existing containers from cluster
-	store := share.CLUSWorkloadHostStore(Host.ID)
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, _ := cluster.GetStoreKeys(share.CLUSWorkloadHostStore(Host.ID))
+	txn := cluster.Transact()
 	for _, key := range keys {
-		id := share.CLUSWorkloadKey2ID(key)
-		if !existing.Contains(id) {
-			cluster.Delete(key)
+		if !existing.Contains(share.CLUSWorkloadKey2ID(key)) {
+			txn.Delete(key)
 		}
 	}
+
+	if ok, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Remove workloads")
+	}
+	txn.Close()
 
 	// Start event loop first so existing containers can be posted
 	go func() {

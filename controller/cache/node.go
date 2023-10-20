@@ -98,7 +98,7 @@ func (p *hostRemovalEvent) Expire() {
 		if cache.agents.Cardinality() != 0 {
 			log.WithFields(log.Fields{"count": cache.agents.Cardinality}).Info("host has agent")
 			cache.timerTask = ""
-			cache.state = ""
+			cache.state = api.StateOnline
 			cache.timerSched = time.Time{}
 			return
 		}

@@ -751,7 +751,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 											},
 										},
 									}
-									admission.ConfigK8sAdmissionControl(k8sResInfo, ctrlState)
+									admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
 								}
 							}
 						}

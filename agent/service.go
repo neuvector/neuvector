@@ -628,6 +628,45 @@ func (rs *RPCService) GetStats(ctx context.Context, f *share.CLUSFilter) (*share
 	return &stats, nil
 }
 
+func (rs *RPCService) GetGroupStats(ctx context.Context, f *share.CLUSWlIDArray) (*share.CLUSStats, error) {
+	log.WithFields(log.Fields{"filter": f}).Debug("")
+
+	stats := share.CLUSStats{
+		Total:  &share.CLUSMetry{},
+		Span1:  &share.CLUSMetry{},
+		Span12: &share.CLUSMetry{},
+		Span60: &share.CLUSMetry{},
+	}
+
+	if f.WlID != nil && len(f.WlID) > 0 {
+		var macs []*net.HardwareAddr
+		gInfoRLock()
+		for _, wld := range f.WlID {
+			tstats := share.CLUSStats{
+				Total:  &share.CLUSMetry{},
+				Span1:  &share.CLUSMetry{},
+				Span12: &share.CLUSMetry{},
+				Span60: &share.CLUSMetry{},
+			}
+			if c, ok := gInfo.activeContainers[wld]; ok {
+				for _, pair := range c.intcpPairs {
+					macs = append(macs, &pair.MAC)
+				}
+				system.PopulateSystemStats(&tstats, &c.stats)
+				stats.Span1.CPU += tstats.Span1.CPU
+				stats.Span1.Memory += tstats.Span1.Memory
+				stats.Span12.CPU += tstats.Span12.CPU
+				stats.Span12.Memory += tstats.Span12.Memory
+				stats.Span60.CPU += tstats.Span60.CPU
+				stats.Span60.Memory += tstats.Span60.Memory
+			}
+		}
+		gInfoRUnlock()
+		dp.DPCtrlStatsMAC(macs, cbContainerStats, &stats)
+	}
+
+	return &stats, nil
+}
 // --
 
 func (rs *RPCService) cbSessionCount(buf []byte, param interface{}) bool {

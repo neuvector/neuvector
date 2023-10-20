@@ -257,6 +257,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		Image:              wl.Image,
 		ImageID:            wl.ImageID,
 		ImgCreateAt:        api.RESTTimeString(wl.ImgCreateAt),
+		ImgRegScand:        scan.IsRegistryImageScanned(wl.ImageID),
 		PlatformRole:       cache.platformRole,
 		Domain:             wl.Domain,
 		Author:             wl.Author,
@@ -266,6 +267,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		ShareNSWith:        wl.ShareNetNS,
 		CapQuar:            wl.CapIntcp && cache.state != api.StateUnmanaged,                                      // Allow quarantine when workload is not running
 		CapSniff:           wl.CapSniff && !cacher.disablePCAP && wl.Running && cache.state != api.StateUnmanaged, // Only allow sniff when workload is running
+		HasDatapath:        wl.HasDatapath,
 		CapChgMode:         true,
 		ScanSummary:        cache.scanBrief,
 		Children:           make([]*api.RESTWorkloadBrief, 0),

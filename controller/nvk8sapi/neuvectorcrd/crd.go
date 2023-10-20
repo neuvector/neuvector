@@ -1430,5 +1430,5 @@ func Init(leader bool, cspType share.TCspType) {
 			},
 		},
 	}
-	admission.ConfigK8sAdmissionControl(k8sResInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
+	admission.ConfigK8sAdmissionControl(&k8sResInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
 }

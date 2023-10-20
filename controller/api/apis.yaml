@@ -7998,6 +7998,9 @@ definitions:
       syslog_server_cert:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      output_event_to_logs:
+        type: boolean
+        example: true
   RESTSystemConfigAuthCfgV2:
     type: object
     properties:
@@ -10053,6 +10056,7 @@ definitions:
       - syslog_in_json
       - single_cve_per_syslog
       - syslog_cve_in_layers
+      - output_event_to_logs
       - auth_order
       - auth_by_platform
       - rancher_ep
@@ -10122,6 +10126,9 @@ definitions:
       syslog_server_cert:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      output_event_to_logs:
+        type: boolean
+        example: true
       auth_order:
         type: array
         items:
@@ -10388,6 +10395,7 @@ definitions:
       - single_cve_per_syslog
       - syslog_cve_in_layers
       - syslog_server_cert
+      - output_event_to_logs
     properties:
       syslog_ip:
         type: string
@@ -10423,6 +10431,9 @@ definitions:
       syslog_server_cert:
         type: string
         example: ""
+      output_event_to_logs:
+        type: boolean
+        example: true
   RESTSystemConfigV2:
     type: object
     required:
@@ -10519,6 +10530,9 @@ definitions:
         type: boolean
         example: true
       syslog_cve_in_layers:
+        type: boolean
+        example: true
+      output_event_to_logs:
         type: boolean
         example: true
       auth_order:
@@ -12083,6 +12097,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-01-18T00:44:02Z
+      image_reg_scanned:
+        type: boolean
+        example: false
       platform_role:
         type: string
         example: core
@@ -12185,6 +12202,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-01-18T00:44:02Z
+      image_reg_scanned:
+        type: boolean
+        example: false
       domain:
         type: string
         example: ""

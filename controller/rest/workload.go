@@ -170,6 +170,7 @@ func workloadV1ToV2(wlV1 *api.RESTWorkload) *api.RESTWorkloadV2 {
 			Image:        wlV1.Image,
 			ImageID:      wlV1.ImageID,
 			ImgCreateAt:  wlV1.ImgCreateAt,
+			ImgRegScand:  wlV1.ImgRegScand,
 			Domain:       wlV1.Domain,
 			State:        wlV1.State,
 			Service:      wlV1.Service,

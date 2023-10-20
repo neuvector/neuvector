@@ -50,7 +50,8 @@ import (
 )
 
 const (
-	tlsClientCA = "/var/neuvector/clientCA.cert.pem"
+	tlsClientCA  = "/var/neuvector/clientCA.cert.pem"
+	assessMsgSep = "\v"
 )
 
 const (
@@ -1256,7 +1257,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 						perRuleMsg = fmt.Sprintf("%s, %s", perRuleMsg, matchResult.DenyRuleMsg)
 					}
 					if displayMsg.Len() > 0 {
-						displayMsg.WriteString("\n")
+						displayMsg.WriteString(assessMsgSep)
 					}
 					displayMsg.WriteString(perRuleMsg)
 					if !forTesting {
@@ -1304,6 +1305,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		if forTesting {
 			statusResult.Message = admResult.Msg
 		} else {
+			strings.ReplaceAll(admResult.Msg, assessMsgSep, "\n")
 			if !admResult.NoLogging {
 				cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
 			}
@@ -1502,7 +1504,7 @@ func restartWebhookServer(svcName string) error {
 	}
 	if leader := atomic.LoadUint32(&_isLeader); leader == 1 {
 		if nvAdmName, ok := k8sInfo[svcName]; ok {
-			cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName)
+			cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
 		}
 	}
 

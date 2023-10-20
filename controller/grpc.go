@@ -65,7 +65,7 @@ func (ss *ScanService) preprocessDB(data *share.ScannerRegisterData) map[string]
 
 func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map[string]*share.ScanVulnerability) ([][]byte, error) {
 	// As of now, Feb. 2019, the compressed db size is 3M, while max kv value size is 512K.
-	for slots := 16; slots <= 128; slots *= 2 {
+	for slots := 128; slots <= 256; slots *= 2 {
 		log.WithFields(log.Fields{"slots": slots}).Debug()
 
 		enlarge := false
@@ -197,7 +197,7 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	// Consul value size limit is 512K. The limit also applies to the total value size in a transaction.
 	// => so we cannot really use transaction to write database.
 
-	oldKeys, _ := cluster.GetStoreKeys(share.CLUSScannerDBStore)
+	oldStores, _ := cluster.GetStoreKeys(share.CLUSScannerDBStore)
 	newStore := fmt.Sprintf("%s%s/", share.CLUSScannerDBStore, data.CVEDBVersion)
 
 	txn := cluster.Transact()
@@ -248,11 +248,13 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 		return err
 	}
 
-	// Remove old keys. Ignore failure, missed keys will be removed the next update.
-	if writeDB {
-		for _, key := range oldKeys {
-			cluster.Delete(key)
+	// Remove old stores. Ignore failure, missed keys will be removed the next update.
+	if writeDB && len(oldStores) > 0 {
+		txn.Reset()
+		for _, store := range oldStores {
+			txn.DeleteTree(store)
 		}
+		txn.Apply()
 	}
 
 	// Create scanner stats if not exist

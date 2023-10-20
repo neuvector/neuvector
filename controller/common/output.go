@@ -25,6 +25,8 @@ const syslogTimeout = time.Second * 30
 const syslogDialTimeout = time.Second * 30
 
 type Syslogger struct {
+	syslog     bool
+	stdin      bool
 	writer     *syslog.Writer
 	proto      string
 	addr       string
@@ -60,6 +62,8 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 		}
 	}
 	return &Syslogger{
+		syslog:     cfg.SyslogEnable,
+		stdin:      cfg.OutputEventToLogs,
 		proto:      proto,
 		addr:       fmt.Sprintf("%s:%d", server, cfg.SyslogPort),
 		catSet:     catSet,
@@ -76,7 +80,7 @@ func (s *Syslogger) Close() {
 }
 
 func (s *Syslogger) Identifier() string {
-	return s.proto + ":" + s.addr + ":" + s.serverCert  // a string to identify its connection criteria
+	return s.proto + ":" + s.addr + ":" + s.serverCert // a string to identify its connection criteria
 }
 
 func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
@@ -88,19 +92,30 @@ func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 		return nil
 	}
 
+	var err error
 	if s.inJSON {
 		if data, _ := json.Marshal(elog); len(data) > 2 {
 			logText := fmt.Sprintf("{\"%s\": \"%s\", %s", notificationHeader, header, string(data[1:][:]))
-			return s.send(logText, prio)
+			if s.stdin {
+				fmt.Println(logText)
+			}
+			if s.syslog {
+				err = s.send(logText, prio)
+			}
 		}
 	} else {
 		if logText := struct2Text(elog); logText != "" {
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, header, logText)
-			return s.send(logText, prio)
+			if s.stdin {
+				fmt.Println(logText)
+			}
+			if s.syslog {
+				err = s.send(logText, prio)
+			}
 		}
 	}
 
-	return nil
+	return err
 }
 
 func appendLogField(logText string, tag string, v reflect.Value) string {

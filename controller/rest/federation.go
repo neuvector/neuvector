@@ -178,8 +178,14 @@ var _clusterStatusMap = map[int]string{
 var ibmSACfg share.CLUSIBMSAConfig
 
 func LeadChangeNotify(leader bool) {
-	log.WithFields(log.Fields{"isLeader": leader}).Info()
+	log.WithFields(log.Fields{"isLeader": leader, "_isLeader": _isLeader}).Info()
 	if leader {
+		if k8sPlatform {
+			if isOldLeader := atomic.LoadUint32(&_isLeader); isOldLeader == 0 && crdReqMgr != nil {
+				// this controller just gains leader role
+				crdReqMgr.reloadRecordList()
+			}
+		}
 		atomic.StoreUint32(&_isLeader, 1)
 		if k8sPlatform && leader {
 			k8sInfo := map[string]string{
@@ -190,14 +196,21 @@ func LeadChangeNotify(leader bool) {
 				cn := fmt.Sprintf("%s.%s.svc", svcName, resource.NvAdmSvcNamespace)
 				if cert, _, err := clusHelper.GetObjectCertRev(cn); !cert.IsEmpty() {
 					admission.ResetCABundle(svcName, []byte(cert.Cert))
-					cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName)
+					cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
 				} else {
 					log.WithFields(log.Fields{"cn": cn, "err": err}).Error("no cert")
 				}
 			}
 		}
 	} else {
-		atomic.StoreUint32(&_isLeader, 0)
+		if k8sPlatform {
+			isOldLeader := atomic.LoadUint32(&_isLeader)
+			atomic.StoreUint32(&_isLeader, 0)
+			if isOldLeader == 1 && crdReqMgr != nil {
+				// this controller just lost leader role
+				crdReqMgr.reloadRecordList()
+			}
+		}
 	}
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
 		if leader {

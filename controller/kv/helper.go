@@ -2675,7 +2675,7 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 	}
 
 	queueInfo := share.CLUSCrdEventQueueInfo{Count: len(record.CrdEventRecord)}
-	key = key + "count"
+	key = share.CLUSCrdContentCountKey()
 	value, _ = json.Marshal(&queueInfo)
 	txn.Put(key, value)
 
@@ -2686,8 +2686,7 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 }
 
 func (m clusterHelper) GetCrdEventQueueCount() int {
-	key := share.CLUSCrdProcStore
-	key = key + "count"
+	key := share.CLUSCrdContentCountKey()
 	if value, _ := cluster.Get(key); value != nil {
 		var queueInfo share.CLUSCrdEventQueueInfo
 		json.Unmarshal(value, &queueInfo)

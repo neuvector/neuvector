@@ -1361,6 +1361,12 @@ func initJWTSignKey() error {
 					jwtCertState.jwtOldPublicKeyNotAfter = &t
 				}
 			}
+
+			log.WithFields(log.Fields{
+				"cn":            "neuvector-jwt-signing",
+				"newExpiryDate": jwtCertState.jwtPublicKeyNotAfter,
+				"oldExpiryDate": jwtCertState.jwtOldPublicKeyNotAfter,
+			}).Info("new certificate is loaded")
 		},
 	})
 	// Create and setup certificate.
@@ -1531,6 +1537,7 @@ func StartRESTServer() {
 	r.POST("/v1/group", handlerGroupCreate)                                //
 	r.PATCH("/v1/group/:name", handlerGroupConfig)                         //
 	r.DELETE("/v1/group/:name", handlerGroupDelete)                        // no payload
+	r.GET("/v1/group/:name/stats", handlerGroupStats)
 	r.GET("/v1/process_profile", handlerProcessProfileList)                // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v1/process_profile/:name", handlerProcessProfileShow)          //
 	r.PATCH("/v1/process_profile/:name", handlerProcessProfileConfig)      //

@@ -77,15 +77,6 @@ func isWorkloadIP(wl string) bool {
 	return false
 }
 
-func isHostRelated(addr *share.CLUSWorkloadAddr) bool {
-	if strings.HasPrefix(addr.WlID, share.CLUSLearnedHostPrefix) {
-		return true
-	} else if addr.NatPortApp != nil && len(addr.NatPortApp) > 0 {
-		return true
-	}
-	return false
-}
-
 func isSameHostEP(wl, hid string) bool {
 	return wl == fmt.Sprintf("%s%s", share.CLUSLearnedHostPrefix, hid)
 }
@@ -452,7 +443,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 					for _, ipFrom := range from.NatIP {
 						createIPRule(ipFrom, ipTo, nil, nil, toPortApp, action, pInfo, ctx)
 						ipFromStr := ipFrom.String()
-						if sameHost && isHostRelated(from) {
+						if sameHost && utils.IsHostRelated(from) {
 							//source is on local host, add the rule from all other local/bridge ip as well
 							for _, addr := range e.HostIPs.ToSlice() {
 								if addr.(string) == ipFromStr {
@@ -675,6 +666,9 @@ func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
 			}
 		} else if addr.WlID == share.CLUSWLAllContainer {
 			for id, pInfo := range pMap {
+				if !pInfo.Configured {
+					continue
+				}
 				wlAddr := share.CLUSWorkloadAddr{
 					WlID: id,
 					PolicyMode: pInfo.Policy.Mode,
@@ -823,7 +817,7 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 						fillWorkloadAddress(from, addrMap)
 						fillWorkloadAddress(to, addrMap)
 						e.createWorkloadRule(from, to, &pp, pInfo, false, false)
-					} else if isHostRelated(to) {
+					} else if utils.IsHostRelated(to) {
 						var sameHost bool = false
 						if isSameHostEP(to.WlID, e.HostID) {
 							sameHost = true

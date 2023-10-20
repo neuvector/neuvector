@@ -396,7 +396,7 @@ func main() {
 	resource.NvAdmSvcNamespace = Ctrler.Domain
 
 	cspType, _ := common.GetMappedCspType(cspEnv, nil)
-	if cspType != share.CSP_NONE && cspType != share.CSP_EKS && cspType != share.CSP_AKS {
+	if cspType != share.CSP_NONE && cspType != share.CSP_EKS && cspType != share.CSP_AKS && cspType != share.CSP_GCP {
 		cspType = share.CSP_NONE
 	}
 	if *cspPauseInterval == 0 {
@@ -747,13 +747,13 @@ func main() {
 	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
-	go rest.CrdQueueProc()
+	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
 
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)
 		if Ctrler.Leader {
-			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName)
+			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 		}
 		go rest.CleanupSessCfgCache()
 		go rest.AdmissionRestServer(*admctrlPort, false, *debug)

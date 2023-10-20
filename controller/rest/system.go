@@ -300,6 +300,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						SingleCVEPerSyslog: rconf.SingleCVEPerSyslog,
 						SyslogCVEInLayers:  rconf.SyslogCVEInLayers,
 						SyslogServerCert:   rconf.SyslogServerCert,
+						OutputEventToLogs:  rconf.OutputEventToLogs,
 					},
 					Auth: api.RESTSystemConfigAuthV2{
 						AuthOrder:      rconf.AuthOrder,
@@ -1229,6 +1230,10 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				cconf.SyslogCVEInLayers = *rc.SyslogCVEInLayers
 			}
 
+			if rc.OutputEventToLogs != nil {
+				cconf.OutputEventToLogs = *rc.OutputEventToLogs
+			}
+
 			// Auth order
 			if rc.AuthOrder != nil {
 				order := make([]string, 0)
@@ -1510,6 +1515,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.SingleCVEPerSyslog = configV2.SyslogCfg.SingleCVEPerSyslog
 				config.SyslogCVEInLayers = configV2.SyslogCfg.SyslogCVEInLayers
 				config.SyslogServerCert = configV2.SyslogCfg.SyslogServerCert
+				config.OutputEventToLogs = configV2.SyslogCfg.OutputEventToLogs
 			}
 			if configV2.AuthCfg != nil {
 				config.AuthOrder = configV2.AuthCfg.AuthOrder
@@ -2301,7 +2307,7 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 	var msgToken string
 	switch importType {
 	case share.IMPORT_TYPE_CONFIG:
-		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName)
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 		msgToken = "configurations"
 	case share.IMPORT_TYPE_GROUP_POLICY:
 		msgToken = "group policy"
