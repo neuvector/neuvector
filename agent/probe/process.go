@@ -1911,7 +1911,9 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	mLog.WithFields(log.Fields{
 		"id": id,
 		"name": proc.name,
+		"pname": proc.pname,
 		"pid": proc.pid,
+		"ppid": proc.ppid,
 		"path": proc.path,
 		"action": action,
 		"risky": risky,
@@ -1926,18 +1928,24 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
 
 		// If the ID is empty, lets make sure it is not because we missed the info
-		if id == "" {
+		if id == "" && !global.RT.IsRuntimeProcess(proc.pname, nil) {
 			c, found := p.pidContainerMap[proc.pid]
 			if found && c.id != "" {
 				id = c.id
 				mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "c": c}).Debug("PROC: Patched empty proc ID with updated container info")
 			} else {
-				if procID, _, err, found := global.SYS.GetContainerIDByPID(proc.pid); err == nil && found {
-					id = procID
-					mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "procId": procID}).Debug("PROC: Patched empty proc ID with Container info thru PID")
-				} else {
-					mLog.WithFields(log.Fields{"id": id, "pid": proc.pid, "procId": procID, "err": err, "found": found}).Warning("PROC: Could not find PID's ID")
-				}
+				mLog.WithFields(log.Fields{
+					"id": id,
+					"name": proc.name,
+					"pname": proc.pname,
+					"pid": proc.pid,
+					"ppid": proc.ppid,
+					"path": proc.path,
+					"action": action,
+					"risky": risky,
+					"proc.riskType": proc.riskType,
+				}).Debug("PROC: Container ID is missing, skipping for re-eval")
+				return
 			}
 		}
 
