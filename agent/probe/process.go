@@ -1928,7 +1928,7 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
 
 		// If the ID is empty, lets make sure it is not because we missed the info
-		if id == "" && !global.RT.IsRuntimeProcess(proc.pname, nil) {
+		if id == "" && global.RT.IsRuntimeProcess(proc.pname, nil) {
 			c, found := p.pidContainerMap[proc.pid]
 			if found && c.id != "" {
 				id = c.id
