@@ -195,6 +195,43 @@ func (q *tCrdRequestsMgr) deleteCrInK8s(kind, recordName string, crdSecRule inte
 	}
 }
 
+// for CRD only.
+// it returns non-nil error to indicate skipping the crd request.
+func (q *tCrdRequestsMgr) noExistingObj(rscType, ns, crUid, mdName string) error {
+
+	if obj, err := global.ORCH.GetResource(rscType, ns, mdName); err == nil {
+		var uidExisting string
+		switch rscType {
+		case resource.RscTypeCrdSecurityRule, resource.RscTypeCrdClusterSecurityRule:
+			if rscType == resource.RscTypeCrdSecurityRule {
+				r := obj.(*resource.NvSecurityRule)
+				uidExisting = *r.Metadata.Uid
+			} else {
+				r1 := obj.(*resource.NvClusterSecurityRule)
+				r := resource.NvSecurityRule(*r1)
+				uidExisting = *r.Metadata.Uid
+			}
+		case resource.RscTypeCrdAdmCtrlSecurityRule:
+			r := obj.(*resource.NvAdmCtrlSecurityRule)
+			uidExisting = *r.Metadata.Uid
+		case resource.RscTypeCrdDlpSecurityRule:
+			r := obj.(*resource.NvDlpSecurityRule)
+			if r != nil {
+				uidExisting = *r.Metadata.Uid
+			}
+		case resource.RscTypeCrdWafSecurityRule:
+			r := obj.(*resource.NvWafSecurityRule)
+			uidExisting = *r.Metadata.Uid
+		}
+		if crUid != uidExisting {
+			// cr in k8s & crd request's uid are different!
+			//log.WithFields(log.Fields{"name": mdName, "uid": uid, "crUid": crUid}).Warn()
+			return fmt.Errorf("UID in Kubernetes is %s but UID in request is %s", uidExisting, crUid)
+		}
+	}
+	return nil
+}
+
 func (q *tCrdRequestsMgr) writeCrOpEvent(kind, recordName, uid string, ev share.TLogEvent, msg string, subMsgs []string) {
 	detail := make([]string, 0, len(subMsgs))
 	for _, subMsg := range subMsgs {
@@ -319,50 +356,73 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					errMsg = fmt.Sprintf("CRD Rule format error")
 				}
 			case "CREATE", "UPDATE":
+				var mdName string
+				var rscType string
 				switch kind {
 				case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-					err = json.Unmarshal(req.Object.Raw, &gfwrule)
-					mdBackup := prepareForMd5(gfwrule.Metadata)
-					ruleJsonValue, _ := json.Marshal(&gfwrule)
-					crdMD5, _ = calcCrdSecRuleMD5(gfwrule.Metadata, mdBackup, ruleJsonValue, nil, "")
-					crdSecRule = &gfwrule
-					crdHandler.crUid = gfwrule.Metadata.GetUid()
-
-					if req.Namespace != "" {
-						// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
-						_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
-						if err2 != nil && strings.Contains(err2.Error(), " 404 ") {
-							crInfo = "namespace not found"
-							goto SKIP_CRD_HANDLER
+					if err = json.Unmarshal(req.Object.Raw, &gfwrule); err == nil {
+						mdBackup := prepareForMd5(gfwrule.Metadata)
+						ruleJsonValue, _ := json.Marshal(&gfwrule)
+						crdMD5, _ = calcCrdSecRuleMD5(gfwrule.Metadata, mdBackup, ruleJsonValue, nil, "")
+						crdSecRule = &gfwrule
+						crdHandler.crUid = gfwrule.Metadata.GetUid()
+						mdName = gfwrule.Metadata.GetName()
+						rscType = resource.RscTypeCrdSecurityRule
+						if req.Namespace != "" {
+							// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
+							_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
+							if err2 != nil && strings.Contains(err2.Error(), " 404 ") {
+								crInfo = "namespace not found"
+								goto SKIP_CRD_HANDLER
+							}
+						}
+						if kind == resource.NvClusterSecurityRuleKind {
+							rscType = resource.RscTypeCrdClusterSecurityRule
 						}
 					}
 				case resource.NvAdmCtrlSecurityRuleKind:
-					err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule)
-					mdBackup := prepareForMd5(admCtrlSecRule.Metadata)
-					ruleJsonValue, _ := json.Marshal(&admCtrlSecRule)
-					crdMD5, _ = calcCrdSecRuleMD5(admCtrlSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
-					crdSecRule = &admCtrlSecRule
-					crdHandler.crUid = admCtrlSecRule.Metadata.GetUid()
+					if err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule); err == nil {
+						mdBackup := prepareForMd5(admCtrlSecRule.Metadata)
+						ruleJsonValue, _ := json.Marshal(&admCtrlSecRule)
+						crdMD5, _ = calcCrdSecRuleMD5(admCtrlSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
+						crdSecRule = &admCtrlSecRule
+						crdHandler.crUid = admCtrlSecRule.Metadata.GetUid()
+						mdName = admCtrlSecRule.Metadata.GetName()
+						rscType = resource.RscTypeCrdAdmCtrlSecurityRule
+					}
 				case resource.NvDlpSecurityRuleKind:
-					err = json.Unmarshal(req.Object.Raw, &dlpSecRule)
-					mdBackup := prepareForMd5(dlpSecRule.Metadata)
-					ruleJsonValue, _ := json.Marshal(&dlpSecRule)
-					crdMD5, _ = calcCrdSecRuleMD5(dlpSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
-					crdSecRule = &dlpSecRule
-					crdHandler.crUid = dlpSecRule.Metadata.GetUid()
+					if err = json.Unmarshal(req.Object.Raw, &dlpSecRule); err == nil {
+						mdBackup := prepareForMd5(dlpSecRule.Metadata)
+						ruleJsonValue, _ := json.Marshal(&dlpSecRule)
+						crdMD5, _ = calcCrdSecRuleMD5(dlpSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
+						crdSecRule = &dlpSecRule
+						crdHandler.crUid = dlpSecRule.Metadata.GetUid()
+						mdName = dlpSecRule.Metadata.GetName()
+						rscType = resource.RscTypeCrdDlpSecurityRule
+					}
 				case resource.NvWafSecurityRuleKind:
-					err = json.Unmarshal(req.Object.Raw, &wafSecRule)
-					mdBackup := prepareForMd5(wafSecRule.Metadata)
-					ruleJsonValue, _ := json.Marshal(&wafSecRule)
-					crdMD5, _ = calcCrdSecRuleMD5(wafSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
-					crdSecRule = &wafSecRule
-					crdHandler.crUid = wafSecRule.Metadata.GetUid()
+					if err = json.Unmarshal(req.Object.Raw, &wafSecRule); err == nil {
+						mdBackup := prepareForMd5(wafSecRule.Metadata)
+						ruleJsonValue, _ := json.Marshal(&wafSecRule)
+						crdMD5, _ = calcCrdSecRuleMD5(wafSecRule.Metadata, mdBackup, ruleJsonValue, nil, "")
+						crdSecRule = &wafSecRule
+						crdHandler.crUid = wafSecRule.Metadata.GetUid()
+						mdName = wafSecRule.Metadata.GetName()
+						rscType = resource.RscTypeCrdWafSecurityRule
+					}
 				default:
 					err = fmt.Errorf("unsupported Kubernetese resource kind")
 				}
 				if err != nil {
 					errCount = 1
 					errMsg = fmt.Sprintf("CRD Rule format error")
+				} else {
+					if mdName != "" && rscType != "" {
+						if err = q.noExistingObj(rscType, req.Namespace, crdHandler.crUid, mdName); err != nil {
+							errCount = 1
+							errMsg = err.Error()
+						}
+					}
 				}
 			}
 

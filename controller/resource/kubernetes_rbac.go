@@ -136,7 +136,7 @@ var appRoleVerbs utils.Set = utils.NewSet("get", "list", "update", "watch")
 var rbacRoleVerbs utils.Set = utils.NewSet("get", "list", "watch")
 var admissionRoleVerbs utils.Set = utils.NewSet("create", "delete", "get", "list", "update", "watch")
 var crdRoleVerbs utils.Set = utils.NewSet("create", "get", "update", "watch")
-var crdPolicyRoleVerbs utils.Set = utils.NewSet("delete", "list")
+var crdPolicyRoleVerbs utils.Set = utils.NewSet("delete", "get", "list")
 
 var ctrlerSubjectWanted string = "controller"
 var updaterSubjectWanted string = "updater"

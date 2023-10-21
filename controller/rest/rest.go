@@ -1538,11 +1538,11 @@ func StartRESTServer() {
 	r.PATCH("/v1/group/:name", handlerGroupConfig)                         //
 	r.DELETE("/v1/group/:name", handlerGroupDelete)                        // no payload
 	r.GET("/v1/group/:name/stats", handlerGroupStats)
-	r.GET("/v1/process_profile", handlerProcessProfileList)                // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
-	r.GET("/v1/process_profile/:name", handlerProcessProfileShow)          //
-	r.PATCH("/v1/process_profile/:name", handlerProcessProfileConfig)      //
-	r.GET("/v1/process_rules/:uuid", handlerProcRuleShow)                  //
-	r.GET("/v1/file_monitor", handlerFileMonitorList)                      // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
+	r.GET("/v1/process_profile", handlerProcessProfileList)           // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
+	r.GET("/v1/process_profile/:name", handlerProcessProfileShow)     //
+	r.PATCH("/v1/process_profile/:name", handlerProcessProfileConfig) //
+	r.GET("/v1/process_rules/:uuid", handlerProcRuleShow)             //
+	r.GET("/v1/file_monitor", handlerFileMonitorList)                 // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v1/file_monitor/:name", handlerFileMonitorShow)
 	r.PATCH("/v1/file_monitor/:name", handlerFileMonitorConfig)
 	r.GET("/v1/file_monitor_file", handlerFileMonitorFile) // debug
@@ -2001,6 +2001,10 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 			} else {
 				err = fmt.Errorf("wrong type")
 			}
+		}
+	case share.ProcessCrdQueue:
+		if crdReqMgr != nil {
+			crdReqMgr.crdReqProcTimer.Reset(time.Duration(time.Second) * 3)
 		}
 	}
 
