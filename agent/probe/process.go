@@ -1626,10 +1626,6 @@ func (p *Probe) addContainerCandidate(proc *procInternal, scanMode bool) (*procC
 		}
 		return nil, -1 // not ready
 	}
-	if err != nil {
-		log.WithFields(log.Fields{"id": id, "containerInContainer": containerInContainer,
-			"err": err}).Warning("Container ID by PID failed")
-	}
 
 	// In container-in-container enviroment, the id should be container-in-container type.
 	if p.containerInContainer && !containerInContainer {
@@ -1904,25 +1900,10 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 			risky = false
 		}
 	}
+	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
 	// it has not been reported as a profile/risky event
 	riskyReported = (proc.reported & (suspicReported | profileReported)) != 0
-
-	mLog.WithFields(log.Fields{
-		"id": id,
-		"name": proc.name,
-		"pname": proc.pname,
-		"pid": proc.pid,
-		"ppid": proc.ppid,
-		"path": proc.path,
-		"action": action,
-		"risky": risky,
-		"riskyReported": riskyReported,
-		"bSkipReport": bSkipReport,
-		"proc.riskType": proc.riskType,
-		"suspicReported": proc.reported & suspicReported,
-		"profileReported": proc.reported & profileReported,
-	}).Debug("PROC: Result")
 	if risky && !riskyReported {
 
 		proc.user = p.getUpdatedUsername(proc.pid, proc.euid)
