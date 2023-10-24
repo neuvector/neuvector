@@ -1319,15 +1319,18 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 func (h *nvCrdHandler) crdHandleDlpGroup(txn *cluster.ClusterTransact, name string, dlpGroupCfg *api.RESTCrdDlpGroupConfig, cfgType share.TCfgType) []string {
 	if dlpGroupCfg != nil {
 		changed := false
-		if dlpGroup := clusHelper.GetDlpGroup(name); dlpGroup != nil && dlpGroup.CfgType == cfgType && dlpGroup.Status == dlpGroupCfg.Status &&
-			len(dlpGroupCfg.RepSensors) == len(dlpGroup.Sensors) {
-			for idx, settingCfg := range dlpGroupCfg.RepSensors {
-				if dlpGroup.Sensors[idx] == nil || dlpGroup.Sensors[idx].Name != settingCfg.Name || dlpGroup.Sensors[idx].Action != settingCfg.Action {
-					changed = true
-					break
+		if dlpGroup := clusHelper.GetDlpGroup(name); dlpGroup != nil {
+			if dlpGroup.CfgType == cfgType && dlpGroup.Status == dlpGroupCfg.Status && len(dlpGroupCfg.RepSensors) == len(dlpGroup.Sensors) {
+				for idx, settingCfg := range dlpGroupCfg.RepSensors {
+					if dlpGroup.Sensors[idx] == nil || dlpGroup.Sensors[idx].Name != settingCfg.Name || dlpGroup.Sensors[idx].Action != settingCfg.Action {
+						changed = true
+						break
+					}
 				}
+			} else {
+				changed = true
 			}
-		} else if dlpGroup == nil {
+		} else {
 			changed = true
 		}
 		if changed {
@@ -1407,15 +1410,18 @@ func (h *nvCrdHandler) crdHandleDlpSensor(scope string, dlpSensorConf *api.RESTD
 func (h *nvCrdHandler) crdHandleWafGroup(txn *cluster.ClusterTransact, name string, wafGroupCfg *api.RESTCrdWafGroupConfig, cfgType share.TCfgType) []string {
 	if wafGroupCfg != nil {
 		changed := false
-		if wafGroup := clusHelper.GetWafGroup(name); wafGroup != nil && wafGroup.CfgType == cfgType && wafGroup.Status == wafGroupCfg.Status &&
-			len(wafGroupCfg.RepSensors) == len(wafGroup.Sensors) {
-			for idx, settingCfg := range wafGroupCfg.RepSensors {
-				if wafGroup.Sensors[idx] == nil || wafGroup.Sensors[idx].Name != settingCfg.Name || wafGroup.Sensors[idx].Action != settingCfg.Action {
-					changed = true
-					break
+		if wafGroup := clusHelper.GetWafGroup(name); wafGroup != nil {
+			if wafGroup.CfgType == cfgType && wafGroup.Status == wafGroupCfg.Status && len(wafGroupCfg.RepSensors) == len(wafGroup.Sensors) {
+				for idx, settingCfg := range wafGroupCfg.RepSensors {
+					if wafGroup.Sensors[idx] == nil || wafGroup.Sensors[idx].Name != settingCfg.Name || wafGroup.Sensors[idx].Action != settingCfg.Action {
+						changed = true
+						break
+					}
 				}
+			} else {
+				changed = true
 			}
-		} else if wafGroup == nil {
+		} else {
 			changed = true
 		}
 		if changed {
