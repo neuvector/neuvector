@@ -4,7 +4,7 @@ libdir=${exec_prefix}/lib
 includedir=${prefix}/include
 
 Name: libhs
-Description: Intel(R) Hyperscan Library
+Description: Intel(R) Hyperscan Library (Vectorscan for ARM support)
 Version: 5.4.9
 Libs: -L${libdir} -lhs
 Cflags: -I${includedir}/hs
