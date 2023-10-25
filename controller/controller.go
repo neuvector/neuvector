@@ -37,6 +37,9 @@ import (
 var Host share.CLUSHost = share.CLUSHost{
 	Platform: share.PlatformDocker,
 }
+
+// When accessing global Ctrler, Ctrler.OrchConnStatus and Ctrler.OrchConnLastError will be empty all the time.
+// Use GetOrchConnStatus() instead.
 var Ctrler, parentCtrler share.CLUSController
 
 type ctrlEnvInfo struct {
@@ -747,7 +750,7 @@ func main() {
 	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
-	go rest.CrdQueueProc()
+	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
 
 	if platform == share.PlatformKubernetes {

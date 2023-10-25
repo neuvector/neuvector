@@ -11,6 +11,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/graph"
+	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -42,6 +43,12 @@ func preTest() {
 		MutexLog: mutexLog,
 		LocalDev: localDev,
 	}
+
+	sctx := scan.Context{
+		MutexLog:   mutexLog,
+		ScanLog:    mutexLog,
+	}
+	scan.InitContext(&sctx, true)
 }
 
 type caseParam struct {

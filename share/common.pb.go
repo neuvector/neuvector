@@ -85,6 +85,7 @@ It has these top-level messages:
 	CLUSWorkloadIntercept
 	CLUSMeter
 	CLUSMeterArray
+	CLUSWlIDArray
 	ScanTypeMap
 	ScanVulnerability
 	ScanLayerResult

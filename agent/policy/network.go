@@ -666,6 +666,9 @@ func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
 			}
 		} else if addr.WlID == share.CLUSWLAllContainer {
 			for id, pInfo := range pMap {
+				if !pInfo.Configured {
+					continue
+				}
 				wlAddr := share.CLUSWorkloadAddr{
 					WlID: id,
 					PolicyMode: pInfo.Policy.Mode,

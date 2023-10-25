@@ -857,6 +857,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	Image              string               `json:"image"`
 	ImageID            string               `json:"image_id"`
 	ImgCreateAt        string               `json:"image_created_at"`
+	ImgRegScand        bool                 `json:"image_reg_scanned"`
 	PlatformRole       string               `json:"platform_role"`
 	Domain             string               `json:"domain"`
 	State              string               `json:"state"`
@@ -865,6 +866,7 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	ServiceGroup       string               `json:"service_group"`
 	ShareNSWith        string               `json:"share_ns_with,omitempty"`
 	CapSniff           bool                 `json:"cap_sniff"`
+	HasDatapath        bool                 `json:"has_datapath"`
 	CapQuar            bool                 `json:"cap_quarantine"`
 	CapChgMode         bool                 `json:"cap_change_mode"`
 	PolicyMode         string               `json:"policy_mode"`
@@ -920,6 +922,7 @@ type RESTWorkloadBriefV2 struct {
 	Image        string `json:"image"`
 	ImageID      string `json:"image_id"`
 	ImgCreateAt  string `json:"image_created_at"`
+	ImgRegScand  bool   `json:"image_reg_scanned"`
 	Domain       string `json:"domain"`
 	State        string `json:"state"`
 	Service      string `json:"service"`
@@ -1314,6 +1317,12 @@ type RESTStats struct {
 
 type RESTWorkloadStatsData struct {
 	ID     string     `json:"id"`
+	ReadAt string     `json:"read_at"`
+	Stats  *RESTStats `json:"stats"`
+}
+
+type RESTGroupStatsData struct {
+	Name   string     `json:"name"`
 	ReadAt string     `json:"read_at"`
 	Stats  *RESTStats `json:"stats"`
 }
