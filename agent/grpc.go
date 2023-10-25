@@ -54,7 +54,7 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 	log.WithFields(log.Fields{"id": req.ID}).Info("")
 
 	if ss.setScanStart(req.ID) {
-		log.WithFields(log.Fields{"id": req.ID}).Info("scan in propress")
+		log.WithFields(log.Fields{"id": req.ID}).Info("scan in progress")
 		return &share.ScanData{Error: share.ScanErrorCode_ScanErrInProgress}, nil
 	}
 
