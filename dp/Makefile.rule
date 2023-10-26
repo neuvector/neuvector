@@ -9,7 +9,13 @@ ROOTDIR = $(TOPDIR)/..
 GCC_VERSION = $(shell gcc -dumpversion)
 
 CFLAGS = -Wall -Werror -Wno-unused-result -Wno-unused-function -fstrict-aliasing -Wstrict-aliasing -g
-CFLAGS += -I./ -I$(TOPDIR)/ -I$(TOPDIR)/third-party/.objs/include
+ifeq ($(ARCH), arm64)
+EXTRA_CFLAGS = -I./ -I$(TOPDIR)/ -I$(TOPDIR)/third-party/.objs/arm64/include
+EXTRA_CFLAGS += $(shell pkg-config --cflags libnfnetlink)
+EXTRA_CFLAGS += $(shell pkg-config --cflags libnetfilter_queue)
+else
+EXTRA_CFLAGS = -I./ -I$(TOPDIR)/ -I$(TOPDIR)/third-party/.objs/include
+endif
 ifdef DISABLE_OPT
 CFLAGS += -O0
 else
@@ -18,9 +24,12 @@ endif
 
 # -no-pie is supported since gcc 6
 ifeq ("6.0",$(firstword $(sort "$(GCC_VERSION)" "6.0")))
-LDFLAGS = -no-pie -L$(TOPDIR)/third-party/.objs/lib
+LDFLAGS = -no-pie
+endif
+ifeq ($(ARCH), arm64)
+LDFLAGS += -L$(TOPDIR)/third-party/.objs/arm64/lib
 else
-LDFLAGS = -L$(TOPDIR)/third-party/.objs/lib
+LDFLAGS += -L$(TOPDIR)/third-party/.objs/lib
 endif
 
 CSRCS += $(wildcard *.c)
