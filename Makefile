@@ -124,5 +124,5 @@ all_image: pull_all_base stage_all
 fleet:
 	# This is running in neuvector/
 	@echo "Making $@ ..."
-	@docker pull neuvector/build_fleet:${BUILD_IMAGE_TAG}
-	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet:${BUILD_IMAGE_TAG}
+	# @docker pull neuvector/build_fleet:${BUILD_IMAGE_TAG}
+	@docker run --rm -ia STDOUT --name build -e ARCH=arm64 -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet:${BUILD_IMAGE_TAG}
