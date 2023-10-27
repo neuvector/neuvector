@@ -363,16 +363,20 @@ func runtimeEventCallback(ev container.Event, id string, pid int) {
 		ContainerTaskChan <- &task
 	case container.EventContainerCopyIn:
 		gInfoRLock()
-		defer gInfoRUnlock()
-		if c, ok := gInfo.activeContainers[id]; ok {
+		c, ok := gInfo.activeContainers[id]
+		gInfoRUnlock()
+
+		if ok {
 			prober.ReportDockerCp(id, c.name, true)
 		} else if isAgentContainer(id) {
 			prober.ReportDockerCp(id, Agent.Name, true)
 		}
 	case container.EventContainerCopyOut:
 		gInfoRLock()
-		defer gInfoRUnlock()
-		if c, ok := gInfo.activeContainers[id]; ok {
+		c, ok := gInfo.activeContainers[id]
+		gInfoRUnlock()
+
+		if ok {
 			prober.ReportDockerCp(id, c.name, false)
 		} else if isAgentContainer(id) {
 			prober.ReportDockerCp(id, Agent.Name, false)
@@ -1778,7 +1782,9 @@ func examNetworkInterface(c *containerData) bool {
 }
 
 func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
+	gInfoRLock()
 	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
 	if !ok {
 		return
 	}
@@ -1885,8 +1891,11 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 }
 
 func taskAddContainer(id string, info *container.ContainerMetaExtra) {
-	// This can be invoked from Docker socket and probe. Only used in task loop, no lock.
-	if _, ok := gInfo.activeContainers[id]; ok {
+	// This can be invoked from Docker socket and probe.
+	gInfoRLock()
+	_, ok := gInfo.activeContainers[id];
+	gInfoRUnlock()
+	if ok {
 		return
 	}
 
@@ -2031,7 +2040,9 @@ func taskStopContainer(id string, pid int) {
 
 	// containerd runtime report TaskExit for both process stop and container stop.
 	// Here is to make sure the pid is container's pid
+	gInfoRLock()
 	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
 	if !ok || (pid != 0 && pid != c.pid) {
 		return
 	}
@@ -2135,7 +2146,10 @@ func taskDelContainer(id string) {
 		return
 	}
 
-	if c, ok := gInfo.activeContainers[id]; ok {
+	gInfoRLock()
+	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
+	if ok {
 		if c.pid != 0 && osutil.IsPidValid(c.pid) {
 			// false-positive event from cri-o
 			log.WithFields(log.Fields{"container": id, "pid": c.pid}).Debug("live rootPid")
