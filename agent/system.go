@@ -813,7 +813,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 					wlmacs.Add(pair.MAC.String())
 				}
 				//we need to detect traffic between sidecar and service container
-				if gInfo.tapProxymesh && c.info.ProxyMesh {
+				if gInfo.tapProxymesh && isProxyMesh(c) {
 					lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 					dlpWlRule.WorkloadMac = append(dlpWlRule.WorkloadMac, lomac_str)
 					wlmacs.Add(lomac_str)

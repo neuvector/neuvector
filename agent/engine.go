@@ -1189,6 +1189,9 @@ func fillContainerProperties(c *containerData, parent *containerData,
 			c.capIntcp = !hostMode
 			c.capBlock = true
 		}
+		if c.pid == 0 {
+			c.hasDatapath = false
+		}
 		c.inline = isContainerInline(c)
 		c.blocking = isContainerBlocking(c)
 		c.quar = isContainerQuarantine(c)
@@ -1206,7 +1209,11 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		if parent.pid == 0 {
 			//NVSHAS-7830, multiple children exist, some may not be runnig
 			//when parent pid=0, need to set all child hasDatapath to true
-			c.hasDatapath = true
+			//NVSHAS-8406,for istio only set app container to have datapath
+			info.Sidecar = isSidecarContainer(info.Labels)
+			if !info.Sidecar {
+				c.hasDatapath = true
+			}
 			parent.hasDatapath = false
 		}
 	}
@@ -1838,7 +1845,11 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 			examNetworkInterface(c)
 		}
 	} else {
-		if !hostMode && parent.pid == 0 {
+		info.Sidecar = isSidecarContainer(info.Labels)
+		if info.Sidecar {
+			parent.info.ProxyMesh = true
+		}
+		if !hostMode && parent.pid == 0 && !info.Sidecar {
 			if parent.examIntface == false {
 				parent.examIntface = true // only monitor one child container
 				if examNetworkInterface(c) {
@@ -1847,28 +1858,28 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 			}
 		}
 
-		info.Sidecar = isSidecarContainer(info.Labels)
-		if info.Sidecar {
-			parent.info.ProxyMesh = true
-			if gInfo.tapProxymesh {
-				if parent.pid != 0 {
+		if gInfo.tapProxymesh {
+			if parent.pid != 0 {
+				if info.Sidecar {
 					programProxyMeshDP(parent, false, false)
-				} else if c.hasDatapath { //child that has datapath
-					programProxyMeshDP(c, false, false)
-				} else { //find child that has datapath
-					for podID := range parent.pods.Iter() {
-						if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
-							programProxyMeshDP(ch, false, false)
-							break
-						}
+				}
+			} else if c.hasDatapath { //child that has datapath
+				programProxyMeshDP(c, false, false)
+			} else { //find child that has datapath
+				for podID := range parent.pods.Iter() {
+					if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
+						programProxyMeshDP(ch, false, false)
+						break
 					}
 				}
 			}
 		}
 		gInfoLock()
-		if info.Sidecar && gInfo.tapProxymesh {
+		if gInfo.tapProxymesh {
 			if parent.pid != 0 {
-				updateProxyMeshMac(parent, true)
+				if info.Sidecar {
+					updateProxyMeshMac(parent, true)
+				}
 			} else if c.hasDatapath { //child that has datapath
 				updateProxyMeshMac(c, true)
 			} else { //find child that has datapath
