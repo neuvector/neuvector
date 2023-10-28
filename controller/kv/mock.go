@@ -470,7 +470,7 @@ func (m *MockCluster) GetComplianceProfile(name string, acc *access.AccessContro
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m *MockCluster) PutComplianceProfile(cp *share.CLUSComplianceProfile, rev uint64) error {
+func (m *MockCluster) PutComplianceProfile(cp *share.CLUSComplianceProfile, rev *uint64) error {
 	m.complianceProfiles[cp.Name] = cp
 	return nil
 }

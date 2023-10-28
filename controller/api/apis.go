@@ -511,6 +511,16 @@ type RESTWafSensorExport struct {
 	Names []string `json:"names"`
 }
 
+// vlunerability profile export. only support "default" profile to export(5.3+)
+type RESTVulnProfilesExport struct {
+	Names []string `json:"names"`
+}
+
+// compliance profile export. only support "default" profile to export(5.3+)
+type RESTCompProfilesExport struct {
+	Names []string `json:"names"`
+}
+
 type RESTUser struct {
 	Fullname              string              `json:"fullname"`
 	Server                string              `json:"server"`
@@ -2498,6 +2508,7 @@ type RESTComplianceProfile struct {
 	Name          string                       `json:"name"`
 	DisableSystem bool                         `json:"disable_system"`
 	Entries       []RESTComplianceProfileEntry `json:"entries"`
+	CfgType       string                       `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTComplianceProfileData struct {
@@ -2512,6 +2523,7 @@ type RESTComplianceProfileConfig struct {
 	Name          string                         `json:"name"`
 	DisableSystem *bool                          `json:"disable_system,omitempty"`
 	Entries       *[]*RESTComplianceProfileEntry `json:"entries,omitempty"`
+	CfgType       string                         `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTComplianceProfileConfigData struct {
@@ -2539,6 +2551,7 @@ type RESTVulnerabilityProfileEntry struct {
 type RESTVulnerabilityProfile struct {
 	Name    string                          `json:"name"`
 	Entries []RESTVulnerabilityProfileEntry `json:"entries"`
+	CfgType string                          `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileData struct {
@@ -2552,6 +2565,7 @@ type RESTVulnerabilityProfilesData struct {
 type RESTVulnerabilityProfileConfig struct {
 	Name    string                            `json:"name"`
 	Entries *[]*RESTVulnerabilityProfileEntry `json:"entries,omitempty"`
+	CfgType string                            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileConfigData struct {

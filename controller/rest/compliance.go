@@ -6,21 +6,26 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"sort"
 
 	"github.com/julienschmidt/httprouter"
-	log "github.com/sirupsen/logrus"
-
+	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 )
 
 func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -107,7 +112,7 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 }
 
 func handlerComplianceProfileList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -131,7 +136,7 @@ func handlerComplianceProfileList(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -173,7 +178,7 @@ func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.REST
 	return nil
 }
 
-func configComplianceProfile(ccp *share.CLUSComplianceProfile, rcp *api.RESTComplianceProfileConfig) error {
+func configComplianceProfile(ccp *share.CLUSComplianceProfile, cfgType share.TCfgType, rcp *api.RESTComplianceProfileConfig) error {
 	if rcp.DisableSystem != nil {
 		ccp.DisableSystem = *rcp.DisableSystem
 	}
@@ -185,12 +190,13 @@ func configComplianceProfile(ccp *share.CLUSComplianceProfile, rcp *api.RESTComp
 			}
 		}
 	}
+	ccp.CfgType = cfgType
 
 	return nil
 }
 
 func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -202,6 +208,14 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 	if name != share.DefaultComplianceProfileName {
 		log.Error("Only the default compliance profile is allowed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Only the default compliance profile is allowed")
+		return
+	}
+
+	if cp, _, err := cacher.GetComplianceProfile(name, acc); cp == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	} else if cp.CfgType == api.CfgTypeGround {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
 
@@ -235,7 +249,7 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 
 		// clean up current entries
 		ccp.Entries = make(map[string]share.CLUSComplianceProfileEntry)
-		if err := configComplianceProfile(ccp, rcp); err != nil {
+		if err := configComplianceProfile(ccp, share.UserCreated, rcp); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to configure compliance profile")
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -246,8 +260,8 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 			return
 		}
 
-		if err := clusHelper.PutComplianceProfile(ccp, rev); err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+		if err := clusHelper.PutComplianceProfile(ccp, &rev); err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			break
@@ -263,7 +277,7 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 }
 
 func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -276,6 +290,14 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 	if name != share.DefaultComplianceProfileName {
 		log.Error("Only the default compliance profile is allowed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Only the default compliance profile is allowed")
+		return
+	}
+
+	if cp, _, err := cacher.GetComplianceProfile(name, acc); cp == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	} else if cp.CfgType == api.CfgTypeGround {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
 
@@ -318,8 +340,8 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 			return
 		}
 
-		if err := clusHelper.PutComplianceProfile(ccp, rev); err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+		if err := clusHelper.PutComplianceProfile(ccp, &rev); err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			break
@@ -335,7 +357,7 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 }
 
 func handlerComplianceProfileEntryDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -348,6 +370,14 @@ func handlerComplianceProfileEntryDelete(w http.ResponseWriter, r *http.Request,
 	if name != share.DefaultComplianceProfileName {
 		log.Error("Only the default compliance profile is allowed")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Only the default compliance profile is allowed")
+		return
+	}
+
+	if cp, _, err := cacher.GetComplianceProfile(name, acc); cp == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	} else if cp.CfgType == api.CfgTypeGround {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
 
@@ -366,8 +396,8 @@ func handlerComplianceProfileEntryDelete(w http.ResponseWriter, r *http.Request,
 			return
 		}
 
-		if err := clusHelper.PutComplianceProfile(ccp, rev); err != nil {
-			log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
+		if err := clusHelper.PutComplianceProfile(ccp, &rev); err != nil {
+			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			break
@@ -380,4 +410,212 @@ func handlerComplianceProfileEntryDelete(w http.ResponseWriter, r *http.Request,
 	}
 
 	restRespSuccess(w, r, nil, acc, login, nil, fmt.Sprintf("Delete compliance profile entry '%v'", testNum))
+}
+
+func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
+	if acc == nil {
+		return
+	}
+
+	if !acc.Authorize(&share.CLUSComplianceProfile{}, nil) {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	var rconf api.RESTCompProfilesExport
+	body, _ := ioutil.ReadAll(r.Body)
+	err := json.Unmarshal(body, &rconf)
+	if err == nil {
+		for _, name := range rconf.Names {
+			if name != share.DefaultComplianceProfileName {
+				err = errors.New("Non-default profile name is not supported yet")
+				break
+			}
+		}
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		return
+	}
+	if len(rconf.Names) == 0 {
+		rconf.Names = []string{share.DefaultComplianceProfileName}
+	}
+
+	apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvCompProfileSecurityRuleVersion)
+	kind := resource.NvCompProfileSecurityRuleKind
+	resp := resource.NvCompProfileSecurityRuleList{
+		Kind:       &resource.NvListKind,
+		ApiVersion: &apiVersion,
+	}
+
+	// export compliance profile (currently only default profile is supported)
+	var lock cluster.LockInterface
+	if lock, err = lockClusKey(w, share.CLUSLockCompKey); err != nil {
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	vpNames := utils.NewSet()
+	for _, name := range rconf.Names {
+		if vpNames.Contains(name) {
+			continue
+		}
+		profile, _, _ := clusHelper.GetComplianceProfile(name, acc)
+		if profile == nil {
+			e := "compliance profile doesn't exist"
+			log.WithFields(log.Fields{"name": name}).Error(e)
+			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
+			return
+		}
+
+		entries := make([]*api.RESTComplianceProfileEntry, 0, len(profile.Entries))
+		for _, entry := range profile.Entries {
+			entry := &api.RESTComplianceProfileEntry{
+				TestNum: entry.TestNum,
+				Tags:    entry.Tags,
+			}
+			entries = append(entries, entry)
+		}
+		sort.Slice(entries, func(s, t int) bool {
+			return entries[s].TestNum < entries[t].TestNum
+		})
+
+		resptmp := resource.NvCompProfileSecurityRule{
+			ApiVersion: &apiVersion,
+			Kind:       &kind,
+			Metadata: &cmetav1.ObjectMeta{
+				Name: &name,
+			},
+			Spec: resource.NvSecurityCompProfileSpec{
+				Templates: &resource.NvSecurityCompTemplates{
+					DisableSystem: profile.DisableSystem,
+					Entries:       entries,
+				},
+			},
+		}
+		resp.Items = append(resp.Items, &resptmp)
+		vpNames.Add(name)
+	}
+
+	// tell the browser the returned content should be downloaded
+	var data []byte
+	filename := "cfgComplianceProfileExport.yaml"
+	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
+	w.Header().Set("Content-Encoding", "gzip")
+	w.WriteHeader(http.StatusOK)
+	json_data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ = yaml.JSONToYAML(json_data)
+	data = utils.GzipBytes(data)
+	w.Write(data)
+}
+
+func handlerCompProfileImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if cp, _, err := cacher.GetComplianceProfile(share.DefaultComplianceProfileName, acc); err != nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	} else if cp.CfgType == api.CfgTypeGround {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+		return
+	}
+
+	tid := r.Header.Get("X-Transaction-ID")
+	_importHandler(w, r, tid, share.IMPORT_TYPE_COMP_PROFILE, share.PREFIX_IMPORT_COMP_PROFILE, acc, login)
+}
+
+func importCompProfile(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
+	log.Debug()
+	defer os.Remove(importTask.TempFilename)
+
+	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	var secRuleList resource.NvCompProfileSecurityRuleList
+	var secRule resource.NvCompProfileSecurityRule
+	var secRules []*resource.NvCompProfileSecurityRule = []*resource.NvCompProfileSecurityRule{nil}
+	var invalidCrdKind bool
+	var err error
+	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
+		if err = json.Unmarshal(json_data, &secRule); err == nil {
+			secRules[0] = &secRule
+		}
+	} else {
+		secRules = secRuleList.Items
+	}
+	for _, r := range secRules {
+		if r.Kind == nil || (*r.Kind != resource.NvCompProfileSecurityRuleKind && *r.Kind != resource.NvCompProfileSecurityRuleListKind) {
+			invalidCrdKind = true
+			break
+		}
+	}
+	if invalidCrdKind || len(secRules) == 0 {
+		msg := "Invalid security rule(s)"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+		return nil
+	}
+
+	var inc float32
+	var progress float32 // progress percentage
+
+	inc = 90.0 / float32(2+2*len(secRules))
+	cmpProfilesCfg := make([]*resource.NvSecurityParse, 0, len(secRules))
+	progress = 6
+
+	importTask.Percentage = int(progress)
+	importTask.Status = share.IMPORT_RUNNING
+	clusHelper.PutImportTask(&importTask)
+
+	var crdHandler nvCrdHandler
+	crdHandler.Init(share.CLUSLockCompKey)
+	if crdHandler.AcquireLock(clusterLockWait) {
+		defer crdHandler.ReleaseLock()
+
+		// [1]: parse all security rules in the yaml file
+		for _, secRule := range secRules {
+			if secRule == nil || secRule.Kind == nil || secRule.ApiVersion == nil {
+				continue
+			}
+			if cpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdCompProfileContent(secRule, share.ReviewTypeImportCompProfile, share.ReviewTypeDisplayCompProfile); errCount > 0 {
+				err = fmt.Errorf(errMsg)
+				break
+			} else {
+				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)
+				progress += inc
+				importTask.Percentage = int(progress)
+				clusHelper.PutImportTask(&importTask)
+			}
+		}
+
+		progress += inc
+		importTask.Percentage = int(progress)
+		clusHelper.PutImportTask(&importTask)
+
+		if err == nil {
+			// [2]: import compliance profile defined in the yaml file
+			for _, parsedCfg := range cmpProfilesCfg {
+				// [3] import compliance profile defined in the yaml file
+				if err = crdHandler.crdHandleCompProfile(parsedCfg.CompProfileCfg, nil, share.ReviewTypeImportCompProfile); err != nil {
+					break
+				}
+				progress += inc
+				importTask.Percentage = int(progress)
+				clusHelper.PutImportTask(&importTask)
+			}
+		}
+		importTask.Percentage = 90
+		clusHelper.PutImportTask(&importTask)
+	}
+
+	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+
+	return nil
 }
