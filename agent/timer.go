@@ -112,16 +112,17 @@ func statsLoop(bPassiveContainerDetect bool) {
 			gInfoRLock()
 			gone := gInfo.allContainers.Difference(existing)
 			creates := existing.Difference(gInfo.allContainers)
+			gInfoRUnlock()
 			if stops != nil {
 				// differentiate from active containers
 				for id := range stops.Iter() {
 					cid := id.(string)
-					if _, ok := gInfo.activeContainers[cid]; !ok {
+					if _, ok := gInfoReadActiveContainer(cid); !ok {
 						stops.Remove(cid)
 					}
 				}
 			}
-			gInfoRUnlock()
+
 			if stops != nil {
 				for id := range stops.Iter() {
 					log.WithFields(log.Fields{"id": id.(string)}).Debug("Found stop container")
@@ -381,7 +382,7 @@ func updateConnection() {
 				// get the child container too
 				gInfoRLock()
 				for id, con := range gInfo.activeContainers {
-					if _, parent := getSharedContainer(con.info); parent != nil && parent.id == c.id {
+					if _, parent := getSharedContainerWithLock(con.info); parent != nil && parent.id == c.id {
 						ids = append(ids, id)
 					}
 				}
@@ -399,13 +400,9 @@ func updateConnection() {
 }
 
 func updateSidecarConnection(conn *dp.Connection, id string) {
-	gInfoRLock()
-	defer gInfoRUnlock()
-
-	c, ok := gInfo.activeContainers[id]
-	if ok {
+	if c, ok := gInfoReadActiveContainer(id); ok {
 		for podID := range c.pods.Iter() {
-			if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+			if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
 				if pod.info.Sidecar {
 					if conn.Ingress {
 						conn.ClientWL = podID.(string)
@@ -511,27 +508,21 @@ func updateHostConnection(conns []*dp.ConnectionData) {
 		}
 
 		// To be consistent with non-host-mode platform container, ignore the connection reprot
-		gInfoRLock()
-		c, ok := gInfo.activeContainers[*id]
+		c, ok := gInfoReadActiveContainer(*id)
 		if !ok {
-			gInfoRUnlock()
 			continue
 		} else if c.parentNS != "" {
 			*id = c.parentNS
-			c, ok = gInfo.activeContainers[*id]
-			if !ok {
+			if c, ok = gInfoReadActiveContainer(*id); !ok {
 				log.WithFields(log.Fields{
 					"wlID": *id,
 				}).Error("cannot find parent container")
-				gInfoRUnlock()
 				continue
 			}
 		}
 		if c.pid != 0 && !c.hasDatapath {
-			gInfoRUnlock()
 			continue
 		}
-		gInfoRUnlock()
 
 		conn.AgentID = Agent.ID
 		conn.HostID = Host.ID

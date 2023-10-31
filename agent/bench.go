@@ -286,9 +286,8 @@ func (b *Bench) BenchLoop() {
 
 			// Run custom checks
 			wls := make([]*share.CLUSWorkload, 0)
-			gInfoRLock()
 			for id, name := range containers {
-				if c, ok := gInfo.activeContainers[id]; ok {
+				if c, ok := gInfoReadActiveContainer(id); ok {
 					if Host.Platform == share.PlatformKubernetes && c.parentNS == "" {
 						continue // skip kubernetes pod
 					}
@@ -301,7 +300,6 @@ func (b *Bench) BenchLoop() {
 					}
 				}
 			}
-			gInfoRUnlock()
 
 			if agentEnv.customBenchmark {
 				b.doContainerCustomCheck(wls)
