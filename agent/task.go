@@ -65,15 +65,18 @@ func isContainerQuarantine(c *containerData) bool {
 func taskConfigContainer(id string, newconf *share.CLUSWorkloadConfig) {
 	log.WithFields(log.Fields{"container": id, "config": *newconf}).Debug("")
 	cid := ""
+	gInfoLock()
 	gInfo.containerConfig[id] = newconf
-	if c, ok := gInfo.activeContainers[id]; ok && c.capIntcp {
+	gInfoUnlock()
+
+	if c, ok := gInfoReadActiveContainer(id); ok && c.capIntcp {
 		//NVSHAS-6716,the traffic is not blocked when container is in quarantine oc 4.9+
 		//when parent's pid==0 changeContainerWire only change parent's inline/quar value
 		//but does not really setup datapath correctly, so we need to go through same func
 		//with child whose pid!=0 to setup datapath right
 		if c.pid == 0 {
 			for podID := range c.pods.Iter() {
-				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+				if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
 					if pod.pid != 0 && pod.hasDatapath {
 						cid = podID.(string)
 						break
@@ -82,8 +85,11 @@ func taskConfigContainer(id string, newconf *share.CLUSWorkloadConfig) {
 			}
 			//log.WithFields(log.Fields{"cid": cid}).Debug("")
 			if cid != "" {
+				gInfoLock()
 				gInfo.containerConfig[cid] = newconf
-				if pc, exist := gInfo.activeContainers[cid]; exist && pc.capIntcp {
+				gInfoUnlock()
+
+				if pc, exist := gInfoReadActiveContainer(cid); exist && pc.capIntcp {
 					inline := isContainerInline(pc)
 					quar := isContainerQuarantine(pc)
 					if inline != pc.inline || quar != pc.quar {
@@ -260,13 +266,10 @@ func escalToIncidentLog(e *probe.ProbeEscalation, count int, start time.Time) *s
 		StartAt: start,
 	}
 
-	gInfoRLock()
-	defer gInfoRUnlock()
-
 	if e.ID == "" {
 		//host privilege escalation
 		eLog.ID = share.CLUSIncidHostPrivilEscalate
-	} else if c, ok := gInfo.activeContainers[e.ID]; ok {
+	} else if c, ok := gInfoReadActiveContainer(e.ID); ok {
 		eLog.WorkloadName = c.name
 		eLog.ID = share.CLUSIncidContainerPrivilEscalate
 	} else {
@@ -298,9 +301,6 @@ func fileModifiedToIncidentLog(e *fsmon.MonitorMessage) *share.CLUSIncidentLog {
 		Action:      e.Action,
 	}
 
-	gInfoLock()
-	defer gInfoUnlock()
-
 	if e.ID == "" {
 		if e.Package {
 			eLog.ID = share.CLUSIncidHostPackageUpdated
@@ -311,7 +311,7 @@ func fileModifiedToIncidentLog(e *fsmon.MonitorMessage) *share.CLUSIncidentLog {
 		} else {
 			eLog.ID = share.CLUSIncidHostFileAccessViolation
 		}
-	} else if c, ok := gInfo.activeContainers[e.ID]; ok {
+	} else if c, ok := gInfoReadActiveContainer(e.ID); ok {
 		eLog.WorkloadName = c.name
 		if e.Package {
 			eLog.ID = share.CLUSIncidContainerPackageUpdated
@@ -364,11 +364,8 @@ func processToIncidentLog(s *probe.ProbeProcess, count int, start time.Time) *sh
 		eLog.LocalPeer = isLocalHostIP(eLog.RemoteIP)
 	}
 
-	gInfoRLock()
-	defer gInfoRUnlock()
-
 	if s.ID != "" {
-		if c, ok := gInfo.activeContainers[s.ID]; ok {
+		if c, ok := gInfoReadActiveContainer(s.ID); ok {
 			eLog.WorkloadName = c.name
 		}
 	}
