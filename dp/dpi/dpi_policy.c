@@ -654,9 +654,17 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
         }
         if (_dpi_policy_implicit_default(hdl, desc)) {
             if (is_ingress) {
-                inPolicyAddr = dpi_is_policy_addr(sip);
+                if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
+                    inPolicyAddr = dpi_is_policy_addr(dip);
+                } else {
+                    inPolicyAddr = dpi_is_policy_addr(sip);
+                }
             } else {
-                inPolicyAddr = dpi_is_policy_addr(dip);
+                if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
+                    inPolicyAddr = dpi_is_policy_addr(sip);
+                } else {
+                    inPolicyAddr = dpi_is_policy_addr(dip);
+                }
             }
             if (!inPolicyAddr) {
                 _dpi_policy_chk_unknown_ip(hdl, sip, dip, iptype, &desc);
@@ -1365,6 +1373,12 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *p, int flag)
                     dpi_rule_add(hdl, &key, &key_r,
                                  p->rule_list[i].num_apps,p->rule_list[i].app_rules,
                                  dir, &desc);
+                    if (g_enable_icmp_policy) {
+                        key.proto = key_r.proto = IPPROTO_ICMP;
+                        dpi_rule_add(hdl, &key, &key_r,
+                                    p->rule_list[i].num_apps,p->rule_list[i].app_rules,
+                                    dir, &desc);
+                    }
                 }
             } else {
                 if (key.proto > 0) {
@@ -1380,11 +1394,19 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *p, int flag)
                     dpi_rule_add(hdl, &key, NULL,
                                  p->rule_list[i].num_apps,p->rule_list[i].app_rules,
                                  dir, &desc);
+                    if (g_enable_icmp_policy) {
+                        key.proto = IPPROTO_ICMP;
+                        dpi_rule_add(hdl, &key, NULL,
+                                    p->rule_list[i].num_apps,p->rule_list[i].app_rules,
+                                    dir, &desc);
+                    }
                 }
             }
         }
         if (flag & MSG_END) {
-            dpi_add_default_policy(hdl);
+            if (!g_enable_icmp_policy) {
+                dpi_add_default_policy(hdl);
+            }
         }
     } else {
         if (hdl != NULL) {

@@ -21,7 +21,8 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const defaultDockerSocket string = "unix:///var/run/docker.sock"
+const defaultDockerSocket string = "/var/run/docker.sock"
+const defaultDockerShimSocket string = "/var/run/dockershim.sock"
 
 type dockerDriver struct {
 	sys          *system.SystemTools
@@ -41,7 +42,6 @@ func _connect(endpoint string) (*dockerclient.DockerClient, *dockerclient.Versio
 	var err error
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Connecting to docker")
-
 	client, err = dockerclient.NewDockerClientTimeout(
 		endpoint, nil, clientConnectTimeout, nil)
 	if err != nil {
@@ -69,6 +69,10 @@ func _connect(endpoint string) (*dockerclient.DockerClient, *dockerclient.Versio
 }
 
 func getContainerSocketPath(client *dockerclient.DockerClient, id, endpoint string) (string, error) {
+	if strings.HasPrefix(endpoint, "/proc/1/root") {
+		return strings.TrimPrefix(endpoint, "/proc/1/root"), nil
+	}
+
 	info, err := client.InspectContainer(id)
 	if err == nil {
 		endpoint = strings.TrimPrefix(endpoint, "unix://")
@@ -118,11 +122,11 @@ func (d *dockerDriver) reConnect() error {
 	// the original socket has been recreated and its mounted path was also lost.
 	endpoint := d.endpoint
 	if d.endpointHost != "" { // use the host
-		endpoint = "unix://" + filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
-
 	client, err := dockerclient.NewDockerClientTimeout(
 		endpoint, nil, clientConnectTimeout, nil)
 	if err != nil {

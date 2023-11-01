@@ -27,7 +27,8 @@ import (
 const DefIdleTimeoutInternal uint32 = 300
 const DefaultAdminUser string = "admin"
 const DefaultAdminPass string = "admin"
-const ReservedFedUser string = "~fedOperator" // user name with prefix "~" cannot be created thru configmap/rest api
+const ReservedFedUser string = "~fedOperator"   // user name with prefix "~" cannot be created thru configmap/rest api
+const ReservedNvSystemUser string = "~nvSystem" // user name with prefix "~" cannot be created thru configmap/rest api
 const ReservedUserNameIBMSA string = "~nv.reserved.ibmsa"
 
 const ScanPlatformID = "platform"
@@ -116,7 +117,7 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
 	DisableNetPolicy:     false,
-	DetectUnmanagedWl:    false,
+	EnableIcmpPolicy:     false,
 }
 
 func ActionString(action uint8) string {

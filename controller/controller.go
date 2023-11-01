@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -254,6 +255,7 @@ func main() {
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
+	en_icmp_pol := flag.Bool("en_icmp_policy", false, "Enable icmp policy learning")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
@@ -342,6 +344,12 @@ func main() {
 		}
 	}
 
+	enableIcmpPolicy := false
+	if *en_icmp_pol {
+		log.Info("Enable icmp policy learning")
+		enableIcmpPolicy = true
+	}
+
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Unsupported OEM platform. Exit!")
 		os.Exit(-2)
@@ -360,7 +368,7 @@ func main() {
 		log.Info("Not running in container.")
 	}
 
-	if platform == share.PlatformKubernetes {
+	if platform == share.PlatformKubernetes && global.RT.String() != container.StubRtName {
 		if selfID, err = global.IdentifyK8sContainerID(selfID); err != nil {
 			log.WithFields(log.Fields{"selfID": selfID, "error": err}).Error("lookup")
 		}
@@ -387,6 +395,12 @@ func main() {
 
 		log.Info("Wait for local interface ...")
 		time.Sleep(time.Second * 4)
+	}
+
+	if platform == share.PlatformKubernetes && global.RT.String() == container.StubRtName {
+		if err := amendStubRtInfo(); err != nil {
+			log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get local device information")
+		}
 	}
 
 	Host.Platform = platform
@@ -600,6 +614,17 @@ func main() {
 			} else {
 				// it's official release image
 				nvAppFullVersion = ver.CtrlVersion[1:]
+				if ver.CtrlVersion != Version {
+					log.WithFields(log.Fields{"CtrlVersion": ver.CtrlVersion, "Version": Version}).Info()
+					clusHelper := kv.GetClusterHelper()
+					users := clusHelper.GetAllUsersNoAuth()
+					for _, user := range users {
+						if len(user.AcceptedAlerts) > 0 {
+							user.AcceptedAlerts = nil
+							clusHelper.PutUser(user)
+						}
+					}
+				}
 			}
 			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
 				nvSemanticVersion = "v" + ss[0]
@@ -655,6 +680,7 @@ func main() {
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
 		EnableRmNsGroups:         enableRmNsGrps,
+		EnableIcmpPolicy:         enableIcmpPolicy,
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
@@ -838,4 +864,45 @@ func main() {
 	ctrlDeleteLocalInfo()
 	cluster.LeaveCluster(true)
 	grpcServer.Stop()
+}
+
+func amendStubRtInfo() error {
+	podname := Ctrler.Name
+	objs, err := global.ORCH.ListResource(resource.RscTypeNamespace)
+	if err == nil {
+		for _, obj := range objs {
+			if domain := obj.(*resource.Namespace); domain != nil {
+				if o, err := global.ORCH.GetResource(resource.RscTypePod, domain.Name, podname); err == nil {
+					if pod := o.(*resource.Pod); pod != nil {
+						log.WithFields(log.Fields{"pod": pod}).Debug()
+						Ctrler.Domain = domain.Name
+						Ctrler.Labels = pod.Labels
+						if Ctrler.Labels != nil {
+							Ctrler.Labels["io.kubernetes.container.name"] = resource.NvDeploymentName
+							Ctrler.Labels["io.kubernetes.pod.name"] = podname
+							Ctrler.Labels["io.kubernetes.pod.namespace"] = Ctrler.Domain
+							Ctrler.Labels["io.kubernetes.pod.uid"] = pod.UID
+							Ctrler.Labels["name"] = share.NeuVectorRoleController
+							Ctrler.Labels["neuvector.role"] = share.NeuVectorRoleController
+							Ctrler.Labels["release"] = ""
+							Ctrler.Labels["vendor"] = "NeuVector Inc."
+							Ctrler.Labels["version"] = ""
+						}
+						if pod.HostNet {
+							Ctrler.NetworkMode = "host"
+						} else {
+							Ctrler.NetworkMode = "default"
+						}
+						Ctrler.HostName = pod.Node
+						Ctrler.Name = "k8s_" + Ctrler.Labels["io.kubernetes.container.name"] + "_" +
+							Ctrler.Labels["io.kubernetes.pod.name"] + "_" +
+							Ctrler.Labels["io.kubernetes.pod.namespace"] + "_" +
+							Ctrler.Labels["io.kubernetes.pod.uid"] + "_0"
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return fmt.Errorf("can not found: err = %v", err)
 }

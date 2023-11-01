@@ -228,6 +228,26 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 			},
 		},
 	},
+	nvCrdVulnProfileRole: &k8sRbacRoleInfo{
+		name: nvCrdVulnProfileRole,
+		rules: []*k8sRbacRoleRuleInfo{
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  constApiGroupNV,
+				resources: utils.NewSet(RscTypeCrdVulnProfile),
+				verbs:     crdPolicyRoleVerbs,
+			},
+		},
+	},
+	nvCrdCompProfileRole: &k8sRbacRoleInfo{
+		name: nvCrdCompProfileRole,
+		rules: []*k8sRbacRoleRuleInfo{
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  constApiGroupNV,
+				resources: utils.NewSet(RscTypeCrdCompProfile),
+				verbs:     crdPolicyRoleVerbs,
+			},
+		},
+	},
 	NvScannerRole: &k8sRbacRoleInfo{ // it's actually for updater pod
 		name:      NvScannerRole,
 		namespace: constNvNamespace,
@@ -285,6 +305,14 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	nvCrdWafRoleBinding: &k8sRbacBindingInfo{
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdWafRole],
+	},
+	nvCrdVulnProfileRoleBinding: &k8sRbacBindingInfo{
+		subjects: ctrlerSubjectsWanted,
+		rbacRole: rbacRolesWanted[nvCrdVulnProfileRole],
+	},
+	nvCrdCompProfileRoleBinding: &k8sRbacBindingInfo{
+		subjects: ctrlerSubjectsWanted,
+		rbacRole: rbacRolesWanted[nvCrdCompProfileRole],
 	},
 	nvViewRoleBinding: &k8sRbacBindingInfo{
 		subjects: ctrlerSubjectsWanted,

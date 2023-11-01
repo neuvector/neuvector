@@ -72,6 +72,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	resp.PropsUnavailable = []string{share.CriteriaKeyUser, share.CriteriaKeyK8sGroups}
+	resp.GlobalMode = mode
 	resp.Results = make([]*api.RESTAdmCtrlRulesTestResult, 0, len(yamlParts))
 
 	// first pass: put RBAC resources into OPA
@@ -148,8 +149,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 
 		var tempObj admissionRequestObject
 		i++
-		assessed := false
-		oneResp := api.RESTAdmCtrlRulesTestResult{
+		oneResult := api.RESTAdmCtrlRulesTestResult{
 			Index:   i,
 			Allowed: true,
 		}
@@ -162,8 +162,8 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 				msg = fmt.Sprintf("Invalid yaml: %s", err.Error())
 				log.WithFields(log.Fields{"i": i}).Error(msg)
 			} else {
-				oneResp.Kind = tempObj.Kind
-				oneResp.Name = tempObj.ObjectMeta.Name
+				oneResult.Kind = tempObj.Kind
+				oneResult.Name = tempObj.ObjectMeta.Name
 				switch tempObj.Kind {
 				case k8sKindCronJob, k8sKindDaemonSet, k8sKindDeployment, k8sKindDeploymentConfig, k8sKindJob,
 					K8sKindReplicationController, k8sKindReplicaSet, K8sKindStatefulSet, k8sKindPod:
@@ -176,40 +176,46 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 						},
 					}
 					stamps.Start = time.Now()
-					if response, reqIgnored := whsvr.validate(&ar, mode, defaultAction, &stamps, true); response == nil {
+					if response, assessResults, reqIgnored := whsvr.validate(&ar, mode, defaultAction, &stamps, true); response == nil {
 						msg = "Could not get response"
 					} else if reqIgnored {
 						msg = "Request is ignored"
 					} else {
-						oneResp.Allowed = response.Allowed
+						oneResult.Allowed = response.Allowed
 						msg = response.Result.Message
-						assessed = true
+						matchedRules := make([]*api.RESTAdmCtrlTestRuleInfo, 0, len(assessResults))
+						for _, assessResult := range assessResults {
+							matchedRule := &api.RESTAdmCtrlTestRuleInfo{
+								ID:          assessResult.RuleID,
+								Disabled:    assessResult.Disabled,
+								Type:        assessResult.RuleType,
+								Mode:        assessResult.RuleMode,
+								RuleDetails: assessResult.RuleDetails,
+							}
+							matchedRule.RuleCfgType, _ = cfgTypeMap2Api[assessResult.RuleCfgType]
+							matchedRules = append(matchedRules, matchedRule)
+						}
+						oneResult.MatchedRules = matchedRules
 					}
 				default:
-					msg = "skip"
+					msg = "This resource kind is not assessed by Admission Control"
 					log.WithFields(log.Fields{"i": i, "kind": tempObj.Kind, "name": tempObj.ObjectMeta.Name}).Debug(msg)
 				}
 			}
 		}
-		if oneResp.Allowed || !assessed {
-			oneResp.Message = msg
-			resp.Results = append(resp.Results, &oneResp)
-		} else {
-			for _, ss := range strings.Split(msg, assessMsgSep) {
-				oneRuleResp := api.RESTAdmCtrlRulesTestResult{
-					Index:   i,
-					Kind:    tempObj.Kind,
-					Name:    tempObj.ObjectMeta.Name,
-					Message: ss,
-				}
-				resp.Results = append(resp.Results, &oneRuleResp)
-			}
-		}
+		oneResult.Message = msg
+		resp.Results = append(resp.Results, &oneResult)
 	}
 
 	// cleanup, delete opa keys in opaKeys
 	for _, docKey := range opaKeys {
 		opa.DeleteDocument(docKey)
+	}
+
+	//---------------------------------------------------
+	{
+		data, _ := json.Marshal(&resp)
+		log.WithFields(log.Fields{"resp": string(data)}).Debug("=> test : 99")
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Test admission control rules")

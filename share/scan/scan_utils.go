@@ -46,13 +46,11 @@ const (
 
 const (
 	//max package file size
-	maxFileSize      = 300 * 1024 * 1024
-	hostPackage      = "/usr/local/bin/host_package.sh"
-	containerPackage = "/usr/local/bin/container_package.sh"
-	manifestJson     = "manifest.json"
-	layerJson        = "/json"
-	contentManifest  = "root/buildinfo/content_manifests"
-	dockerfile       = "root/buildinfo/Dockerfile-"
+	maxFileSize     = 300 * 1024 * 1024
+	manifestJson    = "manifest.json"
+	layerJson       = "/json"
+	contentManifest = "root/buildinfo/content_manifests"
+	dockerfile      = "root/buildinfo/Dockerfile-"
 )
 
 var libsList utils.Set = utils.NewSet(
@@ -206,18 +204,6 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 		}
 		if len(data) > 0 {
 			files = append(files, utils.TarFileInfo{AppFileName, data})
-		}
-	}
-
-	if !hasPkgMgr {
-		var scripts string
-		if objType == share.ScanObjectType_HOST {
-			scripts = hostPackage
-		} else {
-			scripts = containerPackage
-		}
-		if data, err := s.sys.NsRunScriptFile(pid, scripts); err == nil {
-			files = append(files, utils.TarFileInfo{"others_modules", data})
 		}
 	}
 

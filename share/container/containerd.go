@@ -29,6 +29,7 @@ import (
 )
 
 const defaultContainerdSock = "/run/containerd/containerd.sock"
+const defaultK3sContainerdSock = "/run/k3s/containerd/containerd.sock"
 const defaultContainerdNamespace = "default"
 const k8sContainerdNamespace = "k8s.io"
 
@@ -123,6 +124,7 @@ func (d *containerdDriver) reConnect() error {
 	endpoint := d.endpoint
 	if d.endpointHost != "" {	// use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")

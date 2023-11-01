@@ -115,6 +115,7 @@ func complianceProfile2REST(ccp *share.CLUSComplianceProfile) *api.RESTComplianc
 		Name:          ccp.Name,
 		DisableSystem: ccp.DisableSystem,
 		Entries:       make([]api.RESTComplianceProfileEntry, len(ccp.Entries)),
+		CfgType:       cfgTypeMapping[ccp.CfgType],
 	}
 
 	i := 0
@@ -412,6 +413,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Protos:       cr.Protos,
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
+				Entries:      cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			ins = append(ins, r)
@@ -434,6 +436,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Protos:       cr.Protos,
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
+				Entries:      cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			outs = append(outs, r)

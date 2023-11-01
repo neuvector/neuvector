@@ -1414,7 +1414,11 @@ func eventLog2API(ev *share.CLUSEventLog) *api.Event {
 		rlog.LicenseExpire = ev.LicenseExpire.Format("2006-01-02")
 	}
 	rlog.EnforcerLimit = ev.EnforcerLimit
-	rlog.Msg = ev.Msg
+	if ev.Msg != "" {
+		rlog.Msg = ev.Msg
+	} else {
+		rlog.Msg = info.Name
+	}
 	rlog.ReportedAt = api.RESTTimeString(ev.ReportedAt)
 	rlog.ReportedTimeStamp = ev.ReportedAt.Unix()
 
@@ -1535,7 +1539,11 @@ func threatLog2API(thrt *share.CLUSThreatLog, id string, port uint16) *api.Threa
 	rlog.ICMPCode = thrt.ICMPCode
 	rlog.Application = common.AppNameMap[thrt.Application]
 	rlog.Monitor = thrt.Tap
-	rlog.Msg = thrt.Msg
+	if thrt.Msg != "" {
+		rlog.Msg = thrt.Msg
+	} else {
+		rlog.Msg = rlog.Name
+	}
 	rlog.Packet = thrt.Packet
 	rlog.CapLen = thrt.CapLen
 
@@ -1651,7 +1659,11 @@ func incidentLog2API(incd *share.CLUSIncidentLog, id string, port uint16) *api.I
 		}
 	}
 
-	rlog.Msg = incd.Msg
+	if incd.Msg != "" {
+		rlog.Msg = incd.Msg
+	} else {
+		rlog.Msg = info.Name
+	}
 	rlog.ReportedAt = api.RESTTimeString(incd.ReportedAt)
 	rlog.ReportedTimeStamp = incd.ReportedAt.Unix()
 

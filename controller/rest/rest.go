@@ -1270,7 +1270,7 @@ func getExpiryDate(certPEM []byte) (time.Time, error) {
 }
 
 func initJWTSignKey() error {
-	ExpiryCheckPeriod := time.Minute * 5
+	ExpiryCheckPeriod := time.Minute * 30
 	RenewThreshold := time.Hour * 24 * 30
 	JWTCertValidityPeriodDay := 90 // 90 days.
 
@@ -1385,7 +1385,7 @@ func InitContext(ctx *Context) {
 	auditQueue = ctx.AuditQueue
 	messenger = ctx.Messenger
 
-	remoteAuther = auth.NewRemoteAuther()
+	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 
@@ -1446,9 +1446,10 @@ func StartRESTServer() {
 	//r.POST("/v1/password_profile", handlerPwdProfileCreate)
 	r.PATCH("/v1/password_profile/:name", handlerPwdProfileConfig)
 	//r.DELETE("/v1/password_profile/:name", handlerPwdProfileDelete)
-	r.GET("/v1/token_auth_server", handlerTokenAuthServerList)             // Skip API document
-	r.GET("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)  // Skip API document
-	r.POST("/v1/token_auth_server/:server", handlerTokenAuthServerRequest) // Skip API document
+	r.GET("/v1/token_auth_server", handlerTokenAuthServerList) // Skip API document
+	r.GET("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)
+	r.POST("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)
+	r.GET("/v1/token_auth_server/:server/slo", handlerGenerateSLORequest)
 	r.GET("/v1/server", handlerServerList)
 	r.GET("/v1/server/:name", handlerServerShow)
 	r.GET("/v1/server/:name/user", handlerServerUserList)
@@ -1461,21 +1462,26 @@ func StartRESTServer() {
 	r.GET("/v1/file/config", handlerConfigExport)
 	r.POST("/v1/file/config", handlerConfigImport)
 	r.GET("/v1/file/group", handlerGroupCfgExport)
-	r.POST("/v1/file/group", handlerGroupCfgExport)           // as client, GO's http.NewRequest(http.MethodGet) doesn't use body. This API is for multi-cluster purpose.
-	r.GET("/v1/file/group/config", handlerGetGroupCfgImport)  // get current running import task
-	r.POST("/v1/file/group/config", handlerGroupCfgImport)    // for providing similar function as crd import but do not rely on crd webhook. supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/admission", handlerAdmCtrlExport)        // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/admission/config", handlerAdmCtrlImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/dlp", handlerDlpExport)                  // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/dlp/config", handlerDlpImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/waf", handlerWafExport)                  // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/waf/config", handlerWafImport)           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.GET("/v1/internal/system", handlerInternalSystem)       // skip API document
-	r.GET("/v1/system/usage", handlerSystemUsage)             // skip API document
+	r.POST("/v1/file/group", handlerGroupCfgExport)                           // as client, GO's http.NewRequest(http.MethodGet) doesn't use body. This API is for multi-cluster purpose.
+	r.GET("/v1/file/group/config", handlerGetGroupCfgImport)                  // get current running import task
+	r.POST("/v1/file/group/config", handlerGroupCfgImport)                    // for providing similar function as crd import but do not rely on crd webhook. supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/admission", handlerAdmCtrlExport)                        // supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/admission/config", handlerAdmCtrlImport)                 // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/dlp", handlerDlpExport)                                  // supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/dlp/config", handlerDlpImport)                           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/waf", handlerWafExport)                                  // supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/waf/config", handlerWafImport)                           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/compliance/profile", handlerCompProfileExport)           //
+	r.POST("/v1/file/compliance/profile/config", handlerCompProfileImport)    // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/vulnerability/profile", handlerVulnProfileExport)        //
+	r.POST("/v1/file/vulnerability/profile/config", handlerVulnProfileImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/internal/alert", handlerAcceptAlert)                          // skip API document
+	r.GET("/v1/internal/system", handlerInternalSystem)                       // skip API document
+	r.GET("/v1/system/usage", handlerSystemUsage)                             // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
 	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
-	r.GET("/v1/system/rbac", handlerSystemGetRBAC)
+	r.GET("/v1/system/rbac", handlerSystemGetRBAC)       // skip API document
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
@@ -2004,7 +2010,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 		}
 	case share.ProcessCrdQueue:
 		if crdReqMgr != nil {
-			crdReqMgr.crdReqProcTimer.Reset(time.Duration(time.Second) * 3)
+			crdReqMgr.crdReqProcTimer.Reset(0)
 		}
 	}
 

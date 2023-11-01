@@ -572,6 +572,58 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/file/compliance/profile:
+    post:
+      tags:
+        - File
+      summary: Export compliance profile as a yaml format. The exported yaml file can be imported by CRD or REST API to update the compliance profile.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Names of profiles to export
+          schema:
+            $ref: '#/definitions/RESTCompProfilesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/compliance/profile/config:
+    post:
+      tags:
+        - compliance profile. The payload body is the content of the compliance profile yaml file.
+      summary: import compliance profile
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: compliance profile yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
   /v1/controller:
     get:
       tags:
@@ -1251,6 +1303,58 @@ paths:
         - in: body
           name: body
           description: DLP config yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+  /v1/file/vulnerability/profile:
+    post:
+      tags:
+        - File
+      summary: Export vulnerability profile as a yaml format. The exported yaml file can be imported by CRD or REST API to update the compliance profile.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Names of profiles to export
+          schema:
+            $ref: '#/definitions/RESTVulnProfilesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/vulnerability/profile/config:
+    post:
+      tags:
+        - compliance profile. The payload body is the content of the vulnerability profile yaml file.
+      summary: import compliance profile
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: compliance profile yaml file
           required: true
           schema:
             type: string
@@ -4968,6 +5072,36 @@ definitions:
           type: integer
           format: uint32
           example: 12
+  RESTAdmCtrlTestRuleInfo:
+    type: object
+    required:
+      - id
+      - disabled
+      - type
+      - mode
+      - rule_details
+      - rule_cfg_type
+    properties:
+      id:
+        type: integer
+        format: uint32
+        example: 10001
+      disabled:
+        type: boolean
+        example: false
+      type:
+        type: string
+        enum: [allow, deny]
+      mode:
+        type: string
+        description: per-rule mode
+        enum: ["monitor","protect",""]
+      rule_details:
+        type: string
+        example: "It matches deny rule id 1000 with criteria: (allow privilege escalation = true)"
+      rule_cfg_type:
+        type: string
+        enum: [federal, ground, user_created]
   RESTAdmCtrlRulesTestResult:
     type: object
     required:
@@ -4975,6 +5109,7 @@ definitions:
       - name
       - kind
       - message
+      - matched_rules
       - allowed
     properties:
       index:
@@ -4988,7 +5123,11 @@ definitions:
         example: Deployment
       message:
         type: string
-        example: "Assessment Creation of Kubernetes Deployment resource (iperfserver) is denied because of deny rule id 1000 with criteria: (allow privilege escalation = true) [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]"
+        example: "<Assessment> Creation of Kubernetes Deployment is allowed [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]."
+      matched_rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTAdmCtrlTestRuleInfo'
       allowed:
         type: boolean
         example: false
@@ -5000,6 +5139,9 @@ definitions:
         items:
           type: string
         example: ["user", "userGroups"]
+      global_mode:
+        type: string
+        enum: ["monitor","protect", ""]
       results:
         type: array
         items:
@@ -5037,6 +5179,7 @@ definitions:
       - cfg_type
       - rule_type
       - rule_mode
+      - containers
     properties:
       id:
         type: integer
@@ -5067,6 +5210,9 @@ definitions:
       rule_mode:
         type: string
         enum: ["", monitor, protect]
+      containers:
+        type: array
+        enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfig:
     type: object
     required:
@@ -5074,6 +5220,7 @@ definitions:
       - category
       - cfg_type
       - rule_type
+      - containers
     properties:
       id:
         type: integer
@@ -5106,6 +5253,9 @@ definitions:
       rule_mode:
         type: string
         enum: ["", monitor, protect]
+      containers:
+        type: array
+        enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfigData:
     type: object
     required:
@@ -5499,6 +5649,10 @@ definitions:
         type: string
         format: password
         example: mypassword
+      new_password:
+        type: string
+        description: need to specify when server responds the user needs to change password
+        example: mynewpassword
   RESTAuthToken:
     type: object
     required:
@@ -5889,6 +6043,9 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTComplianceProfileEntry'
+      cfg_type:
+        type: string
+        enum: [user_created, ground]
   RESTComplianceProfileConfig:
     type: object
     required:
@@ -5948,6 +6105,14 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTComplianceProfile'
+  RESTCompProfilesExport:
+    type: object
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: ["default"]
   RESTController:
     type: object
     required:
@@ -9589,6 +9754,15 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTX509CertInfo'
+      slo_enabled:
+        type: boolean
+        example: true
+      slo_url:
+        type: string
+        example: https://dev.oktapreview.com/app/examplesamlapp_1/exjlpo0/slo/saml
+      signing_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
   RESTServer:
     type: object
     required:
@@ -9722,6 +9896,18 @@ definitions:
         items:
           type: string
         example: ["E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF", "E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF"]
+      slo_enabled:
+        type: boolean
+        example: true
+      slo_url:
+        type: string
+        example: https://dev.oktapreview.com/app/examplesamlapp_1/exjlpo0/slo/saml
+      signing_cert:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      signing_key:
+        type: string
+        example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
   RESTServerConfig:
     type: object
     required:
@@ -10839,6 +11025,10 @@ definitions:
       password_hours_until_expire:
         type: integer
         example:
+      need_to_reset_password:
+        type: boolean
+        description: prompt the uer to login again & provide the new password to reset after login
+        default: false
   RESTUnquarReq:
     type: object
     properties:
@@ -10866,6 +11056,7 @@ definitions:
       - login_count
       - blocked_for_failed_login
       - blocked_for_password_expired
+      - password_resettable
     properties:
       fullname:
         type: string
@@ -10926,6 +11117,10 @@ definitions:
       blocked_for_password_expired:
         type: boolean
         example: false
+      password_resettable:
+        type: boolean
+        description: whether the user's password can be reset by the current login user
+        example: false
   RESTUserData:
     type: object
     required:
@@ -10947,6 +11142,14 @@ definitions:
       new_password:
         type: string
         example: ""
+      force_reset_password:
+        type: boolean
+        description: whether to reset password even it's not expired yet
+        example: false
+      reset_password_in_next_login:
+        type: boolean
+        description: whether the target user needs ti reset password in the next login
+        example: true
   RESTUserPwdConfigData:
     type: object
     required:
@@ -11303,6 +11506,9 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTVulnerabilityProfileEntry'
+      cfg_type:
+        type: string
+        enum: [user_created, ground]
   RESTVulnerabilityProfileConfig:
     type: object
     required:
@@ -11379,6 +11585,14 @@ definitions:
         items:
           type: string
         example: []
+  RESTVulnProfilesExport:
+    type: object
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: ["default"]
   RESTVulnPackageVersion:
     type: object
     required:
