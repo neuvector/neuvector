@@ -389,10 +389,7 @@ func procMemberChanges(members utils.Set) {
 			continue
 		}
 
-		gInfoRLock()
-		c, ok := gInfo.activeContainers[id]
-		gInfoRUnlock()
-		if ok {
+		if c, ok := gInfoReadActiveContainer(id); ok {
 			go applyProcGroupProfile(c)
 		} else {
 			log.WithFields(log.Fields{"id": id}).Debug("GRP: left")
@@ -410,10 +407,7 @@ func fileMemberChanges(members utils.Set) {
 			continue
 		}
 
-		gInfoRLock()
-		c, ok := gInfo.activeContainers[id]
-		gInfoRUnlock()
-		if ok {
+		if c, ok := gInfoReadActiveContainer(id); ok {
 			applyFileGroupProfile(c)
 		} else {
 			log.WithFields(log.Fields{"id": id}).Debug("GRP: left")
@@ -1091,13 +1085,10 @@ func updateContainerFamilyTrees(name string) {
 
 	for _, cid := range cids {
 		bPrivileged := false
-		gInfoRLock()
-		c, ok := gInfo.activeContainers[cid]
-		if ok && c.info != nil {
-			bPrivileged = c.info.Privileged
-		}
-		gInfoRUnlock()
-		if ok {
+		if c, ok := gInfoReadActiveContainer(cid); ok {
+			if c.info != nil {
+				bPrivileged = c.info.Privileged
+			}
 			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivileged)
 		}
 	}

@@ -53,13 +53,13 @@ func policyInit() {
 
 func updateContainerPolicyMode(id, policyMode string) {
 	cid := ""
-	if c, ok := gInfo.activeContainers[id]; ok {
+	if c, ok := gInfoReadActiveContainer(id); ok {
 		//NVSHAS-6719,sometimes the real traffic is pass even the action is block in oc 4.9+
 		//when parent's pid==0, we need to execute func with child first to make sure datapath
 		//is setup correctly
 		if c.pid == 0 {
 			for podID := range c.pods.Iter() {
-				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+				if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
 					if pod.pid != 0 && pod.hasDatapath {
 						cid = podID.(string)
 						break
@@ -68,7 +68,7 @@ func updateContainerPolicyMode(id, policyMode string) {
 			}
 			//log.WithFields(log.Fields{"cid": cid}).Debug("")
 			if cid != "" {
-				if pc, exist := gInfo.activeContainers[cid]; exist {
+				if pc, exist := gInfoReadActiveContainer(cid); exist {
 					if pc.policyMode != policyMode {
 						pc.policyMode = policyMode
 						inline := isContainerInline(pc)
@@ -400,8 +400,6 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	}
 
-	gInfoRLock()
-
 	// Use parent's policy if the connection is reported on child
 	var wlID *string
 	if conn.Ingress {
@@ -414,20 +412,17 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 		conn.ExternalPeer = !isIPInternal(conn.ServerIP)
 	}
 
-	c, ok := gInfo.activeContainers[*wlID]
+	c, ok := gInfoReadActiveContainer(*wlID)
 	if !ok {
-		gInfoRUnlock()
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	} else if c.parentNS != "" {
-		pc ,exist := gInfo.activeContainers[c.parentNS]
-		if exist {
+		if pc ,exist := gInfoReadActiveContainer(c.parentNS); exist {
 			if pc.pid != 0 {
 				wlID = &c.parentNS
-				c, _ = gInfo.activeContainers[*wlID]
+				c, _ = gInfoReadActiveContainer(*wlID)
 			}
 		} else {
 			if !c.hasDatapath {
-				gInfoRUnlock()
 				log.WithFields(log.Fields{
 					"wlID": *wlID,
 				}).Error("cannot find parent container")
@@ -435,8 +430,6 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 			}
 		}
 	}
-
-	gInfoRUnlock()
 
 	if !c.hasDatapath {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
@@ -790,7 +783,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 		if dre == nil {
 			continue
 		}
-		if c, ok := gInfo.activeContainers[dre.WorkloadId]; ok {
+		if c, ok := gInfoReadActiveContainer(dre.WorkloadId); ok {
 			if c.hasDatapath {
 				dlpWlRule := dp.DPWorkloadDlpRule{
 					WlID:          dre.WorkloadId,
@@ -813,7 +806,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 					wlmacs.Add(pair.MAC.String())
 				}
 				//we need to detect traffic between sidecar and service container
-				if gInfo.tapProxymesh && c.info.ProxyMesh {
+				if gInfo.tapProxymesh && isProxyMesh(c) {
 					lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 					dlpWlRule.WorkloadMac = append(dlpWlRule.WorkloadMac, lomac_str)
 					wlmacs.Add(lomac_str)
