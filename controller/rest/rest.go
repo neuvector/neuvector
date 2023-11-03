@@ -1270,7 +1270,7 @@ func getExpiryDate(certPEM []byte) (time.Time, error) {
 }
 
 func initJWTSignKey() error {
-	ExpiryCheckPeriod := time.Minute * 5
+	ExpiryCheckPeriod := time.Minute * 30
 	RenewThreshold := time.Hour * 24 * 30
 	JWTCertValidityPeriodDay := 90 // 90 days.
 
