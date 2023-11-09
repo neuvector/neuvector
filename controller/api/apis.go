@@ -1042,17 +1042,29 @@ type RESTConversationEndpointConfigData struct {
 	Config *RESTConversationEndpointConfig `json:"config"`
 }
 
-type RESTConversationReport struct {
+type RESTConversationReportEntry struct {
 	Bytes        uint64   `json:"bytes"`
 	Sessions     uint32   `json:"sessions"`
-	Severity     string   `json:"severity"`
+	Port         string   `json:"port,omitempty"`
+	Application  string   `json:"application,omitempty"`
 	PolicyAction string   `json:"policy_action"`
-	Protos       []string `json:"protocols,omitempty"`
-	Apps         []string `json:"applications,omitempty"`
-	Ports        []string `json:"ports,omitempty"`
-	SidecarProxy bool     `json:"sidecar_proxy,omitempty"`
-	EventType    []string `json:"event_type,omitempty"`
-	XffEntry     bool     `json:"xff_entry,omitempty"` //has xff entry
+	CIP          string   `json:"client_ip,omitempty"`
+	SIP          string   `json:"server_ip,omitempty"`
+	FQDN         string   `json:"fqdn,omitempty"`
+}
+
+type RESTConversationReport struct {
+	Bytes        uint64                         `json:"bytes"`
+	Sessions     uint32                         `json:"sessions"`
+	Severity     string                         `json:"severity"`
+	PolicyAction string                         `json:"policy_action"`
+	Protos       []string                       `json:"protocols,omitempty"`
+	Apps         []string                       `json:"applications,omitempty"`
+	Ports        []string                       `json:"ports,omitempty"`
+	SidecarProxy bool                           `json:"sidecar_proxy,omitempty"`
+	EventType    []string                       `json:"event_type,omitempty"`
+	XffEntry     bool                           `json:"xff_entry,omitempty"` //has xff entry
+	Entries      []*RESTConversationReportEntry `json:"entries"`
 }
 
 type RESTConversation struct {

@@ -413,6 +413,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Protos:       cr.Protos,
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
+				Entries:      cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			ins = append(ins, r)
@@ -435,6 +436,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				Protos:       cr.Protos,
 				Apps:         cr.Apps,
 				Ports:        cr.Ports,
+				Entries:      cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			outs = append(outs, r)

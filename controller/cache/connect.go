@@ -1414,12 +1414,24 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 	ports := utils.NewSet()
 
 	var eventype map[string]string = make(map[string]string)
+	var entries []*api.RESTConversationReportEntry
+
 	for key, ge := range attr.entries {
+		entry := &api.RESTConversationReportEntry{
+			Bytes:        ge.bytes,
+			Sessions:     ge.sessions,
+			PolicyAction: common.PolicyActionRESTString(ge.policyAction),
+			CIP:          utils.Int2IPv4( key.cip).String(),
+			SIP:          utils.Int2IPv4(key.sip).String(),
+			FQDN:         ge.fqdn,
+		}
 		protos.Add(key.ipproto)
 		if key.application == 0 || key.application == C.DPI_APP_NOT_CHECKED {
 			ports.Add(utils.GetPortLink(key.ipproto, key.port))
+			entry.Port = utils.GetPortLink(key.ipproto, key.port)
 		} else {
 			apps.Add(key.application)
+			entry.Application = common.AppNameMap[key.application]
 		}
 		if _, ok := common.LogThreatMap[ge.threatID]; ok {
 			eventype[share.EventThreat] = share.EventThreat
@@ -1433,6 +1445,7 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 		if ge.xff > 0 {
 			conver.XffEntry = true
 		}
+		entries = append(entries, entry)
 	}
 	conver.EventType = make([]string, 0)
 	for _, et := range eventype {
@@ -1453,6 +1466,8 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 		str := port.(string)
 		conver.Ports = append(conver.Ports, str)
 	}
+	conver.Entries = entries
+
 	return conver
 }
 
@@ -1720,6 +1735,7 @@ func (m CacheMethod) GetApplicationConver(src, dst string, srcList, dstList []st
 		apps := utils.NewSet()
 		ports := utils.NewSet()
 		entries := make([]*api.RESTConversationEntry, 0)
+		reportEntries := make([]*api.RESTConversationReportEntry, 0)
 
 		for _, s := range srcList {
 			for _, d := range dstList {
@@ -1741,6 +1757,7 @@ func (m CacheMethod) GetApplicationConver(src, dst string, srcList, dstList []st
 						for _, a := range r.Apps {
 							apps.Add(a)
 						}
+						reportEntries = append(reportEntries, r.Entries...)
 					}
 				}
 			}
@@ -1748,7 +1765,8 @@ func (m CacheMethod) GetApplicationConver(src, dst string, srcList, dstList []st
 
 		report.Protos = protos.ToStringSlice()
 		report.Ports = ports.ToStringSlice()
-		report.Ports = apps.ToStringSlice()
+		report.Apps = apps.ToStringSlice()
+		report.Entries = reportEntries
 
 		accReadAll := access.NewReaderAccessControl()
 		from, _ := m.GetConverEndpoint(src, accReadAll)
