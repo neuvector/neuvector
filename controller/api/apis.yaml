@@ -572,6 +572,58 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/file/compliance/profile:
+    post:
+      tags:
+        - File
+      summary: Export compliance profile as a yaml format. The exported yaml file can be imported by CRD or REST API to update the compliance profile.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Names of profiles to export
+          schema:
+            $ref: '#/definitions/RESTCompProfilesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/compliance/profile/config:
+    post:
+      tags:
+        - compliance profile. The payload body is the content of the compliance profile yaml file.
+      summary: import compliance profile
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: compliance profile yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
   /v1/controller:
     get:
       tags:
@@ -1251,6 +1303,58 @@ paths:
         - in: body
           name: body
           description: DLP config yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+  /v1/file/vulnerability/profile:
+    post:
+      tags:
+        - File
+      summary: Export vulnerability profile as a yaml format. The exported yaml file can be imported by CRD or REST API to update the compliance profile.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Names of profiles to export
+          schema:
+            $ref: '#/definitions/RESTVulnProfilesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/vulnerability/profile/config:
+    post:
+      tags:
+        - compliance profile. The payload body is the content of the vulnerability profile yaml file.
+      summary: import compliance profile
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Auth-Token
+          required: true
+          type: string
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: compliance profile yaml file
           required: true
           schema:
             type: string
@@ -5889,6 +5993,9 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTComplianceProfileEntry'
+      cfg_type:
+        type: string
+        enum: [user_created, ground]
   RESTComplianceProfileConfig:
     type: object
     required:
@@ -5948,6 +6055,14 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTComplianceProfile'
+  RESTCompProfilesExport:
+    type: object
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: ["default"]
   RESTController:
     type: object
     required:
@@ -11303,6 +11418,9 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTVulnerabilityProfileEntry'
+      cfg_type:
+        type: string
+        enum: [user_created, ground]
   RESTVulnerabilityProfileConfig:
     type: object
     required:
@@ -11379,6 +11497,14 @@ definitions:
         items:
           type: string
         example: []
+  RESTVulnProfilesExport:
+    type: object
+    properties:
+      names:
+        type: array
+        items:
+          type: string
+          example: ["default"]
   RESTVulnPackageVersion:
     type: object
     required:

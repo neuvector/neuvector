@@ -21,10 +21,10 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
-	"github.com/neuvector/neuvector/controller/rpc"
 )
 
 func criteria2REST(inEntries []share.CLUSCriteriaEntry) []api.RESTCriteriaEntry {
@@ -1831,7 +1831,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						crdRecord = share.CLUSCrdSecurityRule{
 							ProfileName:    grpCfgRet.TargetName,
 							ProfileMode:    profileMode,
-							ProcessProfile: share.CLUSCrdProcessProfile{Baseline: grpCfgRet.ProcessProfileCfg.Baseline},
+							ProcessProfile: &share.CLUSCrdProcessProfile{Baseline: grpCfgRet.ProcessProfileCfg.Baseline},
 							ProcessRules:   crdHandler.crdGetProcessRules(grpCfgRet.ProcessProfileCfg),
 							FileRules:      crdHandler.crdGetFileRules(grpCfgRet.FileProfileCfg),
 						}
@@ -2114,15 +2114,15 @@ func handlerGroupStats(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	resp := api.RESTGroupStatsData {
-		Name: groupname,
+	resp := api.RESTGroupStatsData{
+		Name:   groupname,
 		ReadAt: api.RESTTimeString(time.Now()),
 		Stats: &api.RESTStats{
 			Interval: 0,
-			Total: api.RESTMetry{},
-			Span1: api.RESTMetry{},
-			Span12: api.RESTMetry{},
-			Span60: api.RESTMetry{},
+			Total:    api.RESTMetry{},
+			Span1:    api.RESTMetry{},
+			Span12:   api.RESTMetry{},
+			Span60:   api.RESTMetry{},
 		},
 	}
 
@@ -2167,7 +2167,7 @@ func handlerGroupStats(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 	//log.WithFields(log.Fields{"agent_wl_map": agent_wl_map}).Debug("")
 
-    for agid, wlids := range agent_wl_map {
+	for agid, wlids := range agent_wl_map {
 		var wla share.CLUSWlIDArray
 		wla.WlID = make([]string, 0)
 		if wlids != nil {

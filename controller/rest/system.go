@@ -2237,6 +2237,17 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				go importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			case share.IMPORT_TYPE_WAF:
 				go importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+			case share.IMPORT_TYPE_VULN_PROFILE:
+				option := "merge"
+				query := restParseQuery(r)
+				if query != nil {
+					if value, ok := query.pairs["option"]; ok && value == "replace" {
+						option = value
+					}
+				}
+				go importVulnProfile(share.ScopeLocal, option, login.domainRoles, importTask, postImportOp)
+			case share.IMPORT_TYPE_COMP_PROFILE:
+				go importCompProfile(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
 			}
 
 			resp := api.RESTImportTaskData{
@@ -2272,6 +2283,10 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "DLP configurations"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF configurations"
+	case share.IMPORT_TYPE_VULN_PROFILE:
+		msgToken = "vulnerability profile"
+	case share.IMPORT_TYPE_COMP_PROFILE:
+		msgToken = "compliance profile"
 	}
 	configLog(share.CLUSEvImportFail, login, fmt.Sprintf("Failed to import %s", msgToken))
 	return
@@ -2317,6 +2332,10 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		msgToken = "DLP rules"
 	case share.IMPORT_TYPE_WAF:
 		msgToken = "WAF rules"
+	case share.IMPORT_TYPE_VULN_PROFILE:
+		msgToken = "vulnerability profile"
+	case share.IMPORT_TYPE_COMP_PROFILE:
+		msgToken = "compliance profile"
 	}
 
 	importTask.LastUpdateTime = time.Now().UTC()
@@ -2375,6 +2394,18 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 				SpecNamesKind: resource.NvWafSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvWafSecurityRuleKind,
+			},
+			&resource.NvCrdInfo{
+				RscType:       resource.RscTypeCrdVulnProfile,
+				SpecNamesKind: resource.NvVulnProfileSecurityRuleKind,
+				LockKey:       share.CLUSLockVulnKey,
+				KvCrdKind:     resource.NvVulnProfileSecurityRuleKind,
+			},
+			&resource.NvCrdInfo{
+				RscType:       resource.RscTypeCrdCompProfile,
+				SpecNamesKind: resource.NvCompProfileSecurityRuleKind,
+				LockKey:       share.CLUSLockCompKey,
+				KvCrdKind:     resource.NvCompProfileSecurityRuleKind,
 			},
 		}
 		for _, crdInfo := range nvCrdInfo {

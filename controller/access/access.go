@@ -849,6 +849,8 @@ func CompileUriPermitsMapping() {
 			CONST_API_COMPLIANCE: []string{
 				"v1/bench/host/*/docker",
 				"v1/bench/host/*/kubernetes",
+				"v1/file/compliance/profile",
+				"v1/file/compliance/profile/config",
 			},
 			CONST_API_AUTHENTICATION: []string{
 				"v1/server",
@@ -879,6 +881,8 @@ func CompileUriPermitsMapping() {
 			},
 			CONST_API_VULNERABILITY: []string{
 				"v1/vulnerability/profile/*/entry",
+				"v1/file/vulnerability/profile",
+				"v1/file/vulnerability/profile/config",
 			},
 		}
 
