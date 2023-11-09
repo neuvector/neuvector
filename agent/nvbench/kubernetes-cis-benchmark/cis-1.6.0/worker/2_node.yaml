@@ -1,0 +1,233 @@
+version: "cis-1.6"
+id: 4
+title: "Worker Node Security Configuration"
+type: "node"
+groups:
+  - id: 4.1
+    title: "Worker Node Configuration Files"
+    checks:
+      - id: 4.1.1
+        title: "4.1.1 - Ensure that the kubelet service file permissions are set to 644 or more restrictive (Automated)"
+        audit: |
+            if [ -f "$file" ]; then
+              if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                pass "$title"
+              else
+                warn "$title"
+                warn "     * Wrong permissions for $file"
+              fi
+            else
+              info "$title"
+              info "     * The kubelet service file not found"
+            fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chmod 644 $file
+      - id: 4.1.2
+        title: "4.1.2 - Ensure that the kubelet service file owner/group is set to root:root (Automated)"
+        audit: |
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u:%g $file)" = "0:0" ]; then
+              pass "$title"
+            else
+              warn "$title"
+              warn "     * Wrong owner/group for $file"
+            fi
+          else
+            info "$title"
+            info "     * The kubelet service file not found"
+          fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.3
+        title: "4.1.3 - Ensure that the proxy kubeconfig file permissions are set to 644 or more restrictive (Manual)"
+        audit: |
+              if check_argument "$CIS_PROXY_CMD" '--kubeconfig' >/dev/null 2>&1; then
+                  file=$(get_argument_value "$CIS_PROXY_CMD" '--kubeconfig'|cut -d " " -f 1)
+              fi
+
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$title"
+                else
+                  warn "$title"
+                  warn "     * Wrong permissions for $file"
+                fi
+              else
+                info "$title"
+                info "     * kubeconfig file not found"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.4
+        title: "4.1.4 - Ensure that the kubelet.conf file permissions are set to 644 or more restrictive (Automated)"
+        audit: |
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$title"
+                else
+                  warn "$title"
+                  warn "     * Wrong ownership for $file"
+                fi
+              else
+                info "$title"
+                info "     * kubeconfig file not found"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chmod 644 $file
+      - id: 4.1.5
+        title: "4.1.5 - Ensure that the kubelet.conf file permissions are set to 644 or more restrictive (Automated)"
+        audit: |
+              if [ -f "/var/lib/kube-proxy/kubeconfig" ]; then
+                  # kops
+                  file="/var/lib/kube-proxy/kubeconfig"
+              else
+                  file="/etc/kubernetes/proxy"
+              fi
+
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$title"
+                else
+                  warn "$title"
+                  warn "     * Wrong permissions for $file"
+                fi
+              else
+                info "$title"
+                info "     * File not found"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.6
+        title: "4.1.6 - Ensure that the kubelet.conf file ownership is set to root:root (Manual)"
+        audit: |
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$title"
+                else
+                  warn "$title"
+                  warn "     * Wrong ownership for $file"
+                fi
+              else
+                info "$title"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.7
+        title: "4.1.7 - Ensure that the certificate authorities file permissions are set to 644 or more restrictive (Manual)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
+                file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$title"
+                  pass "       * client-ca-file: $file"
+                else
+                  warn "$title"
+                  warn "     * Wrong permissions for $file"
+                fi
+              else
+                info "$title"
+                info "     * --client-ca-file not set"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chmod 644 $file
+      - id: 4.1.8
+        title: "4.1.8 - Ensure that the client certificate authorities file ownership is set to root:root (Manual)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
+                file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$title"
+                  pass "       * client-ca-file: $file"
+                else
+                  warn "$title"
+                  warn "     * Wrong ownership for $file"
+                fi
+              else
+                info "$title"
+                info "     * --client-ca-file not set"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.9
+        title: "4.1.9 - Ensure that the kubelet configuration file has permissions set to 644 or more restrictive (Automated)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
+                file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$title"
+                  pass "       * kubelet configuration file: $file"
+                else
+                  warn "$title"
+                  warn "     * Wrong permissions for $file"
+                fi
+              else
+                info "$title"
+                info "     * kubelet configuration file not set"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+      - id: 4.1.10
+        title: "4.1.10 - Ensure that the kubelet configuration file ownership is set to root:root (Automated)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
+                file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$title"
+                  pass "       * kubelet configuration file: $file"
+                else
+                  warn "$title"
+                  warn "     * Wrong ownership for $file"
+                fi
+              else
+                info "$title"
+                info "     * kubelet configuration file not set"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
+  - id: 4.2
+    title: "Kubelet"
+    checks:
+      - id: 4.2.1
+        title: "4.2.1  - Ensure that the anonymous-auth argument is set to false (Automated)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
+                  pass "$title"
+              else
+                  warn "$title"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chmod 644 $file
+      - id: 4.2.2
+        title: "5.2.2  - Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)"
+        audit: |
+              if check_argument "$CIS_KUBELET_CMD" '--authorization-mode=AlwaysAllow' >/dev/null 2>&1; then
+                  warn "$title"
+              else
+                  pass "$title"
+              fi
+        remediation: |
+          Run the below command (based on the file location on your system) on the each worker node.
+          For example,
+          chown root:root $file
