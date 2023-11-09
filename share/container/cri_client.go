@@ -240,6 +240,9 @@ func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*
 }
 
 func criGetContainerSocketPath(conn *grpc.ClientConn, ctx context.Context, id, endpoint string) (string, error) {
+	if strings.HasPrefix(endpoint, "/proc/1/root") {
+		return strings.TrimPrefix(endpoint, "/proc/1/root"), nil
+	}
 	resp, err := criContainerStatus(conn, ctx, id)
 	if err == nil {
 		endpoint = strings.TrimPrefix(endpoint, "unix://")
