@@ -3250,9 +3250,19 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					}
 				}
 			}
-			if method == http.MethodPost && (request == "/v1/file/config" || request == "/v1/file/group/config" ||
-				request == "/v1/file/admission/config" || request == "/v1/file/waf/config" || request == "/v1/file/dlp/config") {
-				txnID = r.Header.Get("X-Transaction-ID")
+			if method == http.MethodPost {
+				importURIs := utils.NewSetFromStringSlice([]string{
+					"/v1/file/config",
+					"/v1/file/group/config",
+					"/v1/file/admission/config",
+					"/v1/file/waf/config",
+					"/v1/file/dlp/config",
+					"/v1/file/compliance/profile/config",
+					"/v1/file/vulnerability/profile/config",
+				})
+				if importURIs.Contains(request) {
+					txnID = r.Header.Get("X-Transaction-ID")
+				}
 			}
 			if txnID == "" && (method == http.MethodPost || method == http.MethodDelete) && strings.HasPrefix(request, "/v1/scan/registry/") {
 				if ss := strings.Split(request, "/"); len(ss) == 6 && ss[5] == "test" {
@@ -3329,7 +3339,14 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					}
 				}
 			} else if method == http.MethodPost {
-				if request == "/v1/file/admission" || request == "/v1/file/waf" || request == "/v1/file/dlp" {
+				exportURIs := utils.NewSetFromStringSlice([]string{
+					"/v1/file/admission",
+					"/v1/file/waf",
+					"/v1/file/dlp",
+					"/v1/file/compliance/profile",
+					"/v1/file/vulnerability/profile",
+				})
+				if exportURIs.Contains(request) {
 					remoteExport = true
 				}
 			}

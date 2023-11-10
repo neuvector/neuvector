@@ -1230,6 +1230,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 					// it's non-default rule
 					cr.Criteria, _ = cache.AdmCriteria2CLUS(ruleConf.Criteria)
 					cr.Comment = ruleConf.Comment
+					cr.Disable = ruleConf.Disabled
 				}
 				cr.RuleMode = ruleConf.RuleMode
 				cr.CfgType = cfgType
