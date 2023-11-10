@@ -11,6 +11,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
 	github.com/kubernetes/cri-api => k8s.io/cri-api v0.22.3
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc5
+	github.com/russellhaering/gosaml2 => github.com/holyspectral/gosaml2 v0.0.0-20231003195827-3d916621a704
 	golang.org/x/net => golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc => google.golang.org/grpc v1.30.1
@@ -44,7 +45,7 @@ replace (
 
 require (
 	github.com/aws/aws-sdk-go v1.42.22
-	github.com/beevik/etree v1.1.0
+	github.com/beevik/etree v1.2.0
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/cenkalti/hub v1.0.1 // indirect
 	github.com/cenkalti/rpc2 v0.0.0-20210604223624-c1acbc6ec984
@@ -61,28 +62,33 @@ require (
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/protobuf v1.5.2
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-rootcerts v1.0.2
 	github.com/hashicorp/go-version v1.4.0
 	github.com/hashicorp/serf v0.9.7
+	github.com/jonboulle/clockwork v0.3.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
+	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/neuvector/k8s v1.2.1-0.20220214174348-d0b3f377461e
-	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
+	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-	github.com/russellhaering/goxmldsig v1.1.1
+	github.com/russellhaering/gosaml2 v0.0.0-00010101000000-000000000000
+	github.com/russellhaering/goxmldsig v1.4.0
 	github.com/samalba/dockerclient v0.0.0-20160531175551-a30362618471
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72
 	github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74
+	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158

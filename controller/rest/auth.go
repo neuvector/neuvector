@@ -35,6 +35,8 @@ type loginSession struct {
 	mainSessionUser string // From master token claim, i.e. master cluster login's fullname. Empty otherwise
 	token           string
 	fullname        string
+	nameid          string // Used by SAML Single Logout
+	sessionIndex    string // Used by SAML Single Logout
 	domain          string
 	server          string
 	timeout         uint32
@@ -61,6 +63,8 @@ type tokenClaim struct {
 	MainSessionUser string            `json:"main_session_user"` // from fullname in master login token's claim. empty when the token is generated for local cluster login
 	Timeout         uint32            `json:"timeout"`
 	Roles           access.DomainRole `json:"roles"`
+	NameID          string            `json:"nameId,omitempty"`       // Used by SAML Single Logout
+	SessionIndex    string            `json:"sessionIndex,omitempty"` // Used by SAML Single Logout
 	jwt.StandardClaims
 }
 
@@ -81,6 +85,12 @@ type tRancherUser struct {
 	name        string
 	token       string // rancher token from R_SESS cookie
 	domainRoles access.DomainRole
+}
+
+// Extra information of Single Sign-On session
+type SsoSession struct {
+	SAMLNameID       string
+	SAMLSessionIndex string
 }
 
 var errTokenExpired error = errors.New("token expired")
@@ -180,6 +190,8 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 		lastAt:          now,
 		eolAt:           time.Unix(claims.ExpiresAt, 0),
 		domainRoles:     claims.Roles,
+		nameid:          claims.NameID,
+		sessionIndex:    claims.SessionIndex,
 	}
 	if rc := _registerLoginSession(s); rc != userOK {
 		updateFedLoginSession(s)
@@ -189,10 +201,10 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 	}
 }
 
-func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (*loginSession, int) {
+func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string, sso *SsoSession) (*loginSession, int) {
 	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
 
-	id, token, claims := jwtGenerateToken(user, roles, remote, mainSessionID, mainSessionUser)
+	id, token, claims := jwtGenerateToken(user, roles, remote, mainSessionID, mainSessionUser, sso)
 	now := user.LastLoginAt // Already updated
 	s := &loginSession{
 		id:              id,
@@ -211,6 +223,10 @@ func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remo
 	// for federal login, give it longer timeout so it doesn't time out as easily as interactive login
 	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) {
 		s.timeout = s.timeout * 8
+	}
+	if sso != nil {
+		s.nameid = sso.SAMLNameID
+		s.sessionIndex = sso.SAMLSessionIndex
 	}
 
 	var rc int
@@ -895,7 +911,7 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 	return newUser, true
 }
 
-func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, mainSessionID, mainSessionUser, fedRole string) (*loginSession, int) {
+func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, mainSessionID, mainSessionUser, fedRole string, sso *SsoSession) (*loginSession, int) {
 	// 1. When a cluster is promoted to master cluster, the default admin user is automatically assigned fedAdmin role
 	// 2. When a master cluster is demoted, users with fed role(fedAdmin) are downgraded to with admin/reader role
 	// 3. On master cluster, only users with fedAdmin role can assign fed roles to other users
@@ -921,7 +937,7 @@ func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, main
 		roles[access.AccessDomainGlobal] = user.Role
 	}
 
-	return newLoginSessionFromUser(user, roles, remote, mainSessionID, mainSessionUser)
+	return newLoginSessionFromUser(user, roles, remote, mainSessionID, mainSessionUser, sso)
 }
 
 func compareUserWithLogin(user *share.CLUSUser, login *loginSession) bool {
@@ -1311,7 +1327,7 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 	return validateEncryptedData(encryptedTicket, secret, true)
 }
 
-func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string) (string, string, *tokenClaim) {
+func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim) {
 	id := utils.GetRandomID(idLength, "")
 	installID := GetInstallationID()
 	now := time.Now()
@@ -1332,6 +1348,10 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 			Issuer:    localDev.Ctrler.ID,
 			ExpiresAt: now.Add(jwtTokenLife).Unix(),
 		},
+	}
+	if sso != nil {
+		c.NameID = sso.SAMLNameID
+		c.SessionIndex = sso.SAMLSessionIndex
 	}
 	if r, ok := roles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(roles) == 1 {
 		if r == api.UserRoleIBMSA {
@@ -2220,7 +2240,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		rc = userInvalidRequest
 	} else {
 		// Login user accounting
-		login, rc = loginUser(user, nil, remote, mainSessionID, "", fedRole)
+		login, rc = loginUser(user, nil, remote, mainSessionID, "", fedRole, nil)
 	}
 	if rc != userOK {
 		if rc == userTimeout {
@@ -2333,7 +2353,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Login user accounting
-	login, rc := loginUser(user, claims.Roles, remote, claims.MainSessionID, claims.MainSessionUser, api.FedRoleJoint)
+	login, rc := loginUser(user, claims.Roles, remote, claims.MainSessionID, claims.MainSessionUser, api.FedRoleJoint, nil)
 	if rc != userOK {
 		log.WithFields(log.Fields{"user": auth.JointUsername, "rc": rc}).Error("Fed master login failed")
 		authLog(share.CLUSEvAuthLoginFailed, auth.JointUsername, remote, "", nil, "")
@@ -2396,6 +2416,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	var user *share.CLUSUser
 	var defaultPW bool
 	var localAuthed bool
+	var sso SsoSession
 
 	if data.Password != nil {
 		if len(data.Password.Password) == 0 {
@@ -2464,7 +2485,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 
 		if cs.SAML != nil {
-			attrs, err := remoteAuther.SAMLSPAuth(cs.SAML, data.Token)
+			nameid, sessionIndex, attrs, err := remoteAuther.SAMLSPAuth(cs.SAML, data.Token)
 			if err != nil || attrs == nil {
 				log.WithFields(log.Fields{"server": server, "error": err}).Error("User login failed")
 				authLog(share.CLUSEvAuthLoginFailed, "", remote, "", nil, "")
@@ -2487,6 +2508,8 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 				return
 			}
+			sso.SAMLNameID = nameid
+			sso.SAMLSessionIndex = sessionIndex
 		} else if cs.OIDC != nil {
 			claims, err := remoteAuther.OIDCAuth(cs.OIDC, data.Token)
 			if err != nil || claims == nil {
@@ -2520,7 +2543,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 
 	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
 	// Login user accounting
-	login, rc := loginUser(user, nil, remote, _interactiveSessionID, "", fedRole)
+	login, rc := loginUser(user, nil, remote, _interactiveSessionID, "", fedRole, &sso)
 	if rc != userOK {
 		if rc == userTimeout {
 			log.WithFields(log.Fields{"user": user.Fullname}).Error("User login timeout")
@@ -2586,7 +2609,7 @@ func handlerAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		fedRole, err := cacher.GetFedMembershipRole(acc)
 		if err == nil && fedRole == api.FedRoleMaster {
 			ids := cacher.GetFedJoinedClusterIdMap(acc)
-			for id, _ := range ids {
+			for id := range ids {
 				joinedCluster := cacher.GetFedJoinedCluster(id, acc)
 				if joinedCluster.ID != "" {
 					var token string

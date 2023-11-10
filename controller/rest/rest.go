@@ -1385,7 +1385,7 @@ func InitContext(ctx *Context) {
 	auditQueue = ctx.AuditQueue
 	messenger = ctx.Messenger
 
-	remoteAuther = auth.NewRemoteAuther()
+	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 
@@ -1446,9 +1446,10 @@ func StartRESTServer() {
 	//r.POST("/v1/password_profile", handlerPwdProfileCreate)
 	r.PATCH("/v1/password_profile/:name", handlerPwdProfileConfig)
 	//r.DELETE("/v1/password_profile/:name", handlerPwdProfileDelete)
-	r.GET("/v1/token_auth_server", handlerTokenAuthServerList)             // Skip API document
-	r.GET("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)  // Skip API document
-	r.POST("/v1/token_auth_server/:server", handlerTokenAuthServerRequest) // Skip API document
+	r.GET("/v1/token_auth_server", handlerTokenAuthServerList) // Skip API document
+	r.GET("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)
+	r.POST("/v1/token_auth_server/:server", handlerTokenAuthServerRequest)
+	r.GET("/v1/token_auth_server/:server/slo", handlerGenerateSLORequest)
 	r.GET("/v1/server", handlerServerList)
 	r.GET("/v1/server/:name", handlerServerShow)
 	r.GET("/v1/server/:name/user", handlerServerUserList)

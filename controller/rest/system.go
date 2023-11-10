@@ -2214,7 +2214,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 					Server:   login.server,
 				}
 				domainRoles := access.DomainRole{access.AccessDomainGlobal: api.UserRoleImportStatus}
-				_, tempToken, _ = jwtGenerateToken(user, domainRoles, login.remote, login.mainSessionID, "")
+				_, tempToken, _ = jwtGenerateToken(user, domainRoles, login.remote, login.mainSessionID, "", nil)
 			}
 
 			importTask.TotalLines = lines
