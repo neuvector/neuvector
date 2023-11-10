@@ -1233,6 +1233,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 					cr.Disable = ruleConf.Disabled
 				}
 				cr.RuleMode = ruleConf.RuleMode
+				cr.Containers = ruleConf.Containers
 				cr.CfgType = cfgType
 				clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr)
 				newRules[ruleName] = ruleID
@@ -2085,6 +2086,7 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, r
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = gfwrule.Metadata.GetName()
 
 	if reviewType == share.ReviewTypeCRD {
 		if *gfwrule.Kind == resource.NvClusterSecurityRuleKind {
@@ -2387,6 +2389,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = admCtrlSecRule.Metadata.GetName()
 
 	name := h.mdName
 	if reviewType == share.ReviewTypeCRD {
@@ -2492,6 +2495,16 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 					if crdRule.Disabled != nil {
 						ruleCfg.Disabled = *crdRule.Disabled
 					}
+					if crdRule.Containers != nil {
+						if v, err := getAdmCtrlRuleContainers(crdRule.Containers); err != nil {
+							errMsg = fmt.Sprintf("%s Rule format error:   Rule #%d in %s validatation error %s", reviewTypeDisplay, idx, name, err.Error())
+							buffer.WriteString(errMsg)
+							errCount++
+							continue
+						} else {
+							ruleCfg.Containers = v
+						}
+					}
 					if crdRule.RuleMode != nil {
 						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
@@ -2524,6 +2537,7 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = dlpSecRule.Metadata.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2592,6 +2606,7 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = wafSecRule.Metadata.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2660,6 +2675,7 @@ func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resourc
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = vulnProfileSecRule.Metadata.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2725,6 +2741,7 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
+	h.mdName = compProfileSecRule.Metadata.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {

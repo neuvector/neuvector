@@ -3242,15 +3242,16 @@ const (
 )
 
 type RESTAdmissionRule struct { // see type CLUSAdmissionRule
-	ID       uint32                  `json:"id"`
-	Category string                  `json:"category"`
-	Comment  string                  `json:"comment"`
-	Criteria []*RESTAdmRuleCriterion `json:"criteria"`
-	Disable  bool                    `json:"disable"`
-	Critical bool                    `json:"critical"`
-	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode string                  `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	ID         uint32                  `json:"id"`
+	Category   string                  `json:"category"`
+	Comment    string                  `json:"comment"`
+	Criteria   []*RESTAdmRuleCriterion `json:"criteria"`
+	Disable    bool                    `json:"disable"`
+	Critical   bool                    `json:"critical"`
+	CfgType    string                  `json:"cfg_type"`   // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType   string                  `json:"rule_type"`  // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   string                  `json:"rule_mode"`  // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Containers []string                `json:"containers"` // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
 }
 
 type RESTAdmissionRuleData struct {
@@ -3263,15 +3264,16 @@ type RESTAdmissionRulesData struct {
 
 // Passed from manager to controller. Omit fields indicate that it's not modified.
 type RESTAdmissionRuleConfig struct {
-	ID       uint32                  `json:"id"`
-	Category *string                 `json:"category"`
-	Comment  *string                 `json:"comment,omitempty"`
-	Criteria []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
-	Disable  *bool                   `json:"disable,omitempty"`
-	Actions  *[]string               `json:"actions,omitempty"`
-	CfgType  string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	ID         uint32                  `json:"id"`
+	Category   *string                 `json:"category"`
+	Comment    *string                 `json:"comment,omitempty"`
+	Criteria   []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
+	Disable    *bool                   `json:"disable,omitempty"`
+	Actions    *[]string               `json:"actions,omitempty"`
+	CfgType    string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType   string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Containers []string                `json:"containers"`          // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
 }
 
 type RESTAdmissionRuleConfigData struct {

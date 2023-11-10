@@ -5141,6 +5141,7 @@ definitions:
       - cfg_type
       - rule_type
       - rule_mode
+      - containers
     properties:
       id:
         type: integer
@@ -5171,6 +5172,9 @@ definitions:
       rule_mode:
         type: string
         enum: ["", monitor, protect]
+      containers:
+        type: array
+        enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfig:
     type: object
     required:
@@ -5178,6 +5182,7 @@ definitions:
       - category
       - cfg_type
       - rule_type
+      - containers
     properties:
       id:
         type: integer
@@ -5210,6 +5215,9 @@ definitions:
       rule_mode:
         type: string
         enum: ["", monitor, protect]
+      containers:
+        type: array
+        enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfigData:
     type: object
     required:
