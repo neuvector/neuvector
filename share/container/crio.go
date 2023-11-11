@@ -152,6 +152,7 @@ func (d *crioDriver) reConnect() error {
 	endpoint := d.endpoint
 	if d.endpointHost != "" {	// use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")

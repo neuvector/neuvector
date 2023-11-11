@@ -60,6 +60,10 @@ func NewDockerClient(daemonUrl string, tlsConfig *tls.Config) (*DockerClient, er
 }
 
 func NewDockerClientTimeout(daemonUrl string, tlsConfig *tls.Config, timeout time.Duration, setUserTimeout tcpFunc) (*DockerClient, error) {
+	// always use unix socket
+	if !strings.HasPrefix(daemonUrl, "unix://") {
+		daemonUrl = "unix://" + daemonUrl
+	}
 	u, err := url.Parse(daemonUrl)
 	if err != nil {
 		return nil, err
