@@ -1655,7 +1655,7 @@ type RESTSystemConfigConfig struct {
 	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
 	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
 	SyslogCVEInLayers         *bool                            `json:"syslog_cve_in_layers,omitempty"`
-	OutputEventToLogs         *bool                            `json:"output_event_to_log,omitempty"`
+	OutputEventToLogs         *bool                            `json:"output_event_to_logs,omitempty"`
 	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
 	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
 	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
@@ -1729,7 +1729,7 @@ type RESTSystemConfigSyslogCfgV2 struct {
 	SingleCVEPerSyslog *bool     `json:"single_cve_per_syslog"`
 	SyslogCVEInLayers  *bool     `json:"syslog_cve_in_layers,omitempty"`
 	SyslogServerCert   *string   `json:"syslog_server_cert,omitempty"`
-	OutputEventToLogs  *bool     `json:"output_event_to_log,omitempty"`
+	OutputEventToLogs  *bool     `json:"output_event_to_logs,omitempty"`
 }
 
 type RESTSystemConfigAuthCfgV2 struct {
