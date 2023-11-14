@@ -13,4 +13,4 @@ STATIC_LIBS += third-party/.objs/arm64/lib/libhs.a
 
 EXTRA_LDFLAGS = -lpcap -lpcre2-8 -ljansson -ljemalloc -pthread -lurcu -lurcu-cds -lrt -lstdc++ -lm -lnetfilter_queue -Wl,-rpath,'$$ORIGIN' -Wl,--disable-new-dtags
 
-include $(TOPDIR)/Makefile.rule_arm
+include $(TOPDIR)/Makefile_arm64.rule
