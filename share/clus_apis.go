@@ -1878,7 +1878,8 @@ type CLUSAdmissionRule struct { // see type RESTAdmissionRule
 	CfgType           TCfgType                `json:"cfg_type"`
 	RuleType          string                  `json:"rule_type"` // "exception", "deny"
 	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
-	RuleMode          string                  `json:"rule_mode"` // "", "monitor", "protect"
+	RuleMode          string                  `json:"rule_mode"`  // "", "monitor", "protect"
+	Containers        uint8                   `json:"containers"` // 0 for all containers, 1 for containers, 2 for initContainers, 4 for ephemeralContainers (OR of supported types)
 }
 
 type CLUSAdmissionRules struct {
@@ -1892,6 +1893,16 @@ const (
 	CLUSAdmissionCfgRule     = "rule"
 	CLUSAdmissionCfgRuleList = "rules"
 	CLUSAdmissionStatistics  = "statistics"
+)
+
+const (
+	AdmCtrlRuleContainersN          = 1 // for containers
+	AdmCtrlRuleInitContainersN      = 2 // for initContainers
+	AdmCtrlRuleEphemeralContainersN = 4 // for ephemeralContainers
+
+	AdmCtrlRuleContainers          = "containers"
+	AdmCtrlRuleInitContainers      = "initContainers"
+	AdmCtrlRuleEphemeralContainers = "ephemeralContainers"
 )
 
 const (

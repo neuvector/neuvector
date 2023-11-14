@@ -166,7 +166,7 @@ type CacheInterface interface {
 	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
-		globalMode string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult, bool)
+		globalMode, containerType string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()

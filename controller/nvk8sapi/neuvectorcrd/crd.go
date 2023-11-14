@@ -564,6 +564,19 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSc
 											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
 										},
 									},
+									"containers": &apiextv1.JSONSchemaProps{
+										Type: &b.schemaTypeArray,
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+												Enum: []*apiextv1.JSON{
+													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
+													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
+													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
+												},
+											},
+										},
+									},
 									"criteria": &apiextv1.JSONSchemaProps{
 										Type: &b.schemaTypeArray,
 										Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -688,6 +701,19 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 											&apiextv1b1.JSON{Raw: b.enumMap[""]},
 											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
 											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+										},
+									},
+									"containers": &apiextv1b1.JSONSchemaProps{
+										Type: &b.schemaTypeArray,
+										Items: &apiextv1b1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1b1.JSONSchemaProps{
+												Type: &b.schemaTypeString,
+												Enum: []*apiextv1b1.JSON{
+													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
+													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
+													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
+												},
+											},
 										},
 									},
 									"criteria": &apiextv1b1.JSONSchemaProps{
