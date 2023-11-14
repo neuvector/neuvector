@@ -5,10 +5,10 @@ readonly RC_NOTC=1
 readonly RC_OVS=2
 readonly RC_ERROR=3
 
-if [ ! -e /var/run/docker.sock ] && [ ! -e /run/containerd/containerd.sock ] && [ ! -e /var/run/crio/crio.sock ]; then
-    echo "Cannot find container runtime socket"
-    exit $RC_ERROR
-fi
+#if [ ! -e /var/run/docker.sock ] && [ ! -e /run/containerd/containerd.sock ] && [ ! -e /var/run/crio/crio.sock ]; then
+#    echo "Cannot find container runtime socket"
+#    exit $RC_ERROR
+#fi
 
 # In most cases, we don't require /lib/modules to be mounted, assume using tc driver
 # is OK. Only when it's mounted (such as VIC), kernel module is checked.

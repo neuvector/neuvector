@@ -239,8 +239,15 @@ type RESTFedAuthData struct {
 	MasterToken    string `json:"master_token"`
 }
 
+// Used to generate redirect request for integration like SAML or OIDC.
 type RESTTokenRedirect struct {
+	// The NeuVector URL to redirect after authentication/logout.
 	Redirect string `json:"redirect_endpoint"`
+	// (Optional)
+	// When absent, the redirect url will be used as issuer in SAML request.
+	// When it is specified, the value here will be used as the issuer.
+	// This is for Single Logout where redirect url and issue can be different.
+	Issuer string `json:"issuer"`
 }
 
 type RESTToken struct {
@@ -346,6 +353,12 @@ type RESTServerSAML struct {
 	DefaultRole      string                    `json:"default_role"`
 	RoleGroups       map[string][]string       `json:"role_groups,omitempty"`        // role -> groups
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+
+	AuthnSigningEnabled bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.  Default off.
+	SigningCert         string `json:"signing_cert,omitempty"`          // Optional.
+	//SigningKey          string `json:"signing_key,omitempty"`           // Optional.
+	SLOEnabled bool   `json:"slo_enabled,omitempty"` // Optional.
+	SLOURL     string `json:"slo_url,omitempty"`     // Optional.
 }
 
 type RESTServerOIDC struct {
@@ -420,6 +433,12 @@ type RESTServerSAMLConfig struct {
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
 	X509CertExtra    *[]string                  `json:"x509_cert_extra,omitempty"`
+
+	AuthnSigningEnabled *bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.  Default off.
+	SigningCert         *string `json:"signing_cert,omitempty"`          // Optional.
+	SigningKey          *string `json:"signing_key,omitempty"`           // Optional.
+	SLOEnabled          *bool   `json:"slo_enabled,omitempty"`           // Optional.
+	SLOURL              *string `json:"slo_url,omitempty"`               // Optional.
 }
 
 type RESTServerSAMLConfigCfgMap struct {
@@ -508,6 +527,16 @@ type RESTAdmCtrlRulesExport struct {
 }
 
 type RESTWafSensorExport struct {
+	Names []string `json:"names"`
+}
+
+// vlunerability profile export. only support "default" profile to export(5.3+)
+type RESTVulnProfilesExport struct {
+	Names []string `json:"names"`
+}
+
+// compliance profile export. only support "default" profile to export(5.3+)
+type RESTCompProfilesExport struct {
 	Names []string `json:"names"`
 }
 
@@ -1032,17 +1061,29 @@ type RESTConversationEndpointConfigData struct {
 	Config *RESTConversationEndpointConfig `json:"config"`
 }
 
+type RESTConversationReportEntry struct {
+	Bytes        uint64 `json:"bytes"`
+	Sessions     uint32 `json:"sessions"`
+	Port         string `json:"port,omitempty"`
+	Application  string `json:"application,omitempty"`
+	PolicyAction string `json:"policy_action"`
+	CIP          string `json:"client_ip,omitempty"`
+	SIP          string `json:"server_ip,omitempty"`
+	FQDN         string `json:"fqdn,omitempty"`
+}
+
 type RESTConversationReport struct {
-	Bytes        uint64   `json:"bytes"`
-	Sessions     uint32   `json:"sessions"`
-	Severity     string   `json:"severity"`
-	PolicyAction string   `json:"policy_action"`
-	Protos       []string `json:"protocols,omitempty"`
-	Apps         []string `json:"applications,omitempty"`
-	Ports        []string `json:"ports,omitempty"`
-	SidecarProxy bool     `json:"sidecar_proxy,omitempty"`
-	EventType    []string `json:"event_type,omitempty"`
-	XffEntry     bool     `json:"xff_entry,omitempty"` //has xff entry
+	Bytes        uint64                         `json:"bytes"`
+	Sessions     uint32                         `json:"sessions"`
+	Severity     string                         `json:"severity"`
+	PolicyAction string                         `json:"policy_action"`
+	Protos       []string                       `json:"protocols,omitempty"`
+	Apps         []string                       `json:"applications,omitempty"`
+	Ports        []string                       `json:"ports,omitempty"`
+	SidecarProxy bool                           `json:"sidecar_proxy,omitempty"`
+	EventType    []string                       `json:"event_type,omitempty"`
+	XffEntry     bool                           `json:"xff_entry,omitempty"` //has xff entry
+	Entries      []*RESTConversationReportEntry `json:"entries"`
 }
 
 type RESTConversation struct {
@@ -2498,6 +2539,7 @@ type RESTComplianceProfile struct {
 	Name          string                       `json:"name"`
 	DisableSystem bool                         `json:"disable_system"`
 	Entries       []RESTComplianceProfileEntry `json:"entries"`
+	CfgType       string                       `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTComplianceProfileData struct {
@@ -2512,6 +2554,7 @@ type RESTComplianceProfileConfig struct {
 	Name          string                         `json:"name"`
 	DisableSystem *bool                          `json:"disable_system,omitempty"`
 	Entries       *[]*RESTComplianceProfileEntry `json:"entries,omitempty"`
+	CfgType       string                         `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTComplianceProfileConfigData struct {
@@ -2539,6 +2582,7 @@ type RESTVulnerabilityProfileEntry struct {
 type RESTVulnerabilityProfile struct {
 	Name    string                          `json:"name"`
 	Entries []RESTVulnerabilityProfileEntry `json:"entries"`
+	CfgType string                          `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileData struct {
@@ -2552,6 +2596,7 @@ type RESTVulnerabilityProfilesData struct {
 type RESTVulnerabilityProfileConfig struct {
 	Name    string                            `json:"name"`
 	Entries *[]*RESTVulnerabilityProfileEntry `json:"entries,omitempty"`
+	CfgType string                            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround (see above)
 }
 
 type RESTVulnerabilityProfileConfigData struct {
@@ -3197,15 +3242,16 @@ const (
 )
 
 type RESTAdmissionRule struct { // see type CLUSAdmissionRule
-	ID       uint32                  `json:"id"`
-	Category string                  `json:"category"`
-	Comment  string                  `json:"comment"`
-	Criteria []*RESTAdmRuleCriterion `json:"criteria"`
-	Disable  bool                    `json:"disable"`
-	Critical bool                    `json:"critical"`
-	CfgType  string                  `json:"cfg_type"`  // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode string                  `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	ID         uint32                  `json:"id"`
+	Category   string                  `json:"category"`
+	Comment    string                  `json:"comment"`
+	Criteria   []*RESTAdmRuleCriterion `json:"criteria"`
+	Disable    bool                    `json:"disable"`
+	Critical   bool                    `json:"critical"`
+	CfgType    string                  `json:"cfg_type"`   // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType   string                  `json:"rule_type"`  // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   string                  `json:"rule_mode"`  // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Containers []string                `json:"containers"` // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
 }
 
 type RESTAdmissionRuleData struct {
@@ -3218,15 +3264,16 @@ type RESTAdmissionRulesData struct {
 
 // Passed from manager to controller. Omit fields indicate that it's not modified.
 type RESTAdmissionRuleConfig struct {
-	ID       uint32                  `json:"id"`
-	Category *string                 `json:"category"`
-	Comment  *string                 `json:"comment,omitempty"`
-	Criteria []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
-	Disable  *bool                   `json:"disable,omitempty"`
-	Actions  *[]string               `json:"actions,omitempty"`
-	CfgType  string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	RuleType string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	ID         uint32                  `json:"id"`
+	Category   *string                 `json:"category"`
+	Comment    *string                 `json:"comment,omitempty"`
+	Criteria   []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
+	Disable    *bool                   `json:"disable,omitempty"`
+	Actions    *[]string               `json:"actions,omitempty"`
+	CfgType    string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	RuleType   string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Containers []string                `json:"containers"`          // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
 }
 
 type RESTAdmissionRuleConfigData struct {

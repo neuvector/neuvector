@@ -221,12 +221,12 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 }
 
 func (c *CertManager) CheckAndRenewCerts() error {
-	log.Info("CheckAndRenewCerts() starts.")
+	log.Debug("CheckAndRenewCerts() starts.")
 	for cn, callback := range c.callbacks {
 		c.checkAndRotateCert(cn, callback)
 	}
 
-	log.Info("CheckAndRenewCerts() completes.")
+	log.Debug("CheckAndRenewCerts() completes.")
 
 	return nil
 }

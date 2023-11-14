@@ -8,7 +8,7 @@ import (
 )
 
 // TransformExcC14n transforms the passed element into xml-exc-c14n form.
-func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string) error {
+func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string, comments bool) error {
 	prefixes := strings.Fields(inclusiveNamespacesPrefixList)
 	prefixSet := make(map[string]struct{}, len(prefixes))
 
@@ -16,7 +16,8 @@ func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string) e
 		prefixSet[prefix] = struct{}{}
 	}
 
-	err := transformExcC14n(DefaultNSContext, DefaultNSContext, el, prefixSet)
+	ctx := NewDefaultNSContext()
+	err := transformExcC14n(ctx, ctx, el, prefixSet, comments)
 	if err != nil {
 		return err
 	}
@@ -24,14 +25,14 @@ func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string) e
 	return nil
 }
 
-func transformExcC14n(ctx, declared NSContext, el *etree.Element, inclusiveNamespaces map[string]struct{}) error {
+func transformExcC14n(ctx, declared NSContext, el *etree.Element, inclusiveNamespaces map[string]struct{}, comments bool) error {
 	scope, err := ctx.SubContext(el)
 	if err != nil {
 		return err
 	}
 
 	visiblyUtilizedPrefixes := map[string]struct{}{
-		el.Space: struct{}{},
+		el.Space: {},
 	}
 
 	filteredAttrs := []etree.Attr{}
@@ -86,9 +87,20 @@ func transformExcC14n(ctx, declared NSContext, el *etree.Element, inclusiveNames
 
 	sort.Sort(SortedAttrs(el.Attr))
 
+	if !comments {
+		c := 0
+		for c < len(el.Child) {
+			if _, ok := el.Child[c].(*etree.Comment); ok {
+				el.RemoveChildAt(c)
+			} else {
+				c++
+			}
+		}
+	}
+
 	// Transform child elements
 	for _, child := range el.ChildElements() {
-		err := transformExcC14n(scope, declared, child, inclusiveNamespaces)
+		err := transformExcC14n(scope, declared, child, inclusiveNamespaces, comments)
 		if err != nil {
 			return err
 		}

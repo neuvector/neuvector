@@ -196,6 +196,8 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 		resource.RscTypeCrdAdmCtrlSecurityRule,
 		resource.RscTypeCrdDlpSecurityRule,
 		resource.RscTypeCrdWafSecurityRule,
+		resource.RscTypeCrdVulnProfile,
+		resource.RscTypeCrdCompProfile,
 	}
 	for _, r := range rscTypes {
 		global.ORCH.RegisterResource(r)

@@ -542,6 +542,34 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 					return &cfg, wrt
 				}
 			}
+		case share.CFGEndpointVulnerability:
+			if key == share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName) {
+				var cfg share.CLUSVulnerabilityProfile
+				if err := json.Unmarshal(value, &cfg); err == nil {
+					upd := false
+					if cfg.CfgType == 0 {
+						cfg.CfgType = share.UserCreated
+						upd = true
+					}
+					if upd {
+						return &cfg, upd
+					}
+				}
+			}
+		case share.CFGEndpointCompliance:
+			if key == share.CLUSComplianceProfileKey(share.DefaultComplianceProfileName) {
+				var cfg share.CLUSComplianceProfile
+				if err := json.Unmarshal(value, &cfg); err == nil {
+					upd := false
+					if cfg.CfgType == 0 {
+						cfg.CfgType = share.UserCreated
+						upd = true
+					}
+					if upd {
+						return &cfg, upd
+					}
+				}
+			}
 		}
 	}
 
@@ -760,7 +788,9 @@ var phases []kvVersions = []kvVersions{
 
 	{"28ea479c", initFedScanRevKey},
 
-	{"FCAB0BF2", nil},
+	{"FCAB0BF2", upgradeDefSecRisksProfiles},
+
+	{"449EC339", nil},
 }
 
 func latestKVVersion() string {
@@ -1546,6 +1576,9 @@ func upgradeCrdSecurityRule(cfg *share.CLUSCrdSecurityRule) (bool, bool) {
 	}
 	var upd bool
 	if utils.DoesGroupHavePolicyMode(cfg.ProfileName) {
+		if cfg.ProcessProfile == nil {
+			cfg.ProcessProfile = &share.CLUSCrdProcessProfile{}
+		}
 		if cfg.ProcessProfile.Baseline != share.ProfileBasic && cfg.ProcessProfile.Baseline != share.ProfileZeroDrift {
 			cfg.ProcessProfile.Baseline = share.ProfileZeroDrift
 			upd = true
@@ -1653,4 +1686,12 @@ func initFedScanRevKey() {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
 		}
 	}
+}
+
+func upgradeDefSecRisksProfiles() {
+	acc := access.NewAdminAccessControl()
+	// vulnerability profile
+	clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc)
+	// compliance profile
+	clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc)
 }
