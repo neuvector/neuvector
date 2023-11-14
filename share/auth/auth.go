@@ -399,7 +399,7 @@ func (a *remoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAu
 
 	userInfo, err2 := oidc.UserInfoReq(ctx, coidc.UserInfoURL, oauth2.StaticTokenSource(token))
 	if err2 != nil {
-		log.WithFields(log.Fields{"error": err2}).Error("Failed on UserInfo reqeuest")
+		log.WithFields(log.Fields{"error": err2}).Error("Failed on UserInfo request")
 		return claims, err
 	}
 
