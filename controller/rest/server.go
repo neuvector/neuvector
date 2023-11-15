@@ -748,7 +748,12 @@ func validateSAMLServer(cs *share.CLUSServer) error {
 		}
 	}
 
-	if len(csaml.SigningCert) > 0 || len(csaml.SigningKey) > 0 {
+	// When cert/key are empty, we only fail it when SLO is enabled.
+	if csaml.SigningCert == "" || csaml.SigningKey == "" {
+		if csaml.SLOEnabled || csaml.AuthnSigningEnabled {
+			return errors.New("SAML SLO requires key cert pair")
+		}
+	} else {
 		if _, err := tls.X509KeyPair([]byte(csaml.SigningCert), []byte(csaml.SigningKey)); err != nil {
 			return errors.Wrap(err, "invalid key cert pair")
 		}
@@ -822,14 +827,11 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 		csaml.AuthnSigningEnabled = *saml.AuthnSigningEnabled
 	}
 
-	if saml.SigningCert != nil && saml.SigningKey != nil {
-		// Reject invalid certs.  Its caller is expected to return 400 Bad Request
-		_, err := tls.X509KeyPair([]byte(*saml.SigningCert), []byte(*saml.SigningKey))
-		if err != nil {
-			return errors.New("failed to parse key pair")
-		}
-		csaml.SigningKey = *saml.SigningKey
+	if saml.SigningCert != nil {
 		csaml.SigningCert = *saml.SigningCert
+	}
+	if saml.SigningKey != nil {
+		csaml.SigningKey = *saml.SigningKey
 	}
 
 	if saml.SLOEnabled != nil {
