@@ -6,8 +6,10 @@ import "C"
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/md5"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -1861,24 +1863,19 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	emptySlice := make([]string, 0)
 	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
-		ClusterRoleErrors:        emptySlice,
-		ClusterRoleBindingErrors: emptySlice,
-		RoleErrors:               emptySlice,
-		RoleBindingErrors:        emptySlice,
-		NvUpgradeInfo:            &api.RESTCheckUpgradeInfo{},
-		NvCrdSchemaErrors:        emptySlice,
+		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
 	}
+	var clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors []string
 	if k8sPlatform {
-		resp.ClusterRoleErrors, resp.ClusterRoleBindingErrors, resp.RoleErrors, resp.RoleBindingErrors =
+		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
 		if checkCrdSchemaFunc != nil {
 			var leader bool
 			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
 				leader = true
 			}
-			resp.NvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
+			nvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
 		}
 	}
 
@@ -1905,6 +1902,51 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
 		resp.NvUpgradeInfo = nil
 	}
+
+	var accepted []string
+	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, acc); user != nil {
+		accepted = user.AcceptedAlerts
+	}
+	if user, _, _ := clusHelper.GetUserRev(login.fullname, access.NewReaderAccessControl()); user != nil {
+		accepted = append(accepted, user.AcceptedAlerts...)
+	}
+	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
+	var acceptable [5]map[string]string
+	var acceptableAlerts api.RESTK8sNvAcceptableAlerts
+	for i, alerts := range [][]string{clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors} {
+		if len(alerts) > 0 {
+			acceptable[i] = make(map[string]string, 0)
+			for _, alert := range alerts {
+				b := md5.Sum([]byte(alert))
+				key := hex.EncodeToString(b[:])
+				if !acceptedAlerts.Contains(key) {
+					// this alert has not been accepted yet. put it in the response
+					acceptable[i][key] = alert
+				}
+			}
+		}
+	}
+	acceptableAlerts.ClusterRoleErrors = acceptable[0]
+	acceptableAlerts.ClusterRoleBindingErrors = acceptable[1]
+	acceptableAlerts.RoleErrors = acceptable[2]
+	acceptableAlerts.RoleBindingErrors = acceptable[3]
+	acceptableAlerts.NvCrdSchemaErrors = acceptable[4]
+	resp.AcceptableAlerts = &api.RESTK8sNvAcceptableAlerts{
+		ClusterRoleErrors:        acceptable[0],
+		ClusterRoleBindingErrors: acceptable[1],
+		RoleErrors:               acceptable[2],
+		RoleBindingErrors:        acceptable[3],
+		NvCrdSchemaErrors:        acceptable[4],
+	}
+
+	var acceptedManagerAlerts []string
+	for _, key := range []string{share.AlertNvNewVerAvailable, share.AlertNvInMultiVersions, share.AlertCveDbTooOld} {
+		if acceptedAlerts.Contains(key) {
+			// this manager-generated alert key has been accepted. put it in the response
+			acceptedManagerAlerts = append(acceptedManagerAlerts, key)
+		}
+	}
+	resp.AcceptedAlerts = acceptedManagerAlerts
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")
 }

@@ -1368,6 +1368,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/enforcer/*/profiling",
 			"v1/file/config",
 			"v1/csp/file/support",
+			"v1/internal/alert",
 		},
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/workload/*",

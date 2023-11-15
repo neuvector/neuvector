@@ -834,6 +834,7 @@ type CLUSUser struct {
 	LoginCount       uint32              `json:"login_count"`
 	FailedLoginCount uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
 	BlockLoginSince  time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
+	AcceptedAlerts   []string            `json:"accepted_alerts,omitempty"`
 }
 
 type GroupRoleMapping struct {
@@ -1897,12 +1898,12 @@ const (
 
 const (
 	AdmCtrlRuleContainersN          = 1 // for containers
-	AdmCtrlRuleInitContainersN      = 2 // for initContainers
-	AdmCtrlRuleEphemeralContainersN = 4 // for ephemeralContainers
+	AdmCtrlRuleInitContainersN      = 2 // for init_containers
+	AdmCtrlRuleEphemeralContainersN = 4 // for ephemeral_containers
 
 	AdmCtrlRuleContainers          = "containers"
-	AdmCtrlRuleInitContainers      = "initContainers"
-	AdmCtrlRuleEphemeralContainers = "ephemeralContainers"
+	AdmCtrlRuleInitContainers      = "init_containers"
+	AdmCtrlRuleEphemeralContainers = "ephemeral_containers"
 )
 
 const (
@@ -2848,3 +2849,12 @@ type CLUSSigstoreVerifier struct {
 	CertSubject  string `json:"cert_subject"`
 	Comment      string `json:"comment"`
 }
+
+// alerts status
+const (
+	AlertNvNewVerAvailable = "1"
+	AlertNvInMultiVersions = "2"
+	AlertCveDbTooOld       = "3"
+	AlertPwdExpiring       = "1001"
+	AlertAdminHasDefPwd    = "1002"
+)
