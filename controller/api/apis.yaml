@@ -5611,6 +5611,10 @@ definitions:
         type: string
         format: password
         example: mypassword
+      new_password:
+        type: string
+        description: need to specify when server responds the user needs to change password
+        example: mynewpassword
   RESTAuthToken:
     type: object
     required:
@@ -10983,6 +10987,10 @@ definitions:
       password_hours_until_expire:
         type: integer
         example:
+      need_to_reset_password:
+        type: boolean
+        description: prompt the uer to login again & provide the new password to reset after login
+        default: false
   RESTUnquarReq:
     type: object
     properties:
@@ -11010,6 +11018,7 @@ definitions:
       - login_count
       - blocked_for_failed_login
       - blocked_for_password_expired
+      - password_resettable
     properties:
       fullname:
         type: string
@@ -11070,6 +11079,10 @@ definitions:
       blocked_for_password_expired:
         type: boolean
         example: false
+      password_resettable:
+        type: boolean
+        description: whether the user's password can be reset by the current login user
+        example: false
   RESTUserData:
     type: object
     required:
@@ -11091,6 +11104,14 @@ definitions:
       new_password:
         type: string
         example: ""
+      force_reset_password:
+        type: boolean
+        description: whether to reset password even it's not expired yet
+        example: false
+      reset_password_in_next_login:
+        type: boolean
+        description: whether the target user needs ti reset password in the next login
+        example: true
   RESTUserPwdConfigData:
     type: object
     required:

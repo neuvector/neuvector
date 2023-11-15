@@ -2798,6 +2798,7 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string,
 	recordList map[string]*share.CLUSCrdSecurityRule, crossCheckRecord *share.CLUSCrdSecurityRule) (string, string) {
 
+	newRecord := false
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -2806,6 +2807,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 			Rules:  make(map[string]uint32),
 			Uid:    h.crUid,
 		}
+		newRecord = true
 	} else if h.crossCheck {
 		crdRecord.Uid = h.crUid
 	}
@@ -2824,7 +2826,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 
 	h.crdHandleGroupRecordDel(crdRecord, absentGroups, false, recordList)
 
-	log.WithFields(log.Fields{"name": recordName, "target": crdCfgRet.TargetName, "targetDlpWAF": targetGroupDlpWAF}).Debug()
+	log.WithFields(log.Fields{"name": recordName, "target": crdCfgRet.TargetName, "targetDlpWAF": targetGroupDlpWAF, "newRecord": newRecord}).Debug()
 	var policyMode string
 	var profileMode string
 	var baseline string
@@ -3870,7 +3872,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			delete(recordList, recordName)
 		}
 		crdHandler.ReleaseLock()
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 	}
 
 	if len(imported) > 0 {

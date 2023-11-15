@@ -216,8 +216,9 @@ const UserIdleTimeoutMax uint32 = 3600
 const UserIdleTimeoutMin uint32 = 30
 
 type RESTAuthPassword struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username    string  `json:"username"`
+	Password    string  `json:"password"`
+	NewPassword *string `json:"new_password,omitempty"`
 }
 
 type RESTAuthToken struct {
@@ -261,6 +262,7 @@ type RESTTokenData struct {
 	Token               *RESTToken `json:"token"`
 	PwdDaysUntilExpire  int        `json:"password_days_until_expire"`  // negative means we don't know it (for ldap/saml/oidc login).
 	PwdHoursUntilExpire int        `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
+	NeedToResetPassword bool       `json:"need_to_reset_password"`      // prompt the uer to login again & provide the new password to reset after login
 	// If both PwdDaysUntilExpire/PwdDaysUntilExpire are 0, it means the password is already expired
 }
 
@@ -557,6 +559,7 @@ type RESTUser struct {
 	LoginCount            uint32              `json:"login_count"`
 	BlockedForFailedLogin bool                `json:"blocked_for_failed_login"`     // if the user is blocked for too mnay failed login
 	BlockedForPwdExpired  bool                `json:"blocked_for_password_expired"` // if the user is blocked for expired password
+	PwdResettable         bool                `json:"password_resettable"`          // if the user's password can be reset by the current login user
 }
 
 type RESTUserConfig struct {
@@ -599,9 +602,11 @@ type RESTUserConfigData struct {
 }
 
 type RESTUserPwdConfig struct {
-	Fullname         string  `json:"fullname"`
-	ClearFailedLogin *bool   `json:"clear_failed_login,omitempty"`
-	NewPassword      *string `json:"new_password,omitempty,cloak"`
+	Fullname            string  `json:"fullname"`
+	ClearFailedLogin    *bool   `json:"clear_failed_login,omitempty"`
+	NewPassword         *string `json:"new_password,omitempty,cloak"`
+	ForceResetPwd       bool    `json:"force_reset_password,omitempty"`
+	ResetPwdInNextLogin bool    `json:"reset_password_in_next_login,omitempty"`
 }
 
 type RESTUserPwdConfigData struct {

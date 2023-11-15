@@ -817,24 +817,25 @@ type CLUSEULA struct {
 }
 
 type CLUSUser struct {
-	Fullname         string              `json:"fullname"`
-	Username         string              `json:"username"`
-	PasswordHash     string              `json:"password_hash"`
-	PwdResetTime     time.Time           `json:"pwd_reset_time"`
-	PwdHashHistory   []string            `json:"pwd_hash_history"` // not including the current password's hash
-	Domain           string              `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
-	Server           string              `json:"server"`
-	EMail            string              `json:"email"`
-	Role             string              `json:"role"`
-	RoleOverride     bool                `json:"role_oride"` // Used for shadow user
-	Timeout          uint32              `json:"timeout"`
-	Locale           string              `json:"locale"`
-	RoleDomains      map[string][]string `json:"role_domains"`
-	LastLoginAt      time.Time           `json:"last_login_at"`
-	LoginCount       uint32              `json:"login_count"`
-	FailedLoginCount uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
-	BlockLoginSince  time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
-	AcceptedAlerts   []string            `json:"accepted_alerts,omitempty"`
+	Fullname            string              `json:"fullname"`
+	Username            string              `json:"username"`
+	PasswordHash        string              `json:"password_hash"`
+	PwdResetTime        time.Time           `json:"pwd_reset_time"`
+	PwdHashHistory      []string            `json:"pwd_hash_history"` // not including the current password's hash
+	Domain              string              `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
+	Server              string              `json:"server"`
+	EMail               string              `json:"email"`
+	Role                string              `json:"role"`
+	RoleOverride        bool                `json:"role_oride"` // Used for shadow user
+	Timeout             uint32              `json:"timeout"`
+	Locale              string              `json:"locale"`
+	RoleDomains         map[string][]string `json:"role_domains"`
+	LastLoginAt         time.Time           `json:"last_login_at"`
+	LoginCount          uint32              `json:"login_count"`
+	FailedLoginCount    uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
+	BlockLoginSince     time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
+	AcceptedAlerts      []string            `json:"accepted_alerts,omitempty"`
+	ResetPwdInNextLogin bool                `json:"reset_password_in_next_login"`
 }
 
 type GroupRoleMapping struct {
