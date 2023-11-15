@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -3194,6 +3195,26 @@ var forbiddenFwUrlPrefix = map[string][]string{
 	"/v1/auth/": []string{http.MethodPost, http.MethodDelete},
 }
 
+type tForbiddenFwUrlInfo struct {
+	url       string
+	urlPrefix string
+	urlRegex  *regexp.Regexp
+	verbs     []string
+}
+
+var forbiddenFwUrlRegex []tForbiddenFwUrlInfo = []tForbiddenFwUrlInfo{
+	tForbiddenFwUrlInfo{
+		url:       "/v1/auth/.*",
+		urlPrefix: "/v1/auth/",
+		verbs:     []string{http.MethodPost, http.MethodDelete},
+	},
+	tForbiddenFwUrlInfo{
+		url:       "/v1/user/.*/password",
+		urlPrefix: "/v1/user/",
+		verbs:     []string{http.MethodPost},
+	},
+}
+
 func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprouter.Params, method string) {
 	if !licenseAllowFed(1) {
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
@@ -3236,16 +3257,21 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				}
 			}
 			if !forbidden {
-				for urlPrefix, verbs := range forbiddenFwUrlPrefix {
-					if strings.HasPrefix(request, urlPrefix) {
-						for _, verb := range verbs {
-							if verb == method {
-								forbidden = true
+				for _, urlInfo := range forbiddenFwUrlRegex {
+					if strings.HasPrefix(request, urlInfo.urlPrefix) {
+						if urlInfo.urlRegex == nil {
+							urlInfo.urlRegex, _ = regexp.Compile(urlInfo.url)
+						}
+						if urlInfo.urlRegex != nil && urlInfo.urlRegex.MatchString(request) {
+							for _, verb := range urlInfo.verbs {
+								if verb == method {
+									forbidden = true
+									break
+								}
+							}
+							if forbidden {
 								break
 							}
-						}
-						if forbidden {
-							break
 						}
 					}
 				}

@@ -1857,13 +1857,19 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	return nil, fmt.Errorf("%s user is not authorized", server)
 }
 
-func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*share.CLUSUser, bool, bool, bool, int, error) {
-	// returns (user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err)
+type tLocalPwdAuthResult struct {
+	blockedForFailedLogin bool
+	blockedForExpiredPwd  bool
+	userFound             bool
+	blockAfterFailedCount int
+}
+
+func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*share.CLUSUser, tLocalPwdAuthResult, error) {
 	var user *share.CLUSUser
-	var blockAfterFailedCount int
+	var result tLocalPwdAuthResult
 
 	if pw.Username == "" || pw.Username[0] == '~' {
-		return nil, false, false, false, 0, errors.New("User not found")
+		return nil, result, errors.New("User not found")
 	}
 	now := time.Now()
 
@@ -1874,18 +1880,19 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 
 		user, rev, _ = clusHelper.GetUserRev(pw.Username, acc)
 		if user == nil {
-			return nil, false, false, false, 0, errors.New("User not found")
+			return nil, result, errors.New("User not found")
 		}
 
 		if user.Server != "" {
-			return nil, false, false, false, 0, errors.New("User not found")
+			return nil, result, errors.New("User not found")
 		}
 
+		result.userFound = true
 		origFailedLoginCount := user.FailedLoginCount
 		origBlockLoginSince := user.BlockLoginSince
 		pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
 		if pwdProfile.EnableBlockAfterFailedLogin {
-			blockAfterFailedCount = pwdProfile.BlockAfterFailedCount
+			result.blockAfterFailedCount = pwdProfile.BlockAfterFailedCount
 		}
 		if pwdProfile.EnableBlockAfterFailedLogin && !user.BlockLoginSince.IsZero() {
 			if time.Now().UTC().Before(user.BlockLoginSince.Add(time.Minute * time.Duration(pwdProfile.BlockMinutes))) {
@@ -1895,8 +1902,8 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 				}
 				user.BlockLoginSince = time.Now().UTC()
 				clusHelper.PutUserRev(user, rev)
-				return nil, true, false, true, blockAfterFailedCount,
-					fmt.Errorf("User %s is temporarily blocked from login because of too many failed login attempts", pw.Username)
+				result.blockedForFailedLogin = true
+				return nil, result, fmt.Errorf("User %s is temporarily blocked from login because of too many failed login attempts", pw.Username)
 			} else {
 				// user.BlockLoginSince is not zero time but current time is past user.BlockLoginSince
 				// it means this is the 1st time the user tries to login beyond the blocked time window. Giva user a new start for failed login count.
@@ -1912,18 +1919,17 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 		// Validate password
 		hash := utils.HashPassword(pw.Password)
 		if hash != user.PasswordHash {
-			userBlocked := false
 			if pwdProfile.EnableBlockAfterFailedLogin {
 				user.FailedLoginCount++
 				if int(user.FailedLoginCount) >= pwdProfile.BlockAfterFailedCount {
 					user.BlockLoginSince = time.Now().UTC()
-					userBlocked = true
+					result.blockedForFailedLogin = true
 				}
 			}
 			if user.FailedLoginCount != origFailedLoginCount || user.BlockLoginSince != origBlockLoginSince {
 				clusHelper.PutUserRev(user, rev)
 			}
-			return nil, userBlocked, false, true, blockAfterFailedCount, errors.New("Wrong password")
+			return nil, result, errors.New("Wrong password")
 		} else {
 			if pwdProfile.EnablePwdExpiration && pwdProfile.PwdExpireAfterDays > 0 && !user.PwdResetTime.IsZero() {
 				pwdValidUnit := _pwdValidUnit
@@ -1932,8 +1938,30 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 				}
 				pwdExpireTime := user.PwdResetTime.Add(time.Duration(time.Minute * pwdValidUnit * time.Duration(pwdProfile.PwdExpireAfterDays)))
 				if now.After(pwdExpireTime) {
-					return nil, false, true, true, blockAfterFailedCount,
-						fmt.Errorf("User %s is blocked from login because of expired password", pw.Username)
+					result.blockedForExpiredPwd = true
+					return nil, result, fmt.Errorf("User %s is blocked from login because of expired password", pw.Username)
+				}
+			}
+
+			if user.ResetPwdInNextLogin {
+				if pw.NewPassword == nil {
+					return user, result, nil
+				}
+				if weak, pwdHistoryToKeep, _, e := isWeakPassword(*pw.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
+					log.WithFields(log.Fields{"create": pw.Username}).Error(e)
+					return nil, result, fmt.Errorf("New password is too weak")
+				} else {
+					if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
+						user.PwdHashHistory = nil
+					} else {
+						user.PwdHashHistory = append(user.PwdHashHistory, user.PasswordHash)
+						if i := len(user.PwdHashHistory) - pwdHistoryToKeep; i >= 0 { // len(user.PwdHashHistory) + 1(current password hash) should be <= pwdHistoryToKeep
+							user.PwdHashHistory = user.PwdHashHistory[i+1:]
+						}
+					}
+					user.PasswordHash = utils.HashPassword(*pw.NewPassword)
+					user.PwdResetTime = time.Now().UTC()
+					user.ResetPwdInNextLogin = false
 				}
 			}
 		}
@@ -1959,7 +1987,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 		log.WithFields(log.Fields{"user": user.Username}).Error("Failed to update user in cluster")
 	}
 
-	return user, false, false, true, 0, nil
+	return user, result, nil
 }
 
 func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, *tokenClaim, error) {
@@ -2132,20 +2160,19 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 		var errLocalAuth error
 		var localAuthEnabled bool
-		var blockedForFailedLogin, blockedForExpiredPwd, userFound bool
-		var blockAfterFailedCount int
+		var localAuthResult tLocalPwdAuthResult
 
 		servers := getAuthServersInOrder(accReadAll)
 
 		// Succeed if one server authenticates the user
 		for _, cs := range servers {
-			log.WithFields(log.Fields{"server": cs.Name}).Debug("")
+			log.WithFields(log.Fields{"server": cs.Name}).Debug()
 			if cs.Name == api.AuthServerLocal {
 				localAuthEnabled = true
-				if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err == nil {
+				if user, localAuthResult, err = localPasswordAuth(auth.Password, accReadAll); err == nil {
 					localAuthed = true
 					break
-				} else if userFound {
+				} else if localAuthResult.userFound {
 					// when a user exists in local & ldap, 'err' will records the ldap auth result. 'errLocalAuth' is for the local auth result
 					errLocalAuth = err
 				}
@@ -2165,7 +2192,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		// lock-out in case the remote server is mis-configured
 		if user == nil && !localAuthEnabled && auth.Password.Username == common.DefaultAdminUser {
 			log.Debug("Attempt to login with default admin user")
-			if user, blockedForFailedLogin, blockedForExpiredPwd, userFound, blockAfterFailedCount, err = localPasswordAuth(auth.Password, accReadAll); err != nil {
+			if user, localAuthResult, err = localPasswordAuth(auth.Password, accReadAll); err != nil {
 				log.WithFields(log.Fields{"user": auth.Password.Username, "error": err}).Info()
 			} else {
 				localAuthed = true
@@ -2176,17 +2203,17 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			code := api.RESTErrUnauthorized
 			var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
 			var msg string
-			if userFound {
+			if localAuthResult.userFound {
 				if errLocalAuth != nil {
 					// when a user exists in local & ldap and both auth failed, we adop the errot message from local auth
 					msg = errLocalAuth.Error()
 				} else if err != nil {
 					msg = err.Error()
 				}
-				if blockedForFailedLogin {
+				if localAuthResult.blockedForFailedLogin {
 					ev = share.CLUSEvAuthLoginBlocked
 					code = api.RESTErrUserLoginBlocked
-				} else if blockedForExpiredPwd {
+				} else if localAuthResult.blockedForExpiredPwd {
 					ev = share.CLUSEvAuthLoginBlocked
 					code = api.RESTErrPasswordExpired
 				}
@@ -2197,14 +2224,14 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			return
 		} else {
 			// user password passes auth (could be local or remote auth)
-			if !localAuthed && userFound && blockAfterFailedCount > 0 {
+			if !localAuthed && localAuthResult.userFound && localAuthResult.blockAfterFailedCount > 0 {
 				// user password passes remote auth but not local auth(user found in local). do not increase local user's FailedLoginCount
 				retry := 0
 				for retry < retryClusterMax {
 					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
 						if user.FailedLoginCount > 0 {
 							user.FailedLoginCount--
-							if user.FailedLoginCount < uint32(blockAfterFailedCount) {
+							if user.FailedLoginCount < uint32(localAuthResult.blockAfterFailedCount) {
 								// case: after restoring user's FailedLoginCount, it doesn't match the "block M minutes after N failed login attemps"
 								user.BlockLoginSince = time.Time{}
 							}
@@ -2228,6 +2255,13 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			defaultPW = true
 		}
 		mainSessionID = _interactiveSessionID
+	}
+
+	if user != nil && localAuthed && user.ResetPwdInNextLogin {
+		// do not login user when the user needs to reset password first
+		resp := api.RESTTokenData{NeedToResetPassword: true}
+		restRespSuccess(w, r, &resp, nil, nil, nil, "")
+		return
 	}
 
 	var rc int
@@ -2416,6 +2450,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	var user *share.CLUSUser
 	var defaultPW bool
 	var localAuthed bool
+	var localAuthResult tLocalPwdAuthResult
 	var sso SsoSession
 
 	if data.Password != nil {
@@ -2427,11 +2462,10 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 
 		username := data.Password.Username
-		var blockedForFailedLogin, blockedForExpiredPwd, userFound bool
 
 		log.WithFields(log.Fields{"server": server}).Debug()
 		if server == api.AuthServerLocal {
-			user, blockedForFailedLogin, blockedForExpiredPwd, userFound, _, err = localPasswordAuth(data.Password, accReadAll)
+			user, localAuthResult, err = localPasswordAuth(data.Password, accReadAll)
 			if user != nil && err == nil {
 				localAuthed = true
 			}
@@ -2449,16 +2483,17 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 
 		if err != nil {
-			log.WithFields(log.Fields{"server": server, "user": data.Password.Username, "blockedLogin": blockedForFailedLogin, "blockedPwd": blockedForExpiredPwd, "error": err}).Error("User login failed")
+			log.WithFields(log.Fields{"server": server, "user": data.Password.Username, "blockedLogin": localAuthResult.blockedForFailedLogin,
+				"blockedPwd": localAuthResult.blockedForExpiredPwd, "error": err}).Error("User login failed")
 			code := api.RESTErrUnauthorized
 			var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
 			var msg string
-			if userFound {
+			if localAuthResult.userFound {
 				msg = err.Error()
-				if blockedForFailedLogin {
+				if localAuthResult.blockedForFailedLogin {
 					ev = share.CLUSEvAuthLoginBlocked
 					code = api.RESTErrUserLoginBlocked
-				} else if blockedForExpiredPwd {
+				} else if localAuthResult.blockedForExpiredPwd {
 					ev = share.CLUSEvAuthLoginBlocked
 					code = api.RESTErrPasswordExpired
 				}
@@ -2539,6 +2574,13 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 			return
 		}
+	}
+
+	if user != nil && localAuthed && user.ResetPwdInNextLogin {
+		// do not login user when the user needs to reset password first
+		resp := api.RESTTokenData{NeedToResetPassword: true}
+		restRespSuccess(w, r, &resp, nil, nil, nil, "")
+		return
 	}
 
 	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)

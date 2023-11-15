@@ -175,7 +175,6 @@ func (q *tCrdRequestsMgr) deleteCrInK8s(kind, recordName string, crdSecRule inte
 
 	var err error
 	for i := 0; i < 5; i++ {
-		time.Sleep(time.Second)
 		switch kind {
 		case resource.NvSecurityRuleKind:
 			err = global.ORCH.DeleteResource(resource.RscTypeCrdSecurityRule, crdSecRule)
@@ -198,6 +197,7 @@ func (q *tCrdRequestsMgr) deleteCrInK8s(kind, recordName string, crdSecRule inte
 		if err == nil || strings.Index(err.Error(), " 404 ") < 0 {
 			break
 		}
+		time.Sleep(time.Second)
 	}
 	if err != nil {
 		log.WithFields(log.Fields{"kind": kind, "error": err}).Error(recordName)
@@ -494,7 +494,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					}
 				}
 			}
-			time.Sleep(time.Second)
+			// time.Sleep(time.Second)
 			goto NEXT_CRD
 		}
 	}

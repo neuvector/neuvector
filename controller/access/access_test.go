@@ -1424,10 +1424,10 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/user_role",
 			"v1/user",
 			"v1/api_key",
+			"v1/user/*/password",
 		},
 		CONST_API_PWD_PROFILE: []string{
 			"v1/password_profile",
-			"v1/user/*/password",
 		},
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license/update",
