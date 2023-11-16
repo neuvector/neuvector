@@ -805,6 +805,7 @@ func CompileUriPermitsMapping() {
 				"v1/enforcer/*/profiling",
 				"v1/file/config",
 				"v1/csp/file/support",
+				"v1/internal/alert",
 			},
 			CONST_API_RT_SCAN: []string{
 				"v1/scan/workload/*",
@@ -860,10 +861,10 @@ func CompileUriPermitsMapping() {
 				"v1/user_role",
 				"v1/user",
 				"v1/api_key",
+				"v1/user/*/password",
 			},
 			CONST_API_PWD_PROFILE: []string{
 				"v1/password_profile",
-				"v1/user/*/password",
 			},
 			CONST_API_SYSTEM_CONFIG: []string{
 				"v1/system/license/update",
@@ -1595,7 +1596,7 @@ func (acc *AccessControl) AuthorizeOwn(obj share.AccessObject, f share.GetAccess
 	return authz
 }
 
-func (acc *AccessControl) GetRoleDomains() map[string][]string{
+func (acc *AccessControl) GetRoleDomains() map[string][]string {
 	var roleDomains = make(map[string][]string)
 
 	for d, role := range acc.roles {

@@ -111,7 +111,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	ruser := rconf.User
 	username := ruser.Fullname
-	if username[0] == '~' {
+	if len(username) == 0 || username[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -213,12 +213,12 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Create user")
 }
 
-func user2REST(user *share.CLUSUser) *api.RESTUser {
+func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 	var defaultPW bool
 	if user.Fullname == common.DefaultAdminUser && user.PasswordHash == utils.HashPassword(common.DefaultAdminPass) {
 		defaultPW = true
 	}
-	return &api.RESTUser{
+	userRest := &api.RESTUser{
 		Fullname:           user.Fullname,
 		Server:             user.Server,
 		Username:           user.Username,
@@ -232,6 +232,14 @@ func user2REST(user *share.CLUSUser) *api.RESTUser {
 		LastLoginAt:        api.RESTTimeString(user.LastLoginAt),
 		LoginCount:         user.LoginCount,
 	}
+
+	if acc.HasGlobalPermissions(0, share.PERM_AUTHORIZATION) && userRest.Server == "" {
+		if acc.IsFedAdmin() || (acc.CanWriteCluster() && user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader) {
+			userRest.PwdResettable = true
+		}
+	}
+
+	return userRest
 }
 
 func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -245,7 +253,7 @@ func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '~' {
+	if len(fullname) == 0 || fullname[0] == '~' {
 		handlerNotFound(w, r)
 		return
 	}
@@ -257,7 +265,7 @@ func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
-	resp := api.RESTUserData{User: user2REST(user)}
+	resp := api.RESTUserData{User: user2REST(user, acc)}
 	if user.Server == "" {
 		if pwdProfile, err := cacher.GetPwdProfile(share.CLUSSysPwdProfileName); err == nil {
 			now := time.Now().UTC()
@@ -305,7 +313,7 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	resp := api.RESTSelfUserData{User: user2REST(user)}
+	resp := api.RESTSelfUserData{User: user2REST(user, acc)}
 	if user.Server == "" {
 		pwdDaysUntilExpire, pwdHoursUntilExpire, _ := isPasswordExpired(true, user.Fullname, user.PwdResetTime)
 		resp.PwdDaysUntilExpire = pwdDaysUntilExpire
@@ -343,7 +351,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		}
 
 		// skip hidden user
-		if user.Fullname[0] == '~' {
+		if len(user.Fullname) == 0 || user.Fullname[0] == '~' {
 			continue
 		}
 
@@ -352,7 +360,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 			continue
 		}
 
-		userRest := user2REST(user)
+		userRest := user2REST(user, acc)
 		if user.Server == "" && pwdProfile.Name != "" {
 			if pwdProfile.EnablePwdExpiration && pwdProfile.PwdExpireAfterDays > 0 {
 				pwdValidUnit := _pwdValidUnit
@@ -471,7 +479,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		log.WithFields(log.Fields{"name": fullname, "config": rconf.Config.Fullname}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 		return
-	} else if fullname[0] == '~' {
+	} else if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -706,7 +714,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '~' {
+	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -721,6 +729,8 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 		errMsg = "Request error"
 	} else if fullname != rconf.Config.Fullname {
 		errMsg = "Username not match"
+	} else if rconf.Config.ForceResetPwd && rconf.Config.NewPassword == nil {
+		errMsg = "No password provided"
 	}
 	if errMsg != "" {
 		log.WithFields(log.Fields{"error": err, "fullname": fullname}).Error(errMsg)
@@ -759,7 +769,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 			errMsg = ""
 			if user.Server != "" {
 				errMsg = "Cannot modify remote user's password"
-			} else if pwdProfile.EnablePwdExpiration && pwdProfile.PwdExpireAfterDays > 0 {
+			} else if !ruser.ForceResetPwd && pwdProfile.EnablePwdExpiration && pwdProfile.PwdExpireAfterDays > 0 {
 				pwdValidUnit := _pwdValidUnit
 				if user.Fullname == common.DefaultAdminUser {
 					pwdValidUnit = _pwdValidPerDayUnit
@@ -772,6 +782,14 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if errMsg != "" {
 				log.WithFields(log.Fields{"user": fullname}).Error(errMsg)
 				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, errMsg)
+				return
+			}
+
+			// only fedAdmin-role user can force reset other fedAdmin/fedReader-role user's password
+			// only admin-role user can force reset other admin-role user's password
+			if ((user.Role == api.UserRoleFedAdmin || user.Role == api.UserRoleFedReader) && !acc.IsFedAdmin()) ||
+				(user.Role == api.UserRoleAdmin && !acc.CanWriteCluster()) {
+				restRespAccessDenied(w, login)
 				return
 			}
 
@@ -790,6 +808,11 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 				}
 				user.PasswordHash = utils.HashPassword(*ruser.NewPassword)
 				user.PwdResetTime = time.Now().UTC()
+				if ruser.ForceResetPwd {
+					user.FailedLoginCount = 0
+					user.BlockLoginSince = time.Time{}
+					user.ResetPwdInNextLogin = ruser.ResetPwdInNextLogin
+				}
 				resetPassword = true
 			}
 		}
@@ -798,6 +821,9 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 			log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
 			retry++
 		} else {
+			if resetPassword {
+				kickLoginSessions(user)
+			}
 			break
 		}
 	}
@@ -835,7 +861,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
 	role := ps.ByName("role")
-	if fullname[0] == '~' {
+	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -963,7 +989,7 @@ func handlerUserDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	fullname := ps.ByName("fullname")
 	fullname, _ = url.PathUnescape(fullname)
-	if fullname[0] == '~' {
+	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -1175,7 +1201,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	rapikey := rconf.Apikey
 	name := rapikey.Name
-	if name[0] == '~' {
+	if len(name) == 0 || name[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
 	}

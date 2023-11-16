@@ -1475,12 +1475,13 @@ func StartRESTServer() {
 	r.POST("/v1/file/compliance/profile/config", handlerCompProfileImport)    // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
 	r.POST("/v1/file/vulnerability/profile", handlerVulnProfileExport)        //
 	r.POST("/v1/file/vulnerability/profile/config", handlerVulnProfileImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/internal/alert", handlerAcceptAlert)                          // skip API document
 	r.GET("/v1/internal/system", handlerInternalSystem)                       // skip API document
 	r.GET("/v1/system/usage", handlerSystemUsage)                             // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
 	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
-	r.GET("/v1/system/rbac", handlerSystemGetRBAC)
+	r.GET("/v1/system/rbac", handlerSystemGetRBAC)       // skip API document
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
