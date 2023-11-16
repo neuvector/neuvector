@@ -3309,17 +3309,28 @@ type RESTAdmissionStatsData struct {
 	Stats *RESTAdmissionStats `json:"stats"`
 }
 
+type RESTAdmCtrlTestRuleInfo struct {
+	ID          uint32 `json:"id"`
+	Disabled    bool   `json:"disabled"`      // for disabled rules, we still get their matching results(not taking effect in determining final result) simply for user's reference
+	Type        string `json:"type"`          // allow / deny
+	Mode        string `json:"mode"`          // monitor/protect
+	RuleDetails string `json:"rule_details"`  // rule criteria details
+	RuleCfgType string `json:"rule_cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+}
+
 type RESTAdmCtrlRulesTestResult struct {
-	Index   int    `json:"index"`
-	Name    string `json:"name"`
-	Kind    string `json:"kind"`
-	Message string `json:"message"`
-	Allowed bool   `json:"allowed"`
+	Index        int                        `json:"index"`
+	Name         string                     `json:"name"`
+	Kind         string                     `json:"kind"`
+	Message      string                     `json:"message"`
+	MatchedRules []*RESTAdmCtrlTestRuleInfo `json:"matched_rules"` // one entry per matched rule for all rules(irrelevant to rule type/status/mode/action)
+	Allowed      bool                       `json:"allowed"`       // final result if the yaml is applied to k8s
 }
 
 type RESTAdmCtrlRulesTestResults struct {
 	PropsUnavailable []string                      `json:"props_unavailable,omitempty"`
-	Results          []*RESTAdmCtrlRulesTestResult `json:"results,omitempty"`
+	GlobalMode       string                        `json:"global_mode"`       // monitor/protect
+	Results          []*RESTAdmCtrlRulesTestResult `json:"results,omitempty"` // one entry per yaml doc
 }
 
 const FilterByPredefined string = "predefined"

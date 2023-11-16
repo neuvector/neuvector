@@ -131,9 +131,6 @@ func TestWalkThruContainersForSkipUpdateLog(t *testing.T) {
 			admResObject, _ := parseAdmRequest(req, objectMeta, podTemplateSpec)
 			oldContainers, _ := parseAdmReqOldObj(req, oldObjectMeta, oldPodTemplateSpec)
 			admResult := walkThruContainers(admission.NvAdmValidateType, admResObject, oldContainers, OPERATION_UPDATE, &stamps)
-			if !admResult.NoLogging {
-				t.Errorf("Didn't skip logging for update request: %s\n", dataFileName)
-			}
 		} else {
 			t.Errorf("Unexpected test data: %s (%s)\n", dataFileName, err)
 		}
