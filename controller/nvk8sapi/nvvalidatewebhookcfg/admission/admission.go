@@ -137,18 +137,20 @@ type AdmUriState struct {
 }
 
 type AdmAssessResult struct {
-	RuleID        uint32
-	AdmRule       string
-	RuleMode      string
-	MatchedSource string
-	DenyRuleMsg   string
+	RuleID          uint32
+	Disabled        bool
+	RuleDetails     string
+	RuleMode        string
+	RuleType        string
+	RuleCfgType     share.TCfgType
+	MatchedSource   string
+	DenyRuleMatched bool
 }
 
 type AdmResult struct { // AdmResult is per-image
 	MatchDeny       bool
 	FinalDeny       bool
 	ImageNotScanned bool
-	NoLogging       bool
 	MatchFedRule    bool
 	RuleID          uint32
 	RuleCategory    string
@@ -167,6 +169,7 @@ type AdmResult struct { // AdmResult is per-image
 	MatchedSource   string
 	HighVulsCnt     int
 	MedVulsCnt      int
+	AssessResults   []*AdmAssessResult // for assessment only
 }
 
 type AdmResObject struct {

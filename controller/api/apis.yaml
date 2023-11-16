@@ -5072,6 +5072,36 @@ definitions:
           type: integer
           format: uint32
           example: 12
+  RESTAdmCtrlTestRuleInfo:
+    type: object
+    required:
+      - id
+      - disabled
+      - type
+      - mode
+      - rule_details
+      - rule_cfg_type
+    properties:
+      id:
+        type: integer
+        format: uint32
+        example: 10001
+      disabled:
+        type: boolean
+        example: false
+      type:
+        type: string
+        enum: [allow, deny]
+      mode:
+        type: string
+        description: per-rule mode
+        enum: ["monitor","protect",""]
+      rule_details:
+        type: string
+        example: "It matches deny rule id 1000 with criteria: (allow privilege escalation = true)"
+      rule_cfg_type:
+        type: string
+        enum: [federal, ground, user_created]
   RESTAdmCtrlRulesTestResult:
     type: object
     required:
@@ -5079,6 +5109,7 @@ definitions:
       - name
       - kind
       - message
+      - matched_rules
       - allowed
     properties:
       index:
@@ -5092,7 +5123,11 @@ definitions:
         example: Deployment
       message:
         type: string
-        example: "Assessment Creation of Kubernetes Deployment resource (iperfserver) is denied because of deny rule id 1000 with criteria: (allow privilege escalation = true) [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]"
+        example: "<Assessment> Creation of Kubernetes Deployment is allowed [Notice: the requested image(s) are not scanned: quay.io/nvlab/iperf]."
+      matched_rules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTAdmCtrlTestRuleInfo'
       allowed:
         type: boolean
         example: false
@@ -5104,6 +5139,9 @@ definitions:
         items:
           type: string
         example: ["user", "userGroups"]
+      global_mode:
+        type: string
+        enum: ["monitor","protect", ""]
       results:
         type: array
         items:
