@@ -1716,7 +1716,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 }
 
 func (d *kubernetes) getResource(rt, namespace, name string) (interface{}, error) {
-	log.WithFields(log.Fields{"resource": rt}).Debug()
+	//log.WithFields(log.Fields{"resource": rt}).Debug()
 
 	maker, err := d.discoverResource(rt)
 	if err != nil {
