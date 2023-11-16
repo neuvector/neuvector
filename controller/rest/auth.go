@@ -1862,6 +1862,9 @@ type tLocalPwdAuthResult struct {
 	blockedForExpiredPwd  bool
 	userFound             bool
 	blockAfterFailedCount int
+	newPwdWeak            bool
+	newPwdError           string
+	pwdProfileBasic       api.RESTPwdProfileBasic
 }
 
 func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*share.CLUSUser, tLocalPwdAuthResult, error) {
@@ -1947,8 +1950,11 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 				if pw.NewPassword == nil {
 					return user, result, nil
 				}
-				if weak, pwdHistoryToKeep, _, e := isWeakPassword(*pw.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
+				if weak, pwdHistoryToKeep, pwdProfileBasic, e := isWeakPassword(*pw.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
 					log.WithFields(log.Fields{"create": pw.Username}).Error(e)
+					result.newPwdWeak = true
+					result.newPwdError = e
+					result.pwdProfileBasic = pwdProfileBasic
 					return nil, result, fmt.Errorf("New password is too weak")
 				} else {
 					if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
@@ -2220,7 +2226,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			}
 			log.WithFields(log.Fields{"user": auth.Password.Username, "msg": msg}).Error("User login failed")
 			authLog(ev, auth.Password.Username, remote, "", nil, msg) // when msg is empty, authLog() will compose the msg
-			restRespError(w, http.StatusUnauthorized, code)
+			if localAuthResult.newPwdWeak {
+				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, localAuthResult.newPwdError, localAuthResult.pwdProfileBasic)
+			} else {
+				restRespError(w, http.StatusUnauthorized, code)
+			}
 			return
 		} else {
 			// user password passes auth (could be local or remote auth)
@@ -2485,21 +2495,25 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		if err != nil {
 			log.WithFields(log.Fields{"server": server, "user": data.Password.Username, "blockedLogin": localAuthResult.blockedForFailedLogin,
 				"blockedPwd": localAuthResult.blockedForExpiredPwd, "error": err}).Error("User login failed")
-			code := api.RESTErrUnauthorized
-			var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
-			var msg string
-			if localAuthResult.userFound {
-				msg = err.Error()
-				if localAuthResult.blockedForFailedLogin {
-					ev = share.CLUSEvAuthLoginBlocked
-					code = api.RESTErrUserLoginBlocked
-				} else if localAuthResult.blockedForExpiredPwd {
-					ev = share.CLUSEvAuthLoginBlocked
-					code = api.RESTErrPasswordExpired
+			if server == api.AuthServerLocal && localAuthResult.newPwdWeak {
+				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, localAuthResult.newPwdError, localAuthResult.pwdProfileBasic)
+			} else {
+				code := api.RESTErrUnauthorized
+				var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
+				var msg string
+				if localAuthResult.userFound {
+					msg = err.Error()
+					if localAuthResult.blockedForFailedLogin {
+						ev = share.CLUSEvAuthLoginBlocked
+						code = api.RESTErrUserLoginBlocked
+					} else if localAuthResult.blockedForExpiredPwd {
+						ev = share.CLUSEvAuthLoginBlocked
+						code = api.RESTErrPasswordExpired
+					}
 				}
+				authLog(ev, data.Password.Username, remote, "", nil, msg)
+				restRespError(w, http.StatusUnauthorized, code)
 			}
-			authLog(ev, data.Password.Username, remote, "", nil, msg)
-			restRespError(w, http.StatusUnauthorized, code)
 			return
 		}
 

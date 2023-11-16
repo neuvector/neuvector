@@ -48,6 +48,7 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.FileAccessBehaviorMonitor, share.FileAccessBehaviorBlock,
 		share.DlpPatternContextURI, share.DlpPatternContextHEAD, share.DlpPatternContextBODY, share.DlpPatternContextPACKET,
 		share.CriteriaOpRegex, share.CriteriaOpNotRegex, share.DlpRuleKeyPattern,
+		share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers,
 	}
 	b.enumMap = make(map[string][]byte, len(enums))
 	for _, k := range enums {
