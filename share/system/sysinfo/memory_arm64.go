@@ -1,3 +1,5 @@
+//go:build arm64
+
 // Copyright © 2016 Zlatko Čalušić
 //
 // Use of this source code is governed by an MIT-style license that can be found in the LICENSE file.
@@ -9,10 +11,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // Memory information.
@@ -39,111 +41,13 @@ func qword(data []byte, index int) uint64 {
 	return binary.LittleEndian.Uint64(data[index : index+8])
 }
 
-func epsChecksum(sl []byte) (sum byte) {
-	for _, v := range sl {
-		sum += v
-	}
-
-	return
-}
-
-func epsValid(eps []byte) bool {
-	if epsChecksum(eps) == 0 && bytes.Equal(eps[0x10:0x15], []byte("_DMI_")) && epsChecksum(eps[0x10:]) == 0 {
-		return true
-	}
-
-	return false
-}
-
-func getStructureTableAddressEFI(f *os.File) (address int64, length int, err error) {
-	systab, err := openFile("/sys/firmware/efi/systab")
-	if err != nil {
-		return 0, 0, err
-	}
-	defer systab.Close()
-
-	s := bufio.NewScanner(systab)
-	for s.Scan() {
-		sl := strings.Split(s.Text(), "=")
-		if len(sl) != 2 || sl[0] != "SMBIOS" {
-			continue
-		}
-
-		addr, err := strconv.ParseInt(sl[1], 0, 64)
-		if err != nil {
-			return 0, 0, err
-		}
-
-		eps, err := syscall.Mmap(int(f.Fd()), addr, epsSize, syscall.PROT_READ, syscall.MAP_SHARED)
-		if err != nil {
-			return 0, 0, err
-		}
-		defer syscall.Munmap(eps)
-
-		if !epsValid(eps) {
-			break
-		}
-
-		return int64(dword(eps, 0x18)), int(word(eps, 0x16)), nil
-	}
-	if err := s.Err(); err != nil {
-		return 0, 0, err
-	}
-
-	return 0, 0, ErrNotExist
-}
-
-func getStructureTableAddress(f *os.File) (address int64, length int, err error) {
-	// SMBIOS Reference Specification Version 3.0.0, page 21
-	mem, err := syscall.Mmap(int(f.Fd()), 0xf0000, 0x10000, syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer syscall.Munmap(mem)
-
-	for i := range mem {
-		if i > len(mem)-epsSize {
-			break
-		}
-
-		// Search for the anchor string on paragraph (16 byte) boundaries.
-		if i%16 != 0 || !bytes.Equal(mem[i:i+4], []byte("_SM_")) {
-			continue
-		}
-
-		eps := mem[i : i+epsSize]
-		if !epsValid(eps) {
-			continue
-		}
-
-		return int64(dword(eps, 0x18)), int(word(eps, 0x16)), nil
-	}
-
-	return 0, 0, ErrNotExist
-}
-
 func getStructureTable() ([]byte, error) {
-	f, err := openFile("/dev/mem")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	address, length, err := getStructureTableAddressEFI(f)
-	if err != nil {
-		if address, length, err = getStructureTableAddress(f); err != nil {
-			return nil, err
-		}
-	}
-
-	// Mandatory page aligning for mmap() system call, lest we get EINVAL
-	align := address & (int64(os.Getpagesize()) - 1)
-	mem, err := syscall.Mmap(int(f.Fd()), address-align, length+int(align), syscall.PROT_READ, syscall.MAP_SHARED)
+	data, err := ioutil.ReadFile("/sys/firmware/dmi/tables/DMI")
 	if err != nil {
 		return nil, err
 	}
 
-	return mem[align:], nil
+	return data, nil
 }
 
 // the proc/meminfo also disclose the total memory of the system
@@ -190,7 +94,6 @@ func (si *SysInfo) getMemoryInfo() {
 		}
 		return
 	}
-	defer syscall.Munmap(mem)
 
 	var memSizeAlt uint
 loop:
