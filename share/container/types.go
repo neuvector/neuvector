@@ -209,7 +209,7 @@ func Connect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 			return rt, nil
 		}
 
-		if isPidHost() {
+		if IsPidHost() {
 			if rtEndpoint, ok := obtainRtEndpointFromKubelet(sys); ok {
 				log.WithFields(log.Fields{"rtEndpoint": rtEndpoint}).Info()
 				edpt := filepath.Join("/proc/1/root", rtEndpoint)
@@ -401,7 +401,7 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, bool) {
 	return "", false
 }
 
-func isPidHost() bool {	// pid host, pid-1 is the Linux bootup process
+func IsPidHost() bool {	// pid host, pid-1 is the Linux bootup process
 	name, _ := os.Readlink("/proc/1/exe")
 	// nv containers: "monitor" is for the controller
 	return name != "/usr/local/bin/monitor"
