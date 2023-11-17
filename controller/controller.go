@@ -390,9 +390,15 @@ func main() {
 		time.Sleep(time.Second * 4)
 	}
 
-	if platform == share.PlatformKubernetes && global.RT.String() == container.StubRtName {
-		if err := amendStubRtInfo(); err != nil {
-			log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get local device information")
+	if platform == share.PlatformKubernetes {
+		if global.RT.String() == container.StubRtName {
+			if err := amendStubRtInfo(); err != nil {
+				log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get local device information")
+			}
+		} else if Ctrler.HostName == "" { // non-privileged mode
+			if err := amendNotPrivilegedMode(); err != nil {
+				log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get not-privileged information")
+			}
 		}
 	}
 
@@ -885,7 +891,12 @@ func amendStubRtInfo() error {
 						} else {
 							Ctrler.NetworkMode = "default"
 						}
-						Ctrler.HostName = pod.Node
+						Host.Name = pod.Node
+						Ctrler.HostName = Host.Name
+						if tokens := strings.Split(Ctrler.HostID, ":"); len(tokens) > 0 {
+							Host.ID = fmt.Sprintf("%s:%s", Host.Name, tokens[1])
+							Ctrler.HostID = Host.ID
+						}
 						Ctrler.Name = "k8s_" + Ctrler.Labels["io.kubernetes.container.name"] + "_" +
 							Ctrler.Labels["io.kubernetes.pod.name"] + "_" +
 							Ctrler.Labels["io.kubernetes.pod.namespace"] + "_" +
@@ -897,4 +908,23 @@ func amendStubRtInfo() error {
 		}
 	}
 	return fmt.Errorf("can not found: err = %v", err)
+}
+
+func amendNotPrivilegedMode() error {
+	podname, _ := Ctrler.Labels["io.kubernetes.pod.name"]
+	domain, _ := Ctrler.Labels["io.kubernetes.pod.namespace"]
+	if o, err := global.ORCH.GetResource(resource.RscTypePod, domain, podname); err != nil {
+		return fmt.Errorf("can not found: err = %v, %v, %v", domain, podname, err)
+	} else {
+		if pod := o.(*resource.Pod); pod != nil {
+			log.WithFields(log.Fields{"pod": pod}).Debug()
+			Host.Name = pod.Node
+			Ctrler.HostName = Host.Name
+			if tokens := strings.Split(Ctrler.HostID, ":"); len(tokens) > 0 {
+				Host.ID = fmt.Sprintf("%s:%s", Host.Name, tokens[1])
+				Ctrler.HostID = Host.ID
+			}
+		}
+	}
+	return nil
 }
