@@ -64,6 +64,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	var stamps api.AdmCtlTimeStamps
 
 	body, _ := ioutil.ReadAll(r.Body)
+	body = _preprocessImportBody(body)
 	yamlParts := strings.Split(string(body), "\n---\n")
 
 	// check if it's Windows format
@@ -84,7 +85,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 		scanner := bufio.NewScanner(strings.NewReader(yamlPart))
 		for scanner.Scan() {
 			line := scanner.Text()
-			lineTemp := strings.Trim(line, " ")
+			lineTemp := strings.TrimSpace(line)
 			if len(lineTemp) == 0 || lineTemp[0] == byte('#') {
 				continue
 			} else {
@@ -134,7 +135,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 		scanner := bufio.NewScanner(strings.NewReader(yamlPart))
 		for scanner.Scan() {
 			line := scanner.Text()
-			lineTemp := strings.Trim(line, " ")
+			lineTemp := strings.TrimSpace(line)
 			if len(lineTemp) == 0 || lineTemp[0] == byte('#') {
 				continue
 			} else {
@@ -210,12 +211,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	// cleanup, delete opa keys in opaKeys
 	for _, docKey := range opaKeys {
 		opa.DeleteDocument(docKey)
-	}
-
-	//---------------------------------------------------
-	{
-		data, _ := json.Marshal(&resp)
-		log.WithFields(log.Fields{"resp": string(data)}).Debug("=> test : 99")
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Test admission control rules")

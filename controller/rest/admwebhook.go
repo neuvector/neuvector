@@ -1201,7 +1201,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			if len(assessResults) > 0 {
 				admResult.FinalDeny = assessResults[0].DenyRuleMatched
 				if admResult.FinalDeny {
-					finalAction = "allowed"
+					finalAction = "denied"
+					allowed = false
 				}
 			}
 			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, finalAction, subMsg)

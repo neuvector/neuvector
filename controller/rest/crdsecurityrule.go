@@ -2505,6 +2505,9 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 							ruleCfg.Containers = v
 						}
 					}
+					if ruleCfg.Containers == 0 {
+						ruleCfg.Containers = share.AdmCtrlRuleContainersN
+					}
 					if crdRule.RuleMode != nil {
 						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
