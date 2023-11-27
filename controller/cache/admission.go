@@ -305,44 +305,17 @@ func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 			r.RuleType = api.ValidatingDenyRuleType
 		}
 	}
-	if rule.Containers == 0 {
-		r.Containers = []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
-	} else {
-		if rule.Containers&share.AdmCtrlRuleContainersN > 0 {
-			r.Containers = append(r.Containers, share.AdmCtrlRuleContainers)
-		}
-		if rule.Containers&share.AdmCtrlRuleInitContainersN > 0 {
-			r.Containers = append(r.Containers, share.AdmCtrlRuleInitContainers)
-		}
-		if rule.Containers&share.AdmCtrlRuleEphemeralContainersN > 0 {
-			r.Containers = append(r.Containers, share.AdmCtrlRuleEphemeralContainers)
-		}
+	if rule.Containers&share.AdmCtrlRuleContainersN > 0 {
+		r.Containers = append(r.Containers, share.AdmCtrlRuleContainers)
 	}
-
-	return &r
-}
-
-func copyAdmissionRule(rule *share.CLUSAdmissionRule) *share.CLUSAdmissionRule {
-	criteria := make([]*share.CLUSAdmRuleCriterion, 0, len(rule.Criteria))
-	for _, crit := range rule.Criteria {
-		c := &share.CLUSAdmRuleCriterion{
-			Name:  crit.Name,
-			Op:    crit.Op,
-			Value: crit.Value,
-		}
-		criteria = append(criteria, c)
+	if rule.Containers&share.AdmCtrlRuleInitContainersN > 0 {
+		r.Containers = append(r.Containers, share.AdmCtrlRuleInitContainers)
 	}
-	r := share.CLUSAdmissionRule{
-		ID:         rule.ID,
-		Category:   rule.Category,
-		Comment:    rule.Comment,
-		Criteria:   criteria,
-		Disable:    rule.Disable,
-		Critical:   rule.Critical,
-		CfgType:    rule.CfgType,
-		RuleType:   rule.RuleType,
-		RuleMode:   rule.RuleMode,
-		Containers: rule.Containers,
+	if rule.Containers&share.AdmCtrlRuleEphemeralContainersN > 0 {
+		r.Containers = append(r.Containers, share.AdmCtrlRuleEphemeralContainers)
+	}
+	if len(r.Containers) == 0 {
+		r.Containers = []string{share.AdmCtrlRuleContainers}
 	}
 
 	return &r
@@ -1707,7 +1680,9 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 					// check whether this rule should be evaluated for the container
 					var evaluate bool
 					if rule.Containers == 0 {
-						evaluate = true
+						if containerType == share.AdmCtrlRuleContainers {
+							evaluate = true
+						}
 					} else {
 						switch containerType {
 						case share.AdmCtrlRuleContainers:

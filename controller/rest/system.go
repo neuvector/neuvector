@@ -2147,6 +2147,24 @@ func multipartImportRead(r *http.Request, params map[string]string, tmpfile *os.
 	return lines, nil
 }
 
+func _preprocessImportBody(body []byte) []byte {
+	bomUtf8 := []byte{0xc3, 0xaf, 0xc2, 0xbb, 0xc2, 0xbf}
+	if len(body) >= len(bomUtf8) {
+		found := true
+		for i, b := range bomUtf8 {
+			if b != body[i] {
+				found = false
+				break
+			}
+		}
+		if found {
+			body = body[len(bomUtf8):]
+		}
+	}
+
+	return body
+}
+
 func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tempFilePrefix string, acc *access.AccessControl, login *loginSession) {
 	importRunning := false
 	importNoResponse := false
@@ -2239,6 +2257,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			}
 		} else {
 			body, _ := ioutil.ReadAll(r.Body)
+			body = _preprocessImportBody(body)
 			json_data, err := yaml.YAMLToJSON(body)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")

@@ -305,8 +305,8 @@ func getAdmCtrlRuleContainers(targets []string) (uint8, error) {
 			return 0, fmt.Errorf("Invalid containers value")
 		}
 	}
-	if ruleContainers == (share.AdmCtrlRuleContainersN | share.AdmCtrlRuleInitContainersN | share.AdmCtrlRuleEphemeralContainersN) {
-		ruleContainers = 0
+	if ruleContainers == 0 {
+		ruleContainers = share.AdmCtrlRuleContainersN
 	}
 
 	return ruleContainers, nil
@@ -1442,6 +1442,8 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			}
 			if len(rule.Containers) > 0 {
 				ruleItem.Containers = rule.Containers
+			} else {
+				ruleItem.Containers = []string{share.AdmCtrlRuleContainers}
 			}
 			admissionRules = append(admissionRules, &ruleItem)
 			ids.Add(id)
