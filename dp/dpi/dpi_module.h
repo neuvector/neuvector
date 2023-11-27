@@ -20,6 +20,7 @@ extern io_spec_internal_subnet4_t *g_specialip_subnet4;
 extern uint8_t g_xff_enabled;
 extern uint8_t g_disable_net_policy;
 extern uint8_t g_detect_unmanaged_wl;
+extern uint8_t g_enable_icmp_policy;
 extern io_internal_subnet4_t *g_policy_addr;
 
 typedef struct dpi_snap_ {

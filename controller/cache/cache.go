@@ -195,6 +195,7 @@ type Context struct {
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
 	EnableRmNsGroups         bool
+	EnableIcmpPolicy         bool
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
@@ -2128,6 +2129,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	startWorkerThread(ctx) // timer and orch channel
 	startPolicyThread()
 
+	configIcmpPolicy(ctx)
 	configInit()
 	scanInit()
 

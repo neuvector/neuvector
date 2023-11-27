@@ -797,6 +797,7 @@ type CLUSSystemConfig struct {
 	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
 	DisableNetPolicy     bool                      `json:"disable_net_policy"`
 	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
+	EnableIcmpPolicy     bool                      `json:"enable_icmp_policy"`
 	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`

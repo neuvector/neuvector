@@ -481,6 +481,36 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	}
 }
 
+func configIcmpPolicy(ctx *Context) {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	retry := 0
+	for retry < 3 {
+		if cfg == nil {
+			if cfg, rev = clusHelper.GetSystemConfigRev(acc); cfg != nil {
+				break
+			}
+			retry++
+		} else {
+			break
+		}
+	}
+	if cfg == nil {
+		cfg = &common.DefaultSystemConfig
+		rev = 0
+	}
+	cfg.EnableIcmpPolicy = ctx.EnableIcmpPolicy
+
+	retry = 0
+	for retry < 3 {
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			retry++
+		} else {
+			break
+		}
+	}
+}
+
 func configInit() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)

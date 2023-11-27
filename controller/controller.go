@@ -255,6 +255,7 @@ func main() {
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
+	en_icmp_pol := flag.Bool("en_icmp_policy", false, "Enable icmp policy learning")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
@@ -341,6 +342,12 @@ func main() {
 			log.Info("Remove groups when namespace was deleted")
 			enableRmNsGrps = false
 		}
+	}
+
+	enableIcmpPolicy := false
+	if *en_icmp_pol {
+		log.Info("Enable icmp policy learning")
+		enableIcmpPolicy = true
 	}
 
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
@@ -679,6 +686,7 @@ func main() {
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
 		EnableRmNsGroups:         enableRmNsGrps,
+		EnableIcmpPolicy:         enableIcmpPolicy,
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,

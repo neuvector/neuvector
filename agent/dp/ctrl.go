@@ -235,6 +235,17 @@ func DPCtrlSetDetectUnmanagedWl(detectUnmanagedWl *bool) {
 	dpSendMsg(msg)
 }
 
+func DPCtrlSetEnableIcmpPolicy(enableIcmpPolicy *bool) {
+
+	data := DPEnableIcmpPolicyReq{
+		EnableIcmpPolicyConf: &DPEnableIcmpPolicy{
+			EnableIcmpPolicy: enableIcmpPolicy,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
 func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr, pips []net.IP) {
 	log.WithFields(log.Fields{"mac": mac, "iface": iface}).Debug("")
 
