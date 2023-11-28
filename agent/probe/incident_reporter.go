@@ -348,3 +348,25 @@ func (p *Probe) sendReport(pmsga probeMsgAggregate) {
 		p.sendProbeReport(*pmsga.msg, pmsga.count-1, pmsga.startTime)
 	}
 }
+
+func (p *Probe) sendFsnJavaPkgReport(id string, files []string, bAdd bool) {
+	group, _, _ := p.getServiceGroupName(id)
+	fsMsg := fsmon.MonitorMessage {
+		ID:      id,
+		Path:    strings.Join(files, ", "),
+		Group:   group,
+		Package: true,
+		Msg:     fsPackageUpdate,
+		Action:  share.PolicyActionViolate,
+		StartAt: time.Now().UTC(),
+	}
+
+	if bAdd {	// inofrmative
+		fsMsg.Path += " (added)"
+	} else {
+		fsMsg.Path += " (removed)"
+	}
+
+	p.notifyFsTaskChan <- &fsMsg
+	log.WithFields(log.Fields{"report": fsMsg}).Debug("PROC:")
+}
