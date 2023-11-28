@@ -2206,7 +2206,11 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		}
 		if importTask.TID == tid {
 			if !importRunning && resp.Data.Status != share.IMPORT_DONE {
-				restRespErrorMessageEx(w, http.StatusInternalServerError, api.RESTErrFailImport, importTask.Status, resp)
+				status := http.StatusInternalServerError
+				if importTask.Status == "Invalid security rule(s)" {
+					status = http.StatusBadRequest
+				}
+				restRespErrorMessageEx(w, status, api.RESTErrFailImport, importTask.Status, resp)
 			} else {
 				// import is not running and caller tries to query the last import status
 				restRespSuccess(w, r, &resp, acc, login, nil, "")
