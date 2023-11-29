@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.2.2'
+  version: '5.3'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -11876,6 +11876,7 @@ definitions:
       - name
       - url
       - enable
+      - use_proxy
       - type
       - cfg_type
     properties:
@@ -11888,6 +11889,9 @@ definitions:
       enable:
         type: boolean
         example: true
+      use_proxy:
+        type: boolean
+        example: false
       type:
         type: string
         enum: ["", Slack, JSON, Teams]
