@@ -1669,11 +1669,12 @@ const (
 )
 
 type RESTWebhook struct {
-	Name    string `json:"name"`
-	Url     string `json:"url"`
-	Enable  bool   `json:"enable"`
-	Type    string `json:"type"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
+	Name     string `json:"name"`
+	Url      string `json:"url"`
+	Enable   bool   `json:"enable"`
+	UseProxy bool   `json:"use_proxy"`
+	Type     string `json:"type"`
+	CfgType  string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
 }
 
 type RESTSystemWebhookConfigData struct {

@@ -3,9 +3,11 @@ package common
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"syscall"
@@ -231,39 +233,24 @@ const requestTimeout = time.Duration(5 * time.Second)
 
 type Webhook struct {
 	url    string
-	client *http.Client
+	target string
 }
 
-func NewWebHook(url string) *Webhook {
+func NewWebHook(url, target string) *Webhook {
 	w := &Webhook{
-		url: url,
-		client: &http.Client{
-			Timeout: requestTimeout,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		},
+		url:    url,
+		target: target,
 	}
 	return w
 }
 
-func (w *Webhook) Validate() error {
-	log.WithFields(log.Fields{"url": w.url}).Debug("")
-	fields := make(map[string]string)
-	fields["text"] = fmt.Sprintf("%s", webhookInfo)
-	jsonValue, _ := json.Marshal(fields)
-
-	return w.httpRequest(jsonValue)
-}
-
-func (w *Webhook) Notify(elog interface{}, target, level, category, cluster, title string) {
+func (w *Webhook) Notify(elog interface{}, level, category, cluster, title string, proxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"title": title}).Debug()
 
 	if logText := struct2Text(elog); logText != "" {
 		var data []byte
-		if target == api.WebhookTypeSlack {
+		switch w.target {
+		case api.WebhookTypeSlack:
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
@@ -272,31 +259,54 @@ func (w *Webhook) Notify(elog interface{}, target, level, category, cluster, tit
 			fields["text"] = logText
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
 			data, _ = json.Marshal(fields)
-		} else if target == api.WebhookTypeTeams {
+		case api.WebhookTypeTeams:
 			fields := make(map[string]string)
 			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
 			data, _ = json.Marshal(fields)
-		} else if target == api.WebhookTypeJSON {
+		case api.WebhookTypeJSON:
 			extra := fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster)
 			data, _ = json.Marshal(elog)
 			data = append([]byte(extra), data[1:]...)
-		} else {
+		default:
 			msg := fmt.Sprintf("level=%s,cluster=%s,%s", strings.ToUpper(LevelToString(level)), cluster, logText)
 			data = []byte(msg)
 		}
 
-		w.httpRequest(data)
+		w.httpRequest(data, proxy)
 	}
 }
 
-func (w *Webhook) httpRequest(data []byte) error {
+func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+	if proxy != nil {
+		transport.Proxy = func(r *http.Request) (*url.URL, error) {
+			return url.Parse(proxy.URL)
+		}
+		if proxy.Username != "" {
+			transport.ProxyConnectHeader = http.Header{}
+			transport.ProxyConnectHeader.Add(
+				"Proxy-Authorization",
+				"Basic "+base64.StdEncoding.EncodeToString([]byte(proxy.Username+":"+proxy.Password)),
+			)
+		}
+	}
+
+	client := &http.Client{
+		Timeout:   requestTimeout,
+		Transport: transport,
+	}
+
 	var err error
 	var resp *http.Response
 	retry := 0
 	for retry < 3 {
-		resp, err = w.client.Post(w.url, contentType, bytes.NewBuffer(data))
+		resp, err = client.Post(w.url, contentType, bytes.NewBuffer(data))
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Webhook Send HTTP fail")
 			return err
