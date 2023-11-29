@@ -10784,7 +10784,7 @@ definitions:
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
-      svslog_cfg:
+      syslog_cfg:
         $ref: '#/definitions/RESTSystemConfigSyslogCfgV2'
       auth_cfg:
         $ref: '#/definitions/RESTSystemConfigAuthCfgV2'
