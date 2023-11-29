@@ -1168,7 +1168,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 		}
 		var subMsg, ruleScope, msgHeader string
-		// check if the containers are allowed. assessResults is only for the deny rules that are triggered before (the 1st allow rule and 1st monitored deny rule)
+		// check whether the containers are allowed.
+		// assessResults is for all the matched rules(disabled or not)
 		admResult, assessResults = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, forTesting)
 		if req.DryRun != nil && *req.DryRun {
 			msgHeader = "<Server Dry Run> "
@@ -1199,7 +1200,16 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		if forTesting {
 			finalAction := "allowed"
 			if len(assessResults) > 0 {
-				admResult.FinalDeny = assessResults[0].DenyRuleMatched
+				for _, r := range assessResults {
+					if !r.Disabled {
+						if r.DenyRuleMatched {
+							if (r.RuleMode == "" && mode == share.AdmCtrlModeProtect) || r.RuleMode == share.AdmCtrlModeProtect {
+								admResult.FinalDeny = true
+							}
+						}
+						break
+					}
+				}
 				if admResult.FinalDeny {
 					finalAction = "denied"
 					allowed = false
