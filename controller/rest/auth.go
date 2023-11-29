@@ -1367,7 +1367,10 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	// Validate token
 	jwtCert := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	tokenString, _ := token.SignedString(jwtCert.jwtPrivateKey)
+	tokenString, err := token.SignedString(jwtCert.jwtPrivateKey)
+	if tokenString == "" || err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	}
 	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 

@@ -5075,6 +5075,7 @@ definitions:
   RESTAdmCtrlTestRuleInfo:
     type: object
     required:
+      - container_image
       - id
       - disabled
       - type
@@ -5082,6 +5083,9 @@ definitions:
       - rule_details
       - rule_cfg_type
     properties:
+      container_image:
+        type: string
+        description: the tested container image in the pod
       id:
         type: integer
         format: uint32

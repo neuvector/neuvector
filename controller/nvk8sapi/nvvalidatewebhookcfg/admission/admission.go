@@ -137,6 +137,7 @@ type AdmUriState struct {
 }
 
 type AdmAssessResult struct {
+	ContainerImage  string
 	RuleID          uint32
 	Disabled        bool
 	RuleDetails     string
