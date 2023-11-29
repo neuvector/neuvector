@@ -240,7 +240,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					Webhooks: make([]api.RESTWebhook, len(cconf.Webhooks)),
 				}
 				for i, wh := range cconf.Webhooks {
-					fedConf.Webhooks[i] = api.RESTWebhook{Name: wh.Name, Url: wh.Url, Enable: wh.Enable, Type: wh.Type, CfgType: api.CfgTypeFederal}
+					fedConf.Webhooks[i] = api.RESTWebhook{
+						Name: wh.Name, Url: wh.Url, Enable: wh.Enable, UseProxy: wh.UseProxy,
+						Type: wh.Type, CfgType: api.CfgTypeFederal,
+					}
 				}
 				sort.Slice(fedConf.Webhooks, func(i, j int) bool { return fedConf.Webhooks[i].Name < fedConf.Webhooks[j].Name })
 			}
@@ -534,7 +537,10 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 		}
 
 		newWebhookNames.Add(api.WebhookDefaultName)
-		h := share.CLUSWebhook{Name: api.WebhookDefaultName, Url: *rcWebhookUrl, Enable: true, Type: api.WebhookTypeSlack, CfgType: cfgType}
+		h := share.CLUSWebhook{
+			Name: api.WebhookDefaultName, Url: *rcWebhookUrl, Enable: true,
+			Type: api.WebhookTypeSlack, UseProxy: false, CfgType: cfgType,
+		}
 		if !acc.Authorize(&h, nil) {
 			return nil, api.RESTErrObjectAccessDenied, common.ErrObjectAccessDenied
 		}
@@ -563,7 +569,10 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 			}
 
 			newWebhookNames.Add(h.Name)
-			newWebhooks = append(newWebhooks, share.CLUSWebhook{Name: h.Name, Url: h.Url, Enable: h.Enable, Type: h.Type, CfgType: cfgType})
+			newWebhooks = append(newWebhooks, share.CLUSWebhook{
+				Name: h.Name, Url: h.Url, Enable: h.Enable, UseProxy: h.UseProxy,
+				Type: h.Type, CfgType: cfgType,
+			})
 		}
 	}
 
@@ -627,11 +636,12 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	cwh := share.CLUSWebhook{
-		Name:    rwh.Name,
-		Url:     rwh.Url,
-		Enable:  rwh.Enable,
-		Type:    rwh.Type,
-		CfgType: share.UserCreated,
+		Name:     rwh.Name,
+		Url:      rwh.Url,
+		Enable:   rwh.Enable,
+		UseProxy: rwh.UseProxy,
+		Type:     rwh.Type,
+		CfgType:  share.UserCreated,
 	}
 	if rwh.CfgType == api.CfgTypeFederal {
 		cwh.CfgType = share.FederalCfg
@@ -797,7 +807,13 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 		var found bool
 		for i, _ := range cconf.Webhooks {
 			if cconf.Webhooks[i].Name == rwh.Name {
-				cconf.Webhooks[i] = share.CLUSWebhook{Name: rwh.Name, Url: rwh.Url, Enable: rwh.Enable, Type: rwh.Type}
+				cconf.Webhooks[i] = share.CLUSWebhook{
+					Name:     rwh.Name,
+					Url:      rwh.Url,
+					Enable:   rwh.Enable,
+					UseProxy: rwh.UseProxy,
+					Type:     rwh.Type,
+				}
 				found = true
 				break
 			}

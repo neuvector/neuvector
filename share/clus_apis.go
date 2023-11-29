@@ -762,11 +762,12 @@ type CLUSIBMSAOnboardData struct {
 }
 
 type CLUSWebhook struct {
-	Name    string   `json:"name"`
-	Url     string   `json:"url"`
-	Enable  bool     `json:"enable"`
-	Type    string   `json:"type"`
-	CfgType TCfgType `json:"cfg_type"`
+	Name     string   `json:"name"`
+	Url      string   `json:"url"`
+	Enable   bool     `json:"enable"`
+	UseProxy bool     `json:"use_proxy"`
+	Type     string   `json:"type"`
+	CfgType  TCfgType `json:"cfg_type"`
 }
 
 type CLUSSystemConfig struct {

@@ -1669,11 +1669,12 @@ const (
 )
 
 type RESTWebhook struct {
-	Name    string `json:"name"`
-	Url     string `json:"url"`
-	Enable  bool   `json:"enable"`
-	Type    string `json:"type"`
-	CfgType string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
+	Name     string `json:"name"`
+	Url      string `json:"url"`
+	Enable   bool   `json:"enable"`
+	UseProxy bool   `json:"use_proxy"`
+	Type     string `json:"type"`
+	CfgType  string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
 }
 
 type RESTSystemWebhookConfigData struct {
@@ -1808,7 +1809,7 @@ type RESTSystemConfigIBMSAVCfg2 struct {
 
 type RESTSystemConfigConfigV2 struct {
 	SvcCfg           *RESTSystemConfigSvcCfgV2        `json:"svc_cfg,omitempty"`
-	SyslogCfg        *RESTSystemConfigSyslogCfgV2     `json:"svslog_cfg,omitempty"`
+	SyslogCfg        *RESTSystemConfigSyslogCfgV2     `json:"syslog_cfg,omitempty"`
 	AuthCfg          *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
 	ProxyCfg         *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
 	Webhooks         *[]*RESTWebhook                  `json:"webhooks,omitempty"`
