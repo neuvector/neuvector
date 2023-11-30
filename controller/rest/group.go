@@ -424,6 +424,21 @@ func validateGroupConfig(rg *api.RESTGroupConfig, create bool) (int, string) {
 		log.WithFields(log.Fields{"name": rg.Name}).Error(e)
 		return api.RESTErrInvalidName, e
 	}
+	if rg.GrpSessCur != nil && *rg.GrpSessCur > api.GrpMetricMax {
+		e := "Metric group active session number exceed max limit"
+		log.WithFields(log.Fields{"GrpSessCur": *rg.GrpSessCur, "Max":api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
+	if rg.GrpSessRate != nil && *rg.GrpSessRate > api.GrpMetricMax {
+		e := "Metric group session rate exceed max limit"
+		log.WithFields(log.Fields{"GrpSessRate": *rg.GrpSessRate, "Max":api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
+	if rg.GrpBandWidth != nil && *rg.GrpBandWidth > api.GrpMetricMax {
+		e := "Metric group bandwidth exceed max limit"
+		log.WithFields(log.Fields{"GrpBandWidth": *rg.GrpBandWidth, "Max":api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
 	switch rg.CfgType {
 	case api.CfgTypeFederal:
 		if !strings.HasPrefix(rg.Name, api.FederalGroupPrefix) || rg.Name == api.FederalGroupPrefix {
@@ -610,6 +625,18 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	if rg.Comment != nil {
 		cg.Comment = *rg.Comment
 	}
+	if rg.MonMetric != nil {
+		cg.MonMetric = *rg.MonMetric
+	}
+	if rg.GrpSessCur != nil {
+		cg.GrpSessCur = *rg.GrpSessCur
+	}
+	if rg.GrpSessRate != nil {
+		cg.GrpSessRate = *rg.GrpSessRate
+	}
+	if rg.GrpBandWidth != nil {
+		cg.GrpBandWidth = *rg.GrpBandWidth
+	}
 
 	// Write group definition into key-value store. Make sure group doesn't exist.
 	if err := clusHelper.PutGroup(&cg, true); err != nil {
@@ -715,8 +742,8 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Apply changes
-	cg.Criteria = nil
 	if rg.Criteria != nil && len(*rg.Criteria) > 0 {
+		cg.Criteria = nil
 		bHasCriteriaAddress := false
 		for _, ct := range *rg.Criteria {
 			cg.Criteria = append(cg.Criteria, share.CLUSCriteriaEntry{
@@ -738,6 +765,18 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	if rg.Comment != nil {
 		cg.Comment = *rg.Comment
+	}
+	if rg.MonMetric != nil {
+		cg.MonMetric = *rg.MonMetric
+	}
+	if rg.GrpSessCur != nil {
+		cg.GrpSessCur = *rg.GrpSessCur
+	}
+	if rg.GrpSessRate != nil {
+		cg.GrpSessRate = *rg.GrpSessRate
+	}
+	if rg.GrpBandWidth != nil {
+		cg.GrpBandWidth = *rg.GrpBandWidth
 	}
 
 	if !acc.Authorize(cg, nil) {

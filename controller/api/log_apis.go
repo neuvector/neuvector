@@ -158,6 +158,7 @@ const (
 	EventNameAuthDefAdminPwdUnchanged    = "User.Password.Alert"
 	EventNameScannerAutoScaleDisabled    = "Configuration.ScannerAutoScale.Disabled"
 	EventNameK8sAdmissionWebhookChange   = "Kubenetes.Admission.Webhook.Change" // for admission control
+	EventNameGroupMetricViolation        = "Group.Metric.Violation"
 )
 
 // TODO: these are not events but incidents
