@@ -3311,12 +3311,13 @@ type RESTAdmissionStatsData struct {
 }
 
 type RESTAdmCtrlTestRuleInfo struct {
-	ID          uint32 `json:"id"`
-	Disabled    bool   `json:"disabled"`      // for disabled rules, we still get their matching results(not taking effect in determining final result) simply for user's reference
-	Type        string `json:"type"`          // allow / deny
-	Mode        string `json:"mode"`          // monitor/protect
-	RuleDetails string `json:"rule_details"`  // rule criteria details
-	RuleCfgType string `json:"rule_cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	ContainerImage string `json:"container_image"` // the tested container image in the pod
+	ID             uint32 `json:"id"`
+	Disabled       bool   `json:"disabled"`      // for disabled rules, we still get their matching results(not taking effect in determining final result) simply for user's reference
+	Type           string `json:"type"`          // allow / deny
+	Mode           string `json:"mode"`          // monitor/protect
+	RuleDetails    string `json:"rule_details"`  // rule criteria details
+	RuleCfgType    string `json:"rule_cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 }
 
 type RESTAdmCtrlRulesTestResult struct {

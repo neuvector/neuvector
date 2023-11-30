@@ -1736,11 +1736,12 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 							}
 							if forTesting {
 								assessResult := &nvsysadmission.AdmAssessResult{
-									RuleID:        rule.ID,
-									Disabled:      rule.Disable,
-									RuleDetails:   ruleDetails,
-									RuleCfgType:   rule.CfgType,
-									MatchedSource: matchedSource,
+									ContainerImage: c.Image,
+									RuleID:         rule.ID,
+									Disabled:       rule.Disable,
+									RuleDetails:    ruleDetails,
+									RuleCfgType:    rule.CfgType,
+									MatchedSource:  matchedSource,
 								}
 								if isDenyRuleType {
 									assessResult.RuleType = api.ValidatingDenyRuleType

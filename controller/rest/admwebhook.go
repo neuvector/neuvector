@@ -792,7 +792,7 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	var denyMatchedResult *nvsysadmission.AdmResult     // from first deny match
 	var assessResults []*nvsysadmission.AdmAssessResult // for all matched rules in assessment
 	containerTypes := []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
-	for i, containers := range admResObject.AllContainers {
+	for i, containers := range admResObject.AllContainers { // range (initContainers, Containers, ephemeralContainers)
 		for _, c := range containers {
 			var thisStamp api.AdmCtlTimeStamps
 			perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
