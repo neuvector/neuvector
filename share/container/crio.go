@@ -119,11 +119,8 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon, selfID: id,
 	}
 
-	name, _ := os.Readlink("/proc/1/exe")
-	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
-		driver.pidHost = false
-	} else {
-		driver.pidHost = true
+	driver.pidHost = IsPidHost()
+	if driver.pidHost {
 		if repoDig, err := getPauseImageRepoDigests(); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Fail to get pause image info")
 		} else {
@@ -132,7 +129,6 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 			log.WithFields(log.Fields{"repoDig": driver.podImgRepoDigest, "imgID": driver.podImgID, "imgDigest": driver.podImgDigest}).Debug("CRIO:")
 		}
 	}
-
 	return &driver, nil
 }
 
@@ -152,6 +148,7 @@ func (d *crioDriver) reConnect() error {
 	endpoint := d.endpoint
 	if d.endpointHost != "" {	// use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")

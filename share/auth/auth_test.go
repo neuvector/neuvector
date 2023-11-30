@@ -1,0 +1,328 @@
+package auth_test
+
+import (
+	"crypto/x509"
+	"testing"
+	"time"
+
+	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/auth"
+	"github.com/stretchr/testify/assert"
+)
+
+//
+// ***Read before you change this test file.***
+//
+// Because SAML requires multiple components to work, and it highly depends on each vendor's implementation.
+// Therefore, we only have regression tests here to make sure that the working code will not fail.
+//
+// How to update these data.
+// 1. Update api.RESTTokenRedirect, SSOURL, SLOURL, Issuer to reflect your environment settings.
+// 2. Update cert, key that you store in NV and idpCert you retrieved from Okta.
+// 3. Run the test to generate URL.
+// 4. Verify the URL to make sure it works as expected.  https://www.samltool.com/decode.php is useful here.
+// 5. Revert your change in step#1.
+// 6. Regenerate the URL and update the testdata.
+
+// To setup Okta:
+// 1. Single sign-on URL: https://NV/token_auth_server
+// 2. SP Entity ID: https://NV/token_auth_server
+// 3. Name ID format: Unspecified
+// 4. Extra attributes Email, Username and NVRoleGroup.
+// 5. Import signing key.
+// 6. Allow app to initiate single logout.
+// 7. Check SLO initiation
+// 8. Response URL: https://NV/samlslo
+// 9. SP Issuer: https://NV/samlslo
+
+// This test verifies unsigned Authn request.
+// On Okta, validate SAML requests with signature certificates should be "unchecked".
+func TestOktaSAMLUnsignedAuthnRequest(t *testing.T) {
+	fakeTime := time.Date(2023, time.October, 4, 21, 8, 30, 0, time.UTC)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+
+	// Generate IdP cert/key
+	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
+		Year: 1,
+	}, x509.ExtKeyUsageAny)
+	assert.Nil(t, err)
+
+	reqData := api.RESTTokenRedirect{
+		Redirect: "https://example.com/token_auth_server",
+	}
+	url, err := remoteAuth.SAMLSPGetRedirectURL(&share.CLUSServerSAML{
+		CLUSServerAuth: share.CLUSServerAuth{
+			GroupMappedRoles: []*share.GroupRoleMapping{
+				&share.GroupRoleMapping{
+					Group:       "group1",
+					GlobalRole:  api.UserRoleReader,
+					RoleDomains: make(map[string][]string),
+				},
+			},
+		},
+		SSOURL:   "https://dev.okta.com/app/dev/xxxxx/sso/saml",
+		Issuer:   "https://example.com/token_auth_server",
+		X509Cert: string(idpCert),
+	}, &reqData,
+		map[string]string{
+			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
+		},
+	)
+
+	// Verify if it's consistent with Authn request for Okta.
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
+}
+
+// This test verifies signed Authn request.
+// On Okta, validate SAML requests with signature certificates should be "checked".
+func TestOktaSAMLSignedAuthnRequest(t *testing.T) {
+	cert := `-----BEGIN CERTIFICATE-----
+MIIDazCCAlOgAwIBAgIUGOj9G2/XbRCF9QhmuyhqCGf/et0wDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yMzA3MjgwMDEzMTBaFw0yNDA3
+MjcwMDEzMTBaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw
+HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQC5vn5AHjxELLmzr8P2noWjhwmI7TxH+5ZBerjQnbKI
+agSqL3UnTxc0GsOhGciP7bdOvpgCLCtpxWIEmjTYfOH/Z8Mr6X9XeAK8N9K+CLDM
+D5HQeqwPLUoe9RPKcil24MkpiorN/o99cWat0F5XeEFTJeSsBQ1Gv5AvZrDk2NHu
+SsDZ7OzLvTQOqSGkoaUB0zUCLRempUML33i5YLUf/OKl1e1IzgIXDUlRSY3qnMSw
+Po+k0xuJEp2FJnRnzfKokE8rSODOmhif5g17b4tnL0K79CUCZgkJScGlBWcUZHKt
+fAuf9dplECCRUKknk98TYfGPkhnsRyuqVo2S8rSQbu5HAgMBAAGjUzBRMB0GA1Ud
+DgQWBBTSUC03SNS2pkb+i30ADeORHK9JizAfBgNVHSMEGDAWgBTSUC03SNS2pkb+
+i30ADeORHK9JizAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBU
+3/3Il9b+fCKp/N8IvgZxVEiGs+MfUtbNgdZidovpfAEHRrgCZBS6+nI8uA9vS+5n
+AaMSpe4KXuhRWxp0HPruqXZF2Ipolk+gBAxPRqF5CMLLoTiJA45bzdbOYHlahqve
+vn2m965TmKZSMGUMdeVALANKInsQLP7jxNmoX9PJ+76fPReGRIYxV5Y0Ko8iipLH
+LWTr21onnXVr5qvoJ4RsiMCWtVtk6tpxOvC2H7IbVKCfeS8mgJ+xB+7OWn/2MwGk
+0twZ4lJoT/IvIs3Szq6sdAPXXFs/qug2AUgeLNPViVkW6XA8Nnv9h26KhkLUJ13U
+WTDHcR4IliyrrbdkfJiG
+-----END CERTIFICATE-----`
+
+	key := `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC5vn5AHjxELLmz
+r8P2noWjhwmI7TxH+5ZBerjQnbKIagSqL3UnTxc0GsOhGciP7bdOvpgCLCtpxWIE
+mjTYfOH/Z8Mr6X9XeAK8N9K+CLDMD5HQeqwPLUoe9RPKcil24MkpiorN/o99cWat
+0F5XeEFTJeSsBQ1Gv5AvZrDk2NHuSsDZ7OzLvTQOqSGkoaUB0zUCLRempUML33i5
+YLUf/OKl1e1IzgIXDUlRSY3qnMSwPo+k0xuJEp2FJnRnzfKokE8rSODOmhif5g17
+b4tnL0K79CUCZgkJScGlBWcUZHKtfAuf9dplECCRUKknk98TYfGPkhnsRyuqVo2S
+8rSQbu5HAgMBAAECggEAHHcUiwf3LW17Qg3IJtXRXie2Lt1IdTGZq8w+YX4hW6V/
+tIMUXaNRx4Logxpb8a64/mDYE9EoEAwXQuRM//ZXfhgtQWAFy2ZRaP3XFpdnXMZw
+DraWArdqmgbt8wL+1sCJI4wfTIVcARntZeq+YoJD5JW0jyYxDCwUUSdYKaIOvglE
+hylSCysUw8kE/zpTmlm6MD3Q7ILfVcezbWyaGQbz4hmJEkVogMQaqHrHv00c0EW+
+0lSdsm5wgky8YSALsEWRLbdLxtb0YWZaRgv12QDlLyjz5XqVbOTajW77HCKp3bTo
+Vfx31tU5sWfdToyxPydN3KBbGMkZBDvUizHO9C6F1QKBgQDEwfHPoRYoEKkkJljz
+rIAn2AKth64pikEhpxfBOqpElLfqQr0lK8hNqN7hmhDKF9ZB0mnmV+NqgDL5GQjp
+FKFgUDpNU61SLdJbpfhX30kfGZvKJGkJrsKbori3NViiHC65hX6IIBxrZctc8SNa
+BZya/o1wiLu+x/zzxSEy6i8sowKBgQDxq6FpmJV8jjkQ3xicnm56CtOh8lBAcycL
+tatkIkQUBDWFaxEpbtQuz/o1lY/p/frm++8wzom5tePtweSpUqYwNx/R1fqY8EFA
+hkcX4Ea8+a4clhI7e6gbdj+sdyvHLZtrFd7MhS7UPOcemiCkW72j2eyep4GkfjUH
+kn8IWNBODQKBgQCteCBtYiRapnW5PWXnUAqdFkEmJR1T2mSZ+utinQpI9KVBkB2a
+jANJFL2MQXzT8DgiSBS91HbYCrbmD0Bf3qR4ecMtMbz5WxS/YJCXSHD7TmSfz4Ib
+20wQU2JvhETkh9xaDGwGL+ledpzZEHCOiawMqqigsqx0A3XspbwjW3zD6QKBgFln
+ijZbeWnz346rShqezfYeTT7LOv8s2pQNaFOKDa9uAzLRci7mzl5nGIR8SRpimFCd
+gVaIAhGPBbxuj55IcizCJ+ZkB+pOb4VkZ6aglOrSX6Q5rJMO4xkNvO6bw7lS2P1b
+wOnel31y7nm2wT6spdKZC12CUIa/HfUoMBCxcpZ9AoGARg0PijCk5QWmYiJkwXge
+R/an9nanajMItgZBY1AxOmyOTvTvVwvzozwLPoVIH5kfBnhK8H/DFrG0J4Ixv48e
+Ac24T2ndenjpLnEycZLM9V+/U0rAfLkKgOOWSL+NlkOPgoWD9erDJj/g5Udjbywk
+ma7nkie3ORja96UTROAZ77o=
+-----END PRIVATE KEY-----`
+
+	fakeTime := time.Date(2023, time.October, 4, 21, 8, 30, 0, time.UTC)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+
+	// Generate IdP cert/key
+	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
+		Year: 1,
+	}, x509.ExtKeyUsageAny)
+	assert.Nil(t, err)
+
+	reqData := api.RESTTokenRedirect{
+		Redirect: "https://example.com/token_auth_server",
+	}
+	url, err := remoteAuth.SAMLSPGetRedirectURL(&share.CLUSServerSAML{
+		CLUSServerAuth: share.CLUSServerAuth{
+			GroupMappedRoles: []*share.GroupRoleMapping{
+				&share.GroupRoleMapping{
+					Group:       "group1",
+					GlobalRole:  api.UserRoleReader,
+					RoleDomains: make(map[string][]string),
+				},
+			},
+		},
+		SSOURL:      "https://dev.okta.com/app/dev/xxxxx/sso/saml",
+		Issuer:      "https://example.com/token_auth_server",
+		X509Cert:    string(idpCert),
+		SLOEnabled:  false,
+		SigningCert: string(cert),
+		SigningKey:  string(key),
+	}, &reqData,
+		map[string]string{
+			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
+		},
+	)
+
+	// Verify if it's consistent with Authn request for Okta.
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
+}
+
+// Verify NV can accept Okta Authn response.
+func TestOktaSAMLAuthnResponse(t *testing.T) {
+	tokenData := api.RESTAuthToken{
+		Token:    "SAMLResponse=PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c2FtbDJwOlJlc3BvbnNlIERlc3RpbmF0aW9uPSJodHRwczovL2V4YW1wbGUuY29tL3Rva2VuX2F1dGhfc2VydmVyIiBJRD0iaWQ3MTM5NjAxOTA1MzI3MDI4MzM1OTM4ODYiIEluUmVzcG9uc2VUbz0iX2Y4MDkxOGVmLWQzMWItNDRhMi05ZWEzLTY0ODcxNDViNDU4ZSIgSXNzdWVJbnN0YW50PSIyMDIzLTEwLTA2VDAwOjUxOjA4Ljg5MloiIFZlcnNpb249IjIuMCIgeG1sbnM6c2FtbDJwPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6cHJvdG9jb2wiIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSI%2BPHNhbWwyOklzc3VlciBGb3JtYXQ9InVybjpvYXNpczpuYW1lczp0YzpTQU1MOjIuMDpuYW1laWQtZm9ybWF0OmVudGl0eSIgeG1sbnM6c2FtbDI9InVybjpvYXNpczpuYW1lczp0YzpTQU1MOjIuMDphc3NlcnRpb24iPmh0dHA6Ly93d3cub2t0YS5jb20vZXhrYm41Ymw4djhkYVNwZDQ1ZDc8L3NhbWwyOklzc3Vlcj48ZHM6U2lnbmF0dXJlIHhtbG5zOmRzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwLzA5L3htbGRzaWcjIj48ZHM6U2lnbmVkSW5mbz48ZHM6Q2Fub25pY2FsaXphdGlvbk1ldGhvZCBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMTAveG1sLWV4Yy1jMTRuIyIvPjxkczpTaWduYXR1cmVNZXRob2QgQWxnb3JpdGhtPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzA0L3htbGRzaWctbW9yZSNyc2Etc2hhMjU2Ii8%2BPGRzOlJlZmVyZW5jZSBVUkk9IiNpZDcxMzk2MDE5MDUzMjcwMjgzMzU5Mzg4NiI%2BPGRzOlRyYW5zZm9ybXM%2BPGRzOlRyYW5zZm9ybSBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvMDkveG1sZHNpZyNlbnZlbG9wZWQtc2lnbmF0dXJlIi8%2BPGRzOlRyYW5zZm9ybSBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMTAveG1sLWV4Yy1jMTRuIyI%2BPGVjOkluY2x1c2l2ZU5hbWVzcGFjZXMgUHJlZml4TGlzdD0ieHMiIHhtbG5zOmVjPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzEwL3htbC1leGMtYzE0biMiLz48L2RzOlRyYW5zZm9ybT48L2RzOlRyYW5zZm9ybXM%2BPGRzOkRpZ2VzdE1ldGhvZCBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMDQveG1sZW5jI3NoYTI1NiIvPjxkczpEaWdlc3RWYWx1ZT45ZjRRcTB5djBWQmFxOWRZa1JYQ0UrWHFkNGh2cys5N0tXbHZyTkZUMVhJPTwvZHM6RGlnZXN0VmFsdWU%2BPC9kczpSZWZlcmVuY2U%2BPC9kczpTaWduZWRJbmZvPjxkczpTaWduYXR1cmVWYWx1ZT5EQ1BSUXZRWldsV0NSSXNITUszRk91aWY2eHlacm8yUVpRMGFYQUJnTzQra1M3VVVoMmJBQjB1SUdvK2Q1MDRGb0NsT0xzeW5OR1M4YUJRVU1jTXllQTllbnFPTGExR0NWZ2REVDBDKzlEaHlma0x0MUJ6SFI1SXE5WVBSMy9jbENYN2lBTTNyelRubHpSaGJyWmZvWEtnYjZrck9FWHMyNGl4ZldKUG1jR0VhYWtwQ3RFTTJreGIxMmpVZVkxOXVNNjRCM0I1V09aR3hrQUhzejFjdzZEME1wRno5bWpWWUtxUXNpakxubXZpYUcyZ0x3SjZGQ3ZwZTU4V1lycUFtelBvWkV1L0lyRFg1ZzdVay9aYk1mSk9qeDFMNGRyckNOZHg3REIzM0hUY3ZERTc5bzc5Y0dZcHVVc1ovc2NaSEtISFliWmptc0FOcmhZVlRoRTA4K1E9PTwvZHM6U2lnbmF0dXJlVmFsdWU%2BPGRzOktleUluZm8%2BPGRzOlg1MDlEYXRhPjxkczpYNTA5Q2VydGlmaWNhdGU%2BTUlJRHFEQ0NBcENnQXdJQkFnSUdBWXJpZ09nbk1BMEdDU3FHU0liM0RRRUJDd1VBTUlHVU1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFRwpBMVVFQ0F3S1EyRnNhV1p2Y201cFlURVdNQlFHQTFVRUJ3d05VMkZ1SUVaeVlXNWphWE5qYnpFTk1Bc0dBMVVFQ2d3RVQydDBZVEVVCk1CSUdBMVVFQ3d3TFUxTlBVSEp2ZG1sa1pYSXhGVEFUQmdOVkJBTU1ER1JsZGkweE5UY3pOamcyTlRFY01Cb0dDU3FHU0liM0RRRUoKQVJZTmFXNW1iMEJ2YTNSaExtTnZiVEFlRncweU16QTVNamt4T1RVeU16TmFGdzB6TXpBNU1qa3hPVFV6TXpOYU1JR1VNUXN3Q1FZRApWUVFHRXdKVlV6RVRNQkVHQTFVRUNBd0tRMkZzYVdadmNtNXBZVEVXTUJRR0ExVUVCd3dOVTJGdUlFWnlZVzVqYVhOamJ6RU5NQXNHCkExVUVDZ3dFVDJ0MFlURVVNQklHQTFVRUN3d0xVMU5QVUhKdmRtbGtaWEl4RlRBVEJnTlZCQU1NREdSbGRpMHhOVGN6TmpnMk5URWMKTUJvR0NTcUdTSWIzRFFFSkFSWU5hVzVtYjBCdmEzUmhMbU52YlRDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQwpnZ0VCQUtOdmpyQWU5cXE4WmQrN2JLQlV5ZW12c3NTbkgzV2hndXNySlcyTVVwUjZKaEJYaytmck9LSUE2Z0trcG94VVBQZEpsOUFqCjlSMThkZWN0YXNsa2VoaUR1d2ExTVZWeFRCSi9BK21xaGNBUWlKQjhJUHVXelUxVGh0eEpMMU9SMmlDWXJhZWVEcFBVL1JmUXJJVGQKL1NaTm5pcDZzeVZZbW9JRk93MWM5cjlGd0JjQ1RmcnBTWHl6NnMwd1VYZ0dsRnYraUtmMmVXdCtOeHRFVHYrQ0NldHV3dFpFTHRGSQpvNVE0RmhUb3Z5dEJCejU2Q2J5SnBmUEcxS3JQN1ZvbElBOVRhUElPdEIzZUMyOTd2ZHBMTUhoMjhIQzZKeHZ5ci80SEpzUytUbytmCk15dzU1dTl1Y0xhM1RXdkZwVEVZOGpJNC92Q0ozTHRPc2IzQU5sdzZHQ2NDQXdFQUFUQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUEKbUZBOFZKeGp5U3FRd1lJNklCa09NK3Y4ajBoa0hicjI3MlpnV1pHL3NNek5EamZLaitmQTdXeVdtYWJpT3RLakREZDg1aERTRldQdgo2a3dqdzd0NUpXRjl6bFpPaTZVSWdwTTUxYmFCWkUyUmYrTGRFbGNBOW41bEVNSlRSeUtZamdrUWVpNUt2WVNWVXZvbXcydVUwajFQCndlYnF2TTQ0VTNCcnJiajNZWStLQ3crcitJekw0REc5UDhCZC9RM3Z3VDhPWGRub1crQW5SaXQ0OTNGK0N2ZzltbUFzV0ViSDdOeXUKSDlZNmNvY3pxaCt5aTN0VzBHOFB5bE1hV0N3VmRUWGdOYlFHbWM3SHNDalVjWWFETVZUZGVJN3gzVjhoUVZhM0dzTEZBNGNvSFM0QwpSRWczTEEzWVN5ZUx4eWh3U1VPSlNIZit5QktMWkZyRGxiSlE0dz09PC9kczpYNTA5Q2VydGlmaWNhdGU%2BPC9kczpYNTA5RGF0YT48L2RzOktleUluZm8%2BPC9kczpTaWduYXR1cmU%2BPHNhbWwycDpTdGF0dXMgeG1sbnM6c2FtbDJwPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6cHJvdG9jb2wiPjxzYW1sMnA6U3RhdHVzQ29kZSBWYWx1ZT0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOnN0YXR1czpTdWNjZXNzIi8%2BPC9zYW1sMnA6U3RhdHVzPjxzYW1sMjpBc3NlcnRpb24gSUQ9ImlkNzEzOTYwMTkwODIxNDM3NjczNDE4NDMwIiBJc3N1ZUluc3RhbnQ9IjIwMjMtMTAtMDZUMDA6NTE6MDguODkyWiIgVmVyc2lvbj0iMi4wIiB4bWxuczpzYW1sMj0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmFzc2VydGlvbiIgeG1sbnM6eHM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hIj48c2FtbDI6SXNzdWVyIEZvcm1hdD0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOm5hbWVpZC1mb3JtYXQ6ZW50aXR5IiB4bWxuczpzYW1sMj0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmFzc2VydGlvbiI%2BaHR0cDovL3d3dy5va3RhLmNvbS9leGtibjVibDh2OGRhU3BkNDVkNzwvc2FtbDI6SXNzdWVyPjxkczpTaWduYXR1cmUgeG1sbnM6ZHM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvMDkveG1sZHNpZyMiPjxkczpTaWduZWRJbmZvPjxkczpDYW5vbmljYWxpemF0aW9uTWV0aG9kIEFsZ29yaXRobT0iaHR0cDovL3d3dy53My5vcmcvMjAwMS8xMC94bWwtZXhjLWMxNG4jIi8%2BPGRzOlNpZ25hdHVyZU1ldGhvZCBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMDQveG1sZHNpZy1tb3JlI3JzYS1zaGEyNTYiLz48ZHM6UmVmZXJlbmNlIFVSST0iI2lkNzEzOTYwMTkwODIxNDM3NjczNDE4NDMwIj48ZHM6VHJhbnNmb3Jtcz48ZHM6VHJhbnNmb3JtIEFsZ29yaXRobT0iaHR0cDovL3d3dy53My5vcmcvMjAwMC8wOS94bWxkc2lnI2VudmVsb3BlZC1zaWduYXR1cmUiLz48ZHM6VHJhbnNmb3JtIEFsZ29yaXRobT0iaHR0cDovL3d3dy53My5vcmcvMjAwMS8xMC94bWwtZXhjLWMxNG4jIj48ZWM6SW5jbHVzaXZlTmFtZXNwYWNlcyBQcmVmaXhMaXN0PSJ4cyIgeG1sbnM6ZWM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMTAveG1sLWV4Yy1jMTRuIyIvPjwvZHM6VHJhbnNmb3JtPjwvZHM6VHJhbnNmb3Jtcz48ZHM6RGlnZXN0TWV0aG9kIEFsZ29yaXRobT0iaHR0cDovL3d3dy53My5vcmcvMjAwMS8wNC94bWxlbmMjc2hhMjU2Ii8%2BPGRzOkRpZ2VzdFZhbHVlPkZrWmxPQVNYcWpNeFJ2bTA4bTN0TU5rMkcvZVFSOUZNcUN3bWcxSHIvb0U9PC9kczpEaWdlc3RWYWx1ZT48L2RzOlJlZmVyZW5jZT48L2RzOlNpZ25lZEluZm8%2BPGRzOlNpZ25hdHVyZVZhbHVlPlNRbXNyYUVBeVBlOGV4ekcweFI1Qy9pb2RjbjIreVMzZDVNR01aL01kakNlWWNwYko4ekgyQkR0RWZYaXkvTm1kbmhuM0pSQkh4RHBsNktIaW1QWEh0VjFiLzZobnNEMnRTR0xYaWRMYkpWakllMmdRNkNOTkNwNi9OT1ZGcGU1VWovNGxSUmdiek8vczRmek1hSHN2Q0V3TDd2VnFjZnpWL0FWeHAwYzlOajVsWVRHU2ZkUXRjakRTVHNRLzdhRm45cGdqekJqa2FSTmI0NkpvblNCVkZaZ1graE15MUh6VjY2YmJtYUozL2lHVXRkMGNFbWpsZ0xOVnlKdjdoUGFjbVdDNHVRdGIyWk1PaVBiYkZoaDBNak5TNFdtL2IxZ1VRVFFNeXJQTUFFODJ3VU5NN3RQcWNqTHpQcXZwd0Urays3QlVvbGZKNkRaU2I3Y1dQTmVIQT09PC9kczpTaWduYXR1cmVWYWx1ZT48ZHM6S2V5SW5mbz48ZHM6WDUwOURhdGE%2BPGRzOlg1MDlDZXJ0aWZpY2F0ZT5NSUlEcURDQ0FwQ2dBd0lCQWdJR0FZcmlnT2duTUEwR0NTcUdTSWIzRFFFQkN3VUFNSUdVTVFzd0NRWURWUVFHRXdKVlV6RVRNQkVHCkExVUVDQXdLUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnd3TlUyRnVJRVp5WVc1amFYTmpiekVOTUFzR0ExVUVDZ3dFVDJ0MFlURVUKTUJJR0ExVUVDd3dMVTFOUFVISnZkbWxrWlhJeEZUQVRCZ05WQkFNTURHUmxkaTB4TlRjek5qZzJOVEVjTUJvR0NTcUdTSWIzRFFFSgpBUllOYVc1bWIwQnZhM1JoTG1OdmJUQWVGdzB5TXpBNU1qa3hPVFV5TXpOYUZ3MHpNekE1TWpreE9UVXpNek5hTUlHVU1Rc3dDUVlEClZRUUdFd0pWVXpFVE1CRUdBMVVFQ0F3S1EyRnNhV1p2Y201cFlURVdNQlFHQTFVRUJ3d05VMkZ1SUVaeVlXNWphWE5qYnpFTk1Bc0cKQTFVRUNnd0VUMnQwWVRFVU1CSUdBMVVFQ3d3TFUxTlBVSEp2ZG1sa1pYSXhGVEFUQmdOVkJBTU1ER1JsZGkweE5UY3pOamcyTlRFYwpNQm9HQ1NxR1NJYjNEUUVKQVJZTmFXNW1iMEJ2YTNSaExtTnZiVENDQVNJd0RRWUpLb1pJaHZjTkFRRUJCUUFEZ2dFUEFEQ0NBUW9DCmdnRUJBS052anJBZTlxcThaZCs3YktCVXllbXZzc1NuSDNXaGd1c3JKVzJNVXBSNkpoQlhrK2ZyT0tJQTZnS2twb3hVUFBkSmw5QWoKOVIxOGRlY3Rhc2xrZWhpRHV3YTFNVlZ4VEJKL0ErbXFoY0FRaUpCOElQdVd6VTFUaHR4SkwxT1IyaUNZcmFlZURwUFUvUmZRcklUZAovU1pObmlwNnN5Vlltb0lGT3cxYzlyOUZ3QmNDVGZycFNYeXo2czB3VVhnR2xGditpS2YyZVd0K054dEVUditDQ2V0dXd0WkVMdEZJCm81UTRGaFRvdnl0QkJ6NTZDYnlKcGZQRzFLclA3Vm9sSUE5VGFQSU90QjNlQzI5N3ZkcExNSGgyOEhDNkp4dnlyLzRISnNTK1RvK2YKTXl3NTV1OXVjTGEzVFd2RnBURVk4akk0L3ZDSjNMdE9zYjNBTmx3NkdDY0NBd0VBQVRBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQQptRkE4Vkp4anlTcVF3WUk2SUJrT00rdjhqMGhrSGJyMjcyWmdXWkcvc016TkRqZktqK2ZBN1d5V21hYmlPdEtqRERkODVoRFNGV1B2CjZrd2p3N3Q1SldGOXpsWk9pNlVJZ3BNNTFiYUJaRTJSZitMZEVsY0E5bjVsRU1KVFJ5S1lqZ2tRZWk1S3ZZU1ZVdm9tdzJ1VTBqMVAKd2VicXZNNDRVM0JycmJqM1lZK0tDdytyK0l6TDRERzlQOEJkL1EzdndUOE9YZG5vVytBblJpdDQ5M0YrQ3ZnOW1tQXNXRWJIN055dQpIOVk2Y29jenFoK3lpM3RXMEc4UHlsTWFXQ3dWZFRYZ05iUUdtYzdIc0NqVWNZYURNVlRkZUk3eDNWOGhRVmEzR3NMRkE0Y29IUzRDClJFZzNMQTNZU3llTHh5aHdTVU9KU0hmK3lCS0xaRnJEbGJKUTR3PT08L2RzOlg1MDlDZXJ0aWZpY2F0ZT48L2RzOlg1MDlEYXRhPjwvZHM6S2V5SW5mbz48L2RzOlNpZ25hdHVyZT48c2FtbDI6U3ViamVjdCB4bWxuczpzYW1sMj0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmFzc2VydGlvbiI%2BPHNhbWwyOk5hbWVJRCBGb3JtYXQ9InVybjpvYXNpczpuYW1lczp0YzpTQU1MOjEuMTpuYW1laWQtZm9ybWF0OnVuc3BlY2lmaWVkIj5hYUBiYi5jYzwvc2FtbDI6TmFtZUlEPjxzYW1sMjpTdWJqZWN0Q29uZmlybWF0aW9uIE1ldGhvZD0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmNtOmJlYXJlciI%2BPHNhbWwyOlN1YmplY3RDb25maXJtYXRpb25EYXRhIEluUmVzcG9uc2VUbz0iX2Y4MDkxOGVmLWQzMWItNDRhMi05ZWEzLTY0ODcxNDViNDU4ZSIgTm90T25PckFmdGVyPSIyMDIzLTEwLTA2VDAwOjU2OjA4Ljg5MloiIFJlY2lwaWVudD0iaHR0cHM6Ly9leGFtcGxlLmNvbS90b2tlbl9hdXRoX3NlcnZlciIvPjwvc2FtbDI6U3ViamVjdENvbmZpcm1hdGlvbj48L3NhbWwyOlN1YmplY3Q%2BPHNhbWwyOkNvbmRpdGlvbnMgTm90QmVmb3JlPSIyMDIzLTEwLTA2VDAwOjQ2OjA4Ljg5MloiIE5vdE9uT3JBZnRlcj0iMjAyMy0xMC0wNlQwMDo1NjowOC44OTJaIiB4bWxuczpzYW1sMj0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmFzc2VydGlvbiI%2BPHNhbWwyOkF1ZGllbmNlUmVzdHJpY3Rpb24%2BPHNhbWwyOkF1ZGllbmNlPmh0dHBzOi8vMTAuMS41Ni4xMDI6MzAyNzYvdG9rZW5fYXV0aF9zZXJ2ZXI8L3NhbWwyOkF1ZGllbmNlPjwvc2FtbDI6QXVkaWVuY2VSZXN0cmljdGlvbj48L3NhbWwyOkNvbmRpdGlvbnM%2BPHNhbWwyOkF1dGhuU3RhdGVtZW50IEF1dGhuSW5zdGFudD0iMjAyMy0xMC0wNlQwMDo1MTowOC44OTJaIiBTZXNzaW9uSW5kZXg9Il9mODA5MThlZi1kMzFiLTQ0YTItOWVhMy02NDg3MTQ1YjQ1OGUiIHhtbG5zOnNhbWwyPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXNzZXJ0aW9uIj48c2FtbDI6QXV0aG5Db250ZXh0PjxzYW1sMjpBdXRobkNvbnRleHRDbGFzc1JlZj51cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YWM6Y2xhc3NlczpQYXNzd29yZFByb3RlY3RlZFRyYW5zcG9ydDwvc2FtbDI6QXV0aG5Db250ZXh0Q2xhc3NSZWY%2BPC9zYW1sMjpBdXRobkNvbnRleHQ%2BPC9zYW1sMjpBdXRoblN0YXRlbWVudD48c2FtbDI6QXR0cmlidXRlU3RhdGVtZW50IHhtbG5zOnNhbWwyPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXNzZXJ0aW9uIj48c2FtbDI6QXR0cmlidXRlIE5hbWU9IkVtYWlsIiBOYW1lRm9ybWF0PSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXR0cm5hbWUtZm9ybWF0OnVuc3BlY2lmaWVkIj48c2FtbDI6QXR0cmlidXRlVmFsdWUgeG1sbnM6eHM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4c2k6dHlwZT0ieHM6c3RyaW5nIj5hYUBiYi5jYzwvc2FtbDI6QXR0cmlidXRlVmFsdWU%2BPC9zYW1sMjpBdHRyaWJ1dGU%2BPHNhbWwyOkF0dHJpYnV0ZSBOYW1lPSJVc2VybmFtZSIgTmFtZUZvcm1hdD0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmF0dHJuYW1lLWZvcm1hdDp1bnNwZWNpZmllZCI%2BPHNhbWwyOkF0dHJpYnV0ZVZhbHVlIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSIgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOnR5cGU9InhzOnN0cmluZyI%2BSmltPC9zYW1sMjpBdHRyaWJ1dGVWYWx1ZT48L3NhbWwyOkF0dHJpYnV0ZT48c2FtbDI6QXR0cmlidXRlIE5hbWU9Ik5WUm9sZUdyb3VwIiBOYW1lRm9ybWF0PSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXR0cm5hbWUtZm9ybWF0OnVuc3BlY2lmaWVkIj48c2FtbDI6QXR0cmlidXRlVmFsdWUgeG1sbnM6eHM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hIiB4bWxuczp4c2k9Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvWE1MU2NoZW1hLWluc3RhbmNlIiB4c2k6dHlwZT0ieHM6c3RyaW5nIj5FdmVyeW9uZTwvc2FtbDI6QXR0cmlidXRlVmFsdWU%2BPC9zYW1sMjpBdHRyaWJ1dGU%2BPC9zYW1sMjpBdHRyaWJ1dGVTdGF0ZW1lbnQ%2BPC9zYW1sMjpBc3NlcnRpb24%2BPC9zYW1sMnA6UmVzcG9uc2U%2B&RelayState=",
+		State:    "",
+		Redirect: "https://example.com/token_auth_server",
+	}
+	idpCert := `-----BEGIN CERTIFICATE-----
+MIIDqDCCApCgAwIBAgIGAYrigOgnMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEG
+A1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEU
+MBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi0xNTczNjg2NTEcMBoGCSqGSIb3DQEJ
+ARYNaW5mb0Bva3RhLmNvbTAeFw0yMzA5MjkxOTUyMzNaFw0zMzA5MjkxOTUzMzNaMIGUMQswCQYD
+VQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsG
+A1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi0xNTczNjg2NTEc
+MBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+ggEBAKNvjrAe9qq8Zd+7bKBUyemvssSnH3WhgusrJW2MUpR6JhBXk+frOKIA6gKkpoxUPPdJl9Aj
+9R18dectaslkehiDuwa1MVVxTBJ/A+mqhcAQiJB8IPuWzU1ThtxJL1OR2iCYraeeDpPU/RfQrITd
+/SZNnip6syVYmoIFOw1c9r9FwBcCTfrpSXyz6s0wUXgGlFv+iKf2eWt+NxtETv+CCetuwtZELtFI
+o5Q4FhTovytBBz56CbyJpfPG1KrP7VolIA9TaPIOtB3eC297vdpLMHh28HC6Jxvyr/4HJsS+To+f
+Myw55u9ucLa3TWvFpTEY8jI4/vCJ3LtOsb3ANlw6GCcCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEA
+mFA8VJxjySqQwYI6IBkOM+v8j0hkHbr272ZgWZG/sMzNDjfKj+fA7WyWmabiOtKjDDd85hDSFWPv
+6kwjw7t5JWF9zlZOi6UIgpM51baBZE2Rf+LdElcA9n5lEMJTRyKYjgkQei5KvYSVUvomw2uU0j1P
+webqvM44U3Brrbj3YY+KCw+r+IzL4DG9P8Bd/Q3vwT8OXdnoW+AnRit493F+Cvg9mmAsWEbH7Nyu
+H9Y6coczqh+yi3tW0G8PylMaWCwVdTXgNbQGmc7HsCjUcYaDMVTdeI7x3V8hQVa3GsLFA4coHS4C
+REg3LA3YSyeLxyhwSUOJSHf+yBKLZFrDlbJQ4w==
+-----END CERTIFICATE-----`
+
+	fakeTime := time.Date(2023, time.October, 6, 00, 52, 0, 0, time.UTC)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+
+	nameid, sessionindex, attrs, err := remoteAuth.SAMLSPAuth(&share.CLUSServerSAML{
+		CLUSServerAuth: share.CLUSServerAuth{
+			GroupMappedRoles: []*share.GroupRoleMapping{
+				&share.GroupRoleMapping{
+					Group:       "group1",
+					GlobalRole:  api.UserRoleReader,
+					RoleDomains: make(map[string][]string),
+				},
+			},
+		},
+		Issuer:   "http://www.okta.com/exkbn5bl8v8daSpd45d7",
+		X509Cert: string(idpCert),
+	}, &tokenData)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "aa@bb.cc", nameid)
+	assert.Equal(t, "_f80918ef-d31b-44a2-9ea3-6487145b458e", sessionindex)
+	assert.Equal(t, map[string][]string{
+		"Email": {
+			"aa@bb.cc",
+		},
+		"NVRoleGroup": {
+			"Everyone",
+		},
+		"Username": {
+			"Jim",
+		},
+	}, attrs)
+}
+
+// This test verifies signed logout request. (always signed)
+// Enable Okta's SLO feature so you can generate test data.
+func TestOktaSAMLSLORequest(t *testing.T) {
+	cert := `-----BEGIN CERTIFICATE-----
+MIIDazCCAlOgAwIBAgIUGOj9G2/XbRCF9QhmuyhqCGf/et0wDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yMzA3MjgwMDEzMTBaFw0yNDA3
+MjcwMDEzMTBaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw
+HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQC5vn5AHjxELLmzr8P2noWjhwmI7TxH+5ZBerjQnbKI
+agSqL3UnTxc0GsOhGciP7bdOvpgCLCtpxWIEmjTYfOH/Z8Mr6X9XeAK8N9K+CLDM
+D5HQeqwPLUoe9RPKcil24MkpiorN/o99cWat0F5XeEFTJeSsBQ1Gv5AvZrDk2NHu
+SsDZ7OzLvTQOqSGkoaUB0zUCLRempUML33i5YLUf/OKl1e1IzgIXDUlRSY3qnMSw
+Po+k0xuJEp2FJnRnzfKokE8rSODOmhif5g17b4tnL0K79CUCZgkJScGlBWcUZHKt
+fAuf9dplECCRUKknk98TYfGPkhnsRyuqVo2S8rSQbu5HAgMBAAGjUzBRMB0GA1Ud
+DgQWBBTSUC03SNS2pkb+i30ADeORHK9JizAfBgNVHSMEGDAWgBTSUC03SNS2pkb+
+i30ADeORHK9JizAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBU
+3/3Il9b+fCKp/N8IvgZxVEiGs+MfUtbNgdZidovpfAEHRrgCZBS6+nI8uA9vS+5n
+AaMSpe4KXuhRWxp0HPruqXZF2Ipolk+gBAxPRqF5CMLLoTiJA45bzdbOYHlahqve
+vn2m965TmKZSMGUMdeVALANKInsQLP7jxNmoX9PJ+76fPReGRIYxV5Y0Ko8iipLH
+LWTr21onnXVr5qvoJ4RsiMCWtVtk6tpxOvC2H7IbVKCfeS8mgJ+xB+7OWn/2MwGk
+0twZ4lJoT/IvIs3Szq6sdAPXXFs/qug2AUgeLNPViVkW6XA8Nnv9h26KhkLUJ13U
+WTDHcR4IliyrrbdkfJiG
+-----END CERTIFICATE-----`
+
+	key := `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC5vn5AHjxELLmz
+r8P2noWjhwmI7TxH+5ZBerjQnbKIagSqL3UnTxc0GsOhGciP7bdOvpgCLCtpxWIE
+mjTYfOH/Z8Mr6X9XeAK8N9K+CLDMD5HQeqwPLUoe9RPKcil24MkpiorN/o99cWat
+0F5XeEFTJeSsBQ1Gv5AvZrDk2NHuSsDZ7OzLvTQOqSGkoaUB0zUCLRempUML33i5
+YLUf/OKl1e1IzgIXDUlRSY3qnMSwPo+k0xuJEp2FJnRnzfKokE8rSODOmhif5g17
+b4tnL0K79CUCZgkJScGlBWcUZHKtfAuf9dplECCRUKknk98TYfGPkhnsRyuqVo2S
+8rSQbu5HAgMBAAECggEAHHcUiwf3LW17Qg3IJtXRXie2Lt1IdTGZq8w+YX4hW6V/
+tIMUXaNRx4Logxpb8a64/mDYE9EoEAwXQuRM//ZXfhgtQWAFy2ZRaP3XFpdnXMZw
+DraWArdqmgbt8wL+1sCJI4wfTIVcARntZeq+YoJD5JW0jyYxDCwUUSdYKaIOvglE
+hylSCysUw8kE/zpTmlm6MD3Q7ILfVcezbWyaGQbz4hmJEkVogMQaqHrHv00c0EW+
+0lSdsm5wgky8YSALsEWRLbdLxtb0YWZaRgv12QDlLyjz5XqVbOTajW77HCKp3bTo
+Vfx31tU5sWfdToyxPydN3KBbGMkZBDvUizHO9C6F1QKBgQDEwfHPoRYoEKkkJljz
+rIAn2AKth64pikEhpxfBOqpElLfqQr0lK8hNqN7hmhDKF9ZB0mnmV+NqgDL5GQjp
+FKFgUDpNU61SLdJbpfhX30kfGZvKJGkJrsKbori3NViiHC65hX6IIBxrZctc8SNa
+BZya/o1wiLu+x/zzxSEy6i8sowKBgQDxq6FpmJV8jjkQ3xicnm56CtOh8lBAcycL
+tatkIkQUBDWFaxEpbtQuz/o1lY/p/frm++8wzom5tePtweSpUqYwNx/R1fqY8EFA
+hkcX4Ea8+a4clhI7e6gbdj+sdyvHLZtrFd7MhS7UPOcemiCkW72j2eyep4GkfjUH
+kn8IWNBODQKBgQCteCBtYiRapnW5PWXnUAqdFkEmJR1T2mSZ+utinQpI9KVBkB2a
+jANJFL2MQXzT8DgiSBS91HbYCrbmD0Bf3qR4ecMtMbz5WxS/YJCXSHD7TmSfz4Ib
+20wQU2JvhETkh9xaDGwGL+ledpzZEHCOiawMqqigsqx0A3XspbwjW3zD6QKBgFln
+ijZbeWnz346rShqezfYeTT7LOv8s2pQNaFOKDa9uAzLRci7mzl5nGIR8SRpimFCd
+gVaIAhGPBbxuj55IcizCJ+ZkB+pOb4VkZ6aglOrSX6Q5rJMO4xkNvO6bw7lS2P1b
+wOnel31y7nm2wT6spdKZC12CUIa/HfUoMBCxcpZ9AoGARg0PijCk5QWmYiJkwXge
+R/an9nanajMItgZBY1AxOmyOTvTvVwvzozwLPoVIH5kfBnhK8H/DFrG0J4Ixv48e
+Ac24T2ndenjpLnEycZLM9V+/U0rAfLkKgOOWSL+NlkOPgoWD9erDJj/g5Udjbywk
+ma7nkie3ORja96UTROAZ77o=
+-----END PRIVATE KEY-----`
+
+	fakeTime := time.Date(2023, time.October, 6, 0, 6, 30, 0, time.UTC)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+
+	// Generate IdP cert/key
+	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
+		Year: 1,
+	}, x509.ExtKeyUsageAny)
+	assert.Nil(t, err)
+
+	reqData := api.RESTTokenRedirect{
+		Redirect: "https://example.com/token_auth_server",
+	}
+	url, err := remoteAuth.SAMLSPGetLogoutURL(&share.CLUSServerSAML{
+		CLUSServerAuth: share.CLUSServerAuth{
+			GroupMappedRoles: []*share.GroupRoleMapping{
+				&share.GroupRoleMapping{
+					Group:       "group1",
+					GlobalRole:  api.UserRoleReader,
+					RoleDomains: make(map[string][]string),
+				},
+			},
+		},
+		SSOURL: "https://dev.okta.com/app/dev/xxxxx/sso/saml",
+		// TODO: Make sure issuer and redirect don't conflict.
+		Issuer:      "https://example.com/token_auth_server",
+		X509Cert:    string(idpCert),
+		SLOEnabled:  true,
+		SLOURL:      "https://dev.okta.com/app/dev/xxxxx/slo/saml",
+		SigningCert: string(cert),
+		SigningKey:  string(key),
+	}, &reqData,
+		"aa@bb.cc",
+		"_6d713693-660a-4740-b9e0-c1ac2321fabe",
+		map[string]string{
+			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
+		},
+	)
+	assert.Nil(t, err)
+
+	// Verify if it's consistent with logout request for Okta.
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/slo/saml?SAMLRequest=fJLf65swFMX%2FFcl7NP6o%2Bg1fZYMyELo9rGMPe5Frcl2lmrjcWPzzh7aFbrDl8SSfc8K5951gGmd5sj%2Ft4r%2FirwXJB%2Bs0GpL7TcUWZ6QFGkgamJCkV%2FL88fNJJqGQs7PeKjuyF%2BT%2FBBCh84M1LGiOFWtRZQWqouRQ9BnPDqXmZQ6a9yUetCoP2JXAgu%2FoaLCmYkkoWNAQLdgY8mB8xRKRpDwWXOTfhJAil6n4wYIjkh8M%2BJ26eD%2BTjCKNt9BePYTKThHM8yZE63YiGm20%2FZ7VeyNyz3D1k8QVpnnEHfT2iqaFxV9aQndD9x69Inf%2BC0zYHINP1k3g%2F11JHMa7Mmje70%2FlYmhGNfQDalYDfOi6UKlHwt20fszsjLSV0hiNa93muojT%2FC3leS6AZ0UmePeGgqsYVJImcQ8d3m3%2BIp%2FiHytQ%2Fw4AAP%2F%2F&SigAlg=http%3A%2F%2Fwww.w3.org%2F2001%2F04%2Fxmldsig-more%23rsa-sha256&Signature=IAXj56i9MlhULmRq9v0LNTeFmmuce4PK%2B41jiEM%2BYX5HFgdav7u6%2B8zlNk5PQB%2FGqYsXpT4CbhB%2BwVDj4DaL87OFDAk5urz2Af3CK209ktL0YO1MT3D%2BitwP8nzmxdfQ1LIxQp%2B8MMk6vVlLzosY3M0wtxMnQ3QOO229BT13FTt%2BNtTxzY4TiUtgPaa7xzAVdgKLZFabPG8U%2FvKZkttaifjMRK1V1px42KiRB6WoD1bWRRdAZecfUg4AcUH%2BOs21OwmL4LVQiLkCzuXNL4dOlqqbxz5P9AjXZS5XTfog1fMvxhqM2Rk0pOnUxTyrlctJVigzENhmvn1MuJPjSCt3JA%3D%3D", url)
+}
+
+func TestOktaSAMLSLOResponse(t *testing.T) {
+}

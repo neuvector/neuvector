@@ -115,6 +115,7 @@ type localSystemInfo struct {
 	ciliumCNI         bool
 	disableNetPolicy  bool
 	detectUnmanagedWl bool
+	enableIcmpPolicy  bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -124,6 +125,7 @@ var defaultTapProxymesh bool = true
 var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
 var defaultDetectUnmanagedWl bool = false
+var defaultEnableIcmpPolicy bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
@@ -166,6 +168,13 @@ func gInfoRLock() {
 func gInfoRUnlock() {
 	//log.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("PROC: ")
 	gInfo.mutex.RUnlock()
+}
+
+func gInfoReadActiveContainer(id string) (*containerData, bool) {
+	gInfoRLock()
+	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
+	return c, ok
 }
 
 func getContainerByMAC(mac net.HardwareAddr) *containerData {
@@ -362,17 +371,13 @@ func runtimeEventCallback(ev container.Event, id string, pid int) {
 		task := ContainerTask{task: TASK_DEL_CONTAINER, id: id}
 		ContainerTaskChan <- &task
 	case container.EventContainerCopyIn:
-		gInfoRLock()
-		defer gInfoRUnlock()
-		if c, ok := gInfo.activeContainers[id]; ok {
+		if c, ok := gInfoReadActiveContainer(id); ok {
 			prober.ReportDockerCp(id, c.name, true)
 		} else if isAgentContainer(id) {
 			prober.ReportDockerCp(id, Agent.Name, true)
 		}
 	case container.EventContainerCopyOut:
-		gInfoRLock()
-		defer gInfoRUnlock()
-		if c, ok := gInfo.activeContainers[id]; ok {
+		if c, ok := gInfoReadActiveContainer(id); ok {
 			prober.ReportDockerCp(id, c.name, false)
 		} else if isAgentContainer(id) {
 			prober.ReportDockerCp(id, Agent.Name, false)
@@ -483,7 +488,7 @@ func notifyDPContainerApps(c *containerData) {
 func updatePods(c *containerData, quarReason *string) {
 	if c.pods.Cardinality() > 0 {
 		for pod := range c.pods.Iter() {
-			if pc, ok := gInfo.activeContainers[pod.(string)]; ok {
+			if pc, ok := gInfoReadActiveContainer(pod.(string)); ok {
 				pc.inline = c.inline
 				pc.quar = c.quar
 				ClusterEventChan <- &ClusterEvent{
@@ -493,8 +498,7 @@ func updatePods(c *containerData, quarReason *string) {
 			}
 		}
 	} else if c.parentNS != "" {
-		p, ok := gInfo.activeContainers[c.parentNS]
-		if ok { //parent exist
+		if p, ok := gInfoReadActiveContainer(c.parentNS); ok { //parent exist
 			p.inline = c.inline
 			p.quar = c.quar
 			ClusterEventChan <- &ClusterEvent{
@@ -504,7 +508,7 @@ func updatePods(c *containerData, quarReason *string) {
 			for podID := range p.pods.Iter() {
 				podid := podID.(string)
 				if podid != c.id {
-					if ch, ok1 := gInfo.activeContainers[podid]; ok1 {
+					if ch, ok1 := gInfoReadActiveContainer(podid); ok1 {
 						ch.inline = c.inline
 						ch.quar = c.quar
 						ClusterEventChan <- &ClusterEvent{
@@ -768,10 +772,10 @@ func getIPAddrScope(mac net.HardwareAddr, ip net.IP) (string, string) {
 }
 
 // Return if container is child and its parent container.
-func getSharedContainer(info *container.ContainerMetaExtra) (bool, *containerData) {
+func getSharedContainerWithLock(info *container.ContainerMetaExtra) (bool, *containerData) {
 	if isChild, parent_cid := global.RT.GetParent(info, gInfo.activePid2ID); parent_cid != "" {
-		var ok bool
 		var parent *containerData
+		var ok bool
 		if parent, ok = gInfo.activeContainers[parent_cid]; !ok {
 			if real_parent_cid := getContainerIDByName(parent_cid); real_parent_cid != "" {
 				parent_cid = real_parent_cid
@@ -787,6 +791,13 @@ func getSharedContainer(info *container.ContainerMetaExtra) (bool, *containerDat
 	} else {
 		return isChild, nil
 	}
+}
+
+// Return if container is child and its parent container.
+func getSharedContainer(info *container.ContainerMetaExtra) (bool, *containerData) {
+	gInfoRLock()
+	defer gInfoRUnlock()
+	return getSharedContainerWithLock(info)
 }
 
 func intcpPairs2Ifaces(intcpPairs []*pipe.InterceptPair) map[string][]share.CLUSIPAddr {
@@ -1003,7 +1014,7 @@ func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, rest
 	}
 
 	// Check if the container is the same running instance when event is scheduled.
-	c, ok := gInfo.activeContainers[id]
+	c, ok := gInfoReadActiveContainer(id)
 	if !ok || (info != nil && c.pid != info.Pid) || !c.propertyFilled {
 		return
 	}
@@ -1105,7 +1116,7 @@ func updateAppPorts(c *containerData, parent *containerData) bool {
 func taskReexamProcContainer(id string, info *container.ContainerMetaExtra) {
 
 	// Check if the container is the same running instance when event is scheduled.
-	c, ok := gInfo.activeContainers[id]
+	c, ok := gInfoReadActiveContainer(id)
 	if !ok || (info != nil && c.pid != info.Pid) || !c.propertyFilled {
 		return
 	}
@@ -1185,6 +1196,9 @@ func fillContainerProperties(c *containerData, parent *containerData,
 			c.capIntcp = !hostMode
 			c.capBlock = true
 		}
+		if c.pid == 0 {
+			c.hasDatapath = false
+		}
 		c.inline = isContainerInline(c)
 		c.blocking = isContainerBlocking(c)
 		c.quar = isContainerQuarantine(c)
@@ -1202,7 +1216,11 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		if parent.pid == 0 {
 			//NVSHAS-7830, multiple children exist, some may not be runnig
 			//when parent pid=0, need to set all child hasDatapath to true
-			c.hasDatapath = true
+			//NVSHAS-8406,for istio only set app container to have datapath
+			info.Sidecar = isSidecarContainer(info.Labels)
+			if !info.Sidecar {
+				c.hasDatapath = true
+			}
 			parent.hasDatapath = false
 		}
 	}
@@ -1778,7 +1796,7 @@ func examNetworkInterface(c *containerData) bool {
 }
 
 func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
-	c, ok := gInfo.activeContainers[id]
+	c, ok := gInfoReadActiveContainer(id)
 	if !ok {
 		return
 	}
@@ -1832,7 +1850,11 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 			examNetworkInterface(c)
 		}
 	} else {
-		if !hostMode && parent.pid == 0 {
+		info.Sidecar = isSidecarContainer(info.Labels)
+		if info.Sidecar {
+			parent.info.ProxyMesh = true
+		}
+		if !hostMode && parent.pid == 0 && !info.Sidecar {
 			if parent.examIntface == false {
 				parent.examIntface = true // only monitor one child container
 				if examNetworkInterface(c) {
@@ -1841,28 +1863,28 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 			}
 		}
 
-		info.Sidecar = isSidecarContainer(info.Labels)
-		if info.Sidecar {
-			parent.info.ProxyMesh = true
-			if gInfo.tapProxymesh {
-				if parent.pid != 0 {
+		if gInfo.tapProxymesh {
+			if parent.pid != 0 {
+				if info.Sidecar {
 					programProxyMeshDP(parent, false, false)
-				} else if c.hasDatapath { //child that has datapath
-					programProxyMeshDP(c, false, false)
-				} else { //find child that has datapath
-					for podID := range parent.pods.Iter() {
-						if ch, ok := gInfo.activeContainers[podID.(string)]; ok && ch.hasDatapath {
-							programProxyMeshDP(ch, false, false)
-							break
-						}
+				}
+			} else if c.hasDatapath { //child that has datapath
+				programProxyMeshDP(c, false, false)
+			} else { //find child that has datapath
+				for podID := range parent.pods.Iter() {
+					if ch, ok := gInfoReadActiveContainer(podID.(string)); ok && ch.hasDatapath {
+						programProxyMeshDP(ch, false, false)
+						break
 					}
 				}
 			}
 		}
 		gInfoLock()
-		if info.Sidecar && gInfo.tapProxymesh {
+		if gInfo.tapProxymesh {
 			if parent.pid != 0 {
-				updateProxyMeshMac(parent, true)
+				if info.Sidecar {
+					updateProxyMeshMac(parent, true)
+				}
 			} else if c.hasDatapath { //child that has datapath
 				updateProxyMeshMac(c, true)
 			} else { //find child that has datapath
@@ -1885,8 +1907,8 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 }
 
 func taskAddContainer(id string, info *container.ContainerMetaExtra) {
-	// This can be invoked from Docker socket and probe. Only used in task loop, no lock.
-	if _, ok := gInfo.activeContainers[id]; ok {
+	// This can be invoked from Docker socket and probe.
+	if _, ok := gInfoReadActiveContainer(id); ok {
 		return
 	}
 
@@ -2031,7 +2053,7 @@ func taskStopContainer(id string, pid int) {
 
 	// containerd runtime report TaskExit for both process stop and container stop.
 	// Here is to make sure the pid is container's pid
-	c, ok := gInfo.activeContainers[id]
+	c, ok := gInfoReadActiveContainer(id)
 	if !ok || (pid != 0 && pid != c.pid) {
 		return
 	}
@@ -2135,7 +2157,7 @@ func taskDelContainer(id string) {
 		return
 	}
 
-	if c, ok := gInfo.activeContainers[id]; ok {
+	if c, ok := gInfoReadActiveContainer(id); ok {
 		if c.pid != 0 && osutil.IsPidValid(c.pid) {
 			// false-positive event from cri-o
 			log.WithFields(log.Fields{"container": id, "pid": c.pid}).Debug("live rootPid")
@@ -2194,6 +2216,9 @@ func taskDPConnect() {
 	//set detectUnmanagedWl
 	duw := gInfo.detectUnmanagedWl
 	dp.DPCtrlSetDetectUnmanagedWl(&duw)
+	//set enableIcmpPolicy
+	eip := gInfo.enableIcmpPolicy
+	dp.DPCtrlSetEnableIcmpPolicy(&eip)
 }
 
 var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version
@@ -2397,9 +2422,7 @@ func cbGetContainerPid(id string) int {
 		return Agent.Pid
 	}
 
-	gInfoRLock()
-	defer gInfoRUnlock()
-	if c, ok := gInfo.activeContainers[id]; ok {
+	if c, ok := gInfoReadActiveContainer(id); ok {
 		return c.pid
 	}
 	return 0
@@ -2410,9 +2433,7 @@ func getContainerService(id string) (string, bool, bool) {
 		return "nodes", true, false // allowed kill
 	}
 
-	gInfoRLock()
-	defer gInfoRUnlock()
-	if c, ok := gInfo.activeContainers[id]; ok {
+	if c, ok := gInfoReadActiveContainer(id); ok {
 		return c.service, c.capBlock, false
 	}
 

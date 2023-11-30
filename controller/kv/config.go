@@ -601,6 +601,25 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 		return nil
 	}, importTask)
 
+	// delete/reset scan/state/scan_revisions key when necessary
+	if currFedRole == api.FedRoleJoint {
+		for _, s := range header.Sections {
+			if s == api.ConfSectionAll || s == api.ConfSectionConfig {
+				key := share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey)
+				if importFedRole == api.FedRoleNone {
+					cluster.Delete(key)
+				} else if importFedRole == api.FedRoleJoint {
+					scanRevs := share.CLUSFedScanRevisions{
+						ScannedRegRevs: make(map[string]uint64),
+					}
+					value, _ := json.Marshal(&scanRevs)
+					cluster.Put(key, value)
+				}
+				break
+			}
+		}
+	}
+
 	importTask.Percentage += 1
 	importTask.LastUpdateTime = time.Now().UTC()
 	clusHelper.PutImportTask(importTask)

@@ -35,6 +35,8 @@ const CLUSLockCrdQueueKey string = CLUSLockStore + "crd_queue"
 const CLUSLockCloudKey string = CLUSLockStore + "cloud"
 const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
 const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
+const CLUSLockVulnKey string = CLUSLockStore + "vulnerability"
+const CLUSLockCompKey string = CLUSLockStore + "compliance"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -624,7 +626,7 @@ func CLUSComplianceKey2Type(key string) string {
 }
 
 func CLUSComplianceProfileKey2Name(key string) string {
-	return keyLastToken(key)
+	return CLUSKeyNthToken(key, 4)
 }
 
 func CLUSVulnerabilityKey2Type(key string) string {
@@ -632,7 +634,7 @@ func CLUSVulnerabilityKey2Type(key string) string {
 }
 
 func CLUSVulnerabilityProfileKey2Name(key string) string {
-	return keyLastToken(key)
+	return CLUSKeyNthToken(key, 4)
 }
 
 func CLUSDomainKey2Name(key string) string {
@@ -760,11 +762,12 @@ type CLUSIBMSAOnboardData struct {
 }
 
 type CLUSWebhook struct {
-	Name    string   `json:"name"`
-	Url     string   `json:"url"`
-	Enable  bool     `json:"enable"`
-	Type    string   `json:"type"`
-	CfgType TCfgType `json:"cfg_type"`
+	Name     string   `json:"name"`
+	Url      string   `json:"url"`
+	Enable   bool     `json:"enable"`
+	UseProxy bool     `json:"use_proxy"`
+	Type     string   `json:"type"`
+	CfgType  TCfgType `json:"cfg_type"`
 }
 
 type CLUSSystemConfig struct {
@@ -795,6 +798,7 @@ type CLUSSystemConfig struct {
 	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
 	DisableNetPolicy     bool                      `json:"disable_net_policy"`
 	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
+	EnableIcmpPolicy     bool                      `json:"enable_icmp_policy"`
 	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
@@ -815,23 +819,25 @@ type CLUSEULA struct {
 }
 
 type CLUSUser struct {
-	Fullname         string              `json:"fullname"`
-	Username         string              `json:"username"`
-	PasswordHash     string              `json:"password_hash"`
-	PwdResetTime     time.Time           `json:"pwd_reset_time"`
-	PwdHashHistory   []string            `json:"pwd_hash_history"` // not including the current password's hash
-	Domain           string              `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
-	Server           string              `json:"server"`
-	EMail            string              `json:"email"`
-	Role             string              `json:"role"`
-	RoleOverride     bool                `json:"role_oride"` // Used for shadow user
-	Timeout          uint32              `json:"timeout"`
-	Locale           string              `json:"locale"`
-	RoleDomains      map[string][]string `json:"role_domains"`
-	LastLoginAt      time.Time           `json:"last_login_at"`
-	LoginCount       uint32              `json:"login_count"`
-	FailedLoginCount uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
-	BlockLoginSince  time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
+	Fullname            string              `json:"fullname"`
+	Username            string              `json:"username"`
+	PasswordHash        string              `json:"password_hash"`
+	PwdResetTime        time.Time           `json:"pwd_reset_time"`
+	PwdHashHistory      []string            `json:"pwd_hash_history"` // not including the current password's hash
+	Domain              string              `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
+	Server              string              `json:"server"`
+	EMail               string              `json:"email"`
+	Role                string              `json:"role"`
+	RoleOverride        bool                `json:"role_oride"` // Used for shadow user
+	Timeout             uint32              `json:"timeout"`
+	Locale              string              `json:"locale"`
+	RoleDomains         map[string][]string `json:"role_domains"`
+	LastLoginAt         time.Time           `json:"last_login_at"`
+	LoginCount          uint32              `json:"login_count"`
+	FailedLoginCount    uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
+	BlockLoginSince     time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
+	AcceptedAlerts      []string            `json:"accepted_alerts,omitempty"`
+	ResetPwdInNextLogin bool                `json:"reset_password_in_next_login"`
 }
 
 type GroupRoleMapping struct {
@@ -861,11 +867,16 @@ type CLUSServerLDAP struct {
 
 type CLUSServerSAML struct {
 	CLUSServerAuth
-	SSOURL        string   `json:"sso_url"`
-	Issuer        string   `json:"issuer"`
-	X509Cert      string   `json:"x509_cert,cloak"`
-	GroupClaim    string   `json:"group_claim"`
-	X509CertExtra []string `json:"x509_cert_extra"`
+	SSOURL              string   `json:"sso_url"`
+	Issuer              string   `json:"issuer"`
+	X509Cert            string   `json:"x509_cert,cloak"`
+	GroupClaim          string   `json:"group_claim"`
+	X509CertExtra       []string `json:"x509_cert_extra"`
+	AuthnSigningEnabled bool     `json:"authn_signing_enabled,omitempty"`
+	SigningCert         string   `json:"signing_cert,cloak,omitempty"`
+	SigningKey          string   `json:"signing_key,cloak,omitempty"`
+	SLOEnabled          bool     `json:"slo_enabled,omitempty"`
+	SLOURL              string   `json:"slo_url,omitempty"`
 }
 
 type CLUSServerOIDC struct {
@@ -1475,6 +1486,7 @@ type CLUSComplianceProfile struct {
 	Name          string                                `json:"name"`
 	DisableSystem bool                                  `json:"disable_system"`
 	Entries       map[string]CLUSComplianceProfileEntry `json:"entries"`
+	CfgType       TCfgType                              `json:"cfg_type"`
 }
 
 type CLUSVulnerabilityProfileEntry struct {
@@ -1490,6 +1502,7 @@ type CLUSVulnerabilityProfileEntry struct {
 type CLUSVulnerabilityProfile struct {
 	Name    string                           `json:"name"`
 	Entries []*CLUSVulnerabilityProfileEntry `json:"entries"`
+	CfgType TCfgType                         `json:"cfg_type"`
 }
 
 type CLUSBenchItem struct {
@@ -1869,7 +1882,8 @@ type CLUSAdmissionRule struct { // see type RESTAdmissionRule
 	CfgType           TCfgType                `json:"cfg_type"`
 	RuleType          string                  `json:"rule_type"` // "exception", "deny"
 	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
-	RuleMode          string                  `json:"rule_mode"` // "", "monitor", "protect"
+	RuleMode          string                  `json:"rule_mode"`  // "", "monitor", "protect"
+	Containers        uint8                   `json:"containers"` // 0 for all containers, 1 for containers, 2 for initContainers, 4 for ephemeralContainers (OR of supported types)
 }
 
 type CLUSAdmissionRules struct {
@@ -1883,6 +1897,16 @@ const (
 	CLUSAdmissionCfgRule     = "rule"
 	CLUSAdmissionCfgRuleList = "rules"
 	CLUSAdmissionStatistics  = "statistics"
+)
+
+const (
+	AdmCtrlRuleContainersN          = 1 // for containers
+	AdmCtrlRuleInitContainersN      = 2 // for init_containers
+	AdmCtrlRuleEphemeralContainersN = 4 // for ephemeral_containers
+
+	AdmCtrlRuleContainers          = "containers"
+	AdmCtrlRuleInitContainers      = "init_containers"
+	AdmCtrlRuleEphemeralContainers = "ephemeral_containers"
 )
 
 const (
@@ -2007,25 +2031,35 @@ type CLUSCrdProcessProfile struct {
 	Baseline string `json:"baseline"` // "basic" & "zero-drift" for process profile. "default"/"shield" are obsolete and both mean "zero-drift"
 }
 
-type CLUSCrdSecurityRule struct {
-	Name            string                `json:"name"` // crd record name in the format {crd kind}-{ns}-{metadata.name}
-	MetadataName    string                `json:"metadata_name"`
-	Groups          []string              `json:"groups"`
-	Rules           map[string]uint32     `json:"rules"`
-	PolicyMode      string                `json:"policy_mode"`
-	ProfileName     string                `json:"profile_name"`
-	ProfileMode     string                `json:"profile_mode"`
-	ProcessProfile  CLUSCrdProcessProfile `json:"process_profile"`
-	ProcessRules    []CLUSCrdProcessRule  `json:"process_rules"`
-	FileRules       []CLUSCrdFileRule     `json:"file_rules"`
-	DlpGroupSensors []string              `json:"dlp_group_sensors"` // dlp sensors associated with the target group
-	WafGroupSensors []string              `json:"waf_group_sensors"` // waf sensors associated with the target group
-	AdmCtrlRules    map[string]uint32     `json:"admctrl_rules"`     // map key is the generated name of admission control rule, valud is assigned rule id
-	DlpSensor       string                `json:"dlp_sensor"`        // dlp sensor defined in this crd security rule
-	WafSensor       string                `json:"waf_sensor"`        // waf sensor defined in this crd security rule
-	Uid             string                `json:"uid"`               // metadata.uid in admissionreview CREATE request
-	CrdMD5          string                `json:"md5"`               // md5 of k8s crd resource, for metadata, only include name/namespace
+type CLUSCrdVulnProfile struct {
+	Name string `json:"name"`
+}
 
+type CLUSCrdCompProfile struct {
+	Name string `json:"name"`
+}
+
+type CLUSCrdSecurityRule struct {
+	Name            string                 `json:"name"` // crd record name in the format {crd kind}-{ns}-{metadata.name}
+	MetadataName    string                 `json:"metadata_name"`
+	Groups          []string               `json:"groups,omitempty"`
+	Rules           map[string]uint32      `json:"rules,omitempty"`
+	PolicyMode      string                 `json:"policy_mode,omitempty"`
+	ProfileName     string                 `json:"profile_name,omitempty"`
+	ProfileMode     string                 `json:"profile_mode,omitempty"`
+	ProcessProfile  *CLUSCrdProcessProfile `json:"process_profile,omitempty"`
+	ProcessRules    []CLUSCrdProcessRule   `json:"process_rules,omitempty"`
+	FileRules       []CLUSCrdFileRule      `json:"file_rules,omitempty"`
+	DlpGroupSensors []string               `json:"dlp_group_sensors,omitempty"` // dlp sensors associated with the target group
+	WafGroupSensors []string               `json:"waf_group_sensors,omitempty"` // waf sensors associated with the target group
+	AdmCtrlRules    map[string]uint32      `json:"admctrl_rules,omitempty"`     // map key is the generated name of admission control rule, valud is assigned rule id
+	DlpSensor       string                 `json:"dlp_sensor,omitempty"`        // dlp sensor defined in this crd security rule
+	WafSensor       string                 `json:"waf_sensor,omitempty"`        // waf sensor defined in this crd security rule
+	VulnProfile     string                 `json:"vuln_profile,omitempty"`      // vulnerability profile defined in this crd security rule
+	CompProfile     string                 `json:"comp_profile,omitempty"`      // compliance profile defined in this crd security rule
+	Uid             string                 `json:"uid"`                         // metadata.uid in admissionreview CREATE request
+	CrdMD5          string                 `json:"md5"`                         // md5 of k8s crd resource, for metadata, only include name/namespace
+	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
 // Multi-Clusters (Federation)
@@ -2687,6 +2721,8 @@ const (
 	PREFIX_IMPORT_ADMCTRL      = "admctrl_import_"
 	PREFIX_IMPORT_DLP          = "dlp_import_"
 	PREFIX_IMPORT_WAF          = "waf_import_"
+	PREFIX_IMPORT_VULN_PROFILE = "vul_profile_import_" // for vulnerability profile
+	PREFIX_IMPORT_COMP_PROFILE = "cmp_profile_import_" // for compliance profile
 )
 
 const (
@@ -2695,6 +2731,8 @@ const (
 	IMPORT_TYPE_ADMCTRL      = "admctrl"
 	IMPORT_TYPE_DLP          = "dlp"
 	IMPORT_TYPE_WAF          = "waf"
+	IMPORT_TYPE_VULN_PROFILE = "vuln_profile" // for vulnerability profile
+	IMPORT_TYPE_COMP_PROFILE = "comp_profile" // for compliance profile
 )
 
 const IMPORT_QUERY_INTERVAL = 30
@@ -2745,19 +2783,23 @@ func CLUSNodeProfileGroupKey(nodeID, profile, group string) string {
 type TReviewType int
 
 const (
-	ReviewTypeCRD           = iota + 1
-	ReviewTypeImportGroup   // interactive import
-	ReviewTypeImportAdmCtrl // interactive import
-	ReviewTypeImportDLP     // interactive import
-	ReviewTypeImportWAF     // interactive import
+	ReviewTypeCRD               = iota + 1
+	ReviewTypeImportGroup       // interactive import
+	ReviewTypeImportAdmCtrl     // interactive import
+	ReviewTypeImportDLP         // interactive import
+	ReviewTypeImportWAF         // interactive import
+	ReviewTypeImportVulnProfile // interactive import vulnerability profile
+	ReviewTypeImportCompProfile // interactive import compliance profile
 )
 
 const (
-	ReviewTypeDisplayCRD       = "CRD"
-	ReviewTypeDisplayGroup     = "Group Policy"                     // interactive import
-	ReviewTypeDisplayAdmission = "Admission Control Configurations" // interactive import
-	ReviewTypeDisplayDLP       = "DLP Configurations"               // interactive import
-	ReviewTypeDisplayWAF       = "WAF Configurations"               // interactive import
+	ReviewTypeDisplayCRD         = "CRD"
+	ReviewTypeDisplayGroup       = "Group Policy"                     // interactive import
+	ReviewTypeDisplayAdmission   = "Admission Control Configurations" // interactive import
+	ReviewTypeDisplayDLP         = "DLP Configurations"               // interactive import
+	ReviewTypeDisplayWAF         = "WAF Configurations"               // interactive import
+	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"            // interactive import
+	ReviewTypeDisplayCompProfile = "compliance Profile"               // interactive import
 )
 
 // Telemetry (upgrade responder)
@@ -2810,3 +2852,12 @@ type CLUSSigstoreVerifier struct {
 	CertSubject  string `json:"cert_subject"`
 	Comment      string `json:"comment"`
 }
+
+// alerts status
+const (
+	AlertNvNewVerAvailable = "1"
+	AlertNvInMultiVersions = "2"
+	AlertCveDbTooOld       = "3"
+	AlertPwdExpiring       = "1001"
+	AlertAdminHasDefPwd    = "1002"
+)

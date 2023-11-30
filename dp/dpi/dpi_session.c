@@ -1049,6 +1049,9 @@ void dpi_icmp_tracker(dpi_packet_t *p)
         s->client.icmp_echo_seq = 0;
         s->client.icmp_times = 0; 
         FLAGS_SET(s->flags, DPI_SESS_FLAG_SKIP_PARSER);
+        if (g_enable_icmp_policy) {
+            FLAGS_SET(s->flags, DPI_SESS_FLAG_POLICY_APP_READY);
+        }
     } else {
         dpi_session_timer_refresh(s);
     }

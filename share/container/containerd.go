@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -29,6 +28,7 @@ import (
 )
 
 const defaultContainerdSock = "/run/containerd/containerd.sock"
+const defaultK3sContainerdSock = "/run/k3s/containerd/containerd.sock"
 const defaultContainerdNamespace = "default"
 const k8sContainerdNamespace = "k8s.io"
 
@@ -105,13 +105,7 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 	}
 
 	driver.rtProcMap = utils.NewSet("runc", "containerd", "containerd-shim", "containerd-shim-runc-v1", "containerd-shim-runc-v2")
-
-	name, _ := os.Readlink("/proc/1/exe")
-	if name == "/usr/local/bin/monitor" || strings.HasPrefix(name, "/usr/bin/python") { // when pid mode != host, 'pythohn' is for allinone
-		driver.pidHost = false
-	} else {
-		driver.pidHost = true
-	}
+	driver.pidHost = IsPidHost()
 	return &driver, nil
 }
 
@@ -123,6 +117,7 @@ func (d *containerdDriver) reConnect() error {
 	endpoint := d.endpoint
 	if d.endpointHost != "" {	// use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
+		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")

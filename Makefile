@@ -54,8 +54,6 @@ copy_enf:
 	cp neuvector/agent/nvbench/kubecis_gke_1_0_0.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/kubecis_ocp_4_5.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/kubecis_ocp_4_3.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/tools/host_package.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/tools/container_package.sh ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/

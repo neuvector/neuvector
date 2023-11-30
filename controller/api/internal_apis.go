@@ -177,17 +177,18 @@ type RESTRiskScoreMetrics struct {
 }
 
 type RESTExposedEndpoint struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	DisplayName  string   `json:"display_name"`
-	PodName      string   `json:"pod_name"`
-	Service      string   `json:"service"`
-	Severity     string   `json:"severity"`
-	PolicyMode   string   `json:"policy_mode"`
-	PolicyAction string   `json:"policy_action"`
-	Protos       []string `json:"protocols,omitempty"`
-	Apps         []string `json:"applications,omitempty"`
-	Ports        []string `json:"ports,omitempty"`
+	ID           string                         `json:"id"`
+	Name         string                         `json:"name"`
+	DisplayName  string                         `json:"display_name"`
+	PodName      string                         `json:"pod_name"`
+	Service      string                         `json:"service"`
+	Severity     string                         `json:"severity"`
+	PolicyMode   string                         `json:"policy_mode"`
+	PolicyAction string                         `json:"policy_action"`
+	Protos       []string                       `json:"protocols,omitempty"`
+	Apps         []string                       `json:"applications,omitempty"`
+	Ports        []string                       `json:"ports,omitempty"`
+	Entries      []*RESTConversationReportEntry `json:"entries"`
 }
 
 type RESTInternalSystemData struct {
@@ -197,12 +198,29 @@ type RESTInternalSystemData struct {
 }
 
 type RESTK8sNvRbacStatus struct {
-	ClusterRoleErrors        []string              `json:"clusterrole_errors"`
-	ClusterRoleBindingErrors []string              `json:"clusterrolebinding_errors"`
-	RoleErrors               []string              `json:"role_errors"`
-	RoleBindingErrors        []string              `json:"rolebinding_errors"`
-	NvUpgradeInfo            *RESTCheckUpgradeInfo `json:"neuvector_upgrade_info"`
-	NvCrdSchemaErrors        []string              `json:"neuvector_crd_errors"`
+	ClusterRoleErrors        []string                   `json:"clusterrole_errors,omitempty"`        // obsolete
+	ClusterRoleBindingErrors []string                   `json:"clusterrolebinding_errors,omitempty"` // obsolete
+	RoleErrors               []string                   `json:"role_errors,omitempty"`               // obsolete
+	RoleBindingErrors        []string                   `json:"rolebinding_errors,omitempty"`        // obsolete
+	NvCrdSchemaErrors        []string                   `json:"neuvector_crd_errors,omitempty"`      // obsolete
+	NvUpgradeInfo            *RESTCheckUpgradeInfo      `json:"neuvector_upgrade_info"`
+	AcceptableAlerts         *RESTK8sNvAcceptableAlerts `json:"acceptable_alerts,omitempty"` // acceptable controller-generated alerts
+	AcceptedAlerts           []string                   `json:"accepted_alerts,omitempty"`   // keys of accepted manager-generated/user alerts
+}
+
+type RESTK8sNvAcceptableAlerts struct {
+	ClusterRoleErrors        map[string]string `json:"clusterrole_errors"`        // key is md5 of the English message
+	ClusterRoleBindingErrors map[string]string `json:"clusterrolebinding_errors"` // key is md5 of the English message
+	RoleErrors               map[string]string `json:"role_errors"`               // key is md5 of the English message
+	RoleBindingErrors        map[string]string `json:"rolebinding_errors"`        // key is md5 of the English message
+	NvCrdSchemaErrors        map[string]string `json:"neuvector_crd_errors"`      // key is md5 of the English message
+	OtherAlerts              map[string]string `json:"other_alerts"`              // key is md5 of the English message
+}
+
+type RESTAcceptedAlerts struct {
+	ManagerAlerts    []string `json:"manager_alerts"`    // message key slice of manager-generated alerts
+	ControllerAlerts []string `json:"controller_alerts"` // message key slice of controller-generated alerts
+	UserAlerts       []string `json:"user_alerts"`       // message key slice of current login user alerts
 }
 
 // telemetry

@@ -18,7 +18,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -281,7 +281,11 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			fedWebhookCacheTemp := make(map[string]*webhookCache, 0)
 			for _, h := range cfg.Webhooks {
 				if h.Enable {
-					fedWebhookCacheTemp[h.Name] = &webhookCache{conn: common.NewWebHook(h.Url), target: h.Type}
+					fedWebhookCacheTemp[h.Name] = &webhookCache{
+						c:        common.NewWebHook(h.Url, h.Type),
+						url:      h.Url,
+						useProxy: h.UseProxy,
+					}
 				}
 			}
 			fedWebhookCacheMap = fedWebhookCacheTemp

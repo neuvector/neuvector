@@ -17,8 +17,9 @@ import (
 )
 
 type webhookCache struct {
-	conn   *common.Webhook
-	target string
+	c        *common.Webhook
+	url      string
+	useProxy bool
 }
 
 var systemConfigCache share.CLUSSystemConfig = common.DefaultSystemConfig
@@ -299,7 +300,14 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 
 	rconf.Webhooks = make([]api.RESTWebhook, len(systemConfigCache.Webhooks))
 	for i, wh := range systemConfigCache.Webhooks {
-		rconf.Webhooks[i] = api.RESTWebhook{Name: wh.Name, Url: wh.Url, Enable: wh.Enable, Type: wh.Type, CfgType: api.CfgTypeUserCreated}
+		rconf.Webhooks[i] = api.RESTWebhook{
+			Name:     wh.Name,
+			Url:      wh.Url,
+			Type:     wh.Type,
+			Enable:   wh.Enable,
+			UseProxy: wh.UseProxy,
+			CfgType:  api.CfgTypeUserCreated,
+		}
 	}
 
 	proxy := systemConfigCache.RegistryHttpProxy
@@ -459,7 +467,11 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
 		if h.Enable {
-			webhookCachTemp[h.Name] = &webhookCache{conn: common.NewWebHook(h.Url), target: h.Type}
+			webhookCachTemp[h.Name] = &webhookCache{
+				c:        common.NewWebHook(h.Url, h.Type),
+				url:      h.Url,
+				useProxy: h.UseProxy,
+			}
 		}
 	}
 	webhookCacheMap = webhookCachTemp
@@ -478,6 +490,36 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	} else if syslogger != nil {
 		syslogger.Close()
 		syslogger = nil
+	}
+}
+
+func configIcmpPolicy(ctx *Context) {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	retry := 0
+	for retry < 3 {
+		if cfg == nil {
+			if cfg, rev = clusHelper.GetSystemConfigRev(acc); cfg != nil {
+				break
+			}
+			retry++
+		} else {
+			break
+		}
+	}
+	if cfg == nil {
+		cfg = &common.DefaultSystemConfig
+		rev = 0
+	}
+	cfg.EnableIcmpPolicy = ctx.EnableIcmpPolicy
+
+	retry = 0
+	for retry < 3 {
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			retry++
+		} else {
+			break
+		}
 	}
 }
 

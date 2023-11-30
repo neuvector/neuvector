@@ -6,7 +6,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,10 +54,13 @@ var (
 	ErrNotFound           = errors.New("Not found")
 )
 
+const defaultUserSock = "/run/runtime.sock"
+
 const (
 	RuntimeDocker     = "docker"
 	RuntimeContainerd = "containerd"
 	RuntimeCriO       = "cri-o"
+	RuntimeUnknown    = "unknown"
 )
 
 const (
@@ -199,25 +204,32 @@ func Connect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 			return rt, nil
 		}
 	} else {
-		if isUnixSockFile(defaultDockerSocket) {
-			rt, err := dockerConnect(defaultDockerSocket, sys)
-			if err == nil {
+		// assigned "/run/runtime.sock"
+		if rt, err := connectRt(defaultUserSock, RuntimeUnknown, sys); err == nil {
+			return rt, nil
+		}
+
+		if IsPidHost() {
+			if rtEndpoint, ok := obtainRtEndpointFromKubelet(sys); ok {
+				log.WithFields(log.Fields{"rtEndpoint": rtEndpoint}).Info()
+				edpt := filepath.Join("/proc/1/root", rtEndpoint)
+				if rt, err := tryConnectRt(edpt, sys); err == nil {
+					return rt, nil
+				}
+
+				if rt, err := connectRt(edpt, RuntimeUnknown, sys); err == nil {
+					return rt, nil
+				}
+			}
+
+			if rt, err := tryConnectDefaultRt("/proc/1/root", sys); err == nil {
 				return rt, nil
 			}
 		}
 
-		if isUnixSockFile(defaultContainerdSock) {
-			rt, err := containerdConnect(defaultContainerdSock, sys)
-			if err == nil {
-				return rt, nil
-			}
-		}
-
-		if isUnixSockFile(defaultCriOSock) {
-			rt, err := crioConnect(defaultCriOSock, sys)
-			if err == nil {
-				return rt, nil
-			}
+		// backup: current approach
+		if rt, err := tryConnectDefaultRt("", sys); err == nil {
+			return rt, nil
 		}
 	}
 
@@ -262,4 +274,152 @@ func buildJsonFromMap(info map[string]string) string {
 	jsonInfo += "}"
 	// log.WithFields(log.Fields{"info": jsonInfo}).Debug()
 	return jsonInfo
+}
+
+func connectRt(rtPath, rtType string, sys *system.SystemTools) (Runtime, error) {
+	if fpath, ok := justifyRuntimeSocketFile(rtPath); !ok {
+		return nil, ErrUnknownRuntime
+	} else {
+		rtPath = fpath  // updated
+	}
+
+	log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug()
+
+	switch rtType {
+	case RuntimeDocker:
+		if rt, err := dockerConnect(rtPath, sys); err == nil {
+			return rt, nil
+		}
+	case RuntimeContainerd:
+		if rt, err := containerdConnect(rtPath, sys); err == nil {
+			return rt, nil
+		}
+	case RuntimeCriO:
+		if rt, err := crioConnect(rtPath, sys); err == nil {
+			return rt, nil
+		}
+	default:
+		if rt, err := dockerConnect(rtPath, sys); err == nil {	// prefer docker
+			return rt, nil
+		}
+		if rt, err := containerdConnect(rtPath, sys); err == nil {
+			return rt, nil
+		}
+		if rt, err := crioConnect(rtPath, sys); err == nil {
+			return rt, nil
+		}
+	}
+	log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug("Failed")
+	return nil, ErrUnknownRuntime
+}
+
+func tryConnectRt(rtPath string, sys *system.SystemTools) (Runtime, error) {
+	log.WithFields(log.Fields{"rtPath": rtPath}).Info()
+
+	// guessing RT from the socket name
+	sock := filepath.Base(rtPath)
+	if strings.Contains(sock, "docker") {
+		// prefer docker
+		if rt, err := connectRt(rtPath, RuntimeDocker, sys); err == nil {
+			return rt, nil
+		}
+	} else if strings.Contains(sock, "containerd") {
+		if rt, err := connectRt(rtPath, RuntimeContainerd, sys); err == nil {
+			return rt, nil
+		}
+	} else if strings.Contains(sock, "crio") {
+		if rt, err := connectRt(rtPath, RuntimeCriO, sys); err == nil {
+			return rt, nil
+		}
+	}
+	return nil, ErrUnknownRuntime
+}
+
+func tryConnectDefaultRt(rootPath string, sys *system.SystemTools) (Runtime, error) {
+	// prefer docker
+	if rt, err := connectRt(filepath.Join(rootPath, defaultDockerSocket), RuntimeDocker, sys); err == nil {
+		return rt, nil
+	}
+
+	if rt, err := connectRt(filepath.Join(rootPath, defaultDockerShimSocket), RuntimeDocker, sys); err == nil {
+		return rt, nil
+	}
+
+	// prefer k3s
+	if rt, err := connectRt(filepath.Join(rootPath, defaultK3sContainerdSock), RuntimeContainerd, sys); err == nil {
+		return rt, nil
+	}
+
+	if rt, err := connectRt(filepath.Join(rootPath, defaultContainerdSock), RuntimeContainerd, sys); err == nil {
+		return rt, nil
+	}
+
+	if rt, err := connectRt(filepath.Join(rootPath, defaultCriOSock), RuntimeCriO, sys); err == nil {
+		return rt, nil
+	}
+	return nil, ErrUnknownRuntime
+}
+
+func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, bool) {
+	// (1) iterating proc paths to find the "kubelet"
+	if d, err := os.Open("/proc"); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("open")
+	} else {
+		defer d.Close()
+		if files, err := d.Readdir(-1); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("read")
+		} else {
+			var pid int
+			for _, file := range files {
+				if file.IsDir() {
+					// get all the process
+					pid, _ = strconv.Atoi(file.Name())
+					if cmds, err := sys.ReadCmdLine(pid); err == nil && len(cmds) > 0 {
+						if filepath.Base(cmds[0]) != "kubelet" {
+							continue
+						}
+						// (2) cmdline: obtain token: "--container-runtime-endpoint="
+						//     --container-runtime-endpoint=unix:///run/k3s/containerd/containerd.sock
+						//     --container-runtime-endpoint=unix:///var/run/crio/crio.sock
+						//     if not found, return "defaultDockerSocket"
+						for _, cmd := range cmds {
+							// log.WithFields(log.Fields{"cmd": cmd}).Debug()
+							if strings.HasPrefix(cmd, "--container-runtime-endpoint=") {
+								// log.WithFields(log.Fields{"cmd": cmd}).Debug("found")
+								cmd = strings.TrimPrefix(cmd, "--container-runtime-endpoint=")
+								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
+								return cmd, true
+							}
+						}
+						// pre-k8s-1.24, docker is the default runtime
+						return defaultDockerSocket, true
+					}
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+func IsPidHost() bool {	// pid host, pid-1 is the Linux bootup process
+	name, _ := os.Readlink("/proc/1/exe")
+	// nv containers: "monitor" is for the controller
+	return name != "/usr/local/bin/monitor"
+}
+
+func justifyRuntimeSocketFile(rtPath string) (string, bool) {
+	if isUnixSockFile(rtPath) == false {
+		if strings.HasPrefix(rtPath, "/proc/") == false{
+			// log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug("not exist")
+			return "", false
+		}
+
+		// The /run directory is the companion directory to /var/run.
+		rtPath = strings.Replace(rtPath, "/var/", "/", 1) // remove "/var"
+		if isUnixSockFile(rtPath) == false {
+			// log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug("not exist")
+			return "", false
+		}
+	}
+	return rtPath, true
 }

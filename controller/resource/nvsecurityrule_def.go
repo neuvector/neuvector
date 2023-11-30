@@ -46,6 +46,20 @@ const NvWafSecurityRuleKind = "NvWafSecurityRule"
 const NvWafSecurityRuleListKind = "NvWafSecurityRuleList"
 const NvWafSecurityRuleSingular = "nvwafsecurityrule"
 
+const NvVulnProfileSecurityRuleName = "nvvulnerabilityprofiles.neuvector.com"
+const NvVulnProfileSecurityRuleVersion = "v1"
+const NvVulnProfileSecurityRulePlural = "nvvulnerabilityprofiles"
+const NvVulnProfileSecurityRuleKind = "NvVulnerabilityProfile"
+const NvVulnProfileSecurityRuleListKind = "NvVulnerabilityProfileList"
+const NvVulnProfileSecurityRuleSingular = "nvvulnerabilityprofile"
+
+const NvCompProfileSecurityRuleName = "nvcomplianceprofiles.neuvector.com"
+const NvCompProfileSecurityRuleVersion = "v1"
+const NvCompProfileSecurityRulePlural = "nvcomplianceprofiles"
+const NvCompProfileSecurityRuleKind = "NvComplianceProfile"
+const NvCompProfileSecurityRuleListKind = "NvComplianceProfileList"
+const NvCompProfileSecurityRuleSingular = "nvcomplianceprofile"
+
 // csp billing adapter
 const NvCspUsageName = "cspadapterusagerecords.susecloud.net"
 const NvCspUsagePlural = "cspadapterusagerecords"
@@ -54,18 +68,27 @@ const NvCspUsageListKind = "CspAdapterUsageRecordList"
 const NvCspUsageSingular = "cspadapterusagerecord"
 
 type NvCrdAdmCtrlRule struct {
-	ID       uint32                      `json:"id"`        // only set for default rules
-	RuleType string                      `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode string                      `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Comment  string                      `json:"comment"`
-	Criteria []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
-	Disabled bool                        `json:"disabled"`
+	ID         uint32                      `json:"id"`        // only set for default rules
+	RuleType   string                      `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   string                      `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Comment    string                      `json:"comment"`
+	Criteria   []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
+	Disabled   bool                        `json:"disabled"`
+	Containers uint8                       `json:"containers,omitempty"`
 }
 
 type NvCrdAdmCtrlConfig struct {
 	Enable        bool   `json:"enable"`
 	Mode          string `json:"mode"`
 	AdmClientMode string `json:"adm_client_mode"`
+}
+
+type NvCrdVulnProfileConfig struct {
+	Profile *api.RESTVulnerabilityProfileConfig `json:"profile"`
+}
+
+type NvCrdCompProfileConfig struct {
+	Templates *api.RESTComplianceProfileConfig `json:"profile"`
 }
 
 type NvSecurityParse struct {
@@ -81,6 +104,8 @@ type NvSecurityParse struct {
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
+	VulnProfileCfg    *NvCrdVulnProfileConfig        // vulerability profile defined by this crd object
+	CompProfileCfg    *NvCrdCompProfileConfig        // compliance profile defined by this crd object
 	Uid               string                         // Metadata.Uid from AdmissionReview request
 }
 
@@ -208,12 +233,13 @@ type NvSecurityAdmCtrlConfig struct {
 }
 
 type NvSecurityAdmCtrlRule struct {
-	ID       *uint32                     `json:"id,omitempty"`
-	Action   *string                     `json:"action,omitempty"`    // api.ValidatingAllowRuleType / api.ValidatingDenyRuleType
-	RuleMode *string                     `json:"rule_mode,omitempty"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Comment  *string                     `json:"comment,omitempty"`
-	Disabled *bool                       `json:"disabled,omitempty"`
-	Criteria []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
+	ID         *uint32                     `json:"id,omitempty"`
+	Action     *string                     `json:"action,omitempty"`    // api.ValidatingAllowRuleType / api.ValidatingDenyRuleType
+	RuleMode   *string                     `json:"rule_mode,omitempty"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Comment    *string                     `json:"comment,omitempty"`
+	Disabled   *bool                       `json:"disabled,omitempty"`
+	Containers []string                    `json:"containers,omitempty"`
+	Criteria   []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
 }
 
 type NvSecurityAdmCtrlRules struct {
@@ -323,6 +349,79 @@ func (m *NvWafSecurityRule) GetMetadata() *metav1.ObjectMeta {
 }
 
 func (m *NvWafSecurityRuleList) GetMetadata() *metav1.ListMeta {
+	return m.Metadata
+}
+
+// vulnerability profile
+type NvSecurityVulnProfileEntry struct {
+	Name    string   `json:"name"`
+	Comment *string  `json:"comment"`
+	Days    *uint    `json:"days"` // Only used for 'recent' vuln entries
+	Domains []string `json:"domains"`
+	Images  []string `json:"images"`
+}
+
+type NvSecurityVulnProfile struct {
+	Entries []*NvSecurityVulnProfileEntry `json:"entries"`
+}
+
+type NvSecurityVulnProfileSpec struct {
+	Profile *NvSecurityVulnProfile `json:"profile"`
+}
+
+type NvVulnProfileSecurityRule struct {
+	Kind       *string                   `json:"kind,omitempty"`
+	ApiVersion *string                   `json:"apiVersion,omitempty"`
+	Metadata   *metav1.ObjectMeta        `json:"metadata"`
+	Spec       NvSecurityVulnProfileSpec `json:"spec"`
+}
+
+type NvVulnProfileSecurityRuleList struct {
+	Kind             *string                      `json:"kind,omitempty"`
+	ApiVersion       *string                      `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ListMeta             `json:"metadata"`
+	Items            []*NvVulnProfileSecurityRule `json:"items"`
+	XXX_unrecognized []byte                       `json:"-"`
+}
+
+func (m *NvVulnProfileSecurityRule) GetMetadata() *metav1.ObjectMeta {
+	return m.Metadata
+}
+
+func (m *NvVulnProfileSecurityRuleList) GetMetadata() *metav1.ListMeta {
+	return m.Metadata
+}
+
+// compliance profile
+type NvSecurityCompTemplates struct {
+	DisableSystem bool                              `json:"disable_system"`
+	Entries       []*api.RESTComplianceProfileEntry `json:"entries"`
+}
+
+type NvSecurityCompProfileSpec struct {
+	Templates *NvSecurityCompTemplates `json:"templates,omitempty"`
+}
+
+type NvCompProfileSecurityRule struct {
+	Kind       *string                   `json:"kind,omitempty"`
+	ApiVersion *string                   `json:"apiVersion,omitempty"`
+	Metadata   *metav1.ObjectMeta        `json:"metadata"`
+	Spec       NvSecurityCompProfileSpec `json:"spec"`
+}
+
+type NvCompProfileSecurityRuleList struct {
+	Kind             *string                      `json:"kind,omitempty"`
+	ApiVersion       *string                      `json:"apiVersion,omitempty"`
+	Metadata         *metav1.ListMeta             `json:"metadata"`
+	Items            []*NvCompProfileSecurityRule `json:"items"`
+	XXX_unrecognized []byte                       `json:"-"`
+}
+
+func (m *NvCompProfileSecurityRule) GetMetadata() *metav1.ObjectMeta {
+	return m.Metadata
+}
+
+func (m *NvCompProfileSecurityRuleList) GetMetadata() *metav1.ListMeta {
 	return m.Metadata
 }
 

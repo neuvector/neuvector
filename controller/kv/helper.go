@@ -133,12 +133,12 @@ type ClusterHelper interface {
 
 	GetAllComplianceProfiles(acc *access.AccessControl) []*share.CLUSComplianceProfile
 	GetComplianceProfile(name string, acc *access.AccessControl) (*share.CLUSComplianceProfile, uint64, error)
-	PutComplianceProfile(cp *share.CLUSComplianceProfile, rev uint64) error
+	PutComplianceProfile(cp *share.CLUSComplianceProfile, rev *uint64) error
 	PutComplianceProfileIfNotExist(cp *share.CLUSComplianceProfile) error
 
 	GetAllVulnerabilityProfiles(acc *access.AccessControl) []*share.CLUSVulnerabilityProfile
 	GetVulnerabilityProfile(name string, acc *access.AccessControl) (*share.CLUSVulnerabilityProfile, uint64, error)
-	PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev uint64) error
+	PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev *uint64) error
 	PutVulnerabilityProfileIfNotExist(cp *share.CLUSVulnerabilityProfile) error
 
 	GetRegistry(name string, acc *access.AccessControl) (*share.CLUSRegistryConfig, uint64, error)
@@ -191,7 +191,7 @@ type ClusterHelper interface {
 	DeleteFileAccessRuleTxn(txn *cluster.ClusterTransact, name string) error
 	GetAllFileAccessRuleSubKeys(scope string) utils.Set
 	GetCrdSecurityRuleRecord(crdKind, crdName string) *share.CLUSCrdSecurityRule
-	PutCrdSecurityRuleRecord(crdKind, crdName string, rules *share.CLUSCrdSecurityRule) error
+	PutCrdSecurityRuleRecord(crdKind, crdName string, rule *share.CLUSCrdSecurityRule) error
 	DeleteCrdSecurityRuleRecord(crdKind, crdName string) error
 	GetCrdSecurityRuleRecordList(crdKind string) map[string]*share.CLUSCrdSecurityRule
 
@@ -1367,10 +1367,14 @@ func (m clusterHelper) GetComplianceProfile(name string, acc *access.AccessContr
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m clusterHelper) PutComplianceProfile(cp *share.CLUSComplianceProfile, rev uint64) error {
+func (m clusterHelper) PutComplianceProfile(cp *share.CLUSComplianceProfile, rev *uint64) error {
 	key := share.CLUSComplianceProfileKey(cp.Name)
 	value, _ := json.Marshal(cp)
-	return cluster.PutRev(key, value, rev)
+	if rev == nil {
+		return cluster.Put(key, value)
+	} else {
+		return cluster.PutRev(key, value, *rev)
+	}
 }
 
 func (m clusterHelper) PutComplianceProfileIfNotExist(cp *share.CLUSComplianceProfile) error {
@@ -1416,10 +1420,14 @@ func (m clusterHelper) GetVulnerabilityProfile(name string, acc *access.AccessCo
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m clusterHelper) PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev uint64) error {
+func (m clusterHelper) PutVulnerabilityProfile(cp *share.CLUSVulnerabilityProfile, rev *uint64) error {
 	key := share.CLUSVulnerabilityProfileKey(cp.Name)
 	value, _ := json.Marshal(cp)
-	return cluster.PutRev(key, value, rev)
+	if rev == nil {
+		return cluster.Put(key, value)
+	} else {
+		return cluster.PutRev(key, value, *rev)
+	}
 }
 
 func (m clusterHelper) PutVulnerabilityProfileIfNotExist(cp *share.CLUSVulnerabilityProfile) error {
@@ -2147,9 +2155,10 @@ func (m clusterHelper) GetCrdSecurityRuleRecord(crdKind, crdName string) *share.
 	return nil
 }
 
-func (m clusterHelper) PutCrdSecurityRuleRecord(crdKind, crdName string, rules *share.CLUSCrdSecurityRule) error {
+func (m clusterHelper) PutCrdSecurityRuleRecord(crdKind, crdName string, rule *share.CLUSCrdSecurityRule) error {
 	key := share.CLUSCrdKey(crdKind, crdName)
-	value, _ := json.Marshal(rules)
+	rule.UpdatedAt = time.Now().UTC()
+	value, _ := json.Marshal(rule)
 	return m.putSizeAware(nil, key, value)
 }
 

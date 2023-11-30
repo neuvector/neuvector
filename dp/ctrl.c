@@ -2288,6 +2288,24 @@ static int dp_ctrl_detect_unmanaged_wl(json_t *msg)
     return 0;
 }
 
+uint8_t g_enable_icmp_policy = 0;
+
+static int dp_ctrl_enable_icmp_policy(json_t *msg)
+{
+    json_t *enable_icmp_policy_obj;
+    bool enable_icmp_policy = false;
+
+    enable_icmp_policy_obj = json_object_get(msg, "enable_icmp_policy");
+    if (enable_icmp_policy_obj != NULL) {
+        enable_icmp_policy = json_boolean_value(enable_icmp_policy_obj);
+    }
+    g_enable_icmp_policy = enable_icmp_policy ? 1 : 0;
+
+    DEBUG_CTRL("g_enable_icmp_policy=%u\n", g_enable_icmp_policy);
+
+    return 0;
+}
+
 #define BUF_SIZE 8192
 char ctrl_msg_buf[BUF_SIZE];
 static int dp_ctrl_handler(int fd)
@@ -2389,6 +2407,8 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_disable_net_policy(msg);
         } else if (strcmp(key, "ctrl_detect_unmanaged_wl") == 0) {
             ret = dp_ctrl_detect_unmanaged_wl(msg);
+        } else if (strcmp(key, "ctrl_enable_icmp_policy") == 0) {
+            ret = dp_ctrl_enable_icmp_policy(msg);
         }
         DEBUG_CTRL("\"%s\" done\n", key);
     }

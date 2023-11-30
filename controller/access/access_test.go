@@ -1368,6 +1368,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/enforcer/*/profiling",
 			"v1/file/config",
 			"v1/csp/file/support",
+			"v1/internal/alert",
 		},
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/workload/*",
@@ -1412,6 +1413,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		CONST_API_COMPLIANCE: []string{
 			"v1/bench/host/*/docker",
 			"v1/bench/host/*/kubernetes",
+			"v1/file/compliance/profile",
+			"v1/file/compliance/profile/config",
 		},
 		CONST_API_AUTHENTICATION: []string{
 			"v1/server",
@@ -1421,10 +1424,10 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/user_role",
 			"v1/user",
 			"v1/api_key",
+			"v1/user/*/password",
 		},
 		CONST_API_PWD_PROFILE: []string{
 			"v1/password_profile",
-			"v1/user/*/password",
 		},
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license/update",
@@ -1442,6 +1445,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_VULNERABILITY: []string{
 			"v1/vulnerability/profile/*/entry",
+			"v1/file/vulnerability/profile",
+			"v1/file/vulnerability/profile/config",
 		},
 	}
 

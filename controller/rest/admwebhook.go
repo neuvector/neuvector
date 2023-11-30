@@ -50,8 +50,7 @@ import (
 )
 
 const (
-	tlsClientCA  = "/var/neuvector/clientCA.cert.pem"
-	assessMsgSep = "\v"
+	tlsClientCA = "/var/neuvector/clientCA.cert.pem"
 )
 
 const (
@@ -269,11 +268,6 @@ func parseReqImageName(admContainerInfo *nvsysadmission.AdmContainerInfo) error 
 	return nil
 }
 
-type typedSpecContainer struct {
-	k8sType       nvsysadmission.K8sContainerType
-	containerInfo corev1.Container
-}
-
 const appArmorAnnotation = "container.apparmor.security.beta.kubernetes.io"
 
 func getAppArmorProfilesByContainer(specAnnotations map[string]string) map[string]string {
@@ -295,32 +289,13 @@ func getAppArmorProfilesByContainer(specAnnotations map[string]string) map[strin
 	return profilesByContainer
 }
 
-func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsysadmission.AdmContainerInfo, error) {
+func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nvsysadmission.AdmContainerInfo, error) {
+	var allContainers [3][]*nvsysadmission.AdmContainerInfo
 	vols := make(map[string]string, len(spec.Volumes))
-	numOfContainers := len(spec.Containers) + len(spec.EphemeralContainers) + len(spec.InitContainers)
-	containers := make([]*nvsysadmission.AdmContainerInfo, 0, numOfContainers)
-	typedSpecContainers := make([]typedSpecContainer, 0, numOfContainers)
 	appArmorProfilesByContainer := getAppArmorProfilesByContainer(objectMeta.Annotations)
-
-	for _, standardContainer := range spec.Containers {
-		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
-			k8sType:       nvsysadmission.K8sStandardContainer,
-			containerInfo: standardContainer,
-		})
-	}
-
-	for _, initContainer := range spec.InitContainers {
-		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
-			k8sType:       nvsysadmission.K8sInitContainer,
-			containerInfo: initContainer,
-		})
-	}
-
-	for _, ephemeralContainer := range spec.EphemeralContainers {
-		typedSpecContainers = append(typedSpecContainers, typedSpecContainer{
-			k8sType:       nvsysadmission.K8SEphemeralContainer,
-			containerInfo: corev1.Container(ephemeralContainer.EphemeralContainerCommon),
-		})
+	ephemeralContainers := make([]corev1.Container, len(spec.EphemeralContainers))
+	for i, ephemeralContainer := range spec.EphemeralContainers {
+		ephemeralContainers[i] = corev1.Container(ephemeralContainer.EphemeralContainerCommon)
 	}
 
 	for _, vol := range spec.Volumes {
@@ -329,264 +304,265 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([]*nvsys
 		}
 	}
 
-	for _, sc := range typedSpecContainers {
-		c := sc.containerInfo
-		volMounts := utils.NewSet()
-		for _, volMnt := range c.VolumeMounts {
-			if path, exist := vols[volMnt.Name]; exist {
-				volMounts.Add(path)
+	for i, containers := range [3][]corev1.Container{spec.InitContainers, spec.Containers, ephemeralContainers} {
+		allContainers[i] = make([]*nvsysadmission.AdmContainerInfo, 0, len(containers))
+		for _, c := range containers {
+			volMounts := utils.NewSet()
+			for _, volMnt := range c.VolumeMounts {
+				if path, exist := vols[volMnt.Name]; exist {
+					volMounts.Add(path)
+				}
 			}
-		}
 
-		envVars := make(map[string]string)
-		regualrEnvVars := make(map[string]string) // reducing false-positive cases from "ValueFrom" types
-		for _, env := range c.Env {
-			if env.Value == "" {
-				if env.ValueFrom != nil {
-					/*[2019/Apr.] do not enable ConfigMap support for env vars yet
-					if env.ValueFrom.ConfigMapKeyRef != nil {
-						if cfgMap, err := admission.GetK8sConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, objectMeta.Namespace); err == nil {
-							if cfgMap != nil && cfgMap.Data != nil {
-								if value, exist := cfgMap.Data[env.ValueFrom.ConfigMapKeyRef.Key]; exist {
+			envVars := make(map[string]string)
+			regualrEnvVars := make(map[string]string) // reducing false-positive cases from "ValueFrom" types
+			for _, env := range c.Env {
+				if env.Value == "" {
+					if env.ValueFrom != nil {
+						/*[2019/Apr.] do not enable ConfigMap support for env vars yet
+						if env.ValueFrom.ConfigMapKeyRef != nil {
+							if cfgMap, err := admission.GetK8sConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, objectMeta.Namespace); err == nil {
+								if cfgMap != nil && cfgMap.Data != nil {
+									if value, exist := cfgMap.Data[env.ValueFrom.ConfigMapKeyRef.Key]; exist {
+										envVars[env.Name] = value
+									}
+								}
+							}
+						}*/
+						if env.ValueFrom.FieldRef != nil {
+							switch env.ValueFrom.FieldRef.FieldPath {
+							case "metadata.name":
+								envVars[env.Name] = objectMeta.Name
+							case "metadata.namespace":
+								envVars[env.Name] = objectMeta.Namespace
+							case "metadata.labels":
+								if value, exist := objectMeta.Labels[env.Name]; exist {
 									envVars[env.Name] = value
+								}
+							case "metadata.annotations":
+								if value, exist := objectMeta.Annotations[env.Name]; exist {
+									envVars[env.Name] = value
+								}
+							case "spec.nodeName":
+								envVars[env.Name] = spec.NodeName
+							case "spec.serviceAccountName":
+								envVars[env.Name] = spec.ServiceAccountName
+							case "status.hostIP", "status.podIP":
+								envVars[env.Name] = ""
+							}
+						} /*else if env.ValueFrom.ResourceFieldRef != nil || env.ValueFrom.SecretKeyRef != nil {
+							// For env var from ResourceFieldRef and SecretKeyRef, we don't resolve its value
+							envVars[env.Name] = ""
+						}*/
+					} else {
+						envVars[env.Name] = ""
+					}
+				} else {
+					envVars[env.Name] = env.Value
+					regualrEnvVars[env.Name] = env.Value
+				}
+			}
+			/*[2019/Apr.] do not enable ConfigMap support for env vars yet
+			for _, envFrom := range c.EnvFrom {
+				// do not handle SecretRef(*SecretEnvSource)
+				if envFrom.ConfigMapRef != nil {
+					if cfgMap, err := admission.GetK8sConfigMap(envFrom.ConfigMapRef.Name, objectMeta.Namespace); err == nil {
+						if cfgMap != nil && cfgMap.Data != nil {
+							for k, v := range cfgMap.Data {
+								if envFrom.Prefix == "" {
+									envVars[k] = v
+								} else {
+									k2 := fmt.Sprintf("%s%s", envFrom.Prefix, k)
+									envVars[k2] = v
 								}
 							}
 						}
-					}*/
-					if env.ValueFrom.FieldRef != nil {
-						switch env.ValueFrom.FieldRef.FieldPath {
-						case "metadata.name":
-							envVars[env.Name] = objectMeta.Name
-						case "metadata.namespace":
-							envVars[env.Name] = objectMeta.Namespace
-						case "metadata.labels":
-							if value, exist := objectMeta.Labels[env.Name]; exist {
-								envVars[env.Name] = value
-							}
-						case "metadata.annotations":
-							if value, exist := objectMeta.Annotations[env.Name]; exist {
-								envVars[env.Name] = value
-							}
-						case "spec.nodeName":
-							envVars[env.Name] = spec.NodeName
-						case "spec.serviceAccountName":
-							envVars[env.Name] = spec.ServiceAccountName
-						case "status.hostIP", "status.podIP":
-							envVars[env.Name] = ""
-						}
-					} /*else if env.ValueFrom.ResourceFieldRef != nil || env.ValueFrom.SecretKeyRef != nil {
-						// For env var from ResourceFieldRef and SecretKeyRef, we don't resolve its value
-						envVars[env.Name] = ""
-					}*/
-				} else {
-					envVars[env.Name] = ""
+					}
 				}
-			} else {
-				envVars[env.Name] = env.Value
-				regualrEnvVars[env.Name] = env.Value
+			}*/
+
+			admContainerInfo := &nvsysadmission.AdmContainerInfo{
+				RunAsUser:   -1,
+				VolMounts:   volMounts,
+				EnvVars:     envVars,
+				HostNetwork: spec.HostNetwork,
+				HostPID:     spec.HostPID,
+				HostIPC:     spec.HostIPC,
+				Volumes:     spec.Volumes,
+				Capabilities: nvsysadmission.LinuxCapabilities{
+					Add:  []string{},
+					Drop: []string{},
+				},
+				HostPorts:      []int32{},
+				SELinuxOptions: nvsysadmission.SELinuxOptions{},
+				Sysctls:        []string{},
 			}
-		}
-		/*[2019/Apr.] do not enable ConfigMap support for env vars yet
-		for _, envFrom := range c.EnvFrom {
-			// do not handle SecretRef(*SecretEnvSource)
-			if envFrom.ConfigMapRef != nil {
-				if cfgMap, err := admission.GetK8sConfigMap(envFrom.ConfigMapRef.Name, objectMeta.Namespace); err == nil {
-					if cfgMap != nil && cfgMap.Data != nil {
-						for k, v := range cfgMap.Data {
-							if envFrom.Prefix == "" {
-								envVars[k] = v
-							} else {
-								k2 := fmt.Sprintf("%s%s", envFrom.Prefix, k)
-								envVars[k2] = v
-							}
-						}
+
+			if c.Ports != nil {
+				for _, port := range c.Ports {
+					if port.HostPort != 0 {
+						admContainerInfo.HostPorts = append(admContainerInfo.HostPorts, port.HostPort)
 					}
 				}
 			}
-		}*/
 
-		admContainerInfo := &nvsysadmission.AdmContainerInfo{
-			RunAsUser:   -1,
-			VolMounts:   volMounts,
-			EnvVars:     envVars,
-			HostNetwork: spec.HostNetwork,
-			HostPID:     spec.HostPID,
-			HostIPC:     spec.HostIPC,
-			Type:        sc.k8sType,
-			Volumes:     spec.Volumes,
-			Capabilities: nvsysadmission.LinuxCapabilities{
-				Add:  []string{},
-				Drop: []string{},
-			},
-			HostPorts:      []int32{},
-			SELinuxOptions: nvsysadmission.SELinuxOptions{},
-			Sysctls:        []string{},
-		}
+			if appArmorProfile, hasProfile := appArmorProfilesByContainer[c.Name]; hasProfile {
+				admContainerInfo.AppArmorProfile = &appArmorProfile
+			}
 
-		if c.Ports != nil {
-			for _, port := range c.Ports {
-				if port.HostPort != 0 {
-					admContainerInfo.HostPorts = append(admContainerInfo.HostPorts, port.HostPort)
+			cpuRequestSpecified := false
+			memoryRequestSpecified := false
+			if len(c.Resources.Requests) > 0 {
+				if q, ok := c.Resources.Requests[corev1.ResourceCPU]; ok {
+					if v := q.Value(); v < 9223372036854775 {
+						admContainerInfo.CpuRequests = float64(q.MilliValue()) / 1000
+					} else {
+						admContainerInfo.CpuRequests = float64(v)
+					}
+					cpuRequestSpecified = true
+				}
+				if q, ok := c.Resources.Requests[corev1.ResourceMemory]; ok {
+					admContainerInfo.MemoryRequests = q.Value()
+					memoryRequestSpecified = true
 				}
 			}
-		}
 
-		if appArmorProfile, hasProfile := appArmorProfilesByContainer[c.Name]; hasProfile {
-			admContainerInfo.AppArmorProfile = &appArmorProfile
-		}
+			if len(c.Resources.Limits) > 0 {
+				if q, ok := c.Resources.Limits[corev1.ResourceCPU]; ok {
+					if v := q.Value(); v < 9223372036854775 {
+						admContainerInfo.CpuLimits = float64(q.MilliValue()) / 1000
+					} else {
+						admContainerInfo.CpuLimits = float64(v)
+					}
+					if !cpuRequestSpecified {
+						admContainerInfo.CpuRequests = admContainerInfo.CpuLimits
+					}
+				}
+				if q, ok := c.Resources.Limits[corev1.ResourceMemory]; ok {
+					admContainerInfo.MemoryLimits = q.Value()
+					if !memoryRequestSpecified {
+						admContainerInfo.MemoryRequests = admContainerInfo.MemoryLimits
+					}
+				}
+			}
 
-		cpuRequestSpecified := false
-		memoryRequestSpecified := false
-		if len(c.Resources.Requests) > 0 {
-			if q, ok := c.Resources.Requests[corev1.ResourceCPU]; ok {
-				if v := q.Value(); v < 9223372036854775 {
-					admContainerInfo.CpuRequests = float64(q.MilliValue()) / 1000
+			admContainerInfo.EnvSecrets = scanEnvVarSecrets(regualrEnvVars)
+
+			if spec.SecurityContext != nil {
+				// pod selinux options
+				if spec.SecurityContext.SELinuxOptions != nil {
+					admContainerInfo.SELinuxOptions.Type = spec.SecurityContext.SELinuxOptions.Type
+					admContainerInfo.SELinuxOptions.User = spec.SecurityContext.SELinuxOptions.User
+					admContainerInfo.SELinuxOptions.Role = spec.SecurityContext.SELinuxOptions.Role
+				}
+
+				// sysctls
+				if spec.SecurityContext.Sysctls != nil {
+					for _, sysctl := range spec.SecurityContext.Sysctls {
+						admContainerInfo.Sysctls = append(admContainerInfo.Sysctls, sysctl.Name)
+					}
+				}
+
+				// pod seccomp profile type
+				if spec.SecurityContext.SeccompProfile != nil {
+					admContainerInfo.SeccompProfileType = &spec.SecurityContext.SeccompProfile.Type
+				}
+
+				// run as non root
+				if spec.SecurityContext.RunAsNonRoot != nil {
+					admContainerInfo.RunAsNonRoot = *spec.SecurityContext.RunAsNonRoot
 				} else {
-					admContainerInfo.CpuRequests = float64(v)
-				}
-				cpuRequestSpecified = true
-			}
-			if q, ok := c.Resources.Requests[corev1.ResourceMemory]; ok {
-				admContainerInfo.MemoryRequests = q.Value()
-				memoryRequestSpecified = true
-			}
-		}
-
-		if len(c.Resources.Limits) > 0 {
-			if q, ok := c.Resources.Limits[corev1.ResourceCPU]; ok {
-				if v := q.Value(); v < 9223372036854775 {
-					admContainerInfo.CpuLimits = float64(q.MilliValue()) / 1000
-				} else {
-					admContainerInfo.CpuLimits = float64(v)
-				}
-				if !cpuRequestSpecified {
-					admContainerInfo.CpuRequests = admContainerInfo.CpuLimits
-				}
-			}
-			if q, ok := c.Resources.Limits[corev1.ResourceMemory]; ok {
-				admContainerInfo.MemoryLimits = q.Value()
-				if !memoryRequestSpecified {
-					admContainerInfo.MemoryRequests = admContainerInfo.MemoryLimits
-				}
-			}
-		}
-
-		admContainerInfo.EnvSecrets = scanEnvVarSecrets(regualrEnvVars)
-
-		if spec.SecurityContext != nil {
-			// pod selinux options
-			if spec.SecurityContext.SELinuxOptions != nil {
-				admContainerInfo.SELinuxOptions.Type = spec.SecurityContext.SELinuxOptions.Type
-				admContainerInfo.SELinuxOptions.User = spec.SecurityContext.SELinuxOptions.User
-				admContainerInfo.SELinuxOptions.Role = spec.SecurityContext.SELinuxOptions.Role
-			}
-
-			// sysctls
-			if spec.SecurityContext.Sysctls != nil {
-				for _, sysctl := range spec.SecurityContext.Sysctls {
-					admContainerInfo.Sysctls = append(admContainerInfo.Sysctls, sysctl.Name)
+					admContainerInfo.RunAsNonRoot = false
 				}
 			}
 
-			// pod seccomp profile type
-			if spec.SecurityContext.SeccompProfile != nil {
-				admContainerInfo.SeccompProfileType = &spec.SecurityContext.SeccompProfile.Type
-			}
-
-			// run as non root
-			if spec.SecurityContext.RunAsNonRoot != nil {
-				admContainerInfo.RunAsNonRoot = *spec.SecurityContext.RunAsNonRoot
-			} else {
-				admContainerInfo.RunAsNonRoot = false
-			}
-		}
-
-		if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
-			admContainerInfo.RunAsUser = *spec.SecurityContext.RunAsUser
-		}
-
-		if c.SecurityContext != nil { // c.SecurityContext is type SecurityContext
-			if c.SecurityContext.Privileged != nil {
-				admContainerInfo.Privileged = *c.SecurityContext.Privileged
-				if *c.SecurityContext.Privileged {
-					admContainerInfo.AllowPrivilegeEscalation = true
-				}
-			}
-			if c.SecurityContext.RunAsUser != nil {
-				// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
-				admContainerInfo.RunAsUser = *c.SecurityContext.RunAsUser
-			} else if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
+			if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
 				admContainerInfo.RunAsUser = *spec.SecurityContext.RunAsUser
 			}
-			if c.SecurityContext.AllowPrivilegeEscalation != nil && *c.SecurityContext.AllowPrivilegeEscalation {
-				admContainerInfo.AllowPrivilegeEscalation = true
-			}
 
-			// linux capabilities
-			if c.SecurityContext.Capabilities != nil {
-				if c.SecurityContext.Capabilities.Add != nil {
+			if c.SecurityContext != nil { // c.SecurityContext is type SecurityContext
+				if c.SecurityContext.Privileged != nil {
+					admContainerInfo.Privileged = *c.SecurityContext.Privileged
+					if *c.SecurityContext.Privileged {
+						admContainerInfo.AllowPrivilegeEscalation = true
+					}
+				}
+				if c.SecurityContext.RunAsUser != nil {
+					// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+					admContainerInfo.RunAsUser = *c.SecurityContext.RunAsUser
+				} else if spec.SecurityContext != nil && spec.SecurityContext.RunAsUser != nil {
+					admContainerInfo.RunAsUser = *spec.SecurityContext.RunAsUser
+				}
+				if c.SecurityContext.AllowPrivilegeEscalation != nil && *c.SecurityContext.AllowPrivilegeEscalation {
+					admContainerInfo.AllowPrivilegeEscalation = true
+				}
 
-					for _, addedCapability := range c.SecurityContext.Capabilities.Add {
-						if addedCapability == "SYS_ADMIN" {
-							admContainerInfo.AllowPrivilegeEscalation = true
+				// linux capabilities
+				if c.SecurityContext.Capabilities != nil {
+					if c.SecurityContext.Capabilities.Add != nil {
+
+						for _, addedCapability := range c.SecurityContext.Capabilities.Add {
+							if addedCapability == "SYS_ADMIN" {
+								admContainerInfo.AllowPrivilegeEscalation = true
+							}
+							admContainerInfo.Capabilities.Add = append(admContainerInfo.Capabilities.Add, string(addedCapability))
 						}
-						admContainerInfo.Capabilities.Add = append(admContainerInfo.Capabilities.Add, string(addedCapability))
+					}
+					if c.SecurityContext.Capabilities.Drop != nil {
+						for _, droppedCapability := range c.SecurityContext.Capabilities.Drop {
+							admContainerInfo.Capabilities.Drop = append(admContainerInfo.Capabilities.Drop, string(droppedCapability))
+						}
 					}
 				}
-				if c.SecurityContext.Capabilities.Drop != nil {
-					for _, droppedCapability := range c.SecurityContext.Capabilities.Drop {
-						admContainerInfo.Capabilities.Drop = append(admContainerInfo.Capabilities.Drop, string(droppedCapability))
-					}
+
+				// container selinux options
+				if c.SecurityContext.SELinuxOptions != nil {
+					admContainerInfo.SELinuxOptions.Type = c.SecurityContext.SELinuxOptions.Type
+					admContainerInfo.SELinuxOptions.User = c.SecurityContext.SELinuxOptions.User
+					admContainerInfo.SELinuxOptions.Role = c.SecurityContext.SELinuxOptions.Role
+				}
+
+				// proc masks
+				if c.SecurityContext.ProcMount != nil {
+					admContainerInfo.ProcMount = string(*c.SecurityContext.ProcMount)
+				} else {
+					admContainerInfo.ProcMount = ""
+				}
+
+				// container seccomp profile type
+				if c.SecurityContext.SeccompProfile != nil {
+					admContainerInfo.SeccompProfileType = &c.SecurityContext.SeccompProfile.Type
+				}
+
+				// container run as non root
+				if c.SecurityContext.RunAsNonRoot != nil {
+					admContainerInfo.RunAsNonRoot = *c.SecurityContext.RunAsNonRoot
+				} else {
+					admContainerInfo.RunAsNonRoot = false
 				}
 			}
-
-			// container selinux options
-			if c.SecurityContext.SELinuxOptions != nil {
-				admContainerInfo.SELinuxOptions.Type = c.SecurityContext.SELinuxOptions.Type
-				admContainerInfo.SELinuxOptions.User = c.SecurityContext.SELinuxOptions.User
-				admContainerInfo.SELinuxOptions.Role = c.SecurityContext.SELinuxOptions.Role
-			}
-
-			// proc masks
-			if c.SecurityContext.ProcMount != nil {
-				admContainerInfo.ProcMount = string(*c.SecurityContext.ProcMount)
-			} else {
-				admContainerInfo.ProcMount = ""
-			}
-
-			// container seccomp profile type
-			if c.SecurityContext.SeccompProfile != nil {
-				admContainerInfo.SeccompProfileType = &c.SecurityContext.SeccompProfile.Type
-			}
-
-			// container run as non root
-			if c.SecurityContext.RunAsNonRoot != nil {
-				admContainerInfo.RunAsNonRoot = *c.SecurityContext.RunAsNonRoot
-			} else {
-				admContainerInfo.RunAsNonRoot = false
-			}
-		}
-		admContainerInfo.Name = c.Name
-		admContainerInfo.Image = c.Image
-		parseReqImageName(admContainerInfo)
-		isSidecar := false
-		for imageRegistry := range admContainerInfo.ImageRegistry.Iter() {
-			for _, sidecar := range sidecarImages {
-				if sidecar.registry == imageRegistry && sidecar.imageRepo == admContainerInfo.ImageRepo {
-					isSidecar = true
+			admContainerInfo.Name = c.Name
+			admContainerInfo.Image = c.Image
+			parseReqImageName(admContainerInfo)
+			isSidecar := false
+			for imageRegistry := range admContainerInfo.ImageRegistry.Iter() {
+				for _, sidecar := range sidecarImages {
+					if sidecar.registry == imageRegistry && sidecar.imageRepo == admContainerInfo.ImageRepo {
+						isSidecar = true
+						break
+					}
+				}
+				if isSidecar {
 					break
 				}
 			}
-			if isSidecar {
-				break
+			if !isSidecar {
+				allContainers[i] = append(allContainers[i], admContainerInfo)
 			}
-		}
-		if !isSidecar {
-			containers = append(containers, admContainerInfo)
 		}
 	}
 
-	return containers, nil
+	return allContainers, nil
 }
 
 func mergeMaps(labels1, labels2 map[string]string) map[string]string {
@@ -710,17 +686,17 @@ func isRootOwnerCacheAvailable(ownerUIDs []string) bool {
 func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.ObjectMeta, podSpec interface{}) (*nvsysadmission.AdmResObject, error) {
 	var specLabels map[string]string
 	var specAnnotations map[string]string
-	var containers []*nvsysadmission.AdmContainerInfo
+	var allContainers [3][]*nvsysadmission.AdmContainerInfo
 	if podSpec != nil {
 		switch podSpec.(type) {
 		case *corev1.PodTemplateSpec:
 			podTemplateSpec, _ := podSpec.(*corev1.PodTemplateSpec)
-			containers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
+			allContainers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
 			specLabels = podTemplateSpec.ObjectMeta.Labels
 			specAnnotations = podTemplateSpec.ObjectMeta.Annotations
 		case *corev1.PodSpec:
 			podSpec, _ := podSpec.(*corev1.PodSpec)
-			containers, _ = parsePodSpec(objectMeta, podSpec)
+			allContainers, _ = parsePodSpec(objectMeta, podSpec)
 		default:
 			return nil, errors.New("unsupported podSpec type")
 		}
@@ -747,16 +723,16 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	}
 
 	resObject := &nvsysadmission.AdmResObject{
-		ValidUntil:  time.Now().Add(time.Minute * 5).Unix(),
-		Kind:        req.Kind.Kind,
-		Name:        objectMeta.Name,
-		Namespace:   objectMeta.Namespace,
-		UserName:    userName,
-		Groups:      groups,
-		OwnerUIDs:   ownerUIDs,
-		Labels:      labels,
-		Annotations: annotations,
-		Containers:  containers,
+		ValidUntil:    time.Now().Add(time.Minute * 5).Unix(),
+		Kind:          req.Kind.Kind,
+		Name:          objectMeta.Name,
+		Namespace:     objectMeta.Namespace,
+		UserName:      userName,
+		Groups:        groups,
+		OwnerUIDs:     ownerUIDs,
+		Labels:        labels,
+		Annotations:   annotations,
+		AllContainers: allContainers,
 		// AdmResults: make(map[string]*nvsysadmission.AdmResult), // comment out because we do not re-use the matching result of owners anymore.
 	}
 	admResCacheMutex.Lock()
@@ -768,7 +744,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 }
 
 func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps,
-	ar *admissionv1beta1.AdmissionReview, globalMode string, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult) {
+	ar *admissionv1beta1.AdmissionReview, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult) {
 
 	matchData := &nvsysadmission.AdmMatchData{}
 	if len(admResObject.OwnerUIDs) > 0 {
@@ -812,63 +788,68 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	var scannedImages strings.Builder
 	var unscannedImages strings.Builder
 	var noMatchedResult nvsysadmission.AdmResult
-	var allowMatchedResult *nvsysadmission.AdmResult         // from first allow match
-	var denyMatchedResult *nvsysadmission.AdmResult          // from first deny match
-	var finalAssessResults []*nvsysadmission.AdmAssessResult // for the triggered deny rules before (the 1st allow rule and 1st monitored deny rule) in assessment
-	for _, c := range admResObject.Containers {
-		var thisStamp api.AdmCtlTimeStamps
-		perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
-		result, assessResults, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, globalMode, forTesting)
-		if !licenseAllowed {
-			continue
-		}
-		if thisStamp.Fetched.Sub(thisStamp.GonnaFetch).Seconds() > stamps.Fetched.Sub(stamps.GonnaFetch).Seconds() {
-			stamps.GonnaFetch = thisStamp.GonnaFetch
-			stamps.Fetched = thisStamp.Fetched
-		}
-		if result.ImageNotScanned {
-			if unscannedImages.Len() > 0 {
-				unscannedImages.WriteString(", ")
+	var allowMatchedResult *nvsysadmission.AdmResult    // from first allow match
+	var denyMatchedResult *nvsysadmission.AdmResult     // from first deny match
+	var assessResults []*nvsysadmission.AdmAssessResult // for all matched rules in assessment
+	containerTypes := []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
+	for i, containers := range admResObject.AllContainers {
+		for _, c := range containers {
+			var thisStamp api.AdmCtlTimeStamps
+			perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
+			result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, containerTypes[i], forTesting)
+			if !licenseAllowed {
+				continue
 			}
-			unscannedImages.WriteString(c.Image)
-		} else if result.RuleID == 0 {
-			// image is scanned but doesn't match any rule
-			if scannedImages.Len() > 0 {
-				scannedImages.WriteString(", ")
+			if thisStamp.Fetched.Sub(thisStamp.GonnaFetch).Seconds() > stamps.Fetched.Sub(stamps.GonnaFetch).Seconds() {
+				stamps.GonnaFetch = thisStamp.GonnaFetch
+				stamps.Fetched = thisStamp.Fetched
 			}
-			scannedImages.WriteString(c.Image)
-			noMatchedResult.HighVulsCnt += result.HighVulsCnt
-			noMatchedResult.MedVulsCnt += result.MedVulsCnt
-		}
-		if result.RuleID != 0 {
-			if result.MatchDeny {
-				// deny this resource request if any container matches a deny rule. Still keep collecting unscanned-image info
-				if denyMatchedResult == nil {
-					matchData.MatchState = nvsysadmission.MatchedDeny
-					denyMatchedResult = result
+			if result.ImageNotScanned {
+				if unscannedImages.Len() > 0 {
+					unscannedImages.WriteString(", ")
 				}
-				finalAssessResults = append(finalAssessResults, assessResults...)
-			} else {
-				// matches an allow rule. we only cache the 1st allow matching result and keep checking if any container matches deny rule
-				// matching a deny rule overrides matching any allow rule. Still keep collecting unscanned-image info
-				if allowMatchedResult == nil {
-					matchData.MatchState = nvsysadmission.MatchedAllow
-					allowMatchedResult = result
+				unscannedImages.WriteString(c.Image)
+			} else if result.RuleID == 0 {
+				// image is scanned but doesn't match any rule
+				if scannedImages.Len() > 0 {
+					scannedImages.WriteString(", ")
+				}
+				scannedImages.WriteString(c.Image)
+				noMatchedResult.HighVulsCnt += result.HighVulsCnt
+				noMatchedResult.MedVulsCnt += result.MedVulsCnt
+			}
+			if result.RuleID != 0 {
+				if result.MatchDeny {
+					// deny this resource request if any container matches a deny rule. Still keep collecting unscanned-image info
+					if denyMatchedResult == nil {
+						matchData.MatchState = nvsysadmission.MatchedDeny
+						denyMatchedResult = result
+					}
+				} else {
+					// matches an allow rule. we only cache the 1st allow matching result and keep checking if any container matches deny rule
+					// matching a deny rule overrides matching any allow rule. Still keep collecting unscanned-image info
+					if allowMatchedResult == nil {
+						matchData.MatchState = nvsysadmission.MatchedAllow
+						allowMatchedResult = result
+					}
+				}
+				if forTesting {
+					assessResults = append(assessResults, result.AssessResults...)
 				}
 			}
+			// admResObject.AdmResults[c.ImageRepo] = result // comment out because we do not re-use the matching result of owners anymore.
 		}
-		// admResObject.AdmResults[c.ImageRepo] = result // comment out because we do not re-use the matching result of owners anymore.
 	}
 	if denyMatchedResult != nil {
 		denyMatchedResult.UnscannedImages = unscannedImages.String()
-		return denyMatchedResult, finalAssessResults
+		return denyMatchedResult, assessResults
 	} else if allowMatchedResult != nil {
 		allowMatchedResult.UnscannedImages = unscannedImages.String()
-		return allowMatchedResult, nil
+		return allowMatchedResult, assessResults
 	} else {
 		noMatchedResult.Image = scannedImages.String()
 		noMatchedResult.UnscannedImages = unscannedImages.String()
-		return &noMatchedResult, nil // return empty result & will apply defaultAction later
+		return &noMatchedResult, assessResults // return empty result & will apply defaultAction later
 	}
 }
 
@@ -991,8 +972,9 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult
 	return nil
 }
 
-func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode string, defaultAction int,
-	stamps *api.AdmCtlTimeStamps, forTesting bool) (*admissionv1beta1.AdmissionResponse, bool) {
+func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode string, defaultAction int, stamps *api.AdmCtlTimeStamps,
+	forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmAssessResult, bool) {
+
 	req := ar.Request
 	var objectMeta *metav1.ObjectMeta
 	var podTemplateSpec *corev1.PodTemplateSpec
@@ -1011,13 +993,13 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 	case admissionv1beta1.Delete:
 		op = OPERATION_DELETE
 	default:
-		return composeResponse(nil), reqIgnored
+		return composeResponse(nil), nil, reqIgnored
 	}
 	switch req.Kind.Kind {
 	case k8sKindCronJob:
 		var cronJob batchv1beta1.CronJob // The batch/v1beta1 API version of CronJob will no longer be served in v1.25 !!
 		if err := json.Unmarshal(req.Object.Raw, &cronJob); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &cronJob.ObjectMeta
 		podTemplateSpec = &cronJob.Spec.JobTemplate.Spec.Template
@@ -1028,19 +1010,19 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 				cacher.SetNvDeployStatusInCluster(resource.NvDeploymentName, false) // leverage resource.NvDeploymentName to tell NV is being uninstalled
 				time.Sleep(time.Second * 2)                                         // so that the leading controller should have enough time to unregister adm ctrl from K8s
 			}
-			return composeResponse(nil), reqIgnored // always allow
+			return composeResponse(nil), nil, reqIgnored // always allow
 		}
 
 		var daemonSet appsv1.DaemonSet
 		if err := json.Unmarshal(req.Object.Raw, &daemonSet); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &daemonSet.ObjectMeta
 		podTemplateSpec = &daemonSet.Spec.Template
 		if op == OPERATION_UPDATE {
 			var oldDaemonSet appsv1.DaemonSet
 			if err := json.Unmarshal(req.OldObject.Raw, &oldDaemonSet); err != nil {
-				return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+				return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 			}
 		}
 	case k8sKindDeployment:
@@ -1050,17 +1032,17 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 				cacher.SetNvDeployStatusInCluster(req.Name, false) // leverage resource.NvDeploymentName to tell NV is being uninstalled
 				time.Sleep(time.Second * 2)                        // so that the leading controller should have enough time to unregister adm ctrl from K8s
 			}
-			return composeResponse(nil), reqIgnored // always allow
+			return composeResponse(nil), nil, reqIgnored // always allow
 		}
 
 		var deployment appsv1.Deployment
 		if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		if op == OPERATION_UPDATE {
 			var oldDeployment appsv1.Deployment
 			if err := json.Unmarshal(req.OldObject.Raw, &oldDeployment); err != nil {
-				return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+				return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 			}
 		}
 		objectMeta = &deployment.ObjectMeta
@@ -1068,28 +1050,28 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 	case k8sKindDeploymentConfig:
 		var deploymentConfig resource.DeploymentConfig
 		if err := json.Unmarshal(req.Object.Raw, &deploymentConfig); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &deploymentConfig.ObjectMeta
 		podTemplateSpec = deploymentConfig.Spec.Template
 	case k8sKindJob:
 		var job batchv1.Job
 		if err := json.Unmarshal(req.Object.Raw, &job); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &job.ObjectMeta
 		podTemplateSpec = &job.Spec.Template
 	case K8sKindReplicationController:
 		var controller corev1.ReplicationController
 		if err := json.Unmarshal(req.Object.Raw, &controller); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &controller.ObjectMeta
 		podTemplateSpec = controller.Spec.Template
 	case k8sKindReplicaSet:
 		var replicaSet appsv1.ReplicaSet
 		if err := json.Unmarshal(req.Object.Raw, &replicaSet); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &replicaSet.ObjectMeta
 		podTemplateSpec = &replicaSet.Spec.Template
@@ -1114,7 +1096,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 				cacher.SetNvDeployStatusInCluster(req.Name, false)
 			}
 		}
-		return composeResponse(nil), reqIgnored // always allow
+		return composeResponse(nil), nil, reqIgnored // always allow
 	case K8sKindStatefulSet:
 		if op == OPERATION_DELETE {
 			if req.Namespace == resource.NvAdmSvcNamespace && (req.Name == resource.NvDeploymentName || req.Name == resource.NvDaemonSetName) {
@@ -1122,22 +1104,22 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 				cacher.SetNvDeployStatusInCluster(resource.NvDeploymentName, false) // leverage resource.NvDeploymentName to tell NV is being uninstalled
 				time.Sleep(time.Second * 2)                                         // so that the leading controller should have enough time to unregister adm ctrl from K8s
 			}
-			return composeResponse(nil), reqIgnored // always allow
+			return composeResponse(nil), nil, reqIgnored // always allow
 		}
 
 		var statefulSet appsv1.StatefulSet
 		if err := json.Unmarshal(req.Object.Raw, &statefulSet); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		objectMeta = &statefulSet.ObjectMeta
 		podTemplateSpec = &statefulSet.Spec.Template
 	case k8sKindPod:
 		var pod corev1.Pod
 		if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
-			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), reqIgnored
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		if pod.Status.Phase == "Running" {
-			return composeResponse(nil), reqIgnored
+			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
 	case K8sKindRole, K8sKindRoleBinding, K8sKindClusterRole, K8sKindClusterRoleBinding:
@@ -1150,9 +1132,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			opa.AddDocument(docKey, string(jsonData))
 			updateToOtherControllers(docKey, string(jsonData))
 		}
-		return composeResponse(nil), reqIgnored
+		return composeResponse(nil), nil, reqIgnored
 	default:
-		return composeResponse(nil), reqIgnored
+		return composeResponse(nil), nil, reqIgnored
 	}
 
 	// for non-Pod requests only
@@ -1160,8 +1142,12 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
 	}
 	stamps.Parsed = time.Now()
-	if len(admResObject.Containers) > 0 && admResObject.Containers[0] != nil {
-		stamps.Image = admResObject.Containers[0].Image
+	totalContainers := 0
+	for _, containers := range admResObject.AllContainers {
+		if len(containers) > 0 {
+			stamps.Image = containers[0].Image
+		}
+		totalContainers += len(containers)
 	}
 
 	var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
@@ -1169,7 +1155,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 	var statusResult = &metav1.Status{}
 	var admResult *nvsysadmission.AdmResult
 	var assessResults []*nvsysadmission.AdmAssessResult
-	if admResObject != nil && len(admResObject.Containers) > 0 {
+	if admResObject != nil && totalContainers > 0 {
 		var requestedBy string
 		if admResObject.UserName != "" {
 			requestedBy = admResObject.UserName
@@ -1182,8 +1168,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 		}
 		var subMsg, ruleScope, msgHeader string
-		// check if the containers are allowed. assessResults is only for the deny rules that are triggered before (the 1st allow rule and 1st monitored deny rule)
-		admResult, assessResults = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, mode, forTesting)
+		// check whether the containers are allowed.
+		// assessResults is for all the matched rules(disabled or not)
+		admResult, assessResults = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, forTesting)
 		if req.DryRun != nil && *req.DryRun {
 			msgHeader = "<Server Dry Run> "
 		} else if forTesting {
@@ -1202,123 +1189,113 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		// 	opa.AddDocument(docKey, string(jsonData))
 		// }
 
-		if !admResult.NoLogging {
-			admResult.RuleCategory = admission.AdmRuleCatK8s
-			admResult.User = requestedBy
-			if admResult.MatchFedRule {
-				ruleScope = "federal "
-			}
-			if len(admResult.UnscannedImages) > 0 {
-				subMsg = fmt.Sprintf(" [Notice: the requested image(s) are not scanned: %s]", admResult.UnscannedImages)
-			}
-			if admResult.MatchDeny {
-				var displayMsg strings.Builder
-				// when not in assessment, the 1st entry in assessResults is exactly for the deny rule that denies the admission request
-				if len(assessResults) == 0 {
-					assessResult := nvsysadmission.AdmAssessResult{
-						RuleID:        admResult.RuleID,
-						AdmRule:       admResult.AdmRule,
-						RuleMode:      admResult.RuleMode,
-						MatchedSource: admResult.MatchedSource,
-						DenyRuleMsg:   admResult.Msg,
-					}
-					assessResults = append(assessResults, &assessResult)
-				}
-				for _, matchResult := range assessResults {
-					var modeStr string
-					var perRuleMsg string
-					// matches deny rule
-					if matchResult.RuleMode != "" {
-						// a deny rule's "rule mode"(if specified) takes precedence over global mode
-						mode = matchResult.RuleMode
-						modeStr = "per-rule " + mode
-					} else {
-						modeStr = mode
-					}
-					if mode == share.AdmCtrlModeMonitor {
-						perRuleMsg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
-							msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, matchResult.RuleID, modeStr, subMsg)
-						eventID = share.CLUSAuditAdmCtrlK8sReqViolation
-					} else {
-						allowed = false
-						matchedSrcMsg := ""
-						if matchResult.MatchedSource != "" {
-							matchedSrcMsg = fmt.Sprintf(" and matched data from %s", matchResult.MatchedSource)
+		admResult.RuleCategory = admission.AdmRuleCatK8s
+		admResult.User = requestedBy
+		if admResult.MatchFedRule {
+			ruleScope = "federal "
+		}
+		if len(admResult.UnscannedImages) > 0 {
+			subMsg = fmt.Sprintf(" [Notice: the requested image(s) are not scanned: %s]", admResult.UnscannedImages)
+		}
+		if forTesting {
+			finalAction := "allowed"
+			if len(assessResults) > 0 {
+				for _, r := range assessResults {
+					if !r.Disabled {
+						if r.DenyRuleMatched {
+							if (r.RuleMode == "" && mode == share.AdmCtrlModeProtect) || r.RuleMode == share.AdmCtrlModeProtect {
+								admResult.FinalDeny = true
+							}
 						}
-						statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-						admResult.FinalDeny = true
-						perRuleMsg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
-							msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, matchResult.RuleID, matchResult.AdmRule, matchedSrcMsg, subMsg)
-						eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-					}
-
-					// appned the causes
-					if len(matchResult.DenyRuleMsg) > 0 {
-						perRuleMsg = fmt.Sprintf("%s, %s", perRuleMsg, matchResult.DenyRuleMsg)
-					}
-					if displayMsg.Len() > 0 {
-						displayMsg.WriteString(assessMsgSep)
-					}
-					displayMsg.WriteString(perRuleMsg)
-					if !forTesting {
-						// when not in assessment, the 1st entry in assessResults is exaactly for the deny rule that denies the admission request
-						// so no need to process remaining matched deny entries
 						break
 					}
 				}
-				admResult.Msg = displayMsg.String()
+				if admResult.FinalDeny {
+					finalAction = "denied"
+					allowed = false
+				}
+			}
+			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, finalAction, subMsg)
+			for _, assessResult := range assessResults {
+				matchedSrcMsg := ""
+				if assessResult.MatchedSource != "" {
+					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", assessResult.MatchedSource)
+				}
+				assessResult.RuleDetails = fmt.Sprintf("It matches rule with criteria: %s%s", assessResult.RuleDetails, matchedSrcMsg)
+			}
+		} else if admResult.MatchDeny {
+			msg := admResult.Msg
+			var modeStr string
+			// matches deny rule
+			if admResult.RuleMode != "" {
+				// a deny rule's "rule mode"(if specified) takes precedence over global mode
+				mode = admResult.RuleMode
+				modeStr = "per-rule " + mode
 			} else {
-				if admResult.RuleID != 0 {
-					// matches allow rule
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because of %sallow rule id %d with criteria: %s%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, admResult.AdmRule, subMsg)
-				} else {
-					// doesn't match any rule
-					var actionMsg string
-					switch defaultAction {
-					case nvsysadmission.AdmCtrlActionAllow:
-						actionMsg = "allowed"
-					case nvsysadmission.AdmCtrlActionDeny:
-						actionMsg = "denied"
-						allowed = false
-						statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-						admResult.FinalDeny = true
-						eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-					default:
-						actionMsg = "allowed"
-					}
-					admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is %s because it doesn't match any rule%s",
-						msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, actionMsg, subMsg)
-					var images strings.Builder
-					for _, c := range admResObject.Containers {
+				modeStr = mode
+			}
+			if mode == share.AdmCtrlModeMonitor {
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr, subMsg)
+				eventID = share.CLUSAuditAdmCtrlK8sReqViolation
+			} else {
+				allowed = false
+				matchedSrcMsg := ""
+				if admResult.MatchedSource != "" {
+					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
+				}
+				statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+				admResult.FinalDeny = true
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
+				eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+			}
+
+			// append the causes
+			if len(msg) > 0 {
+				admResult.Msg += ", " + msg
+			}
+		} else {
+			if admResult.RuleID != 0 {
+				// matches allow rule
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because of %sallow rule id %d with criteria: %s%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, admResult.AdmRule, subMsg)
+			} else {
+				// doesn't match any rule
+				var actionMsg string
+				switch defaultAction {
+				case nvsysadmission.AdmCtrlActionAllow:
+					actionMsg = "allowed"
+				case nvsysadmission.AdmCtrlActionDeny:
+					actionMsg = "denied"
+					allowed = false
+					statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+					admResult.FinalDeny = true
+					eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+				default:
+					actionMsg = "allowed"
+				}
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is %s because it doesn't match any rule%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, actionMsg, subMsg)
+				var images strings.Builder
+				for _, containers := range admResObject.AllContainers {
+					for _, c := range containers { //->
 						if images.Len() > 0 {
 							images.WriteString(", ")
 						}
 						images.WriteString(c.Image)
 					}
-					admResult.Image = images.String()
 				}
+				admResult.Image = images.String()
 			}
 		}
 	}
-	if admResult != nil {
-		if forTesting {
-			statusResult.Message = admResult.Msg
-		} else {
-			strings.ReplaceAll(admResult.Msg, assessMsgSep, "\n")
-			if !admResult.NoLogging {
-				cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
-			}
-			reqIgnored = admResult.NoLogging
-		}
-	} else {
-		reqIgnored = true
-	}
+	cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: allowed,
 		Result:  statusResult,
-	}, reqIgnored
+	}, assessResults, false
 }
 
 // Serve method for Kubernetes Admission Control
@@ -1350,7 +1327,7 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 		}
 
 		if admType == admission.NvAdmValidateType {
-			admissionResponse, ignoredReq = whsvr.validate(&ar, mode, defaultAction, stamps, false)
+			admissionResponse, _, ignoredReq = whsvr.validate(&ar, mode, defaultAction, stamps, false)
 			admissionResponse.UID = ar.Request.UID
 		} else {
 			log.WithFields(log.Fields{"path": r.URL.Path}).Debug("unsupported path")

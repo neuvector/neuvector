@@ -316,11 +316,7 @@ func waitOnSniffer(key string, proc *procInfo) {
 func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 	var pid int
 
-	gInfoRLock()
-	c, ok := gInfo.activeContainers[info.WorkloadID]
-	gInfoRUnlock()
-
-	if ok {
+	if c, ok := gInfoReadActiveContainer(info.WorkloadID); ok {
 		if c.hostMode {
 			return "", grpc.Errorf(codes.InvalidArgument, "Container packet capture not supported")
 		}
@@ -329,7 +325,7 @@ func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 		//NVSHAS-6635 and NVSHAS-6682,ep is parent whose pid could be zero
 		if pid == 0 {
 			for podID := range c.pods.Iter() {
-				if pod, ok := gInfo.activeContainers[podID.(string)]; ok {
+				if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
 					if pod.pid != 0 && pod.hasDatapath {
 						pid = pod.pid
 						break
