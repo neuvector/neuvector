@@ -531,13 +531,21 @@ func main() {
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
+
+	// Initialize installation ID.  Ignore if ID is already set.
+	clusHelper := kv.GetClusterHelper()
+	if id, err := clusHelper.GetInstallationID(); err != nil {
+		log.WithError(err).Warn("installation id is not readable. Will retry later.")
+	} else {
+		log.WithField("installation-id", id).Info("Installation id is created")
+	}
+
 	if Ctrler.Leader {
 		// See [NVSHAS-5490]:
 		// clusterHelper.AcquireLock() may fail with error "failed to create session: Unexpected response code: 500 (Missing node registration)".
 		// It indicates that the node is not yet registered in the catalog.
 		// It's possibly because controller attempts to create a session immediately after starting Consul but actually Consul is not ready yet.
 		// Even it's rare, we might need to allow Consul some time to initialize and sync the node registration to the catalog.
-		clusHelper := kv.GetClusterHelper()
 		for i := 0; i < 6; i++ {
 			lock, err := clusHelper.AcquireLock(share.CLUSLockUpgradeKey, time.Duration(time.Second))
 			if err != nil {
@@ -548,9 +556,6 @@ func main() {
 			clusHelper.ReleaseLock(lock)
 			break
 		}
-
-		// Initiate installation ID if the controller is the first, ignore if ID is already set.
-		clusHelper.PutInstallationID()
 
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
@@ -584,14 +589,14 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	if Ctrler.Leader || !isNewCluster {
-		kv.GetClusterHelper().UpgradeClusterKV()
-		kv.GetClusterHelper().FixMissingClusterKV()
+		clusHelper.UpgradeClusterKV()
+		clusHelper.FixMissingClusterKV()
 	}
 
 	if Ctrler.Leader {
 		kv.ValidateWebhookCert()
 		if isNewCluster && *noDefAdmin {
-			kv.GetClusterHelper().DeleteUser(common.DefaultAdminUser)
+			clusHelper.DeleteUser(common.DefaultAdminUser)
 		}
 		setConfigLoaded()
 	} else {
@@ -702,7 +707,7 @@ func main() {
 	cache.ScannerChangeNotify(Ctrler.Leader)
 
 	var fedRole string
-	if m := kv.GetClusterHelper().GetFedMembership(); m != nil {
+	if m := clusHelper.GetFedMembership(); m != nil {
 		fedRole = m.FedRole
 	}
 

@@ -38,7 +38,6 @@ type ClusterHelper interface {
 	UpgradeClusterImport(ver *share.CLUSCtrlVersion)
 	FixMissingClusterKV()
 
-	PutInstallationID() (string, error)
 	GetInstallationID() (string, error)
 
 	GetAllControllers() []*share.CLUSController
@@ -300,9 +299,10 @@ type ClusterHelper interface {
 }
 
 type clusterHelper struct {
-	id      string
-	version string
-	persist bool
+	id             string
+	version        string
+	persist        bool
+	installationID string
 }
 
 var clusHelperImpl *clusterHelper
@@ -479,32 +479,60 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 		}
 	}
 */
-func (m clusterHelper) PutInstallationID() (string, error) {
-	if id, _ := m.GetInstallationID(); id != "" {
-		return id, nil
-	}
 
-	id, err := utils.GetGuid()
-	if err != nil {
+// This function tries to get installation ID from consul in a concurrency safe way.
+//  1. Try to get installation ID.
+//     a. If it exists, someone has set it up.  Just return the ID.
+//     b. If not, we have to create one.
+//  2. Generate installation and save it to consul using PutRev.
+//  3. If we receive CASError, that means conflict happens.  Retry so we get the consistent result.
+//
+// TODO: We can wrap those code, so certmanager.checkAndRotateCert() and this function can share most of codes.
+func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
+	var id string
+	if err := RetryOnCASError(DefaultRetryNumber, func() error {
+		var index uint64
+		var value []byte
+		var err error
+
+		key := share.CLUSCtrlInstallationKey
+		value, index, err = m.get(key)
+		if err != nil && err != cluster.ErrKeyNotFound {
+			return err
+		}
+		id = string(value)
+		if id != "" {
+			// Already have an installation ID. Do nothing
+			return nil
+		}
+
+		// Now installation id is either absent or invalid.  We need to generate a new ID.
+
+		id, err = utils.GetGuid()
+		if err != nil {
+			return err
+		}
+
+		if err = cluster.PutRev(key, []byte(id), index); err != nil {
+			// Return the error. CASError will be automatically retried.
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", err
 	}
 
-	key := share.CLUSCtrlInstallationKey
-	if err = cluster.Put(key, []byte(id)); err != nil {
-		return "", err
-	} else {
-		return id, nil
-	}
+	return id, nil
 }
 
 func (m clusterHelper) GetInstallationID() (string, error) {
-	key := share.CLUSCtrlInstallationKey
-	value, _, err := m.get(key)
-	if value != nil {
-		return string(value[:]), nil
-	} else {
-		return "", err
+	// Get from cache if exists
+	if m.installationID != "" {
+		return m.installationID, nil
 	}
+
+	// Otherwise try to create one.
+	return m.GetOrCreateInstallationID()
 }
 
 func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {
