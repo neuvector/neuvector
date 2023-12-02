@@ -149,6 +149,7 @@ func systemConfigEnableIcmpPolicy(enableIcmpPolicy bool) {
 	if gInfo.enableIcmpPolicy == enableIcmpPolicy {
 		return
 	}
+	policy.ToggleIcmpPolicy = true
 	gInfo.enableIcmpPolicy = enableIcmpPolicy
 	//set enableIcmpPolicy to dp
 	eip := gInfo.enableIcmpPolicy
