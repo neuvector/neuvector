@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -24,6 +25,10 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/utils"
+)
+
+const (
+	InstallationCacheTTL = time.Minute * 30
 )
 
 type MockKvConfigUpdateFunc func(nType cluster.ClusterNotifyType, key string, value []byte)
@@ -298,11 +303,16 @@ type ClusterHelper interface {
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
 }
 
+var (
+	installationID           string
+	installationIDLastUpdate time.Time
+	installationIDLock       sync.RWMutex
+)
+
 type clusterHelper struct {
-	id             string
-	version        string
-	persist        bool
-	installationID string
+	id      string
+	version string
+	persist bool
 }
 
 var clusHelperImpl *clusterHelper
@@ -502,7 +512,7 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 		}
 		id = string(value)
 		if id != "" {
-			// Already have an installation ID. Do nothing
+			// Already have an installation ID stored in "id". Do nothing
 			return nil
 		}
 
@@ -525,14 +535,31 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 	return id, nil
 }
 
-func (m clusterHelper) GetInstallationID() (string, error) {
-	// Get from cache if exists
-	if m.installationID != "" {
-		return m.installationID, nil
+// Installation ID will be cached for the given TTL.
+// This is to correct data inconsistency that could happen during fresh install.
+func (m *clusterHelper) GetInstallationID() (string, error) {
+	// Get from cache if it exists and does not expire.
+	installationIDLock.RLock()
+	if installationID != "" && time.Now().Before(installationIDLastUpdate.Add(InstallationCacheTTL)) {
+		installationIDLock.RUnlock()
+		return installationID, nil
 	}
+	installationIDLock.RUnlock()
 
-	// Otherwise try to create one.
-	return m.GetOrCreateInstallationID()
+	installationIDLock.Lock()
+	defer installationIDLock.Unlock()
+
+	// Otherwise try to get/create one.
+	id, err := m.GetOrCreateInstallationID()
+	if err != nil {
+		return "", err
+	}
+	if installationID != id {
+		log.WithFields(log.Fields{"id": id}).Info("installation ID is updated")
+		installationID = id
+	}
+	installationIDLastUpdate = time.Now()
+	return id, err
 }
 
 func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {

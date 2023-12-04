@@ -534,10 +534,8 @@ func main() {
 
 	// Initialize installation ID.  Ignore if ID is already set.
 	clusHelper := kv.GetClusterHelper()
-	if id, err := clusHelper.GetInstallationID(); err != nil {
+	if _, err := clusHelper.GetInstallationID(); err != nil {
 		log.WithError(err).Warn("installation id is not readable. Will retry later.")
-	} else {
-		log.WithField("installation-id", id).Info("Installation id is created")
 	}
 
 	if Ctrler.Leader {
