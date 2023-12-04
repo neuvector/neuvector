@@ -1,14 +1,19 @@
 info "1.4 - Configuration Files"
 
 check_1_4_1="1.4.1  - Ensure that the API server pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-apiserver.json" ]; then
-    file="/etc/kubernetes/manifests/kube-apiserver.json"
-elif [ -f "/etc/kubernetes/manifests/kube-apiserver.manifest" ]; then
+config_json=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.json")
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
+if [ -f $config_json ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-apiserver.manifest"
+    file=$config_json
+elif [ -f $config_manifest ]; then
+    # kops
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/kube-apiserver.yaml"
+    file=$config_yaml
 fi
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_1"
@@ -22,14 +27,6 @@ else
 fi
 
 check_1_4_2="1.4.2  - Ensure that the API server pod specification file ownership is set to root:root (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-apiserver.json" ]; then
-    file="/etc/kubernetes/manifests/kube-apiserver.json"
-elif [ -f "/etc/kubernetes/manifests/kube-apiserver.manifest" ]; then
-    # kops
-    file="/etc/kubernetes/manifests/kube-apiserver.manifest"
-else
-    file="/etc/kubernetes/manifests/kube-apiserver.yaml"
-fi
 if [ -f $file ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_4_2"
@@ -42,14 +39,19 @@ else
 fi
 
 check_1_4_3="1.4.3  - Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-controller-manager.json" ]; then
-    file="/etc/kubernetes/manifests/kube-controller-manager.json"
-elif [ -f "/etc/kubernetes/manifests/kube-controller-manager.manifest" ]; then
+config_json=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.json")
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
+if [ -f $config_json ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-controller-manager.manifest"
+    file=$config_json
+elif [ -f $config_manifest ]; then
+    # kops
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/kube-controller-manager.yaml"
+    file=$config_yaml
 fi
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_3"
@@ -63,14 +65,6 @@ else
 fi
 
 check_1_4_4="1.4.4  - Ensure that the controller manager pod specification file ownership is set to root:root (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-controller-manager.json" ]; then
-    file="/etc/kubernetes/manifests/kube-controller-manager.json"
-elif [ -f "/etc/kubernetes/manifests/kube-controller-manager.manifest" ]; then
-    # kops
-    file="/etc/kubernetes/manifests/kube-controller-manager.manifest"
-else
-    file="/etc/kubernetes/manifests/kube-controller-manager.yaml"
-fi
 if [ -f $file ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_4_4"
@@ -84,14 +78,18 @@ else
 fi
 
 check_1_4_5="1.4.5  - Ensure that the scheduler pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-scheduler.json" ]; then
-    file="/etc/kubernetes/manifests/kube-scheduler.json"
-elif [ -f "/etc/kubernetes/manifests/kube-scheduler.manifest" ]; then
+config_json=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.json")
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
+if [ -f $config_json ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-scheduler.manifest"
+    file=$config_json
+elif [ -f $config_manifest ]; then
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/kube-scheduler.yaml"
+    file=$config_yaml
 fi
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_5"
@@ -105,14 +103,6 @@ else
 fi
 
 check_1_4_6="1.4.6  - Ensure that the scheduler pod specification file ownership is set to root:root (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-scheduler.json" ]; then
-    file="/etc/kubernetes/manifests/kube-scheduler.json"
-elif [ -f "/etc/kubernetes/manifests/kube-scheduler.manifest" ]; then
-    # kops
-    file="/etc/kubernetes/manifests/kube-scheduler.manifest"
-else
-    file="/etc/kubernetes/manifests/kube-scheduler.yaml"
-fi
 if [ -f $file ]; then
   if [ "$(stat -c %U:%G $file)" = "root:root" ]; then
     pass "$check_1_4_6"
@@ -127,15 +117,20 @@ else
 fi
 
 check_1_4_7="1.4.7  - Ensure that the etcd pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/etcd.json" ]; then
-    file="/etc/kubernetes/manifests/etcd.json"
-elif [ -f "/etc/kubernetes/manifests/etcd.manifest" ]; then
+config_json=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.json")
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+if [ -f $config_json ]; then
+    # kops
+    file=$config_json
+elif [ -f $config_manifest ]; then
     # kops
     # Also this file is a symlink, hence 'stat -L' below.
-    file="/etc/kubernetes/manifests/etcd.manifest"
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/etcd.yaml"
+    file=$config_yaml
 fi
+
 if [ -f $file ]; then
   if [ "$(stat -L -c %a $file)" -eq 644 -o "$(stat -L -c %a $file)" -eq 640 -o "$(stat -L -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_7"
@@ -149,14 +144,6 @@ else
 fi
 
 check_1_4_8="1.4.8  - Ensure that the etcd pod specification file ownership is set to root:root (Scored)"
-if [ -f "/etc/kubernetes/manifests/etcd.json" ]; then
-    file="/etc/kubernetes/manifests/etcd.json"
-elif [ -f "/etc/kubernetes/manifests/etcd.manifest" ]; then
-    # kops
-    file="/etc/kubernetes/manifests/etcd.manifest"
-else
-    file="/etc/kubernetes/manifests/etcd.yaml"
-fi
 if [ -f $file ]; then
   if [ "$(stat -c %U:%G $file)" = "root:root" ]; then
     pass "$check_1_4_8"
@@ -208,6 +195,8 @@ fi
 
 check_1_4_13="1.4.13  - Ensure that the admin.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/admin.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_13"
@@ -223,6 +212,8 @@ fi
 
 check_1_4_14="1.4.14  - Ensure that the admin.conf file ownership is set to root:root (Scored)"
 file="/etc/kubernetes/admin.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_4_14"
@@ -238,6 +229,8 @@ fi
 
 check_1_4_15="1.4.15  - Ensure that the scheduler.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/scheduler.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_15"
@@ -253,6 +246,8 @@ fi
 
 check_1_4_16="1.4.16  - Ensure that the scheduler.conf file ownership is set to root:root (Scored)"
 file="/etc/kubernetes/scheduler.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_4_16"
@@ -268,6 +263,8 @@ fi
 
 check_1_4_17="1.4.17  - Ensure that the controller-manager.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/controller-manager.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_4_17"
@@ -283,6 +280,8 @@ fi
 
 check_1_4_18="1.4.18  - Ensure that the controller-manager.conf file ownership is set to root:root (Scored)"
 file="/etc/kubernetes/controller-manager.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f $file ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_4_18"
@@ -298,6 +297,7 @@ fi
 
 check_1_4_19="1.4.19  - Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Scored)"
 file="/etc/kubernetes/pki/"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 files=$(find $file)
 pass=true
 for f in ${files}; do
