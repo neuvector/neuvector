@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,6 +27,10 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+const (
+	InstallationCacheTTL = time.Minute * 30
+)
+
 type MockKvConfigUpdateFunc func(nType cluster.ClusterNotifyType, key string, value []byte)
 
 type LogEventFunc func(share.TLogEvent, time.Time, int, string)
@@ -38,7 +43,6 @@ type ClusterHelper interface {
 	UpgradeClusterImport(ver *share.CLUSCtrlVersion)
 	FixMissingClusterKV()
 
-	PutInstallationID() (string, error)
 	GetInstallationID() (string, error)
 
 	GetAllControllers() []*share.CLUSController
@@ -299,6 +303,12 @@ type ClusterHelper interface {
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
 }
 
+var (
+	installationID           string
+	installationIDLastUpdate time.Time
+	installationIDLock       sync.RWMutex
+)
+
 type clusterHelper struct {
 	id      string
 	version string
@@ -479,32 +489,77 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 		}
 	}
 */
-func (m clusterHelper) PutInstallationID() (string, error) {
-	if id, _ := m.GetInstallationID(); id != "" {
-		return id, nil
+
+// This function tries to get installation ID from consul in a concurrency safe way.
+//  1. Try to get installation ID.
+//     a. If it exists, someone has set it up.  Just return the ID.
+//     b. If not, we have to create one.
+//  2. Generate installation and save it to consul using PutRev.
+//  3. If we receive CASError, that means conflict happens.  Retry so we get the consistent result.
+//
+// TODO: We can wrap those code, so certmanager.checkAndRotateCert() and this function can share most of codes.
+func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
+	var id string
+	if err := RetryOnCASError(DefaultRetryNumber, func() error {
+		var index uint64
+		var value []byte
+		var err error
+
+		key := share.CLUSCtrlInstallationKey
+		value, index, err = m.get(key)
+		if err != nil && err != cluster.ErrKeyNotFound {
+			return err
+		}
+		id = string(value)
+		if id != "" {
+			// Already have an installation ID stored in "id". Do nothing
+			return nil
+		}
+
+		// Now installation id is either absent or invalid.  We need to generate a new ID.
+
+		id, err = utils.GetGuid()
+		if err != nil {
+			return err
+		}
+
+		if err = cluster.PutRev(key, []byte(id), index); err != nil {
+			// Return the error. CASError will be automatically retried.
+			return err
+		}
+		return nil
+	}); err != nil {
+		return "", err
 	}
 
-	id, err := utils.GetGuid()
+	return id, nil
+}
+
+// Installation ID will be cached for the given TTL.
+// This is to correct data inconsistency that could happen during fresh install.
+func (m *clusterHelper) GetInstallationID() (string, error) {
+	// Get from cache if it exists and does not expire.
+	installationIDLock.RLock()
+	if installationID != "" && time.Now().Before(installationIDLastUpdate.Add(InstallationCacheTTL)) {
+		installationIDLock.RUnlock()
+		return installationID, nil
+	}
+	installationIDLock.RUnlock()
+
+	installationIDLock.Lock()
+	defer installationIDLock.Unlock()
+
+	// Otherwise try to get/create one.
+	id, err := m.GetOrCreateInstallationID()
 	if err != nil {
 		return "", err
 	}
-
-	key := share.CLUSCtrlInstallationKey
-	if err = cluster.Put(key, []byte(id)); err != nil {
-		return "", err
-	} else {
-		return id, nil
+	if installationID != id {
+		log.WithFields(log.Fields{"id": id}).Info("installation ID is updated")
+		installationID = id
 	}
-}
-
-func (m clusterHelper) GetInstallationID() (string, error) {
-	key := share.CLUSCtrlInstallationKey
-	value, _, err := m.get(key)
-	if value != nil {
-		return string(value[:]), nil
-	} else {
-		return "", err
-	}
+	installationIDLastUpdate = time.Now()
+	return id, err
 }
 
 func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {

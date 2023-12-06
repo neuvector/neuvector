@@ -1205,7 +1205,7 @@ func compareStoreKeys(cache map[string]uint64, kvs api.KVPairs) []string {
 	}
 
 	var ret []string
-	for key, _ := range cache {
+	for key := range cache {
 		if _, ok := m[key]; ok {
 			continue
 		}
@@ -1334,7 +1334,7 @@ func (m *consulMethod) RegisterExistingWatchers() {
 		go registerNodeUpdate()
 	}
 	keyWatcherMutex.RLock()
-	for key, _ := range keyWatchers {
+	for key := range keyWatchers {
 		go registerKeyUpdate(key)
 	}
 	keyWatcherMutex.RUnlock()
@@ -1342,7 +1342,7 @@ func (m *consulMethod) RegisterExistingWatchers() {
 		go registerStateUpdate()
 	}
 	storeWatcherMutex.RLock()
-	for store, _ := range storeWatchers {
+	for store := range storeWatchers {
 		go registerStoreUpdate(store, storeWatchersCongestCtl[store])
 	}
 	storeWatcherMutex.RUnlock()
