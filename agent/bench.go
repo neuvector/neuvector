@@ -72,6 +72,8 @@ const (
 	cmdKubeEtcd         = "etcd"
 	cmdKubelet          = "kubelet"
 	cmdKubeProxy        = "kube-proxy"
+	pathBaseImageBin    = "baseImageBin"
+	pathConfigPrefix	= "configPrefix"
 	scriptTimeout       = 1 * time.Minute
 )
 
@@ -127,12 +129,14 @@ type DockerReplaceOpts struct {
 }
 
 type KubeCisReplaceOpts struct {
-	Replace_apiserver_cmd string
-	Replace_manager_cmd   string
-	Replace_scheduler_cmd string
-	Replace_etcd_cmd      string
-	Replace_kubelet_cmd   string
-	Replace_proxy_cmd     string
+	Replace_apiserver_cmd     string
+	Replace_manager_cmd       string
+	Replace_scheduler_cmd     string
+	Replace_etcd_cmd          string
+	Replace_kubelet_cmd       string
+	Replace_proxy_cmd         string
+	Replace_baseImageBin_path string
+	Replace_configPrefix_path string
 }
 
 func newBench(platform, flavor string) *Bench {
@@ -164,10 +168,14 @@ func newBench(platform, flavor string) *Bench {
 	// the master and worker's process will be set by probe
 	//b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
 	//b.kubeCisCmds[cmdKubelet] = cmdKubelet
+	baseImageBinPath := fmt.Sprintf("/proc/%d/root/", Agent.Pid)
 	b.kubeCisCmds[cmdKubeManager] = cmdKubeManager
 	b.kubeCisCmds[cmdKubeScheduler] = cmdKubeScheduler
 	b.kubeCisCmds[cmdKubeEtcd] = cmdKubeEtcd
 	b.kubeCisCmds[cmdKubeProxy] = cmdKubeProxy
+	b.kubeCisCmds[pathBaseImageBin] = baseImageBinPath
+	b.kubeCisCmds[pathConfigPrefix] = "/proc/1/root/"
+
 	return b
 }
 
@@ -428,6 +436,12 @@ func (b *Bench) RerunDocker(forced bool) {
 	}
 }
 
+func (b *Bench) kubeCheckPrerequisites() (error) {
+	kmasterProgs := []string{"kubectl"}
+	masterError := b.checkRequiredHostProgs(kmasterProgs)
+	return masterError
+}
+
 func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	if agentEnv.autoBenchmark == false && forced == false {
 		log.Info("ignored")
@@ -436,11 +450,12 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 
 	log.Info("")
 
+	masterErr := b.kubeCheckPrerequisites()
+
 	if cmd != "" && cmdRemap != "" {
 		b.kubeCisCmds[cmd] = cmdRemap
 	}
 
-	masterErr, workerErr := b.kubeCheckPrerequisites()
 	_, b.isKubeMaster = b.kubeCisCmds[cmdKubeApiServer]
 	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
 
@@ -457,15 +472,12 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 		sched = true
 	}
 
-	if workerErr != nil {
-		log.WithFields(log.Fields{"error": workerErr}).Error("Cannot run worker node CIS benchmark")
-		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusNotSupport)
-	} else if !b.isKubeWorker {
-		log.Info("Not a kubernetes worker node")
-		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusIdle)
-	} else {
+	if b.isKubeWorker {
 		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusScheduled)
 		sched = true
+	} else {
+		log.Info("Not a kubernetes worker node")
+		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusIdle)
 	}
 
 	if sched {
@@ -701,14 +713,6 @@ func (b *Bench) getBenchMsg(out []byte) []*benchItem {
 		}
 	}
 	return list
-}
-
-func (b *Bench) kubeCheckPrerequisites() (error, error) {
-	kmasterProgs := []string{"grep", "pgrep", "sed", "kubectl"}
-	masterError := b.checkRequiredHostProgs(kmasterProgs)
-	kworkerProgs := []string{"grep", "pgrep", "sed"}
-	workerError := b.checkRequiredHostProgs(kworkerProgs)
-	return masterError, workerError
 }
 
 func (b *Bench) dockerCheckPrerequisites() error {
@@ -1152,7 +1156,6 @@ func (b *Bench) checkRequiredHostProgs(progs []string) error {
 			log.WithFields(log.Fields{"error": err, "program": p}).Error("")
 			return fmt.Errorf("%s command not found.\n", p)
 		}
-
 	}
 	return nil
 }
@@ -1163,13 +1166,11 @@ func (b *Bench) runKubeBench(bench share.BenchType, script string) ([]byte, erro
 	}
 
 	var errb, outb bytes.Buffer
-	args := []string{
-		system.NSActRun, "-f", script,
-		"-m", global.SYS.GetMountNamespacePath(1),
-		"-n", global.SYS.GetNetNamespacePath(1),
-	}
 	log.WithFields(log.Fields{"type": bench}).Debug("Running Kubernetes CIS bench")
-	cmd := exec.Command(system.ExecNSTool, args...)
+
+	var cmd *exec.Cmd 
+
+	cmd = exec.Command("sh", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
@@ -1274,12 +1275,14 @@ func (b *Bench) replaceKubeCisCmd(srcPath, dstPath string) error {
 	defer f.Close()
 
 	r := KubeCisReplaceOpts{
-		Replace_apiserver_cmd: b.kubeCisCmds[cmdKubeApiServer],
-		Replace_manager_cmd:   b.kubeCisCmds[cmdKubeManager],
-		Replace_scheduler_cmd: b.kubeCisCmds[cmdKubeScheduler],
-		Replace_etcd_cmd:      b.kubeCisCmds[cmdKubeEtcd],
-		Replace_kubelet_cmd:   b.kubeCisCmds[cmdKubelet],
-		Replace_proxy_cmd:     b.kubeCisCmds[cmdKubeProxy],
+		Replace_apiserver_cmd:     b.kubeCisCmds[cmdKubeApiServer],
+		Replace_manager_cmd:       b.kubeCisCmds[cmdKubeManager],
+		Replace_scheduler_cmd:     b.kubeCisCmds[cmdKubeScheduler],
+		Replace_etcd_cmd:          b.kubeCisCmds[cmdKubeEtcd],
+		Replace_kubelet_cmd:       b.kubeCisCmds[cmdKubelet],
+		Replace_proxy_cmd:         b.kubeCisCmds[cmdKubeProxy],
+		Replace_baseImageBin_path: b.kubeCisCmds[pathBaseImageBin],
+		Replace_configPrefix_path: b.kubeCisCmds[pathConfigPrefix],
 	}
 	t := template.New("kubecis")
 	t.Delims("<<<", ">>>")
