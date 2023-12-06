@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"errors"
+	"regexp"
 
 	log "github.com/sirupsen/logrus"
 
@@ -42,27 +44,75 @@ type FileInfoExt struct {
 	UserAdded   bool
 }
 
+
+func fileExists(path string) bool {
+    _, err := os.Lstat(path)
+    return !errors.Is(err, os.ErrNotExist)
+}
+
+
+func extractProcRootPath(input string) (string, error) {
+    // Regular expression to match the pattern /proc/[number]/root/
+    re := regexp.MustCompile(`.*/proc/\d+/root/`)
+    matches := re.FindStringSubmatch(input)
+
+    if len(matches) == 0 {
+        return "", fmt.Errorf("no match found")
+    }
+
+    return matches[0], nil
+}
+
 //try to get sym link
-func GetContainerRealFilePath(pid int, path string) (string, error) {
-	retry := 0
-	for retry < linkMaxLayers {
-		linkPath, err := os.Readlink(path)
-		if err != nil {
+func GetContainerRealFilePath(pid int, symlinkPath string) (string, error) {
+	var symlink, procRoot, currentPath, resolvedPath string
+	var err error
+	visitedSymlink := make(map[string]struct{})
+	currentPath = symlinkPath
+
+	layer := 0
+	for ; layer < linkMaxLayers; layer++ {
+		if _, exists := visitedSymlink[currentPath]; exists {
+            return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
+        }
+
+		if !fileExists(currentPath) {
+			log.WithFields(log.Fields{"currentPath": currentPath}).Debug("File not exist")
+			break
+		}
+
+		if symlink, err = os.Readlink(currentPath); err != nil {
 			log.WithFields(log.Fields{"error": err}).Debug("Read file link fail")
 			return "", err
 		}
-		if !filepath.IsAbs(linkPath) {
-			path = filepath.Dir(path) + "/" + linkPath
-			path = filepath.Clean(path)
+	
+		if procRoot, _ = extractProcRootPath(currentPath); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Get Proc Root Path fail")
+			return "", err
+		}
+	
+		parts := strings.Split(symlink, "/")
+		for i := range parts {
+			partialSymlink := strings.Join(parts[i:], "/")
+			resolvedPath = filepath.Join(filepath.Dir(currentPath), partialSymlink)
+			if strings.HasPrefix(resolvedPath, procRoot) && fileExists(resolvedPath) {
+				break
+			}
+		}
+
+		// nest link
+		if strings.HasPrefix(resolvedPath, procRoot) && fileExists(resolvedPath) {
+			if symlink, err = os.Readlink(resolvedPath); err == nil {
+				visitedSymlink[currentPath] = struct{}{}
+				currentPath = resolvedPath;
+			} else {
+				return resolvedPath, nil 
+			}
 		} else {
-			path = global.SYS.ContainerFilePath(pid, linkPath)
+			break
 		}
-		finfo, err := os.Lstat(path)
-		if err == nil && (finfo.Mode()&os.ModeSymlink) == 0 {
-			return path, nil
-		}
-		retry++
 	}
+
 	return "", fmt.Errorf("Get file symlink fail")
 }
 
