@@ -772,6 +772,8 @@ func CompileUriPermitsMapping() {
 				"v1/system/license",
 				"v1/system/summary",
 				"v1/internal/system",
+				"v1/system/config/remote_repository",
+				"v1/system/config/remote_repository/*",
 			},
 			CONST_API_FED: []string{
 				"v1/fed/join_token",
@@ -869,6 +871,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_SYSTEM_CONFIG: []string{
 				"v1/system/license/update",
 				"v1/system/config/webhook",
+				"v1/system/config/remote_repository",
 			},
 			CONST_API_IBMSA: []string{
 				"v1/partner/ibm_sa/*/setup/*",
@@ -958,6 +961,7 @@ func CompileUriPermitsMapping() {
 				"v1/system/config",
 				"v2/system/config",
 				"v1/system/config/webhook/*",
+				"v1/system/config/remote_repository/*",
 			},
 			CONST_API_FED: []string{
 				"v1/fed/cluster/*/**",
@@ -1020,6 +1024,7 @@ func CompileUriPermitsMapping() {
 			CONST_API_SYSTEM_CONFIG: []string{
 				"v1/system/license",
 				"v1/system/config/webhook/*",
+				"v1/system/config/remote_repository/*",
 			},
 			CONST_API_FED: []string{
 				"v1/fed/cluster/*",
