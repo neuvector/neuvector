@@ -261,7 +261,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/notExist",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "Get file symlink fail",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
@@ -269,7 +269,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmquery",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
-			ExpectResult: "Get file symlink fail",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", "bin","pwd") + ": no such file or directory",
 		},
 
 		// two layer 
@@ -319,7 +319,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmNest",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "Get file symlink fail",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
@@ -327,8 +327,54 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmNest",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
-			ExpectResult: "Get file symlink fail",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", "bin","pwd") + ": no such file or directory",
 		},
+	}
+}
+
+func PrepareSingleLayerAbsSymlink(root string) []MockFile {
+    return []MockFile{
+		// absolute path
+        {
+            Pid:          8,
+            SymlinkFile:  filepath.Join(root, "proc", "8", "root", "bin","rpmverify"),
+            Symlink:      filepath.Join(root, "proc", "8", "root", "bin","rpm"),
+            Exist:        true,
+            ResolvePath:  filepath.Join(root, "proc", "8", "root", "bin","rpm"),
+			ExpectResult: "",
+        },
+        {
+            Pid:          9,
+            SymlinkFile:  filepath.Join(root, "proc", "9", "root", "bin","rpmverify"),
+            Symlink:      filepath.Join(root, "proc", "9", "root", "bin","neu","vector","rpm"),
+            Exist:        true,
+            ResolvePath:  filepath.Join(root, "proc", "9", "root", "bin","neu","vector","rpm"),
+			ExpectResult: "",
+        },
+        {
+            Pid:          10,
+            SymlinkFile:  filepath.Join(root, "proc", "10", "root", "bin","rpmverify"),
+            Symlink:      filepath.Join(root, "proc", "10", "root", "bin","rpm"),
+            Exist:        false,
+            ResolvePath:  "",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "10", "root", "bin","rpm") + ": no such file or directory",
+        },
+        {
+            Pid:          11,
+            SymlinkFile:  filepath.Join(root, "proc", "11", "root", "bin","rpmverify"),
+            Symlink:      filepath.Join(root, "proc", "11", "root", "bin","neu","vector","rpm"),
+            Exist:        true,
+            ResolvePath:  filepath.Join(root, "proc", "11", "root", "bin","rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "11", "root", "bin","neu","vector","rpm") + ": no such file or directory",
+        },
+        {
+            Pid:          12,
+            SymlinkFile:  filepath.Join(root, "proc", "12", "root", "bin","rpmverify"),
+            Symlink:      filepath.Join(root, "a", "b","..","..","..","bin","rpm"),
+            Exist:        true,
+            ResolvePath:  filepath.Join(root,"bin","rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "12", "root", "bin","rpm") + ": no such file or directory",
+        },
 	}
 }
 
@@ -380,7 +426,7 @@ func PrepareSingleLayerSymlink(root string) []MockFile {
             Symlink:      "../../bin/rpm",
             Exist:        false,
             ResolvePath:  "",
-            ExpectResult: "Get file symlink fail",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
         },
         {
             Pid:          7,
@@ -388,13 +434,14 @@ func PrepareSingleLayerSymlink(root string) []MockFile {
             Symlink:      filepath.Join(root, "bin", "pwd"),
             Exist:        true,
             ResolvePath:  filepath.Join(root, "bin", "pwd"),
-            ExpectResult: "Get file symlink fail",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", "bin","pwd") + ": no such file or directory",
         },
 	}
 }
 
 func PrepareMockFilesMetaData(root string) []MockFile {
-	mockFilesMetaData := append(PrepareSingleLayerSymlink(root), PrepareNestLayerSymlink(root)...)
+	mockFilesMetaData := append(PrepareSingleLayerSymlink(root), PrepareSingleLayerAbsSymlink(root)...)
+	mockFilesMetaData = append(mockFilesMetaData, PrepareNestLayerSymlink(root)...)
 	mockFilesMetaData = append(mockFilesMetaData, PrepareCircularLayerSymlink(root)...)
 	return mockFilesMetaData
 }
@@ -409,8 +456,6 @@ func initMockFileSystem(root string, mockFileMetaDatas []MockFile) error {
 		if err := os.Symlink(mockFileMetaData.Symlink, mockFileMetaData.SymlinkFile); err != nil {
 			log.WithFields(log.Fields{"mockFileMetaData.SymlinkFile": mockFileMetaData.SymlinkFile, "mockFileMetaData.Symlink": mockFileMetaData.Symlink, "err": err}).Info("Failed to create symlink:")
 			return err
-		} else {
-			log.WithFields(log.Fields{"mockFileMetaData.SymlinkFile": mockFileMetaData.SymlinkFile, "mockFileMetaData.Symlink": mockFileMetaData.Symlink, "err": err}).Info("Success to create symlink:")
 		}
 
 		if mockFileMetaData.Exist {
@@ -420,8 +465,6 @@ func initMockFileSystem(root string, mockFileMetaDatas []MockFile) error {
 			if _, err := os.Create(mockFileMetaData.ResolvePath); err != nil {
 				log.WithFields(log.Fields{"mockFileMetaData.ResolvePath": mockFileMetaData.ResolvePath, "err": err}).Info("Failed to create mockFileMetaData.ResolvePath:")
 				return err
-			} else {
-				log.WithFields(log.Fields{"mockFileMetaData.ResolvePath": mockFileMetaData.ResolvePath, "err": err}).Info("Success to create mockFileMetaData.ResolvePath:")
 			}
 		}
 	}
@@ -434,8 +477,9 @@ func TestGetContainerRealFilePath(t *testing.T) {
 	// create a /proc/ like folder then mimic the link.
 	// type of test cases
 	// 1. one layer of symlink
-	// 2. append another layer on type 1, make it a nest link
-	// 3. circular link
+	// 2. abs path for symlink
+	// 3. append another layer on type 1, make it a nest link
+	// 4. circular link
 	tempDir, err := ioutil.TempDir("", "proc")
 	if err != nil {
 		t.Fatal(err)
@@ -449,9 +493,9 @@ func TestGetContainerRealFilePath(t *testing.T) {
 	}
 
 	for _, mockFileMetaData := range mockFileMetaDatas {
-		if resolvePath, err := GetContainerRealFilePath(mockFileMetaData.Pid, mockFileMetaData.SymlinkFile); err != nil {
+		if resolvePath, err := GetContainerRealFilePath(mockFileMetaData.Pid, mockFileMetaData.SymlinkFile, true); err != nil {
 			if err.Error() != mockFileMetaData.ExpectResult {
-				t.Errorf("Error: Unknown failure %s, expect %s\n", err.Error(), mockFileMetaData.ExpectResult)
+				t.Errorf("Error: Unknown failure: %s, expect: %s\n", err.Error(), mockFileMetaData.ExpectResult)
 			}
 		} else if resolvePath != mockFileMetaData.ResolvePath {
 			t.Errorf("Error: failed to reolve the path of %s with result %s\n", mockFileMetaData.ResolvePath, resolvePath)
