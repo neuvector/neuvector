@@ -45,40 +45,71 @@ type FileInfoExt struct {
 }
 
 
-func fileExists(path string) bool {
-    _, err := os.Lstat(path)
-    return !errors.Is(err, os.ErrNotExist)
-}
-
-
-func extractProcRootPath(input string) (string, error) {
-    // Regular expression to match the pattern /proc/[number]/root/
-    re := regexp.MustCompile(`.*/proc/\d+/root/`)
-    matches := re.FindStringSubmatch(input)
-
-    if len(matches) == 0 {
-        return "", fmt.Errorf("no match found")
+func fileExists(path string) (err error) {
+    _, err = os.Lstat(path)
+    if err == nil {
+        // No error, file exists and is accessible
+        return nil
     }
 
-    return matches[0], nil
+    if errors.Is(err, os.ErrNotExist) {
+        // File does not exist
+        return err
+    }
+
+    if os.IsPermission(err) {
+        return fmt.Errorf("Permission error accessing file: %s", err)
+    }
+
+    // Other types of errors
+    return err
 }
 
-//try to get sym link
-func GetContainerRealFilePath(pid int, symlinkPath string) (string, error) {
+func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
+	if inTest {
+		// Since we use ioutil.TempDir("", "proc") to mock proc file system
+		// Regular expression to match the pattern /proc/[number]/root/
+		re := regexp.MustCompile(`.*/proc/\d+/root/`)
+		matches := re.FindStringSubmatch(input)
+
+		if len(matches) == 0 {
+			return "", fmt.Errorf("no match found")
+		}
+		return matches[0], nil
+
+	} else {
+		return fmt.Sprintf("/proc/%d/root", pid), nil
+	}
+
+}
+
+// GetContainerRealFilePath resolves the real file path of a container file from a given symlink. 
+// It handles nested symlinks and detects circular references to prevent infinite loops.
+// Input: pid (process id), symlinkPath (path of the symlink)
+// Output: real file path (string) or an error if the resolution fails.
+func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string, error) {
 	var symlink, procRoot, currentPath, resolvedPath string
 	var err error
+
+	// Flag to check if the current path is under the process root.
+	var underProcRoot bool
+
+	// Keeps track of already visited symlinks to detect loops.
 	visitedSymlink := make(map[string]struct{})
 	currentPath = symlinkPath
 
+	// Nest symlink would look for the the symlink for many times, we limit it to 5 layer of searching of its symlink.
 	layer := 0
 	for ; layer < linkMaxLayers; layer++ {
+		underProcRoot = false
+
 		if _, exists := visitedSymlink[currentPath]; exists {
             return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
         }
 
-		if !fileExists(currentPath) {
+		if err = fileExists(currentPath); err != nil {
 			log.WithFields(log.Fields{"currentPath": currentPath}).Debug("File not exist")
-			break
+			return "", err
 		}
 
 		if symlink, err = os.Readlink(currentPath); err != nil {
@@ -86,7 +117,15 @@ func GetContainerRealFilePath(pid int, symlinkPath string) (string, error) {
 			return "", err
 		}
 	
-		if procRoot, _ = extractProcRootPath(currentPath); err != nil {
+		// Convert an absolute symlink into a relative path, ensuring that the symlink is processed correctly relative to the current working directory of the function.
+		if filepath.IsAbs(symlink) {
+			if symlink, err = filepath.Rel(filepath.Dir(currentPath), symlink); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("Read file relative path")
+				return "", err
+			}
+		}
+
+		if procRoot, err = extractProcRootPath(pid, currentPath, inTest); err != nil {
 			log.WithFields(log.Fields{"error": err}).Debug("Get Proc Root Path fail")
 			return "", err
 		}
@@ -95,21 +134,26 @@ func GetContainerRealFilePath(pid int, symlinkPath string) (string, error) {
 		for i := range parts {
 			partialSymlink := strings.Join(parts[i:], "/")
 			resolvedPath = filepath.Join(filepath.Dir(currentPath), partialSymlink)
-			if strings.HasPrefix(resolvedPath, procRoot) && fileExists(resolvedPath) {
+			// Assume the first resolved path under proc root is the correct path
+			if strings.HasPrefix(resolvedPath, procRoot) {
+				underProcRoot = true
 				break
 			}
 		}
 
-		// nest link
-		if strings.HasPrefix(resolvedPath, procRoot) && fileExists(resolvedPath) {
+		if underProcRoot {
+			if err = fileExists(resolvedPath); err != nil {
+				log.WithFields(log.Fields{"resolvedPath": resolvedPath}).Debug("File not exist")
+				return "", err
+			}
+
+			// nest link
 			if symlink, err = os.Readlink(resolvedPath); err == nil {
 				visitedSymlink[currentPath] = struct{}{}
 				currentPath = resolvedPath;
 			} else {
 				return resolvedPath, nil 
 			}
-		} else {
-			break
 		}
 	}
 
@@ -179,7 +223,7 @@ func GetFileInfoExtFromPath(root int, path string, flt interface{}, protect, use
 		//for symlink, we need to watch two of them, symlink and the real file
 		//read the link and create a seperated file info.
 		if (finfo.FileMode & os.ModeSymlink) != 0 {
-			if rpath, err := GetContainerRealFilePath(root, path); err == nil {
+			if rpath, err := GetContainerRealFilePath(root, path, false); err == nil {
 				finfo.Link = rpath
 				rinfo := &FileInfoExt{
 					Path:    rpath,
