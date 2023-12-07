@@ -120,6 +120,7 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) error {
 		}
 	}
 
+	cluster.RegisterLeadChangeWatcher(leadChangeHandler, leadAddr)
 	if err = waitForAdmission(); err != nil {
 		return err
 	}
@@ -807,7 +808,6 @@ func clusterLoop(existing utils.Set) {
 		cluster.RegisterStoreWatcher(share.CLUSNodeCommonProfileStore, systemUpdateHandler, agentEnv.kvCongestCtrl)
 		cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, agentEnv.kvCongestCtrl)
 		cluster.RegisterStoreWatcher(share.CLUSConfigDomainStore, domainConfigUpdate, false)
-		cluster.RegisterLeadChangeWatcher(leadChangeHandler, leadAddr)
 	}()
 }
 
