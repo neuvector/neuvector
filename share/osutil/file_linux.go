@@ -45,24 +45,27 @@ type FileInfoExt struct {
 }
 
 
-func fileExists(path string) (err error) {
-    _, err = os.Lstat(path)
+func fileExists(path string) bool {
+    _, err := os.Lstat(path)
     if err == nil {
         // No error, file exists and is accessible
-        return nil
+        return true
     }
 
     if errors.Is(err, os.ErrNotExist) {
         // File does not exist
-        return err
+		log.WithError(err).Error("File not exist")
+        return false
     }
 
     if os.IsPermission(err) {
-        return fmt.Errorf("Permission error accessing file: %s", err)
+		log.WithError(err).Error("Permission error accessing file")
+        return false
     }
 
     // Other types of errors
-    return err
+	log.WithError(err).Error("")
+    return false
 }
 
 func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
@@ -80,7 +83,6 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 	} else {
 		return fmt.Sprintf("/proc/%d/root", pid), nil
 	}
-
 }
 
 // GetContainerRealFilePath resolves the real file path of a container file from a given symlink. 
@@ -107,52 +109,50 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
             return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
         }
 
-		if err = fileExists(currentPath); err != nil {
-			log.WithFields(log.Fields{"currentPath": currentPath}).Debug("File not exist")
+		if !fileExists(currentPath) {
+			log.WithError(err).Error("File not exist")
 			return "", err
 		}
 
 		if symlink, err = os.Readlink(currentPath); err != nil {
-			log.WithFields(log.Fields{"error": err}).Debug("Read file link fail")
+			log.WithError(err).Error("Read file link fail")
 			return "", err
-		}
-	
-		// Convert an absolute symlink into a relative path, ensuring that the symlink is processed correctly relative to the current working directory of the function.
-		if filepath.IsAbs(symlink) {
-			if symlink, err = filepath.Rel(filepath.Dir(currentPath), symlink); err != nil {
-				log.WithFields(log.Fields{"error": err}).Debug("Read file relative path")
-				return "", err
-			}
 		}
 
 		if procRoot, err = extractProcRootPath(pid, currentPath, inTest); err != nil {
-			log.WithFields(log.Fields{"error": err}).Debug("Get Proc Root Path fail")
+			log.WithError(err).Error("Get Proc Root Path fail")
 			return "", err
 		}
-	
-		parts := strings.Split(symlink, "/")
-		for i := range parts {
-			partialSymlink := strings.Join(parts[i:], "/")
-			resolvedPath = filepath.Join(filepath.Dir(currentPath), partialSymlink)
-			// Assume the first resolved path under proc root is the correct path
-			if strings.HasPrefix(resolvedPath, procRoot) {
-				underProcRoot = true
-				break
+		
+		// if absolute symlink, we will join with procroot directly.
+		if filepath.IsAbs(symlink) {
+			underProcRoot = true
+			resolvedPath = filepath.Join(procRoot, symlink)
+		} else {
+			parts := strings.Split(symlink, "/")
+			for i := range parts {
+				partialSymlink := strings.Join(parts[i:], "/")
+				resolvedPath = filepath.Join(filepath.Dir(currentPath), partialSymlink)
+				// Assume the first resolved path under proc root is the correct path
+				if strings.HasPrefix(resolvedPath, procRoot) {
+					underProcRoot = true
+					break
+				}
 			}
 		}
 
 		if underProcRoot {
-			if err = fileExists(resolvedPath); err != nil {
-				log.WithFields(log.Fields{"resolvedPath": resolvedPath}).Debug("File not exist")
-				return "", err
-			}
-
 			// nest link
 			if symlink, err = os.Readlink(resolvedPath); err == nil {
 				visitedSymlink[currentPath] = struct{}{}
 				currentPath = resolvedPath;
 			} else {
-				return resolvedPath, nil 
+				if os.IsNotExist(err) {
+					log.WithError(err).Error("File not exist")
+					return "", err
+				} else {
+					return resolvedPath, nil 
+				}
 			}
 		}
 	}
