@@ -150,7 +150,11 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 				if os.IsNotExist(err) {
 					log.WithError(err).Error("File not exist")
 					return "", err
+				} else if os.IsPermission(err) {
+					log.WithError(err).Error("Permission error accessing file")
+					return "", err
 				} else {
+					// Others we assume such file exist
 					return resolvedPath, nil 
 				}
 			}
