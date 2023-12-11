@@ -261,7 +261,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/notExist",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
@@ -269,7 +269,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmquery",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
 		},
 
 		// two layer 
@@ -319,7 +319,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmNest",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
@@ -327,7 +327,7 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 			Symlink:      "../../bin/rpmNest",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
 		},
 	}
 }
@@ -357,7 +357,7 @@ func PrepareSingleLayerAbsSymlink(root string) []MockFile {
             Symlink:      filepath.Join("/bin","rpm"),
             Exist:        false,
             ResolvePath:  "",
-            ExpectResult: "readlink " + filepath.Join(root, "proc", "10", "root", "bin","rpm") + ": no such file or directory",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "10", "root", "bin","rpm") + ": no such file or directory",
         },
         {
             Pid:          11,
@@ -365,7 +365,7 @@ func PrepareSingleLayerAbsSymlink(root string) []MockFile {
             Symlink:      filepath.Join("/bin","neu","vector","rpm"),
             Exist:        true,
             ResolvePath:  filepath.Join(root, "proc", "11", "root", "bin","rpm"),
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "11", "root", "bin","neu","vector","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "11", "root", "bin","neu","vector","rpm") + ": no such file or directory",
         },
         {
             Pid:          12,
@@ -373,7 +373,7 @@ func PrepareSingleLayerAbsSymlink(root string) []MockFile {
             Symlink:      filepath.Join("/a", "b","..","..","..","bin","rpm"),
             Exist:        true,
             ResolvePath:  filepath.Join(root,"bin","rpm"),
-			ExpectResult: "readlink " + filepath.Join(root, "proc", "12", "root", "bin","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "12", "root", "bin","rpm") + ": no such file or directory",
         },
 	}
 }
@@ -426,7 +426,7 @@ func PrepareSingleLayerSymlink(root string) []MockFile {
             Symlink:      "../../bin/rpm",
             Exist:        false,
             ResolvePath:  "",
-            ExpectResult: "readlink " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
         },
         {
             Pid:          7,
@@ -434,7 +434,7 @@ func PrepareSingleLayerSymlink(root string) []MockFile {
             Symlink:      filepath.Join(root, "bin", "pwd"),
             Exist:        true,
             ResolvePath:  filepath.Join(root, "bin", "pwd"),
-            ExpectResult: "readlink " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
+            ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
         },
 	}
 }

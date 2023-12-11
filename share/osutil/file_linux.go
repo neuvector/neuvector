@@ -53,8 +53,6 @@ func fileExists(path string) bool {
     }
 
     if errors.Is(err, os.ErrNotExist) {
-        // File does not exist
-		log.WithError(err).Error("File not exist")
         return false
     }
 
@@ -141,23 +139,21 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 			}
 		}
 
+		visitedSymlink[currentPath] = struct{}{}
 		if underProcRoot {
 			// nest link
-			if symlink, err = os.Readlink(resolvedPath); err == nil {
-				visitedSymlink[currentPath] = struct{}{}
-				currentPath = resolvedPath;
-			} else {
-				if os.IsNotExist(err) {
-					log.WithError(err).Error("File not exist")
-					return "", err
-				} else if os.IsPermission(err) {
-					log.WithError(err).Error("Permission error accessing file")
-					return "", err
-				} else {
-					// Others we assume such file exist
-					return resolvedPath, nil 
-				}
+			finfo, err := os.Lstat(resolvedPath)
+			if err != nil {
+				log.WithError(err).Error("failed to read resolvedPath")
+				return "", err
 			}
+			if finfo.Mode()&os.ModeSymlink == 0 {
+				// Not a symlink
+				return resolvedPath, nil
+			}
+			currentPath = resolvedPath
+		} else {
+			return "", errors.New("failed to resolve symlink")
 		}
 	}
 
