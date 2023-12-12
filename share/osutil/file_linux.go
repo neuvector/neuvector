@@ -2,14 +2,14 @@ package osutil
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
-	"errors"
 	"regexp"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -44,26 +44,25 @@ type FileInfoExt struct {
 	UserAdded   bool
 }
 
-
 func fileExists(path string) bool {
-    _, err := os.Lstat(path)
-    if err == nil {
-        // No error, file exists and is accessible
-        return true
-    }
+	_, err := os.Lstat(path)
+	if err == nil {
+		// No error, file exists and is accessible
+		return true
+	}
 
-    if errors.Is(err, os.ErrNotExist) {
-        return false
-    }
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
 
-    if os.IsPermission(err) {
+	if os.IsPermission(err) {
 		log.WithError(err).Error("Permission error accessing file")
-        return false
-    }
+		return false
+	}
 
-    // Other types of errors
+	// Other types of errors
 	log.WithError(err).Error("")
-    return false
+	return false
 }
 
 func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
@@ -83,7 +82,7 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 	}
 }
 
-// GetContainerRealFilePath resolves the real file path of a container file from a given symlink. 
+// GetContainerRealFilePath resolves the real file path of a container file from a given symlink.
 // It handles nested symlinks and detects circular references to prevent infinite loops.
 // Input: pid (process id), symlinkPath (path of the symlink)
 // Output: real file path (string) or an error if the resolution fails.
@@ -104,8 +103,8 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 		underProcRoot = false
 
 		if _, exists := visitedSymlink[currentPath]; exists {
-            return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
-        }
+			return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
+		}
 
 		if !fileExists(currentPath) {
 			log.WithError(err).Error("File not exist")
@@ -121,7 +120,7 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 			log.WithError(err).Error("Get Proc Root Path fail")
 			return "", err
 		}
-		
+
 		// if absolute symlink, we will join with procroot directly.
 		if filepath.IsAbs(symlink) {
 			underProcRoot = true

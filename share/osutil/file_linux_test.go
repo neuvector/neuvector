@@ -1,39 +1,39 @@
 package osutil
 
 import (
-	"os"
-	"testing"
-	"path/filepath"
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
 
 	log "github.com/sirupsen/logrus"
 )
 
 type MockFile struct {
-	Pid 		  int
-	SymlinkFile   string
-	Symlink 	  string
-	Exist  		  bool
-	ResolvePath   string
-	ExpectResult  string
+	Pid          int
+	SymlinkFile  string
+	Symlink      string
+	Exist        bool
+	ResolvePath  string
+	ExpectResult string
 }
 
 func PrepareCircularLayerSymlink(root string) []MockFile {
 	return []MockFile{
-		// length 1 cycle 
+		// length 1 cycle
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C1P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C1P1"),
 			Symlink:      "../bin/C1P1",
 			Exist:        false,
 			ResolvePath:  "",
 			ExpectResult: "Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.",
 		},
 
-		// length 2 cycle 
+		// length 2 cycle
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C2P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C2P1"),
 			Symlink:      "../bin/C2P2",
 			Exist:        false,
 			ResolvePath:  "",
@@ -41,7 +41,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C2P2"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C2P2"),
 			Symlink:      "./../bin/C2P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -51,7 +51,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		// length 3 cycle
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C3P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C3P1"),
 			Symlink:      "../bin/C3P2",
 			Exist:        false,
 			ResolvePath:  "",
@@ -59,7 +59,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C3P2"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C3P2"),
 			Symlink:      "./../bin/C3P3",
 			Exist:        false,
 			ResolvePath:  "",
@@ -67,7 +67,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C3P3"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C3P3"),
 			Symlink:      "../bin/C3P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -77,7 +77,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		// length 4 cycle => fit the rule
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C4P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C4P1"),
 			Symlink:      "../bin/C4P2",
 			Exist:        false,
 			ResolvePath:  "",
@@ -85,7 +85,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C4P2"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C4P2"),
 			Symlink:      "./../bin/C4P3",
 			Exist:        false,
 			ResolvePath:  "",
@@ -93,15 +93,15 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C4P3"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C4P3"),
 			Symlink:      "../bin/C4P4",
 			Exist:        false,
 			ResolvePath:  "",
 			ExpectResult: "Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.",
-		},		
+		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C4P4"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C4P4"),
 			Symlink:      "../bin/C4P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -111,7 +111,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		// length 5 cycle => break the rule
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C5P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C5P1"),
 			Symlink:      "../bin/C4P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -119,7 +119,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C5P2"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C5P2"),
 			Symlink:      "./../bin/C5P3",
 			Exist:        false,
 			ResolvePath:  "",
@@ -127,15 +127,15 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C5P3"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C5P3"),
 			Symlink:      "../bin/C5P4",
 			Exist:        false,
 			ResolvePath:  "",
 			ExpectResult: "Get file symlink fail",
-		},		
+		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C5P4"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C5P4"),
 			Symlink:      "../bin/C5P5",
 			Exist:        false,
 			ResolvePath:  "",
@@ -143,7 +143,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C5P5"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C5P5"),
 			Symlink:      "./../bin/C5P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -153,7 +153,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		// length 6 cycle => break the rule
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P1"),
 			Symlink:      "../bin/C6P2",
 			Exist:        false,
 			ResolvePath:  "",
@@ -161,7 +161,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P2"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P2"),
 			Symlink:      "./../bin/C6P3",
 			Exist:        false,
 			ResolvePath:  "",
@@ -169,7 +169,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P3"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P3"),
 			Symlink:      "../bin/C6P4",
 			Exist:        false,
 			ResolvePath:  "",
@@ -177,7 +177,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P4"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P4"),
 			Symlink:      "../bin/C6P5",
 			Exist:        false,
 			ResolvePath:  "",
@@ -185,7 +185,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P5"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P5"),
 			Symlink:      "./../bin/C6P6",
 			Exist:        false,
 			ResolvePath:  "",
@@ -193,7 +193,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		},
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","C6P6"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "C6P6"),
 			Symlink:      "../bin/C6P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -203,7 +203,7 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 		// random access to one of the cycle, say cycle with length 2
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","CRP1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "CRP1"),
 			Symlink:      "../bin/C2P1",
 			Exist:        false,
 			ResolvePath:  "",
@@ -214,116 +214,116 @@ func PrepareCircularLayerSymlink(root string) []MockFile {
 
 func PrepareNestLayerSymlink(root string) []MockFile {
 	return []MockFile{
-		// one layer 
+		// one layer
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "rpmNest"),
 			Symlink:      "../bin/rpmverify",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          2,
-			SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin", "rpmNest"),
 			Symlink:      "./../bin/rpmverify",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          3,
-			SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin", "rpmNest"),
 			Symlink:      "../../bin/rpmverify",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          4,
-			SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin", "rpmNest"),
 			Symlink:      "../../../bin/rpmverify",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          5,
-			SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin", "rpmNest"),
 			Symlink:      "./../../../bin/rpmverify",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          6,
-			SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin", "rpmNest"),
 			Symlink:      "../../bin/notExist",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin", "rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
-			SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin","rpmNest"),
+			SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin", "rpmNest"),
 			Symlink:      "../../bin/rpmquery",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
 			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
 		},
 
-		// two layer 
+		// two layer
 		{
 			Pid:          1,
-			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "rpmNest1"),
 			Symlink:      "../bin/rpmNest",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          2,
-			SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin", "rpmNest1"),
 			Symlink:      "./../bin/rpmNest",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          3,
-			SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin", "rpmNest1"),
 			Symlink:      "../../bin/rpmNest",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          4,
-			SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin", "rpmNest1"),
 			Symlink:      "../../../bin/rpmNest",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          5,
-			SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin", "rpmNest1"),
 			Symlink:      "./../../../bin/rpmNest",
 			Exist:        true,
-			ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin","rpm"),
+			ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin", "rpm"),
 			ExpectResult: "",
 		},
 		{
 			Pid:          6,
-			SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin", "rpmNest1"),
 			Symlink:      "../../bin/rpmNest",
 			Exist:        false,
 			ResolvePath:  "",
-			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin", "rpm") + ": no such file or directory",
 		},
 		{
 			Pid:          7,
-			SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin","rpmNest1"),
+			SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin", "rpmNest1"),
 			Symlink:      "../../bin/rpmNest",
 			Exist:        true,
 			ResolvePath:  filepath.Join(root, "bin", "pwd"),
@@ -333,109 +333,109 @@ func PrepareNestLayerSymlink(root string) []MockFile {
 }
 
 func PrepareSingleLayerAbsSymlink(root string) []MockFile {
-    return []MockFile{
+	return []MockFile{
 		// absolute path
-        {
-            Pid:          8,
-            SymlinkFile:  filepath.Join(root, "proc", "8", "root", "bin","rpmverify"),
-            Symlink:      filepath.Join("/bin","rpm"),
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "8", "root", "bin","rpm"),
+		{
+			Pid:          8,
+			SymlinkFile:  filepath.Join(root, "proc", "8", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/bin", "rpm"),
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "8", "root", "bin", "rpm"),
 			ExpectResult: "",
-        },
-        {
-            Pid:          9,
-            SymlinkFile:  filepath.Join(root, "proc", "9", "root", "bin","rpmverify"),
-            Symlink:      filepath.Join("/bin","neu","vector","rpm"),
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "9", "root", "bin","neu","vector","rpm"),
+		},
+		{
+			Pid:          9,
+			SymlinkFile:  filepath.Join(root, "proc", "9", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/bin", "neu", "vector", "rpm"),
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "9", "root", "bin", "neu", "vector", "rpm"),
 			ExpectResult: "",
-        },
-        {
-            Pid:          10,
-            SymlinkFile:  filepath.Join(root, "proc", "10", "root", "bin","rpmverify"),
-            Symlink:      filepath.Join("/bin","rpm"),
-            Exist:        false,
-            ResolvePath:  "",
-            ExpectResult: "lstat " + filepath.Join(root, "proc", "10", "root", "bin","rpm") + ": no such file or directory",
-        },
-        {
-            Pid:          11,
-            SymlinkFile:  filepath.Join(root, "proc", "11", "root", "bin","rpmverify"),
-            Symlink:      filepath.Join("/bin","neu","vector","rpm"),
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "11", "root", "bin","rpm"),
-			ExpectResult: "lstat " + filepath.Join(root, "proc", "11", "root", "bin","neu","vector","rpm") + ": no such file or directory",
-        },
-        {
-            Pid:          12,
-            SymlinkFile:  filepath.Join(root, "proc", "12", "root", "bin","rpmverify"),
-            Symlink:      filepath.Join("/a", "b","..","..","..","bin","rpm"),
-            Exist:        true,
-            ResolvePath:  filepath.Join(root,"bin","rpm"),
-			ExpectResult: "lstat " + filepath.Join(root, "proc", "12", "root", "bin","rpm") + ": no such file or directory",
-        },
+		},
+		{
+			Pid:          10,
+			SymlinkFile:  filepath.Join(root, "proc", "10", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/bin", "rpm"),
+			Exist:        false,
+			ResolvePath:  "",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "10", "root", "bin", "rpm") + ": no such file or directory",
+		},
+		{
+			Pid:          11,
+			SymlinkFile:  filepath.Join(root, "proc", "11", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/bin", "neu", "vector", "rpm"),
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "11", "root", "bin", "rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "11", "root", "bin", "neu", "vector", "rpm") + ": no such file or directory",
+		},
+		{
+			Pid:          12,
+			SymlinkFile:  filepath.Join(root, "proc", "12", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/a", "b", "..", "..", "..", "bin", "rpm"),
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "bin", "rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "12", "root", "bin", "rpm") + ": no such file or directory",
+		},
 	}
 }
 
 func PrepareSingleLayerSymlink(root string) []MockFile {
-    return []MockFile{
-        {
-            Pid:          1,
-            SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin","rpmverify"),
-            Symlink:      "../bin/rpm",
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin","rpm"),
-            ExpectResult: "",
-        },
-        {
-            Pid:          2,
-            SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin","rpmverify"),
-            Symlink:      "./../bin/rpm",
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin","rpm"),
-            ExpectResult: "",
-        },
-        {
-            Pid:          3,
-            SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin","rpmverify"),
-            Symlink:      "../../bin/rpm",
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin","rpm"),
-            ExpectResult: "",
-        },
+	return []MockFile{
 		{
-            Pid:          4,
-            SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin","rpmverify"),
-            Symlink:      "../../../bin/rpm",
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin","rpm"),
-            ExpectResult: "",
-        },
+			Pid:          1,
+			SymlinkFile:  filepath.Join(root, "proc", "1", "root", "bin", "rpmverify"),
+			Symlink:      "../bin/rpm",
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "1", "root", "bin", "rpm"),
+			ExpectResult: "",
+		},
 		{
-            Pid:          5,
-            SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin","rpmverify"),
-            Symlink:      "./../../../bin/rpm",
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin","rpm"),
-            ExpectResult: "",
-        },
-        {
-            Pid:          6,
-            SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin","notExist"),
-            Symlink:      "../../bin/rpm",
-            Exist:        false,
-            ResolvePath:  "",
-            ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin","rpm") + ": no such file or directory",
-        },
-        {
-            Pid:          7,
-            SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin","rpmquery"),
-            Symlink:      filepath.Join(root, "bin", "pwd"),
-            Exist:        true,
-            ResolvePath:  filepath.Join(root, "bin", "pwd"),
-            ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
-        },
+			Pid:          2,
+			SymlinkFile:  filepath.Join(root, "proc", "2", "root", "bin", "rpmverify"),
+			Symlink:      "./../bin/rpm",
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "2", "root", "bin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          3,
+			SymlinkFile:  filepath.Join(root, "proc", "3", "root", "bin", "rpmverify"),
+			Symlink:      "../../bin/rpm",
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "3", "root", "bin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          4,
+			SymlinkFile:  filepath.Join(root, "proc", "4", "root", "bin", "rpmverify"),
+			Symlink:      "../../../bin/rpm",
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "4", "root", "bin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          5,
+			SymlinkFile:  filepath.Join(root, "proc", "5", "root", "bin", "rpmverify"),
+			Symlink:      "./../../../bin/rpm",
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "5", "root", "bin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          6,
+			SymlinkFile:  filepath.Join(root, "proc", "6", "root", "bin", "notExist"),
+			Symlink:      "../../bin/rpm",
+			Exist:        false,
+			ResolvePath:  "",
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "6", "root", "bin", "rpm") + ": no such file or directory",
+		},
+		{
+			Pid:          7,
+			SymlinkFile:  filepath.Join(root, "proc", "7", "root", "bin", "rpmquery"),
+			Symlink:      filepath.Join(root, "bin", "pwd"),
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "bin", "pwd"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "7", "root", filepath.Join(root, "bin", "pwd")) + ": no such file or directory",
+		},
 	}
 }
 
@@ -487,7 +487,7 @@ func TestGetContainerRealFilePath(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	mockFileMetaDatas := PrepareMockFilesMetaData(tempDir)
-	
+
 	if err := initMockFileSystem(tempDir, mockFileMetaDatas); err != nil {
 		t.Errorf("Error: initMockFileSystem failure: %s \n", err)
 	}
