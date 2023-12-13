@@ -158,6 +158,19 @@ check_argument() {
     grep "^${OPTION}"
 }
 
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}
 info "4.1 - Worker Node Configuration Files"
 
 check_4_1_1="4.1.1  - Ensure that the kubelet service file permissions are set to 644 or more restrictive (Scored)"

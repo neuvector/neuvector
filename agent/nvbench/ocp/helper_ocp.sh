@@ -158,3 +158,16 @@ check_argument() {
     grep "^${OPTION}"
 }
 
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}
