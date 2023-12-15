@@ -15,6 +15,7 @@ import (
 
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/share/system"
 )
 
 const (
@@ -78,7 +79,8 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 		return matches[0], nil
 
 	} else {
-		return fmt.Sprintf("/proc/%d/root", pid), nil
+		SYS := system.NewSystemTools()
+		return fmt.Sprintf(SYS.GetProcDir() + "%d/root", pid), nil
 	}
 }
 
@@ -123,8 +125,10 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 
 		// if absolute symlink, we will join with procroot directly.
 		if filepath.IsAbs(symlink) {
-			underProcRoot = true
 			resolvedPath = filepath.Join(procRoot, symlink)
+			if strings.HasPrefix(resolvedPath, procRoot) {
+				underProcRoot = true
+			}
 		} else {
 			parts := strings.Split(symlink, "/")
 			for i := range parts {
