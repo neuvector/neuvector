@@ -209,7 +209,7 @@ func parseRange(s string) (int, int, error) {
 func normalizePorts(s string) (string, error) {
 	s = strings.Trim(s, " ")
 
-	if len(s) == 0 || strings.ToUpper(s) == strings.ToUpper(api.PolicyPortAny) {
+	if len(s) == 0 || strings.EqualFold(s, api.PolicyPortAny) {
 		return api.PolicyPortAny, nil
 	}
 
@@ -228,14 +228,14 @@ func normalizePorts(s string) (string, error) {
 
 		proto := syscall.IPPROTO_TCP
 		if strings.HasPrefix(f, "tcp/") || strings.HasPrefix(f, "TCP/") {
-			if strings.ToUpper(f[4:]) == strings.ToUpper(api.PolicyPortAny) {
+			if strings.EqualFold(f[4:], api.PolicyPortAny) {
 				tcpAny = true
 				continue
 			} else {
 				low, high, err = parseRange(f[4:])
 			}
 		} else if strings.HasPrefix(f, "udp/") || strings.HasPrefix(f, "UDP/") {
-			if strings.ToUpper(f[4:]) == strings.ToUpper(api.PolicyPortAny) {
+			if strings.EqualFold(f[4:], api.PolicyPortAny) {
 				udpAny = true
 				continue
 			} else {
@@ -246,7 +246,7 @@ func normalizePorts(s string) (string, error) {
 			icmp = true
 			continue
 		} else {
-			if strings.ToUpper(f) == strings.ToUpper(api.PolicyPortAny) {
+			if strings.EqualFold(f, api.PolicyPortAny) {
 				tcpAny = true
 				udpAny = true
 				continue
@@ -319,7 +319,7 @@ func appNames2IDs(apps []string) []uint32 {
 
 	var ids []uint32 = make([]uint32, 0)
 	for _, app := range apps {
-		if strings.ToUpper(app) == strings.ToUpper(api.PolicyAppAny) {
+		if strings.EqualFold(app, api.PolicyAppAny) {
 			return []uint32{}
 		}
 		if id := common.GetAppIDByName(app); id != 0 {
@@ -338,7 +338,7 @@ func normalizeApps(apps []string) ([]string, error) {
 
 	appSet := utils.NewSet()
 	for _, app := range apps {
-		if strings.ToUpper(app) == strings.ToUpper(api.PolicyAppAny) {
+		if strings.EqualFold(app, api.PolicyAppAny) {
 			return []string{api.PolicyAppAny}, nil
 		}
 		if id := common.GetAppIDByName(app); id != 0 {
