@@ -226,8 +226,6 @@ func (s *Syslogger) makeDial(prio syslog.Priority, timeout time.Duration) (*sysl
 
 // --
 
-const contentType = "application/json"
-
 const webhookInfo = "Neuvector webhook is configured."
 const requestTimeout = time.Duration(5 * time.Second)
 
@@ -279,34 +277,47 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title strin
 }
 
 func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-	if proxy != nil {
-		transport.Proxy = func(r *http.Request) (*url.URL, error) {
-			return url.Parse(proxy.URL)
-		}
-		if proxy.Username != "" {
-			transport.ProxyConnectHeader = http.Header{}
-			transport.ProxyConnectHeader.Add(
-				"Proxy-Authorization",
-				"Basic "+base64.StdEncoding.EncodeToString([]byte(proxy.Username+":"+proxy.Password)),
-			)
-		}
+	client := &http.Client{
+		Timeout: requestTimeout,
 	}
 
-	client := &http.Client{
-		Timeout:   requestTimeout,
-		Transport: transport,
+	var authHdr string
+	if proxy != nil && proxy.Username != "" {
+		authHdr = "Basic " + base64.StdEncoding.EncodeToString([]byte(proxy.Username+":"+proxy.Password))
+	}
+
+	if strings.HasPrefix(w.url, "https://") {
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+		if proxy != nil {
+			transport.Proxy = func(r *http.Request) (*url.URL, error) {
+				return url.Parse(proxy.URL)
+			}
+			if authHdr != "" {
+				transport.ProxyConnectHeader = http.Header{}
+				transport.ProxyConnectHeader.Add(
+					"Proxy-Authorization", authHdr,
+				)
+			}
+		}
+
+		client.Transport = transport
 	}
 
 	var err error
 	var resp *http.Response
 	retry := 0
 	for retry < 3 {
-		resp, err = client.Post(w.url, contentType, bytes.NewBuffer(data))
+		req, _ := http.NewRequest("POST", w.url, bytes.NewReader(data))
+		// if authHdr is not empty, proxy must be enabled.
+		if strings.HasPrefix(w.url, "http://") && authHdr != "" {
+			req.Header.Add("Proxy-Authorization", authHdr)
+		}
+
+		resp, err = client.Do(req)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Webhook Send HTTP fail")
 			return err
