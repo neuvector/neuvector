@@ -447,7 +447,9 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	var sched bool
 
 	if masterErr != nil {
-		log.WithFields(log.Fields{"error": masterErr}).Error("Cannot run master node CIS benchmark")
+		if !strings.Contains(masterErr.Error(), "kubectl") { // not possibly a master node
+			log.WithFields(log.Fields{"error": masterErr}).Error("Cannot run master node CIS benchmark")
+		}
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusNotSupport)
 	} else if !b.isKubeMaster {
 		log.Info("Not a kubernetes master node")

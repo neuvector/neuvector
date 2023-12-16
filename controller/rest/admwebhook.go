@@ -1285,7 +1285,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 		}
 	}
-	cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
+	if !forTesting {
+		cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
+	}
 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: allowed,
