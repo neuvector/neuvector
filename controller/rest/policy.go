@@ -1998,6 +1998,20 @@ func handlerDebugPolicyRuleList(w http.ResponseWriter, r *http.Request, ps httpr
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrClusterRPCError, "Failed to make the RPC call")
 		return
 	} else {
+		uzb := utils.GunzipBytes(rules.RuleByte)
+		if uzb == nil {
+			log.Error("Failed to unzip data")
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrClusterRPCError, "Failed to unzip data")
+		}
+		if rules.RuleMap == nil {
+			rules.RuleMap = make(map[string]*share.CLUSDerivedPolicyRuleArray)
+		}
+		err := json.Unmarshal(uzb, &rules.RuleMap)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Cannot decode derived rules")
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrClusterRPCError, "Failed to decode derived rules")
+		}
+
 		resp := api.RESTDerivedPolicyRuleData{WorkloadRules: parseDerivedPolicyRules(rules.RuleMap, acc)}
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get derived policy rules")
 	}
