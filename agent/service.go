@@ -4,6 +4,7 @@ package main
 import "C"
 
 import (
+	"encoding/json"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -839,7 +840,10 @@ func (rs *RPCService) GetDerivedPolicyRules(ctx context.Context, f *share.CLUSFi
 			ruleMap[pInfo.Policy.WlID] = rs.convertIPPolicy(&pInfo.Policy)
 		}
 	}
-	return &share.CLUSDerivedPolicyRuleMap{RuleMap: ruleMap}, nil
+
+	value, _ := json.Marshal(ruleMap)
+	zb := utils.GzipBytes(value)
+	return &share.CLUSDerivedPolicyRuleMap{RuleByte: zb}, nil
 }
 
 func (rs *RPCService) ProbeSummary(ctx context.Context, v *share.RPCVoid) (*share.CLUSProbeSummary, error) {
