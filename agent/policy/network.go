@@ -976,6 +976,8 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 	return 0, action, action > C.DP_POLICY_ACTION_CHECK_APP
 }
 
+var ToggleIcmpPolicy bool = false
+
 func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	newPolicy map[string]*WorkloadIPPolicyInfo) utils.Set {
 
@@ -1014,7 +1016,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 				dp.DPCtrlConfigPolicy(&pInfo.Policy, C.CFG_ADD)
 			}
 		} else if pInfo.Configured != old.Configured ||
-			reflect.DeepEqual(&pInfo.Policy, &old.Policy) != true {
+			reflect.DeepEqual(&pInfo.Policy, &old.Policy) != true || ToggleIcmpPolicy {
 			if pInfo.HostMode {
 				hostPolicyChangeSet.Add(id)
 			} else if dpConnected {
@@ -1023,6 +1025,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 			}
 		}
 	}
+	ToggleIcmpPolicy = false
 	//always push policy address map at the end after all policy has
 	//been pushed to DP, so that if there is early traffic at the DP
 	//if wl ip is not in addr map we know that policy is not yet pushed

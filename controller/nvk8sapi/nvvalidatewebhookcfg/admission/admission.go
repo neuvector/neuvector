@@ -137,39 +137,39 @@ type AdmUriState struct {
 }
 
 type AdmAssessResult struct {
-	RuleID          uint32
-	Disabled        bool
-	RuleDetails     string
-	RuleMode        string
-	RuleType        string
-	RuleCfgType     share.TCfgType
-	MatchedSource   string
-	DenyRuleMatched bool
+	ContainerImage string
+	RuleID         uint32
+	Disabled       bool
+	RuleDetails    string
+	RuleMode       string
+	RuleType       string // "allow"/"deny"
+	RuleCfgType    share.TCfgType
+	MatchedSource  string
 }
 
-type AdmResult struct { // AdmResult is per-image
-	MatchDeny       bool
-	FinalDeny       bool
-	ImageNotScanned bool
-	MatchFedRule    bool
-	RuleID          uint32
-	RuleCategory    string
-	RuleMode        string
-	RuleCfgType     share.TCfgType
-	User            string
-	AdmRule         string
-	Msg             string
-	Image           string // the image specified in yaml
-	ImageID         string // starting from this field, the following fields are available when the scan result for the image is available
-	Registry        string
-	Repository      string
-	Tag             string
-	BaseOS          string
-	UnscannedImages string
-	MatchedSource   string
-	HighVulsCnt     int
-	MedVulsCnt      int
-	AssessResults   []*AdmAssessResult // for assessment only
+type AdmResult struct { // AdmResult is per-container-image
+	MatchDeny             bool // for non-assessment only
+	ImageNotScanned       bool
+	MatchFedRule          bool // for non-assessment only
+	RuleID                uint32
+	RuleCategory          string
+	RuleMode              string
+	RuleCfgType           share.TCfgType
+	User                  string
+	AdmRule               string
+	Msg                   string
+	Image                 string // the image specified in yaml
+	ImageID               string // starting from this field, the following fields are available when the scan result for the image is available
+	Registry              string
+	Repository            string
+	Tag                   string
+	BaseOS                string
+	UnscannedImages       string
+	MatchedSource         string
+	HighVulsCnt           int
+	MedVulsCnt            int
+	AssessResults         []*AdmAssessResult // for assessment only, including all matched rules (disabled or not)
+	AssessMatchedRuleType string             // for assessment only, the 1st matched non-disabled rule's type(""/"allow"/"deny")
 }
 
 type AdmResObject struct {

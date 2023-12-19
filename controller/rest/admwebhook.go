@@ -790,13 +790,14 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 	var noMatchedResult nvsysadmission.AdmResult
 	var allowMatchedResult *nvsysadmission.AdmResult    // from first allow match
 	var denyMatchedResult *nvsysadmission.AdmResult     // from first deny match
-	var assessResults []*nvsysadmission.AdmAssessResult // for all matched rules in assessment
+	var assessResults []*nvsysadmission.AdmAssessResult // for all matched rules of all containers in assessment
 	containerTypes := []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
-	for i, containers := range admResObject.AllContainers {
+	for i, containers := range admResObject.AllContainers { // range (initContainers, Containers, ephemeralContainers)
 		for _, c := range containers {
 			var thisStamp api.AdmCtlTimeStamps
 			perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
 			result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, containerTypes[i], forTesting)
+			// result is per-container-image's matching result
 			if !licenseAllowed {
 				continue
 			}
@@ -819,13 +820,15 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 				noMatchedResult.MedVulsCnt += result.MedVulsCnt
 			}
 			if result.RuleID != 0 {
-				if result.MatchDeny {
+				// result.MatchDeny is for non-assessment only
+				// result.AssessDenyRuleMatched is for assessment only
+				if (!forTesting && result.MatchDeny) || (forTesting && result.AssessMatchedRuleType == api.ValidatingDenyRuleType) {
 					// deny this resource request if any container matches a deny rule. Still keep collecting unscanned-image info
 					if denyMatchedResult == nil {
 						matchData.MatchState = nvsysadmission.MatchedDeny
 						denyMatchedResult = result
 					}
-				} else {
+				} else if (!forTesting && !result.MatchDeny) || (forTesting && result.AssessMatchedRuleType == api.ValidatingAllowRuleType) {
 					// matches an allow rule. we only cache the 1st allow matching result and keep checking if any container matches deny rule
 					// matching a deny rule overrides matching any allow rule. Still keep collecting unscanned-image info
 					if allowMatchedResult == nil {
@@ -1199,20 +1202,14 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		if forTesting {
 			finalAction := "allowed"
-			if len(assessResults) > 0 {
-				for _, r := range assessResults {
-					if !r.Disabled {
-						if r.DenyRuleMatched {
-							if (r.RuleMode == "" && mode == share.AdmCtrlModeProtect) || r.RuleMode == share.AdmCtrlModeProtect {
-								admResult.FinalDeny = true
-							}
-						}
-						break
-					}
+			if admResult.AssessMatchedRuleType == api.ValidatingDenyRuleType {
+				if admResult.RuleMode != "" {
+					// a deny rule's "rule mode"(if specified) takes precedence over global mode
+					mode = admResult.RuleMode
 				}
-				if admResult.FinalDeny {
-					finalAction = "denied"
+				if mode == share.AdmCtrlModeProtect {
 					allowed = false
+					finalAction = "denied"
 				}
 			}
 			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, finalAction, subMsg)
@@ -1245,7 +1242,6 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
 				}
 				statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-				admResult.FinalDeny = true
 				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
 					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
 				eventID = share.CLUSAuditAdmCtrlK8sReqDenied
@@ -1270,7 +1266,6 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 					actionMsg = "denied"
 					allowed = false
 					statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-					admResult.FinalDeny = true
 					eventID = share.CLUSAuditAdmCtrlK8sReqDenied
 				default:
 					actionMsg = "allowed"
@@ -1290,7 +1285,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			}
 		}
 	}
-	cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
+	if !forTesting {
+		cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
+	}
 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: allowed,

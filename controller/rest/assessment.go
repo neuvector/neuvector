@@ -187,11 +187,12 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 						matchedRules := make([]*api.RESTAdmCtrlTestRuleInfo, 0, len(assessResults))
 						for _, assessResult := range assessResults {
 							matchedRule := &api.RESTAdmCtrlTestRuleInfo{
-								ID:          assessResult.RuleID,
-								Disabled:    assessResult.Disabled,
-								Type:        assessResult.RuleType,
-								Mode:        assessResult.RuleMode,
-								RuleDetails: assessResult.RuleDetails,
+								ContainerImage: assessResult.ContainerImage,
+								ID:             assessResult.RuleID,
+								Disabled:       assessResult.Disabled,
+								Type:           assessResult.RuleType,
+								Mode:           assessResult.RuleMode,
+								RuleDetails:    assessResult.RuleDetails,
 							}
 							matchedRule.RuleCfgType, _ = cfgTypeMap2Api[assessResult.RuleCfgType]
 							matchedRules = append(matchedRules, matchedRule)
