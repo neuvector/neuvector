@@ -40,6 +40,11 @@ yell "# ------------------------------------------------------------------------
 # security concerns slow down your CI/CD processes.
 # ------------------------------------------------------------------------------"
 
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
 #get a process command line from /proc
 get_command_line_args() {
     PROC="$1"
@@ -65,7 +70,7 @@ get_argument_value() {
         |
     grep "^${OPTION}" |
     sed \
-        -e "s/^${OPTION}=//g"
+        -E "s/^${OPTION}(=|\s+)//g"
 }
 
 #check whether an argument exist in command line
@@ -80,6 +85,19 @@ check_argument() {
     grep "^${OPTION}" 
 }
 
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}
 CIS_KUBELET_CMD="<<<.Replace_kubelet_cmd>>>"
 
 if ps -ef | grep "$CIS_KUBELET_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
@@ -115,6 +133,7 @@ fi
 check_2_1_4="2.1.4  - Ensure that the --client-ca-file argument is set as appropriate"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_2_1_4"
     pass "       * client-ca-file: $cafile"
 else
@@ -189,6 +208,8 @@ if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_KUBELET_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
         cfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-cert-file')
         kfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-private-key-file')
+        cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+        kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
         pass "$check_2_1_12"
         pass "        * tls-cert-file: $cfile"
         pass "        * tls-private-key-file: $kfile"
@@ -215,10 +236,12 @@ fi
 info "2.2 - Configuration Files"
 
 check_2_2_1="2.2.1  - Ensure that the config file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/config" ]; then
-    file="/etc/kubernetes/config"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/config")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -246,10 +269,12 @@ else
 fi
 
 check_2_2_3="2.2.3  - Ensure that the kubelet file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/kubelet" ]; then
-    file="/etc/kubernetes/kubelet"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubele")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -278,7 +303,7 @@ fi
 
 check_2_2_5="2.2.5  - Ensure that the proxy file permissions are set to 644 or more restrictive"
 file="/etc/kubernetes/proxy"
-
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_2_2_5"

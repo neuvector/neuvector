@@ -21,6 +21,11 @@ fi
 level2="1.3.6, 2.7, 3.1.1, 3.2.2, 4.2.9, 5.2.6, 5.2.9, 5.3.2, 5.4.2, 5.6.2, 5.6.3, 5.6.4,
 6.1.4, 6.2.1, 6.4.2, 6.5.1, 6.5.7, 6.6.1, 6.6.4, 6.6.8, 6.7.2, 6.8.3, 6.10.4, 6.10.5"
 
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
 info () {
 
   s_txt=""

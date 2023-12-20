@@ -28,6 +28,7 @@ fi
 check_1_3_4="1.3.4  - Ensure that the --service-account-private-key-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_MANAGER_CMD" '--service-account-private-key-file' >/dev/null 2>&1; then
     keyfile=$(get_argument_value "$CIS_MANAGER_CMD" '--service-account-private-key-file')
+    keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
     pass "$check_1_3_4"
     pass "       * service-account-private-key-file: $keyfile"
 else
@@ -37,6 +38,7 @@ fi
 check_1_3_5="1.3.5  - Ensure that the --root-ca-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_MANAGER_CMD" '--root-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_MANAGER_CMD" '--root-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_3_5"
     pass "       * root-ca-file: $cafile"
 else

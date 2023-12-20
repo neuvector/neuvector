@@ -3,12 +3,15 @@ info "1 - Control Plane Components"
 info "1.1 - Master Node Configuration Files"
 
 check_1_1_1="1.1.1  - Ensure that the API server pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-apiserver.manifest" ]; then
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
+if [ -f $config_manifest ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-apiserver.manifest"
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/kube-apiserver.yaml"
+    file=$config_yaml
 fi
+
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_1_1"
@@ -34,11 +37,13 @@ else
 fi
 
 check_1_1_3="1.1.3  - Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-controller-manager.manifest" ]; then
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
+if [ -f $config_manifest ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-controller-manager.manifest"
+    file=$config_manifest
 else
-    file="/etc/kubernetes/manifests/kube-controller-manager.yaml"
+    file=$config_yaml
 fi
 
 if [ -f "$file" ]; then
@@ -66,11 +71,13 @@ else
 fi
 
 check_1_1_5="1.1.5  - Ensure that the scheduler pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/kube-scheduler.yaml" ]; then
-    file="/etc/kubernetes/manifests/kube-scheduler.yaml"
-else
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
+if [ -f $config_yaml ]; then
     # kops
-    file="/etc/kubernetes/manifests/kube-scheduler.manifest"
+    file=$config_yaml
+else
+    file=$config_manifest
 fi
 
 if [ -f "$file" ]; then
@@ -98,11 +105,13 @@ else
 fi
 
 check_1_1_7="1.1.7  - Ensure that the etcd pod specification file permissions are set to 644 or more restrictive (Scored)"
-if [ -f "/etc/kubernetes/manifests/etcd.yaml" ]; then
-    file="/etc/kubernetes/manifests/etcd.yaml"
-else
+config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
+config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+if [ -f $config_yaml ]; then
     # kops
-    file="/etc/kubernetes/manifests/etcd.manifest"
+    file=$config_yaml
+else
+    file=$config_manifest
 fi
 
 if [ -f "$file" ]; then
@@ -149,6 +158,8 @@ file=""
 if check_argument "$CIS_ETCD_CMD" '--data-dir' >/dev/null 2>&1; then
     file=$(get_argument_value "$CIS_ETCD_CMD" '--data-dir'|cut -d " " -f 1)
 fi
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 700 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_11"
@@ -176,6 +187,8 @@ fi
 
 check_1_1_13="1.1.13  - Ensure that the admin.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/admin.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_13"
@@ -202,6 +215,8 @@ fi
 
 check_1_1_15="1.1.15  - Ensure that the scheduler.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/scheduler.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_15"
@@ -228,6 +243,8 @@ fi
 
 check_1_1_17="1.1.17  - Ensure that the controller-manager.conf file permissions are set to 644 or more restrictive (Scored)"
 file="/etc/kubernetes/controller-manager.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_17"
@@ -254,6 +271,7 @@ fi
 
 check_1_1_19="1.1.19  - Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Scored)"
 file="/etc/kubernetes/pki/"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 files=$(find $file)
 pass=true
 for f in ${files}; do
@@ -542,6 +560,7 @@ fi
 check_1_2_28="1.2.28  - Ensure that the --service-account-key-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_APISERVER_CMD" '--service-account-key-file' >/dev/null 2>&1; then
     file=$(get_argument_value "$CIS_APISERVER_CMD" '--service-account-key-file')
+    file=$(append_prefix "$CONFIG_PREFIX" "$file")
     pass "$check_1_2_28"
     pass "        * service-account-key-file: $file"
 else
@@ -553,6 +572,8 @@ if check_argument "$CIS_APISERVER_CMD" '--etcd-certfile' >/dev/null 2>&1; then
     if check_argument "$CIS_APISERVER_CMD" '--etcd-keyfile' >/dev/null 2>&1; then
         certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-certfile')
         keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-keyfile')
+        certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+        keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
         pass "$check_1_2_29"
         pass "        * etcd-certfile: $certfile"
         pass "        * etcd-keyfile: $keyfile"
@@ -568,6 +589,8 @@ if check_argument "$CIS_APISERVER_CMD" '--tls-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_APISERVER_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
         certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cert-file')
         keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-private-key-file')
+        certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+        keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
         pass "$check_1_2_30"
         pass "        * tls-cert-file: $certfile"
         pass "        * tls-private-key-file: $keyfile"
@@ -581,6 +604,7 @@ fi
 check_1_2_31="1.2.31  - Ensure that the --client-ca-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_2_31"
     pass "        * client-ca-file: $cafile"
 else
@@ -590,6 +614,7 @@ fi
 check_1_2_32="1.2.32  - Ensure that the --etcd-cafile argument is set as appropriate (Scored)"
 if check_argument "$CIS_APISERVER_CMD" '--etcd-cafile' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-cafile')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_2_32"
     pass "        * etcd-cafile: $cafile"
 else
@@ -672,6 +697,7 @@ fi
 check_1_3_4="1.3.4  - Ensure that the --service-account-private-key-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_MANAGER_CMD" '--service-account-private-key-file' >/dev/null 2>&1; then
     keyfile=$(get_argument_value "$CIS_MANAGER_CMD" '--service-account-private-key-file')
+    keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
     pass "$check_1_3_4"
     pass "       * service-account-private-key-file: $keyfile"
 else
@@ -681,6 +707,7 @@ fi
 check_1_3_5="1.3.5  - Ensure that the --root-ca-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_MANAGER_CMD" '--root-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_MANAGER_CMD" '--root-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_3_5"
     pass "       * root-ca-file: $cafile"
 else

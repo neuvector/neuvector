@@ -11,6 +11,7 @@ info "3.2 - Logging"
 check_3_2_1="3.2.1 - Ensure that a minimal audit policy is created (Scored)"
 if check_argument "$CIS_APISERVER_CMD" '--audit-policy-file' >/dev/null 2>&1; then
     auditPolicyFile=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-policy-file')
+    auditPolicyFile=$(append_prefix "$CONFIG_PREFIX" "$auditPolicyFile")
     pass "$check_3_2_1"
     pass "        * audit-policy-file: $auditPolicyFile"
 else
