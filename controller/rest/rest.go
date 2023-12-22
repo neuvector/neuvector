@@ -2024,7 +2024,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	return err
 }
 
-func doExport(filename string, remoteExportOptions *share.RemoteExportConfig, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
 	var data []byte
 	json_data, _ := json.MarshalIndent(resp, "", "  ")
 	data, _ = yaml.JSONToYAML(json_data)
@@ -2034,7 +2034,7 @@ func doExport(filename string, remoteExportOptions *share.RemoteExportConfig, re
 			DefaultFilePath: filename,
 			Options:         remoteExportOptions,
 			Content:         data,
-			ClusterHelper:   clusHelper,
+			Cacher:          cacher,
 			AccessControl:   acc,
 		}
 		err := remoteExport.Do()
