@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -170,22 +171,22 @@ func (exp GitHubExport) getBaseRequest() http.Request {
 	return baseRequest
 }
 
-func NewGitHubExport(filePath string, fileContents []byte, commitMessage string, config *share.RemoteRepository_GitHubConfiguration) (GitHubExport, error) {
-	exportUrl, err := url.Parse(fmt.Sprintf(githubRepoContentUrl, *config.RepositoryOwnerUsername, *config.RepositoryName, filePath))
+func NewGitHubExport(filePath string, fileContents []byte, commitMessage string, config api.RESTRemoteRepo_GitHubConfig) (GitHubExport, error) {
+	exportUrl, err := url.Parse(fmt.Sprintf(githubRepoContentUrl, config.RepositoryOwnerUsername, config.RepositoryName, filePath))
 	if err != nil {
 		return GitHubExport{}, fmt.Errorf("could not parse url for new remote export object: %s", err.Error())
 	}
 
 	return GitHubExport{
 		repo: githubRepo{
-			owner:  *config.RepositoryOwnerUsername,
-			name:   *config.RepositoryName,
-			branch: *config.RepositoryBranchName,
+			owner:  config.RepositoryOwnerUsername,
+			name:   config.RepositoryName,
+			branch: config.RepositoryBranchName,
 		},
 		committer: githubCommitter{
-			name:                *config.PersonalAccessTokenCommitterName,
-			email:               *config.PersonalAccessTokenEmail,
-			personalAccessToken: *config.PersonalAccessToken,
+			name:                config.PersonalAccessTokenCommitterName,
+			email:               config.PersonalAccessTokenEmail,
+			personalAccessToken: config.PersonalAccessToken,
 		},
 		filePath:      filePath,
 		fileContents:  fileContents,
