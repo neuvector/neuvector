@@ -575,3 +575,7 @@ func (o *CLUSApikey) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 	}
 	return domains, nil
 }
+
+func (r *CLUSRemoteRepository) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
+	return nil, nil
+}

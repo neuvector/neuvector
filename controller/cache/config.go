@@ -310,6 +310,26 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		}
 	}
 
+    rconf.RemoteRepositories = make([]api.RESTRemoteRepository, len(systemConfigCache.RemoteRepositories))
+	for i, rr := range systemConfigCache.RemoteRepositories {
+		repo := api.RESTRemoteRepository{
+			Nickname: rr.Nickname,
+			Comment:  rr.Comment,
+			Provider: rr.Provider,
+		}
+		if rr.Provider == share.RemoteRepositoryProvider_GitHub && rr.GitHubConfiguration != nil {
+			repo.GitHubConfiguration = &api.RESTRemoteRepo_GitHubConfig{
+				RepositoryOwnerUsername:          rr.GitHubConfiguration.RepositoryOwnerUsername,
+				RepositoryName:                   rr.GitHubConfiguration.RepositoryName,
+				RepositoryBranchName:             rr.GitHubConfiguration.RepositoryBranchName,
+				PersonalAccessToken:              rr.GitHubConfiguration.PersonalAccessToken,
+				PersonalAccessTokenCommitterName: rr.GitHubConfiguration.PersonalAccessTokenCommitterName,
+				PersonalAccessTokenEmail:         rr.GitHubConfiguration.PersonalAccessTokenEmail,
+			}
+		}
+		rconf.RemoteRepositories[i] = repo
+	}
+
 	proxy := systemConfigCache.RegistryHttpProxy
 	rconf.RegistryHttpProxyEnable = proxy.Enable
 	rconf.RegistryHttpProxy = api.RESTProxy{

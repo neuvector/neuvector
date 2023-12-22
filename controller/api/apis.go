@@ -66,6 +66,7 @@ const RESTErrPasswordExpired int = 48
 const RESTErrPromoteFail int = 49
 const RESTErrPlatformAuthDisabled int = 50
 const RESTErrRancherUnauthorized int = 51
+const RESTErrRemoteExportFail int = 52
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
@@ -519,27 +520,32 @@ type RESTListData struct {
 }
 
 type RESTGroupExport struct {
-	Groups     []string `json:"groups"`
-	PolicyMode string   `json:"policy_mode,omitempty"`
+	Groups              []string                  `json:"groups"`
+	PolicyMode          string                    `json:"policy_mode,omitempty"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTAdmCtrlRulesExport struct {
-	ExportConfig bool     `json:"export_config"`
-	IDs          []uint32 `json:"ids"` // used when ExportRules is true
+	ExportConfig        bool                      `json:"export_config"`
+	IDs                 []uint32                  `json:"ids"` // used when ExportRules is true
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTWafSensorExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 // vlunerability profile export. only support "default" profile to export(5.3+)
 type RESTVulnProfilesExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 // compliance profile export. only support "default" profile to export(5.3+)
 type RESTCompProfilesExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTUser struct {
@@ -1721,6 +1727,7 @@ type RESTSystemConfigConfig struct {
 	XffEnabled                *bool                            `json:"xff_enabled,omitempty"`
 	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
 	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
+	RemoteRepositories        *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
@@ -1816,6 +1823,7 @@ type RESTSystemConfigConfigV2 struct {
 	IbmsaCfg         *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
 	ScannerAutoscale *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
 	MiscCfg          *RESTSystemConfigMiscCfgV2       `json:"misc_cfg,omitempty"`
+	RemoteRepositories *[]RESTRemoteRepository        `json:"remote_repositories,omitempty"`
 }
 
 type RESTUnquarReq struct {
@@ -1877,6 +1885,7 @@ type RESTSystemConfig struct {
 	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
 	CspType                   string                    `json:"csp_type"`
+	RemoteRepositories        []RESTRemoteRepository    `json:"remote_repositories"`
 }
 
 type RESTSystemConfigData struct {
@@ -1973,6 +1982,7 @@ type RESTSystemConfigV2 struct {
 	NetSvc           RESTSystemConfigNetSvcV2   `json:"net_svc"`
 	ModeAuto         RESTSystemConfigModeAutoV2 `json:"mode_auto"`
 	ScannerAutoscale RESTSystemConfigAutoscale  `json:"scanner_autoscale"`
+	RemoteRepositories []RESTRemoteRepository   `json:"remote_repositories"`
 }
 
 type RESTIBMSAConfig struct {
@@ -2883,7 +2893,8 @@ type RESTCrdDlpGroupConfig struct {
 }
 
 type RESTDlpSensorExport struct {
-	Names []string `json:"names"`
+	Names               []string                 `json:"names"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTDerivedWorkloadDlpRule struct {
@@ -3626,4 +3637,71 @@ type REST_SigstoreRootOfTrustCollection struct {
 
 type REST_SigstoreVerifierCollection struct {
 	Verifiers []REST_SigstoreVerifier `json:"verifiers"`
+}
+
+// remote repositories
+type RESTRemoteRepo_GitHubConfig struct {
+	RepositoryOwnerUsername          string `json:"repository_owner_username"`
+	RepositoryName                   string `json:"repository_name"`
+	RepositoryBranchName             string `json:"repository_branch_name"`
+	PersonalAccessToken              string `json:"personal_access_token,cloak"`
+	PersonalAccessTokenCommitterName string `json:"personal_access_token_committer_name"`
+	PersonalAccessTokenEmail         string `json:"personal_access_token_email"`
+}
+
+type RESTRemoteRepository struct {
+	Nickname            string                       `json:"nickname"`
+	Provider            string                       `json:"provider"`
+	Comment             string                       `json:"comment"`
+	GitHubConfiguration *RESTRemoteRepo_GitHubConfig `json:"github_configuration"`
+}
+
+type RESTRemoteRepository_GitHubConfigConfig struct {
+	RepositoryOwnerUsername          *string `json:"repository_owner_username"`
+	RepositoryName                   *string `json:"repository_name"`
+	RepositoryBranchName             *string `json:"repository_branch_name"`
+	PersonalAccessToken              *string `json:"personal_access_token,cloak"`
+	PersonalAccessTokenCommitterName *string `json:"personal_access_token_committer_name"`
+	PersonalAccessTokenEmail         *string `json:"personal_access_token_email"`
+}
+
+// TODO: generalize this
+func (g *RESTRemoteRepository_GitHubConfigConfig) IsValid() bool {
+	isEmpty := func(s *string) bool {
+		return s != nil && *s == ""
+	}
+	requiredFields := []*string{
+		g.RepositoryOwnerUsername,
+		g.RepositoryName,
+		g.RepositoryBranchName,
+		g.PersonalAccessToken,
+		g.PersonalAccessTokenCommitterName,
+		g.PersonalAccessTokenEmail,
+	}
+	for _, requiredField := range requiredFields {
+		if isEmpty(requiredField) {
+			return false
+		}
+	}
+	return true
+}
+
+type RESTRemoteRepositoryConfig struct {
+	// Provider is unchangable
+	Nickname            string                                   `json:"nickname"`
+	Comment             *string                                  `json:"comment"`
+	GitHubConfiguration *RESTRemoteRepository_GitHubConfigConfig `json:"github_configuration"`
+}
+
+type RESTRemoteRepositoryConfigData struct {
+	Config *RESTRemoteRepositoryConfig `json:"config"`
+}
+
+type RESTRemoteExportOptions struct {
+	RemoteRepositoryNickname string `json:"remote_repository_nickname"`
+	FilePath                 string `json:"file_path"`
+}
+
+func (config *RESTRemoteExportOptions) IsValid() bool {
+	return config.RemoteRepositoryNickname != ""
 }

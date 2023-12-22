@@ -258,6 +258,9 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 			return
 		} else {
 			sort.Slice(rconf.Webhooks, func(i, j int) bool { return rconf.Webhooks[i].Name < rconf.Webhooks[j].Name })
+			sort.Slice(rconf.RemoteRepositories, func(i, j int) bool {
+				return rconf.RemoteRepositories[i].Nickname < rconf.RemoteRepositories[j].Nickname
+			})
 		}
 		if !k8sPlatform && scope == share.ScopeLocal {
 			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
@@ -322,7 +325,8 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						NoTelemetryReport:  rconf.NoTelemetryReport,
 						CspType:            rconf.CspType,
 					},
-					Webhooks: rconf.Webhooks,
+					Webhooks:           rconf.Webhooks,
+					RemoteRepositories: rconf.RemoteRepositories,
 					Proxy: api.RESTSystemConfigProxyV2{
 						RegistryHttpProxyEnable:  rconf.RegistryHttpProxyEnable,
 						RegistryHttpsProxyEnable: rconf.RegistryHttpsProxyEnable,
@@ -986,7 +990,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 		}
 
 		// Acquire lock if auth order or webhook is changing
-		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
+		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil || rc.RemoteRepositories != nil {
 			lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 			if err != nil {
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
@@ -1318,6 +1322,41 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				}
 			}
 
+			// remote registories
+			if rc.RemoteRepositories != nil {
+				if len(*rc.RemoteRepositories) == 0 {
+					cconf.RemoteRepositories = make([]share.CLUSRemoteRepository, 0)
+				} else {
+					rr := (*rc.RemoteRepositories)[0]
+					if len(cconf.RemoteRepositories) != 1 {
+						cconf.RemoteRepositories = make([]share.CLUSRemoteRepository, 1)
+					}
+					cr := share.CLUSRemoteRepository{
+						Nickname: rr.Nickname,
+						Provider: rr.Provider,
+						Comment:  rr.Comment,
+					}
+					if rr.GitHubConfiguration != nil {
+						githubCfg := *rr.GitHubConfiguration
+						cr.GitHubConfiguration = &share.RemoteRepository_GitHubConfiguration{
+							RepositoryOwnerUsername:          githubCfg.RepositoryOwnerUsername,
+							RepositoryName:                   githubCfg.RepositoryName,
+							RepositoryBranchName:             githubCfg.RepositoryBranchName,
+							PersonalAccessToken:              githubCfg.PersonalAccessToken,
+							PersonalAccessTokenCommitterName: githubCfg.PersonalAccessTokenCommitterName,
+							PersonalAccessTokenEmail:         githubCfg.PersonalAccessTokenEmail,
+						}
+					}
+					if len(*rc.RemoteRepositories) > 1 || !cr.IsValid() {
+						err := errors.New("Unsupported remote repository nickname or provider")
+						log.WithFields(log.Fields{"err": err}).Error()
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+						return kick, err
+					}
+					cconf.RemoteRepositories[0] = cr
+				}
+			}
+
 			// Controller debug
 			if rc.ControllerDebug != nil {
 				cconf.ControllerDebug = *rc.ControllerDebug
@@ -1548,6 +1587,9 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 			}
 			if configV2.Webhooks != nil {
 				config.Webhooks = configV2.Webhooks
+			}
+			if configV2.RemoteRepositories != nil {
+				config.RemoteRepositories = configV2.RemoteRepositories
 			}
 			if configV2.IbmsaCfg != nil {
 				config.IBMSAEpEnabled = configV2.IbmsaCfg.IBMSAEpEnabled

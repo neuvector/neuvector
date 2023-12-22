@@ -23,6 +23,11 @@ notScored="1.1.1, 1.1.12, 1.1.13, 1.1.31, 1.4.9, 1.4.10, 1.5.7, 1.6.1, 1.6.2, 1.
 level2="1.3.6, 1.5.7, 1.6.1, 1.6.4, 1.6.5, 1.6.6, 1.6.7, 1.6.8,
  1.7.6, 1.7.7"
 
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
 info () {
 
   s_txt=""
@@ -129,7 +134,7 @@ get_argument_value() {
         |
     grep "^${OPTION}" |
     sed \
-        -e "s/^${OPTION}=//g"
+        -E "s/^${OPTION}(=|\s+)//g"
 }
 
 #check whether an argument exist in command line
@@ -144,3 +149,17 @@ check_argument() {
     grep "^${OPTION}"
 }
 
+#get the pid that running the command
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}

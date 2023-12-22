@@ -22,6 +22,11 @@ level2="1.3.6, 2.7, 3.1.1, 3.2.2, 4.2.9, 5.2.9, 5.3.2, 5.4.2, 5.5.1, 5.7.2, 5.7.
 not_scored="1.1.9, 1.1.10, 1.1.20, 1.1.21, 1.2.1, 1.2.10, 1.2.12, 1.2.13, 1.2.33, 1.2.34, 1.2.35, 1.3.1, 2.7, 3.1.1, 3.2.2, 4,2.8, 4.2.9, 4.2.13, 5.1.1, 5.1.2, 5.1.3, 5.1.4, 5.1.6, 5.2.1, 5.2.6, 5.2.7, 5.2.8, 5.2.9, 5.3.1, 5.4.1, 5.4.2, 5.5.1, 5.7.1, 5.7.2, 5.7.3"
 assessment_manual="1.1.9, 1.1.10, 1.1.20, 1.1.21, 1.2.1, 1.2.10, 1.2.12, 1.2.13, 1.2.33, 1.2.34, 1.2.35, 1.3.1, 2.7, 3.1.1, 3.2.1, 3.2.2, 4.1.3, 4.1.4, 4.1.6, 4.1.7, 4.1.8, 4.2.4, 4.2.5, 4.2.8, 4.2.9, 4.2.10, 4.2.11, 4.2.12, 4.2.13, 5.1.1, 5.1.2, 5.1.3, 5.1.4, 5.1.5, 5.1.6, 5.2.1, 5.2.2, 5.2.3, 5.2.4, 5.2.5, 5.2.6, 5.2.7, 5.2.8, 5.2.9, 5.3.1, 5.3.2, 5.4.1, 5.4.2, 5.5.1, 5.7.1, 5.7.2, 5.7.3, 5.7.4"
 
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
 info () {
 
   s_txt=""
@@ -146,7 +151,7 @@ get_argument_value() {
         |
     grep "^${OPTION}" |
     sed \
-        -e "s/^${OPTION}=//g"
+        -E "s/^${OPTION}(=|\s+)//g"
 }
 
 #check whether an argument exist in command line
@@ -161,3 +166,17 @@ check_argument() {
     grep "^${OPTION}"
 }
 
+#append prefix for the file
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}

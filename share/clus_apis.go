@@ -805,6 +805,7 @@ type CLUSSystemConfig struct {
 	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
+	RemoteRepositories   []CLUSRemoteRepository    `json:"remote_repositories"`
 }
 
 type CLUSSystemConfigAutoscale struct {
@@ -2861,3 +2862,56 @@ const (
 	AlertPwdExpiring       = "1001"
 	AlertAdminHasDefPwd    = "1002"
 )
+
+// remote repositories
+type RemoteRepository_GitHubConfiguration struct {
+	RepositoryOwnerUsername          string `json:"repository_owner_username"`
+	RepositoryName                   string `json:"repository_name"`
+	RepositoryBranchName             string `json:"repository_branch_name"`
+	PersonalAccessToken              string `json:"personal_access_token,cloak"`
+	PersonalAccessTokenCommitterName string `json:"personal_access_token_committer_name"`
+	PersonalAccessTokenEmail         string `json:"personal_access_token_email"`
+}
+
+// TODO: generalize this
+func (g *RemoteRepository_GitHubConfiguration) IsValid() bool {
+	isEmpty := func(s string) bool {
+		return s == ""
+	}
+	requiredFields := []string{
+		g.RepositoryOwnerUsername,
+		g.RepositoryName,
+		g.RepositoryBranchName,
+		g.PersonalAccessToken,
+		g.PersonalAccessTokenCommitterName,
+		g.PersonalAccessTokenEmail,
+	}
+	for _, requiredField := range requiredFields {
+		if isEmpty(requiredField) {
+			return false
+		}
+	}
+	return true
+}
+
+const RemoteRepositoryProvider_GitHub string = "github"
+
+type CLUSRemoteRepository struct {
+	Nickname            string                                `json:"nickname"`
+	Provider            string                                `json:"provider"`
+	Comment             string                                `json:"comment"`
+	GitHubConfiguration *RemoteRepository_GitHubConfiguration `json:"github_configuration"`
+}
+
+func (r *CLUSRemoteRepository) IsValid() bool {
+	if r.Nickname != "default" {
+		return false
+	}
+	if r.Provider == RemoteRepositoryProvider_GitHub {
+		if r.GitHubConfiguration == nil {
+			return false
+		}
+		return r.GitHubConfiguration.IsValid()
+	}
+	return false
+}
