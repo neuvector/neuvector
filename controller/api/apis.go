@@ -66,6 +66,7 @@ const RESTErrPasswordExpired int = 48
 const RESTErrPromoteFail int = 49
 const RESTErrPlatformAuthDisabled int = 50
 const RESTErrRancherUnauthorized int = 51
+const RESTErrRemoteExportFail int = 52
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
@@ -519,27 +520,32 @@ type RESTListData struct {
 }
 
 type RESTGroupExport struct {
-	Groups     []string `json:"groups"`
-	PolicyMode string   `json:"policy_mode,omitempty"`
+	Groups              []string                  `json:"groups"`
+	PolicyMode          string                    `json:"policy_mode,omitempty"`
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 type RESTAdmCtrlRulesExport struct {
-	ExportConfig bool     `json:"export_config"`
-	IDs          []uint32 `json:"ids"` // used when ExportRules is true
+	ExportConfig        bool                      `json:"export_config"`
+	IDs                 []uint32                  `json:"ids"` // used when ExportRules is true
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 type RESTWafSensorExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 // vlunerability profile export. only support "default" profile to export(5.3+)
 type RESTVulnProfilesExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 // compliance profile export. only support "default" profile to export(5.3+)
 type RESTCompProfilesExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 type RESTUser struct {
@@ -1877,6 +1883,7 @@ type RESTSystemConfig struct {
 	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
 	CspType                   string                    `json:"csp_type"`
+	RemoteRepositories        []share.RemoteRepository  `json:"remote_repositories"`
 }
 
 type RESTSystemConfigData struct {
@@ -2883,7 +2890,8 @@ type RESTCrdDlpGroupConfig struct {
 }
 
 type RESTDlpSensorExport struct {
-	Names []string `json:"names"`
+	Names               []string                  `json:"names"`
+	RemoteExportOptions *share.RemoteExportConfig `json:"remote_export_options,omitempty"`
 }
 
 type RESTDerivedWorkloadDlpRule struct {
