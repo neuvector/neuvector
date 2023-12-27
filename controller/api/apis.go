@@ -520,31 +520,31 @@ type RESTListData struct {
 }
 
 type RESTGroupExport struct {
-	Groups              []string                  `json:"groups"`
-	PolicyMode          string                    `json:"policy_mode,omitempty"`
+	Groups              []string                 `json:"groups"`
+	PolicyMode          string                   `json:"policy_mode,omitempty"`
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTAdmCtrlRulesExport struct {
-	ExportConfig        bool                      `json:"export_config"`
-	IDs                 []uint32                  `json:"ids"` // used when ExportRules is true
+	ExportConfig        bool                     `json:"export_config"`
+	IDs                 []uint32                 `json:"ids"` // used when ExportRules is true
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 type RESTWafSensorExport struct {
-	Names               []string                  `json:"names"`
+	Names               []string                 `json:"names"`
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 // vlunerability profile export. only support "default" profile to export(5.3+)
 type RESTVulnProfilesExport struct {
-	Names               []string                  `json:"names"`
+	Names               []string                 `json:"names"`
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
 // compliance profile export. only support "default" profile to export(5.3+)
 type RESTCompProfilesExport struct {
-	Names               []string                  `json:"names"`
+	Names               []string                 `json:"names"`
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
@@ -1815,15 +1815,15 @@ type RESTSystemConfigIBMSAVCfg2 struct {
 }
 
 type RESTSystemConfigConfigV2 struct {
-	SvcCfg           *RESTSystemConfigSvcCfgV2        `json:"svc_cfg,omitempty"`
-	SyslogCfg        *RESTSystemConfigSyslogCfgV2     `json:"syslog_cfg,omitempty"`
-	AuthCfg          *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
-	ProxyCfg         *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
-	Webhooks         *[]*RESTWebhook                  `json:"webhooks,omitempty"`
-	IbmsaCfg         *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
-	ScannerAutoscale *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
-	MiscCfg          *RESTSystemConfigMiscCfgV2       `json:"misc_cfg,omitempty"`
-	RemoteRepositories *[]RESTRemoteRepository        `json:"remote_repositories,omitempty"`
+	SvcCfg             *RESTSystemConfigSvcCfgV2        `json:"svc_cfg,omitempty"`
+	SyslogCfg          *RESTSystemConfigSyslogCfgV2     `json:"syslog_cfg,omitempty"`
+	AuthCfg            *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
+	ProxyCfg           *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
+	Webhooks           *[]*RESTWebhook                  `json:"webhooks,omitempty"`
+	IbmsaCfg           *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
+	ScannerAutoscale   *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
+	MiscCfg            *RESTSystemConfigMiscCfgV2       `json:"misc_cfg,omitempty"`
+	RemoteRepositories *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
 }
 
 type RESTUnquarReq struct {
@@ -1972,17 +1972,17 @@ type RESTSystemConfigModeAutoV2 struct {
 }
 
 type RESTSystemConfigV2 struct {
-	NewSvc           RESTSystemConfigNewSvcV2   `json:"new_svc"`
-	Syslog           RESTSystemConfigSyslogV2   `json:"syslog"`
-	Auth             RESTSystemConfigAuthV2     `json:"auth"`
-	Misc             RESTSystemConfigMiscV2     `json:"misc"`
-	Webhooks         []RESTWebhook              `json:"webhooks"`
-	Proxy            RESTSystemConfigProxyV2    `json:"proxy"`
-	IBMSA            RESTSystemConfigIBMSAV2    `json:"ibmsa"`
-	NetSvc           RESTSystemConfigNetSvcV2   `json:"net_svc"`
-	ModeAuto         RESTSystemConfigModeAutoV2 `json:"mode_auto"`
-	ScannerAutoscale RESTSystemConfigAutoscale  `json:"scanner_autoscale"`
-	RemoteRepositories []RESTRemoteRepository   `json:"remote_repositories"`
+	NewSvc             RESTSystemConfigNewSvcV2   `json:"new_svc"`
+	Syslog             RESTSystemConfigSyslogV2   `json:"syslog"`
+	Auth               RESTSystemConfigAuthV2     `json:"auth"`
+	Misc               RESTSystemConfigMiscV2     `json:"misc"`
+	Webhooks           []RESTWebhook              `json:"webhooks"`
+	Proxy              RESTSystemConfigProxyV2    `json:"proxy"`
+	IBMSA              RESTSystemConfigIBMSAV2    `json:"ibmsa"`
+	NetSvc             RESTSystemConfigNetSvcV2   `json:"net_svc"`
+	ModeAuto           RESTSystemConfigModeAutoV2 `json:"mode_auto"`
+	ScannerAutoscale   RESTSystemConfigAutoscale  `json:"scanner_autoscale"`
+	RemoteRepositories []RESTRemoteRepository     `json:"remote_repositories"`
 }
 
 type RESTIBMSAConfig struct {
@@ -3700,6 +3700,7 @@ type RESTRemoteRepositoryConfigData struct {
 type RESTRemoteExportOptions struct {
 	RemoteRepositoryNickname string `json:"remote_repository_nickname"`
 	FilePath                 string `json:"file_path"`
+	Comment                  string `json:"comment"`
 }
 
 func (config *RESTRemoteExportOptions) IsValid() bool {

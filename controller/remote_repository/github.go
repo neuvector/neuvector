@@ -29,6 +29,7 @@ type gitHubAPI_Comitter struct {
 
 type gitHubAPI_PutRepoContent_RequestBody struct {
 	Message   string             `json:"message"`
+	Branch    string             `json:"branch"`
 	Committer gitHubAPI_Comitter `json:"comitter"`
 	Content   string             `json:"content"`
 	SHA       string             `json:"sha"`
@@ -79,6 +80,7 @@ func (exp GitHubExport) Do() error {
 			Name:  exp.committer.name,
 			Email: exp.committer.email,
 		},
+		Branch:  exp.repo.branch,
 		Content: string(encodedFileContents),
 		SHA:     existingFileSha,
 	}
