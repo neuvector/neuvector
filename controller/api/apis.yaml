@@ -13546,6 +13546,10 @@ definitions:
       file_path:
         type: string
         example: my_exports/example.yaml
+      comment:
+        type: string
+        description: commit message
+        example: commit for poc
       remote_repository_nickname:
         type: string
         example: default

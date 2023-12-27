@@ -56,8 +56,12 @@ func (exp *Export) Do() error {
 		if exp.Options.FilePath != "" {
 			exportFilePath = exp.Options.FilePath
 		}
+		commitMessage := exportFilePath
+		if exp.Options.Comment != "" {
+			commitMessage = exp.Options.Comment
+		}
 
-		githubExport, err := NewGitHubExport(exportFilePath, exp.Content, exportFilePath, *remoteRepository.GitHubConfiguration)
+		githubExport, err := NewGitHubExport(exportFilePath, exp.Content, commitMessage, *remoteRepository.GitHubConfiguration)
 		if err != nil {
 			return fmt.Errorf("could not initialize github export object: %s", err.Error())
 		}
