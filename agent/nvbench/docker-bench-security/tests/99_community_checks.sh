@@ -28,6 +28,7 @@ check_c_1() {
     return
   fi
   warn -s "$check"
+  warn "       * Docker is running on an unsupported architecture. This may lead to compatibility or performance issues."
   logcheckresult "WARN"
 }
 
@@ -50,6 +51,7 @@ check_c_1_1() {
     return
   fi
   warn -c "$check"
+  warn "       * Manual check required: Docker architecture is not standard. Please verify compatibility and performance requirements."
   logcheckresult "WARN"
 }
 
@@ -76,6 +78,7 @@ check_c_2() {
       return
     fi
     warn -s "$check"
+    warn "       * Legacy registry (v1) operations are not disabled."
     logcheckresult "WARN"
     return
   fi
