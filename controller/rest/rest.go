@@ -157,6 +157,7 @@ var restErrMessage = []string{
 	api.RESTErrPromoteFail:           "Failed to promote rules",
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
+	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -2039,15 +2040,11 @@ func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions,
 		}
 		err := remoteExport.Do()
 		if err != nil {
-			msg := "could not do remote export"
-			if strings.Contains(err.Error(), remote_repository.ErrGitHubRateLimitReached) {
-				msg = fmt.Sprintf("%s, %s", msg, err.Error())
-			}
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, msg)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, err.Error())
 			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
 			return
 		}
-		restRespSuccess(w, r, nil, acc, login, nil, "Do remote dlp export")
+		restRespSuccess(w, r, nil, acc, login, nil, "Export to remote repository")
 	} else {
 		// tell the browser the returned content should be downloaded
 		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
