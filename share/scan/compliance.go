@@ -12,6 +12,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share"
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 )
@@ -2348,19 +2349,30 @@ type YamlFile struct {
     Groups []Group `yaml:"groups"`
 }
 
-func GetComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+
+func InitComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
 	// Ensuring initialization happens only once
 	once.Do(func() {
 		// inProductionK8s flag means we will read yaml provided from the pod environment, which we are not allowed to read in test environment
-        complianceMetas, complianceMetaMap = PrepareComplianceMeta(inProductionK8s)
+        complianceMetas, complianceMetaMap = PrepareComplianceMeta(platform, flavor, inProductionK8s)
     })
 
 	return complianceMetas, complianceMetaMap
 }
 
-func PrepareComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+func GetComplianceMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+
+	if complianceMetas == nil || complianceMetaMap == nil {
+		// if this is still nil, wait for the InitComplianceMeta
+		// scanUtils.InitComplianceMeta() is called in controller\controller.go before cache/rest call GetComplianceMeta => we can assume the platform / flavor is correct at this point
+		return InitComplianceMeta("", "", true)
+	}
+	return complianceMetas, complianceMetaMap
+}
+
+func PrepareComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	// Currently support k8s related yaml to do the dynamically update from the production environment only.
-	GetK8sCISMeta(inProductionK8s)
+	GetK8sCISMeta(platform, flavor, inProductionK8s)
 
 	complianceMetaMap = make(map[string]api.RESTBenchMeta)
 
@@ -2395,34 +2407,45 @@ func PrepareComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[strin
 }
 
 // Currently update the k8s Folder only
-func GetK8sCISFolder(inProductionK8s bool) string{
+func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string{
 	var remediationFolder string
 	if inProductionK8s {
-		k8sVer, _ := global.ORCH.GetVersion(false, false)
-		kVer, err := version.NewVersion(k8sVer)
-		if err != nil {
-			remediationFolder = kube180YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
-			remediationFolder = kube180YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
-			remediationFolder = kube124YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
-			remediationFolder = kube123YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
-			remediationFolder = kube160YAMLFolder
+		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
+
+		if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
+			ocVer, err := version.NewVersion(ocVer)
+			if err != nil {
+				remediationFolder = rh140YAMLFolder
+			} else if ocVer.Compare(version.Must(version.NewVersion("4.6"))) >= 0 {
+				remediationFolder = rh140YAMLFolder
+			} else {
+				remediationFolder = defaultYAMLFolder
+			}
 		} else {
-			remediationFolder = defaultYAMLFolder
-		}	
+			kVer, err := version.NewVersion(k8sVer)
+			if err != nil {
+				remediationFolder = kube180YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
+				remediationFolder = kube180YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
+				remediationFolder = kube124YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+				remediationFolder = kube123YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
+				remediationFolder = kube160YAMLFolder
+			} else {
+				remediationFolder = defaultYAMLFolder
+			}
+		}
 	} else {
 		log.WithFields(log.Fields{"defaultYAMLFolder": defaultYAMLFolder}).Info("Error reading file")
 		remediationFolder = defaultYAMLFolder
 	}
 	return remediationFolder
 }
-
-func GetK8sCISMeta(inProductionK8s bool) {
+func GetK8sCISMeta(platform, flavor string, inProductionK8s bool) {
 	// Check the current k8s version, then read the correct folder
-	remediationFolder := GetK8sCISFolder(inProductionK8s)
+	remediationFolder := GetK8sCISFolder(platform, flavor, inProductionK8s)
 	
 	// Read every yaml under the folder, then dynamically update the cis_items and complianceSet
 	filepath.Walk(remediationFolder, func(path string, info os.FileInfo, err error) error {

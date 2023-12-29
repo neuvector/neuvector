@@ -685,7 +685,7 @@ func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, c
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
 
-	_, metaMap := scanUtils.GetComplianceMeta(true)
+	_, metaMap := scanUtils.GetComplianceMeta()
 
 	// Add check tags
 	for _, item := range r.Items {
@@ -759,7 +759,7 @@ func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfile
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
 
-	_, metaMap := scanUtils.GetComplianceMeta(true)
+	_, metaMap := scanUtils.GetComplianceMeta()
 
 	// Add check tags
 	for _, item := range r.Items {

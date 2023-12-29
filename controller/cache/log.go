@@ -1831,7 +1831,7 @@ func scanReport2BenchLog(id string, objType share.ScanObjectType, report *share.
 		clog.Tag = report.Tag
 	}
 
-	_, metaMap := scanUtils.GetComplianceMeta(true)
+	_, metaMap := scanUtils.GetComplianceMeta()
 	runAsRoot, hasADD, hasHEALTHCHECK := scanUtils.ParseImageCmds(report.Cmds)
 
 	clog.Items = make([]string, 0)

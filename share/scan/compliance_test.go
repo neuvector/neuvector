@@ -2277,7 +2277,7 @@ func testInit() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
 func TestGetComplianceMeta(t *testing.T) { 
 	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis")
 	mockComplianceMetas, mockComplianceMetaMap := testInit()
-	complianceMetas, complianceMetaMap := GetComplianceMeta(false)
+	complianceMetas, complianceMetaMap := InitComplianceMeta("", "", false)
 
 	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
 		t.Errorf("mockComplianceMetas is not update correctly")

@@ -189,7 +189,7 @@ func GetSecretBenchMessage(stype, loc, evidence string) string {
 }
 
 func ImageBench2REST(cmds []string, secrets []*share.ScanSecretLog, setids []*share.ScanSetIdPermLog, tagMap map[string][]string) []*api.RESTBenchItem {
-	_, metaMap := GetComplianceMeta(true)
+	_, metaMap := GetComplianceMeta()
 	runAsRoot, hasADD, hasHEALTHCHECK := ParseImageCmds(cmds)
 
 	checks := make([]*api.RESTBenchItem, 0)
