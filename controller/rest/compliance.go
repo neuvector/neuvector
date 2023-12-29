@@ -35,7 +35,7 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	metas, _ := scanUtils.GetComplianceMeta()
+	metas, _ := scanUtils.GetComplianceMeta(true)
 	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
 }
@@ -156,7 +156,7 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
-	_, metaMap := scanUtils.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta(true)
 	if _, ok := metaMap[re.TestNum]; !ok {
 		return errors.New("Unknonwn compliance ID")
 	}

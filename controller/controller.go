@@ -647,7 +647,7 @@ func main() {
 	}
 
 	// pre-build compliance map
-	scanUtils.GetComplianceMeta()
+	scanUtils.GetComplianceMeta(true)
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.

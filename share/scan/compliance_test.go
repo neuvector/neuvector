@@ -1,245 +1,21 @@
 package scan
 
 import (
-	"sort"
-	"sync"
 	"fmt"
+	"sort"
+	"testing"
 	"path/filepath"
-	"io/ioutil"
-	"os"
-	"regexp"
-	"gopkg.in/yaml.v3"
-
+	
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/share/global"
-	"github.com/hashicorp/go-version"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
-	dstPrefix           = "/tmp/"
-	kube160YAMLFolder	= dstPrefix + "cis-1.6.0/"
-	kube123YAMLFolder	= dstPrefix + "cis-1.23/"
-	kube124YAMLFolder	= dstPrefix + "cis-1.24/"
-	kube180YAMLFolder	= dstPrefix + "cis-1.8.0/"
-	rh140YAMLFolder		= dstPrefix + "rh-1.4.0/"
-	defaultYAMLFolder  	= dstPrefix + "cis-1.8.0/"
-	catchDescription 	= regexp.MustCompile(`^(.*?) \([^)]*\)$`)
-	complianceMetas []api.RESTBenchMeta
-	complianceMetaMap map[string]api.RESTBenchMeta
-	once sync.Once
+	mockComplianceMetas []api.RESTBenchMeta
+	mockComplianceMetaMap map[string]api.RESTBenchMeta
 )
 
-var complianceHIPAA []string = []string{
-	// trusted user
-	"D.1.1.2",
-	// audit
-	"D.1.1.3", "D.1.1.4", "D.1.1.5", "D.1.1.6", "D.1.1.7", "D.1.1.8", "D.1.1.9", "D.1.1.10", "D.1.1.11", "D.1.1.12",
-	"D.1.1.13", "D.1.1.14", "D.1.1.15", "D.1.1.16", "D.1.1.17", "D.1.1.18",
 
-	// insecure registry, tls, no new privileges
-	"D.2.5", "D.2.7", "D.2.14",
-
-	// file mode, owner
-	"D.3.1", "D.3.2", "D.3.3", "D.3.4", "D.3.5", "D.3.6", "D.3.7", "D.3.8", "D.3.9", "D.3.10",
-	"D.3.11", "D.3.12", "D.3.13", "D.3.14", "D.3.15", "D.3.16", "D.3.17", "D.3.18", "D.3.19", "D.3.20",
-	"D.3.21", "D.3.22",
-
-	// privilege, mount, ssh (5.6)
-	"D.5.4", "D.5.5", "D.5.6", "D.5.7", "D.5.17", "D.5.25", "D.5.31",
-
-	// host ns shared
-	"D.5.9", "D.5.12", "D.5.15", "D.5.16", "D.5.20", "D.5.30",
-
-	// master file mode, owner
-	"K.1.1.1", "K.1.1.2", "K.1.1.3", "K.1.1.4", "K.1.1.5", "K.1.1.6", "K.1.1.7", "K.1.1.8", "K.1.1.9", "K.1.1.10",
-	"K.1.1.11", "K.1.1.12", "K.1.1.13", "K.1.1.14", "K.1.1.15", "K.1.1.16", "K.1.1.17", "K.1.1.18", "K.1.1.19", "K.1.1.20",
-	"K.1.1.21",
-
-	// token, cert, auth
-	"K.1.2.1", "K.1.2.2", "K.1.2.3", "K.1.2.4", "K.1.2.5", "K.1.2.6", "K.1.2.7", "K.1.2.8", "K.1.2.9",
-	// adm. ctrl.
-	"K.1.2.10", "K.1.2.11", "K.1.2.12", "K.1.2.13", "K.1.2.14", "K.1.2.15", "K.1.2.16", "K.1.2.17",
-	// secure port
-	"K.1.2.18", "K.1.2.19", "K.1.2.20",
-	// audit
-	"K.1.2.22", "K.1.2.23", "K.1.2.24", "K.1.2.25",
-	// service account, tls, encrypt
-	"K.1.2.27", "K.1.2.28", "K.1.2.29", "K.1.2.30", "K.1.2.31", "K.1.2.32", "K.1.2.33", "K.1.2.34", "K.1.2.35",
-
-	// service account
-	"K.1.3.3", "K.1.3.4", "K.1.3.5", "K.1.3.6",
-
-	// cert
-	"K.2.1", "K.2.2", "K.2.3", "K.2.4", "K.2.5", "K.2.6", "K.2.7",
-
-	// audit
-	"K.3.2.1", "K.3.2.2",
-
-	// worker: file mode owner
-	"K.4.1.1", "K.4.1.2", "K.4.1.3", "K.4.1.4", "K.4.1.5", "K.4.1.6", "K.4.1.7", "K.4.1.8", "K.4.1.9", "K.4.1.10",
-
-	// auth
-	"K.4.2.1", "K.4.2.2", "K.4.2.3", "K.4.2.4", "K.4.2.6",
-	// cert
-	"K.4.2.10", "K.4.2.11", "K.4.2.12", "K.4.2.13",
-}
-
-var complianceNIST []string = []string{
-	// trusted user
-	"D.1.1.2",
-	// audit
-	"D.1.1.3", "D.1.1.4", "D.1.1.5", "D.1.1.6", "D.1.1.7", "D.1.1.8", "D.1.1.9", "D.1.1.10", "D.1.1.11", "D.1.1.12",
-	"D.1.1.13", "D.1.1.14", "D.1.1.15", "D.1.1.16", "D.1.1.17", "D.1.1.18",
-
-	// insecure registry, tls, no new privileges
-	"D.2.5", "D.2.7", "D.2.14",
-
-	// file mode, owner
-	"D.3.1", "D.3.2", "D.3.3", "D.3.4", "D.3.5", "D.3.6", "D.3.7", "D.3.8", "D.3.9", "D.3.10",
-	"D.3.11", "D.3.12", "D.3.13", "D.3.14", "D.3.15", "D.3.16", "D.3.17", "D.3.18", "D.3.19", "D.3.20",
-	"D.3.21", "D.3.22",
-
-	// image/container, root user, setuid, no secrets
-	"D.4.1", "D.4.8", "D.4.10",
-	"I.4.1", "I.4.8", "I.4.10",
-
-	// privilege, mount, ssh (5.6)
-	"D.5.4", "D.5.5", "D.5.6", "D.5.7", "D.5.17", "D.5.25", "D.5.31",
-
-	// host ns shared
-	"D.5.9", "D.5.12", "D.5.15", "D.5.16", "D.5.20", "D.5.30",
-
-	// master file mode, owner
-	"K.1.1.1", "K.1.1.2", "K.1.1.3", "K.1.1.4", "K.1.1.5", "K.1.1.6", "K.1.1.7", "K.1.1.8", "K.1.1.9", "K.1.1.10",
-	"K.1.1.11", "K.1.1.12", "K.1.1.13", "K.1.1.14", "K.1.1.15", "K.1.1.16", "K.1.1.17", "K.1.1.18", "K.1.1.19", "K.1.1.20",
-	"K.1.1.21",
-
-	// token, cert, auth
-	"K.1.2.1", "K.1.2.2", "K.1.2.3", "K.1.2.4", "K.1.2.5", "K.1.2.6", "K.1.2.7", "K.1.2.8", "K.1.2.9",
-	// adm. ctrl.
-	"K.1.2.10", "K.1.2.11", "K.1.2.12", "K.1.2.13", "K.1.2.14", "K.1.2.15", "K.1.2.16", "K.1.2.17",
-	// secure port
-	"K.1.2.18", "K.1.2.19", "K.1.2.20",
-	// audit
-	"K.1.2.22", "K.1.2.23", "K.1.2.24", "K.1.2.25",
-	// service account, tls, encrypt
-	"K.1.2.27", "K.1.2.28", "K.1.2.29", "K.1.2.30", "K.1.2.31", "K.1.2.32", "K.1.2.33", "K.1.2.34", "K.1.2.35",
-
-	// service account
-	"K.1.3.3", "K.1.3.4", "K.1.3.5", "K.1.3.6",
-
-	// cert
-	"K.2.1", "K.2.2", "K.2.3", "K.2.4", "K.2.5", "K.2.6", "K.2.7",
-
-	// audit
-	"K.3.2.1", "K.3.2.2",
-
-	// worker: file mode owner
-	"K.4.1.1", "K.4.1.2", "K.4.1.3", "K.4.1.4", "K.4.1.5", "K.4.1.6", "K.4.1.7", "K.4.1.8", "K.4.1.9", "K.4.1.10",
-
-	// auth
-	"K.4.2.1", "K.4.2.2", "K.4.2.3", "K.4.2.4", "K.4.2.6",
-	// cert
-	"K.4.2.10", "K.4.2.11", "K.4.2.12", "K.4.2.13",
-}
-
-var compliancePCI []string = []string{
-	// trusted user
-	"D.1.1.2",
-
-	// insecure registry, tls, no new privileges
-	"D.2.5", "D.2.7", "D.2.14",
-
-	// file mode, owner
-	"D.3.1", "D.3.2", "D.3.3", "D.3.4", "D.3.5", "D.3.6", "D.3.7", "D.3.8", "D.3.9", "D.3.10",
-	"D.3.11", "D.3.12", "D.3.13", "D.3.14", "D.3.15", "D.3.16", "D.3.17", "D.3.18", "D.3.19", "D.3.20",
-	"D.3.21", "D.3.22",
-
-	// privilege, mount, ssh (5.6)
-	"D.5.4", "D.5.5", "D.5.6", "D.5.7", "D.5.17", "D.5.25", "D.5.31",
-
-	// host ns shared
-	"D.5.9", "D.5.12", "D.5.15", "D.5.16", "D.5.20", "D.5.30",
-
-	// master file mode, owner
-	"K.1.1.1", "K.1.1.2", "K.1.1.3", "K.1.1.4", "K.1.1.5", "K.1.1.6", "K.1.1.7", "K.1.1.8", "K.1.1.9", "K.1.1.10",
-	"K.1.1.11", "K.1.1.12", "K.1.1.13", "K.1.1.14", "K.1.1.15", "K.1.1.16", "K.1.1.17", "K.1.1.18", "K.1.1.19", "K.1.1.20",
-	"K.1.1.21",
-
-	// token, cert, auth
-	"K.1.2.1", "K.1.2.2", "K.1.2.3", "K.1.2.4", "K.1.2.5", "K.1.2.6", "K.1.2.7", "K.1.2.8", "K.1.2.9",
-	// adm. ctrl.
-	"K.1.2.10", "K.1.2.11", "K.1.2.12", "K.1.2.13", "K.1.2.14", "K.1.2.15", "K.1.2.16", "K.1.2.17",
-	// secure port
-	"K.1.2.18", "K.1.2.19", "K.1.2.20",
-
-	// service account, tls, encrypt
-	"K.1.2.27", "K.1.2.28", "K.1.2.29", "K.1.2.30", "K.1.2.31", "K.1.2.32", "K.1.2.33", "K.1.2.34", "K.1.2.35",
-
-	// service account
-	"K.1.3.3", "K.1.3.4", "K.1.3.5", "K.1.3.6",
-
-	// cert
-	"K.2.1", "K.2.2", "K.2.3", "K.2.4", "K.2.5", "K.2.6", "K.2.7",
-
-	// worker: file mode owner
-	"K.4.1.1", "K.4.1.2", "K.4.1.3", "K.4.1.4", "K.4.1.5", "K.4.1.6", "K.4.1.7", "K.4.1.8", "K.4.1.9", "K.4.1.10",
-
-	// auth
-	"K.4.2.1", "K.4.2.2", "K.4.2.3", "K.4.2.4", "K.4.2.6",
-	// cert
-	"K.4.2.10", "K.4.2.11", "K.4.2.12", "K.4.2.13",
-}
-
-var complianceGDPR []string = []string{
-	// trusted user
-	"D.1.1.2",
-	// audit
-	"D.1.1.3", "D.1.1.4", "D.1.1.5", "D.1.1.6", "D.1.1.7", "D.1.1.8", "D.1.1.9", "D.1.1.10", "D.1.1.11", "D.1.1.12",
-	"D.1.1.13", "D.1.1.14", "D.1.1.15", "D.1.1.16", "D.1.1.17", "D.1.1.18",
-
-	// tls,
-	"D.2.7",
-
-	// file mode, owner
-	"D.3.1", "D.3.2", "D.3.3", "D.3.4", "D.3.5", "D.3.6", "D.3.7", "D.3.8", "D.3.9", "D.3.10",
-	"D.3.11", "D.3.12", "D.3.13", "D.3.14", "D.3.15", "D.3.16", "D.3.17", "D.3.18", "D.3.19", "D.3.20",
-	"D.3.21", "D.3.22",
-
-	// master file mode, owner
-	"K.1.1.1", "K.1.1.2", "K.1.1.3", "K.1.1.4", "K.1.1.5", "K.1.1.6", "K.1.1.7", "K.1.1.8", "K.1.1.9", "K.1.1.10",
-	"K.1.1.11", "K.1.1.12", "K.1.1.13", "K.1.1.14", "K.1.1.15", "K.1.1.16", "K.1.1.17", "K.1.1.18", "K.1.1.19", "K.1.1.20",
-	"K.1.1.21",
-
-	// token, cert, auth
-	"K.1.2.1", "K.1.2.2", "K.1.2.3", "K.1.2.4", "K.1.2.5", "K.1.2.6", "K.1.2.7", "K.1.2.8", "K.1.2.9",
-	// secure port
-	"K.1.2.18", "K.1.2.19", "K.1.2.20",
-	// audit
-	"K.1.2.22", "K.1.2.23", "K.1.2.24", "K.1.2.25",
-	// service account, tls, encrypt
-	"K.1.2.27", "K.1.2.28", "K.1.2.29", "K.1.2.30", "K.1.2.31", "K.1.2.32", "K.1.2.33", "K.1.2.34", "K.1.2.35",
-
-	// service account
-	"K.1.3.3", "K.1.3.4", "K.1.3.5", "K.1.3.6",
-
-	// cert
-	"K.2.1", "K.2.2", "K.2.3", "K.2.4", "K.2.5", "K.2.6", "K.2.7",
-
-	// audit
-	"K.3.2.1", "K.3.2.2",
-
-	// worker: file mode owner
-	"K.4.1.1", "K.4.1.2", "K.4.1.3", "K.4.1.4", "K.4.1.5", "K.4.1.6", "K.4.1.7", "K.4.1.8", "K.4.1.9", "K.4.1.10",
-
-	// auth
-	"K.4.2.1", "K.4.2.2", "K.4.2.3", "K.4.2.4", "K.4.2.6",
-	// cert
-	"K.4.2.10", "K.4.2.11", "K.4.2.12", "K.4.2.13",
-}
-
-var docker_image_cis_items = map[string]api.RESTBenchCheck{
+var mock_docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.1": api.RESTBenchCheck{
 		TestNum:     "I.4.1",
 		Type:        "image",
@@ -287,7 +63,7 @@ var docker_image_cis_items = map[string]api.RESTBenchCheck{
 	},
 }
 
-var cis_items = map[string]api.RESTBenchCheck{
+var mock_cis_items = map[string]api.RESTBenchCheck{
 	"D.1.1.1": api.RESTBenchCheck{
 		TestNum:     "D.1.1.1",
 		Type:        "host",
@@ -1355,7 +1131,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
-		Description: "Ensure that the API server pod specification file ownership is set to root:root",
+		Description: "mock Ensure that the API server pod specification file ownership is set to root:root",
 		Remediation: "Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml",
 	},
 	"K.1.1.3": api.RESTBenchCheck{
@@ -1365,7 +1141,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
-		Description: "Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive",
+		Description: "mock Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive",
 		Remediation: "Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-controller-manager.yaml",
 	},
 	"K.1.1.4": api.RESTBenchCheck{
@@ -1375,7 +1151,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
-		Description: "Ensure that the controller manager pod specification file ownership is set to root:root",
+		Description: "mock Ensure that the controller manager pod specification file ownership is set to root:root",
 		Remediation: "Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml",
 	},
 	"K.1.1.5": api.RESTBenchCheck{
@@ -1405,7 +1181,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   false,
-		Description: "Ensure that the etcd pod specification file permissions are set to 644 or more restrictive",
+		Description: "mock Ensure that the etcd pod specification file permissions are set to 644 or more restrictive",
 		Remediation: "Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/etcd.yaml",
 	},
 	"K.1.1.8": api.RESTBenchCheck{
@@ -2055,7 +1831,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
-		Description: "Ensure that a unique Certificate Authority is used for etcd",
+		Description: "mock Ensure that a unique Certificate Authority is used for etcd",
 		Remediation: "Follow the etcd documentation and create a dedicated certificate authority setup for the etcd service. Then, edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml on the master node and set the below parameter. --trusted-ca-file=</path/to/ca-file>",
 	},
 	"K.3.1.1": api.RESTBenchCheck{
@@ -2065,7 +1841,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      false,
 		Profile:     "Level 2",
 		Automated:   false,
-		Description: "Client certificate authentication should not be used for users",
+		Description: "mock Client certificate authentication should not be used for users",
 		Remediation: "Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of client certificates.",
 	},
 	"K.3.2.1": api.RESTBenchCheck{
@@ -2095,7 +1871,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
-		Description: "Ensure that the kubelet service file permissions are set to 644 or more restrictive",
+		Description: "mock Ensure that the kubelet service file permissions are set to 644 or more restrictive",
 		Remediation: "Run the below command (based on the file location on your system) on the each worker node. For example, chmod 644 /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
 	},
 	"K.4.1.2": api.RESTBenchCheck{
@@ -2195,7 +1971,7 @@ var cis_items = map[string]api.RESTBenchCheck{
 		Scored:      true,
 		Profile:     "Level 1",
 		Automated:   true,
-		Description: "Ensure that the anonymous-auth argument is set to false",
+		Description: "mock Ensure that the anonymous-auth argument is set to false",
 		Remediation: "If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false. If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --anonymous-auth=false Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service",
 	},
 	"K.4.2.2": api.RESTBenchCheck{
@@ -2320,56 +2096,160 @@ var cis_items = map[string]api.RESTBenchCheck{
 	},
 }
 
-// Map to record each complicance, inorder to update and iterate it easier.
-var complianceSet = map[string]map[string]bool{
-	api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
-	api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
-	api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
-	api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+var mockComplianceSet = map[string]map[string]bool{
+	api.ComplianceTemplateGDPR: {
+		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
+		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
+		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
+		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
+		"D.1.1.9": true, "D.2.7": true, "D.3.1": true, "D.3.10": true,
+		"D.3.11": true, "D.3.12": true, "D.3.13": true, "D.3.14": true,
+		"D.3.15": true, "D.3.16": true, "D.3.17": true, "D.3.18": true,
+		"D.3.19": true, "D.3.2": true, "D.3.20": true, "D.3.21": true,
+		"D.3.22": true, "D.3.3": true, "D.3.4": true, "D.3.5": true,
+		"D.3.6": true, "D.3.7": true, "D.3.8": true, "D.3.9": true,
+		"K.1.1.1": true, "K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true,
+		"K.1.1.13": true, "K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true,
+		"K.1.1.17": true, "K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true,
+		"K.1.1.20": true, "K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true,
+		"K.1.1.5": true, "K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true,
+		"K.1.1.9": true, "K.1.2.1": true, "K.1.2.18": true, "K.1.2.19": true,
+		"K.1.2.2": true, "K.1.2.20": true, "K.1.2.22": true, "K.1.2.23": true,
+		"K.1.2.24": true, "K.1.2.25": true, "K.1.2.27": true, "K.1.2.28": true,
+		"K.1.2.29": true, "K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true,
+		"K.1.2.32": true, "K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true,
+		"K.1.2.4": true, "K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true,
+		"K.1.2.8": true, "K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true,
+		"K.1.3.5": true, "K.1.3.6": true, "K.2.1": true, "K.2.2": true,
+		"K.2.3": true, "K.2.4": true, "K.2.5": true, "K.2.6": true,
+		"K.2.7": true, "K.3.2.1": true, "K.3.2.2": true, "K.4.1.1": true,
+		"K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true, "K.4.1.4": true,
+		"K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true, "K.4.1.8": true,
+		"K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true, "K.4.2.11": true,
+		"K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true, "K.4.2.3": true,
+		"K.4.2.4": true, "K.4.2.6": true,
+	},
+	api.ComplianceTemplateHIPAA: {
+		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
+		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
+		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
+		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
+		"D.1.1.9": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
+		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
+		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
+		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
+		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
+		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
+		"D.3.8": true, "D.3.9": true, "D.5.12": true, "D.5.15": true,
+		"D.5.16": true, "D.5.17": true, "D.5.20": true, "D.5.25": true,
+		"D.5.30": true, "D.5.31": true, "D.5.4": true, "D.5.5": true,
+		"D.5.6": true, "D.5.7": true, "D.5.9": true, "K.1.1.1": true,
+		"K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true, "K.1.1.13": true,
+		"K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true, "K.1.1.17": true,
+		"K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true, "K.1.1.20": true,
+		"K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true, "K.1.1.5": true,
+		"K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true, "K.1.1.9": true,
+		"K.1.2.1": true, "K.1.2.10": true, "K.1.2.11": true, "K.1.2.12": true,
+		"K.1.2.13": true, "K.1.2.14": true, "K.1.2.15": true, "K.1.2.16": true,
+		"K.1.2.17": true, "K.1.2.18": true, "K.1.2.19": true, "K.1.2.2": true,
+		"K.1.2.20": true, "K.1.2.22": true, "K.1.2.23": true, "K.1.2.24": true,
+		"K.1.2.25": true, "K.1.2.27": true, "K.1.2.28": true, "K.1.2.29": true,
+		"K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true, "K.1.2.32": true,
+		"K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true, "K.1.2.4": true,
+		"K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true, "K.1.2.8": true,
+		"K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true, "K.1.3.5": true,
+		"K.1.3.6": true, "K.2.1": true, "K.2.2": true, "K.2.3": true,
+		"K.2.4": true, "K.2.5": true, "K.2.6": true, "K.2.7": true,
+		"K.3.2.1": true, "K.3.2.2": true, "K.4.1.1": true, "K.4.1.10": true,
+		"K.4.1.2": true, "K.4.1.3": true, "K.4.1.4": true, "K.4.1.5": true,
+		"K.4.1.6": true, "K.4.1.7": true, "K.4.1.8": true, "K.4.1.9": true,
+		"K.4.2.1": true, "K.4.2.10": true, "K.4.2.11": true, "K.4.2.12": true,
+		"K.4.2.13": true, "K.4.2.2": true, "K.4.2.3": true, "K.4.2.4": true,
+		"K.4.2.6": true,
+	},   
+	api.ComplianceTemplateNIST: {
+		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
+		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
+		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
+		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
+		"D.1.1.9": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
+		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
+		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
+		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
+		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
+		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
+		"D.3.8": true, "D.3.9": true, "D.4.1": true, "D.4.10": true,
+		"D.4.8": true, "D.5.12": true, "D.5.15": true, "D.5.16": true,
+		"D.5.17": true, "D.5.20": true, "D.5.25": true, "D.5.30": true,
+		"D.5.31": true, "D.5.4": true, "D.5.5": true, "D.5.6": true,
+		"D.5.7": true, "D.5.9": true, "I.4.1": true, "I.4.10": true,
+		"I.4.8": true, "K.1.1.1": true, "K.1.1.10": true, "K.1.1.11": true,
+		"K.1.1.12": true, "K.1.1.13": true, "K.1.1.14": true, "K.1.1.15": true,
+		"K.1.1.16": true, "K.1.1.17": true, "K.1.1.18": true, "K.1.1.19": true,
+		"K.1.1.2": true, "K.1.1.20": true, "K.1.1.21": true, "K.1.1.3": true,
+		"K.1.1.4": true, "K.1.1.5": true, "K.1.1.6": true, "K.1.1.7": true,
+		"K.1.1.8": true, "K.1.1.9": true, "K.1.2.1": true, "K.1.2.10": true,
+		"K.1.2.11": true, "K.1.2.12": true, "K.1.2.13": true, "K.1.2.14": true,
+		"K.1.2.15": true, "K.1.2.16": true, "K.1.2.17": true, "K.1.2.18": true,
+		"K.1.2.19": true, "K.1.2.2": true, "K.1.2.20": true, "K.1.2.22": true,
+		"K.1.2.23": true, "K.1.2.24": true, "K.1.2.25": true, "K.1.2.27": true,
+		"K.1.2.28": true, "K.1.2.29": true, "K.1.2.3": true, "K.1.2.30": true,
+		"K.1.2.31": true, "K.1.2.32": true, "K.1.2.33": true, "K.1.2.34": true,
+		"K.1.2.35": true, "K.1.2.4": true, "K.1.2.5": true, "K.1.2.6": true,
+		"K.1.2.7": true, "K.1.2.8": true, "K.1.2.9": true, "K.1.3.3": true,
+		"K.1.3.4": true, "K.1.3.5": true, "K.1.3.6": true, "K.2.1": true,
+		"K.2.2": true, "K.2.3": true, "K.2.4": true, "K.2.5": true,
+		"K.2.6": true, "K.2.7": true, "K.3.2.1": true, "K.3.2.2": true,
+		"K.4.1.1": true, "K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true,
+		"K.4.1.4": true, "K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true,
+		"K.4.1.8": true, "K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true,
+		"K.4.2.11": true, "K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true,
+		"K.4.2.3": true, "K.4.2.4": true, "K.4.2.6": true,
+		// ... 更多 NIST 項目 ...
+	},
+	api.ComplianceTemplatePCI: {
+		"D.1.1.2": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
+		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
+		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
+		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
+		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
+		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
+		"D.3.8": true, "D.3.9": true, "D.5.12": true, "D.5.15": true,
+		"D.5.16": true, "D.5.17": true, "D.5.20": true, "D.5.25": true,
+		"D.5.30": true, "D.5.31": true, "D.5.4": true, "D.5.5": true,
+		"D.5.6": true, "D.5.7": true, "D.5.9": true, "K.1.1.1": true,
+		"K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true, "K.1.1.13": true,
+		"K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true, "K.1.1.17": true,
+		"K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true, "K.1.1.20": true,
+		"K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true, "K.1.1.5": true,
+		"K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true, "K.1.1.9": true,
+		"K.1.2.1": true, "K.1.2.10": true, "K.1.2.11": true, "K.1.2.12": true,
+		"K.1.2.13": true, "K.1.2.14": true, "K.1.2.15": true, "K.1.2.16": true,
+		"K.1.2.17": true, "K.1.2.18": true, "K.1.2.19": true, "K.1.2.2": true,
+		"K.1.2.20": true, "K.1.2.27": true, "K.1.2.28": true, "K.1.2.29": true,
+		"K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true, "K.1.2.32": true,
+		"K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true, "K.1.2.4": true,
+		"K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true, "K.1.2.8": true,
+		"K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true, "K.1.3.5": true,
+		"K.1.3.6": true, "K.2.1": true, "K.2.2": true, "K.2.3": true,
+		"K.2.4": true, "K.2.5": true, "K.2.6": true, "K.2.7": true,
+		"K.4.1.1": true, "K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true,
+		"K.4.1.4": true, "K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true,
+		"K.4.1.8": true, "K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true,
+		"K.4.2.11": true, "K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true,
+		"K.4.2.3": true, "K.4.2.4": true, "K.4.2.6": true,
+	},
 }
 
-type Check struct {
-    ID          string `yaml:"id"`
-	Description string `yaml:"description"`
-	Type	 	string `yaml:"type"`
-	Category 	string `yaml:"category"`
-	Scored 		bool `yaml:"scored"`
-	Profile 	string `yaml:"profile"`
-	Automated 	bool `yaml:"automated"`
-	Tags	 	[]string `yaml:"tags"`
-    Remediation string `yaml:"remediation"`
-}
-
-type Group struct {
-    Checks []Check `yaml:"checks"`
-}
-
-type YamlFile struct {
-    Groups []Group `yaml:"groups"`
-}
-
-func GetComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
-	// Ensuring initialization happens only once
-	once.Do(func() {
-		// inProductionK8s flag means we will read yaml provided from the pod environment, which we are not allowed to read in test environment
-        complianceMetas, complianceMetaMap = PrepareComplianceMeta(inProductionK8s)
-    })
-
-	return complianceMetas, complianceMetaMap
-}
-
-func PrepareComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
-	// Currently support k8s related yaml to do the dynamically update from the production environment only.
-	GetK8sCISMeta(inProductionK8s)
-
-	complianceMetaMap = make(map[string]api.RESTBenchMeta)
+func testInit() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
+	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
 
 	var all []api.RESTBenchMeta
 
-	for _, item := range cis_items {
+	for _, item := range mock_cis_items {
 		all = append(all, api.RESTBenchMeta{RESTBenchCheck: item})
 	}
-	for _, item := range docker_image_cis_items {
+	for _, item := range mock_docker_image_cis_items {
 		all = append(all, api.RESTBenchMeta{RESTBenchCheck: item})
 	}
 
@@ -2377,111 +2257,37 @@ func PrepareComplianceMeta(inProductionK8s bool) ([]api.RESTBenchMeta, map[strin
 		item := &all[i]
 		item.Tags = make([]string, 0)
 
-		// Iterate the compliance set to append the tag if this testitem in the complicance
-		for compliance, _ := range complianceSet {
-			if _, exists := complianceSet[compliance][item.TestNum]; exists {
+		// Mock the mockComplianceSet
+		for compliance, _ := range mockComplianceSet {
+			if _, exists := mockComplianceSet[compliance][item.TestNum]; exists {
 				item.Tags = append(item.Tags, compliance)
 			}
 		}
 
 		sort.Strings(item.Tags)
-		complianceMetaMap[item.TestNum] = *item
+		mockComplianceMetaMap[item.TestNum] = *item
 	}
 
 	sort.Slice(all, func(i, j int) bool { return all[i].TestNum < all[j].TestNum })
-	complianceMetas = all
+	mockComplianceMetas = all
 
-	return complianceMetas, complianceMetaMap
+	return mockComplianceMetas, mockComplianceMetaMap
 }
 
-// Currently update the k8s Folder only
-func GetK8sCISFolder(inProductionK8s bool) string{
-	var remediationFolder string
-	if inProductionK8s {
-		k8sVer, _ := global.ORCH.GetVersion(false, false)
-		kVer, err := version.NewVersion(k8sVer)
-		if err != nil {
-			remediationFolder = kube180YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
-			remediationFolder = kube180YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
-			remediationFolder = kube124YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
-			remediationFolder = kube123YAMLFolder
-		} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
-			remediationFolder = kube160YAMLFolder
-		} else {
-			remediationFolder = defaultYAMLFolder
-		}	
-	} else {
-		log.WithFields(log.Fields{"defaultYAMLFolder": defaultYAMLFolder}).Info("Error reading file")
-		remediationFolder = defaultYAMLFolder
+func TestGetComplianceMeta(t *testing.T) { 
+	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis")
+	mockComplianceMetas, mockComplianceMetaMap := testInit()
+	complianceMetas, complianceMetaMap := GetComplianceMeta(false)
+
+	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
+		t.Errorf("mockComplianceMetas is not update correctly")
 	}
-	return remediationFolder
-}
 
-func GetK8sCISMeta(inProductionK8s bool) {
-	// Check the current k8s version, then read the correct folder
-	remediationFolder := GetK8sCISFolder(inProductionK8s)
-	
-	// Read every yaml under the folder, then dynamically update the cis_items and complianceSet
-	filepath.Walk(remediationFolder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
-			return err 
-		}
-
-		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
-			fileContent, err := ioutil.ReadFile(path)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Error reading file")
-				return err
-			}
-
-			var yamlFile YamlFile
-			err = yaml.Unmarshal(fileContent, &yamlFile)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
-				return err
-			}
-
-			for _, group := range yamlFile.Groups {
-				for _, check := range group.Checks {
-					cis_id := fmt.Sprintf("K.%s", check.ID)
-					cis_items[cis_id] = api.RESTBenchCheck{
-						TestNum:     cis_id,
-						Type:        check.Type,
-						Category:    check.Category,
-						Scored:      check.Scored,
-						Profile:     check.Profile,
-						Automated:   check.Automated,
-						Description: catchDescription.ReplaceAllString(check.Description, "$1"),
-						Remediation: check.Remediation,
-					}
-
-					envolvedCompliance := TransformArrayToMap(check.Tags)
-					for compliance := range complianceSet {
-						// Update the compliance
-						// if cis_id affect the compliance, make sure it in the compliance.
-						// else, make sure the cis_id is not in the compliance.
-						if _, exists := envolvedCompliance[compliance]; exists {
-							complianceSet[compliance][cis_id] = true
-						} else {
-							delete(complianceSet[compliance], cis_id)
-						}
-					}
-				}
-			}
-		}
-		return nil 
-	})
-}
-
-// Transform the array as set, implement with built-in map 
-func TransformArrayToMap(array []string) map [string]bool{
-	arrayItemMap := make(map [string]bool)
-	for _, arrrayItem := range array {
-		arrayItemMap[arrrayItem] = true
+	if fmt.Sprint(mockComplianceMetaMap) != fmt.Sprint(complianceMetaMap) {
+		t.Errorf("mockComplianceMetaMap is not update correctly")
 	}
-	return arrayItemMap
+
+	if fmt.Sprint(mockComplianceSet) != fmt.Sprint(complianceSet) {
+		t.Errorf("complianceSet is not update correctly")
+	}
 }

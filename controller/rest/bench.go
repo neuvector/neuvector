@@ -20,10 +20,8 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter) *api.RESTBenchItem {
+func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter, metaMap map[string]api.RESTBenchMeta) *api.RESTBenchItem {
 	var r *api.RESTBenchItem
-
-	_, metaMap := scanUtils.GetComplianceMeta()
 
 	if c, ok := metaMap[item.TestNum]; ok {
 		r = &api.RESTBenchItem{
@@ -687,9 +685,11 @@ func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, c
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
 
+	_, metaMap := scanUtils.GetComplianceMeta(true)
+
 	// Add check tags
 	for _, item := range r.Items {
-		if ritem := bench2REST(bench, item, cpf); ritem != nil {
+		if ritem := bench2REST(bench, item, cpf, metaMap); ritem != nil {
 			rpt.Items = append(rpt.Items, ritem)
 		}
 	}
@@ -759,9 +759,11 @@ func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfile
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
 
+	_, metaMap := scanUtils.GetComplianceMeta(true)
+
 	// Add check tags
 	for _, item := range r.Items {
-		if ritem := bench2REST(bench, item, cpf); ritem != nil {
+		if ritem := bench2REST(bench, item, cpf, metaMap); ritem != nil {
 			rpt.Items = append(rpt.Items, ritem)
 		}
 	}

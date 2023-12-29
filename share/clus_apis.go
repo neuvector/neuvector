@@ -1561,6 +1561,7 @@ const (
 	BenchLevelPass  = "PASS"
 	BenchLevelInfo  = "INFO"
 	BenchLevelWarn  = "WARN"
+	BenchLevelManual  = "MANUAL"
 	BenchLevelHigh  = "HIGH"
 	BenchLevelNote  = "NOTE"
 	BenchLevelError = "ERROR"
