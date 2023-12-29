@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+	"gopkg.in/yaml.v3"
+	"path/filepath"
 
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
@@ -50,6 +52,13 @@ const (
 	kube160MasterTmpl   = srcSh + "kube_master_1_6_0.tmpl"
 	kube160WorkerTmpl   = srcSh + "kube_worker_1_6_0.tmpl"
 	kube160Remediation  = srcSh + "kubecis_1_6_0.rem"
+	kubeRunnerTmpl    	= srcSh + "kube_runner.tmpl"
+	rhRunnerTmpl    	= srcSh + "rh_runner.tmpl"
+	kube160YAMLFolder	= dstSh + "cis-1.6.0/"
+	kube123YAMLFolder	= dstSh + "cis-1.23/"
+	kube124YAMLFolder	= dstSh + "cis-1.24/"
+	kube180YAMLFolder	= dstSh + "cis-1.8.0/"
+	rh140YAMLFolder		= dstSh + "rh-1.4.0/"
 	kubeGKEMasterTmpl   = srcSh + "kube_master_gke_1_0_0.tmpl"
 	kubeGKEWorkerTmpl   = srcSh + "kube_worker_gke_1_0_0.tmpl"
 	kubeGKERemediation  = srcSh + "kubecis_gke_1_0_0.rem"
@@ -121,6 +130,7 @@ type Bench struct {
 	kubeCISVer      string
 	dockerCISVer    string
 	taskScanner     *TaskScanner
+	cisYAMLMode	    bool
 }
 
 type DockerReplaceOpts struct {
@@ -137,6 +147,19 @@ type KubeCisReplaceOpts struct {
 	Replace_proxy_cmd         string
 	Replace_baseImageBin_path string
 	Replace_configPrefix_path string
+}
+
+type Check struct {
+    ID          string `yaml:"id"`
+    Remediation string `yaml:"remediation"`
+}
+
+type Group struct {
+    Checks []Check `yaml:"checks"`
+}
+
+type YamlFile struct {
+    Groups []Group `yaml:"groups"`
 }
 
 func newBench(platform, flavor string) *Bench {
@@ -229,10 +252,15 @@ func (b *Bench) BenchLoop() {
 				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorOpenShift {
 					ocVer, err := version.NewVersion(ocVer)
 					if err != nil {
-						b.kubeCISVer = "OpenShift-1.1.0"
-						masterScript = kubeOC45MasterTmpl
-						workerScript = kubeOC45WorkerTmpl
-						remediation = kubeOC45Remediation
+						b.kubeCISVer = "OpenShift-1.4.0"
+						masterScript = rhRunnerTmpl
+						workerScript = rhRunnerTmpl
+						remediation = rh140YAMLFolder
+					} else if ocVer.Compare(version.Must(version.NewVersion("4.6"))) >= 0 {
+						b.kubeCISVer = "OpenShift-1.4.0"
+						masterScript = rhRunnerTmpl
+						workerScript = rhRunnerTmpl
+						remediation = rh140YAMLFolder
 					} else if ocVer.Compare(version.Must(version.NewVersion("4.4"))) >= 0 {
 						b.kubeCISVer = "OpenShift-1.1.0"
 						masterScript = kubeOC45MasterTmpl
@@ -247,15 +275,35 @@ func (b *Bench) BenchLoop() {
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
-						b.kubeCISVer = "1.6.0"
-						masterScript = kube160MasterTmpl
-						workerScript = kube160WorkerTmpl
-						remediation = kube160Remediation
+						b.cisYAMLMode = true
+						b.kubeCISVer = "1.8.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube180YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
+						b.cisYAMLMode = true
+						b.kubeCISVer = "1.8.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube180YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
+						b.cisYAMLMode = true
+						b.kubeCISVer = "1.24"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube124YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+						b.cisYAMLMode = true
+						b.kubeCISVer = "1.23"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube123YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
+						b.cisYAMLMode = true
 						b.kubeCISVer = "1.6.0"
-						masterScript = kube160MasterTmpl
-						workerScript = kube160WorkerTmpl
-						remediation = kube160Remediation
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube160YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.15"))) >= 0 {
 						b.kubeCISVer = "1.5.1"
 						masterScript = kube151MasterTmpl
@@ -347,7 +395,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeMaster {
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusRunning)
 
-		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh)
+		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh, remediation)
 		if errMaster != nil {
 			log.WithFields(log.Fields{
 				"error": errMaster, "script": masterScriptSh,
@@ -368,7 +416,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeWorker {
 		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusRunning)
 
-		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh)
+		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh, remediation)
 		if errWorker != nil {
 			log.WithFields(log.Fields{
 				"error": errWorker, "script": workerScriptSh,
@@ -524,6 +572,8 @@ func (b *Bench) parseBenchMsg(line string) (*benchItem, bool) {
 		level = share.BenchLevelWarn
 	} else if strings.Contains(line, "[NOTE]") {
 		level = share.BenchLevelNote
+	} else if strings.Contains(line, "[MANUAL]") {
+		level = share.BenchLevelManual
 	} else {
 		return nil, false
 	}
@@ -1162,7 +1212,7 @@ func (b *Bench) checkRequiredHostProgs(progs []string) error {
 	return nil
 }
 
-func (b *Bench) runKubeBench(bench share.BenchType, script string) ([]byte, error) {
+func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder string) ([]byte, error) {
 	if !b.bEnable {
 		return nil, fmt.Errorf("Session ended")
 	}
@@ -1171,8 +1221,17 @@ func (b *Bench) runKubeBench(bench share.BenchType, script string) ([]byte, erro
 	log.WithFields(log.Fields{"type": bench}).Debug("Running Kubernetes CIS bench")
 
 	var cmd *exec.Cmd 
+	var config string
 
-	cmd = exec.Command("sh", script)
+	if b.cisYAMLMode {
+		if bench == share.BenchKubeMaster {
+			config = remediationFolder + "master"
+		} else if bench == share.BenchKubeWorker {
+			config = remediationFolder + "worker"
+		}
+	}
+
+	cmd = exec.Command("sh", script, config)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
@@ -1243,23 +1302,55 @@ func (b *Bench) getKubeVersion() string {
 	return string(out)
 }
 
-func (b *Bench) loadRemediation(remediation string) map[string]string {
-	r := make(map[string]string)
+func (b *Bench) loadRemediation(path string) map[string]string {
+    remediationMap := make(map[string]string)
 
-	dat, err := ioutil.ReadFile(remediation)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Open remediation file fail")
-		return r
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(string(dat)))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if i := strings.Index(line, ":"); i > 0 {
-			r[strings.TrimSpace(line[:i-1])] = line[i+1:]
+	if b.cisYAMLMode {
+		filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
+				return err // return the error encountered
+			}
+	
+			if !info.IsDir() && filepath.Ext(path) == ".yaml" {
+				fileContent, err := ioutil.ReadFile(path)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("Error reading file")
+					return err // return the error encountered
+				}
+	
+				var yamlFile YamlFile
+				err = yaml.Unmarshal(fileContent, &yamlFile)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+					return err // return the error encountered
+				}
+	
+				for _, group := range yamlFile.Groups {
+					for _, check := range group.Checks {
+						remediationMap[check.ID] = check.Remediation
+					}
+				}
+			}
+			return nil // no error, return nil
+		})
+	} else {
+		dat, err := ioutil.ReadFile(path)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Open remediation file fail")
+			return remediationMap
+		}
+	
+		scanner := bufio.NewScanner(strings.NewReader(string(dat)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if i := strings.Index(line, ":"); i > 0 {
+				remediationMap[strings.TrimSpace(line[:i-1])] = line[i+1:]
+			}
 		}
 	}
-	return r
+
+    return remediationMap
 }
 
 //replace the kubernetes cis command
