@@ -1,0 +1,60 @@
+version: "cis-1.6"
+id: 4
+title: "4 - Worker Nodes"
+type: "node"
+groups:
+  - id: 4.1
+    title: "4.1 - Worker Node Configuration Files"
+    checks:
+      - id: 4.1.1
+        description: mock Ensure that the kubelet service file permissions are set to 644 or more restrictive
+        type: worker
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$check"
+                else
+                  warn "$check"
+                  warn "      * Wrong permissions for $file"
+                fi
+              else
+                info "$check"
+                info "      * The kubelet service file not found"
+              fi
+        remediation: "Run the below command (based on the file location on your system) on the each worker node. For example, chmod 644 /etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+  - id: 4.2
+    title: "4.2 - Kubelet"
+    checks:
+      - id: 4.2.1
+        description: mock Ensure that the anonymous-auth argument is set to false
+        type: worker
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              if check_argument "$CIS_KUBELET_CMD" 'anonymous-auth=false' >/dev/null 2>&1; then
+                  pass "$check"
+              else
+                  warn "$check"
+              fi
+        remediation: "If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false. If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. --anonymous-auth=false Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service"
