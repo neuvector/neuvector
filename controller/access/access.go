@@ -772,7 +772,6 @@ func CompileUriPermitsMapping() {
 				"v1/system/license",
 				"v1/system/summary",
 				"v1/internal/system",
-				"v1/system/config/remote_repository/*",
 			},
 			CONST_API_FED: []string{
 				"v1/fed/join_token",
