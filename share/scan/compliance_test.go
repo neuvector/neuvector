@@ -2292,9 +2292,12 @@ func restoreMockData() {
 	}
 }
 
-func TestGetComplianceMeta(t *testing.T) { 
+func TestSetup(t *testing.T) { 
 	// must PrepareBackup() in the first test function to store the original cis_items
 	PrepareBackup()
+}
+
+func TestGetComplianceMeta(t *testing.T) { 
 	restoreMockData()
 	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis")
 	mockComplianceMetas, mockComplianceMetaMap := initMockData(mock_docker_image_cis_items, mock_cis_items, mockComplianceSet)
