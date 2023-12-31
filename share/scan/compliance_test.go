@@ -2122,7 +2122,8 @@ var mockComplianceSet = map[string]map[string]bool{
 		"K.1.2.8": true, "K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true,
 		"K.1.3.5": true, "K.1.3.6": true, "K.2.1": true, "K.2.2": true,
 		"K.2.3": true, "K.2.4": true, "K.2.5": true, "K.2.6": true,
-		"K.2.7": true, "K.3.2.1": true, "K.3.2.2": true, "K.4.1.1": true,
+		// remove GDPR in 4.1.1 for mocking
+		"K.2.7": true, "K.3.2.1": true, "K.3.2.2": true,
 		"K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true, "K.4.1.4": true,
 		"K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true, "K.4.1.8": true,
 		"K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true, "K.4.2.11": true,
@@ -2205,7 +2206,6 @@ var mockComplianceSet = map[string]map[string]bool{
 		"K.4.1.8": true, "K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true,
 		"K.4.2.11": true, "K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true,
 		"K.4.2.3": true, "K.4.2.4": true, "K.4.2.6": true,
-		// ... 更多 NIST 項目 ...
 	},
 	api.ComplianceTemplatePCI: {
 		"D.1.1.2": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
@@ -2241,7 +2241,7 @@ var mockComplianceSet = map[string]map[string]bool{
 	},
 }
 
-func testInit() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
+func initMockData(mock_docker_image_cis_items map[string]api.RESTBenchCheck, mock_cis_items map[string]api.RESTBenchCheck, mockComplianceSet map[string]map[string]bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
 	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
 
 	var all []api.RESTBenchMeta
@@ -2274,20 +2274,60 @@ func testInit() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
 	return mockComplianceMetas, mockComplianceMetaMap
 }
 
+// restore the related data
+func restoreMockData() {
+	for key, value := range cis_items {
+		backup_cis_items[key] = value
+	}
+
+	for key, value := range docker_image_cis_items {
+		backup_docker_image_cis_items[key] = value
+	}
+
+	backup_complianceSet = map[string]map[string]bool{
+		api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
+		api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
+		api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
+		api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+	}
+}
+
 func TestGetComplianceMeta(t *testing.T) { 
+	// must PrepareBackup() in the first test function to store the original cis_items
+	PrepareBackup()
+	restoreMockData()
 	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis")
-	mockComplianceMetas, mockComplianceMetaMap := testInit()
-	complianceMetas, complianceMetaMap := InitComplianceMeta("", "", false)
+	mockComplianceMetas, mockComplianceMetaMap := initMockData(mock_docker_image_cis_items, mock_cis_items, mockComplianceSet)
+	complianceMetas, complianceMetaMap := PrepareComplianceMeta("", "", false)
 
 	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
-		t.Errorf("mockComplianceMetas is not update correctly")
+		t.Errorf("complianceMetas is not update correctly")
 	}
 
 	if fmt.Sprint(mockComplianceMetaMap) != fmt.Sprint(complianceMetaMap) {
-		t.Errorf("mockComplianceMetaMap is not update correctly")
+		t.Errorf("complianceMetaMap is not update correctly")
 	}
 
 	if fmt.Sprint(mockComplianceSet) != fmt.Sprint(complianceSet) {
 		t.Errorf("complianceSet is not update correctly")
+	}
+}
+
+func TestComplianceMetaFilepathWalkFailure(t *testing.T) { 
+	restoreMockData()
+	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
+	mockComplianceMetas, mockComplianceMetaMap := initMockData(backup_docker_image_cis_items, backup_cis_items, backup_complianceSet)
+	complianceMetas, complianceMetaMap := PrepareComplianceMeta("", "", false)
+
+	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
+		t.Errorf("complianceMetas should not update when filepath.walk fail")
+	}
+
+	if fmt.Sprint(mockComplianceMetaMap) != fmt.Sprint(complianceMetaMap) {
+		t.Errorf("complianceMetaMap should not update when filepath.walk fail")
+	}
+
+	if fmt.Sprint(backup_complianceSet) != fmt.Sprint(complianceSet) {
+		t.Errorf("complianceSet should not update when filepath.walk fail")
 	}
 }

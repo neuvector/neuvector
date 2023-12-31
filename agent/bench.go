@@ -1302,54 +1302,72 @@ func (b *Bench) getKubeVersion() string {
 	return string(out)
 }
 
-func (b *Bench) loadRemediation(path string) map[string]string {
+func (b *Bench) loadRemediationFromYAML(path string) map[string]string {
     remediationMap := make(map[string]string)
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
+			return err // return the error encountered
+		}
 
-	if b.cisYAMLMode {
-		filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
+			fileContent, err := ioutil.ReadFile(path)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
+				log.WithFields(log.Fields{"error": err}).Error("Error reading file")
 				return err // return the error encountered
 			}
-	
-			if !info.IsDir() && filepath.Ext(path) == ".yaml" {
-				fileContent, err := ioutil.ReadFile(path)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Error("Error reading file")
-					return err // return the error encountered
-				}
-	
-				var yamlFile YamlFile
-				err = yaml.Unmarshal(fileContent, &yamlFile)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
-					return err // return the error encountered
-				}
-	
-				for _, group := range yamlFile.Groups {
-					for _, check := range group.Checks {
-						remediationMap[check.ID] = check.Remediation
-					}
+
+			var yamlFile YamlFile
+			err = yaml.Unmarshal(fileContent, &yamlFile)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+				return err // return the error encountered
+			}
+
+			for _, group := range yamlFile.Groups {
+				for _, check := range group.Checks {
+					remediationMap[check.ID] = check.Remediation
 				}
 			}
-			return nil // no error, return nil
-		})
-	} else {
-		dat, err := ioutil.ReadFile(path)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Open remediation file fail")
-			return remediationMap
 		}
-	
-		scanner := bufio.NewScanner(strings.NewReader(string(dat)))
-		for scanner.Scan() {
-			line := scanner.Text()
-			if i := strings.Index(line, ":"); i > 0 {
-				remediationMap[strings.TrimSpace(line[:i-1])] = line[i+1:]
-			}
-		}
+		return nil // no error, return nil
+	})
+
+	if err != nil || remediationMap == nil{
+		// When the filepath walk fail, fill remediationMap with a default version of remediation
+		fallbackRemediation := kube160Remediation
+		remediationMap = b.loadRemediationFromRem(fallbackRemediation)
 	}
 
+	return remediationMap
+}
+
+func (b *Bench) loadRemediationFromRem(path string) map[string]string {
+	remediationMap := make(map[string]string)
+	dat, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Open remediation file fail")
+		return remediationMap
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(dat)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if i := strings.Index(line, ":"); i > 0 {
+			remediationMap[strings.TrimSpace(line[:i-1])] = line[i+1:]
+		}
+	}
+	return remediationMap 
+}
+
+func (b *Bench) loadRemediation(path string) map[string]string {
+    var remediationMap map[string]string
+
+	if b.cisYAMLMode {
+		remediationMap = b.loadRemediationFromYAML(path)
+	} else {
+		remediationMap = b.loadRemediationFromRem(path)
+	}
     return remediationMap
 }
 

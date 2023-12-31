@@ -29,6 +29,9 @@ var (
 	complianceMetas []api.RESTBenchMeta
 	complianceMetaMap map[string]api.RESTBenchMeta
 	once sync.Once
+	backup_cis_items = make(map[string]api.RESTBenchCheck)
+	backup_docker_image_cis_items = make(map[string]api.RESTBenchCheck)
+	backup_complianceSet = make(map[string]map[string]bool)
 )
 
 var complianceHIPAA []string = []string{
@@ -2349,10 +2352,11 @@ type YamlFile struct {
     Groups []Group `yaml:"groups"`
 }
 
-
 func InitComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
 	// Ensuring initialization happens only once
 	once.Do(func() {
+		// For fast rollback to original setting when fail
+		PrepareBackup()
 		// inProductionK8s flag means we will read yaml provided from the pod environment, which we are not allowed to read in test environment
         complianceMetas, complianceMetaMap = PrepareComplianceMeta(platform, flavor, inProductionK8s)
     })
@@ -2370,10 +2374,25 @@ func GetComplianceMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	return complianceMetas, complianceMetaMap
 }
 
-func PrepareComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
-	// Currently support k8s related yaml to do the dynamically update from the production environment only.
-	GetK8sCISMeta(platform, flavor, inProductionK8s)
+func PrepareBackup() {
+	for key, value := range cis_items {
+		backup_cis_items[key] = value
+	}
 
+	for key, value := range docker_image_cis_items {
+		backup_docker_image_cis_items[key] = value
+	}
+
+	backup_complianceSet = map[string]map[string]bool{
+		api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
+		api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
+		api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
+		api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+	}
+}
+
+func PrepareComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+	GetK8sCISMeta(platform, flavor, inProductionK8s)
 	complianceMetaMap = make(map[string]api.RESTBenchMeta)
 
 	var all []api.RESTBenchMeta
@@ -2407,7 +2426,7 @@ func PrepareComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api
 }
 
 // Currently update the k8s Folder only
-func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string{
+func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string {
 	var remediationFolder string
 	if inProductionK8s {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
@@ -2438,66 +2457,78 @@ func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string{
 			}
 		}
 	} else {
-		log.WithFields(log.Fields{"defaultYAMLFolder": defaultYAMLFolder}).Info("Error reading file")
 		remediationFolder = defaultYAMLFolder
 	}
 	return remediationFolder
 }
+
+func processYAMLFile(path string) error {
+	fileContent, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Error reading file")
+		return err
+	}
+
+	var yamlFile YamlFile
+	err = yaml.Unmarshal(fileContent, &yamlFile)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+		return err
+	}
+
+	for _, group := range yamlFile.Groups {
+		for _, check := range group.Checks {
+			cis_id := fmt.Sprintf("K.%s", check.ID)
+			cis_items[cis_id] = api.RESTBenchCheck{
+				TestNum:     cis_id,
+				Type:        check.Type,
+				Category:    check.Category,
+				Scored:      check.Scored,
+				Profile:     check.Profile,
+				Automated:   check.Automated,
+				Description: catchDescription.ReplaceAllString(check.Description, "$1"),
+				Remediation: check.Remediation,
+			}
+			
+			envolvedCompliance := TransformArrayToMap(check.Tags)
+			for compliance := range complianceSet {
+				// Update the compliance
+				// if cis_id affect the compliance, make sure it in the compliance.
+				// else, make sure the cis_id is not in the compliance.
+				if _, exists := envolvedCompliance[compliance]; exists {
+					complianceSet[compliance][cis_id] = true
+				} else {
+					delete(complianceSet[compliance], cis_id)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func GetK8sCISMeta(platform, flavor string, inProductionK8s bool) {
 	// Check the current k8s version, then read the correct folder
 	remediationFolder := GetK8sCISFolder(platform, flavor, inProductionK8s)
 	
 	// Read every yaml under the folder, then dynamically update the cis_items and complianceSet
-	filepath.Walk(remediationFolder, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(remediationFolder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
 			return err 
 		}
 
 		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
-			fileContent, err := ioutil.ReadFile(path)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Error reading file")
-				return err
-			}
-
-			var yamlFile YamlFile
-			err = yaml.Unmarshal(fileContent, &yamlFile)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
-				return err
-			}
-
-			for _, group := range yamlFile.Groups {
-				for _, check := range group.Checks {
-					cis_id := fmt.Sprintf("K.%s", check.ID)
-					cis_items[cis_id] = api.RESTBenchCheck{
-						TestNum:     cis_id,
-						Type:        check.Type,
-						Category:    check.Category,
-						Scored:      check.Scored,
-						Profile:     check.Profile,
-						Automated:   check.Automated,
-						Description: catchDescription.ReplaceAllString(check.Description, "$1"),
-						Remediation: check.Remediation,
-					}
-
-					envolvedCompliance := TransformArrayToMap(check.Tags)
-					for compliance := range complianceSet {
-						// Update the compliance
-						// if cis_id affect the compliance, make sure it in the compliance.
-						// else, make sure the cis_id is not in the compliance.
-						if _, exists := envolvedCompliance[compliance]; exists {
-							complianceSet[compliance][cis_id] = true
-						} else {
-							delete(complianceSet[compliance], cis_id)
-						}
-					}
-				}
-			}
+			return processYAMLFile(path)
 		}
 		return nil 
 	})
+	
+	// if Failed at walk, stay with original value
+	if err != nil {
+		cis_items = backup_cis_items
+		docker_image_cis_items = backup_docker_image_cis_items
+		complianceSet = backup_complianceSet
+	}
 }
 
 // Transform the array as set, implement with built-in map 

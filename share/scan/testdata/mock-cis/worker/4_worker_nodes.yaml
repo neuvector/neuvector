@@ -17,7 +17,6 @@ groups:
         - HIPAA
         - NIST
         - PCI
-        - GDPR
         audit: |
               check="$id  - $description"
               file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
