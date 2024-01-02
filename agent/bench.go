@@ -484,21 +484,11 @@ func (b *Bench) RerunDocker(forced bool) {
 	}
 }
 
-func (b *Bench) kubeCheckPrerequisites() (error) {
-	kmasterProgs := []string{"kubectl"}
-	masterError := b.checkRequiredHostProgs(kmasterProgs)
-	return masterError
-}
-
 func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	if agentEnv.autoBenchmark == false && forced == false {
 		log.Info("ignored")
 		return
 	}
-
-	log.Info("")
-
-	masterErr := b.kubeCheckPrerequisites()
 
 	if cmd != "" && cmdRemap != "" {
 		b.kubeCisCmds[cmd] = cmdRemap
@@ -509,17 +499,12 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 
 	var sched bool
 
-	if masterErr != nil {
-		if !strings.Contains(masterErr.Error(), "kubectl") { // not possibly a master node
-			log.WithFields(log.Fields{"error": masterErr}).Error("Cannot run master node CIS benchmark")
-		}
-		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusNotSupport)
-	} else if !b.isKubeMaster {
-		log.Info("Not a kubernetes master node")
-		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
-	} else {
+	if b.isKubeMaster {
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusScheduled)
 		sched = true
+	} else {
+		log.Info("Not a kubernetes master node")
+		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
 	}
 
 	if b.isKubeWorker {
