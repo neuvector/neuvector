@@ -260,9 +260,34 @@ groups:
         - GDPR
         audit: |
               check="$id  - $description"
-              manual "$check"
-              manual  "      * Audit: Run the command on the master node. stat -c %a <path/to/cni/files> Verify that the permissions are 644 or more restrictive."
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 <path/to/cni/files>
+              # Initialize counters and non-compliant files list
+              count_files=0
+              non_compliant_files=""
+              cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+              for file in $(find "$cni_folder" -name "*kube*" -type f); do
+                count_files=$((count_files + 1))
+                permissions=$(stat -c %a "$file")
+
+                # Check if the permissions are more permissive than 644
+                if [ "$permissions" -gt 644 ]; then
+                  non_compliant_files="$non_compliant_files$file ($permissions), "
+                fi
+              done
+
+              # Remove trailing comma and space
+              non_compliant_files=${non_compliant_files%, }
+
+              # Check and output results
+              if [ "$count_files" -eq 0 ]; then
+                warn "$check"
+                warn "      * No matching files found in $cni_folder"
+              elif [ -z "$non_compliant_files" ]; then
+                pass "$check"
+              else
+                warn "$check"
+                warn "$check - Non-compliant file(s): $non_compliant_files"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 the related files in etc/cni/net.d
       - id: 1.1.10
         description: Ensure that the Container Network Interface file ownership is set to root:root (Manual)
         type: master
@@ -277,9 +302,34 @@ groups:
         - GDPR
         audit: |
               check="$id  - $description"
-              manual "$check"
-              manual  "      * Audit: Run the command on the master node. stat -c %U:%G <path/to/cni/files> Verify that the ownership is set to root:root."              
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root <path/to/cni/files>
+              # Initialize counters and non-compliant files list
+              count_files=0
+              non_compliant_files=""
+              cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+              for file in $(find "$cni_folder" -name "*kube*" -type f); do
+                count_files=$((count_files + 1))
+                permissions=$(stat -c %u%g $file)
+
+                # Check if the ownership is set to root:root 
+                if [ "$permissions" != "00" ]; then
+                  non_compliant_files="$non_compliant_files$file ($permissions), "
+                fi
+              done
+
+              # Remove trailing comma and space
+              non_compliant_files=${non_compliant_files%, }
+
+              # Check and output results
+              if [ "$count_files" -eq 0 ]; then
+                warn "$check"
+                warn "      * No matching files found in $cni_folder"
+              elif [ -z "$non_compliant_files" ]; then
+                pass "$check"
+              else
+                warn "$check"
+                warn "$check - Non-compliant file(s): $non_compliant_files"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root the related files in etc/cni/net.d
       - id: 1.1.11
         description: Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)
         type: master
