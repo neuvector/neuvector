@@ -42,6 +42,10 @@ func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 }
 
 func PopulateAssetVul(assetVul *DbAssetVul) error {
+	if dbHandle == nil {
+		return errors.New("db is not initialized")
+	}
+
 	assetID := assetVul.AssetID
 
 	existingAsset, err := GetAssetVulIDByAssetID(assetID)

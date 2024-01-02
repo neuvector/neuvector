@@ -319,6 +319,10 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 }
 
 func PopulateVulAsset(resType ResourceType, resourceID string, vul *api.RESTVulnerability, baseOS string) error {
+	if dbHandle == nil {
+		return errors.New("db is not initialized")
+	}
+
 	vulasset, err := getVulAssetByName(vul.Name)
 	if err != nil {
 		// not exist, need to create a new one
