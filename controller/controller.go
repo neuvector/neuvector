@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -465,6 +466,8 @@ func main() {
 	auditQueue = cluster.NewObjectQueue(auditLogKey, 128)
 	messenger = cluster.NewMessenger(Host.ID, Ctrler.ID)
 
+	db.CreateVulAssetDb(false)
+
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData)
 	ruleid.Init()
 
@@ -700,6 +703,8 @@ func main() {
 		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
+		CreateQuerySessionFunc:   rest.CreateQuerySession,
+		DeleteQuerySessionFunc:   rest.DeleteQuerySession,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
@@ -787,6 +792,8 @@ func main() {
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
+
+	// go rest.StartLocalDevHttpServer() // for local dev only
 
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)

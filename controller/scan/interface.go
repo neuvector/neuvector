@@ -35,6 +35,7 @@ type ScanInterface interface {
 	StopRegistry(name string) error
 	GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRegistryConfig, utils.Set)
 	CheckRegistry(name string) bool
+	GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl, filteredMap map[string]bool) ([]string, error)
 
 	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary
 	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string)
@@ -55,7 +56,7 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 		if report := clusHelper.GetScanReport(key); report != nil {
 			var highs, meds []string
 			alives := vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
-			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
+			highs, meds, _, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.filteredTime = time.Now()
@@ -444,7 +445,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -454,7 +455,7 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
 					nmap[id] = images2IDNames(rs, sum)
 				}
 			}
@@ -545,7 +546,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			rrpt.Cmds = c.cmds
 
 			refreshScanCache(rs, id, sum, c, vpf)
-			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag)
+			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
 			// The checks are still to be filtered
 			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
 
@@ -902,4 +903,67 @@ func (m *scanMethod) TestRegistry(ctx context.Context, config *share.CLUSRegistr
 	}
 
 	return nil
+}
+
+func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl, filteredMap map[string]bool) ([]string, error) {
+	var rs *Registry
+	var ok bool
+
+	if name == common.RegistryRepoScanName {
+		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
+	} else if rs, ok = regMapLookup(name); !ok {
+		return nil, common.ErrObjectNotFound
+	}
+
+	rs.stateLock()
+	defer rs.stateUnlock()
+	if !acc.Authorize(rs.config, nil) {
+		return nil, common.ErrObjectAccessDenied
+	}
+
+	allowed := make([]string, 0)
+
+	// sdb := scanUtils.GetScannerDB()
+	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
+		// To avoid authorize for every image - run faster.
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
+				allowed = append(allowed, id)
+
+				refreshScanCache(rs, id, sum, c, vpf)
+
+				// vpf handling
+				for _, v := range c.vulTraits {
+					if v.IsFiltered() {
+						key := fmt.Sprintf("%s;%s", id, v.Name)
+						filteredMap[key] = true
+						filteredMap[v.Name] = true
+					}
+				}
+			}
+		}
+	} else {
+		for id, c := range rs.cache {
+			if sum, ok := rs.summary[id]; ok {
+				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
+					allowed = append(allowed, id)
+
+					refreshScanCache(rs, id, sum, c, vpf)
+
+					// vpf handling
+					for _, v := range c.vulTraits {
+						if v.IsFiltered() {
+							key := fmt.Sprintf("%s;%s", id, v.Name)
+							filteredMap[key] = true
+							filteredMap[v.Name] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return allowed, nil
 }

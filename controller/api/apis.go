@@ -67,6 +67,7 @@ const RESTErrPromoteFail int = 49
 const RESTErrPlatformAuthDisabled int = 50
 const RESTErrRancherUnauthorized int = 51
 const RESTErrRemoteExportFail int = 52
+const RESTErrInvalidQueryToken int = 53
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
@@ -2200,6 +2201,7 @@ type RESTVulnerability struct {
 	FeedRating     string   `json:"feed_rating"`
 	InBaseImage    bool     `json:"in_base_image,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
+	DbKey          string   `json:"-"`
 }
 
 type RESTVulnPackageVersion struct {
@@ -2231,6 +2233,67 @@ type RESTVulnerabilityAssetData struct {
 	Nodes     map[string][]RESTIDName   `json:"nodes"`
 	Images    map[string][]RESTIDName   `json:"images"`
 	Platforms map[string][]RESTIDName   `json:"platforms"`
+}
+
+type RESTVulnerabilityAssetV2 struct {
+	Name        string                              `json:"name"`
+	Severity    string                              `json:"severity"`
+	Description string                              `json:"description"`
+	Packages    map[string][]RESTVulnPackageVersion `json:"packages"`
+	Link        string                              `json:"link"`
+	Score       float32                             `json:"score"`
+	Vectors     string                              `json:"vectors"`
+	ScoreV3     float32                             `json:"score_v3"`
+	VectorsV3   string                              `json:"vectors_v3"`
+	PublishedTS int64                               `json:"published_timestamp"`
+	LastModTS   int64                               `json:"last_modified_timestamp"`
+
+	Workloads   []*RESTWorkloadAsset `json:"workloads,omitempty"`
+	WorkloadIDs []string             `json:"-"`
+
+	Nodes    []*RESTHostAsset `json:"nodes,omitempty"`
+	NodesIDs []string         `json:"-"`
+
+	Images    []*RESTImageAsset `json:"images,omitempty"`
+	ImagesIDs []string          `json:"-"`
+
+	Platforms    []*RESTPlatformAsset `json:"platforms,omitempty"`
+	PlatformsIDs []string             `json:"-"`
+}
+
+type RESTVulnerabilityAssetDataV2 struct {
+	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
+	PerfStats []string                    `json:"debug_perf_stats,omitempty"`
+}
+
+type RESTWorkloadAsset struct {
+	ID          string   `json:"id"`
+	Domains     []string `json:"domains,omitempty"`
+	DisplayName string   `json:"display_name"`
+	PolicyMode  string   `json:"policy_mode"`
+	Service     string   `json:"service"`
+	Image       string   `json:"image"`
+}
+
+type RESTHostAsset struct {
+	ID          string   `json:"id"`
+	Domains     []string `json:"domains"`
+	DisplayName string   `json:"display_name"`
+	PolicyMode  string   `json:"policy_mode"`
+}
+
+type RESTPlatformAsset struct {
+	ID          string   `json:"id"`
+	Domains     []string `json:"domains"`
+	DisplayName string   `json:"display_name"`
+	PolicyMode  string   `json:"policy_mode"`
+}
+
+type RESTImageAsset struct {
+	ID          string   `json:"id"`
+	Domains     []string `json:"domains"`
+	DisplayName string   `json:"display_name"`
+	PolicyMode  string   `json:"policy_mode"`
 }
 
 type RESTScanReportData struct {
@@ -3705,4 +3768,152 @@ type RESTRemoteExportOptions struct {
 
 func (config *RESTRemoteExportOptions) IsValid() bool {
 	return config.RemoteRepositoryNickname != ""
+}
+
+// for Vulnerability Page
+type VulQueryFilterViewModel struct {
+	PackageType   string `json:"packageType"`
+	SeverityType  string `json:"severityType"`
+	ScoreType     string `json:"scoreType"`
+	PublishedType string `json:"publishedType"`
+	PublishedTime int64  `json:"publishedTime"`
+
+	MatchType4Ns    string   `json:"matchTypeNs"`
+	SelectedDomains []string `json:"selectedDomains"`
+
+	ServiceName   string `json:"serviceName"`
+	ImageName     string `json:"imageName"`
+	NodeName      string `json:"nodeName"`
+	ContainerName string `json:"containerName"`
+
+	ServiceNameMatchType   string `json:"matchTypeService"`
+	ImageNameMatchType     string `json:"matchTypeImage"`
+	NodeNameMatchType      string `json:"matchTypeNode"`
+	ContainerNameMatchType string `json:"matchTypeContainer"`
+
+	Scorev2_min float32 `json:"scoreV2Min"`
+	Scorev2_max float32 `json:"scoreV2Max"`
+
+	Scorev3_min float32 `json:"scoreV3Min"`
+	Scorev3_max float32 `json:"scoreV3Max"`
+
+	QuickFilter string `json:"quickFilter"`
+
+	OrderByColume string `json:"orderbyColumn"`
+	OrderByType   string `json:"orderby"`
+	ViewType      string `json:"viewType"`
+
+	//specific for /v1/assetvul
+	LastModifiedTime int64  `json:"lastModifiedTime"`
+	DebugCVEName     string `json:"debugcve"`
+}
+
+type UserAccessControl struct {
+	LoginName           string
+	LoginID             string
+	LoginType           int
+	Op                  string
+	Roles               map[string]string
+	WRoles              map[string]string
+	ApiCategoryID       int8
+	RequiredPermissions uint64
+	BoostPermissions    uint64
+}
+
+type QuerySessionRequest struct {
+	QueryToken   string
+	CreationTime int64
+	UserAccess   *UserAccessControl
+	Filters      *VulQueryFilterViewModel
+}
+
+type RESTAssetView struct {
+	Workloads []*RESTWorkloadAssetView    `json:"workloads"`
+	Nodes     []*RESTHostAssetView        `json:"nodes"`
+	Platforms []*RESTPlatformAssetView    `json:"platforms"`
+	Images    []*RESTImageAssetView       `json:"images"`
+	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
+	QueryStat *RESTScanAssetQueryStats    `json:"summary"`
+}
+
+type RESTWorkloadAssetView struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Domain          string   `json:"domain"`
+	Applications    []string `json:"applications"`
+	PolicyMode      string   `json:"policy_mode"`
+	ServiceGroup    string   `json:"service_group"`
+	High            int      `json:"high"`
+	Medium          int      `json:"medium"`
+	Low             int      `json:"low"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+	ScannedAt       string   `json:"scanned_at"`
+}
+
+type RESTHostAssetView struct {
+	ID              string   `json:"id"` //TODO: remove later
+	Name            string   `json:"name"`
+	PolicyMode      string   `json:"policy_mode"`
+	OS              string   `json:"os"`
+	Kernel          string   `json:"kernel"`
+	CPUs            int      `json:"cpus"`
+	Memory          int64    `json:"memory"`
+	Containers      int      `json:"containers"`
+	High            int      `json:"high"`
+	Medium          int      `json:"medium"`
+	Low             int      `json:"low"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+	ScannedAt       string   `json:"scanned_at"`
+}
+
+type RESTPlatformAssetView struct {
+	ID              string   `json:"id"` //TODO: remove later
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	BaseOS          string   `json:"base_os"`
+	High            int      `json:"high"`
+	Medium          int      `json:"medium"`
+	Low             int      `json:"low"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+}
+
+type RESTImageAssetView struct {
+	ID              string   `json:"id"` //TODO: remove later
+	Name            string   `json:"name"`
+	High            int      `json:"high"`
+	Medium          int      `json:"medium"`
+	Low             int      `json:"low"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+}
+
+type RESTScanAssetQueryStats struct {
+	TotalRecordCount        int                     `json:"total_records"`
+	TotalMatchedRecordCount int                     `json:"total_matched_records"`
+	QueryToken              string                  `json:"query_token"`
+	PerfStats               []string                `json:"debug_perf_stats"`
+	Summary                 *VulAssetSessionSummary `json:"summary"`
+}
+
+type VulAssetSessionSummary struct {
+	CountDist *VulAssetCountDist `json:"count_distribution"`
+	TopImages []*AssetCVECount   `json:"top_images"`
+	TopNodes  []*AssetCVECount   `json:"top_nodes"`
+}
+
+type VulAssetCountDist struct {
+	High       int `json:"high"`
+	Medium     int `json:"medium"`
+	Low        int `json:"low"`
+	Platforms  int `json:"platform"`
+	Images     int `json:"image"`
+	Nodes      int `json:"node"`
+	Containers int `json:"container"`
+}
+
+type AssetCVECount struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	High        int    `json:"high"`
+	Medium      int    `json:"medium"`
+	Low         int    `json:"low"`
 }
