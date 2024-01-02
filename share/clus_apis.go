@@ -75,6 +75,7 @@ const (
 	CFGEndpointPwdProfile           = "pwd_profile"
 	CFGEndpointApikey               = "apikey"
 	CFGEndpointSigstoreRootsOfTrust = "sigstore_roots_of_trust"
+	CFGEndpointQuerySession         = "querysession"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -106,6 +107,7 @@ const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
 const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
 const CLUSConfigSigstoreRootsOfTrust string = CLUSConfigStore + CFGEndpointSigstoreRootsOfTrust + "/"
+const CLUSConfigQuerySessionStore string = CLUSConfigStore + CFGEndpointQuerySession + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -468,6 +470,10 @@ func CLUSFileAccessRuleNetworkKey(name string) string {
 
 func CLUSApikeyKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
+}
+
+func CLUSQuerySessionKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigQuerySessionStore, name)
 }
 
 // Host ID is included in the workload key to helps us retrieve all workloads on a host

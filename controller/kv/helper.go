@@ -298,6 +298,8 @@ type ClusterHelper interface {
 	GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error)
 	PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreTimestamp() (string, *uint64, error)
+	CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error
+	DeleteQuerySessionRequest(queryToken string)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -3340,4 +3342,15 @@ func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
 	}
 
 	return string(configData), &rev, nil
+}
+
+func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error {
+	key := share.CLUSQuerySessionKey(qsr.QueryToken)
+	value, _ := json.Marshal(qsr)
+	return cluster.PutIfNotExist(key, value, false)
+}
+
+func (m clusterHelper) DeleteQuerySessionRequest(queryToken string) {
+	key := share.CLUSQuerySessionKey(queryToken)
+	cluster.Delete(key)
 }
