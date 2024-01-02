@@ -501,7 +501,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		vpNames.Add(name)
 	}
 
-	doExport("cfgComplianceProfileExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgComplianceProfileExport.yaml", "compliance profile", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerCompProfileImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

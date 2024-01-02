@@ -2029,7 +2029,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	return err
 }
 
-func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
 	var data []byte
 	json_data, _ := json.MarshalIndent(resp, "", "  ")
 	data, _ = yaml.JSONToYAML(json_data)
@@ -2048,7 +2048,8 @@ func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions,
 			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
 			return
 		}
-		restRespSuccess(w, r, nil, acc, login, nil, "Export to remote repository")
+		msg := fmt.Sprintf("Export %s to remote repository", exportType)
+		restRespSuccess(w, r, nil, acc, login, nil, msg)
 	} else {
 		// tell the browser the returned content should be downloaded
 		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)

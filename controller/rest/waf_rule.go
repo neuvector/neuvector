@@ -1107,7 +1107,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		resp.Items = append(resp.Items, &resptmp)
 	}
 
-	doExport("cfgWafExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgWafExport.yaml", "WAF sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerWafImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

@@ -22,8 +22,8 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -1450,7 +1450,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		resp.Spec.Rules = admissionRules
 	}
 
-	doExport("cfgAdmissionRulesExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgAdmissionRulesExport.yaml", "admission control settings", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerAdmCtrlImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

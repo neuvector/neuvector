@@ -1673,7 +1673,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		resp.Items = append(resp.Items, &resptmp)
 	}
 
-	doExport("cfgDlpExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgDlpExport.yaml", "DLP sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerDlpImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
