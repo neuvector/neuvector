@@ -854,7 +854,12 @@ func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 		for i, key := range keys {
 			b.WriteString(key)
 			b.WriteByte('=')
-			fmt.Fprintf(b, "%+v", entry.Data[key])
+			item := entry.Data[key]
+			if err, ok := item.(error); ok {
+				fmt.Fprintf(b, "%+v", err.Error())
+			} else {
+				fmt.Fprintf(b, "%+v", item)
+			}
 			if i < len(keys)-1 {
 				b.WriteByte(' ')
 			}
