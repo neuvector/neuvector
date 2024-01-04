@@ -41,7 +41,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 
 	// in 5.3, only an alias of "default" is allowed
 	if remoteRepository.Nickname != "default" {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "only \"default\" alias is allowed")
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, `only "default" alias is allowed`)
 		return
 	}
 
