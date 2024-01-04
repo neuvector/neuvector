@@ -45,6 +45,11 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	if *remoteRepository.Provider != "github" {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, `only "github" provider is allowed`)
+		return
+	}
+
 	lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
@@ -225,6 +230,10 @@ func getUpdatedRemoteRepository(base share.RemoteRepository, updates *share.Remo
 		if isSet(updates.GitHubConfiguration.PersonalAccessTokenEmail) {
 			base.GitHubConfiguration.PersonalAccessTokenEmail = updates.GitHubConfiguration.PersonalAccessTokenEmail
 		}
+	}
+
+	if *base.Provider != "github" {
+		return share.RemoteRepository{}, errors.New(`only "github" provider is allowed`)
 	}
 
 	if !base.IsValid() {
