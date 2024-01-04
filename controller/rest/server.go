@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -755,7 +755,7 @@ func validateSAMLServer(cs *share.CLUSServer) error {
 		}
 	} else {
 		if _, err := tls.X509KeyPair([]byte(csaml.SigningCert), []byte(csaml.SigningKey)); err != nil {
-			return errors.Wrap(err, "invalid key cert pair")
+			return fmt.Errorf("invalid key cert pair: %w", err)
 		}
 	}
 

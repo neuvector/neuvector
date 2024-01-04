@@ -5,12 +5,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"sync"
 	"time"
 
+	"errors"
+
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -118,7 +120,7 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		data, index, err := clusHelper.GetObjectCertRev(cn)
 		if err != nil && err != cluster.ErrKeyNotFound {
 			// This function assumes the previous certificate should be there.  If not, return an error.
-			return errors.Wrap(err, "failed to get certificate")
+			return fmt.Errorf("failed to get certificate: %w", err)
 		}
 
 		if data == nil {
@@ -173,24 +175,24 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		newcert, err := callback.NewCert(data)
 		if err != nil {
 			logctx.WithError(err).Warn("failed to create new cert for rotation")
-			return errors.Wrap(err, "failed to create new cert for rotation")
+			return fmt.Errorf("failed to create new cert for rotation: %w", err)
 		}
 
 		tlscert, err := tls.X509KeyPair([]byte(newcert.Cert), []byte(newcert.Key))
 		if err != nil {
 			logctx.WithError(err).Error("failed to load key pair")
-			return errors.Wrap(err, "failed to load ca key pair")
+			return fmt.Errorf("failed to load ca key pair: %w", err)
 		}
 
 		if len(tlscert.Certificate) == 0 {
 			logctx.Warn("no certificate generated found")
-			return errors.New("no certificate generated found")
+			return fmt.Errorf("no certificate generated found: %w", err)
 		}
 
 		x509cert, err := x509.ParseCertificate([]byte(tlscert.Certificate[0]))
 		if err != nil {
 			logctx.WithError(err).Warn("failed to parse certificate generated")
-			return errors.Wrap(err, "failed to parse certificate generated")
+			return fmt.Errorf("failed to parse certificate generated: %w", err)
 		}
 
 		// We only want to keep one old cert, so remove data.OldCert.

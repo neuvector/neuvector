@@ -23,8 +23,9 @@ import (
 	"syscall"
 	"time"
 
+	"errors"
+
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/go-version"
@@ -1314,7 +1315,7 @@ func initJWTSignKey() error {
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+				return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
 			}
 			return &share.CLUSX509Cert{
 				CN:   share.CLUSJWTKey,
