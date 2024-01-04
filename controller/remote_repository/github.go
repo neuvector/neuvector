@@ -60,13 +60,14 @@ type GitHubExport struct {
 	commitMessage string
 	filePath      string
 	fileContents  []byte
-	url           *url.URL
+	exportUrl     *url.URL
+	getUrl        *url.URL
 	Config        *share.RemoteRepository_GitHubConfiguration
 }
 
 func (exp GitHubExport) Do() error {
 	client := http.DefaultClient
-	request := exp.getBaseRequest()
+	request := exp.getBaseRequest(http.MethodPut)
 	request.Method = http.MethodPut
 
 	encodedFileContents := make([]byte, base64.StdEncoding.EncodedLen(len(exp.fileContents)))
@@ -139,7 +140,7 @@ func getRateLimitResetDate(rateLimitResetHeader string) *time.Time {
 func (exp GitHubExport) getExistingFileSha() (string, string, error) {
 	client := http.DefaultClient
 
-	req := exp.getBaseRequest()
+	req := exp.getBaseRequest(http.MethodGet)
 	req.Method = http.MethodGet
 
 	resp, err := client.Do(&req)
@@ -185,10 +186,14 @@ func (exp GitHubExport) getExistingFileSha() (string, string, error) {
 	return githubApiFile.Sha, githubVer, nil
 }
 
-func (exp GitHubExport) getBaseRequest() http.Request {
+func (exp GitHubExport) getBaseRequest(method string) http.Request {
 	baseRequest := http.Request{
-		URL:    exp.url,
 		Header: http.Header{},
+	}
+	if method == http.MethodGet {
+		baseRequest.URL = exp.getUrl
+	} else {
+		baseRequest.URL = exp.exportUrl
 	}
 	baseRequest.Header.Add("Accept", "application/vnd.github+json")
 	baseRequest.Header.Add("Authorization", fmt.Sprintf("Bearer %s", exp.committer.personalAccessToken))
@@ -197,7 +202,11 @@ func (exp GitHubExport) getBaseRequest() http.Request {
 }
 
 func NewGitHubExport(filePath string, fileContents []byte, commitMessage string, config api.RESTRemoteRepo_GitHubConfig) (GitHubExport, error) {
+	var getUrl *url.URL
 	exportUrl, err := url.Parse(fmt.Sprintf(githubRepoContentUrl, config.RepositoryOwnerUsername, config.RepositoryName, filePath))
+	if err == nil {
+		getUrl, err = url.Parse(fmt.Sprintf("%s?ref=%s", exportUrl.String(), config.RepositoryBranchName))
+	}
 	if err != nil {
 		return GitHubExport{}, fmt.Errorf("could not parse url for new remote export object: %s", err.Error())
 	}
@@ -216,6 +225,7 @@ func NewGitHubExport(filePath string, fileContents []byte, commitMessage string,
 		filePath:      filePath,
 		fileContents:  fileContents,
 		commitMessage: commitMessage,
-		url:           exportUrl,
+		exportUrl:     exportUrl,
+		getUrl:        getUrl,
 	}, nil
 }
