@@ -1,0 +1,64 @@
+version: "cis-1.23"
+id: 3
+title: "3 - Control Plane Configuration"
+type: "master"
+groups:
+  - id: 3.1
+    title: "3.1 - Authentication and Authorization"
+    checks:
+      - id: 3.1.1
+        description: Client certificate authentication should not be used for users (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Review user access to the cluster and ensure that users are not making use of Kubernetes client certificate authentication."
+        remediation: Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of client certificates.
+  - id: 3.2
+    title: "3.2 - Logging"
+    checks:
+      - id: 3.2.1
+        description: Ensure that a minimal audit policy is created (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              if check_argument "$CIS_APISERVER_CMD" '--audit-policy-file' >/dev/null 2>&1; then
+                  auditPolicyFile=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-policy-file')
+                  auditPolicyFile=$(append_prefix "$CONFIG_PREFIX" "$auditPolicyFile")
+                  pass "$check"
+                  pass "      * audit-policy-file: $auditPolicyFile"
+              else
+                  warn "$check"
+              fi        
+        remediation: Create an audit policy file for your cluster.
+      - id: 3.2.2
+        description: Ensure that the audit policy covers key security concerns (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Access to Secrets managed by the cluster. Care should be taken to only log Metadata for requests to Secrets, ConfigMaps, and TokenReviews, in order to avoid the risk of logging sensitive data."
+              manual "      * Modification of pod and deployment objects."
+              manual "      * Use of pods/exec, pods/portforward, pods/proxy and services/proxy."        
+        remediation: Consider modification of the audit policy in use on the cluster to include these items, at a minimum.

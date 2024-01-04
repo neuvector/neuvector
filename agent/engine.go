@@ -115,6 +115,7 @@ type localSystemInfo struct {
 	ciliumCNI         bool
 	disableNetPolicy  bool
 	detectUnmanagedWl bool
+	enableIcmpPolicy  bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -124,6 +125,7 @@ var defaultTapProxymesh bool = true
 var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
 var defaultDetectUnmanagedWl bool = false
+var defaultEnableIcmpPolicy bool = false
 var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
@@ -2214,6 +2216,9 @@ func taskDPConnect() {
 	//set detectUnmanagedWl
 	duw := gInfo.detectUnmanagedWl
 	dp.DPCtrlSetDetectUnmanagedWl(&duw)
+	//set enableIcmpPolicy
+	eip := gInfo.enableIcmpPolicy
+	dp.DPCtrlSetEnableIcmpPolicy(&eip)
 }
 
 var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version

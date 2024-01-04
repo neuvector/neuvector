@@ -622,6 +622,8 @@ func CompileUriPermitsMapping() {
 				"v1/scan/platform",
 				"v1/scan/platform/platform",
 				"v1/scan/asset",
+				"v1/vulasset",
+				// "scanasset5", // TODO: local dev only
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry",
@@ -772,8 +774,6 @@ func CompileUriPermitsMapping() {
 				"v1/system/license",
 				"v1/system/summary",
 				"v1/internal/system",
-				"v1/system/config/remote_repository",
-				"v1/system/config/remote_repository/*",
 			},
 			CONST_API_FED: []string{
 				"v1/fed/join_token",
@@ -813,6 +813,10 @@ func CompileUriPermitsMapping() {
 				"v1/scan/workload/*",
 				"v1/scan/host/*",
 				"v1/scan/platform/platform",
+				"v1/vulasset",
+				"v1/assetvul",
+				// "scanasset5",     // TODO: local dev only
+				// "scanassetview1", // TODO: local dev only
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry/*/scan",
@@ -1614,4 +1618,31 @@ func (acc *AccessControl) GetRoleDomains() map[string][]string {
 func ContainsNonSupportRole(role string) bool {
 	var roles = utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader, api.UserRoleIBMSA, api.UserRoleImportStatus)
 	return roles.Contains(role)
+}
+
+func (acc *AccessControl) ExportAccessControl() *api.UserAccessControl {
+	c := &api.UserAccessControl{
+		Op:                  string(acc.op),
+		Roles:               acc.roles,
+		WRoles:              acc.wRoles,
+		ApiCategoryID:       acc.apiCategoryID,
+		RequiredPermissions: acc.requiredPermissions,
+		BoostPermissions:    acc.boostPermissions,
+	}
+	return c
+}
+
+func ImportAccessControl(uac *api.UserAccessControl) *AccessControl {
+	op := AccessOPRead
+	if uac.Op == "write" {
+		op = AccessOPWrite
+	}
+	acc := &AccessControl{
+		op:                  op,
+		roles:               uac.Roles,
+		wRoles:              uac.WRoles,
+		apiCategoryID:       uac.ApiCategoryID,
+		requiredPermissions: uac.RequiredPermissions,
+	}
+	return acc
 }

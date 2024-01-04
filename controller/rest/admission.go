@@ -22,8 +22,8 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -304,8 +304,8 @@ func getAdmCtrlRuleContainers(targets []string) (uint8, error) {
 			return 0, fmt.Errorf("Invalid containers value")
 		}
 	}
-	if ruleContainers == (share.AdmCtrlRuleContainersN | share.AdmCtrlRuleInitContainersN | share.AdmCtrlRuleEphemeralContainersN) {
-		ruleContainers = 0
+	if ruleContainers == 0 {
+		ruleContainers = share.AdmCtrlRuleContainersN
 	}
 
 	return ruleContainers, nil
@@ -1441,6 +1441,8 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			}
 			if len(rule.Containers) > 0 {
 				ruleItem.Containers = rule.Containers
+			} else {
+				ruleItem.Containers = []string{share.AdmCtrlRuleContainers}
 			}
 			admissionRules = append(admissionRules, &ruleItem)
 			ids.Add(id)
@@ -1448,7 +1450,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		resp.Spec.Rules = admissionRules
 	}
 
-	doExport("cfgAdmissionRulesExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgAdmissionRulesExport.yaml", "admission control settings", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerAdmCtrlImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

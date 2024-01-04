@@ -157,6 +157,8 @@ var restErrMessage = []string{
 	api.RESTErrPromoteFail:           "Failed to promote rules",
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
+	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
+	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -1671,6 +1673,9 @@ func StartRESTServer() {
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
 	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
@@ -2024,7 +2029,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	return err
 }
 
-func doExport(filename string, remoteExportOptions *share.RemoteExportConfig, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
 	var data []byte
 	json_data, _ := json.MarshalIndent(resp, "", "  ")
 	data, _ = yaml.JSONToYAML(json_data)
@@ -2034,20 +2039,17 @@ func doExport(filename string, remoteExportOptions *share.RemoteExportConfig, re
 			DefaultFilePath: filename,
 			Options:         remoteExportOptions,
 			Content:         data,
-			ClusterHelper:   clusHelper,
+			Cacher:          cacher,
 			AccessControl:   acc,
 		}
 		err := remoteExport.Do()
 		if err != nil {
-			msg := "could not do remote export"
-			if strings.Contains(err.Error(), remote_repository.ErrGitHubRateLimitReached) {
-				msg = fmt.Sprintf("%s, %s", msg, err.Error())
-			}
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, msg)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, err.Error())
 			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
 			return
 		}
-		restRespSuccess(w, r, nil, acc, login, nil, "Do remote dlp export")
+		msg := fmt.Sprintf("Export %s to remote repository", exportType)
+		restRespSuccess(w, r, nil, acc, login, nil, msg)
 	} else {
 		// tell the browser the returned content should be downloaded
 		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)

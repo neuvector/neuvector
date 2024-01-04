@@ -117,7 +117,7 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
 	DisableNetPolicy:     false,
-	DetectUnmanagedWl:    false,
+	EnableIcmpPolicy:     false,
 }
 
 func ActionString(action uint8) string {

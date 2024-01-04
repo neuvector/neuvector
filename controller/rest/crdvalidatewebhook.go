@@ -663,7 +663,7 @@ func CrdValidateRestServer(port uint, clientAuth, debug bool) {
 
 func CrdValidateReqManager() {
 	crdReqMgr = new(tCrdRequestsMgr)
-	crdReqMgr.init(32)
+	crdReqMgr.init(128)
 	go crdReqMgr.crdQueueProc()
 	go crdReqMgr.kvCrdEnqueueProc()
 }

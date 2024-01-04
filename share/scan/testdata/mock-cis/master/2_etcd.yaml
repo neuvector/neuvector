@@ -1,0 +1,44 @@
+version: "cis-1.6"
+id: 2
+title: "2 - etcd"
+type: "master"
+groups:
+  - id: 2.7
+    title: ""
+    checks:
+      - id: '2.7'
+        description: mock Ensure that a unique Certificate Authority is used for etcd
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              if check_argument "$CIS_ETCD_CMD" '--trusted-ca-file' >/dev/null 2>&1; then
+                  if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
+                      tfile=$(get_argument_value "$CIS_ETCD_CMD" '--trusted-ca-file')
+                      cfile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
+                      tfile=$(append_prefix "$CONFIG_PREFIX" "$tfile")
+                      cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+                      if [ "$tfile" = "$cfile" ]; then
+                          pass "$check"
+                          pass "      * trusted-ca-file: $tfile"
+                          pass "      * client-ca-file: $cfile"
+                      else
+                        warn "$check"
+                      fi
+                  else
+                      warn "$check"
+                      warn "      * client-ca-file doesn't exist"
+                  fi
+              else
+                  warn "$check"
+                  warn "      * trusted-ca-file doesn't exist"
+              fi        
+        remediation: Follow the etcd documentation and create a dedicated certificate authority setup for the etcd service. Then, edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml on the master node and set the below parameter. --trusted-ca-file=</path/to/ca-file>

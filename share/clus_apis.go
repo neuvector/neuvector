@@ -75,7 +75,7 @@ const (
 	CFGEndpointPwdProfile           = "pwd_profile"
 	CFGEndpointApikey               = "apikey"
 	CFGEndpointSigstoreRootsOfTrust = "sigstore_roots_of_trust"
-	CFGEndpointRemoteRepository     = "remote_repository"
+	CFGEndpointQuerySession         = "querysession"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -107,7 +107,7 @@ const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
 const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
 const CLUSConfigSigstoreRootsOfTrust string = CLUSConfigStore + CFGEndpointSigstoreRootsOfTrust + "/"
-const CLUSRemoteRepositoryStore string = CLUSConfigStore + CFGEndpointRemoteRepository + "/"
+const CLUSConfigQuerySessionStore string = CLUSConfigStore + CFGEndpointQuerySession + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -472,6 +472,10 @@ func CLUSApikeyKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
 }
 
+func CLUSQuerySessionKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigQuerySessionStore, name)
+}
+
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
 // quickly. Without it, we have to loop through all workload keys; using agent ID is
 // also problematic, as a new agent has no idea of the agent ID when the workload
@@ -671,10 +675,6 @@ func CLUSSigstoreTimestampKey() string {
 	return fmt.Sprintf("%s%s", CLUSConfigStore, "sigstore_timestamp")
 }
 
-func CLUSRemoteRepositoryKey(nickname string) string {
-	return fmt.Sprintf("%s%s", CLUSRemoteRepositoryStore, nickname)
-}
-
 type CLUSDistLocker struct {
 	LockedBy string    `json:"locked_by"`
 	LockedAt time.Time `json:"locked_at"`
@@ -768,11 +768,12 @@ type CLUSIBMSAOnboardData struct {
 }
 
 type CLUSWebhook struct {
-	Name    string   `json:"name"`
-	Url     string   `json:"url"`
-	Enable  bool     `json:"enable"`
-	Type    string   `json:"type"`
-	CfgType TCfgType `json:"cfg_type"`
+	Name     string   `json:"name"`
+	Url      string   `json:"url"`
+	Enable   bool     `json:"enable"`
+	UseProxy bool     `json:"use_proxy"`
+	Type     string   `json:"type"`
+	CfgType  TCfgType `json:"cfg_type"`
 }
 
 type CLUSSystemConfig struct {
@@ -803,13 +804,14 @@ type CLUSSystemConfig struct {
 	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
 	DisableNetPolicy     bool                      `json:"disable_net_policy"`
 	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
+	EnableIcmpPolicy     bool                      `json:"enable_icmp_policy"`
 	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
 	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
-	RemoteRepositories   []RemoteRepository        `json:"remote_repositories"`
+	RemoteRepositories   []CLUSRemoteRepository    `json:"remote_repositories"`
 }
 
 type CLUSSystemConfigAutoscale struct {
@@ -1565,6 +1567,7 @@ const (
 	BenchLevelPass  = "PASS"
 	BenchLevelInfo  = "INFO"
 	BenchLevelWarn  = "WARN"
+	BenchLevelManual  = "MANUAL"
 	BenchLevelHigh  = "HIGH"
 	BenchLevelNote  = "NOTE"
 	BenchLevelError = "ERROR"
@@ -2867,30 +2870,22 @@ const (
 	AlertAdminHasDefPwd    = "1002"
 )
 
-type RemoteExportConfig struct {
-	RemoteRepositoryNickname string `json:"remote_repository_nickname"`
-	FilePath                 string `json:"file_path"`
-}
-
-func (config *RemoteExportConfig) IsValid() bool {
-	return config.RemoteRepositoryNickname != ""
-}
-
+// remote repositories
 type RemoteRepository_GitHubConfiguration struct {
-	RepositoryOwnerUsername          *string `json:"repository_owner_username"`
-	RepositoryName                   *string `json:"repository_name"`
-	RepositoryBranchName             *string `json:"repository_branch_name"`
-	PersonalAccessToken              *string `json:"personal_access_token"`
-	PersonalAccessTokenCommitterName *string `json:"personal_access_token_committer_name"`
-	PersonalAccessTokenEmail         *string `json:"personal_access_token_email"`
+	RepositoryOwnerUsername          string `json:"repository_owner_username"`
+	RepositoryName                   string `json:"repository_name"`
+	RepositoryBranchName             string `json:"repository_branch_name"`
+	PersonalAccessToken              string `json:"personal_access_token,cloak"`
+	PersonalAccessTokenCommitterName string `json:"personal_access_token_committer_name"`
+	PersonalAccessTokenEmail         string `json:"personal_access_token_email"`
 }
 
 // TODO: generalize this
 func (g *RemoteRepository_GitHubConfiguration) IsValid() bool {
-	isEmpty := func(s *string) bool {
-		return s == nil || *s == ""
+	isEmpty := func(s string) bool {
+		return s == ""
 	}
-	requiredFields := []*string{
+	requiredFields := []string{
 		g.RepositoryOwnerUsername,
 		g.RepositoryName,
 		g.RepositoryBranchName,
@@ -2906,29 +2901,24 @@ func (g *RemoteRepository_GitHubConfiguration) IsValid() bool {
 	return true
 }
 
-type RemoteRepositoryProvider string
+const RemoteRepositoryProvider_GitHub string = "github"
 
-const RemoteRepositoryProvider_GitHub RemoteRepositoryProvider = "github"
-
-type RemoteRepository struct {
+type CLUSRemoteRepository struct {
 	Nickname            string                                `json:"nickname"`
-	Provider            *RemoteRepositoryProvider             `json:"provider"`
+	Provider            string                                `json:"provider"`
+	Comment             string                                `json:"comment"`
 	GitHubConfiguration *RemoteRepository_GitHubConfiguration `json:"github_configuration"`
 }
 
-func (r *RemoteRepository) IsValid() bool {
-	if r.Provider == nil {
+func (r *CLUSRemoteRepository) IsValid() bool {
+	if r.Nickname != "default" {
 		return false
 	}
-	if *r.Provider == RemoteRepositoryProvider_GitHub {
+	if r.Provider == RemoteRepositoryProvider_GitHub {
 		if r.GitHubConfiguration == nil {
 			return false
 		}
 		return r.GitHubConfiguration.IsValid()
 	}
 	return false
-}
-
-func (r *RemoteRepository) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
-	return nil, nil
 }

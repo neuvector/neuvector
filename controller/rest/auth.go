@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/julienschmidt/httprouter"
@@ -165,14 +166,6 @@ func GetJWTSigningKey() JWTCertificateState {
 	jwtKeyMutex.RLock()
 	defer jwtKeyMutex.RUnlock()
 	return jwtCertState
-}
-
-func GetInstallationID() string {
-	if installID == nil {
-		id, _ := clusHelper.GetInstallationID()
-		installID = &id
-	}
-	return *installID
 }
 
 // With userMutex locked when calling this because it does loginSession lookup first
@@ -707,7 +700,11 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	if !ok {
 		if claims.MainSessionID == "" || strings.HasPrefix(claims.MainSessionID, _rancherSessionPrefix) { // meaning it's not a master token issued by master cluster
 			// Check if the token is from the same "installation"
-			installID := GetInstallationID()
+			installID, err := clusHelper.GetInstallationID()
+			if err != nil {
+				log.WithError(err).Error("failed to get installation ID")
+				return nil, userTimeout, rsessToken
+			}
 			if installID != claims.Subject {
 				log.Debug("Token from different installation")
 				return nil, userTimeout, rsessToken
@@ -1231,7 +1228,11 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var alternativeKey *rsa.PublicKey
 
 	jwtCert := GetJWTSigningKey()
-	installID := GetInstallationID()
+	installID, err := clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Error("failed to get installation ID")
+		return nil, errors.Wrap(err, "failed to get installation ID")
+	}
 
 	if secret == "" {
 		tokenString = utils.DecryptUserToken(encryptedToken, []byte(installID))
@@ -1329,7 +1330,11 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 
 func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim) {
 	id := utils.GetRandomID(idLength, "")
-	installID := GetInstallationID()
+	installID, err := clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Error("failed to get installation ID")
+		return "", "", &tokenClaim{}
+	}
 	now := time.Now()
 	c := tokenClaim{
 		Remote:          remote,
@@ -1367,7 +1372,10 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 	// Validate token
 	jwtCert := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
-	tokenString, _ := token.SignedString(jwtCert.jwtPrivateKey)
+	tokenString, err := token.SignedString(jwtCert.jwtPrivateKey)
+	if tokenString == "" || err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	}
 	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
 }
 

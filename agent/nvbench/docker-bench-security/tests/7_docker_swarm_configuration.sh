@@ -23,6 +23,7 @@ check_7_1() {
     return
   fi
   warn -s "$check"
+  warn "       * Swarm mode is currently enabled. If not required, consider disabling it using 'docker swarm leave' to reduce the attack surface."
   logcheckresult "WARN"
 }
 
@@ -42,6 +43,7 @@ check_7_2() {
       return
     fi
     warn -s "$check"
+    warn "       * The number of manager nodes in the swarm exceeds the minimum required. "
     logcheckresult "WARN"
     return
   fi
@@ -65,6 +67,7 @@ check_7_3() {
       return
     fi
     warn -s "$check"
+    warn "       * Swarm services are not bound to a specific host interface."
     logcheckresult "WARN"
     return
   fi
@@ -136,6 +139,7 @@ check_7_6() {
   if docker info 2>/dev/null | grep -e "Swarm:\s*active\s*" >/dev/null 2>&1; then
     if ! docker swarm unlock-key 2>/dev/null | grep 'SWMKEY' 2>/dev/null 1>&2; then
       warn -s "$check"
+      warn "       * The swarm manager is not running in auto-lock mode."
       logcheckresult "WARN"
       return
     fi

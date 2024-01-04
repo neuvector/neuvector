@@ -1,0 +1,21 @@
+version: "cis-1.6"
+id: 3
+title: "3 - Control Plane Configuration"
+type: "master"
+groups:
+  - id: 3.1
+    title: "3.1 - Authentication and Authorization"
+    checks:
+      - id: 3.1.1
+        description: mock Client certificate authentication should not be used for users
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              info "$check"
+              info "      * Review user access to the cluster and ensure that users are not making use of Kubernetes client certificate authentication."
+        remediation: Alternative mechanisms provided by Kubernetes such as the use of OIDC should be implemented in place of client certificates.

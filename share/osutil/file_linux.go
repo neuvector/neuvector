@@ -2,11 +2,13 @@ package osutil
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -42,27 +44,117 @@ type FileInfoExt struct {
 	UserAdded   bool
 }
 
-//try to get sym link
-func GetContainerRealFilePath(pid int, path string) (string, error) {
-	retry := 0
-	for retry < linkMaxLayers {
-		linkPath, err := os.Readlink(path)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Debug("Read file link fail")
+func fileExists(path string) bool {
+	_, err := os.Lstat(path)
+	if err == nil {
+		// No error, file exists and is accessible
+		return true
+	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+
+	if os.IsPermission(err) {
+		log.WithError(err).Error("Permission error accessing file")
+		return false
+	}
+
+	// Other types of errors
+	log.WithError(err).Error("")
+	return false
+}
+
+func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
+	if inTest {
+		// Since we use ioutil.TempDir("", "proc") to mock proc file system
+		// Regular expression to match the pattern /proc/[number]/root/
+		re := regexp.MustCompile(`.*/proc/\d+/root/`)
+		matches := re.FindStringSubmatch(input)
+
+		if len(matches) == 0 {
+			return "", fmt.Errorf("no match found")
+		}
+		return matches[0], nil
+	} else {
+		return fmt.Sprintf(global.SYS.GetProcDir() + "%d/root", pid), nil
+	}
+}
+
+// GetContainerRealFilePath resolves the real file path of a container file from a given symlink.
+// It handles nested symlinks and detects circular references to prevent infinite loops.
+// Input: pid (process id), symlinkPath (path of the symlink)
+// Output: real file path (string) or an error if the resolution fails.
+func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string, error) {
+	var symlink, procRoot, currentPath, resolvedPath string
+	var err error
+
+	// Flag to check if the current path is under the process root.
+	var underProcRoot bool
+
+	// Keeps track of already visited symlinks to detect loops.
+	visitedSymlink := make(map[string]struct{})
+	currentPath = symlinkPath
+
+	// Nest symlink would look for the the symlink for many times, we limit it to 5 layer of searching of its symlink.
+	layer := 0
+	for ; layer < linkMaxLayers; layer++ {
+		underProcRoot = false
+
+		if _, exists := visitedSymlink[currentPath]; exists {
+			return "", fmt.Errorf("Error: Circular symlink detected. The symlink structure creates a loop and cannot be resolved.")
+		}
+
+		if !fileExists(currentPath) {
+			log.WithError(err).Error("File not exist")
 			return "", err
 		}
-		if !filepath.IsAbs(linkPath) {
-			path = filepath.Dir(path) + "/" + linkPath
-			path = filepath.Clean(path)
+
+		if symlink, err = os.Readlink(currentPath); err != nil {
+			log.WithError(err).Error("Read file link fail")
+			return "", err
+		}
+
+		if procRoot, err = extractProcRootPath(pid, currentPath, inTest); err != nil {
+			log.WithError(err).Error("Get Proc Root Path fail")
+			return "", err
+		}
+
+		// if absolute symlink, we will join with procroot directly.
+		if filepath.IsAbs(symlink) {
+			resolvedPath = filepath.Join(procRoot, symlink)
+			underProcRoot = true
 		} else {
-			path = global.SYS.ContainerFilePath(pid, linkPath)
+			parts := strings.Split(symlink, "/")
+			for i := range parts {
+				partialSymlink := strings.Join(parts[i:], "/")
+				resolvedPath = filepath.Join(filepath.Dir(currentPath), partialSymlink)
+				// Assume the first resolved path under proc root is the correct path
+				if strings.HasPrefix(resolvedPath, procRoot) {
+					underProcRoot = true
+					break
+				}
+			}
 		}
-		finfo, err := os.Lstat(path)
-		if err == nil && (finfo.Mode()&os.ModeSymlink) == 0 {
-			return path, nil
+
+		visitedSymlink[currentPath] = struct{}{}
+		if underProcRoot {
+			// nest link
+			finfo, err := os.Lstat(resolvedPath)
+			if err != nil {
+				log.WithError(err).Error("failed to read resolvedPath")
+				return "", err
+			}
+			if finfo.Mode()&os.ModeSymlink == 0 {
+				// Not a symlink
+				return resolvedPath, nil
+			}
+			currentPath = resolvedPath
+		} else {
+			return "", errors.New("failed to resolve symlink")
 		}
-		retry++
 	}
+
 	return "", fmt.Errorf("Get file symlink fail")
 }
 
@@ -129,7 +221,7 @@ func GetFileInfoExtFromPath(root int, path string, flt interface{}, protect, use
 		//for symlink, we need to watch two of them, symlink and the real file
 		//read the link and create a seperated file info.
 		if (finfo.FileMode & os.ModeSymlink) != 0 {
-			if rpath, err := GetContainerRealFilePath(root, path); err == nil {
+			if rpath, err := GetContainerRealFilePath(root, path, false); err == nil {
 				finfo.Link = rpath
 				rinfo := &FileInfoExt{
 					Path:    rpath,

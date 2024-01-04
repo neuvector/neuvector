@@ -405,7 +405,6 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ip", "/sbin/ip"},
 		{"ls", "/bin/busybox"},
 		{"tee", "/usr/bin/tee"},
-		{"stat", "/usr/bin/stat"}, // bench scripts
 		{"stty", "/bin/busybox"},  // python3.9
 
 		// k8s or openshift environment
@@ -527,10 +526,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"kill", "/bin/busybox"}, // replaced
 		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
-		{"nc", "/bin/busybox"},
-		{"echo", "/bin/busybox"},
-		{"tee", "/usr/bin/tee"},
-		{"stat", "/usr/bin/stat"}, // bench scripts
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -591,21 +586,22 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"kill", "/bin/busybox"}, // replaced
 		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
-		{"nc", "/bin/busybox"},
-		{"echo", "/bin/busybox"},
-		{"tee", "/usr/bin/tee"},
-		{"stat", "/usr/bin/stat"}, // bench scripts
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"},           // monitor, CIS bench tests
 		{"which", "*"},
-		{"pgrep", "/usr/bin/pgrep"},
-		{"sed", "*"},
-		{"cut", "*"},
+
+		// bench scripts
 		{"awk", "*"},
+		{"cut", "*"},
+		{"echo", "*"},
+		{"grep", "*"},
+		{"pgrep", "*"},
+		{"sed", "*"},
+		{"stat", "*"},
+		{"tee", "*"},
 		{"tr", "*"},
 	}
 
@@ -678,10 +674,6 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"kill", "/bin/busybox"}, // replaced
 		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
-		{"nc", "/bin/busybox"},
-		{"echo", "/bin/busybox"},
-		{"tee", "/usr/bin/tee"},
-		{"stat", "/usr/bin/stat"}, // bench scripts
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -689,10 +681,16 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"mount", "*"},          // k8s volume plug-in
 		{"grep", "*"},           // monitor, CIS bench tests
 		{"which", "*"},
-		{"pgrep", "/usr/bin/pgrep"},
-		{"sed", "*"},
-		{"cut", "*"},
+
+		// bench scripts
 		{"awk", "*"},
+		{"cut", "*"},
+		{"echo", "*"},
+		{"grep", "*"},
+		{"pgrep", "*"},
+		{"sed", "*"},
+		{"stat", "*"},
+		{"tee", "*"},
 		{"tr", "*"},
 	}
 

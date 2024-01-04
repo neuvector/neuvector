@@ -17,8 +17,9 @@ import (
 )
 
 type webhookCache struct {
-	conn   *common.Webhook
-	target string
+	c        *common.Webhook
+	url      string
+	useProxy bool
 }
 
 var systemConfigCache share.CLUSSystemConfig = common.DefaultSystemConfig
@@ -287,7 +288,6 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 		NoTelemetryReport:         systemConfigCache.NoTelemetryReport,
-		RemoteRepositories:        systemConfigCache.RemoteRepositories,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -300,7 +300,34 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 
 	rconf.Webhooks = make([]api.RESTWebhook, len(systemConfigCache.Webhooks))
 	for i, wh := range systemConfigCache.Webhooks {
-		rconf.Webhooks[i] = api.RESTWebhook{Name: wh.Name, Url: wh.Url, Enable: wh.Enable, Type: wh.Type, CfgType: api.CfgTypeUserCreated}
+		rconf.Webhooks[i] = api.RESTWebhook{
+			Name:     wh.Name,
+			Url:      wh.Url,
+			Type:     wh.Type,
+			Enable:   wh.Enable,
+			UseProxy: wh.UseProxy,
+			CfgType:  api.CfgTypeUserCreated,
+		}
+	}
+
+    rconf.RemoteRepositories = make([]api.RESTRemoteRepository, len(systemConfigCache.RemoteRepositories))
+	for i, rr := range systemConfigCache.RemoteRepositories {
+		repo := api.RESTRemoteRepository{
+			Nickname: rr.Nickname,
+			Comment:  rr.Comment,
+			Provider: rr.Provider,
+		}
+		if rr.Provider == share.RemoteRepositoryProvider_GitHub && rr.GitHubConfiguration != nil {
+			repo.GitHubConfiguration = &api.RESTRemoteRepo_GitHubConfig{
+				RepositoryOwnerUsername:          rr.GitHubConfiguration.RepositoryOwnerUsername,
+				RepositoryName:                   rr.GitHubConfiguration.RepositoryName,
+				RepositoryBranchName:             rr.GitHubConfiguration.RepositoryBranchName,
+				PersonalAccessToken:              rr.GitHubConfiguration.PersonalAccessToken,
+				PersonalAccessTokenCommitterName: rr.GitHubConfiguration.PersonalAccessTokenCommitterName,
+				PersonalAccessTokenEmail:         rr.GitHubConfiguration.PersonalAccessTokenEmail,
+			}
+		}
+		rconf.RemoteRepositories[i] = repo
 	}
 
 	proxy := systemConfigCache.RegistryHttpProxy
@@ -460,7 +487,11 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
 		if h.Enable {
-			webhookCachTemp[h.Name] = &webhookCache{conn: common.NewWebHook(h.Url), target: h.Type}
+			webhookCachTemp[h.Name] = &webhookCache{
+				c:        common.NewWebHook(h.Url, h.Type),
+				url:      h.Url,
+				useProxy: h.UseProxy,
+			}
 		}
 	}
 	webhookCacheMap = webhookCachTemp
@@ -479,6 +510,36 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	} else if syslogger != nil {
 		syslogger.Close()
 		syslogger = nil
+	}
+}
+
+func configIcmpPolicy(ctx *Context) {
+	acc := access.NewReaderAccessControl()
+	cfg, rev := clusHelper.GetSystemConfigRev(acc)
+	retry := 0
+	for retry < 3 {
+		if cfg == nil {
+			if cfg, rev = clusHelper.GetSystemConfigRev(acc); cfg != nil {
+				break
+			}
+			retry++
+		} else {
+			break
+		}
+	}
+	if cfg == nil {
+		cfg = &common.DefaultSystemConfig
+		rev = 0
+	}
+	cfg.EnableIcmpPolicy = ctx.EnableIcmpPolicy
+
+	retry = 0
+	for retry < 3 {
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			retry++
+		} else {
+			break
+		}
 	}
 }
 

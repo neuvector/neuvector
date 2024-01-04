@@ -2,7 +2,9 @@ package remote_repository
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +12,10 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -28,6 +32,7 @@ type gitHubAPI_Comitter struct {
 
 type gitHubAPI_PutRepoContent_RequestBody struct {
 	Message   string             `json:"message"`
+	Branch    string             `json:"branch"`
 	Committer gitHubAPI_Comitter `json:"comitter"`
 	Content   string             `json:"content"`
 	SHA       string             `json:"sha"`
@@ -67,9 +72,18 @@ func (exp GitHubExport) Do() error {
 	encodedFileContents := make([]byte, base64.StdEncoding.EncodedLen(len(exp.fileContents)))
 	base64.StdEncoding.Encode(encodedFileContents, []byte(exp.fileContents))
 
-	existingFileSha, err := exp.getExistingFileSha()
+	existingFileSha, githubVer, err := exp.getExistingFileSha()
 	if err != nil {
 		return fmt.Errorf("could not retrieve sha for file at filepath %s: %s", exp.filePath, err.Error())
+	}
+
+	if githubVer == "github.v3" {
+		hasher := sha1.New()
+		hasher.Write([]byte(fmt.Sprintf("blob %d\x00%s", len(exp.fileContents), exp.fileContents)))
+		newFileSha := hex.EncodeToString(hasher.Sum(nil))
+		if existingFileSha != "" && newFileSha == existingFileSha {
+			return fmt.Errorf("exported content is same as the file content on remote repository")
+		}
 	}
 
 	requestBody := gitHubAPI_PutRepoContent_RequestBody{
@@ -78,6 +92,7 @@ func (exp GitHubExport) Do() error {
 			Name:  exp.committer.name,
 			Email: exp.committer.email,
 		},
+		Branch:  exp.repo.branch,
 		Content: string(encodedFileContents),
 		SHA:     existingFileSha,
 	}
@@ -121,7 +136,7 @@ func getRateLimitResetDate(rateLimitResetHeader string) *time.Time {
 	return &rateLimitResetDate
 }
 
-func (exp GitHubExport) getExistingFileSha() (string, error) {
+func (exp GitHubExport) getExistingFileSha() (string, string, error) {
 	client := http.DefaultClient
 
 	req := exp.getBaseRequest()
@@ -129,34 +144,45 @@ func (exp GitHubExport) getExistingFileSha() (string, error) {
 
 	resp, err := client.Do(&req)
 	if err != nil {
-		return "", fmt.Errorf("could not do request: %s", err.Error())
+		return "", "", fmt.Errorf("could not do request: %s", err.Error())
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
-			return "", nil
+			return "", "", nil
 		}
-		return "", fmt.Errorf("could not retrieve file contents from github api, received status code \"%d\"", resp.StatusCode)
+		return "", "", fmt.Errorf("could not retrieve file contents from github api, received status code \"%d\"", resp.StatusCode)
 	}
 
 	var body []byte
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %s", err.Error())
+		return "", "", fmt.Errorf("error reading response body: %s", err.Error())
 	}
 
 	err = resp.Body.Close()
 	if err != nil {
-		return "", fmt.Errorf("error closing response body: %s", err.Error())
+		return "", "", fmt.Errorf("error closing response body: %s", err.Error())
+	}
+
+	var githubVer string
+	if values, ok := resp.Header["X-Github-Media-Type"]; ok {
+		for _, v := range values {
+			for _, s := range strings.Split(v, "; ") {
+				if strings.HasPrefix(s, "github.") {
+					githubVer = s
+				}
+			}
+		}
 	}
 
 	githubApiFile := &gitHubAPI_GetRepoContent_ResponseBody{}
 	err = json.Unmarshal(body, githubApiFile)
 	if err != nil {
-		return "", fmt.Errorf("error unmarshalling response json: %s", err.Error())
+		return "", githubVer, fmt.Errorf("error unmarshalling response json: %s", err.Error())
 	}
 
-	return githubApiFile.Sha, nil
+	return githubApiFile.Sha, githubVer, nil
 }
 
 func (exp GitHubExport) getBaseRequest() http.Request {
@@ -170,22 +196,22 @@ func (exp GitHubExport) getBaseRequest() http.Request {
 	return baseRequest
 }
 
-func NewGitHubExport(filePath string, fileContents []byte, commitMessage string, config *share.RemoteRepository_GitHubConfiguration) (GitHubExport, error) {
-	exportUrl, err := url.Parse(fmt.Sprintf(githubRepoContentUrl, *config.RepositoryOwnerUsername, *config.RepositoryName, filePath))
+func NewGitHubExport(filePath string, fileContents []byte, commitMessage string, config api.RESTRemoteRepo_GitHubConfig) (GitHubExport, error) {
+	exportUrl, err := url.Parse(fmt.Sprintf(githubRepoContentUrl, config.RepositoryOwnerUsername, config.RepositoryName, filePath))
 	if err != nil {
 		return GitHubExport{}, fmt.Errorf("could not parse url for new remote export object: %s", err.Error())
 	}
 
 	return GitHubExport{
 		repo: githubRepo{
-			owner:  *config.RepositoryOwnerUsername,
-			name:   *config.RepositoryName,
-			branch: *config.RepositoryBranchName,
+			owner:  config.RepositoryOwnerUsername,
+			name:   config.RepositoryName,
+			branch: config.RepositoryBranchName,
 		},
 		committer: githubCommitter{
-			name:                *config.PersonalAccessTokenCommitterName,
-			email:               *config.PersonalAccessTokenEmail,
-			personalAccessToken: *config.PersonalAccessToken,
+			name:                config.PersonalAccessTokenCommitterName,
+			email:               config.PersonalAccessTokenEmail,
+			personalAccessToken: config.PersonalAccessToken,
 		},
 		filePath:      filePath,
 		fileContents:  fileContents,

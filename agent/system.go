@@ -145,6 +145,17 @@ func systemConfigUnmanagedWl(detectUnmanagedWl bool) {
 	dp.DPCtrlSetDetectUnmanagedWl(&duw)
 }
 
+func systemConfigEnableIcmpPolicy(enableIcmpPolicy bool) {
+	if gInfo.enableIcmpPolicy == enableIcmpPolicy {
+		return
+	}
+	policy.ToggleIcmpPolicy = true
+	gInfo.enableIcmpPolicy = enableIcmpPolicy
+	//set enableIcmpPolicy to dp
+	eip := gInfo.enableIcmpPolicy
+	dp.DPCtrlSetEnableIcmpPolicy(&eip)
+}
+
 func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
@@ -157,12 +168,14 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigXff(conf.XffEnabled)
 		systemConfigNetPolicy(conf.DisableNetPolicy)
 		systemConfigUnmanagedWl(conf.DetectUnmanagedWl)
+		systemConfigEnableIcmpPolicy(conf.EnableIcmpPolicy)
 	case cluster.ClusterNotifyDelete:
 		systemConfigPolicyMode(defaultPolicyMode)
 		systemConfigTapProxymesh(defaultTapProxymesh)
 		systemConfigXff(defaultXffEnabled)
 		systemConfigNetPolicy(defaultDisableNetPolicy)
 		systemConfigUnmanagedWl(defaultDetectUnmanagedWl)
+		systemConfigEnableIcmpPolicy(defaultEnableIcmpPolicy)
 	}
 }
 

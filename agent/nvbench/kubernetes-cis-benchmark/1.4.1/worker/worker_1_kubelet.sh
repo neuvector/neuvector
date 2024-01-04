@@ -17,6 +17,7 @@ fi
 check_2_1_3="2.1.3  - Ensure that the --client-ca-file argument is set as appropriate (Scored)"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_2_1_3"
     pass "       * client-ca-file: $cafile"
 else
@@ -84,6 +85,8 @@ if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_KUBELET_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
         cfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-cert-file')
         kfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-private-key-file')
+        cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+        kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
         pass "$check_2_1_10"
         pass "        * tls-cert-file: $cfile"
         pass "        * tls-private-key-file: $kfile"
@@ -106,6 +109,7 @@ fi
 
 check_2_1_13="2.1.13  - Ensure that the RotateKubeletServerCertificate argument is set to true (Scored)"
 file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
 if [ -z "$found" ]; then
     warn "$check_2_1_13"

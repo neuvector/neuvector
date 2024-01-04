@@ -15,6 +15,7 @@ import (
 
 	"github.com/neuvector/neuvector/agent/workerlet"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/neuvector/neuvector/share/scan"
 )
 
 const hostRootMountPoint = "/proc/1/root"
@@ -31,6 +32,7 @@ const (
 	file_image = iota
 	file_added
 	file_deleted
+	file_changed
 	file_not_exist // exclude deleted case
 )
 
@@ -38,6 +40,7 @@ const (
 type fileInfo struct {
 	fileType  uint32 // referred by snapshots only
 	bExec     bool
+	bJavaPkg  bool
 	hashValue uint32
 	length    int64
 }
@@ -65,15 +68,16 @@ type FileNotificationCtr struct {
 }
 
 /////
-func calculateFileInfo(fi os.FileInfo, path string) (bool, int64, uint32) {
+func calculateFileInfo(fi os.FileInfo, path string) (bool, bool, int64, uint32) {
 	var hash uint32
 
 	bExec := utils.IsExecutable(fi, path)
+	bJavaPkg := scan.IsJava(path)
 	length := fi.Size()
 	if bExec && length > 0 { // focus on executables now
 		hash = utils.FileHashCrc32(path, length)
 	}
-	return bExec, length, hash
+	return bExec, bJavaPkg, length, hash
 }
 
 ////////////
@@ -237,7 +241,7 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 	root, ok := fsn.roots[index]
 	if !ok {
 		// the container might be removed
-		// log.WithFields(log.Fields{"index": index, "event": event}).Debug("FSN: no root")
+		// log.WithFields(log.Fields{"index": index}).Debug("FSN: no root")
 		return
 	}
 
@@ -265,31 +269,69 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 	}
 
 	// calculations
-	bExec, length, hash := calculateFileInfo(fi, path)
+	bExec, bJavaPkg, length, hash := calculateFileInfo(fi, path)
 
 	// updating record
-	var bChanged, bNewFile bool
+	var bUpdated, bNewFile bool
 	finfo, ok := root.files[file]
 	if ok {
-		bChanged = (length != finfo.length) || (hash != finfo.hashValue) || (bExec != finfo.bExec)
+		bUpdated = (length != finfo.length) || (hash != finfo.hashValue) || (bExec != finfo.bExec) || (finfo.bJavaPkg != bJavaPkg)
 	} else {
-		bChanged = true
+		bUpdated = true
 		bNewFile = true
 	}
 
-	finfo = &fileInfo{bExec: bExec, hashValue: hash, length: length, fileType: file_added}
+	if !bUpdated {
+		return
+	}
+
+	finfo = &fileInfo{bExec: bExec,  bJavaPkg: bJavaPkg, hashValue: hash, length: length, fileType: file_changed}
+	if bNewFile {
+		finfo.fileType = file_added
+	}
 	root.files[file] = finfo
 
 	// reporting events
-	if bChanged {
-		// log.WithFields(log.Fields{"id": root.id, "file": file, "bNew": bNewFile}).Debug("FSN:")
-		fsn.prober.FsnExecFileChanged(root.id, file, bNewFile, *finfo)
+	// log.WithFields(log.Fields{"id": root.id, "file": file, "finfo": finfo}).Debug("FSN:")
+	fsn.prober.ProcessFsnEvent(root.id, []string {file}, *finfo)
+}
+
+// already locked
+func (fsn *FileNotificationCtr) handleRemoveEvent(op string, root *fsnRootFd, path, file string) {
+	// mLog.WithFields(log.Fields{"op": op, "path": path}).Debug("FSN:")
+	if root.dirs.Contains(path) {
+
+		fsn.removeDir(path)
+		var execs, jars []string
+		for p, fi := range root.files {
+			if fi.bExec {
+				execs = append(execs, p)
+			}
+			if fi.bJavaPkg {
+				jars = append(jars, p)
+			}
+			delete(root.files, p)
+		}
+		mLog.WithFields(log.Fields{"dir": file, "execs": execs, "jars": jars}).Debug("FSN: remove dir")
+		if len(execs) > 0 {
+			fsn.prober.ProcessFsnEvent(root.id, execs, fileInfo{bExec: true, fileType: file_deleted})
+		}
+		if len(jars) > 0 {
+			fsn.prober.ProcessFsnEvent(root.id, jars, fileInfo{bJavaPkg: true, fileType: file_deleted})
+		}
+		root.dirs.Remove(path)
+	} else {
+		// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: remove file")
+		if fi, ok := root.files[file]; ok && fi.bJavaPkg {
+			fsn.prober.ProcessFsnEvent(root.id, []string {file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+		}
+		delete(root.files, file)
 	}
 }
 
 //
 func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
-	// log.WithFields(log.Fields{"event": event}).Debug("FSN:")
+	// mLog.WithFields(log.Fields{"event": event}).Debug("FSN:")
 	index := fsn.rootIndex(event.Name)
 
 	fsn.lockMux()
@@ -298,28 +340,21 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 	root, ok := fsn.roots[index]
 	if !ok {
 		// the container might be removed
-		// log.WithFields(log.Fields{"index": index, "event": event}).Debug("FSN: no root")
+		// mLog.WithFields(log.Fields{"index": index, "event": event}).Debug("FSN: no root")
 		return
 	}
 
 	path := event.Name
 	if len(path) <= root.cLayerLen {
-		// log.WithFields(log.Fields{"path": path, "len": len(path), "headerLength": root.cLayerLen}).Debug()
+		// mLog.WithFields(log.Fields{"path": path, "len": len(path), "headerLength": root.cLayerLen}).Debug()
 		return
 	}
 
 	file := event.Name[root.cLayerLen:]
 	// Op: fsnotify.[Create, Write, Remove, Rename, Chmod]
-	// log.WithFields(log.Fields{"file": file, "op": event.Op}).Debug("FSN:")
+	// mLog.WithFields(log.Fields{"file": file, "op": event.Op}).Debug("FSN:")
 	if (event.Op & (fsnotify.Remove | fsnotify.Rename)) != 0 {
-		if root.dirs.Contains(path) {
-			//log.WithFields(log.Fields{"dir": file}).Debug("FSN: remove dir")
-			fsn.removeDir(path)
-			root.dirs.Remove(path)
-		} else {
-			//log.WithFields(log.Fields{"file": file}).Debug("FSN: remove file")
-			delete(root.files, file)
-		}
+		fsn.handleRemoveEvent(event.Op.String(), root, path, file)
 		return
 	}
 
@@ -330,31 +365,44 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 	time.Sleep(time.Millisecond * 2) // avoid reading an incomplete change
 	fi, err := os.Stat(path)
 	if err != nil {
-		// log.WithFields(log.Fields{"file": file}).Error("FSN: stat")
+		// mLog.WithFields(log.Fields{"file": file}).Error("FSN: stat")
 		return
 	}
 
 	if (event.Op & fsnotify.Create) != 0 {
-		if fi.IsDir() {
+		switch {
+		case fi.IsDir():
 			dirs, _ := fsn.enumFiles(path, root.id, false)
 			// sample: mkdir -p /tmp/test/bin, only "/tmp" was reported.
 			for d := range dirs.Iter() {
 				dir := d.(string)
-				// log.WithFields(log.Fields{"rdir": dir[root.cLayerLen:]}).Debug("FSN: new dir")
+				// mLog.WithFields(log.Fields{"rdir": dir[root.cLayerLen:]}).Debug("FSN: new dir")
 				fsn.addDir(dir)
 				root.dirs.Add(dir)
 			}
-		} else if fi.Mode().IsRegular() {
-			go fsn.updateFileInfo(index, file, path)
-			// log.WithFields(log.Fields{"file": file, "path": path}).Debug("FSN: new file")
-			return
+		case fi.Mode().IsRegular():
+			// mLog.WithFields(log.Fields{"file": file, "path": path}).Debug("FSN: new file")
+			name := filepath.Base(file)
+			if fsn.storageDrv == drv_aufs && name != ".wh..wh.aufs" && strings.HasPrefix(name, ".wh.") && fi.Mode().Perm() == 0444 { // read-only
+				name = name[len(".wh."):]
+				file = filepath.Join(filepath.Dir(file), name)
+				// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: deleted file")
+				if scan.IsJava(path) {
+					fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+				}
+			} else {
+				go fsn.updateFileInfo(index, file, path)
+			}
+		case fi.Mode() == (os.ModeDevice | os.ModeCharDevice):
+			// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: deleted file")
+			if scan.IsJava(path) {
+				fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+			}
 		}
-	}
-
-	if (event.Op & (fsnotify.Chmod | fsnotify.Write)) != 0 {
+	} else if (event.Op & (fsnotify.Chmod | fsnotify.Write)) != 0 {
 		if fi.Mode().IsRegular() {
+			// mLog.WithFields(log.Fields{"file": file, "op": event.Op}).Debug("FSN: file modfied")
 			go fsn.updateFileInfo(index, file, path)
-			// log.WithFields(log.Fields{"file": file, "op": event.Op}).Debug("FSN: file modfied")
 		}
 	}
 }
@@ -525,12 +573,13 @@ func (fsn *FileNotificationCtr) GetUpperFileInfo(id, file string) (*fileInfo, bo
 
 			fpath := filepath.Join(root.cLayer, file)
 			if fi, err := os.Stat(fpath); err == nil {
-				finfo.bExec, finfo.length, finfo.hashValue = calculateFileInfo(fi, fpath)
+				finfo.bExec, finfo.bJavaPkg, finfo.length, finfo.hashValue = calculateFileInfo(fi, fpath)
 				if fsn.storageDrv == drv_btrfs {
 					ipath := filepath.Join(root.imgLayer, file)
 					if ifi, err := os.Stat(ipath); err == nil {
-						bExec, length, hashValue := calculateFileInfo(ifi, ipath)
-						if finfo.bExec == bExec && finfo.length == length && finfo.hashValue == hashValue {
+						bExec, bJavaPkg, length, hashValue := calculateFileInfo(ifi, ipath)
+						if (finfo.bExec == bExec || finfo.bJavaPkg == bJavaPkg) &&
+							finfo.length == length && finfo.hashValue == hashValue {
 							// no update
 							return finfo, false // image layers: return safe
 						}

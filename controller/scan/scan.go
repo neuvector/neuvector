@@ -55,10 +55,11 @@ func isScanner() bool {
 // count vul. with the consideration of vul. profile (alives)
 // requirement: entries in 'vts' are in the same order as in 'vuls'
 func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alives utils.Set) (
-	[]string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
+	[]string, []string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
 
 	highs := make([]string, 0)
 	meds := make([]string, 0)
+	lows := make([]string, 0)
 	var highWithFix, others int
 	var scoreTemp int
 
@@ -78,6 +79,10 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 			others++
 		}
 		scoreTemp += int(10 * v.Score)
+
+		if v.Severity == share.VulnSeverityLow {
+			lows = append(lows, v.Name)
+		}
 	}
 
 	highVulPublishDate := make(map[string]share.CLUSScannedVulInfo, len(highs))
@@ -159,7 +164,7 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 
 	s := fmt.Sprintf("%d.%s", scoreTemp/10, strconv.Itoa(scoreTemp%10))
 	totalScore, _ := strconv.ParseFloat(s, 32)
-	return highs, meds, highWithFix, float32(totalScore), vulPublishDate, otherVuls
+	return highs, meds, lows, highWithFix, float32(totalScore), vulPublishDate, otherVuls
 }
 
 func imageWatcher() {

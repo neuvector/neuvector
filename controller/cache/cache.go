@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
@@ -195,6 +196,7 @@ type Context struct {
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
 	EnableRmNsGroups         bool
+	EnableIcmpPolicy         bool
 	ConnLog                  *log.Logger
 	MutexLog                 *log.Logger
 	ScanLog                  *log.Logger
@@ -204,6 +206,8 @@ type Context struct {
 	NvSemanticVersion        string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
+	CreateQuerySessionFunc   func(qsr *api.QuerySessionRequest) error
+	DeleteQuerySessionFunc   func(queryToken string) error
 }
 
 type k8sProbeCmd struct {
@@ -2128,6 +2132,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	startWorkerThread(ctx) // timer and orch channel
 	startPolicyThread()
 
+	configIcmpPolicy(ctx)
 	configInit()
 	scanInit()
 
@@ -2139,6 +2144,9 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
 	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
 	automode_init(ctx)
+
+	// pass function to db so it can use it
+	db.InitGetCVERecord(GetCVERecord)
 
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()
@@ -2283,4 +2291,91 @@ func pruneWorkloadKV(suspected utils.Set) {
 			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
 		}
 	}
+}
+
+func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	workloadIDs := make([]string, 0)
+	for _, cache := range wlCacheMap {
+		if !acc.Authorize(cache.workload, nil) {
+			continue
+		}
+		if common.OEMIgnoreWorkload(cache.workload) {
+			continue
+		}
+		if !cache.workload.Running {
+			continue
+		}
+
+		if cache.workload.ShareNetNS == "" {
+			workloadIDs = append(workloadIDs, cache.workload.ID)
+			getFilteredVulTraits(cache.workload.ID, cache.vulTraits, filteredMap)
+
+			for child := range cache.children.Iter() {
+				if childCache, ok := wlCacheMap[child.(string)]; ok {
+					workloadIDs = append(workloadIDs, childCache.workload.ID)
+					getFilteredVulTraits(childCache.workload.ID, childCache.vulTraits, filteredMap)
+				}
+			}
+		}
+	}
+	return workloadIDs
+}
+
+func (m CacheMethod) GetAllHostsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	hostIDs := make([]string, 0)
+	for _, cache := range hostCacheMap {
+		if !acc.Authorize(cache.host, nil) || isDummyHostCache(cache) {
+			continue
+		}
+
+		hostIDs = append(hostIDs, cache.host.ID)
+		getFilteredVulTraits(cache.host.ID, cache.vulTraits, filteredMap)
+	}
+	return hostIDs
+}
+
+func (m CacheMethod) GetPlatformID(acc *access.AccessControl, filteredMap map[string]bool) string {
+	scanMutexRLock()
+	defer scanMutexRUnlock()
+
+	if acc.Authorize(&share.CLUSHost{}, nil) {
+		if info, ok := scanMap[common.ScanPlatformID]; ok {
+			getFilteredVulTraits(common.ScanPlatformID, info.vulTraits, filteredMap)
+			return common.ScanPlatformID
+		}
+	}
+
+	return ""
+}
+
+func getFilteredVulTraits(id string, vulTraits []*scanUtils.VulTrait, filteredMap map[string]bool) {
+	for _, v := range vulTraits {
+		if v.IsFiltered() {
+			key := fmt.Sprintf("%s;%s", id, v.Name)
+			filteredMap[key] = true
+			filteredMap[v.Name] = true
+		}
+	}
+}
+
+func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
+	cve := scanUtils.GetCVERecord(name, dbKey, baseOS)
+	vul := &db.DbVulAsset{
+		Severity:    cve.Severity,
+		Description: cve.Description,
+		Link:        cve.Link,
+		Score:       int(cve.Score * 10),
+		Vectors:     cve.Vectors,
+		ScoreV3:     int(cve.ScoreV3 * 10),
+		VectorsV3:   cve.VectorsV3,
+		PublishedTS: cve.PublishedTS,
+		LastModTS:   cve.LastModTS,
+	}
+	return vul
 }

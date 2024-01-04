@@ -114,7 +114,7 @@ func NewScanApps(v2 bool) *ScanApps {
 }
 
 func isAppsPkgFile(filename, fullpath string) bool {
-	if isNodejs(filename) || isJava(filename) || isPython(filename) ||
+	if isNodejs(filename) || IsJava(filename) || isPython(filename) ||
 		isRuby(filename) || isDotNet(filename) || isWordpress(filename) {
 		return true
 	}
@@ -160,7 +160,7 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 
 	if isNodejs(filename) {
 		s.parseNodePackage(filename, fullpath)
-	} else if isJava(filename) {
+	} else if IsJava(filename) {
 		if r, err := zip.OpenReader(fullpath); err == nil {
 			s.parseJarPackage(r.Reader, filename, filename, fullpath, 0)
 			r.Close()
@@ -317,7 +317,7 @@ func isJavaJar(filename string) bool {
 	return strings.HasSuffix(filename, ".jar")
 }
 
-func isJava(filename string) bool {
+func IsJava(filename string) bool {
 	return strings.HasSuffix(filename, ".war") ||
 		strings.HasSuffix(filename, ".jar") ||
 		strings.HasSuffix(filename, ".ear")
@@ -342,7 +342,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		if depth+1 < jarMaxDepth && isJava(f.Name) {
+		if depth+1 < jarMaxDepth && IsJava(f.Name) {
 			// Parse jar file recursively
 			if jarFile, err := f.Open(); err == nil {
 				// Unzip the jar file to disk then walk through. Can we unzip on the fly?

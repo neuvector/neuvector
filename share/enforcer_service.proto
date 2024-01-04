@@ -140,6 +140,7 @@ message CLUSDerivedPolicyRuleArray {
 
 message CLUSDerivedPolicyRuleMap {
     map<string, CLUSDerivedPolicyRuleArray> RuleMap = 1;
+    bytes RuleByte = 2;
 }
 
 message CLUSProbeSummary {

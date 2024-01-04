@@ -4,6 +4,7 @@ FROM neuvector/${BASE_PREFIX}controller_base:${BASE_IMAGE_TAG}
 
 COPY stage /
 
+ARG NV_TAG
 LABEL name="controller" \
       vendor="NeuVector Inc." \
       version=${NV_TAG} \

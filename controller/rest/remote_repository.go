@@ -20,13 +20,13 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
-	} else if !acc.Authorize(&share.RemoteRepository{}, nil) {
+	} else if !acc.Authorize(&share.CLUSRemoteRepository{}, nil) {
 		restRespAccessDenied(w, login)
 		return
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
-	var remoteRepository share.RemoteRepository
+	var remoteRepository api.RESTRemoteRepository
 	err := json.Unmarshal(body, &remoteRepository)
 	if err != nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
@@ -50,6 +50,23 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	repo := share.CLUSRemoteRepository{
+		Nickname: remoteRepository.Nickname,
+		Provider: remoteRepository.Provider,
+		Comment:  remoteRepository.Comment,
+	}
+	if remoteRepository.GitHubConfiguration != nil {
+		githubCfg := *remoteRepository.GitHubConfiguration
+		repo.GitHubConfiguration = &share.RemoteRepository_GitHubConfiguration{
+			RepositoryOwnerUsername:          githubCfg.RepositoryOwnerUsername,
+			RepositoryName:                   githubCfg.RepositoryName,
+			RepositoryBranchName:             githubCfg.RepositoryBranchName,
+			PersonalAccessToken:              githubCfg.PersonalAccessToken,
+			PersonalAccessTokenCommitterName: githubCfg.PersonalAccessTokenCommitterName,
+			PersonalAccessTokenEmail:         githubCfg.PersonalAccessTokenEmail,
+		}
+	}
+
 	lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
@@ -65,13 +82,14 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 
 	for i := range systemConfig.RemoteRepositories {
 		if systemConfig.RemoteRepositories[i].Nickname == remoteRepository.Nickname {
-			log.WithFields(log.Fields{"alias": remoteRepository.Nickname}).Error("duplicate remote repository alias")
+			e := "duplicate remote repository alias"
+			log.WithFields(log.Fields{"alias": remoteRepository.Nickname}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "duplicate remote repository alias")
 			return
 		}
 	}
 
-	systemConfig.RemoteRepositories = append(systemConfig.RemoteRepositories, remoteRepository)
+	systemConfig.RemoteRepositories = append(systemConfig.RemoteRepositories, repo)
 	err = clusHelper.PutSystemConfigRev(systemConfig, rev)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "rev": rev}).Error("could not update system config")
@@ -87,7 +105,7 @@ func handlerRemoteRepositoryDelete(w http.ResponseWriter, r *http.Request, ps ht
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
-	} else if !acc.Authorize(&share.RemoteRepository{}, nil) {
+	} else if !acc.Authorize(&share.CLUSRemoteRepository{}, nil) {
 		restRespAccessDenied(w, login)
 		return
 	}
@@ -140,19 +158,21 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
-	} else if !acc.Authorize(&share.RemoteRepository{}, nil) {
+	} else if !acc.Authorize(&share.CLUSRemoteRepository{}, nil) {
 		restRespAccessDenied(w, login)
 		return
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
-	var remoteRepositoryUpdates share.RemoteRepository
-	err := json.Unmarshal(body, &remoteRepositoryUpdates)
-	if err != nil {
+	var rconf api.RESTRemoteRepositoryConfigData
+	err := json.Unmarshal(body, &rconf)
+	if err != nil || rconf.Config == nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
 		return
 	}
+
+	remoteRepositoryUpdates := rconf.Config
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 	if err != nil {
@@ -171,7 +191,7 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 	targetNickname := ps.ByName("nickname")
 	for i := range systemConfig.RemoteRepositories {
 		if systemConfig.RemoteRepositories[i].Nickname == targetNickname {
-			updatedRemoteRepository, err := getUpdatedRemoteRepository(systemConfig.RemoteRepositories[i], &remoteRepositoryUpdates)
+			updatedRemoteRepository, err := getUpdatedRemoteRepository(systemConfig.RemoteRepositories[i], remoteRepositoryUpdates)
 			if err != nil {
 				msg := fmt.Sprintf("could not update remote repository: %s", err.Error())
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -202,33 +222,32 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 // TODO: turn this into a generic function that is directed via struct tags
-func getUpdatedRemoteRepository(base share.RemoteRepository, updates *share.RemoteRepository) (share.RemoteRepository, error) {
+func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RESTRemoteRepositoryConfig) (share.CLUSRemoteRepository, error) {
 	isSet := func(s *string) bool {
-		return s != nil && *s != ""
+		return s != nil
 	}
 
-	if updates.Provider != nil {
-		base.Provider = updates.Provider
-	}
-
-	if *base.Provider == share.RemoteRepositoryProvider_GitHub {
+	if base.Provider == share.RemoteRepositoryProvider_GitHub {
+		if isSet(updates.Comment) {
+			base.Comment = *updates.Comment
+		}
 		if isSet(updates.GitHubConfiguration.RepositoryOwnerUsername) {
-			base.GitHubConfiguration.RepositoryOwnerUsername = updates.GitHubConfiguration.RepositoryOwnerUsername
+			base.GitHubConfiguration.RepositoryOwnerUsername = *updates.GitHubConfiguration.RepositoryOwnerUsername
 		}
 		if isSet(updates.GitHubConfiguration.RepositoryName) {
-			base.GitHubConfiguration.RepositoryName = updates.GitHubConfiguration.RepositoryName
+			base.GitHubConfiguration.RepositoryName = *updates.GitHubConfiguration.RepositoryName
 		}
 		if isSet(updates.GitHubConfiguration.RepositoryBranchName) {
-			base.GitHubConfiguration.RepositoryBranchName = updates.GitHubConfiguration.RepositoryBranchName
+			base.GitHubConfiguration.RepositoryBranchName = *updates.GitHubConfiguration.RepositoryBranchName
 		}
 		if isSet(updates.GitHubConfiguration.PersonalAccessToken) {
-			base.GitHubConfiguration.PersonalAccessToken = updates.GitHubConfiguration.PersonalAccessToken
+			base.GitHubConfiguration.PersonalAccessToken = *updates.GitHubConfiguration.PersonalAccessToken
 		}
 		if isSet(updates.GitHubConfiguration.PersonalAccessTokenCommitterName) {
-			base.GitHubConfiguration.PersonalAccessTokenCommitterName = updates.GitHubConfiguration.PersonalAccessTokenCommitterName
+			base.GitHubConfiguration.PersonalAccessTokenCommitterName = *updates.GitHubConfiguration.PersonalAccessTokenCommitterName
 		}
 		if isSet(updates.GitHubConfiguration.PersonalAccessTokenEmail) {
-			base.GitHubConfiguration.PersonalAccessTokenEmail = updates.GitHubConfiguration.PersonalAccessTokenEmail
+			base.GitHubConfiguration.PersonalAccessTokenEmail = *updates.GitHubConfiguration.PersonalAccessTokenEmail
 		}
 	}
 
@@ -237,7 +256,7 @@ func getUpdatedRemoteRepository(base share.RemoteRepository, updates *share.Remo
 	}
 
 	if !base.IsValid() {
-		return share.RemoteRepository{}, errors.New("updates result in invalid object")
+		return share.CLUSRemoteRepository{}, errors.New("updates result in invalid object")
 	}
 	return base, nil
 }

@@ -1,0 +1,128 @@
+version: "cis-1.6"
+id: 1
+title: "1 - Control Plane Components"
+type: "master"
+groups:
+  - id: 1.1
+    title: "1.1 - Master Node Configuration Files"
+    checks:
+      - id: 1.1.2
+        description: mock Ensure that the API server pod specification file ownership is set to root:root
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$check"
+                else
+                  warn "$check"
+                  warn "      * Wrong ownership for $file"
+                fi
+              else
+                info "$check"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
+      - id: 1.1.3
+        description: mock Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
+              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
+              if [ -f $config_manifest ]; then
+                  # kops
+                  file=$config_manifest
+              else
+                  file=$config_yaml
+              fi
+
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$check"
+                else
+                  warn "$check"
+                  warn "      * Wrong permissions for $file"
+                fi
+              else
+                info "$check"
+                info "      * File not found"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: 1.1.4
+        description: mock Ensure that the controller manager pod specification file ownership is set to root:root
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"    
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+                  pass "$check"
+                else
+                  warn "$check"
+                  warn "      * Wrong ownership for $file"
+                fi
+              else
+                info "$check"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: 1.1.7
+        description: mock Ensure that the etcd pod specification file permissions are set to 644 or more restrictive
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
+              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+              if [ -f $config_yaml ]; then
+                  # kops
+                  file=$config_yaml
+              else
+                  file=$config_manifest
+              fi
+
+              if [ -f "$file" ]; then
+                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+                  pass "$check"
+                else
+                  warn "$check"
+                  warn "      * Wrong permissions for $file"
+                fi
+              else
+                info "$check"
+                info "      * File not found"
+              fi
+        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/etcd.yaml

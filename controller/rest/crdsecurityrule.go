@@ -2504,6 +2504,9 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 							ruleCfg.Containers = v
 						}
 					}
+					if ruleCfg.Containers == 0 {
+						ruleCfg.Containers = share.AdmCtrlRuleContainersN
+					}
 					if crdRule.RuleMode != nil {
 						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
@@ -3293,7 +3296,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	// for all the group in the From/To , if learned group we also need export it's policymode
 	// We don't know the default policy mode in other system so in current system just export
 
-	doExport("cfgExport.yaml", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport("cfgGroupsExport.yaml", "groups", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func (h *nvCrdHandler) crdDeleteRecord(kind, recordName string) {

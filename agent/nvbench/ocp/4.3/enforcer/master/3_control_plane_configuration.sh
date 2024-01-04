@@ -4,7 +4,7 @@ info "3.1 - Authentication and Authorization"
 
 #todo review
 check_3_1_1="3.1.1  - Client certificate authentication should not be used for users (Not Scored)"
-output=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*configmaps/client-ca/ca-bundle.crt')
+output=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*configmaps/client-ca/ca-bundle.crt')
 if [ -z "$output" ]; then
   warn "$check_3_1_1"
 else

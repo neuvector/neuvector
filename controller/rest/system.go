@@ -240,7 +240,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					Webhooks: make([]api.RESTWebhook, len(cconf.Webhooks)),
 				}
 				for i, wh := range cconf.Webhooks {
-					fedConf.Webhooks[i] = api.RESTWebhook{Name: wh.Name, Url: wh.Url, Enable: wh.Enable, Type: wh.Type, CfgType: api.CfgTypeFederal}
+					fedConf.Webhooks[i] = api.RESTWebhook{
+						Name: wh.Name, Url: wh.Url, Enable: wh.Enable, UseProxy: wh.UseProxy,
+						Type: wh.Type, CfgType: api.CfgTypeFederal,
+					}
 				}
 				sort.Slice(fedConf.Webhooks, func(i, j int) bool { return fedConf.Webhooks[i].Name < fedConf.Webhooks[j].Name })
 			}
@@ -255,6 +258,9 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 			return
 		} else {
 			sort.Slice(rconf.Webhooks, func(i, j int) bool { return rconf.Webhooks[i].Name < rconf.Webhooks[j].Name })
+			sort.Slice(rconf.RemoteRepositories, func(i, j int) bool {
+				return rconf.RemoteRepositories[i].Nickname < rconf.RemoteRepositories[j].Nickname
+			})
 		}
 		if !k8sPlatform && scope == share.ScopeLocal {
 			rconf.ScannerAutoscale = api.RESTSystemConfigAutoscale{}
@@ -319,7 +325,8 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						NoTelemetryReport:  rconf.NoTelemetryReport,
 						CspType:            rconf.CspType,
 					},
-					Webhooks: rconf.Webhooks,
+					Webhooks:           rconf.Webhooks,
+					RemoteRepositories: rconf.RemoteRepositories,
 					Proxy: api.RESTSystemConfigProxyV2{
 						RegistryHttpProxyEnable:  rconf.RegistryHttpProxyEnable,
 						RegistryHttpsProxyEnable: rconf.RegistryHttpsProxyEnable,
@@ -534,7 +541,10 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 		}
 
 		newWebhookNames.Add(api.WebhookDefaultName)
-		h := share.CLUSWebhook{Name: api.WebhookDefaultName, Url: *rcWebhookUrl, Enable: true, Type: api.WebhookTypeSlack, CfgType: cfgType}
+		h := share.CLUSWebhook{
+			Name: api.WebhookDefaultName, Url: *rcWebhookUrl, Enable: true,
+			Type: api.WebhookTypeSlack, UseProxy: false, CfgType: cfgType,
+		}
 		if !acc.Authorize(&h, nil) {
 			return nil, api.RESTErrObjectAccessDenied, common.ErrObjectAccessDenied
 		}
@@ -563,7 +573,10 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 			}
 
 			newWebhookNames.Add(h.Name)
-			newWebhooks = append(newWebhooks, share.CLUSWebhook{Name: h.Name, Url: h.Url, Enable: h.Enable, Type: h.Type, CfgType: cfgType})
+			newWebhooks = append(newWebhooks, share.CLUSWebhook{
+				Name: h.Name, Url: h.Url, Enable: h.Enable, UseProxy: h.UseProxy,
+				Type: h.Type, CfgType: cfgType,
+			})
 		}
 	}
 
@@ -627,11 +640,12 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	cwh := share.CLUSWebhook{
-		Name:    rwh.Name,
-		Url:     rwh.Url,
-		Enable:  rwh.Enable,
-		Type:    rwh.Type,
-		CfgType: share.UserCreated,
+		Name:     rwh.Name,
+		Url:      rwh.Url,
+		Enable:   rwh.Enable,
+		UseProxy: rwh.UseProxy,
+		Type:     rwh.Type,
+		CfgType:  share.UserCreated,
 	}
 	if rwh.CfgType == api.CfgTypeFederal {
 		cwh.CfgType = share.FederalCfg
@@ -797,7 +811,13 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 		var found bool
 		for i, _ := range cconf.Webhooks {
 			if cconf.Webhooks[i].Name == rwh.Name {
-				cconf.Webhooks[i] = share.CLUSWebhook{Name: rwh.Name, Url: rwh.Url, Enable: rwh.Enable, Type: rwh.Type}
+				cconf.Webhooks[i] = share.CLUSWebhook{
+					Name:     rwh.Name,
+					Url:      rwh.Url,
+					Enable:   rwh.Enable,
+					UseProxy: rwh.UseProxy,
+					Type:     rwh.Type,
+				}
 				found = true
 				break
 			}
@@ -970,7 +990,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 		}
 
 		// Acquire lock if auth order or webhook is changing
-		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil {
+		if rc.AuthOrder != nil || (rc.WebhookUrl != nil && *rc.WebhookUrl != "") || rc.Webhooks != nil || rc.RemoteRepositories != nil {
 			lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 			if err != nil {
 				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
@@ -1302,6 +1322,41 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				}
 			}
 
+			// remote registories
+			if rc.RemoteRepositories != nil {
+				if len(*rc.RemoteRepositories) == 0 {
+					cconf.RemoteRepositories = make([]share.CLUSRemoteRepository, 0)
+				} else {
+					rr := (*rc.RemoteRepositories)[0]
+					if len(cconf.RemoteRepositories) != 1 {
+						cconf.RemoteRepositories = make([]share.CLUSRemoteRepository, 1)
+					}
+					cr := share.CLUSRemoteRepository{
+						Nickname: rr.Nickname,
+						Provider: rr.Provider,
+						Comment:  rr.Comment,
+					}
+					if rr.GitHubConfiguration != nil {
+						githubCfg := *rr.GitHubConfiguration
+						cr.GitHubConfiguration = &share.RemoteRepository_GitHubConfiguration{
+							RepositoryOwnerUsername:          githubCfg.RepositoryOwnerUsername,
+							RepositoryName:                   githubCfg.RepositoryName,
+							RepositoryBranchName:             githubCfg.RepositoryBranchName,
+							PersonalAccessToken:              githubCfg.PersonalAccessToken,
+							PersonalAccessTokenCommitterName: githubCfg.PersonalAccessTokenCommitterName,
+							PersonalAccessTokenEmail:         githubCfg.PersonalAccessTokenEmail,
+						}
+					}
+					if len(*rc.RemoteRepositories) > 1 || !cr.IsValid() {
+						err := errors.New("Unsupported remote repository nickname or provider")
+						log.WithFields(log.Fields{"err": err}).Error()
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+						return kick, err
+					}
+					cconf.RemoteRepositories[0] = cr
+				}
+			}
+
 			// Controller debug
 			if rc.ControllerDebug != nil {
 				cconf.ControllerDebug = *rc.ControllerDebug
@@ -1532,6 +1587,9 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 			}
 			if configV2.Webhooks != nil {
 				config.Webhooks = configV2.Webhooks
+			}
+			if configV2.RemoteRepositories != nil {
+				config.RemoteRepositories = configV2.RemoteRepositories
 			}
 			if configV2.IbmsaCfg != nil {
 				config.IBMSAEpEnabled = configV2.IbmsaCfg.IBMSAEpEnabled
@@ -2147,6 +2205,24 @@ func multipartImportRead(r *http.Request, params map[string]string, tmpfile *os.
 	return lines, nil
 }
 
+func _preprocessImportBody(body []byte) []byte {
+	bomUtf8 := []byte{0xc3, 0xaf, 0xc2, 0xbb, 0xc2, 0xbf}
+	if len(body) >= len(bomUtf8) {
+		found := true
+		for i, b := range bomUtf8 {
+			if b != body[i] {
+				found = false
+				break
+			}
+		}
+		if found {
+			body = body[len(bomUtf8):]
+		}
+	}
+
+	return body
+}
+
 func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tempFilePrefix string, acc *access.AccessControl, login *loginSession) {
 	importRunning := false
 	importNoResponse := false
@@ -2188,7 +2264,11 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		}
 		if importTask.TID == tid {
 			if !importRunning && resp.Data.Status != share.IMPORT_DONE {
-				restRespErrorMessageEx(w, http.StatusInternalServerError, api.RESTErrFailImport, importTask.Status, resp)
+				status := http.StatusInternalServerError
+				if importTask.Status == "Invalid security rule(s)" {
+					status = http.StatusBadRequest
+				}
+				restRespErrorMessageEx(w, status, api.RESTErrFailImport, importTask.Status, resp)
 			} else {
 				// import is not running and caller tries to query the last import status
 				restRespSuccess(w, r, &resp, acc, login, nil, "")
@@ -2239,6 +2319,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			}
 		} else {
 			body, _ := ioutil.ReadAll(r.Body)
+			body = _preprocessImportBody(body)
 			json_data, err := yaml.YAMLToJSON(body)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")

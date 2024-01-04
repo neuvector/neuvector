@@ -154,6 +154,14 @@ type DPDetectUnmanagedWlReq struct {
 	DetectUnmanagedWlConf *DPDetectUnmanagedWl `json:"ctrl_detect_unmanaged_wl"`
 }
 
+type DPEnableIcmpPolicy struct {
+	EnableIcmpPolicy	*bool  `json:"enable_icmp_policy"`
+}
+
+type DPEnableIcmpPolicyReq struct {
+	EnableIcmpPolicyConf *DPEnableIcmpPolicy `json:"ctrl_enable_icmp_policy"`
+}
+
 type DPStatsMACReq struct {
 	Stats *DPMACArray `json:"ctrl_stats_macs"`
 }

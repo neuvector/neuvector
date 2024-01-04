@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -255,6 +256,7 @@ func main() {
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
 	noRmNsGrps := flag.Bool("no_rm_nsgroups", false, "Not to remove groups when namespace was deleted")
+	en_icmp_pol := flag.Bool("en_icmp_policy", false, "Enable icmp policy learning")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
@@ -343,6 +345,12 @@ func main() {
 		}
 	}
 
+	enableIcmpPolicy := false
+	if *en_icmp_pol {
+		log.Info("Enable icmp policy learning")
+		enableIcmpPolicy = true
+	}
+
 	if _, err = global.ORCH.GetOEMVersion(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Unsupported OEM platform. Exit!")
 		os.Exit(-2)
@@ -390,9 +398,15 @@ func main() {
 		time.Sleep(time.Second * 4)
 	}
 
-	if platform == share.PlatformKubernetes && global.RT.String() == container.StubRtName {
-		if err := amendStubRtInfo(); err != nil {
-			log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get local device information")
+	if platform == share.PlatformKubernetes {
+		if global.RT.String() == container.StubRtName {
+			if err := amendStubRtInfo(); err != nil {
+				log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get local device information")
+			}
+		} else if Ctrler.HostName == "" { // non-privileged mode
+			if err := amendNotPrivilegedMode(); err != nil {
+				log.WithFields(log.Fields{"error": err, "Ctrler": Ctrler}).Error("Failed to get not-privileged information")
+			}
 		}
 	}
 
@@ -451,6 +465,8 @@ func main() {
 	auditLogKey := share.CLUSAuditLogKey(Host.ID, Ctrler.ID)
 	auditQueue = cluster.NewObjectQueue(auditLogKey, 128)
 	messenger = cluster.NewMessenger(Host.ID, Ctrler.ID)
+
+	db.CreateVulAssetDb(false)
 
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData)
 	ruleid.Init()
@@ -518,13 +534,19 @@ func main() {
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
+
+	// Initialize installation ID.  Ignore if ID is already set.
+	clusHelper := kv.GetClusterHelper()
+	if _, err := clusHelper.GetInstallationID(); err != nil {
+		log.WithError(err).Warn("installation id is not readable. Will retry later.")
+	}
+
 	if Ctrler.Leader {
 		// See [NVSHAS-5490]:
 		// clusterHelper.AcquireLock() may fail with error "failed to create session: Unexpected response code: 500 (Missing node registration)".
 		// It indicates that the node is not yet registered in the catalog.
 		// It's possibly because controller attempts to create a session immediately after starting Consul but actually Consul is not ready yet.
 		// Even it's rare, we might need to allow Consul some time to initialize and sync the node registration to the catalog.
-		clusHelper := kv.GetClusterHelper()
 		for i := 0; i < 6; i++ {
 			lock, err := clusHelper.AcquireLock(share.CLUSLockUpgradeKey, time.Duration(time.Second))
 			if err != nil {
@@ -535,9 +557,6 @@ func main() {
 			clusHelper.ReleaseLock(lock)
 			break
 		}
-
-		// Initiate installation ID if the controller is the first, ignore if ID is already set.
-		clusHelper.PutInstallationID()
 
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
@@ -571,14 +590,14 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	if Ctrler.Leader || !isNewCluster {
-		kv.GetClusterHelper().UpgradeClusterKV()
-		kv.GetClusterHelper().FixMissingClusterKV()
+		clusHelper.UpgradeClusterKV()
+		clusHelper.FixMissingClusterKV()
 	}
 
 	if Ctrler.Leader {
 		kv.ValidateWebhookCert()
 		if isNewCluster && *noDefAdmin {
-			kv.GetClusterHelper().DeleteUser(common.DefaultAdminUser)
+			clusHelper.DeleteUser(common.DefaultAdminUser)
 		}
 		setConfigLoaded()
 	} else {
@@ -631,7 +650,7 @@ func main() {
 	}
 
 	// pre-build compliance map
-	scanUtils.GetComplianceMeta()
+	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor, true)
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.
@@ -673,6 +692,7 @@ func main() {
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
 		EnableRmNsGroups:         enableRmNsGrps,
+		EnableIcmpPolicy:         enableIcmpPolicy,
 		ConnLog:                  connLog,
 		MutexLog:                 mutexLog,
 		ScanLog:                  scanLog,
@@ -683,12 +703,14 @@ func main() {
 		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
+		CreateQuerySessionFunc:   rest.CreateQuerySession,
+		DeleteQuerySessionFunc:   rest.DeleteQuerySession,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
 
 	var fedRole string
-	if m := kv.GetClusterHelper().GetFedMembership(); m != nil {
+	if m := clusHelper.GetFedMembership(); m != nil {
 		fedRole = m.FedRole
 	}
 
@@ -770,6 +792,8 @@ func main() {
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
+
+	// go rest.StartLocalDevHttpServer() // for local dev only
 
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)
@@ -885,7 +909,12 @@ func amendStubRtInfo() error {
 						} else {
 							Ctrler.NetworkMode = "default"
 						}
-						Ctrler.HostName = pod.Node
+						Host.Name = pod.Node
+						Ctrler.HostName = Host.Name
+						if tokens := strings.Split(Ctrler.HostID, ":"); len(tokens) > 0 {
+							Host.ID = fmt.Sprintf("%s:%s", Host.Name, tokens[1])
+							Ctrler.HostID = Host.ID
+						}
 						Ctrler.Name = "k8s_" + Ctrler.Labels["io.kubernetes.container.name"] + "_" +
 							Ctrler.Labels["io.kubernetes.pod.name"] + "_" +
 							Ctrler.Labels["io.kubernetes.pod.namespace"] + "_" +
@@ -897,4 +926,23 @@ func amendStubRtInfo() error {
 		}
 	}
 	return fmt.Errorf("can not found: err = %v", err)
+}
+
+func amendNotPrivilegedMode() error {
+	podname, _ := Ctrler.Labels["io.kubernetes.pod.name"]
+	domain, _ := Ctrler.Labels["io.kubernetes.pod.namespace"]
+	if o, err := global.ORCH.GetResource(resource.RscTypePod, domain, podname); err != nil {
+		return fmt.Errorf("can not found: err = %v, %v, %v", domain, podname, err)
+	} else {
+		if pod := o.(*resource.Pod); pod != nil {
+			log.WithFields(log.Fields{"pod": pod}).Debug()
+			Host.Name = pod.Node
+			Ctrler.HostName = Host.Name
+			if tokens := strings.Split(Ctrler.HostID, ":"); len(tokens) > 0 {
+				Host.ID = fmt.Sprintf("%s:%s", Host.Name, tokens[1])
+				Ctrler.HostID = Host.ID
+			}
+		}
+	}
+	return nil
 }

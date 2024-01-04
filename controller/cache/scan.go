@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/controller/scheduler"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
@@ -472,7 +473,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		"id": id, "type": objType, "result": scanUtils.ScanErrorToStr(report.Error),
 	}).Debug("")
 
-	var highs, meds []string
+	var highs, meds, lows []string
 	var fixedHighsInfo []scanUtils.FixedVulInfo
 	var alives utils.Set // vul names that are not filtered
 
@@ -496,7 +497,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 		info.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
 		alives = vpf.FilterVulTraits(info.vulTraits, info.idns)
-		highs, meds, fixedHighsInfo = scanUtils.GatherVulTrait(info.vulTraits)
+		highs, meds, lows, fixedHighsInfo = scanUtils.GatherVulTrait(info.vulTraits)
 		brief := fillScanBrief(info, len(highs), len(meds))
 		info.brief = brief
 		info.filteredTime = time.Now()
@@ -506,12 +507,69 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 			if c := getWorkloadCache(id); c != nil {
 				c.scanBrief = brief
 				c.vulTraits = info.vulTraits
+
+				// populate vulAsset data..
+				sdb := scanUtils.GetScannerDB()
+
+				baseOS := ""
+				if c.scanBrief != nil {
+					baseOS = c.scanBrief.BaseOS
+				}
+
+				vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
+
+				// populate vulasset
+				for _, vul := range vuls {
+					if err := db.PopulateVulAsset(db.TypeWorkload, c.workload.ID, vul, baseOS); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
+					}
+				}
+
+				// populate assetvul
+				dbAssetVul := getWorkloadDbAssetVul(c, highs, meds, lows, info.lastScanTime)
+				db.PopulateAssetVul(dbAssetVul)
 			}
 		case share.ScanObjectType_HOST:
 			if c := getHostCache(id); c != nil {
 				c.scanBrief = brief
 				c.vulTraits = info.vulTraits
+
+				sdb := scanUtils.GetScannerDB()
+				baseOS := ""
+				if c.scanBrief != nil {
+					baseOS = c.scanBrief.BaseOS
+				}
+
+				vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
+
+				// populate vulasset
+				for _, vul := range vuls {
+					if err := db.PopulateVulAsset(db.TypeNode, c.host.ID, vul, baseOS); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
+					}
+				}
+
+				// populate assetvul
+				dbAssetVul := getHostDbAssetVul(c, highs, meds, lows, info.lastScanTime)
+				db.PopulateAssetVul(dbAssetVul)
 			}
+		case share.ScanObjectType_PLATFORM:
+			log.WithFields(log.Fields{"brief": brief, "highs": highs, "meds": meds}).Debug("scanDone(), platform")
+			sdb := scanUtils.GetScannerDB()
+			baseOS := ""
+			if brief != nil {
+				baseOS = brief.BaseOS
+			}
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, info.vulTraits, "", true)
+
+			for _, vul := range vuls {
+				if err := db.PopulateVulAsset(db.TypePlatform, common.ScanPlatformID, vul, baseOS); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
+				}
+			}
+
+			dbAssetVul := getPlatformDbAssetVul(highs, meds, lows, baseOS, info.lastScanTime)
+			db.PopulateAssetVul(dbAssetVul)
 		}
 	} else {
 		cctx.ScanLog.WithFields(log.Fields{"id": id, "type": objType}).Debug("Scan object is gone")
@@ -1386,7 +1444,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 
 		sdb := scanUtils.GetScannerDB()
-		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, info.vulTraits, showTag)
+		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, info.vulTraits, showTag, false)
 		modules := make([]*api.RESTScanModule, len(info.modules))
 		for i, m := range info.modules {
 			modules[i] = scanUtils.ScanModule2REST(m)
@@ -1413,4 +1471,84 @@ func (m CacheMethod) GetScanPlatformSummary(acc *access.AccessControl) (*api.RES
 	} else {
 		return nil, common.ErrObjectAccessDenied
 	}
+}
+
+func getWorkloadDbAssetVul(c *workloadCache, highs, meds, lows []string, lastScanTime time.Time) *db.DbAssetVul {
+	d := &db.DbAssetVul{
+		Type:             db.AssetWorkload,
+		AssetID:          c.workload.ID,
+		Name:             c.podName,
+		W_domain:         c.workload.Domain,
+		W_service_group:  c.serviceName,
+		W_workload_image: c.workload.Image,
+		CVE_high:         len(highs),
+		CVE_medium:       len(meds),
+		CVE_low:          len(lows),
+	}
+
+	apps := translateWorkloadApps(c.workload)
+	b, err := json.Marshal(apps)
+	if err == nil {
+		d.W_applications = string(b)
+	}
+
+	d.Policy_mode, _ = getWorkloadPerGroupPolicyMode(c)
+
+	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
+	b, err = json.Marshal(allCVEs)
+	if err == nil {
+		d.CVE_lists = string(b)
+	}
+
+	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
+	return d
+}
+
+func getHostDbAssetVul(c *hostCache, highs, meds, lows []string, lastScanTime time.Time) *db.DbAssetVul {
+	d := &db.DbAssetVul{
+		Type:         db.AssetNode,
+		AssetID:      c.host.ID,
+		Name:         c.host.Name,
+		CVE_high:     len(highs),
+		CVE_medium:   len(meds),
+		CVE_low:      len(lows),
+		N_os:         c.host.OS,
+		N_kernel:     c.host.Kernel,
+		N_cpus:       int(c.host.CPUs),
+		N_memory:     c.host.Memory,
+		N_containers: c.workloads.Cardinality(),
+	}
+
+	d.Policy_mode, _ = getHostPolicyMode(c)
+
+	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
+	b, err := json.Marshal(allCVEs)
+	if err == nil {
+		d.CVE_lists = string(b)
+	}
+
+	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
+	return d
+}
+
+func getPlatformDbAssetVul(highs, meds, lows []string, baseOS string, lastScanTime time.Time) *db.DbAssetVul {
+	d := &db.DbAssetVul{
+		Type:       db.AssetPlatform,
+		AssetID:    localDev.Host.Platform,
+		Name:       localDev.Host.Platform,
+		CVE_high:   len(highs),
+		CVE_medium: len(meds),
+		CVE_low:    len(lows),
+		P_version:  cctx.k8sVersion,
+		P_base_os:  baseOS,
+	}
+
+	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
+	b, err := json.Marshal(allCVEs)
+	if err == nil {
+		d.CVE_lists = string(b)
+	}
+
+	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
+	return d
 }

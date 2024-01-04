@@ -1,10 +1,12 @@
 info "2.2 - Configuration Files"
 
 check_2_2_1="2.2.1  - Ensure that the config file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/config" ]; then
-    file="/etc/kubernetes/config"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/config")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -32,10 +34,12 @@ else
 fi
 
 check_2_2_3="2.2.3  - Ensure that the kubelet file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/kubelet" ]; then
-    file="/etc/kubernetes/kubelet"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubele")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -64,7 +68,7 @@ fi
 
 check_2_2_5="2.2.5  - Ensure that the proxy file permissions are set to 644 or more restrictive"
 file="/etc/kubernetes/proxy"
-
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_2_2_5"

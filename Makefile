@@ -8,6 +8,7 @@ copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
 	mkdir -p ${STAGE_DIR}/etc/
 	mkdir -p ${STAGE_DIR}/etc/neuvector/templates
+	mkdir -p ${STAGE_DIR}/tmp/
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
@@ -18,15 +19,23 @@ copy_ctrl:
 	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/templates/podTemplate.json ${STAGE_DIR}/etc/neuvector/templates/podTemplate.json
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/tmp/
 
 copy_enf:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
 	mkdir -p ${STAGE_DIR}/etc/
+	mkdir -p ${STAGE_DIR}/tmp/
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/agent ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/workerlet/pathWalker/pathWalker ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/dp/dp ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/agent/nvbench/kube_runner.tmpl ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/agent/nvbench/rh_runner.tmpl ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/host.tmpl ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/container.tmpl ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/check_kube_version.sh ${STAGE_DIR}/usr/local/bin/
@@ -55,6 +64,13 @@ copy_enf:
 	cp neuvector/agent/nvbench/kubecis_ocp_4_5.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/kubecis_ocp_4_3.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/utils/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/tmp/
+
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
 	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/
@@ -114,6 +130,7 @@ ctrl_image: pull_fleet_base stage_ctrl
 	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/controller -f neuvector/build/Dockerfile.controller .
 
 enf_image: pull_fleet_base stage_enf
+
 	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
 
 all_image: pull_all_base stage_all

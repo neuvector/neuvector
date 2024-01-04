@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.2.2'
+  version: '5.3'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -4530,7 +4530,7 @@ paths:
           description: Initial Configuration
           required: true
           schema:
-            $ref: '#/definitions/RemoteRepository'
+            $ref: '#/definitions/RESTRemoteRepository'
       responses:
         '200':
           description: Created the remote repository.
@@ -4555,7 +4555,7 @@ paths:
           description: Configuration fields to update
           required: true
           schema:
-            $ref: '#/definitions/RemoteRepository'
+            $ref: '#/definitions/RESTRemoteRepositoryConfigData'
       responses:
         '200':
           description: Updated the remote repository.
@@ -5136,10 +5136,11 @@ definitions:
           format: uint32
           example: 12
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTAdmCtrlTestRuleInfo:
     type: object
     required:
+      - container_image
       - id
       - disabled
       - type
@@ -5147,6 +5148,9 @@ definitions:
       - rule_details
       - rule_cfg_type
     properties:
+      container_image:
+        type: string
+        description: the tested container image in the pod
       id:
         type: integer
         format: uint32
@@ -5277,6 +5281,8 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        items:
+          type: string
         enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfig:
     type: object
@@ -5320,6 +5326,8 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        items:
+          type: string
         enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfigData:
     type: object
@@ -6179,7 +6187,7 @@ definitions:
           type: string
           example: ["default"]
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTController:
     type: object
     required:
@@ -6576,7 +6584,7 @@ definitions:
           type: string
         example: [""]
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTDlpSensorsData:
     type: object
     required:
@@ -7086,7 +7094,7 @@ definitions:
         type: string
         example: Monitor
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTHost:
     type: object
     required:
@@ -10849,13 +10857,17 @@ definitions:
       no_telemetry_report:
         type: boolean
         example: false
+      remote_repositories:
+        type: array
+        items:
+          $ref: '#/definitions/RESTRemoteRepository'
   RESTSystemConfigConfigV2:
     type: object
     description: only for POST(v2/system/config)
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
-      svslog_cfg:
+      syslog_cfg:
         $ref: '#/definitions/RESTSystemConfigSyslogCfgV2'
       auth_cfg:
         $ref: '#/definitions/RESTSystemConfigAuthCfgV2'
@@ -10869,6 +10881,10 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigIBMSAVCfg2'
       scanner_autoscale_cfg:
         $ref: '#/definitions/RESTSystemConfigAutoscaleConfig'
+      remote_repositories:
+        type: array
+        items:
+          $ref: '#/definitions/RESTRemoteRepository'
       misc_cfg:
         $ref: '#/definitions/RESTSystemConfigMiscCfgV2'
   RESTFedSystemConfigConfig:
@@ -11665,7 +11681,7 @@ definitions:
           type: string
           example: ["default"]
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTVulnPackageVersion:
     type: object
     required:
@@ -11912,7 +11928,7 @@ definitions:
           type: string
           example: test4321546242574254672462572452615362453
       remote_export_options:
-        $ref: '#/definitions/RemoteExportOptions'
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTWafSensorsData:
     type: object
     required:
@@ -11951,6 +11967,7 @@ definitions:
       - name
       - url
       - enable
+      - use_proxy
       - type
       - cfg_type
     properties:
@@ -11963,6 +11980,9 @@ definitions:
       enable:
         type: boolean
         example: true
+      use_proxy:
+        type: boolean
+        example: false
       type:
         type: string
         enum: ["", Slack, JSON, Teams]
@@ -13431,10 +13451,9 @@ definitions:
       comment:
         type: string
         example: example comment
-  RemoteRepository:
+  RESTRemoteRepo_GitHubConfig:
     type: object
     required:
-      - alias
       - repository_owner_username
       - repository_name
       - repository_branch_name
@@ -13442,9 +13461,6 @@ definitions:
       - personal_access_token_committer_name
       - personal_access_token_committer_email
     properties:
-      alias:
-        type: string
-        example: default
       repository_owner_username:
         type: string
         example: myuser
@@ -13463,15 +13479,77 @@ definitions:
       personal_access_token_committer_email:
         type: string
         example: myuser@example.com
-  RemoteExportOptions:
+  RESTRemoteRepository:
     type: object
     required:
-      - filepath
+      - nickname
+      - provider
+      - github_configuration
+    properties:
+      nickname:
+        type: string
+        example: default
+      provider:
+        type: string
+        description: currently only github is supported
+        example: github
+      comment:
+        type: string
+      github_configuration:
+        $ref: '#/definitions/RESTRemoteRepo_GitHubConfig'
+  RESTRemoteRepository_GitHubConfigConfig:
+    type: object
+    properties:
+      repository_owner_username:
+        type: string
+        example: myuser
+      repository_name:
+        type: string
+        example: myrepo
+      repository_branch_name:
+        type: string
+        example: main
+      personal_access_token:
+        type: string
+        example: ghp_Agk4DedP5SOHGo8WxSuXCmCcldLyBP0I7CN6
+      personal_access_token_committer_name:
+        type: string
+        example: myuser
+      personal_access_token_committer_email:
+        type: string
+        example: myuser@example.com
+  RESTRemoteRepositoryConfig:
+    type: object
+    required:
+      - nickname
+    properties:
+      nickname:
+        type: string
+        example: default
+      comment:
+        type: string
+      github_configuration:
+        $ref: '#/definitions/RESTRemoteRepository_GitHubConfigConfig'
+  RESTRemoteRepositoryConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTRemoteRepositoryConfig'
+  RESTRemoteExportOptions:
+    type: object
+    required:
+      - file_path
       - remote_repository_nickname
     properties:
-      filepath:
+      file_path:
         type: string
         example: my_exports/example.yaml
+      comment:
+        type: string
+        description: commit message
+        example: commit for poc
       remote_repository_nickname:
         type: string
         example: default
