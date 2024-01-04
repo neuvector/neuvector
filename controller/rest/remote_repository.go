@@ -45,7 +45,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if *remoteRepository.Provider != "github" {
+	if remoteRepository.Provider != "github" {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, `only "github" provider is allowed`)
 		return
 	}
@@ -251,8 +251,8 @@ func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RE
 		}
 	}
 
-	if *base.Provider != "github" {
-		return share.RemoteRepository{}, errors.New(`only "github" provider is allowed`)
+	if base.Provider != "github" {
+		return share.CLUSRemoteRepository{}, errors.New(`only "github" provider is allowed`)
 	}
 
 	if !base.IsValid() {
