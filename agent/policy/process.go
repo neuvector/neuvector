@@ -600,9 +600,11 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"grep", "*"},
 		{"pgrep", "*"},
 		{"sed", "*"},
+		{"sort", "*"},
 		{"stat", "*"},
 		{"tee", "*"},
 		{"tr", "*"},
+		{"yq", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -689,9 +691,11 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"grep", "*"},
 		{"pgrep", "*"},
 		{"sed", "*"},
+		{"sort", "*"},
 		{"stat", "*"},
 		{"tee", "*"},
 		{"tr", "*"},
+		{"yq", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
