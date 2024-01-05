@@ -2,11 +2,11 @@ package kv
 
 import (
 	"crypto/x509"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/neuvector/neuvector/share"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +26,7 @@ func TestCertManager(t *testing.T) {
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := GenTlsKeyCert(CN, "", "", ValidityPeriod{}, x509.ExtKeyUsageAny)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+				return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
 			}
 			return &share.CLUSX509Cert{
 				CN:   CN,

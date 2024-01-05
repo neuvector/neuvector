@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -2043,7 +2042,7 @@ func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, ou
 		}
 		return nil
 	} else {
-		return errors.Wrap(err, "cert is not there after PutIfNotExist")
+		return fmt.Errorf("cert is not there after PutIfNotExist: %w", err)
 	}
 }
 
