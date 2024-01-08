@@ -662,6 +662,11 @@ func main() {
 		*teleNeuvectorEP = ""
 	}
 
+	if strings.HasSuffix(*teleNeuvectorEP, "dbperftest") {
+		rest.TESTDbPerf = true
+		*teleNeuvectorEP = ""
+	}
+
 	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
 		var ver share.CLUSCtrlVersion
 		json.Unmarshal(value, &ver)

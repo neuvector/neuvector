@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -64,13 +65,16 @@ type DbVulnResourcePackageVersion struct {
 }
 
 type VulQueryFilter struct {
-	QueryToken       string
-	QueryStart       int
-	QueryCount       int
-	Debug            int
-	PerfTest         int
-	CreateDummyAsset int
-	Filters          *api.VulQueryFilterViewModel
+	QueryToken                     string
+	QueryStart                     int
+	QueryCount                     int
+	Debug                          int
+	PerfTest                       int
+	CreateDummyAsset_Enable        int
+	CreateDummyAsset_CVE           int
+	CreateDummyAsset_Asset         int
+	CreateDummyAsset_CVE_per_asset int
+	Filters                        *api.VulQueryFilterViewModel
 }
 
 type DbAssetVul struct {
@@ -155,6 +159,7 @@ const (
 var dbHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
 var GetCveRecordFunc func(string, string, string) *DbVulAsset
+var memdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
 	dbFile := dbFile_Vulassets

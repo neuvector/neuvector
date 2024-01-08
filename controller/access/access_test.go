@@ -1186,6 +1186,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/platform",
 			"v1/scan/platform/platform",
 			"v1/scan/asset",
+			"v1/vulasset",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry",
@@ -1374,6 +1375,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/workload/*",
 			"v1/scan/host/*",
 			"v1/scan/platform/platform",
+			"v1/vulasset",
+			"v1/assetvul",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*/scan",
