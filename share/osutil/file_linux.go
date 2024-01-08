@@ -106,17 +106,17 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 		}
 
 		if !fileExists(currentPath) {
-			log.WithError(err).Error("File not exist")
+			log.WithError(err).Debug("File not exist")
 			return "", err
 		}
 
 		if symlink, err = os.Readlink(currentPath); err != nil {
-			log.WithError(err).Error("Read file link fail")
+			log.WithError(err).Debug("Read file link fail")
 			return "", err
 		}
 
 		if procRoot, err = extractProcRootPath(pid, currentPath, inTest); err != nil {
-			log.WithError(err).Error("Get Proc Root Path fail")
+			log.WithError(err).Debug("Get Proc Root Path fail")
 			return "", err
 		}
 
@@ -142,7 +142,7 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 			// nest link
 			finfo, err := os.Lstat(resolvedPath)
 			if err != nil {
-				log.WithError(err).Error("failed to read resolvedPath")
+				log.WithError(err).Debug("failed to read resolvedPath")
 				return "", err
 			}
 			if finfo.Mode()&os.ModeSymlink == 0 {
