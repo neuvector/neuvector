@@ -24,13 +24,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f $file ]; then
                 if [ "$(stat -c %a $file)" -eq 600 ]; then
-                  pass "$check_1_1_1"
+                  pass "$check"
                 else
-                  warn "$check_1_1_1"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_1_1_1"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: |
@@ -54,13 +54,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_1_1_2"
+                  pass "$check"
                 else
-                  warn "$check_1_1_2"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_1_1_2"
+                info "$check"
               fi
         remediation: No remediation required; file permissions are managed by the operator.
       - id: 1.1.3
@@ -81,13 +81,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_1_1_3"
+                  pass "$check"
                 else
-                  warn "$check_1_1_3"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_1_1_3"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: |
@@ -111,13 +111,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_1_1_4"
+                  pass "$check"
                 else
-                  warn "$check_1_1_4"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_1_1_4"
+                info "$check"
               fi
         remediation: No remediation required; file permissions are managed by the operator.
       - id: 1.1.5
@@ -138,13 +138,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_1_1_5"
+                  pass "$check"
                 else
-                  warn "$check_1_1_5"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_1_1_5"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: |
@@ -168,13 +168,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_1_1_6"
+                  pass "$check"
                 else
-                  warn "$check_1_1_6"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_1_1_6"
+                info "$check"
               fi
         remediation: No remediation required; file permissions are managed by the operator.
       - id: 1.1.7
@@ -195,13 +195,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_1_1_7"
+                  pass "$check"
                 else
-                  warn "$check_1_1_7"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_1_1_7"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: |
@@ -225,13 +225,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_1_1_8"
+                  pass "$check"
                 else
-                  warn "$check_1_1_8"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_1_1_8"
+                info "$check"
               fi
         remediation: No remediation required; file permissions are managed by the operator.
       - id: 1.1.9
@@ -276,9 +276,9 @@ groups:
               done
 
               if [ "$valid_permission" = "true" ]; then
-                pass "$check_1_1_9"
+                pass "$check"
               else
-                warn "$check_1_1_9"
+                warn "$check"
                 for p in $invalid_file_list
                 do
                   warn "     * Wrong ownership for $p "
@@ -756,9 +756,9 @@ groups:
                 grep 'system:unauthenticated' )
 
               if [ -z "$output_kube" ] || [ -z "$output" ]; then
-                warn "$check_1_2_1"
+                warn "$check"
               else
-                pass "$check_1_2_1"
+                pass "$check"
               fi       
         remediation: None. The default configuration should not be modified.
       - id: 1.2.2
@@ -779,9 +779,9 @@ groups:
               output_api=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | grep --color "basic-auth" )
               running=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication )
               if [ -z "$output_ocp" ] && [ -z "$output_api" ] && [ -n "$running" ] ; then
-                pass "$check_1_2_2"
+                pass "$check"
               else
-                warn "$check_1_2_2"
+                warn "$check"
               fi
         remediation: None required. --basic-auth-file cannot be configured on OpenShift.
       - id: 1.2.3
@@ -807,9 +807,9 @@ groups:
               auth_operator_status=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication | jq '.status.conditions[] | select(.type == "Available" and .status == "True")')
 
               if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ] || [ -z "$output_4" ] || [ -n "$token_auth_file_present" ] || [ -z "$auth_operator_status" ]; then
-                warn "$check_1_2_3"
+                warn "$check"
               else
-                pass "$check_1_2_3"
+                pass "$check"
               fi
 
         remediation: None is required.
@@ -840,13 +840,13 @@ groups:
               elif [ -z "$client_cert_output" ] || [ -z "$client_key_output" ]; then
                 warn "$check"
                 warn "     * kubelet client certificate and/or key is missing"
-              if ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
+              elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
                 ! echo "$serving_cert_output" | grep -q "tls.crt" || \
                 ! echo "$serving_cert_output" | grep -q "tls.key"; then
                   warn "$check"
                   warn "     * serving-cert for openshift-apiserver is not correctly configured"
               else
-                  pass "$check_1_2_4"
+                  pass "$check"
               fi
         remediation: No remediation is required. OpenShift platform components use X.509 certificates for authentication. OpenShift manages the CAs and certificates for platform components. This is not configurable.
       - id: 1.2.5
@@ -868,17 +868,17 @@ groups:
               client_key_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-key"] // empty')
               serving_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/secrets/serving-cert)
               if [ -z "$output" ]; then
-                warn "$check_1_2_5"
+                warn "$check"
               elif [ -n "$client_cert_output" ] || [ -n "$client_key_output" ]; then
                 warn "$check"
                 warn "     * kubelet client certificate and/or key should not be set"
-              if ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
+              elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
                 ! echo "$serving_cert_output" | grep -q "tls.crt" || \
                 ! echo "$serving_cert_output" | grep -q "tls.key"; then
                   warn "$check"
                   warn "     * serving-cert for openshift-apiserver is not correctly configured"
               else
-                  pass "$check_1_2_5"
+                  pass "$check"
               fi
               
         remediation: Follow the Kubernetes documentation and setup the TLS connection between the apiserver and kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the -- kubelet-certificate-authority parameter to the path to the cert file for the certificate authority. --kubelet-certificate-authority=<ca-string>
@@ -924,9 +924,9 @@ groups:
               output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config  | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty' )
               output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty' )
               if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ]; then
-                warn "$check_1_2_7"
+                warn "$check"
               else
-                pass "$check_1_2_7"
+                pass "$check"
               fi     
         remediation: None. RBAC is always on and the OpenShift API server does not use the values assigned to the flag authorization-mode.
       - id: 1.2.8
@@ -1146,7 +1146,7 @@ groups:
         audit: |
               check="$id  - $description"
               output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
-              if echo "$output_k8s" | grep -qv "^6443$"
+              if echo "$output_k8s" | grep -qv "^6443$"; then
                 pass "$check"
               else
                 warn "$check"
@@ -1366,7 +1366,7 @@ groups:
               expect_certfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.crt"
               expect_keyfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.key"
               # Check if the etcd-certfile is set to the expected path
-              if [ "$etcd_certfile" = "$expect_certfile" -a $etcd_keyfile" = "$expect_keyfile"]; then
+              if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
                 pass "$check"
               else
                 warn "$check"
@@ -1391,7 +1391,7 @@ groups:
               expect_certfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.crt"
               expect_keyfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.key"
               # Check if the etcd-certfile is set to the expected path
-              if [ "$etcd_certfile" = "$expect_certfile" -a $etcd_keyfile" = "$expect_keyfile"]; then
+              if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
                 pass "$check"
               else
                 warn "$check"
@@ -1545,9 +1545,9 @@ groups:
               check="$id  - $description"
               output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["use-service-account-credentials"][]')
               if [ "$output" = "true" ]; then
-                pass "$check_1_3_3"
+                pass "$check"
               else
-                warn "$check_1_3_3"
+                warn "$check"
               fi
         remediation: None
       - id: 1.3.3
@@ -1567,9 +1567,9 @@ groups:
               output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["service-account-private-key-file"][]')
               key_file="/etc/kubernetes/static-pod-resources/secrets/service-account-private-key/service-account.key"
               if [ "$output" = "$key_file" ]; then
-                pass "$check_1_3_3"
+                pass "$check"
               else
-                warn "$check_1_3_3"
+                warn "$check"
               fi    
         remediation: None
       - id: 1.3.4
@@ -1589,9 +1589,9 @@ groups:
               output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["root-ca-file"][]')
               ca_bundle="/etc/kubernetes/static-pod-resources/configmaps/serviceaccount-ca/ca-bundle.crt."
               if [ "$output" = "$ca_bundle" ]; then
-                pass "$check_1_3_3"
+                pass "$check"
               else
-                warn "$check_1_3_3"
+                warn "$check"
               fi      
         remediation: None
       - id: 1.3.5
@@ -1615,9 +1615,9 @@ groups:
 
               # Check if the secure port is 10257 and the insecure port is 0
               if [ "$secure_port" = "10257" ] && [ "$insecure_port" = "0" ]; then
-                pass "$check_1_3_7"
+                pass "$check"
               else
-                warn "$check_1_3_7"
+                warn "$check"
               fi 
         remediation: None
   - id: 1.4
