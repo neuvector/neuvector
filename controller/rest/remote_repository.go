@@ -41,12 +41,12 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 
 	// in 5.3, only an alias of "default" is allowed
 	if remoteRepository.Nickname != "default" {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, `only "default" alias is allowed`)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "the only supported name is default")
 		return
 	}
 
-	if remoteRepository.Provider != "github" {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, `only "github" provider is allowed`)
+	if remoteRepository.Provider != share.RemoteRepositoryProvider_GitHub {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "the only supported provider is github")
 		return
 	}
 
