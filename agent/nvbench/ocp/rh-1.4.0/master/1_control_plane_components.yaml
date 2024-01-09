@@ -1283,9 +1283,9 @@ groups:
 
               # Check if the audit-log-maxsize is set to 100
               if [ "$audit_log_maxsize" = "100" ]; then
-                pass "$check_audit_log_maxsize"
+                pass "$check"
               else
-                warn "$check_audit_log_maxsize"
+                warn "$check"
               fi
         remediation: None. The audit-log-maxsize parameter is by default set to 100 and not supported to change.
       - id: 1.2.24
@@ -1306,9 +1306,9 @@ groups:
 
               # Check if the min-request-timeout is set to 3600
               if [ "$min_request_timeout" = "3600" ]; then
-                pass "$check_min_request_timeout"
+                pass "$check"
               else
-                warn "$check_min_request_timeout"
+                warn "$check"
               fi
         remediation: By default, min-request-timeout is set to 3600 seconds in OpenShift 4
       - id: 1.2.25
@@ -1325,9 +1325,9 @@ groups:
         - GDPR
         audit: |
               check="$id  - $description"
-              info "$check"
-              info "     * OpenShift denies access for any OAuth Access token that does not exist in its etcd data store."
-              info "     * OpenShift does not use the service-account-lookup flag."
+              manual "$check"
+              manual "     * OpenShift denies access for any OAuth Access token that does not exist in its etcd data store."
+              manual "     * OpenShift does not use the service-account-lookup flag."
         remediation: Service account lookup is enabled by default.
       - id: 1.2.26
         description: Ensure that the --service-account-key-file argument is set as appropriate (Manual)
