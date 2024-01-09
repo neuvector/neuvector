@@ -14,6 +14,8 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+var TESTDbPerf bool
+
 func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -39,22 +41,23 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// For performance testing
-	// if queryFilter.CreateDummyAsset == 1 {
-	// 	err = createDummyAssets()
-	// 	restRespSuccess(w, r, "done.", acc, login, nil, "CreateDummyAsset done.")
-	// 	return
-	// }
+	if TESTDbPerf && queryFilter.CreateDummyAsset_Enable == 1 {
+		err = perf_createDummyVulAssets(queryFilter)
+		restRespSuccess(w, r, "done.", acc, login, nil, "CreateDummyAsset done.")
+		return
+	}
 
 	// use acc.Authorize() to filter allowed resources
 	start := time.Now()
 	allowed, filteredMap := getAllAllowedResourceId(acc)
 	elapsed := time.Since(start)
 
-	// For performance testing
-	// if queryFilter.PerfTest == 1 {
-	// 	db.Perf_getAllWorkloadIDs(allowed)
-	// }
-	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("1/4, get allowed resources, took=%v", elapsed))
+	// For performance testing, when enabled it will treat all workload ID as allowed.
+	if TESTDbPerf && queryFilter.PerfTest == 1 {
+		db.Perf_getAllWorkloadIDs(allowed)
+	}
+
+	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("1/4, get allowed resources, workloads_count=%d, took=%v", allowed[db.AssetWorkload].Cardinality(), elapsed))
 
 	// get vul records in vulAssets table
 	start = time.Now()
@@ -125,6 +128,15 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		queryStat.PerfStats = nil
 	}
 
+	// delete exceeded sessions
+	records, err := db.GetExceededSessions(login.fullname, login.id, login.loginType)
+	if err == nil {
+		for _, token := range records {
+			clusHelper.DeleteQuerySessionRequest(token)
+		}
+		log.WithFields(log.Fields{"records": records}).Debug("Delete exceeded sessions")
+	}
+
 	restRespSuccess(w, r, queryStat, acc, login, nil, "Create createAssetVulnerabilitySession5 asset report session")
 
 	// populate the result to file-based database
@@ -132,14 +144,6 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		err = db.PopulateSessionToFile(queryFilter.QueryToken, vulAssets)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("PopulateSessionToFile error")
-		}
-
-		records, err := db.GetExceededSessions(login.fullname, login.id, login.loginType)
-		if err == nil {
-			for _, token := range records {
-				clusHelper.DeleteQuerySessionRequest(token)
-			}
-			log.WithFields(log.Fields{"records": records}).Debug("Delete exceeded sessions")
 		}
 	}()
 }
@@ -327,18 +331,18 @@ func _createQuerySession(qsr *api.QuerySessionRequest) error {
 		return err
 	}
 
+	records, err := db.GetExceededSessions(qsr.UserAccess.LoginName, qsr.UserAccess.LoginID, qsr.UserAccess.LoginType)
+	if err == nil {
+		for _, token := range records {
+			clusHelper.DeleteQuerySessionRequest(token)
+		}
+	}
+
 	// populate the result to file-based database
 	go func() {
 		err := db.PopulateSessionToFile(queryFilter.QueryToken, vulAssets)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("PopulateSessionToFile error")
-		}
-
-		records, err := db.GetExceededSessions(qsr.UserAccess.LoginName, qsr.UserAccess.LoginID, qsr.UserAccess.LoginType)
-		if err == nil {
-			for _, token := range records {
-				clusHelper.DeleteQuerySessionRequest(token)
-			}
 		}
 	}()
 

@@ -29,7 +29,14 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Debug = getQueryParamInteger(r, "debug", defaultDebugMode)
 	q.PerfTest = getQueryParamInteger(r, "perftest", defaultDebugMode)
 	q.Filters.DebugCVEName = r.URL.Query().Get("debugcve")
-	q.CreateDummyAsset = getQueryParamInteger(r, "createdummyasset", 0)
+
+	// for performance test
+	q.CreateDummyAsset_Enable = getQueryParamInteger(r, "createdummyasset", 0)
+	if q.CreateDummyAsset_Enable == 1 {
+		q.CreateDummyAsset_CVE = getQueryParamInteger(r, "howmany_cve", 0)
+		q.CreateDummyAsset_Asset = getQueryParamInteger(r, "howmany_asset", 0)
+		q.CreateDummyAsset_CVE_per_asset = getQueryParamInteger(r, "howmany_cve_per_asset", 0)
+	}
 
 	if r.Method == http.MethodPatch || r.Method == http.MethodPost {
 		body, err := ioutil.ReadAll(r.Body)
@@ -55,6 +62,9 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Filters.ImageNameMatchType = validateOrDefault(q.Filters.ImageNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.NodeNameMatchType = validateOrDefault(q.Filters.NodeNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ContainerNameMatchType = validateOrDefault(q.Filters.ContainerNameMatchType, []string{"equals", "contains"}, "")
+
+	q.Filters.OrderByColume = validateOrDefault(q.Filters.OrderByColume, []string{"name", "score", "score_v3", "published_timestamp"}, "name")
+	q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "desc")
 
 	return q, nil
 }
@@ -313,6 +323,8 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
+		memdbMutex.Lock()
+		defer memdbMutex.Unlock()
 	}
 
 	return populateSession(db, sessionToken, vulAssets)
@@ -485,6 +497,8 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
+		memdbMutex.Lock()
+		defer memdbMutex.Unlock()
 	}
 
 	err := createSessionVulAssetTable(db, sessionToken)
@@ -496,13 +510,8 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 	// If the table does not exist, recreate it to workaround a [potential bug] in SQLite library,
 	// where table creation may fail without raising any error.
 	if memoryDb {
-		isMemoryDbError := false
 		memTables := GetAllTableInMemoryDb()
 		if !strings.Contains(memTables, sessionToken) {
-			isMemoryDbError = true
-		}
-
-		if isMemoryDbError {
 			reopenMemoryDb()
 
 			log.WithFields(log.Fields{"sessionToken": sessionToken}).Error("CeateSessionVulAssetTable error, missing session table in memdb. Recreate it.")
@@ -1120,18 +1129,11 @@ func buildTopAssetWhereClause(assetType string, allowedID []string) exp.Expressi
 
 func getOrderColumn(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
 	column := "name"
-
-	if filters.OrderByColume == "name" {
-		column = "name"
-	} else if filters.OrderByColume == "scorev2" {
-		column = "score"
-	} else if filters.OrderByColume == "scorev3" {
-		column = "score_v3"
-	} else if filters.OrderByColume == "publishtime" {
-		column = "published_timestamp"
+	if filters.OrderByColume == "name" || filters.OrderByColume == "score" || filters.OrderByColume == "score_v3" || filters.OrderByColume == "published_timestamp" {
+		column = filters.OrderByColume
 	}
 
-	if filters.OrderByType == "desc" {
+	if filters.OrderByType == "desc" { // asc, desc
 		return goqu.I(column).Desc()
 	}
 	return goqu.I(column).Asc()

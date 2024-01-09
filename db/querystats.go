@@ -204,16 +204,18 @@ func DeleteQuerySessionByToken(queryToken string) error {
 }
 
 func deleteSessionTempTableInMemDb(queryToken string) error {
+	memdbMutex.Lock()
+	defer memdbMutex.Unlock()
+
 	db := memoryDbHandle
 
-	// delete the session temp table
 	// SQLite does not support parameterized substitution for table and column names, only for values.
 	if len(queryToken) == 12 && isValidSessionTableName(queryToken) {
 		for i := 0; i < 10; i++ {
 			sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", formatSessionTempTableName(queryToken))
 			_, err := db.Exec(sql)
 			if err != nil {
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 			break
