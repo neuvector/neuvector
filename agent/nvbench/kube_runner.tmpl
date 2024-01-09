@@ -62,13 +62,13 @@ run_check() {
             profile=$(yq e ".groups[$group_index].checks[$check_index].profile" "$YAML_FILE")
             scored=$(yq e ".groups[$group_index].checks[$check_index].scored" "$YAML_FILE")
 
-            if [[ "$profile" == "Level 2" ]]; then
+            if [ "$profile" == "Level 2" ]; then
                 level2=$id
             else
                 level2=""
             fi
 
-            if [[ "$scored" == false ]]; then
+            if [ "$scored" == false ]; then
                 not_scored=$id
             else
                 not_scored=""
@@ -86,7 +86,7 @@ run_check() {
 folder=$1
 
 # Check if folder ends with 'master' or 'worker'
-if [[ "$folder" == *master ]]; then
+if echo "$folder" | grep -q 'master$'; then
     # Check if it is a Kubernetes master node
     if ps -ef | grep "$CIS_APISERVER_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
         info "Kubernetes Master Node Security Configuration"
@@ -94,7 +94,7 @@ if [[ "$folder" == *master ]]; then
         info "This node is not a Kubernetes master node"
         exit 2
     fi
-elif [[ "$folder" == *worker ]]; then
+elif echo "$folder" | grep -q 'worker$'; then
     # Check if it is a Kubernetes worker node
     if ps -ef | grep "$CIS_KUBELET_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
         info "Kubernetes Worker Node Security Configuration"
