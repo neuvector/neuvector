@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
@@ -80,9 +79,6 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 
 	for _, m := range item.Message {
 		r.Message = append(r.Message, m)
-	}
-	if len(r.Message) > 0 {
-		r.Description = fmt.Sprintf("%s - %s", r.Description, r.Message[0])
 	}
 
 	// add tags
