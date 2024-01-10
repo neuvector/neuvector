@@ -24,13 +24,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_4_1_1"
+                  pass "$check"
                 else
-                  warn "$check_4_1_1"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_4_1_1"
+                info "$check"
                 info "     * The kubelet service file not found"
               fi
         remediation: None
@@ -52,13 +52,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_4_1_2"
+                  pass "$check"
                 else
-                  warn "$check_4_1_2"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_4_1_2"
+                info "$check"
               fi
         remediation: None
       - id: 4.1.3
@@ -77,10 +77,9 @@ groups:
               check="$id  - $description"
               manual "$check"
               manual "     * Run the following command:"
-              manual "     * for i in $(oc get pods -n openshift-sdn -l app=sdn -oname)"
+              manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
               manual "     * do"
-              manual "     *     oc exec -n openshift-sdn $i -- \"
-              manual "     *       stat -Lc %a /config/kube-proxy-config.yaml"
+              manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %a /config/kube-proxy-config.yaml"
               manual "     * done"
               manual "     * Verify that the kube-proxy-config.yaml file has permissions of 644."    
         remediation: None
@@ -100,10 +99,9 @@ groups:
               check="$id  - $description"           
               manual "$check"
               manual "     * Run the following command:"
-              manual "     * for i in $(oc get pods -n openshift-sdn -l app=sdn -oname)"
+              manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
               manual "     * do"
-              manual "     *     oc exec -n openshift-sdn $i -- \"
-              manual "     *       stat -Lc %U:%G /config/kube-proxy-config.yaml
+              manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %U:%G /config/kube-proxy-config.yaml
               manual "     * done"
               manual "     * Verify that the kube-proxy-config.yaml file has ownership root:root.
         remediation: None required. The configuration is managed by OpenShift operators.
@@ -125,13 +123,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_4_1_5"
+                  pass "$check"
                 else
-                  warn "$check_4_1_5"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_4_1_5"
+                info "$check"
                 info "     * File not found"
               fi   
         remediation: None
@@ -153,13 +151,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_4_1_6"
+                  pass "$check"
                 else
-                  warn "$check_4_1_6"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_4_1_6"
+                info "$check"
               fi
         remediation: None
       - id: 4.1.7
@@ -175,17 +173,18 @@ groups:
         - PCI
         - GDPR
         audit: |
+              check="$id  - $description"
               file="/etc/kubernetes/kubelet-ca.crt"
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check_4_1_7"
+                  pass "$check"
                 else
-                  warn "$check_4_1_7"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_4_1_7"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: None
@@ -207,13 +206,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_4_1_8"
+                  pass "$check"
                 else
-                  warn "$check_4_1_8"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_4_1_8"
+                info "$check"
               fi
         remediation: None
       - id: 4.1.9
@@ -234,13 +233,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %a $file)" -eq 600 ]; then
-                  pass "$check_4_1_9"
+                  pass "$check"
                 else
-                  warn "$check_4_1_9"
+                  warn "$check"
                   warn "     * Wrong permissions for $file"
                 fi
               else
-                info "$check_4_1_9"
+                info "$check"
                 info "     * File not found"
               fi
         remediation: None
@@ -262,13 +261,13 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               if [ -f "$file" ]; then
                 if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check_4_1_10"
+                  pass "$check"
                 else
-                  warn "$check_4_1_10"
+                  warn "$check"
                   warn "     * Wrong ownership for $file"
                 fi
               else
-                info "$check_4_1_10"
+                info "$check"
               fi
         remediation: None
   - id: 4.2
@@ -319,9 +318,9 @@ groups:
               output_ca=$(grep "clientCAFile: $ca_cert" $file)
               output_auth=$(grep '\(enabled: false\)' $file)
               if [ -z "$output_ca" ] || [ -z "$output_auth" ] ; then
-                  warn "$check_4_2_1"
+                  warn "$check"
               else
-                  pass "$check_4_2_1"
+                  pass "$check"
               fi
         remediation: Create a kubeletconfig to explicitly disable anonymous authentication. Examples of how to do this can be found in the OpenShift documentation.                   
       - id: 4.2.3
@@ -343,9 +342,9 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               output=$(grep '\(authorization-mode\)' $file)
               if [ -z "$output" ]; then
-                  pass "$check_4_2_2"
+                  pass "$check"
               else
-                  warn "$check_4_2_2"
+                  warn "$check"
               fi
         remediation: None
       - id: 4.2.4
@@ -367,9 +366,9 @@ groups:
               ca_cert=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet-ca.crt")
               output_ca=$(grep "clientCAFile: $ca_cert" $file)
               if [ -z "$output_ca" ]; then
-                  warn "$check_4_2_3"
+                  warn "$check"
               else
-                  pass "$check_4_2_3"
+                  pass "$check"
               fi     
         remediation: None. Changing the clientCAFile value is unsupported.
       - id: 4.2.5
@@ -390,9 +389,9 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               output=$(grep '\(read-only-port\)' $file)
               if [ -z "$output" ]; then
-                  pass "$check_4_2_4"
+                  pass "$check"
               else
-                  warn "$check_4_2_4"
+                  warn "$check"
               fi       
         remediation: |
                     In earlier versions of OpenShift 4, the read-only-port argument is not used.
@@ -413,13 +412,13 @@ groups:
 
               if [ -z "$output" ]; then
                   # The setting is not found, handle as needed
-                  pass "$check_4_2_5"
+                  pass "$check"
               elif [ "$output" != "0" ]; then
                   # The setting is found and its value is not 0
-                  pass "$check_4_2_5"
+                  pass "$check"
               else
                   # The setting is found but its value is 0
-                  warn "$check_4_2_5"
+                  warn "$check"
               fi
         remediation: Follow the instructions in the documentation to create a kubeletconfig CRD and set the streamingConnectionIdleTimeout to the desired value. Do not set the value to 0.
       - id: 4.2.7
@@ -441,9 +440,9 @@ groups:
               output=$(grep 'hostname-override' $file | cut -d'=' -f2 | tr -d '[:space:]')
 
               if [ "$output" = "true" ]; then
-                  pass "$check_4_2_7"
+                  pass "$check"
               else
-                  warn "$check_4_2_7"
+                  warn "$check"
               fi
         remediation: None
       - id: 4.2.8
@@ -460,9 +459,9 @@ groups:
               file=$(append_prefix "$CONFIG_PREFIX" "$file")
               output=$(grep '\(kubeAPIQPS: 50\)' $file)
               if [ -z "$output" ]; then
-                  warn "$check_4_2_9"
+                  warn "$check"
               else
-                  pass "$check_4_2_9"
+                  pass "$check"
               fi
         remediation: |
                     None by default.
@@ -482,9 +481,9 @@ groups:
               output_cert=$(grep '\(tls-cert-file\)' $file)
               output_key=$(grep '\(tls-private-key-file\)' $file)
               if [ -z "$output_cert" ] && [ -z "$output_key" ]; then
-                  pass "$check_4_2_10"
+                  pass "$check"
               else
-                  warn "$check_4_2_10"
+                  warn "$check"
               fi  
         remediation: OpenShift automatically manages TLS authentication for the API server communication with the node/kublet. This is not configurable.
       - id: 4.2.10
@@ -502,9 +501,9 @@ groups:
               output1=$(grep '\(rotateKubeletClientCertificates: false\)' $file)
               output2=$(grep '\(rotateCertificates: true\)' $file)
               if [ -z "$output1"] && [ -n "$output2" ]; then
-                  pass "$check_4_2_11"
+                  pass "$check"
               else
-                  warn "$check_4_2_11"
+                  warn "$check"
               fi
         remediation: None
       - id: 4.2.11
@@ -526,9 +525,9 @@ groups:
               output1=$(grep '\(RotateKubeletServerCertificate: true\)' $file)
               output2=$(grep '\(rotateCertificates: true\)' $file)
               if [ -n "$output1" ] && [ -n "$output2" ] ; then
-                  pass "$check_4_2_12"
+                  pass "$check"
               else
-                  warn "$check_4_2_12"
+                  warn "$check"
               fi     
         remediation: None              
       - id: 4.2.12

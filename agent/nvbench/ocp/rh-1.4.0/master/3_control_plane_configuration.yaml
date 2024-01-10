@@ -83,8 +83,8 @@ groups:
               # TODO
               output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.auditConfig.auditFilePath','.auditConfig.enabled','.auditConfig.logFormat','.auditConfig.maximumFileSizeMegabytes','.auditConfig.maximumRetainedFiles','.auditConfig.policyConfiguration')
               if [ -z "$output" ]; then
-                warn "$check_3_2_2"
+                warn "$check"
               else
-                pass "$check_3_2_2"
+                pass "$check"
               fi
         remediation: Update the audit log policy profile to use WriteRequestBodies.

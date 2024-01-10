@@ -225,6 +225,7 @@ func (b *Bench) logBenchFailure(benchPlat benchPlatform, status share.BenchStatu
 func (b *Bench) BenchLoop() {
 	var masterScript, workerScript, remediation string
 	b.taskScanner = newTaskScanner(b, scanWorkerMax)
+	b.cisYAMLMode = true
 	//after the host bench, it will schedule a container bench automaticly even if no container
 	for {
 		select {
@@ -245,6 +246,7 @@ func (b *Bench) BenchLoop() {
 				// 1.16- : 1.6.0
 				// GKE: GKE 1.0.0
 				if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorGKE {
+					b.cisYAMLMode = false
 					b.kubeCISVer = "GKE-1.0.0"
 					masterScript = kubeGKEMasterTmpl
 					workerScript = kubeGKEWorkerTmpl
@@ -262,11 +264,13 @@ func (b *Bench) BenchLoop() {
 						workerScript = rhRunnerTmpl
 						remediation = rh140YAMLFolder
 					} else if ocVer.Compare(version.Must(version.NewVersion("4.4"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "OpenShift-1.1.0"
 						masterScript = kubeOC45MasterTmpl
 						workerScript = kubeOC45WorkerTmpl
 						remediation = kubeOC45Remediation
 					} else {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "OpenShift-1.1.0"
 						masterScript = kubeOC43MasterTmpl
 						workerScript = kubeOC43WorkerTmpl
@@ -275,51 +279,50 @@ func (b *Bench) BenchLoop() {
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
-						b.cisYAMLMode = true
 						b.kubeCISVer = "1.8.0"
 						masterScript = kubeRunnerTmpl
 						workerScript = kubeRunnerTmpl
 						remediation = kube180YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
-						b.cisYAMLMode = true
 						b.kubeCISVer = "1.8.0"
 						masterScript = kubeRunnerTmpl
 						workerScript = kubeRunnerTmpl
 						remediation = kube180YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
-						b.cisYAMLMode = true
 						b.kubeCISVer = "1.24"
 						masterScript = kubeRunnerTmpl
 						workerScript = kubeRunnerTmpl
 						remediation = kube124YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
-						b.cisYAMLMode = true
 						b.kubeCISVer = "1.23"
 						masterScript = kubeRunnerTmpl
 						workerScript = kubeRunnerTmpl
 						remediation = kube123YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
-						b.cisYAMLMode = true
 						b.kubeCISVer = "1.6.0"
 						masterScript = kubeRunnerTmpl
 						workerScript = kubeRunnerTmpl
 						remediation = kube160YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.15"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.5.1"
 						masterScript = kube151MasterTmpl
 						workerScript = kube151WorkerTmpl
 						remediation = kube151Remediation
 					} else if kVer.Compare(version.Must(version.NewVersion("1.11"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.4.1"
 						masterScript = kube141MasterTmpl
 						workerScript = kube141WorkerTmpl
 						remediation = kube141Remediation
 					} else if kVer.Compare(version.Must(version.NewVersion("1.8"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.2.0"
 						masterScript = kube120MasterTmpl
 						workerScript = kube120WorkerTmpl
 						remediation = kube120Remediation
 					} else {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.0.0"
 						masterScript = kube100MasterTmpl
 						workerScript = kube100WorkerTmpl
