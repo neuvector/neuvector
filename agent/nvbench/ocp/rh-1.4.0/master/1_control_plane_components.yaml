@@ -703,6 +703,7 @@ groups:
         - PCI
         - GDPR
         audit: |
+              check="$id  - $description"
               cert_path="/etc/kubernetes/static-pod-certs"
               cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
 
@@ -726,7 +727,7 @@ groups:
                 fi
               else
                 warn "$check"
-                warn "$cert_path doesn't exist."
+                warn "     * $cert_path doesn't exist."
               fi
         remediation: No remediation required; file permissions are managed by the operator.
   - id: 1.2
@@ -1637,9 +1638,9 @@ groups:
               readiness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].readinessProbe.httpGet.path')
 
               if [ "$liveness_probe" = "/healthz" -a "$readiness_probe" = "/healthz" ]; then
-                pass "$check_liveness"
+                pass "$check"
               else
-                warn "$check_liveness"
+                warn "$check"
               fi
         remediation: None
       - id: 1.4.2
@@ -1652,7 +1653,7 @@ groups:
         tags: []
         audit: |
               check="$id  - $description"
-              manual "$check_liveness"
+              manual "$check"
               manual "     * Run the following command to verify the schedule endpoints:"
               manual "     * oc -n openshift-kube-scheduler describe endpoints"
               manual "     * Verify the bind-address and port arguments are not used:"
