@@ -3791,20 +3791,17 @@ type VulQueryFilterViewModel struct {
 	NodeNameMatchType      string `json:"matchTypeNode"`
 	ContainerNameMatchType string `json:"matchTypeContainer"`
 
-	Scorev2_min float32 `json:"scoreV2Min"`
-	Scorev2_max float32 `json:"scoreV2Max"`
-
-	Scorev3_min float32 `json:"scoreV3Min"`
-	Scorev3_max float32 `json:"scoreV3Max"`
+	ScoreV2 []int `json:"scoreV2"`
+	ScoreV3 []int `json:"scoreV3"`
 
 	QuickFilter string `json:"quickFilter"`
 
-	OrderByColume string `json:"orderbyColumn"`
+	OrderByColumn string `json:"orderbyColumn"`
 	OrderByType   string `json:"orderby"`
 	ViewType      string `json:"viewType"`
 
 	//specific for /v1/assetvul
-	LastModifiedTime int64  `json:"lastModifiedTime"`
+	LastModifiedTime int64  `json:"last_modified_timestamp"`
 	DebugCVEName     string `json:"debugcve"`
 }
 

@@ -210,12 +210,8 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionToken := queryObj.QueryToken
-	startRow := queryObj.QueryStart
-	totalRow := queryObj.QueryCount
-
-	if sessionToken != "" {
-		resp, allAssets, err := db.GetVulAssetSession(startRow, totalRow, sessionToken)
+	if queryObj.QueryToken != "" {
+		resp, allAssets, err := db.GetVulAssetSession(queryObj)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get session vuls error %s", err))
 			return
