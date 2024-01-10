@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"crypto/md5"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -2586,12 +2585,15 @@ func validateCertificate(certificate string) error {
 	if block == nil {
 		return errors.New("Invalid certificate")
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+	_, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return errors.New("Invalid certificate")
 	}
-	if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
-		return errors.New("Invalid certificate, certificate doesn't contain a public key")
-	}
+
+	// No need to check the specific type of public key; relying on x509.ParseCertificate() should be sufficient.
+	// Different signature algorithms have different types.
+	// if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+	// 	return errors.New("Invalid certificate, certificate doesn't contain a public key")
+	// }
 	return nil
 }
