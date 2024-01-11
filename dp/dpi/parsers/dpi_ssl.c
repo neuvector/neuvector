@@ -281,7 +281,8 @@ void ssl_get_sni_v3(dpi_packet_t *p, uint8_t *ptr, ssl_record_t *rec)
             uint16_t namelen = GET_BIG_INT16(tptr);
             tptr += 2;
             //DEBUG_LOG(DBG_PARSER, p, "ssl: snilen(%hu), sniname(%s)\n", namelen,(char *)tptr);
-            strlcpy((char *)s->vhost, (char *)tptr, namelen+1);
+            strncpy((char *)s->vhost, (char *)tptr, namelen);
+            s->vhost[namelen] = '\0';
             s->vhlen = namelen;
             tptr += namelen;
             break;
