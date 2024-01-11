@@ -13495,6 +13495,9 @@ definitions:
         example: github
       comment:
         type: string
+      enable:
+        type: boolean
+        example: true
       github_configuration:
         $ref: '#/definitions/RESTRemoteRepo_GitHubConfig'
   RESTRemoteRepository_GitHubConfigConfig:
@@ -13528,6 +13531,9 @@ definitions:
         example: default
       comment:
         type: string
+      enable:
+        type: boolean
+        example: true
       github_configuration:
         $ref: '#/definitions/RESTRemoteRepository_GitHubConfigConfig'
   RESTRemoteRepositoryConfigData:

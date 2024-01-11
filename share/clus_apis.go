@@ -1564,15 +1564,15 @@ const (
 )
 
 const (
-	BenchLevelPass  = "PASS"
-	BenchLevelInfo  = "INFO"
-	BenchLevelWarn  = "WARN"
-	BenchLevelManual  = "MANUAL"
-	BenchLevelHigh  = "HIGH"
-	BenchLevelNote  = "NOTE"
-	BenchLevelError = "ERROR"
-	BenchProfileL1  = "Level 1"
-	BenchProfileL2  = "Level 2"
+	BenchLevelPass   = "PASS"
+	BenchLevelInfo   = "INFO"
+	BenchLevelWarn   = "WARN"
+	BenchLevelManual = "MANUAL"
+	BenchLevelHigh   = "HIGH"
+	BenchLevelNote   = "NOTE"
+	BenchLevelError  = "ERROR"
+	BenchProfileL1   = "Level 1"
+	BenchProfileL2   = "Level 2"
 )
 
 const (
@@ -2907,6 +2907,7 @@ type CLUSRemoteRepository struct {
 	Nickname            string                                `json:"nickname"`
 	Provider            string                                `json:"provider"`
 	Comment             string                                `json:"comment"`
+	Enable              bool                                  `json:"enable"`
 	GitHubConfiguration *RemoteRepository_GitHubConfiguration `json:"github_configuration"`
 }
 
