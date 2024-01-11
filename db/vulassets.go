@@ -81,7 +81,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 func (q *VulQueryFilter) GetAssestBasedFilters() map[string]int {
 	stats := make(map[string]int)
 
-	if q.Filters.MatchType4Ns == "equals" || q.Filters.MatchType4Ns == "contains" && len(q.Filters.SelectedDomains) > 0 {
+	if (q.Filters.MatchType4Ns == "equals" || q.Filters.MatchType4Ns == "contains") && len(q.Filters.SelectedDomains) > 0 {
 		stats[AssetRuleDomain] = 1
 	}
 
@@ -589,7 +589,7 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 		}
 	}
 
-	if q.PublishedType == "before" || q.PublishedType == "after" {
+	if (q.PublishedType == "before" || q.PublishedType == "after") && q.PublishedTime > 0 {
 		expectedMeetCount += 1
 
 		if q.PublishedType == "before" && q.PublishedTime < vulasset.PublishedTS {
@@ -604,14 +604,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 	// ScoreV2 and ScoreV3 can be used together
 	if len(q.ScoreV2) == 2 && q.ScoreV2[0] <= q.ScoreV2[1] {
 		expectedMeetCount += 1
-		if vulasset.Score < q.ScoreV2[1]*10 && vulasset.Score > q.ScoreV2[0]*10 {
+		if vulasset.Score <= q.ScoreV2[1]*10 && vulasset.Score >= q.ScoreV2[0]*10 {
 			meetCount += 1
 		}
 	}
 
 	if len(q.ScoreV3) == 2 && q.ScoreV3[0] <= q.ScoreV3[1] {
 		expectedMeetCount += 1
-		if vulasset.Score < q.ScoreV3[1]*10 && vulasset.Score > q.ScoreV3[0]*10 {
+		if vulasset.Score <= q.ScoreV3[1]*10 && vulasset.Score >= q.ScoreV3[0]*10 {
 			meetCount += 1
 		}
 	}
