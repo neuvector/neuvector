@@ -804,8 +804,12 @@ func (m *consulMethod) Transact(entries []transactEntry) (bool, error) {
 
 // Watch related
 var watchPlans []*watch.WatchPlan = make([]*watch.WatchPlan, 0)
+var watchPlansLock sync.RWMutex
 
 func (m *consulMethod) StopAllWatchers() {
+	watchPlansLock.Lock()
+	defer watchPlansLock.Unlock()
+
 	for _, wp := range watchPlans {
 		wp.Stop()
 	}
@@ -813,20 +817,29 @@ func (m *consulMethod) StopAllWatchers() {
 }
 
 func (m *consulMethod) PauseAllWatchers(includeMonitorWatch bool) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
-		if wp.Recover == nil || includeMonitorWatch == true {
+		if wp.Recover == nil || includeMonitorWatch {
 			wp.Pause()
 		}
 	}
 }
 
 func (m *consulMethod) ResumeAllWatchers() {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		wp.Resume()
 	}
 }
 
 func (m *consulMethod) PauseWatcher(key string) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key}).Debug("")
@@ -836,6 +849,9 @@ func (m *consulMethod) PauseWatcher(key string) {
 }
 
 func (m *consulMethod) ResumeWatcher(key string) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key}).Debug("")
@@ -845,6 +861,9 @@ func (m *consulMethod) ResumeWatcher(key string) {
 }
 
 func (m *consulMethod) SetWatcherCongestionCtl(key string, enabled bool) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key, "enabled": enabled}).Debug("")
@@ -946,11 +965,15 @@ func register(params map[string]interface{}, handler watch.HandlerFunc) *watch.W
 	}
 	wp.Key = key
 
+	watchPlansLock.Lock()
+
 	if len(watchPlans) == 0 {
 		wp.Fail = watcherFailFunc
 		wp.Recover = watcherRecoverFunc
 	}
+
 	watchPlans = append(watchPlans, wp)
+	watchPlansLock.Unlock()
 
 	wp.Handler = handler
 	// Run the watch
@@ -1350,6 +1373,9 @@ func (m *consulMethod) RegisterExistingWatchers() {
 
 func (m *consulMethod) RegisterWatcherMonitor(failFunc func() bool, recoverFunc func()) {
 	log.Debug("")
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	watcherFailFunc = failFunc
 	watcherRecoverFunc = recoverFunc
 	if len(watchPlans) > 0 {

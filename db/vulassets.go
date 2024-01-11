@@ -63,8 +63,17 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Filters.NodeNameMatchType = validateOrDefault(q.Filters.NodeNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ContainerNameMatchType = validateOrDefault(q.Filters.ContainerNameMatchType, []string{"equals", "contains"}, "")
 
-	q.Filters.OrderByColume = validateOrDefault(q.Filters.OrderByColume, []string{"name", "score", "score_v3", "published_timestamp"}, "name")
+	q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"name", "score", "score_v3", "published_timestamp"}, "name")
 	q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "desc")
+
+	if r.Method == http.MethodGet {
+		// For the GET request to /v1/vulasset, users have the ability to modify the sorting column during pagination.
+		q.Filters.OrderByColumn = r.URL.Query().Get("orderbyColumn")
+		q.Filters.OrderByType = r.URL.Query().Get("orderby")
+
+		q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"name", "score", "score_v3", "published_timestamp"}, "")
+		q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "")
+	}
 
 	return q, nil
 }
@@ -365,7 +374,11 @@ func PopulateVulAsset(resType ResourceType, resourceID string, vul *api.RESTVuln
 	return nil
 }
 
-func GetVulAssetSession(start, row int, sessionToken string) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+	sessionToken := requesetQuery.QueryToken
+	start := requesetQuery.QueryStart
+	row := requesetQuery.QueryCount
+
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	columns := []interface{}{"name", "severity", "description", "packages", "link", "score",
@@ -383,9 +396,15 @@ func GetVulAssetSession(start, row int, sessionToken string) (*api.RESTVulnerabi
 		return nil, nil, err
 	}
 
+	// check if we need to overwrite sort column
+	if requesetQuery.Filters.OrderByColumn != "" && requesetQuery.Filters.OrderByType != "" {
+		queryFilter.Filters.OrderByColumn = requesetQuery.Filters.OrderByColumn
+		queryFilter.Filters.OrderByType = requesetQuery.Filters.OrderByType
+	}
+
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
-	args := make([]interface{}, 0)
+	var args []interface{}
 	if row == -1 {
 		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
 	} else {
@@ -582,19 +601,17 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 		}
 	}
 
-	//TODO: do we have scorev3 filter?
-	if q.Scorev3_max > 0 {
+	// ScoreV2 and ScoreV3 can be used together
+	if len(q.ScoreV2) == 2 && q.ScoreV2[0] <= q.ScoreV2[1] {
 		expectedMeetCount += 1
-		// note the score range does NOT not have equal !
-		if vulasset.ScoreV3 < int(q.Scorev3_max*10) && vulasset.ScoreV3 > int(q.Scorev3_min*10) {
+		if vulasset.Score < q.ScoreV2[1]*10 && vulasset.Score > q.ScoreV2[0]*10 {
 			meetCount += 1
 		}
 	}
 
-	// score v2
-	if q.Scorev2_max > 0 {
+	if len(q.ScoreV3) == 2 && q.ScoreV3[0] <= q.ScoreV3[1] {
 		expectedMeetCount += 1
-		if vulasset.Score < int(q.Scorev2_max*10) && vulasset.Score > int(q.Scorev2_min*10) {
+		if vulasset.Score < q.ScoreV3[1]*10 && vulasset.Score > q.ScoreV3[0]*10 {
 			meetCount += 1
 		}
 	}
@@ -632,6 +649,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 
 		if strings.Contains(strings.ToLower(vulasset.Name), strings.ToLower(q.QuickFilter)) ||
 			strings.Contains(scoreStr, q.QuickFilter) {
+			meetCount += 1
+		}
+	}
+
+	if q.LastModifiedTime > 0 {
+		expectedMeetCount += 1
+
+		if vulasset.LastModTS > q.LastModifiedTime {
 			meetCount += 1
 		}
 	}
@@ -1129,8 +1154,8 @@ func buildTopAssetWhereClause(assetType string, allowedID []string) exp.Expressi
 
 func getOrderColumn(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
 	column := "name"
-	if filters.OrderByColume == "name" || filters.OrderByColume == "score" || filters.OrderByColume == "score_v3" || filters.OrderByColume == "published_timestamp" {
-		column = filters.OrderByColume
+	if filters.OrderByColumn == "name" || filters.OrderByColumn == "score" || filters.OrderByColumn == "score_v3" || filters.OrderByColumn == "published_timestamp" {
+		column = filters.OrderByColumn
 	}
 
 	if filters.OrderByType == "desc" { // asc, desc

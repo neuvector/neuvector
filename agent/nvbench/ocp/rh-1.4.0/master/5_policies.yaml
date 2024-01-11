@@ -17,7 +17,7 @@ groups:
         audit: |
               check="$id  - $description"
               manual "$check"
-              manual "      * Run oc get clusterrolebindings -o=custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].kind | grep cluster-admin
+              manual "      * Run oc get clusterrolebindings -o=custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].kind | grep cluster-admin"
               manual "      * oc get secrets kubeadmin -n kube-system"
               manual "      * Review each principal listed and ensure that cluster-admin privilege is required for it. Verify that the kubeadmin user no longer exists."
         remediation: 'Identify all clusterrolebindings to the cluster-admin role. Check if they are used and if they need this role or if they could use a role with fewer privileges. Where possible, first bind users to a lower privileged role and then remove the clusterrolebinding to the cluster-admin role : kubectl delete clusterrolebinding [name]'
