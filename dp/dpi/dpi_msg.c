@@ -408,6 +408,17 @@ static void dpi_dump_policy()
         }
     }
 
+    if (th_ip_fqdn_storage_map.map != NULL) {
+        struct cds_lfht_node *ip_fqdn_storage_node;
+        // Iterate through ip fqdn storage map
+        RCU_MAP_FOR_EACH(&th_ip_fqdn_storage_map, ip_fqdn_storage_node) {
+            dpi_ip_fqdn_storage_entry_t *entry = STRUCT_OF(ip_fqdn_storage_node, dpi_ip_fqdn_storage_entry_t, node);
+            fprintf(logfp, "IP-FQDN storage map, IP:"DBG_IPV4_FORMAT" FQDN name:%s\n", DBG_IPV4_TUPLE(entry->r->ip), entry->r->name);
+
+            fflush(logfp);
+        }
+    }
+
     if (dlp_detector != NULL)
     {
         dpi_print_siglist_fp(dlp_detector, logfp);
