@@ -3716,6 +3716,7 @@ type RESTRemoteRepository struct {
 	Nickname            string                       `json:"nickname"`
 	Provider            string                       `json:"provider"`
 	Comment             string                       `json:"comment"`
+	Enable              bool                         `json:"enable"`
 	GitHubConfiguration *RESTRemoteRepo_GitHubConfig `json:"github_configuration"`
 }
 
@@ -3753,6 +3754,7 @@ type RESTRemoteRepositoryConfig struct {
 	// Provider is unchangable
 	Nickname            string                                   `json:"nickname"`
 	Comment             *string                                  `json:"comment"`
+	Enable              *bool                                    `json:"enable"`
 	GitHubConfiguration *RESTRemoteRepository_GitHubConfigConfig `json:"github_configuration"`
 }
 

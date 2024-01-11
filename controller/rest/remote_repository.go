@@ -54,6 +54,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		Nickname: remoteRepository.Nickname,
 		Provider: remoteRepository.Provider,
 		Comment:  remoteRepository.Comment,
+		Enable:   remoteRepository.Enable,
 	}
 	if remoteRepository.GitHubConfiguration != nil {
 		githubCfg := *remoteRepository.GitHubConfiguration
@@ -225,6 +226,10 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RESTRemoteRepositoryConfig) (share.CLUSRemoteRepository, error) {
 	isSet := func(s *string) bool {
 		return s != nil
+	}
+
+	if updates.Enable != nil {
+		base.Enable = *updates.Enable
 	}
 
 	if base.Provider == share.RemoteRepositoryProvider_GitHub {
