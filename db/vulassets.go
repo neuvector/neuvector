@@ -73,6 +73,13 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 
 		q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"name", "score", "score_v3", "published_timestamp"}, "")
 		q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "")
+
+		// quick filter
+		q.Filters.QuickFilter = r.URL.Query().Get("qf")
+		if q.Filters.QuickFilter != "" {
+			q.Filters.ScoreType = r.URL.Query().Get("scoretype")
+			q.Filters.ScoreType = validateOrDefault(q.Filters.ScoreType, []string{"v2", "v3"}, "v3")
+		}
 	}
 
 	return q, nil
@@ -169,6 +176,7 @@ func FilterVulAssets(allowed map[string]utils.Set, queryFilter *VulQueryFilter, 
 		// check allowed and VPF
 		filterAllowedAssets(vulasset, allowed, filteredMap)
 		if vulasset.Skip {
+			nTotalCVE--
 			continue // if no any asset left, then we can skip this CVE.
 		}
 
@@ -344,6 +352,9 @@ func PopulateVulAsset(resType ResourceType, resourceID string, vul *api.RESTVuln
 		return errors.New("db is not initialized")
 	}
 
+	vulassetdbMutex.Lock()
+	defer vulassetdbMutex.Unlock()
+
 	vulasset, err := getVulAssetByName(vul.Name)
 	if err != nil {
 		// not exist, need to create a new one
@@ -402,13 +413,15 @@ func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAs
 		queryFilter.Filters.OrderByType = requesetQuery.Filters.OrderByType
 	}
 
+	quickFilterExp := buildQuickFilterWhereClause(requesetQuery)
+
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
 	if row == -1 {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
+		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
 	} else {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
 	}
 
 	// if file db is ready, use it..
@@ -431,8 +444,9 @@ func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAs
 	allAssets := utils.NewSet()
 
 	resp := &api.RESTVulnerabilityAssetDataV2{
-		Vuls:      make([]*api.RESTVulnerabilityAssetV2, 0),
-		PerfStats: make([]string, 0),
+		Vuls:               make([]*api.RESTVulnerabilityAssetV2, 0),
+		PerfStats:          make([]string, 0),
+		QuickFilterMatched: 0,
 	}
 
 	for rows.Next() {
@@ -508,6 +522,26 @@ func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAs
 
 	elapsed := time.Since(tStart)
 	resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("1/2: get %d vuls from session (file=%d), took=%v", len(resp.Vuls), queryStat.FileDBReady, elapsed))
+
+	// get quick filter count for navigation
+	if requesetQuery.Filters.QuickFilter != "" {
+		sql, _, _ := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(quickFilterExp).ToSQL()
+
+		rows, err := db.Query(sql)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var nCount int
+			err := rows.Scan(&nCount)
+			if err != nil {
+				return nil, nil, err
+			}
+			resp.QuickFilterMatched = nCount
+		}
+	}
 
 	return resp, allAssets, nil
 }
@@ -633,22 +667,6 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 		expectedMeetCount += 1
 
 		if vulasset.Severity == "Low" {
-			meetCount += 1
-		}
-	}
-
-	if q.QuickFilter != "" {
-		expectedMeetCount += 1
-
-		var scoreStr string
-		if q.ScoreType == "v2" {
-			scoreStr = formatScoreToStr(vulasset.Score)
-		} else if q.ScoreType == "v3" {
-			scoreStr = formatScoreToStr(vulasset.ScoreV3)
-		}
-
-		if strings.Contains(strings.ToLower(vulasset.Name), strings.ToLower(q.QuickFilter)) ||
-			strings.Contains(scoreStr, q.QuickFilter) {
 			meetCount += 1
 		}
 	}
@@ -1162,4 +1180,20 @@ func getOrderColumn(filters *api.VulQueryFilterViewModel) exp.OrderedExpression 
 		return goqu.I(column).Desc()
 	}
 	return goqu.I(column).Asc()
+}
+
+func buildQuickFilterWhereClause(queryFilter *VulQueryFilter) exp.ExpressionList {
+	if queryFilter.Filters.QuickFilter != "" {
+		nameExp := goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+
+		scoreColumn := "score_str"
+		if queryFilter.Filters.ScoreType == "v3" {
+			scoreColumn = "scorev3_str"
+		}
+
+		scoreExp := goqu.C(scoreColumn).Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+		return goqu.Or(nameExp, scoreExp)
+	}
+
+	return goqu.And(goqu.Ex{})
 }

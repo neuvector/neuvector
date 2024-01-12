@@ -160,6 +160,7 @@ var dbHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
 var GetCveRecordFunc func(string, string, string) *DbVulAsset
 var memdbMutex sync.RWMutex
+var vulassetdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
 	dbFile := dbFile_Vulassets

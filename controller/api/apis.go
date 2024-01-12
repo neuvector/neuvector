@@ -2262,8 +2262,9 @@ type RESTVulnerabilityAssetV2 struct {
 }
 
 type RESTVulnerabilityAssetDataV2 struct {
-	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
-	PerfStats []string                    `json:"debug_perf_stats,omitempty"`
+	Vuls               []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
+	QuickFilterMatched int                         `json:"qf_matched_records"`
+	PerfStats          []string                    `json:"debug_perf_stats,omitempty"`
 }
 
 type RESTWorkloadAsset struct {
