@@ -53,7 +53,8 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start)
 
 	// For performance testing, when enabled it will treat all workload ID as allowed.
-	if TESTDbPerf && queryFilter.PerfTest == 1 {
+	//if TESTDbPerf && queryFilter.PerfTest == 1 {
+	if TESTDbPerf {
 		db.Perf_getAllWorkloadIDs(allowed)
 	}
 
