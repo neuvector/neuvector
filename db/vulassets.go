@@ -163,7 +163,7 @@ func FilterVulAssets(allowed map[string]utils.Set, queryFilter *VulQueryFilter, 
 			}
 		}
 
-		// CVE details might be incomplete, do this first
+		// CVE details might be incomplete (during Consul restore), do this first
 		fillCVERecord(vulasset)
 
 		// do CVE based filter
@@ -645,7 +645,7 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 
 	if len(q.ScoreV3) == 2 && q.ScoreV3[0] <= q.ScoreV3[1] {
 		expectedMeetCount += 1
-		if vulasset.Score <= q.ScoreV3[1]*10 && vulasset.Score >= q.ScoreV3[0]*10 {
+		if vulasset.ScoreV3 <= q.ScoreV3[1]*10 && vulasset.ScoreV3 >= q.ScoreV3[0]*10 {
 			meetCount += 1
 		}
 	}
@@ -758,7 +758,8 @@ func populateSession(db *sql.DB, sessionToken string, vulAssets []*DbVulAsset) e
 			continue
 		}
 
-		debugLog := strings.Join(vulAsset.DebugLog, ";")
+		debugLog := ""
+		vulAsset.CVESources = ""
 
 		_, err = stmt.Exec(vulAsset.Name, vulAsset.Severity, vulAsset.Description, vulAsset.Packages,
 			vulAsset.Link, vulAsset.Score, vulAsset.Vectors, vulAsset.ScoreV3, vulAsset.VectorsV3, vulAsset.PublishedTS, vulAsset.LastModTS,
@@ -839,7 +840,6 @@ func addVulProperties(resType ResourceType, resourceID string, vul *api.RESTVuln
 	})
 	jsonBytes, err := json.Marshal(packages2)
 	if err != nil {
-		fmt.Println("Error:", err)
 		return err
 	}
 
@@ -911,32 +911,36 @@ func updateVulAsset(vulAsset *DbVulAsset, tableName string, memoryDb bool) (int,
 		db = memoryDbHandle
 	}
 
+	// compile record
+	record := &goqu.Record{
+		"name":                    vulAsset.Name,
+		"severity":                vulAsset.Severity,
+		"description":             vulAsset.Description,
+		"packages":                vulAsset.Packages,
+		"link":                    vulAsset.Link,
+		"score":                   vulAsset.Score,
+		"vectors":                 vulAsset.Vectors,
+		"score_v3":                vulAsset.ScoreV3,
+		"vectors_v3":              vulAsset.VectorsV3,
+		"published_timestamp":     vulAsset.PublishedTS,
+		"last_modified_timestamp": vulAsset.LastModTS,
+		"workloads":               vulAsset.Workloads,
+		"nodes":                   vulAsset.Nodes,
+		"images":                  vulAsset.Images,
+		"platforms":               vulAsset.Platforms,
+		"cve_sources":             vulAsset.CVESources,
+		"f_withFix":               vulAsset.F_withFix,
+		"f_profile":               vulAsset.F_profile,
+		"debuglog":                "",
+		"score_str":               formatScoreToStr(vulAsset.Score),
+		"scorev3_str":             formatScoreToStr(vulAsset.ScoreV3),
+	}
+
+	// insert
 	dialect := goqu.Dialect("sqlite3")
 	if vulAsset.Db_ID == 0 {
 		ds := dialect.Insert(targetTable)
-		sql, args, _ := ds.Rows(goqu.Record{
-			"name":                    vulAsset.Name,
-			"severity":                vulAsset.Severity,
-			"description":             vulAsset.Description,
-			"packages":                vulAsset.Packages,
-			"link":                    vulAsset.Link,
-			"score":                   vulAsset.Score,
-			"vectors":                 vulAsset.Vectors,
-			"score_v3":                vulAsset.ScoreV3,
-			"vectors_v3":              vulAsset.VectorsV3,
-			"published_timestamp":     vulAsset.PublishedTS,
-			"last_modified_timestamp": vulAsset.LastModTS,
-			"workloads":               vulAsset.Workloads,
-			"nodes":                   vulAsset.Nodes,
-			"images":                  vulAsset.Images,
-			"platforms":               vulAsset.Platforms,
-			"cve_sources":             vulAsset.CVESources,
-			"f_withFix":               vulAsset.F_withFix,
-			"f_profile":               vulAsset.F_profile,
-			"debuglog":                "",
-			"score_str":               formatScoreToStr(vulAsset.Score),
-			"scorev3_str":             formatScoreToStr(vulAsset.ScoreV3),
-		}).Prepared(true).ToSQL()
+		sql, args, _ := ds.Rows(record).Prepared(true).ToSQL()
 
 		result, err := db.Exec(sql, args...)
 		if err != nil {
@@ -951,17 +955,19 @@ func updateVulAsset(vulAsset *DbVulAsset, tableName string, memoryDb bool) (int,
 		return int(lastInsertID), nil
 	}
 
-	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(vulAsset.Db_ID)).Set(
-		goqu.Record{
+	// update
+	if vulAsset.Description == "" || vulAsset.PublishedTS == 0 {
+		record = &goqu.Record{
 			"packages":    vulAsset.Packages,
 			"workloads":   vulAsset.Workloads,
 			"nodes":       vulAsset.Nodes,
 			"images":      vulAsset.Images,
 			"platforms":   vulAsset.Platforms,
 			"cve_sources": vulAsset.CVESources,
-		},
-	).Prepared(true).ToSQL()
+		}
+	}
 
+	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(vulAsset.Db_ID)).Set(record).Prepared(true).ToSQL()
 	_, err := db.Exec(sql, args...)
 	if err != nil {
 		return 0, err
@@ -992,23 +998,18 @@ func addAssetId(jsonStr string, newElement string) (string, error) {
 }
 
 func fillCVERecord(record *DbVulAsset) error {
-	//	CVESources string `json:"cve_sources"`	// []DbCVESource  (in json)
-	// need to fetch the data from
-
 	// convert the cve_sources(string) to []DbCVESource
 	// if multiple items available, need to decide which one to use
-	// for [CVE-2015-8865], it has several sources like below
+	// example: for [CVE-2015-8865], it has several sources like below
 	// 		ubuntu:CVE-2015-8865
 	// 		upstream:CVE-2015-8865
 	// 		CVE-2015-8865
 	// 		centos:CVE-2015-8865
 	// 		debian:CVE-2015-8865
-
-	//TODO: Gary mentioned we can use NVD's as first choise
-	// for now, try to use the first one
+	//TODO: use NVD's info as first choise.
 
 	// if it's already valid then skip
-	if record.Description != "" && record.Link != "" && record.PublishedTS != 0 {
+	if record.Description != "" && record.PublishedTS != 0 {
 		return nil
 	}
 
@@ -1021,7 +1022,7 @@ func fillCVERecord(record *DbVulAsset) error {
 	}
 
 	if len(cvesources) == 0 {
-		return nil // ??
+		return nil
 	}
 
 	vulAsset := GetCveRecordFunc(record.Name, cvesources[0].DbKey, cvesources[0].BaseOS)
@@ -1056,7 +1057,7 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	if assetType == AssetImage || assetType == AssetNode {
 		allowedAssets = allowed[assetType].ToStringSlice()
 	} else {
-		return nil, errors.New("unsupport type.")
+		return nil, errors.New("unsupport type")
 	}
 
 	// step-1: format query statement

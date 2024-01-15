@@ -24,6 +24,7 @@ func perf_createDummyVulAssets(q *db.VulQueryFilter) error {
 		dbAssetVul := perf_generateWorkloadDbAssetVul(assetid, vuls, cveCount)
 
 		for _, vul := range vuls {
+			vul.PackageName = fmt.Sprintf("system-package-%s", utils.GetRandomID(4, ""))
 			db.PopulateVulAsset(db.TypeWorkload, assetid, vul, "")
 		}
 
@@ -92,9 +93,6 @@ func perf_createOneVul(name string) *api.RESTVulnerability {
 	} else {
 		vul.Severity = "High"
 	}
-
-	// randomize PackageName
-	vul.PackageName = fmt.Sprintf("system-package-%s", utils.GetRandomID(4, ""))
 
 	return vul
 }
