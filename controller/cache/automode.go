@@ -50,6 +50,7 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 		traceback := time.Now().Unix() - probeDuration - 10
 
 		// process incidents
+		syncRLock(syncCatgIncidentIdx)
 		for i := 0; i < curIncidentIndex; i++ {
 			incd := incidentCache[curIncidentIndex-i-1]
 			if incd == nil || incd.AggregationFrom < traceback {
@@ -61,8 +62,10 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 				incd_last = incd
 			}
 		}
+		syncRUnlock(syncCatgIncidentIdx)
 
 		// suspicious threats
+		syncRLock(syncCatgThreatIdx)
 		for i := 0; i < curThrtIndex; i++ {
 			thrt := thrtCache[curThrtIndex-i-1]
 			if thrt == nil || thrt.ReportedTimeStamp < traceback {
@@ -74,8 +77,10 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 				thrt_last = thrt
 			}
 		}
+		syncRUnlock(syncCatgThreatIdx)
 
 		// network violations
+		syncRLock(syncCatgViolationIdx)
 		service := strings.TrimPrefix(group, "nv.")
 		for i := 0; i < curVioIndex; i++ {
 			vio := vioCache[curVioIndex-i-1]
@@ -88,6 +93,7 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 				vio_last = vio
 			}
 		}
+		syncRUnlock(syncCatgViolationIdx)
 
 		if count > 0 {
 			log.WithFields(log.Fields{"incident": count, "group": group, "incd_last": incd_last, "thrt_last": thrt_last, "vio_last": vio_last}).Debug("ATMO:")
@@ -292,7 +298,7 @@ func automodeConfigUpdate(cfg, cache share.CLUSSystemConfig) {
 	}
 }
 
-//////////////////////
+// ////////////////////
 func automodeGroupDelete(name string, param interface{}) {
 	log.WithFields(log.Fields{"group": name}).Debug("ATMO:")
 	if bD2M, bM2P := atmoHelper.Enabled(); bD2M || bM2P {
