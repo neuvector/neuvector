@@ -384,7 +384,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
 		// python
-		{"support", "/usr/bin/*"}, // support
+		{"support", "*"}, // support
 		{"cli", "/usr/bin/*"},     // cli
 		{"*", "/usr/lib/jvm/*"}, // JVM
 
@@ -619,7 +619,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// python: python2.7 or python3.8
 		{"python", "/usr/bin/*"},      // runtime-gdb.py
 		{"supervisord", "/usr/bin/*"}, // start-up
-		{"support", "/usr/bin/*"},     // support
+		{"support", "*"},     // support
 		{"cli", "/usr/bin/*"},         // cli
 
 		// manager cores :  wildcard
