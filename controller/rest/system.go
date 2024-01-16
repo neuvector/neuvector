@@ -353,6 +353,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
+			if respV2.Config.ModeAuto.ModeAutoD2MDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoD2MDuration = 1
+			}
+			if respV2.Config.ModeAuto.ModeAutoM2PDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoM2PDuration = 1
+			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
 		} else {
