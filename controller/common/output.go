@@ -305,6 +305,15 @@ func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
 		}
 
 		client.Transport = transport
+	} else if strings.HasPrefix(w.url, "http://") {
+		if proxy != nil {
+			transport := &http.Transport{
+				Proxy: func(r *http.Request) (*url.URL, error) {
+					return url.Parse(proxy.URL)
+				},
+			}
+			client.Transport = transport
+		}
 	}
 
 	var err error
