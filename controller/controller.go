@@ -590,7 +590,7 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	if Ctrler.Leader || !isNewCluster {
-		clusHelper.UpgradeClusterKV()
+		clusHelper.UpgradeClusterKV(Version)
 		clusHelper.FixMissingClusterKV()
 	}
 
@@ -626,17 +626,6 @@ func main() {
 			} else {
 				// it's official release image
 				nvAppFullVersion = ver.CtrlVersion[1:]
-				if ver.CtrlVersion != Version {
-					log.WithFields(log.Fields{"CtrlVersion": ver.CtrlVersion, "Version": Version}).Info()
-					clusHelper := kv.GetClusterHelper()
-					users := clusHelper.GetAllUsersNoAuth()
-					for _, user := range users {
-						if len(user.AcceptedAlerts) > 0 {
-							user.AcceptedAlerts = nil
-							clusHelper.PutUser(user)
-						}
-					}
-				}
 			}
 			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
 				nvSemanticVersion = "v" + ss[0]
