@@ -353,6 +353,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
+			if respV2.Config.ModeAuto.ModeAutoD2MDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoD2MDuration = 1
+			}
+			if respV2.Config.ModeAuto.ModeAutoM2PDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoM2PDuration = 1
+			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
 		} else {
@@ -1961,10 +1967,10 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var accepted []string
-	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, acc); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
 		accepted = user.AcceptedAlerts
 	}
-	if user, _, _ := clusHelper.GetUserRev(login.fullname, access.NewReaderAccessControl()); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(login.fullname, acc); user != nil {
 		accepted = append(accepted, user.AcceptedAlerts...)
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
