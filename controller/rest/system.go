@@ -1967,10 +1967,10 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var accepted []string
-	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, acc); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
 		accepted = user.AcceptedAlerts
 	}
-	if user, _, _ := clusHelper.GetUserRev(login.fullname, access.NewReaderAccessControl()); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(login.fullname, acc); user != nil {
 		accepted = append(accepted, user.AcceptedAlerts...)
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
