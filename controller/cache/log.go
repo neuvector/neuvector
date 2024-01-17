@@ -74,6 +74,9 @@ var curAuditIndex int = 0
 // This is currently used to record policy voilation logs. It's not really a traffic log,
 // but an aggregated record.
 func (m CacheMethod) GetViolations(acc *access.AccessControl) []*api.Violation {
+	syncRLock(syncCatgViolationIdx)
+	defer syncRUnlock(syncCatgViolationIdx)
+
 	logs := make([]*api.Violation, 0)
 	for i := 0; i < curVioIndex; i++ {
 		vio := vioCache[curVioIndex-i-1]
@@ -87,6 +90,9 @@ func (m CacheMethod) GetViolations(acc *access.AccessControl) []*api.Violation {
 }
 
 func (m CacheMethod) GetViolationCount(acc *access.AccessControl) int {
+	syncRLock(syncCatgViolationIdx)
+	defer syncRUnlock(syncCatgViolationIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_SECURITY_EVENTS_BASIC, 0) {
 		return curVioIndex
 	} else {
@@ -104,6 +110,10 @@ func (m CacheMethod) GetViolationCount(acc *access.AccessControl) int {
 
 func (m CacheMethod) GetActivities(acc *access.AccessControl) []*api.Event {
 	users := clusHelper.GetAllUsers(acc)
+
+	// Use event sync lock for both event and activity
+	syncRLock(syncCatgEventIdx)
+	defer syncRUnlock(syncCatgEventIdx)
 
 	logs := make([]*api.Event, 0)
 	for i := 0; i < curActivityIndex; i++ {
@@ -124,6 +134,10 @@ func (m CacheMethod) GetActivities(acc *access.AccessControl) []*api.Event {
 }
 
 func (m CacheMethod) GetActivityCount(acc *access.AccessControl) int {
+	// Use event sync lock for both event and activity
+	syncRLock(syncCatgEventIdx)
+	defer syncRUnlock(syncCatgEventIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_EVENTS, 0) {
 		return curActivityIndex
 	} else {
@@ -151,6 +165,8 @@ func (m CacheMethod) GetEvents(caller string, acc *access.AccessControl) []*api.
 	// caller being "" means follow permission only
 	users := clusHelper.GetAllUsers(acc)
 
+	syncRLock(syncCatgEventIdx)
+	defer syncRUnlock(syncCatgEventIdx)
 	logs := make([]*api.Event, 0)
 	for i := 0; i < curEventIndex; i++ {
 		ev := eventCache[curEventIndex-i-1]
@@ -172,6 +188,9 @@ func (m CacheMethod) GetEvents(caller string, acc *access.AccessControl) []*api.
 }
 
 func (m CacheMethod) GetEventCount(caller string, acc *access.AccessControl) int {
+	syncRLock(syncCatgEventIdx)
+	defer syncRUnlock(syncCatgEventIdx)
+
 	// caller being "" means follow permission only
 	if acc.HasGlobalPermissions(share.PERM_EVENTS, 0) {
 		return curEventIndex
@@ -199,6 +218,9 @@ func (m CacheMethod) GetEventCount(caller string, acc *access.AccessControl) int
 }
 
 func (m CacheMethod) GetThreats(acc *access.AccessControl) []*api.Threat {
+	syncRLock(syncCatgThreatIdx)
+	defer syncRUnlock(syncCatgThreatIdx)
+
 	logs := make([]*api.Threat, 0)
 	for i := 0; i < curThrtIndex; i++ {
 		thrt := thrtCache[curThrtIndex-i-1]
@@ -212,6 +234,9 @@ func (m CacheMethod) GetThreats(acc *access.AccessControl) []*api.Threat {
 }
 
 func (m CacheMethod) GetThreat(id string, acc *access.AccessControl) (*api.Threat, error) {
+	syncRLock(syncCatgThreatIdx)
+	defer syncRUnlock(syncCatgThreatIdx)
+
 	if thrt, ok := thrtMap[id]; ok {
 		if !acc.Authorize(thrt, nil) {
 			return nil, common.ErrObjectAccessDenied
@@ -222,6 +247,9 @@ func (m CacheMethod) GetThreat(id string, acc *access.AccessControl) (*api.Threa
 }
 
 func (m CacheMethod) GetThreatCount(acc *access.AccessControl) int {
+	syncRLock(syncCatgThreatIdx)
+	defer syncRUnlock(syncCatgThreatIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_SECURITY_EVENTS_BASIC, 0) {
 		return curThrtIndex
 	} else {
@@ -238,6 +266,9 @@ func (m CacheMethod) GetThreatCount(acc *access.AccessControl) int {
 }
 
 func (m CacheMethod) GetIncidents(acc *access.AccessControl) []*api.Incident {
+	syncRLock(syncCatgIncidentIdx)
+	defer syncRUnlock(syncCatgIncidentIdx)
+
 	logs := make([]*api.Incident, 0)
 	for i := 0; i < curIncidentIndex; i++ {
 		incd := incidentCache[curIncidentIndex-i-1]
@@ -251,6 +282,9 @@ func (m CacheMethod) GetIncidents(acc *access.AccessControl) []*api.Incident {
 }
 
 func (m CacheMethod) GetIncidentCount(acc *access.AccessControl) int {
+	syncRLock(syncCatgIncidentIdx)
+	defer syncRUnlock(syncCatgIncidentIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_SECURITY_EVENTS_BASIC, 0) {
 		return curIncidentIndex
 	} else {
@@ -268,6 +302,9 @@ func (m CacheMethod) GetIncidentCount(acc *access.AccessControl) int {
 
 func (m CacheMethod) GetAudits(acc *access.AccessControl) []*api.Audit {
 	logs := make([]*api.Audit, 0)
+
+	syncRLock(syncCatgAuditIdx)
+	defer syncRUnlock(syncCatgAuditIdx)
 	for i := 0; i < curAuditIndex; i++ {
 		incd := auditCache[curAuditIndex-i-1]
 		if !acc.Authorize(incd, nil) {
@@ -280,6 +317,9 @@ func (m CacheMethod) GetAudits(acc *access.AccessControl) []*api.Audit {
 }
 
 func (m CacheMethod) GetAuditCount(acc *access.AccessControl) int {
+	syncRLock(syncCatgAuditIdx)
+	defer syncRUnlock(syncCatgAuditIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_AUDIT_EVENTS, 0) {
 		return curAuditIndex
 	} else {
@@ -298,6 +338,9 @@ func (m CacheMethod) GetAuditCount(acc *access.AccessControl) int {
 func recordViolation(rlog *api.Violation) {
 	log.WithFields(log.Fields{"client": rlog.ClientName, "server": rlog.ServerName}).Debug("")
 
+	syncLock(syncCatgViolationIdx)
+	defer syncUnlock(syncCatgViolationIdx)
+
 	if curVioIndex == logCacheSize {
 		_, vioCache = vioCache[0], vioCache[1:]
 		vioCache = append(vioCache, rlog)
@@ -309,6 +352,10 @@ func recordViolation(rlog *api.Violation) {
 
 func recordActivity(rlog *api.Event) {
 	log.WithFields(log.Fields{"name": rlog.Name}).Debug("")
+
+	// Use event sync lock for both event and activity
+	syncLock(syncCatgEventIdx)
+	defer syncUnlock(syncCatgEventIdx)
 
 	if curActivityIndex == logCacheSize {
 		_, activityCache = activityCache[0], activityCache[1:]
@@ -322,6 +369,9 @@ func recordActivity(rlog *api.Event) {
 func recordEvent(rlog *api.Event) {
 	log.WithFields(log.Fields{"name": rlog.Name}).Debug("")
 
+	syncLock(syncCatgEventIdx)
+	defer syncUnlock(syncCatgEventIdx)
+
 	if curEventIndex == logCacheSize {
 		_, eventCache = eventCache[0], eventCache[1:]
 		eventCache = append(eventCache, rlog)
@@ -334,6 +384,9 @@ func recordEvent(rlog *api.Event) {
 func recordIncident(rlog *api.Incident) {
 	log.WithFields(log.Fields{"name": rlog.Name}).Debug("")
 
+	syncLock(syncCatgIncidentIdx)
+	defer syncUnlock(syncCatgIncidentIdx)
+
 	if curIncidentIndex == logCacheSize {
 		_, incidentCache = incidentCache[0], incidentCache[1:]
 		incidentCache = append(incidentCache, rlog)
@@ -345,6 +398,9 @@ func recordIncident(rlog *api.Incident) {
 
 func recordThreat(rlog *api.Threat) {
 	log.WithFields(log.Fields{"name": rlog.Name}).Debug("")
+
+	syncLock(syncCatgThreatIdx)
+	defer syncUnlock(syncCatgThreatIdx)
 
 	if curThrtIndex == logCacheSize {
 		var pop *api.Threat
@@ -361,6 +417,9 @@ func recordThreat(rlog *api.Threat) {
 
 func recordAudit(rlog *api.Audit) {
 	log.WithFields(log.Fields{"name": rlog.Name, "level": rlog.Level}).Debug("")
+
+	syncLock(syncCatgAuditIdx)
+	defer syncUnlock(syncCatgAuditIdx)
 
 	auditSuppressSetIdRpts(rlog)
 	if curAuditIndex == logCacheSize {
@@ -1243,7 +1302,7 @@ func syncAuditTx() *syncDataMsg {
 func syncActivityRx(msg *syncDataMsg) int {
 	// Use event sync lock for both event and activity
 	syncLock(syncCatgEventIdx)
-	if validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgEventIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1257,11 +1316,16 @@ func syncActivityRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgEventIdx)
 			return syncRxErrorFailed
 		} else {
-			curActivityIndex = len(acts)
-			for i, act := range acts {
+			num := 0
+			for _, act := range acts {
+				if act == nil {
+					continue
+				}
 				act.Level = api.UpgradeLogLevel(act.Level)
-				activityCache[i] = act
+				activityCache[num] = act
+				num++
 			}
+			curActivityIndex = num
 		}
 	} else {
 		curActivityIndex = 0
@@ -1273,7 +1337,7 @@ func syncActivityRx(msg *syncDataMsg) int {
 
 func syncEventRx(msg *syncDataMsg) int {
 	syncLock(syncCatgEventIdx)
-	if validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgEventIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1287,11 +1351,16 @@ func syncEventRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgEventIdx)
 			return syncRxErrorFailed
 		} else {
-			curEventIndex = len(events)
-			for i, evt := range events {
+			num := 0
+			for _, evt := range events {
+				if evt == nil {
+					continue
+				}
 				evt.Level = api.UpgradeLogLevel(evt.Level)
-				eventCache[i] = evt
+				eventCache[num] = evt
+				num++
 			}
+			curEventIndex = num
 		}
 	} else {
 		curEventIndex = 0
@@ -1303,7 +1372,7 @@ func syncEventRx(msg *syncDataMsg) int {
 
 func syncThreatRx(msg *syncDataMsg) int {
 	syncLock(syncCatgThreatIdx)
-	if validateModifyIdx(syncCatgThreatIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgThreatIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgThreatIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1317,13 +1386,18 @@ func syncThreatRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgThreatIdx)
 			return syncRxErrorFailed
 		} else {
-			curThrtIndex = len(threats)
+			num := 0
 			thrtMap = make(map[string]*api.Threat)
-			for i, thrt := range threats {
+			for _, thrt := range threats {
+				if thrt == nil {
+					continue
+				}
 				thrt.Level = api.UpgradeLogLevel(thrt.Level)
 				thrtMap[thrt.ID] = thrt
-				thrtCache[i] = thrt
+				thrtCache[num] = thrt
+				num++
 			}
+			curThrtIndex = num
 		}
 	} else {
 		curThrtIndex = 0
@@ -1335,7 +1409,7 @@ func syncThreatRx(msg *syncDataMsg) int {
 
 func syncIncidentRx(msg *syncDataMsg) int {
 	syncLock(syncCatgIncidentIdx)
-	if validateModifyIdx(syncCatgIncidentIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgIncidentIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgIncidentIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1349,11 +1423,16 @@ func syncIncidentRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgIncidentIdx)
 			return syncRxErrorFailed
 		} else {
-			curIncidentIndex = len(incidents)
-			for i, incd := range incidents {
+			num := 0
+			for _, incd := range incidents {
+				if incd == nil {
+					continue
+				}
 				incd.Level = api.UpgradeLogLevel(incd.Level)
-				incidentCache[i] = incd
+				incidentCache[num] = incd
+				num++
 			}
+			curIncidentIndex = num
 		}
 	} else {
 		curIncidentIndex = 0
@@ -1365,7 +1444,7 @@ func syncIncidentRx(msg *syncDataMsg) int {
 
 func syncAuditRx(msg *syncDataMsg) int {
 	syncLock(syncCatgAuditIdx)
-	if validateModifyIdx(syncCatgAuditIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgAuditIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgAuditIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1379,12 +1458,17 @@ func syncAuditRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgAuditIdx)
 			return syncRxErrorFailed
 		} else {
-			curAuditIndex = len(audits)
-			for i, audit := range audits {
+			num := 0
+			for _, audit := range audits {
+				if audit == nil {
+					continue
+				}
 				audit.Level = api.UpgradeLogLevel(audit.Level)
 				auditSuppressSetIdRpts(audit)
-				auditCache[i] = audit
+				auditCache[num] = audit
+				num++
 			}
+			curAuditIndex = num
 		}
 	} else {
 		curAuditIndex = 0

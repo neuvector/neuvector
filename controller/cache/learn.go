@@ -723,7 +723,7 @@ func unlearnAll(groupName string) {
 	}
 }
 
-//reduce maxLearnRuleID when delete rules
+// reduce maxLearnRuleID when delete rules
 func adjustMaxLearnRuleID(id uint32) {
 	lprActiveRuleIDs.Remove(id)
 	if id == maxLearnRuleID {
@@ -1501,10 +1501,12 @@ func syncGraphTx() *syncDataMsg {
 		i++
 	}
 
+	syncRLock(syncCatgViolationIdx)
 	var violations []*api.Violation
 	if curVioIndex > 0 {
 		violations = vioCache[0:curVioIndex]
 	}
+	syncRUnlock(syncCatgViolationIdx)
 
 	learnedRules := make([]*graphSyncLearnedRule, 0, len(lprWrapperMap))
 	for pair, rw := range lprWrapperMap {
@@ -1629,11 +1631,18 @@ func syncGraphRx(msg *syncDataMsg) int {
 				}
 			}
 
-			curVioIndex = len(gd.Vios)
-			for i, vio := range gd.Vios {
+			syncLock(syncCatgViolationIdx)
+			num := 0
+			for _, vio := range gd.Vios {
+				if vio == nil {
+					continue
+				}
 				vio.Level = api.UpgradeLogLevel(vio.Level)
-				vioCache[i] = vio
+				vioCache[num] = vio
+				num++
 			}
+			curVioIndex = num
+			syncUnlock(syncCatgViolationIdx)
 
 			maxLearnRuleID = gd.MaxLearnRuleID
 			//after sync clear active rule id list
