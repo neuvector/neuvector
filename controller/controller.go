@@ -590,7 +590,14 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	if Ctrler.Leader || !isNewCluster {
-		clusHelper.UpgradeClusterKV(Version)
+		nvImageVersion := Version
+		if strings.HasPrefix(nvImageVersion, "interim/") {
+			// it's daily dev build image
+			if *teleCurrentVer != "" {
+				nvImageVersion = *teleCurrentVer
+			}
+		}
+		clusHelper.UpgradeClusterKV(nvImageVersion)
 		clusHelper.FixMissingClusterKV()
 	}
 
