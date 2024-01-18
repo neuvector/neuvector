@@ -75,6 +75,8 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 		q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"name", "score", "score_v3", "published_timestamp"}, "")
 		q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "")
 
+		q.Filters.LastModifiedTime = getQueryParamInteger64(r, "lastmtime", 0)
+
 		// quick filter
 		q.Filters.QuickFilter = r.URL.Query().Get("qf")
 		if q.Filters.QuickFilter != "" {
@@ -461,6 +463,11 @@ func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAs
 			&workloads, &nodes, &images, &platforms, &cve_sources)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		// for vul printout
+		if requesetQuery.Filters.LastModifiedTime > 0 && record.LastModTS < requesetQuery.Filters.LastModifiedTime {
+			continue
 		}
 
 		record.Score = float32(score) / 10.0

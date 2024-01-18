@@ -304,6 +304,16 @@ func getQueryParamInteger(r *http.Request, name string, defaultValue int) int {
 	return intValue
 }
 
+func getQueryParamInteger64(r *http.Request, name string, defaultValue int64) int64 {
+	param := r.URL.Query().Get(name)
+
+	intValue, err := strconv.ParseInt(param, 10, 64)
+	if err != nil {
+		intValue = defaultValue
+	}
+	return intValue
+}
+
 func formatScoreToStr(score int) string {
 	f := float32(score) / 10.0
 	return fmt.Sprintf("%.1f", f)
