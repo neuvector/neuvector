@@ -386,6 +386,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// python
 		{"support", "*"}, // support
 		{"cli", "*"},     // cli
+		{"python", "/usr/bin/*"},// cli
 		{"*", "/usr/lib/jvm/*"}, // JVM
 
 		// tools
