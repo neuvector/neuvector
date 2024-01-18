@@ -26,7 +26,7 @@ type syncCatgInfo struct {
 
 type syncCatgAux struct {
 	modifyIdx uint64
-	mtx       sync.Mutex
+	mtx       sync.RWMutex
 }
 
 const (
@@ -113,6 +113,14 @@ func syncLock(catg int) {
 
 func syncUnlock(catg int) {
 	syncCatgAuxArray[catg].mtx.Unlock()
+}
+
+func syncRLock(catg int) {
+	syncCatgAuxArray[catg].mtx.RLock()
+}
+
+func syncRUnlock(catg int) {
+	syncCatgAuxArray[catg].mtx.RUnlock()
 }
 
 func GetSyncTxData(catgName string) []byte {
@@ -455,6 +463,7 @@ func putHotSyncRequest() int {
 }
 
 var lastSyncAt time.Time
+
 const GraphNodeCountSmall uint32 = 500
 const GraphNodeCountMedium uint32 = 1500
 const GraphNodeCountLarge uint32 = 3000
@@ -484,10 +493,10 @@ func syncCheck(isLeader bool) {
 	if len(ss.Mismatches) > 0 && !syncInProcess {
 
 		log.WithFields(log.Fields{
-			"graphcnt": ss.GraphNodeCount,
+			"graphcnt":   ss.GraphNodeCount,
 			"lastSyncAt": api.RESTTimeString(lastSyncAt),
-			"now": api.RESTTimeString(time.Now().UTC()),
-			}).Debug("")
+			"now":        api.RESTTimeString(time.Now().UTC()),
+		}).Debug("")
 		//sync consumes large memory, when cluster has large number of
 		//groups it affects cluster ramping up performance, so we ratelimit
 		//sync frequence based on number of GraphNodeCount

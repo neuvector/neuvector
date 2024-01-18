@@ -575,7 +575,9 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	// all controller should call auditUpdate to record the log, the leader will take action
 	if alives != nil {
 		clog := scanReport2ScanLog(id, objType, report, highs, meds, nil, nil, "")
+		syncLock(syncCatgAuditIdx)
 		auditUpdate(id, share.EventCVEReport, objType, clog, alives, fixedHighsInfo)
+		syncUnlock(syncCatgAuditIdx)
 	}
 }
 
@@ -1006,11 +1008,15 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
 					if alives != nil {
 						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, highs, meds, layerHighs, layerMeds, name)
+						syncLock(syncCatgAuditIdx)
 						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives, fixedHighsInfo)
+						syncUnlock(syncCatgAuditIdx)
 					}
 
 					clog := scanReport2BenchLog(id, share.ScanObjectType_IMAGE, report, name)
+					syncLock(syncCatgAuditIdx)
 					benchUpdate(share.EventCompliance, clog)
+					syncUnlock(syncCatgAuditIdx)
 				}
 
 				if fedRegName != "" {

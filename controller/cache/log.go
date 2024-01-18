@@ -267,6 +267,8 @@ func (m CacheMethod) GetIncidentCount(acc *access.AccessControl) int {
 }
 
 func (m CacheMethod) GetAudits(acc *access.AccessControl) []*api.Audit {
+	syncRLock(syncCatgAuditIdx)
+	defer syncRUnlock(syncCatgAuditIdx)
 	logs := make([]*api.Audit, 0)
 	for i := 0; i < curAuditIndex; i++ {
 		incd := auditCache[curAuditIndex-i-1]
@@ -280,6 +282,9 @@ func (m CacheMethod) GetAudits(acc *access.AccessControl) []*api.Audit {
 }
 
 func (m CacheMethod) GetAuditCount(acc *access.AccessControl) int {
+	syncRLock(syncCatgAuditIdx)
+	defer syncRUnlock(syncCatgAuditIdx)
+
 	if acc.HasGlobalPermissions(share.PERM_AUDIT_EVENTS, 0) {
 		return curAuditIndex
 	} else {
@@ -1365,7 +1370,7 @@ func syncIncidentRx(msg *syncDataMsg) int {
 
 func syncAuditRx(msg *syncDataMsg) int {
 	syncLock(syncCatgAuditIdx)
-	if validateModifyIdx(syncCatgAuditIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgAuditIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgAuditIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1379,12 +1384,17 @@ func syncAuditRx(msg *syncDataMsg) int {
 			syncUnlock(syncCatgAuditIdx)
 			return syncRxErrorFailed
 		} else {
-			curAuditIndex = len(audits)
-			for i, audit := range audits {
+			num := 0
+			for _, audit := range audits {
+				if audit == nil {
+					continue
+				}
 				audit.Level = api.UpgradeLogLevel(audit.Level)
 				auditSuppressSetIdRpts(audit)
-				auditCache[i] = audit
+				auditCache[num] = audit
+				num++
 			}
+			curAuditIndex = num
 		}
 	} else {
 		curAuditIndex = 0
