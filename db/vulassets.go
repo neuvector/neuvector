@@ -13,6 +13,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
+	"github.com/mattn/go-sqlite3"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/utils"
@@ -74,6 +75,8 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 		q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"name", "score", "score_v3", "published_timestamp"}, "")
 		q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "")
 
+		q.Filters.LastModifiedTime = getQueryParamInteger64(r, "lastmtime", 0)
+
 		// quick filter
 		q.Filters.QuickFilter = r.URL.Query().Get("qf")
 		if q.Filters.QuickFilter != "" {
@@ -123,8 +126,10 @@ func FilterVulAssets(allowed map[string]utils.Set, queryFilter *VulQueryFilter, 
 	columns := getVulassetColumns()
 
 	// limitation: CVE content might be empty due to Consul restore process, so we cannot do CVS based filter directly on db
+	// db := memoryDbHandle
+	db := dbHandle
 	statement, args, _ := dialect.From(Table_vulassets).Select(columns...).Prepared(true).ToSQL()
-	rows, err := dbHandle.Query(statement, args...)
+	rows, err := db.Query(statement, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -381,7 +386,6 @@ func PopulateVulAsset(resType ResourceType, resourceID string, vul *api.RESTVuln
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -459,6 +463,11 @@ func GetVulAssetSession(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAs
 			&workloads, &nodes, &images, &platforms, &cve_sources)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		// for vul printout
+		if requesetQuery.Filters.LastModifiedTime > 0 && record.LastModTS < requesetQuery.Filters.LastModifiedTime {
+			continue
 		}
 
 		record.Score = float32(score) / 10.0
@@ -1067,7 +1076,9 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	statement, args, _ := dialect.From("assetvuls").Select("assetid", "name", "cve_high", "cve_medium", "cve_low").Where(buildTopAssetWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
 
 	// step-2: execute it and fetch the data
-	rows, err := dbHandle.Query(statement, args...)
+	// db := memoryDbHandle
+	db := dbHandle
+	rows, err := db.Query(statement, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1197,4 +1208,13 @@ func buildQuickFilterWhereClause(queryFilter *VulQueryFilter) exp.ExpressionList
 	}
 
 	return goqu.And(goqu.Ex{})
+}
+
+func shouleRetry(err error) bool {
+	// ref: https://sourcegraph.com/github.com/juicedata/juicefs/-/blob/pkg/meta/sql.go
+	// case "sqlite3":
+	// 	return errors.Is(err, errBusy) || strings.Contains(msg, "database is locked")
+
+	msg := strings.ToLower(err.Error())
+	return errors.Is(err, sqlite3.ErrBusy) || strings.Contains(msg, "database is locked")
 }

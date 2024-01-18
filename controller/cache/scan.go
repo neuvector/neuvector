@@ -476,6 +476,10 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	var highs, meds, lows []string
 	var fixedHighsInfo []scanUtils.FixedVulInfo
 	var alives utils.Set // vul names that are not filtered
+	var vuls2Populate []*api.RESTVulnerability
+	var dbAssetVul *db.DbAssetVul
+	var assetId, baseOS string
+	var resType db.ResourceType
 
 	scanMutexLock()
 	info, ok := scanMap[id]
@@ -507,27 +511,17 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 			if c := getWorkloadCache(id); c != nil {
 				c.scanBrief = brief
 				c.vulTraits = info.vulTraits
-
-				// populate vulAsset data..
 				sdb := scanUtils.GetScannerDB()
 
-				baseOS := ""
+				baseOS = ""
 				if c.scanBrief != nil {
 					baseOS = c.scanBrief.BaseOS
 				}
 
-				vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
-
-				// populate vulasset
-				for _, vul := range vuls {
-					if err := db.PopulateVulAsset(db.TypeWorkload, c.workload.ID, vul, baseOS); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
-					}
-				}
-
-				// populate assetvul
-				dbAssetVul := getWorkloadDbAssetVul(c, highs, meds, lows, info.lastScanTime)
-				db.PopulateAssetVul(dbAssetVul)
+				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
+				assetId = c.workload.ID
+				resType = db.TypeWorkload
+				dbAssetVul = getWorkloadDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_HOST:
 			if c := getHostCache(id); c != nil {
@@ -535,46 +529,48 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 				c.vulTraits = info.vulTraits
 
 				sdb := scanUtils.GetScannerDB()
-				baseOS := ""
+				baseOS = ""
 				if c.scanBrief != nil {
 					baseOS = c.scanBrief.BaseOS
 				}
 
-				vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
-
-				// populate vulasset
-				for _, vul := range vuls {
-					if err := db.PopulateVulAsset(db.TypeNode, c.host.ID, vul, baseOS); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
-					}
-				}
-
-				// populate assetvul
-				dbAssetVul := getHostDbAssetVul(c, highs, meds, lows, info.lastScanTime)
-				db.PopulateAssetVul(dbAssetVul)
+				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
+				assetId = c.host.ID
+				resType = db.TypeNode
+				dbAssetVul = getHostDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_PLATFORM:
+
 			log.WithFields(log.Fields{"brief": brief, "highs": highs, "meds": meds}).Debug("scanDone(), platform")
 			sdb := scanUtils.GetScannerDB()
-			baseOS := ""
+			baseOS = ""
 			if brief != nil {
 				baseOS = brief.BaseOS
 			}
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, baseOS, info.vulTraits, "", true)
-
-			for _, vul := range vuls {
-				if err := db.PopulateVulAsset(db.TypePlatform, common.ScanPlatformID, vul, baseOS); err != nil {
-					log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
-				}
-			}
-
-			dbAssetVul := getPlatformDbAssetVul(highs, meds, lows, baseOS, info.lastScanTime)
-			db.PopulateAssetVul(dbAssetVul)
+			vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, info.vulTraits, "", true)
+			assetId = common.ScanPlatformID
+			resType = db.TypePlatform
+			dbAssetVul = getPlatformDbAssetVul(highs, meds, lows, baseOS, info.lastScanTime)
 		}
 	} else {
 		cctx.ScanLog.WithFields(log.Fields{"id": id, "type": objType}).Debug("Scan object is gone")
 	}
 	scanMutexUnlock()
+
+	if ok && dbAssetVul != nil {
+		// populate vulasset
+		for i, vul := range vuls2Populate {
+			if err := db.PopulateVulAsset(resType, assetId, vul, baseOS); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
+			}
+			if i%5 == 0 {
+				time.Sleep(time.Millisecond * 100)
+			}
+		}
+
+		// populate assetvul
+		db.PopulateAssetVul(dbAssetVul)
+	}
 
 	// all controller should call auditUpdate to record the log, the leader will take action
 	if alives != nil {

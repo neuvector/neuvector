@@ -42,17 +42,31 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	sql, args, _ := ds.Prepared(true).ToSQL()
 
 	// execute the statement
-	result, err := dbHandle.Exec(sql, args...)
-	if err != nil {
-		return 0, err
+	var lastErr error
+	for retry := 0; retry < 50; retry++ {
+		result, err := dbHandle.Exec(sql, args...)
+		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
+			return 0, err
+		}
+
+		lastInsertID, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+
+		return int(lastInsertID), nil
 	}
 
-	lastInsertID, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
+	if lastErr != nil && shouleRetry(lastErr) {
+		return 0, lastErr
 	}
 
-	return int(lastInsertID), nil
+	return 0, errors.New("populate query stat failed")
 }
 
 func GetQueryStat(token string) (*QueryStat, error) {
@@ -61,20 +75,32 @@ func GetQueryStat(token string) (*QueryStat, error) {
 	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready"}
 	sql, args, _ := dialect.From(queryStatTablename).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(sql, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	stat := &QueryStat{}
-	for rows.Next() {
-		rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
-			&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady)
+	var lastErr error
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(sql, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
-		return stat, nil
+		defer rows.Close()
+
+		stat := &QueryStat{}
+		for rows.Next() {
+			rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
+				&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady)
+			if err != nil {
+				return nil, err
+			}
+			return stat, nil
+		}
+	}
+
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
 	}
 
 	return nil, errors.New("no such query token")

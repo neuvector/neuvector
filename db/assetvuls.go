@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/utils"
@@ -20,24 +21,37 @@ func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		assetVul := &DbAssetVul{
-			AssetID: assetID,
-		}
-
-		err = rows.Scan(&assetVul.Db_ID)
+	var lastErr error
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(statement, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
+		defer rows.Close()
 
-		return assetVul, nil
+		for rows.Next() {
+			assetVul := &DbAssetVul{
+				AssetID: assetID,
+			}
+
+			err = rows.Scan(&assetVul.Db_ID)
+			if err != nil {
+				return nil, err
+			}
+
+			return assetVul, nil
+		}
 	}
+
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
+	}
+
 	return nil, errors.New("no such asset id")
 }
 
@@ -60,14 +74,13 @@ func PopulateAssetVul(assetVul *DbAssetVul) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 	targetTable := Table_assetvuls
-	db := dbHandle
 
+	db := dbHandle
 	dialect := goqu.Dialect("sqlite3")
 
 	// Insert case
@@ -635,27 +648,39 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 	expAssets := goqu.Ex{"assetid": assets}
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	var lastErr error
 	records := make(map[string]*api.RESTWorkloadAsset, 0)
-	for rows.Next() {
-		var domain string
-		as := &api.RESTWorkloadAsset{}
-		err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode, &as.Service, &as.Image)
-
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(statement, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
+		defer rows.Close()
 
-		if domain != "" {
-			as.Domains = []string{domain}
+		for rows.Next() {
+			var domain string
+			as := &api.RESTWorkloadAsset{}
+			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode, &as.Service, &as.Image)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if domain != "" {
+				as.Domains = []string{domain}
+			}
+
+			records[as.ID] = as
 		}
+	}
 
-		records[as.ID] = as
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
 	}
 
 	return records, nil
@@ -671,25 +696,37 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 	expAssets := goqu.Ex{"assetid": assets}
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	var lastErr error
 	records := make(map[string]*api.RESTHostAsset, 0)
-	for rows.Next() {
-		var domain string
-		as := &api.RESTHostAsset{}
-		err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(statement, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
+		defer rows.Close()
 
-		if domain != "" {
-			as.Domains = []string{domain}
+		for rows.Next() {
+			var domain string
+			as := &api.RESTHostAsset{}
+			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			if err != nil {
+				return nil, err
+			}
+
+			if domain != "" {
+				as.Domains = []string{domain}
+			}
+			records[as.ID] = as
 		}
-		records[as.ID] = as
+	}
+
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
 	}
 
 	return records, nil
@@ -705,26 +742,38 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 	expAssets := goqu.Ex{"assetid": assets}
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	var lastErr error
 	records := make(map[string]*api.RESTPlatformAsset, 0)
-	for rows.Next() {
-		var domain string
-		as := &api.RESTPlatformAsset{}
-		err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(statement, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
+		defer rows.Close()
 
-		if domain != "" {
-			as.Domains = []string{domain}
+		for rows.Next() {
+			var domain string
+			as := &api.RESTPlatformAsset{}
+			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			if err != nil {
+				return nil, err
+			}
+
+			if domain != "" {
+				as.Domains = []string{domain}
+			}
+
+			records[as.ID] = as
 		}
+	}
 
-		records[as.ID] = as
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
 	}
 
 	return records, nil
@@ -740,25 +789,37 @@ func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error)
 	expAssets := goqu.Ex{"assetid": assets}
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
 
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	var lastErr error
 	records := make(map[string]*api.RESTImageAsset, 0)
-	for rows.Next() {
-		var domain string
-		as := &api.RESTImageAsset{}
-		err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+	for retry := 0; retry < 50; retry++ {
+		rows, err := dbHandle.Query(statement, args...)
 		if err != nil {
+			if shouleRetry(err) {
+				time.Sleep(time.Millisecond * time.Duration(retry*retry))
+				lastErr = err
+				continue
+			}
 			return nil, err
 		}
+		defer rows.Close()
 
-		if domain != "" {
-			as.Domains = []string{domain}
+		for rows.Next() {
+			var domain string
+			as := &api.RESTImageAsset{}
+			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			if err != nil {
+				return nil, err
+			}
+
+			if domain != "" {
+				as.Domains = []string{domain}
+			}
+			records[as.ID] = as
 		}
-		records[as.ID] = as
+	}
+
+	if lastErr != nil && shouleRetry(lastErr) {
+		return nil, lastErr
 	}
 
 	return records, nil

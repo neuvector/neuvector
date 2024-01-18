@@ -538,10 +538,13 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			sdb := scanUtils.GetScannerDB()
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, "", false)
 
-			for _, vul := range vuls {
+			for i, vul := range vuls {
 				err := db.PopulateVulAsset(db.TypeImage, id, vul, sum.BaseOS)
 				if err != nil {
 					log.WithFields(log.Fields{"err": err}).Error("PopulateVulAsset failed")
+				}
+				if i%5 == 0 {
+					time.Sleep(time.Millisecond * 100)
 				}
 			}
 
