@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -125,6 +126,8 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	queryStat.Summary.TopImages = top5Images
 	queryStat.Summary.TopNodes = top5Nodes
 
+	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";")}).Debug("createVulAssetSession")
+
 	if queryFilter.Debug == 0 {
 		queryStat.PerfStats = nil
 	}
@@ -232,6 +235,8 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		elapsed := time.Since(start)
 		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("2/2, get asset meta, took=%v", elapsed))
 		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("mem tables: [%s]", db.GetAllTableInMemoryDb()))
+
+		log.WithFields(log.Fields{"PerfStats": strings.Join(resp.PerfStats, ";")}).Debug("getVulAssetSession")
 
 		if queryObj.Debug == 0 {
 			resp.PerfStats = nil
