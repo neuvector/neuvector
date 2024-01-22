@@ -100,11 +100,11 @@ func StartOpaServer() *exec.Cmd {
 	if UseOPA_HTTPS {
 		// https
 		// opa run --server --log-level debug --tls-cert-file public.crt --tls-private-key-file private.key --addr=:8181
-		cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--tls-cert-file", "./opa_binary/opa_cert/public.crt", "--tls-private-key-file", "./opa_binary/opa_cert/private.key", "--addr=:8181")
+		cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--tls-cert-file", "./opa_binary/opa_cert/public.crt", "--tls-private-key-file", "./opa_binary/opa_cert/private.key", "--addr=:8181", "--disable-telemetry")
 	} else {
 		// http
 		// cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--addr=:8181")
-		cmd = exec.Command("/usr/local/bin/opa", "run", "--server", "--ignore=.*", "--addr=:8181", "--log-level=error")
+		cmd = exec.Command("/usr/local/bin/opa", "run", "--server", "--ignore=.*", "--addr=:8181", "--log-level=error", "--disable-telemetry")
 	}
 
 	cmd.Stdout = os.Stdout
