@@ -774,7 +774,8 @@ func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, m
 
 func handlerVulAssetCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	if r.Method == http.MethodPost {
-		createVulAssetSession(w, r)
+		// createVulAssetSession(w, r)
+		createVulAssetSessionV2(w, r)
 		return
 	}
 }

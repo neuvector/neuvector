@@ -14,7 +14,6 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 type DbVulAsset struct {
@@ -50,6 +49,7 @@ type DbVulAsset struct {
 
 	Skip       bool
 	MeetSearch bool // for static data which needs all data even not within search result
+	DBKey      string
 }
 
 type DbCVESource struct {
@@ -58,10 +58,12 @@ type DbCVESource struct {
 	BaseOS     string `json:"baseos"`
 }
 
-type DbVulnResourcePackageVersion struct {
-	ResourceID     string `json:"id"`
+type DbVulnResourcePackageVersion2 struct {
+	CVEName        string `json:"cn"`
+	PackageName    string `json:"pn"`
 	PackageVersion string `json:"pv"`
 	FixedVersion   string `json:"fv"`
+	DbKey          string `json:"dbkey"`
 }
 
 type VulQueryFilter struct {
@@ -103,6 +105,8 @@ type DbAssetVul struct {
 
 	P_version string
 	P_base_os string
+
+	Packages []*DbVulnResourcePackageVersion2
 }
 
 type AssetMaps struct {
@@ -193,12 +197,12 @@ func CreateVulAssetDb(useLocal bool) error {
 	statements := make([]string, 0)
 
 	// create vulasset table
-	columns := getVulassetSchema()
-	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", Table_vulassets, strings.Join(columns, ",")))
-	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_name_idx on %s (name)", Table_vulassets, Table_vulassets))
+	// columns := getVulassetSchema()
+	// statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", Table_vulassets, strings.Join(columns, ",")))
+	// statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_name_idx on %s (name)", Table_vulassets, Table_vulassets))
 
 	// querystats table
-	columns = []string{"id INTEGER NOT NULL PRIMARY KEY", "token TEXT", "create_timestamp INTEGER", "login_type TEXT", "login_id TEXT", "login_name TEXT", "data1 TEXT", "data2 TEXT", "data3 TEXT", "filedb_ready INTEGER"}
+	columns := []string{"id INTEGER NOT NULL PRIMARY KEY", "token TEXT", "create_timestamp INTEGER", "login_type TEXT", "login_id TEXT", "login_name TEXT", "data1 TEXT", "data2 TEXT", "data3 TEXT", "filedb_ready INTEGER"}
 	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS querystats (%s)", strings.Join(columns, ",")))
 
 	// assetvuls table
@@ -286,7 +290,7 @@ func getAssetvulSchema() []string {
 		"w_domain TEXT", "w_applications TEXT", "policy_mode TEXT", "w_service_group TEXT", "w_image TEXT",
 		"cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "cve_lists TEXT", "scanned_at TEXT",
 		"n_os TEXT", "n_kernel TEXT", "n_cpus INTEGER", "n_memory INTEGER",
-		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT"}
+		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "packages TEXT", "packagesb BLOB"}
 	return schema
 }
 
@@ -337,47 +341,10 @@ func parseJsonStrToSlice(jsonStr string) []string {
 	return results
 }
 
-func parseJsonStrToSet(jsonStr string) utils.Set {
-	resourceSet := utils.NewSet()
-
-	items := make([]string, 0)
-	err := json.Unmarshal([]byte(jsonStr), &items)
-	if err != nil {
-		return resourceSet
-	}
-
-	for _, r := range items {
-		resourceSet.Add(r)
-	}
-	return resourceSet
-}
-
 func convertToJSON(input interface{}) (string, error) {
 	jsonData, err := json.Marshal(input)
 	if err != nil {
 		return "", err
 	}
 	return string(jsonData), nil
-}
-
-func deleteItemInSlice(assetsInJson string, itemToDelete string) string {
-	slice := parseJsonStrToSlice(assetsInJson)
-
-	indexToDelete := -1
-	for i, item := range slice {
-		if item == itemToDelete {
-			indexToDelete = i
-			break
-		}
-	}
-
-	if indexToDelete != -1 {
-		slice = append(slice[:indexToDelete], slice[indexToDelete+1:]...)
-	}
-
-	str, err := convertToJSON(slice)
-	if err != nil {
-		return assetsInJson // delete fail
-	}
-	return str
 }

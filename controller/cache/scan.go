@@ -478,8 +478,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	var alives utils.Set // vul names that are not filtered
 	var vuls2Populate []*api.RESTVulnerability
 	var dbAssetVul *db.DbAssetVul
-	var assetId, baseOS string
-	var resType db.ResourceType
+	var baseOS string
 
 	scanMutexLock()
 	info, ok := scanMap[id]
@@ -519,8 +518,6 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 				}
 
 				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
-				assetId = c.workload.ID
-				resType = db.TypeWorkload
 				dbAssetVul = getWorkloadDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_HOST:
@@ -535,21 +532,15 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 				}
 
 				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
-				assetId = c.host.ID
-				resType = db.TypeNode
 				dbAssetVul = getHostDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_PLATFORM:
-
-			log.WithFields(log.Fields{"brief": brief, "highs": highs, "meds": meds}).Debug("scanDone(), platform")
 			sdb := scanUtils.GetScannerDB()
 			baseOS = ""
 			if brief != nil {
 				baseOS = brief.BaseOS
 			}
 			vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, info.vulTraits, "", true)
-			assetId = common.ScanPlatformID
-			resType = db.TypePlatform
 			dbAssetVul = getPlatformDbAssetVul(highs, meds, lows, baseOS, info.lastScanTime)
 		}
 	} else {
@@ -558,14 +549,25 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	scanMutexUnlock()
 
 	if ok && dbAssetVul != nil {
-		// populate vulasset
-		for i, vul := range vuls2Populate {
-			if err := db.PopulateVulAsset(resType, assetId, vul, baseOS); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("PopulateVulAsset failed.")
+		// extract package info
+		dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
+		var cveLists utils.Set = utils.NewSet()
+		for _, vul := range vuls2Populate {
+			vulPackage := &db.DbVulnResourcePackageVersion2{
+				CVEName:        vul.Name,
+				PackageName:    vul.PackageName,
+				PackageVersion: vul.PackageVersion,
+				FixedVersion:   vul.FixedVersion,
+				DbKey:          vul.DbKey,
 			}
-			if i%5 == 0 {
-				time.Sleep(time.Millisecond * 100)
-			}
+
+			cveLists.Add(fmt.Sprintf("%s;%s", vul.Name, vul.DbKey))
+			dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
+		}
+
+		b, err := json.Marshal(cveLists.ToStringSlice())
+		if err == nil {
+			dbAssetVul.CVE_lists = string(b)
 		}
 
 		// populate assetvul
@@ -1495,13 +1497,6 @@ func getWorkloadDbAssetVul(c *workloadCache, highs, meds, lows []string, lastSca
 	}
 
 	d.Policy_mode, _ = getWorkloadPerGroupPolicyMode(c)
-
-	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
-	b, err = json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
-
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
 }
@@ -1522,13 +1517,6 @@ func getHostDbAssetVul(c *hostCache, highs, meds, lows []string, lastScanTime ti
 	}
 
 	d.Policy_mode, _ = getHostPolicyMode(c)
-
-	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
-	b, err := json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
-
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
 }
@@ -1536,7 +1524,7 @@ func getHostDbAssetVul(c *hostCache, highs, meds, lows []string, lastScanTime ti
 func getPlatformDbAssetVul(highs, meds, lows []string, baseOS string, lastScanTime time.Time) *db.DbAssetVul {
 	d := &db.DbAssetVul{
 		Type:       db.AssetPlatform,
-		AssetID:    localDev.Host.Platform,
+		AssetID:    common.ScanPlatformID,
 		Name:       localDev.Host.Platform,
 		CVE_high:   len(highs),
 		CVE_medium: len(meds),
@@ -1544,13 +1532,6 @@ func getPlatformDbAssetVul(highs, meds, lows []string, baseOS string, lastScanTi
 		P_version:  cctx.k8sVersion,
 		P_base_os:  baseOS,
 	}
-
-	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
-	b, err := json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
-
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
 }

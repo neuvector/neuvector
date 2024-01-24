@@ -16,10 +16,13 @@ import (
 )
 
 var TESTDbPerf bool
+var createQuerySessionTS time.Time
 
-func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
+func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
+
+	createQuerySessionTS = time.Now()
 
 	queryStat := &api.RESTScanAssetQueryStats{
 		PerfStats: make([]string, 0),
@@ -63,7 +66,8 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 
 	// get vul records in vulAssets table
 	start = time.Now()
-	vulAssets, nTotalCVE, err := db.FilterVulAssets(allowed, queryFilter, filteredMap)
+	// vulAssets, nTotalCVE, err := db.FilterVulAssets(allowed, queryFilter, filteredMap)
+	vulAssets, nTotalCVE, perf, err := db.FilterVulAssetsV2(allowed, queryFilter, filteredMap)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("FilterVulAssets error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -71,6 +75,7 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 	elapsed = time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("2/4, get filtered vulasset from db, took=%v", elapsed))
+	queryStat.PerfStats = append(queryStat.PerfStats, perf...)
 
 	// get [top_image] and [top_nodes] summary,
 	// it's static data (don't interact with filter)
@@ -126,7 +131,7 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	queryStat.Summary.TopImages = top5Images
 	queryStat.Summary.TopNodes = top5Nodes
 
-	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";")}).Debug("createVulAssetSession")
+	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "querytoken": queryStat.QueryToken}).Debug("createVulAssetSession")
 
 	if queryFilter.Debug == 0 {
 		queryStat.PerfStats = nil
@@ -141,7 +146,7 @@ func createVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{"records": records}).Debug("Delete exceeded sessions")
 	}
 
-	restRespSuccess(w, r, queryStat, acc, login, nil, "Create createAssetVulnerabilitySession5 asset report session")
+	restRespSuccess(w, r, queryStat, acc, login, nil, "Create asset report session")
 
 	// populate the result to file-based database
 	go func() {
@@ -198,6 +203,10 @@ func createQueryStat(login *loginSession, queryFilter *db.VulQueryFilter) error 
 }
 
 func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+
+	// elapsed := time.Since(createQuerySessionTS)
+
 	// get access control
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -215,7 +224,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if queryObj.QueryToken != "" {
-		resp, allAssets, err := db.GetVulAssetSession(queryObj)
+		resp, allAssets, err := db.GetVulAssetSessionV2(queryObj)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get session vuls error %s", err))
 			return
@@ -233,10 +242,9 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		}
 
 		elapsed := time.Since(start)
-		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("2/2, get asset meta, took=%v", elapsed))
-		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("mem tables: [%s]", db.GetAllTableInMemoryDb()))
+		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("4/4, get asset meta, took=%v", elapsed))
 
-		log.WithFields(log.Fields{"PerfStats": strings.Join(resp.PerfStats, ";")}).Debug("getVulAssetSession")
+		log.WithFields(log.Fields{"PerfStats": strings.Join(resp.PerfStats, ";"), "querytoken": queryObj.QueryToken}).Debug("getVulAssetSession returns")
 
 		if queryObj.Debug == 0 {
 			resp.PerfStats = nil
@@ -299,7 +307,7 @@ func _createQuerySession(qsr *api.QuerySessionRequest) error {
 	allowed, filteredMapVul := getAllAllowedResourceId(acc)
 
 	// get all records in vulAssets table which represent the complete data
-	vulAssets, _, err := db.FilterVulAssets(allowed, queryFilter, filteredMapVul)
+	vulAssets, _, _, err := db.FilterVulAssetsV2(allowed, queryFilter, filteredMapVul)
 	if err != nil {
 		return err
 	}

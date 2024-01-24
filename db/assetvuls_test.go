@@ -65,9 +65,8 @@ func TestUpdateHostContainerCount(t *testing.T) {
 	queryFilter := &VulQueryFilter{Filters: &api.VulQueryFilterViewModel{
 		ViewType: "all",
 	}}
-	allCVE := utils.NewSet()
-	allAssets := utils.NewSet()
-	assetViews, err := getHostAssetView(vulMap, assets, queryFilter, allCVE, allAssets)
+	cvePackages := make(map[string]map[string]utils.Set)
+	assetViews, err := getHostAssetView(vulMap, assets, queryFilter, cvePackages)
 	if err != nil {
 		t.Errorf("getHostAssetView returns %v", err)
 	}
@@ -104,5 +103,35 @@ func generateHostDbAssetVul(assetid string, containerCount int) *DbAssetVul {
 	if err == nil {
 		d.CVE_lists = string(b)
 	}
+	return d
+}
+
+func generateWorkloadDbAssetVul(assetid string) *DbAssetVul {
+	d := &DbAssetVul{
+		Type:             AssetWorkload,
+		AssetID:          assetid,
+		Name:             "my-dep3-7b64995fb5-ftqln",
+		W_domain:         "default",
+		W_service_group:  "my-dep3.default",
+		W_workload_image: "alpine-5ff9c682:5ff9c682-1c02-4b06-a0fd-011531cf1fc6",
+		CVE_high:         10,
+		CVE_medium:       6,
+		CVE_low:          3,
+	}
+
+	apps := []string{"HTTP", "TCP/9153", "UDP/53", "TCP/53"}
+	b, err := json.Marshal(apps)
+	if err == nil {
+		d.W_applications = string(b)
+	}
+
+	d.Policy_mode = "Discover"
+	allCVEs := []string{"CVE-2030-1001", "CVE-2030-2001", "CVE-2030-3001"}
+	b, err = json.Marshal(allCVEs)
+	if err == nil {
+		d.CVE_lists = string(b)
+	}
+
+	d.Scanned_at = "2023-12-29T08:46:32Z"
 	return d
 }
