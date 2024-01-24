@@ -65,9 +65,8 @@ func TestUpdateHostContainerCount(t *testing.T) {
 	queryFilter := &VulQueryFilter{Filters: &api.VulQueryFilterViewModel{
 		ViewType: "all",
 	}}
-	allCVE := utils.NewSet()
-	allAssets := utils.NewSet()
-	assetViews, err := getHostAssetView(vulMap, assets, queryFilter, allCVE, allAssets)
+	cvePackages := make(map[string]map[string]utils.Set)
+	assetViews, err := getHostAssetView(vulMap, assets, queryFilter, cvePackages)
 	if err != nil {
 		t.Errorf("getHostAssetView returns %v", err)
 	}
