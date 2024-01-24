@@ -97,6 +97,7 @@ func GetQueryStat(token string) (*QueryStat, error) {
 			}
 			return stat, nil
 		}
+		break
 	}
 
 	if lastErr != nil && shouleRetry(lastErr) {

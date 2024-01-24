@@ -1420,11 +1420,3 @@ func CompressToZipFile(source, targetFile string) error {
 		return err
 	})
 }
-
-func GetDistinctValues(input []string) []string {
-	setValue := NewSet()
-	for _, r := range input {
-		setValue.Add(r)
-	}
-	return setValue.ToStringSlice()
-}

@@ -534,22 +534,29 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				}
 			}
 
-			// populate vulAsset
 			sdb := scanUtils.GetScannerDB()
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, "", false)
+			dbAssetVul := getImageDbAssetVul(c, sum, highs, meds, lows)
 
-			for i, vul := range vuls {
-				err := db.PopulateVulAsset(db.TypeImage, id, vul, sum.BaseOS)
-				if err != nil {
-					log.WithFields(log.Fields{"err": err}).Error("PopulateVulAsset failed")
+			// extract all package info, and assign to dbAssetVul
+			dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
+			var cveLists utils.Set = utils.NewSet()
+			for _, vul := range vuls {
+				vulPackage := &db.DbVulnResourcePackageVersion2{
+					CVEName:        vul.Name,
+					PackageName:    vul.PackageName,
+					PackageVersion: vul.PackageVersion,
+					FixedVersion:   vul.FixedVersion,
 				}
-				if i%5 == 0 {
-					time.Sleep(time.Millisecond * 100)
-				}
+
+				cveLists.Add(fmt.Sprintf("%s;%s", vul.Name, vul.DbKey))
+				dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
 			}
 
-			// populate assetvul
-			dbAssetVul := getImageDbAssetVul(c, sum, highs, meds, lows)
+			b, err := json.Marshal(cveLists.ToStringSlice())
+			if err == nil {
+				dbAssetVul.CVE_lists = string(b)
+			}
 			db.PopulateAssetVul(dbAssetVul)
 		}
 	}
@@ -573,12 +580,8 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 		}
 
 		// delete records in database
-		if img, exist := rs.cache[id]; exist {
-			cveNames := make([]string, 0)
-			for _, v := range img.vulTraits {
-				cveNames = append(cveNames, v.Name)
-			}
-			if err := db.DeleteAssetByID(db.AssetImage, id, cveNames); err != nil {
+		if _, exist := rs.cache[id]; exist {
+			if err := db.DeleteAssetByID(db.AssetImage, id); err != nil {
 				log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
 			}
 		}
@@ -1911,12 +1914,5 @@ func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, 
 	if len(sum.Images) > 0 {
 		d.Name = fmt.Sprintf("%s:%s", sum.Images[0].Repo, sum.Images[0].Tag)
 	}
-
-	allCVEs := utils.GetDistinctValues(append(append(highs, meds...), lows...))
-	b, err := json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
-
 	return d
 }

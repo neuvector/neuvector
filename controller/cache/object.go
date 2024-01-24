@@ -693,8 +693,6 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		hostID := share.CLUSHostKey2ID(key)
 		log.WithFields(log.Fields{"id": hostID}).Info("Delete host")
 
-		cveNames := make([]string, 0)
-
 		cacheMutexLock()
 		cache, ok := hostCacheMap[hostID]
 		if ok {
@@ -702,10 +700,6 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			delete(hostCacheMap, hostID)
 			delete(k8sHostInfoMap, cache.host.Name)
 			refreshInternalIPNet()
-
-			for _, v := range cache.vulTraits {
-				cveNames = append(cveNames, v.Name)
-			}
 		}
 		cacheMutexUnlock()
 
@@ -714,7 +708,7 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 
 		// cleanup records in database
-		if err := db.DeleteAssetByID(db.AssetNode, hostID, cveNames); err != nil {
+		if err := db.DeleteAssetByID(db.AssetNode, hostID); err != nil {
 			log.WithFields(log.Fields{"err": err, "id": hostID}).Error("Delete asset in db failed.")
 		}
 	}
@@ -1540,7 +1534,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		// Update workload cache
 		var wlCache *workloadCache
 		var ok bool
-		cveNames := make([]string, 0)
 
 		cacheMutexLock()
 
@@ -1553,10 +1546,6 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 					parent.children.Remove(id)
 				}
 			}
-
-			for _, v := range wlCache.vulTraits {
-				cveNames = append(cveNames, v.Name)
-			}
 		}
 
 		cacheMutexUnlock()
@@ -1566,7 +1555,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		}
 
 		// cleanup records in database
-		if err := db.DeleteAssetByID(db.AssetWorkload, id, cveNames); err != nil {
+		if err := db.DeleteAssetByID(db.AssetWorkload, id); err != nil {
 			log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
 		}
 	}
