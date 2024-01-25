@@ -673,6 +673,10 @@ func FindSecretsByRootpath(rootPath string, envVars []byte, config Config) ([]sh
 				return filepath.SkipDir
 			}
 		} else {
+			if utils.IsMountPoint(path) {
+				return nil
+			}
+
 			////
 			if p, yes := hasChangeAccessPerm(inpath, info.Mode()); yes {
 				log.WithFields(log.Fields{"set-perm": perm}).Debug()
