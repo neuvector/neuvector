@@ -251,6 +251,9 @@ func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
 				return filepath.SkipDir
 			}
 		} else if info.Mode().IsRegular() && info.Size() > 0 {
+			if utils.IsMountPoint(path) {
+				return nil
+			}
 			inpath := path[rootLen:]
 			apps.extractAppPkg(inpath, path)
 		}
