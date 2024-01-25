@@ -81,6 +81,74 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 	}
 }
 
+// The retryResolveSymlink splits the path into parts and checks each segment for symlinks, updating the path as it resolves them.
+func retryResolveSymlink(procRoot, prefix, remaining string) (bool, string) {
+    visited := make(map[string]bool)
+    parts := strings.Split(remaining, "/")
+
+    for i, part := range parts {
+        if part == "" {
+            continue
+        }
+
+        // Construct the current path
+        currentPath := filepath.Join(prefix, part)
+		suffix := strings.Join(parts[i+1:], "/")
+
+		var resolvedPath string
+
+		// It could be nest symlink in one folder
+		for {
+			// Check if the current path segment is a symlink
+			fileInfo, err := os.Lstat(currentPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// If the path doesn't exist, continue to the next part
+					prefix = currentPath
+					break
+				}
+				// Handle other errors
+				return false, err.Error()
+			}
+
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+
+				if symlink, err := os.Readlink(currentPath); err != nil {
+					fmt.Printf("Read file link fail")
+					return false, ""
+				} else {
+					resolvedPath = filepath.Join(procRoot, symlink)
+				}
+
+				// Avoid loops
+				if visited[resolvedPath] {
+					return false, "Detected a loop in symlinks"
+				}
+				visited[resolvedPath] = true
+
+				// Check if the resolved path is under procRoot
+				if !strings.HasPrefix(resolvedPath, procRoot) {
+					return false, ""
+				}
+
+				// Update the prefix with the resolved path
+				currentPath = resolvedPath
+			} else {
+				// Update the prefix with the current path segment
+				prefix = currentPath
+				break
+			}
+		}
+
+        // Check if the path exists
+        if _, err := os.Stat(filepath.Join(prefix, suffix)); err == nil {
+            return true, filepath.Join(prefix, suffix)
+        }
+    }
+
+    return false, ""
+}
+
 // GetContainerRealFilePath resolves the real file path of a container file from a given symlink.
 // It handles nested symlinks and detects circular references to prevent infinite loops.
 // Input: pid (process id), symlinkPath (path of the symlink)
@@ -139,6 +207,17 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 
 		visitedSymlink[currentPath] = struct{}{}
 		if underProcRoot {
+			if _, err := os.Lstat(resolvedPath); err != nil {
+				var exist bool
+				// There can be an edge cases for the symbolic link folder in the middle of path
+				exist, resolvedPath = retryResolveSymlink(procRoot, procRoot, strings.TrimPrefix(resolvedPath, procRoot))
+
+				if !exist {
+					log.WithError(err).Debug("Failed to read resolvedPath")
+					return "", err
+				}
+			}
+			
 			// nest link
 			finfo, err := os.Lstat(resolvedPath)
 			if err != nil {
