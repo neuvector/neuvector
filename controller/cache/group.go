@@ -20,6 +20,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -1237,6 +1238,7 @@ func hostWorkloadStart(id string, param interface{}) {
 		}
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
+		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1264,6 +1266,7 @@ func hostWorkloadDelete(id string, param interface{}) {
 		host.runningPods.Remove(wl.ID)
 		host.runningCntrs.Remove(wl.ID)
 		host.workloads.Remove(wl.ID)
+		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1415,7 +1418,7 @@ func svcipGroupJoin(svcipcache *groupCache) {
 	}
 }
 
-func updateFqdn2Group (cache *groupCache) {
+func updateFqdn2Group(cache *groupCache) {
 	deleteFqdn2Group(cache)
 	for _, ct := range cache.group.Criteria {
 		if ct.Key == share.CriteriaKeyAddress {
@@ -1438,7 +1441,7 @@ func updateFqdn2Group (cache *groupCache) {
 	}
 }
 
-func deleteFqdn2Group (cache *groupCache) {
+func deleteFqdn2Group(cache *groupCache) {
 	if gfqs, ok := grp2FqdnMap[cache.group.Name]; ok {
 		for fq := range gfqs.Iter() {
 			fqn := fq.(string)

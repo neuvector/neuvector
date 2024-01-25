@@ -4027,7 +4027,7 @@ paths:
       responses:
         '200':
           description: Success
-  /v1/waf/sersor/{name}:
+  /v1/waf/sensor/{name}:
     get:
       tags:
         - WAF Rule
@@ -4514,6 +4514,69 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/system/config/remote_repository:
+    post:
+      tags:
+        - Remote Repository
+      summary: Create a remote repository.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Initial Configuration
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRemoteRepository'
+      responses:
+        '200':
+          description: Created the remote repository.
+  /v1/system/config/remote_repository/{alias}:
+    patch:
+      tags:
+        - Remote Repository
+      summary: Update a remote repository.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: path
+          name: alias
+          description: The alias of the remote repository to update.
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Configuration fields to update
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRemoteRepositoryConfigData'
+      responses:
+        '200':
+          description: Updated the remote repository.
+    delete:
+      tags:
+        - Remote Export Repository
+      summary: Delete a remote repository.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: path
+          name: alias
+          description: The alias of the remote repository to update.
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Deleted the remote repository.
 
 ################################################################################
 #                                 Security Definitions                         #
@@ -5072,6 +5135,8 @@ definitions:
           type: integer
           format: uint32
           example: 12
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTAdmCtrlTestRuleInfo:
     type: object
     required:
@@ -5216,6 +5281,8 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        items:
+          type: string
         enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfig:
     type: object
@@ -5259,6 +5326,8 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        items:
+          type: string
         enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfigData:
     type: object
@@ -6117,6 +6186,8 @@ definitions:
         items:
           type: string
           example: ["default"]
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTController:
     type: object
     required:
@@ -6512,6 +6583,8 @@ definitions:
         items:
           type: string
         example: [""]
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTDlpSensorsData:
     type: object
     required:
@@ -7020,6 +7093,8 @@ definitions:
       policy_mode:
         type: string
         example: Monitor
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTHost:
     type: object
     required:
@@ -10782,6 +10857,10 @@ definitions:
       no_telemetry_report:
         type: boolean
         example: false
+      remote_repositories:
+        type: array
+        items:
+          $ref: '#/definitions/RESTRemoteRepository'
   RESTSystemConfigConfigV2:
     type: object
     description: only for POST(v2/system/config)
@@ -10802,6 +10881,10 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigIBMSAVCfg2'
       scanner_autoscale_cfg:
         $ref: '#/definitions/RESTSystemConfigAutoscaleConfig'
+      remote_repositories:
+        type: array
+        items:
+          $ref: '#/definitions/RESTRemoteRepository'
       misc_cfg:
         $ref: '#/definitions/RESTSystemConfigMiscCfgV2'
   RESTFedSystemConfigConfig:
@@ -11597,6 +11680,8 @@ definitions:
         items:
           type: string
           example: ["default"]
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTVulnPackageVersion:
     type: object
     required:
@@ -11842,6 +11927,8 @@ definitions:
         items:
           type: string
           example: test4321546242574254672462572452615362453
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTWafSensorsData:
     type: object
     required:
@@ -13364,3 +13451,111 @@ definitions:
       comment:
         type: string
         example: example comment
+  RESTRemoteRepo_GitHubConfig:
+    type: object
+    required:
+      - repository_owner_username
+      - repository_name
+      - repository_branch_name
+      - personal_access_token
+      - personal_access_token_committer_name
+      - personal_access_token_committer_email
+    properties:
+      repository_owner_username:
+        type: string
+        example: myuser
+      repository_name:
+        type: string
+        example: myrepo
+      repository_branch_name:
+        type: string
+        example: main
+      personal_access_token:
+        type: string
+        example: ghp_Agk4DedP5SOHGo8WxSuXCmCcldLyBP0I7CN6
+      personal_access_token_committer_name:
+        type: string
+        example: myuser
+      personal_access_token_committer_email:
+        type: string
+        example: myuser@example.com
+  RESTRemoteRepository:
+    type: object
+    required:
+      - nickname
+      - provider
+      - github_configuration
+    properties:
+      nickname:
+        type: string
+        example: default
+      provider:
+        type: string
+        description: currently only github is supported
+        example: github
+      comment:
+        type: string
+      enable:
+        type: boolean
+        example: true
+      github_configuration:
+        $ref: '#/definitions/RESTRemoteRepo_GitHubConfig'
+  RESTRemoteRepository_GitHubConfigConfig:
+    type: object
+    properties:
+      repository_owner_username:
+        type: string
+        example: myuser
+      repository_name:
+        type: string
+        example: myrepo
+      repository_branch_name:
+        type: string
+        example: main
+      personal_access_token:
+        type: string
+        example: ghp_Agk4DedP5SOHGo8WxSuXCmCcldLyBP0I7CN6
+      personal_access_token_committer_name:
+        type: string
+        example: myuser
+      personal_access_token_committer_email:
+        type: string
+        example: myuser@example.com
+  RESTRemoteRepositoryConfig:
+    type: object
+    required:
+      - nickname
+    properties:
+      nickname:
+        type: string
+        example: default
+      comment:
+        type: string
+      enable:
+        type: boolean
+        example: true
+      github_configuration:
+        $ref: '#/definitions/RESTRemoteRepository_GitHubConfigConfig'
+  RESTRemoteRepositoryConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTRemoteRepositoryConfig'
+  RESTRemoteExportOptions:
+    type: object
+    required:
+      - file_path
+      - remote_repository_nickname
+    properties:
+      file_path:
+        type: string
+        example: my_exports/example.yaml
+      comment:
+        type: string
+        description: commit message
+        example: commit for poc
+      remote_repository_nickname:
+        type: string
+        example: default

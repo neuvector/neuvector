@@ -2,6 +2,8 @@ info "4.1 - Worker Node Configuration Files"
 
 check_4_1_1="4.1.1  - Ensure that the kubelet service file permissions are set to 644 or more restrictive (Automated)"
 file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_4_1_1"
@@ -32,6 +34,7 @@ if check_argument "$CIS_PROXY_CMD" '--kubeconfig' >/dev/null 2>&1; then
     file=$(get_argument_value "$CIS_PROXY_CMD" '--kubeconfig'|cut -d " " -f 1)
 fi
 
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_4_1_3"
@@ -58,11 +61,14 @@ else
 fi
 
 check_4_1_5="4.1.5  - Ensure that the kubelet.conf file permissions are set to 644 or more restrictive (Automated)"
-if [ -f "/var/lib/kube-proxy/kubeconfig" ]; then
+kube_proxy_config=$(append_prefix "$CONFIG_PREFIX" "/var/lib/kube-proxy/kubeconfig")
+kubernetes_proxy=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/proxy")
+
+if [ -f $kube_proxy_config ]; then
     # kops
-    file="/var/lib/kube-proxy/kubeconfig"
+    file=$kube_proxy_config
 else
-    file="/etc/kubernetes/proxy"
+    file=$kubernetes_proxy
 fi
 
 if [ -f "$file" ]; then
@@ -92,6 +98,7 @@ fi
 check_4_1_7="4.1.7  - Ensure that the certificate authorities file permissions are set to 644 or more restrictive (Manual)"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_4_1_7"
     pass "       * client-ca-file: $file"
@@ -107,6 +114,7 @@ fi
 check_4_1_8="4.1.8  - Ensure that the client certificate authorities file ownership is set to root:root (Manual)"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_4_1_8"
     pass "       * client-ca-file: $file"
@@ -122,6 +130,7 @@ fi
 check_4_1_9="4.1.9  - Ensure that the kubelet configuration file has permissions set to 644 or more restrictive (Automated)"
 if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_4_1_9"
     pass "       * kubelet configuration file: $file"
@@ -137,6 +146,7 @@ fi
 check_4_1_10="4.1.10  - Ensure that the kubelet configuration file ownership is set to root:root (Automated)"
 if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_4_1_10"
     pass "       * kubelet configuration file: $file"
@@ -169,6 +179,7 @@ fi
 check_4_2_3="4.2.3  - Ensure that the --client-ca-file argument is set as appropriate (Automated)"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_4_2_3"
     pass "       * client-ca-file: $cafile"
 else
@@ -230,6 +241,8 @@ if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_KUBELET_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
         cfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-cert-file')
         kfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-private-key-file')
+        cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+        kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
         pass "$check_4_2_10"
         pass "        * tls-cert-file: $cfile"
         pass "        * tls-private-key-file: $kfile"
@@ -255,6 +268,7 @@ fi
 
 check_4_2_12="4.2.12  - Ensure that the RotateKubeletServerCertificate argument is set to true (Manual)"
 file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
 if [ -z "$found" ]; then
     warn "$check_4_2_12"

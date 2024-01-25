@@ -35,7 +35,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spaolacci/murmur3"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"sigs.k8s.io/yaml"
 )
 
 type nvCrdHandler struct {
@@ -3170,13 +3169,12 @@ func exportAttachRule(rule *api.RESTPolicyRule, useFrom bool, acc *access.Access
 func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
-	var data []byte
 	var inCount, eCount int
 	var group *api.RESTGroup
 	var skip bool
 
 	policy_ids := utils.NewSet()
-	acc, _ := getAccessControl(w, r, access.AccessOPRead) // handlerGroupCfgExport() is used for both GET/POST so we force the op to be AccessOPRead for access control
+	acc, login := getAccessControl(w, r, access.AccessOPRead) // handlerGroupCfgExport() is used for both GET/POST so we force the op to be AccessOPRead for access control
 	if acc == nil {
 		return
 	}
@@ -3192,7 +3190,6 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	apiVersion := resource.NvSecurityRuleVersion
-	filename := "cfgExport.yaml"
 	resp := resource.NvSecurityRuleList{
 		Kind:       &resource.NvListKind,
 		ApiVersion: &apiVersion,
@@ -3299,14 +3296,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	// for all the group in the From/To , if learned group we also need export it's policymode
 	// We don't know the default policy mode in other system so in current system just export
 
-	// tell the browser the returned content should be downloaded
-	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(http.StatusOK)
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
-	data = utils.GzipBytes(data)
-	w.Write(data)
+	doExport("cfgGroupsExport.yaml", "groups", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func (h *nvCrdHandler) crdDeleteRecord(kind, recordName string) {

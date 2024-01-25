@@ -40,6 +40,7 @@ check_2_2() {
     return
   fi
   warn -s "$check"
+  warn "       * Need to set 'icc: false' in the Docker daemon configuration file."
   logcheckresult "WARN"
 }
 
@@ -63,6 +64,7 @@ check_2_3() {
       return
     fi
     warn -s "$check"
+    warn "       * The Docker log-level is not set to info."
     logcheckresult "WARN"
     return
   fi
@@ -73,6 +75,7 @@ check_2_3() {
       return
     fi
     warn -s "$check"
+    warn "       * The Docker log-level is not set to info"
     logcheckresult "WARN"
     return
   fi
@@ -90,11 +93,13 @@ check_2_4() {
 
   if get_docker_effective_command_line_args '--iptables' | grep "false" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * The Docker daemon is set with --iptables=false."
     logcheckresult "WARN"
     return
   fi
   if get_docker_configuration_file_args 'iptables' | grep "false" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * The Docker daemon is set with --iptables=false."
     logcheckresult "WARN"
     return
   fi
@@ -112,6 +117,7 @@ check_2_5() {
 
   if get_docker_effective_command_line_args '--insecure-registry' | grep "insecure-registry" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * The Docker daemon is used with --insecure-registry."
     logcheckresult "WARN"
     return
   fi
@@ -122,6 +128,7 @@ check_2_5() {
       return
     fi
     warn -s "$check"
+    warn "       * The Docker daemon config file uses with insecure registry."
     logcheckresult "WARN"
     return
   fi
@@ -139,6 +146,7 @@ check_2_6() {
 
   if docker info 2>/dev/null | grep -e "^\sStorage Driver:\s*aufs\s*$" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * The Docker daemon is using dockerd --storage-driver aufs option."
     logcheckresult "WARN"
     return
   fi
@@ -221,6 +229,7 @@ check_2_9() {
     return
   fi
   warn -s "$check"
+  warn "       * User namespace support is not enabled."
   logcheckresult "WARN"
 }
 
@@ -234,13 +243,13 @@ check_2_10() {
 
   if get_docker_configuration_file_args 'cgroup-parent' | grep -v ''; then
     warn -s "$check"
-    info "     * Confirm cgroup usage"
+    warn "     * Confirm cgroup usage"
     logcheckresult "WARN" "Confirm cgroup usage"
     return
   fi
   if get_docker_effective_command_line_args '--cgroup-parent' | grep "cgroup-parent" >/dev/null 2>&1; then
     warn -s "$check"
-    info "     * Confirm cgroup usage"
+    warn "     * Confirm cgroup usage"
     logcheckresult "WARN" "Confirm cgroup usage"
     return
   fi
@@ -258,11 +267,13 @@ check_2_11() {
 
   if get_docker_configuration_file_args 'storage-opts' | grep "dm.basesize" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * --storage-opt dm.basesize is set in docker config file."
     logcheckresult "WARN"
     return
   fi
   if get_docker_effective_command_line_args '--storage-opt' | grep "dm.basesize" >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * --storage-opt dm.basesize is set in docker daemon."
     logcheckresult "WARN"
     return
   fi
@@ -289,6 +300,7 @@ check_2_12() {
     return
   fi
   warn -s "$check"
+  warn "       * Authorization for Docker client commands is not enabled."
   logcheckresult "WARN"
 }
 
@@ -302,6 +314,7 @@ check_2_13() {
 
   if docker info --format '{{ .LoggingDriver }}' | grep 'json-file' >/dev/null 2>&1; then
     warn -s "$check"
+    warn "       * Centralized and remote logging is not configured."
     logcheckresult "WARN"
     return
   fi
@@ -328,6 +341,7 @@ check_2_14() {
     return
   fi
   warn -s "$check"
+  warn "       * Containers are not restricted from acquiring new privileges. Ensure Docker is run with the '--no-new-privileges' flag to enhance security."
   logcheckresult "WARN"
 }
 
@@ -355,6 +369,7 @@ check_2_15() {
     return
   fi
   warn -s "$check"
+  warn "       * Live restore is not enabled. Enable live restore by running Docker with the '--live-restore' option to ensure container state is preserved on daemon restart."
   logcheckresult "WARN"
 }
 
@@ -377,6 +392,7 @@ check_2_16() {
     return
   fi
   warn -s "$check"
+  warn "       * Userland Proxy is not disabled. For enhanced network performance and security, run Docker with the '--userland-proxy=false' flag."
   logcheckresult "WARN"
 }
 

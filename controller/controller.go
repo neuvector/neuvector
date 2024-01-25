@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -465,6 +466,8 @@ func main() {
 	auditQueue = cluster.NewObjectQueue(auditLogKey, 128)
 	messenger = cluster.NewMessenger(Host.ID, Ctrler.ID)
 
+	db.CreateVulAssetDb(false)
+
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData)
 	ruleid.Init()
 
@@ -587,7 +590,14 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	if Ctrler.Leader || !isNewCluster {
-		clusHelper.UpgradeClusterKV()
+		nvImageVersion := Version
+		if strings.HasPrefix(nvImageVersion, "interim/") {
+			// it's daily dev build image
+			if *teleCurrentVer != "" {
+				nvImageVersion = *teleCurrentVer
+			}
+		}
+		clusHelper.UpgradeClusterKV(nvImageVersion)
 		clusHelper.FixMissingClusterKV()
 	}
 
@@ -623,17 +633,6 @@ func main() {
 			} else {
 				// it's official release image
 				nvAppFullVersion = ver.CtrlVersion[1:]
-				if ver.CtrlVersion != Version {
-					log.WithFields(log.Fields{"CtrlVersion": ver.CtrlVersion, "Version": Version}).Info()
-					clusHelper := kv.GetClusterHelper()
-					users := clusHelper.GetAllUsersNoAuth()
-					for _, user := range users {
-						if len(user.AcceptedAlerts) > 0 {
-							user.AcceptedAlerts = nil
-							clusHelper.PutUser(user)
-						}
-					}
-				}
 			}
 			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
 				nvSemanticVersion = "v" + ss[0]
@@ -647,7 +646,7 @@ func main() {
 	}
 
 	// pre-build compliance map
-	scanUtils.GetComplianceMeta()
+	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor, true)
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.
@@ -656,6 +655,11 @@ func main() {
 
 	if strings.HasSuffix(*teleNeuvectorEP, "apikeytest") {
 		rest.TESTApikeySpecifiedCretionTime = true
+		*teleNeuvectorEP = ""
+	}
+
+	if strings.HasSuffix(*teleNeuvectorEP, "dbperftest") {
+		rest.TESTDbPerf = true
 		*teleNeuvectorEP = ""
 	}
 
@@ -700,6 +704,8 @@ func main() {
 		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
+		CreateQuerySessionFunc:   rest.CreateQuerySession,
+		DeleteQuerySessionFunc:   rest.DeleteQuerySession,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
@@ -787,6 +793,8 @@ func main() {
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
 	go rest.StartRESTServer()
+
+	// go rest.StartLocalDevHttpServer() // for local dev only
 
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)

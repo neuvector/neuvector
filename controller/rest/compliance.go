@@ -21,7 +21,6 @@ import (
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/yaml"
 )
 
 func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -502,16 +501,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		vpNames.Add(name)
 	}
 
-	// tell the browser the returned content should be downloaded
-	var data []byte
-	filename := "cfgComplianceProfileExport.yaml"
-	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(http.StatusOK)
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
-	data = utils.GzipBytes(data)
-	w.Write(data)
+	doExport("cfgComplianceProfileExport.yaml", "compliance profile", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerCompProfileImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

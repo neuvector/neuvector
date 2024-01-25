@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -501,14 +502,16 @@ func normalizeBaseOS(baseOS string) string {
 	return baseOS
 }
 
-func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string) []*api.RESTVulnerability {
+func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string, includeFiltered bool) []*api.RESTVulnerability {
 	baseOS = normalizeBaseOS(baseOS)
 
 	vuls := make([]*api.RESTVulnerability, 0, len(vts))
 
 	for _, vt := range vts {
-		if vt.filtered && showTag == "" {
-			continue
+		if !includeFiltered {
+			if vt.filtered && showTag == "" {
+				continue
+			}
 		}
 
 		vul := &api.RESTVulnerability{
@@ -517,6 +520,7 @@ func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag stri
 			FileName:       vt.fileName,
 			PackageVersion: vt.pkgVer,
 			FixedVersion:   vt.fixVer,
+			DbKey:          vt.dbKey,
 		}
 		if sev, ok := severityID2String[vt.severity]; ok {
 			vul.Severity = sev
@@ -614,9 +618,10 @@ func CountVulTrait(traits []*VulTrait) (int, int) {
 	return highs, meds
 }
 
-func GatherVulTrait(traits []*VulTrait) ([]string, []string, []FixedVulInfo) {
+func GatherVulTrait(traits []*VulTrait) ([]string, []string, []string, []FixedVulInfo) {
 	highs := make([]string, 0)
 	meds := make([]string, 0)
+	lows := make([]string, 0)
 	fixedHighsInfo := make([]FixedVulInfo, 0)
 	for _, t := range traits {
 		if !t.filtered {
@@ -628,10 +633,13 @@ func GatherVulTrait(traits []*VulTrait) ([]string, []string, []FixedVulInfo) {
 				highs = append(highs, t.Name)
 			case vulnSeverityMedium:
 				meds = append(meds, t.Name)
+			case vulnSeverityLow:
+				lows = append(lows, t.Name)
+
 			}
 		}
 	}
-	return highs, meds, fixedHighsInfo
+	return highs, meds, lows, fixedHighsInfo
 }
 
 // ----
@@ -994,4 +1002,64 @@ func (vpf vpFilter) FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTI
 	}
 
 	return list
+}
+
+func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
+	sdb := GetScannerDB()
+	baseOS = normalizeBaseOS(baseOS)
+
+	vul := &api.RESTVulnerability{
+		Name: name,
+	}
+
+	cvedb := sdb.CVEDB
+	if dbKey != "" {
+		if vr, ok := cvedb[dbKey]; ok {
+			fillVulFields(vr, vul)
+		}
+	} else {
+		key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
+		if vr, ok := cvedb[key]; ok {
+			fillVulFields(vr, vul)
+		} else {
+			// lookup apps
+			key = fmt.Sprintf("apps:%s", vul.Name)
+			if vr, ok := cvedb[key]; ok {
+				fillVulFields(vr, vul)
+			} else {
+				if vr, ok := cvedb[vul.Name]; ok {
+					fillVulFields(vr, vul)
+				}
+			}
+		}
+	}
+
+	return vul
+}
+
+// load simulation
+func Perf_getRandomCVEs(count int) []string {
+	sdb := GetScannerDB()
+	cvedb := sdb.CVEDB
+
+	rand.Seed(time.Now().UnixNano())
+
+	// Get all cve names
+	keys := make([]string, 0, len(cvedb))
+	for key := range cvedb {
+		keys = append(keys, key)
+	}
+
+	// Shuffle the keys
+	rand.Shuffle(len(keys), func(i, j int) {
+		keys[i], keys[j] = keys[j], keys[i]
+	})
+
+	// Pick the first 'count' keys
+	if count > len(keys) {
+		count = len(keys)
+	}
+	selectedKeys := keys[:count]
+
+	return selectedKeys
 }

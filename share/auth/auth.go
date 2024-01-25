@@ -18,7 +18,7 @@ import (
 	"golang.org/x/oauth2"
 	"gopkg.in/ldap.v2"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
@@ -172,7 +172,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 	if csaml.SigningCert != "" && csaml.SigningKey != "" {
 		cert, err := tls.X509KeyPair([]byte(csaml.SigningCert), []byte(csaml.SigningKey))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse key pair")
+			return nil, fmt.Errorf("failed to parse key pair: %w", err)
 		}
 		keystore = dsig.TLSCertKeyStore(cert)
 	}
@@ -224,7 +224,7 @@ func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *ap
 		for k, v := range overrides {
 			path, err := etree.CompilePath("./samlp:AuthnRequest")
 			if err != nil {
-				return "", errors.Wrap(err, "failed to parse xml path")
+				return "", fmt.Errorf("failed to parse xml path: %w", err)
 			}
 			for _, e := range doc.FindElementsPath(path) {
 				attr := e.SelectAttr(k)
@@ -248,13 +248,13 @@ func (a *remoteAuth) SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.
 	}
 	sp, err := GenerateSamlSP(csaml, issuer, redir.Redirect, a.fakeTime)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to generate saml service provider")
+		return "", fmt.Errorf("failed to generate saml service provider: %w", err)
 	}
 
 	// Should be no sig in document.
 	doc, err := sp.BuildLogoutRequestDocumentNoSig(nameid, sessionIndex)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to build saml slo document")
+		return "", fmt.Errorf("failed to build saml slo document: %w", err)
 	}
 
 	if overrides != nil {
@@ -262,7 +262,7 @@ func (a *remoteAuth) SAMLSPGetLogoutURL(csaml *share.CLUSServerSAML, redir *api.
 		for k, v := range overrides {
 			path, err := etree.CompilePath("./samlp:LogoutRequest")
 			if err != nil {
-				return "", errors.Wrap(err, "failed to parse xml path")
+				return "", fmt.Errorf("failed to parse xml path: %w", err)
 			}
 			for _, e := range doc.FindElementsPath(path) {
 				attr := e.SelectAttr(k)

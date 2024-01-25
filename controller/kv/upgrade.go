@@ -821,7 +821,8 @@ func putControlVersion(ver *share.CLUSCtrlVersion) error {
 	return cluster.Put(key, value)
 }
 
-func (m clusterHelper) UpgradeClusterKV() {
+// version param is the NV Version embedded in the controller process
+func (m clusterHelper) UpgradeClusterKV(version string) {
 	var run bool
 
 	lock, err := m.AcquireLock(share.CLUSLockUpgradeKey, upgradeClusterLockWait)
@@ -833,6 +834,17 @@ func (m clusterHelper) UpgradeClusterKV() {
 
 	ver := getControlVersion()
 	log.WithFields(log.Fields{"version": ver}).Info("Before upgrade")
+	if !strings.HasPrefix(version, "interim/") {
+		if ver.CtrlVersion != version {
+			users := m.GetAllUsersNoAuth()
+			for _, user := range users {
+				if len(user.AcceptedAlerts) > 0 {
+					user.AcceptedAlerts = nil
+					m.PutUser(user)
+				}
+			}
+		}
+	}
 
 	for i := 0; i < len(phases); i++ {
 		phase := &phases[i]
@@ -993,7 +1005,8 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
 	// return "E907B7AE" // for 5.0
-	return "28ea479c" // for 5.1
+	// return "28ea479c" // for 5.1 ~ 5.2.x
+	return "449EC339" // for 5.3
 }
 
 func genFileAccessRule() {

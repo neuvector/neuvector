@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -579,7 +580,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, wl.VulTraits, "")
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, wl.VulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -593,7 +594,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, n.VulTraits, "")
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, n.VulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -722,4 +723,73 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 
 	log.WithFields(log.Fields{"entries": len(resp.Vuls)}).Debug("Response")
 	restRespSuccess(w, r, resp, acc, login, nil, "Get vulnerabiility asset report")
+}
+
+func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, map[string]bool) {
+	allowed := map[string]utils.Set{
+		db.AssetWorkload: utils.NewSet(),
+		db.AssetNode:     utils.NewSet(),
+		db.AssetImage:    utils.NewSet(),
+		db.AssetPlatform: utils.NewSet(),
+	}
+
+	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
+
+	// key formats: (1) cve (2) asssetID;cve
+	filteredMap := make(map[string]bool)
+
+	podIDs := cacher.GetAllWorkloadsID(acc, filteredMap)
+	for _, podID := range podIDs {
+		allowed[db.AssetWorkload].Add(podID)
+	}
+
+	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
+		nodes := cacher.GetAllHostsID(acc, filteredMap)
+		for _, n := range nodes {
+			allowed[db.AssetNode].Add(n)
+		}
+	}
+
+	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
+		platformID := cacher.GetPlatformID(acc, filteredMap)
+		if platformID != "" {
+			allowed[db.AssetPlatform].Add(platformID) // platform
+		}
+	}
+
+	registries := scanner.GetAllRegistrySummary(share.ScopeAll, acc)
+	for _, reg := range registries {
+		registryImagesIDs, err := scanner.GetRegistryImagesIDs(reg.Name, vpf, "", acc, filteredMap)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Debug("GetRegistryImagesIDs failed")
+		} else {
+			for _, id := range registryImagesIDs {
+				allowed[db.AssetImage].Add(id)
+			}
+		}
+	}
+
+	return allowed, filteredMap
+}
+
+func handlerVulAssetCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	if r.Method == http.MethodPost {
+		// createVulAssetSession(w, r)
+		createVulAssetSessionV2(w, r)
+		return
+	}
+}
+
+func handlerVulAssetGet(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	if r.Method == http.MethodGet {
+		getVulAssetSession(w, r)
+		return
+	}
+}
+
+func handlerAssetVul(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	if r.Method == http.MethodPost {
+		getAssetViewSession(w, r)
+		return
+	}
 }

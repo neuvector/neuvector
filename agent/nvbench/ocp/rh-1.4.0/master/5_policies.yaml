@@ -1,0 +1,412 @@
+version: "rh-1.4"
+id: 5
+title: "5 - Policies"
+type: "master"
+groups:
+  - id: 5.1
+    title: "5.1 - RBAC and Service Accounts"
+    checks:
+      - id: 5.1.1
+        description: Ensure that the cluster-admin role is only used where required (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Run oc get clusterrolebindings -o=custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].kind | grep cluster-admin"
+              manual "      * oc get secrets kubeadmin -n kube-system"
+              manual "      * Review each principal listed and ensure that cluster-admin privilege is required for it. Verify that the kubeadmin user no longer exists."
+        remediation: 'Identify all clusterrolebindings to the cluster-admin role. Check if they are used and if they need this role or if they could use a role with fewer privileges. Where possible, first bind users to a lower privileged role and then remove the clusterrolebinding to the cluster-admin role : kubectl delete clusterrolebinding [name]'
+      - id: 5.1.2
+        description: Minimize access to secrets (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "     * Review the users who have get, list or watch access to secrets objects in the Kubernetes API."
+              manual "     * Executing the command below will return a list of users and groups who are allowed to get secrets:"
+              manual "     * oc adm policy who-can get secrets"
+              manual "     * The following command returns the users and groups who are allowed to list secrets:"
+              manual "     * oc adm policy who-can list secrets"
+              manual "     * The following command returns the users and groups who are allowed to watch secrets:"
+              manual "     * oc adm policy who-can watch secrets"
+        remediation: Where possible, remove get, list and watch access to secret objects in the cluster.
+      - id: 5.1.3
+        description: Minimize wildcard use in Roles and ClusterRoles (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "     * Run the command below to describe each cluster role and inspect it for wildcard usage:"
+              manual "     * oc describe clusterrole"
+              manual "     * Run the command below to describe each role and inspect it for wildcard usage:"
+              manual "     * oc describe role -A"
+        remediation: Where possible replace any use of wildcards in clusterroles and roles with specific objects or actions.
+      - id: 5.1.4
+        description: Minimize access to create pods (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Review the users who have create access to pod objects in the Kubernetes API with the following command:"
+              manual "      * oc adm policy who-can create pod"
+        remediation: Where possible, remove create access to pod objects in the cluster.
+      - id: 5.1.5
+        description: Ensure that default service accounts are not actively used. (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "     * Every OpenShift project has its own service accounts. Every service account has an associated user name that can be granted roles, just like a regular user. The user name for each service account is derived from its project and the name of the service account. Service accounts are required in each project to run builds, deployments, and other pods. The default service accounts that are automatically created for each project are isolated by the project namespace."
+        remediation: None required.
+      - id: 5.1.6
+        description: Ensure that Service Account Tokens are only mounted where necessary (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "     * Review pod and service account objects in the cluster and ensure automatically mounting the service account token is disabled (automountServiceAccountToken: false), unless the resource explicitly requires this access."
+              manual "     * Find all pods that automatically mount service account tokens:"
+              manual "     *   oc get pods -A -o json | jq '.items[] | select(.spec.automountServiceAccountToken) | .metadata.name'"
+              manual "     * Find all service accounts that automatically mount service tokens:"
+              manual "     *   oc get serviceaccounts -A -o json | jq '.items[] | select(.automountServiceAccountToken) | .metadata.name'"
+        remediation: Modify the definition of pods and service accounts which do not need to mount service account tokens to disable it.
+  - id: 5.2
+    title: "5.2 - Security Context Constraints"
+    checks:
+      - id: 5.2.1
+        description: Minimize the admission of privileged containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of privileged containers."
+              manual "      *  oc get scc -o json | jq  '.items[] | select(.allowPrivilegedContainer==false)| .metadata.name' "
+              manual "      *  Verify that at least one SCC is returned."
+        remediation: Create an SCC that sets allowPrivilegedContainer to false and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.2
+        description: Minimize the admission of containers wishing to share the host process ID namespace (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Use the following command to list all SCCs with allowHostPID set to true:"
+              manual "      * oc get scc -o json | jq '.items[] | select(.allowHostPID) | .metadata.name' "
+              manual "      * Verify that at least one SCC is returned."
+        remediation: Create an SCC that sets allowHostPID to false and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.3
+        description: Minimize the admission of containers wishing to share the host IPC namespace (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs with allowHostIPC set to false:"
+              manual "    * oc get scc -o json | jq '.items[] | select(.allowHostIPC==false) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Create an SCC that sets allowHostIPC to false and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.4
+        description: Minimize the admission of containers wishing to share the host network namespace (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs with allowHostNetwork set to false:"
+              manual "    * oc get scc -o json | jq '.items[] | select(.allowHostIPC==false) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Create an SCC that sets allowHostNetwork to false and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.5
+        description: Minimize the admission of containers with allowPrivilegeEscalation (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs with allowPrivilegeEscalation set to false:"
+              manual "    * oc get scc -o json | jq '.items[] | select(.allowPrivilegeEscalation==false) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Create an SCC that sets allowPrivilegeEscalation to false and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.6
+        description: Minimize the admission of root containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs that restrict the ability to run the container as root:"
+              manual "    * oc get scc -A -o json | jq '.items[] | select(.runAsUser[type] == MustRunAsNonRoot) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+              manual "    * You can perform additional validation by using the following command to list the UID range for each SCC:"
+              manual "    * for i in `oc get scc --template '{{range.items}}{{.metadata.name}}{{\n}}{{end}}'`; do echo $i; oc describe scc $i| grep \sUID; done"
+              manual "    * Verify there is at least one SCC that doesn't contain 0 in the UID range."
+        remediation: None required. By default, OpenShift includes the nonroot and nonroot-v2 SCCs that restrict the ability to run as nonroot. If additional SCCs are appropriate, follow the OpenShift documentation to create custom SCCs.
+      - id: 5.2.7
+        description: Minimize the admission of containers with the NET_RAW capability (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs that drop all capabilities:"
+              manual "    * oc get scc -A -o json | jq '.items[] | select(.requiredDropCapabilities[]?|any(. == ALL; .)) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Create an SCC that sets requiredDropCapabilities to include ALL or at least NET_RAW and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.8
+        description: Minimize the admission of containers with added capabilities (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list all SCCs that prohibit users from defining container capabilities:"
+              manual "    * oc get scc -A -o json | jq '.items[] | select(.allowedCapabilities==null) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+              manual "    * Additionally, use the following command to list all SCCs that do not set default container capabilities:"
+              manual "    * oc get scc -A -o json | jq '.items[] | select(.defaultAddCapabilities==null) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Utilize the restricted-v2 SCC or create an SCC that sets allowedCapabilities and defaultAddCapabilities to an empty list and take it into use by assigning it to applicable users and groups.
+      - id: 5.2.9
+        description: Minimize the admission of containers with capabilities assigned (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to list SCCs that drop all capabilities from containers:"
+              manual "    * oc get scc -A -o json | jq '.items[] | select(.requiredDropCapabilities[]?|any(. == ALL; .)) | .metadata.name'"
+              manual "    * Verify at least one SCC is returned."
+        remediation: Review the use of capabilities in applications running on your cluster. Where a namespace contains applications which do not require any Linux capabilities to operate, consider adding a SCC which forbids the admission of containers which do not drop all capabilities.
+      - id: 5.2.10
+        description: Minimize access to privileged Security Context Constraints (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Find all users and groups with access to SCCs that include privileged or elevated capabilities:"
+              manual "    * oc get scc -ojson | jq '.items[]|select(.allowHostIPC or .allowHostPID or .allowHostPorts or .allowHostNetwork or .allowHostDirVolumePlugin or .allowPrivilegedContainer or .runAsUser.type != MustRunAsRange)|.metadata.name,{Group::.groups},{User:.users}'"
+              manual "    * Review the returned users and groups and verify they actually need access to those SCCs."
+        remediation: |
+                    Remove any users and groups who do not need access to an SCC, following the principle of least privilege.
+                    You can remove users and groups from an SCC using the oc edit scc $NAME command.
+                    Additionally, you can create your own SCCs that contain the container functionality you need for a particular use case and assign that SCC to users and groups if the default SCCs are not appropriate for your use case.
+  - id: 5.3
+    title: "5.3 - Network Policies and CNI"
+    checks:
+      - id: 5.3.1
+        description: Ensure that the CNI in use supports Network Policies (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "      * Review the documentation of the CNI plugin (OpenShift SDN or OVN-Kubernetes) in use by the cluster, and confirm that it supports ingress and egress network policies."
+        remediation: None required.
+      - id: 5.3.2
+        description: Ensure that all Namespaces have Network Policies defined (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command and review the NetworkPolicy objects created in the cluster."
+              manual "    * oc -n all get networkpolicy"
+              manual "    * Ensure that each namespace defined in the cluster has at least one Network Policy."
+        remediation: Follow the documentation and create NetworkPolicy objects as you need them.
+  - id: 5.4
+    title: "5.4 - Secrets Management"
+    checks:
+      - id: 5.4.1
+        description: Prefer using secrets as files over secrets as environment variables (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command to find references to objects which use environment variables defined from secrets."
+              manual "    * oc get all -o jsonpath='{range .items[?(@..secretKeyRef)]} {.kind} {.metadata.name} {\n}{end}' -A"
+        remediation: If possible, rewrite application code to read secrets from mounted secret files, rather than from environment variables.
+      - id: 5.4.2
+        description: Consider external secret storage (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * OpenShift supports a broad ecosystem of security partners many of whom provide integration with enterprise secret vaults."
+              manual "    * Review your secrets management implementation."
+        remediation: Refer to the secrets management options offered by your cloud provider or a third-party secrets management solution.
+  - id: 5.5
+    title: "5.5 - Extensible Admission Control"
+    checks:
+      - id: 5.5.1
+        description: Configure Image Provenance using image controller configuration parameters (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command to return all registry sources:"
+              manual "    * oc get image.config.openshift.io/cluster -o json | jq .spec.registrySources"
+              manual "    * If nothing is returned, this is a finding and you should refer to the OpenShift image guide for configuring trusted registries."
+        remediation: Follow the OpenShift documentation - Image configuration resources
+  - id: 5.7
+    title: "5.7 - General Policies"
+    checks:
+      - id: 5.7.1
+        description: Create administrative boundaries between resources using namespaces (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command to obtain a list of all non-default OpenShift and Kubernetes namespaces in the cluster."
+              manual "    * oc get namespaces -o json | jq '.items[] | select(.metadata.name|test((?!default|kube-.|openshift.)^.*)) | .metadata.name'"
+              manual "    * Ensure that these namespaces are the ones you need and are adequately administered as per your requirements."
+        remediation: Follow the documentation and create namespaces for objects in your deployment as you need them.
+      - id: 5.7.2
+        description: Ensure that the seccomp profile is set to docker/default in your pod definitions (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Use the following command to find all non-default pods that do not have a seccomp profile set:"
+              manual "    * oc get pods -A -o json | jq '.items[] | select( (.metadata.namespace | test(^kube*|^openshift*) | not) and .spec.securityContext.seccompProfile.type==null) | (.metadata.namespace + / + .metadata.name)'"
+              manual "    * The output will return a list of namespace pod pairs that do not have a seccomp profile set."
+        remediation: |
+                    For any non-privileged pods or containers that do not have seccomp profiles, consider using the RuntimeDefault or creating a custom seccomp profile specifically for the workload.
+                    Please refer to the OpenShift documentation for working with custom seccomp profiles.
+      - id: 5.7.3
+        description: Apply Security Context to Your Pods and Containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command to obtain a list of pods that are using privileged security context constraints:"
+              manual "    * oc get pods -A -o json | jq '.items[] | select(.metadata.annotations.openshift.io/scc|test(privileged?)) | .metadata.name'"
+              manual "    * Review each pod to ensure it requires the use of privileged security context constraints, which is the most relaxed security context constraint available in OpenShift by default."
+              manual "    * Run the following command to obtain a list of pods that are not using security context constraints at all:"
+              manual "    * oc get pods -A -o json | jq '.items[] | select(.metadata.annotations.openshift.io/scc == null) | .metadata.name'"
+              manual "    * Review each pod and determine if there is an existing security context constraint that it should be using."
+        remediation: Follow the Kubernetes documentation and apply security contexts to your pods. For a suggested list of security contexts, you may refer to the CIS Security Benchmark for Docker Containers.
+      - id: 5.7.4
+        description: The default namespace should not be used (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: []
+        audit: |
+              check="$id  - $description"
+              manual "$check"
+              manual "    * Run the following command to list all resources in the default namespace, besides the kubernetes and openshift services, which are expected to be in the default namespace:"
+              manual "    * oc get all -n default -o json | jq '.items[] | select((.kind|test(Service)) and (.metadata.name|test(openshift|kubernetes))? | not) | (.kind + / + .metadata.name)'"
+              manual "    * Carefully review the list of returned resources and consider moving them to another namespace."
+        remediation: Ensure that namespaces are created to allow for appropriate segregation of Kubernetes resources and that all new resources are created in a specific namespace.

@@ -1,0 +1,110 @@
+#!/bin/sh
+
+# Source the logger and utils scripts
+. /tmp/utils/logger.sh
+. /tmp/utils/utils.sh
+. /tmp/utils/style.sh
+
+# For master
+CIS_APISERVER_CMD="<<<.Replace_apiserver_cmd>>>"
+CIS_MANAGER_CMD="<<<.Replace_manager_cmd>>>"
+CIS_SCHEDULER_CMD="<<<.Replace_scheduler_cmd>>>"
+CIS_ETCD_CMD="<<<.Replace_etcd_cmd>>>"
+CIS_PROXY_CMD="<<<.Replace_proxy_cmd>>>"
+
+# For worker
+CIS_KUBELET_CMD="<<<.Replace_kubelet_cmd>>>"
+CIS_PROXY_CMD="<<<.Replace_proxy_cmd>>>"
+
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
+# Token for api to auth
+OC_TOKEN=$(tail /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+yell "# ------------------------------------------------------------------------------
+# Kubernetes CIS benchmark
+#
+# NeuVector, Inc. (c) 2020-
+#
+# NeuVector delivers an application and network intelligent container security
+# solution that automatically adapts to protect running containers. Don't let
+# security concerns slow down your CI/CD processes.
+# ------------------------------------------------------------------------------"
+
+
+run_check() {
+  local RUN_FOLDER=$1
+
+  find $RUN_FOLDER -type f -name "*.yaml" | sort | while read -r YAML_FILE; do
+    # Get the number of groups
+    NUM_GROUPS=$(yq e '.groups | length' "$YAML_FILE")
+
+    title=$(yq e '.title' "$YAML_FILE")
+    printf "%b\n" "${bldblu}[INFO] $title"
+
+    # Iterate over each group
+    group_index=0
+    while [ $group_index -lt $NUM_GROUPS ]; do
+        # Get the number of checks in the current group
+        NUM_CHECKS=$(yq e ".groups[$group_index].checks | length" "$YAML_FILE")
+        subTitle=$(yq e ".groups[$group_index].title" "$YAML_FILE")
+
+        if [ "$subTitle" != "" ]; then
+            printf "%b\n" "${bldblu}[INFO] $subTitle"
+        fi
+ 
+        # Iterate over each check in the current group
+        check_index=0
+        while [ $check_index -lt $NUM_CHECKS ] ; do
+            id=$(yq e ".groups[$group_index].checks[$check_index].id" "$YAML_FILE")
+            description=$(yq e ".groups[$group_index].checks[$check_index].description" "$YAML_FILE")
+            audit=$(yq e ".groups[$group_index].checks[$check_index].audit" "$YAML_FILE")
+            profile=$(yq e ".groups[$group_index].checks[$check_index].profile" "$YAML_FILE")
+            scored=$(yq e ".groups[$group_index].checks[$check_index].scored" "$YAML_FILE")
+
+            if [ "$profile" == "Level 2" ]; then
+                level2=$id
+            else
+                level2=""
+            fi
+
+            if [ "$scored" == false ]; then
+                not_scored=$id
+            else
+                not_scored=""
+            fi
+
+            eval "$audit"
+            check_index=$((check_index + 1))
+        done
+        group_index=$((group_index + 1))
+      done
+  done
+}
+
+# Input folder
+folder=$1
+
+# Check if folder ends with 'master' or 'worker'
+if echo "$folder" | grep -q 'master$'; then
+    # Check if it is a Kubernetes master node
+    if ps -ef | grep "$CIS_APISERVER_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
+        info "Kubernetes Master Node Security Configuration"
+    else
+        info "This node is not a Kubernetes master node"
+        exit 2
+    fi
+elif echo "$folder" | grep -q 'worker$'; then
+    # Check if it is a Kubernetes worker node
+    if ps -ef | grep "$CIS_KUBELET_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
+        info "Kubernetes Worker Node Security Configuration"
+    else
+        info "This node is not a Kubernetes worker node"
+        exit 2
+    fi
+fi
+
+run_check $folder

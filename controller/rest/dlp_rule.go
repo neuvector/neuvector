@@ -17,7 +17,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -27,7 +26,6 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerDlpSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -292,7 +290,7 @@ func wildCardToRegexp(pattern string) string {
 			if match[1] == '*' {
 				return string(match[0]) + ".*"
 			} else if match[1] == '?' {
-				/* If the pattern starts with 2 continuous "?" characters, convert them to ".*". 
+				/* If the pattern starts with 2 continuous "?" characters, convert them to ".*".
 				   Additionally, single "?" character will be converted to ".". */
 				if match[0] == '?' {
 					return ".*"
@@ -304,7 +302,7 @@ func wildCardToRegexp(pattern string) string {
 			}
 		} else {
 			/* If the pattern starts with multiple continuous "?" characters, convert them to ".*".
- 			   Additionally, convert multiple continuous "?" characters to ".*". */
+			   Additionally, convert multiple continuous "?" characters to ".*". */
 			if match[1] == '?' {
 				if match[0] == '?' {
 					return ".*"
@@ -1675,16 +1673,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		resp.Items = append(resp.Items, &resptmp)
 	}
 
-	// tell the browser the returned content should be downloaded
-	var data []byte
-	filename := "cfgDlpExport.yaml"
-	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(http.StatusOK)
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
-	data = utils.GzipBytes(data)
-	w.Write(data)
+	doExport("cfgDlpExport.yaml", "DLP sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerDlpImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

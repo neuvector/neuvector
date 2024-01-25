@@ -75,6 +75,7 @@ const (
 	CFGEndpointPwdProfile           = "pwd_profile"
 	CFGEndpointApikey               = "apikey"
 	CFGEndpointSigstoreRootsOfTrust = "sigstore_roots_of_trust"
+	CFGEndpointQuerySession         = "querysession"
 )
 const CLUSConfigStore string = CLUSObjectStore + "config/"
 const CLUSConfigSystemKey string = CLUSConfigStore + CFGEndpointSystem
@@ -106,6 +107,7 @@ const CLUSConfigUserRoleStore string = CLUSConfigStore + CFGEndpointUserRole + "
 const CLUSConfigPwdProfileStore string = CLUSConfigStore + CFGEndpointPwdProfile + "/"
 const CLUSConfigApikeyStore string = CLUSConfigStore + CFGEndpointApikey + "/"
 const CLUSConfigSigstoreRootsOfTrust string = CLUSConfigStore + CFGEndpointSigstoreRootsOfTrust + "/"
+const CLUSConfigQuerySessionStore string = CLUSConfigStore + CFGEndpointQuerySession + "/"
 
 // !!! NOTE: When adding new config items, update the import/export list as well !!!
 
@@ -470,6 +472,10 @@ func CLUSApikeyKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSConfigApikeyStore, name)
 }
 
+func CLUSQuerySessionKey(name string) string {
+	return fmt.Sprintf("%s%s", CLUSConfigQuerySessionStore, name)
+}
+
 // Host ID is included in the workload key to helps us retrieve all workloads on a host
 // quickly. Without it, we have to loop through all workload keys; using agent ID is
 // also problematic, as a new agent has no idea of the agent ID when the workload
@@ -805,6 +811,7 @@ type CLUSSystemConfig struct {
 	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
 	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
 	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
+	RemoteRepositories   []CLUSRemoteRepository    `json:"remote_repositories"`
 }
 
 type CLUSSystemConfigAutoscale struct {
@@ -1577,14 +1584,15 @@ const (
 )
 
 const (
-	BenchLevelPass  = "PASS"
-	BenchLevelInfo  = "INFO"
-	BenchLevelWarn  = "WARN"
-	BenchLevelHigh  = "HIGH"
-	BenchLevelNote  = "NOTE"
-	BenchLevelError = "ERROR"
-	BenchProfileL1  = "Level 1"
-	BenchProfileL2  = "Level 2"
+	BenchLevelPass   = "PASS"
+	BenchLevelInfo   = "INFO"
+	BenchLevelWarn   = "WARN"
+	BenchLevelManual = "MANUAL"
+	BenchLevelHigh   = "HIGH"
+	BenchLevelNote   = "NOTE"
+	BenchLevelError  = "ERROR"
+	BenchProfileL1   = "Level 1"
+	BenchProfileL2   = "Level 2"
 )
 
 const (
@@ -2881,3 +2889,57 @@ const (
 	AlertPwdExpiring       = "1001"
 	AlertAdminHasDefPwd    = "1002"
 )
+
+// remote repositories
+type RemoteRepository_GitHubConfiguration struct {
+	RepositoryOwnerUsername          string `json:"repository_owner_username"`
+	RepositoryName                   string `json:"repository_name"`
+	RepositoryBranchName             string `json:"repository_branch_name"`
+	PersonalAccessToken              string `json:"personal_access_token,cloak"`
+	PersonalAccessTokenCommitterName string `json:"personal_access_token_committer_name"`
+	PersonalAccessTokenEmail         string `json:"personal_access_token_email"`
+}
+
+// TODO: generalize this
+func (g *RemoteRepository_GitHubConfiguration) IsValid() bool {
+	isEmpty := func(s string) bool {
+		return s == ""
+	}
+	requiredFields := []string{
+		g.RepositoryOwnerUsername,
+		g.RepositoryName,
+		g.RepositoryBranchName,
+		g.PersonalAccessToken,
+		g.PersonalAccessTokenCommitterName,
+		g.PersonalAccessTokenEmail,
+	}
+	for _, requiredField := range requiredFields {
+		if isEmpty(requiredField) {
+			return false
+		}
+	}
+	return true
+}
+
+const RemoteRepositoryProvider_GitHub string = "github"
+
+type CLUSRemoteRepository struct {
+	Nickname            string                                `json:"nickname"`
+	Provider            string                                `json:"provider"`
+	Comment             string                                `json:"comment"`
+	Enable              bool                                  `json:"enable"`
+	GitHubConfiguration *RemoteRepository_GitHubConfiguration `json:"github_configuration"`
+}
+
+func (r *CLUSRemoteRepository) IsValid() bool {
+	if r.Nickname != "default" {
+		return false
+	}
+	if r.Provider == RemoteRepositoryProvider_GitHub {
+		if r.GitHubConfiguration == nil {
+			return false
+		}
+		return r.GitHubConfiguration.IsValid()
+	}
+	return false
+}

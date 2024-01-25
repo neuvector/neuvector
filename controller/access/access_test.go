@@ -1186,6 +1186,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/platform",
 			"v1/scan/platform/platform",
 			"v1/scan/asset",
+			"v1/vulasset",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry",
@@ -1374,6 +1375,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/workload/*",
 			"v1/scan/host/*",
 			"v1/scan/platform/platform",
+			"v1/vulasset",
+			"v1/assetvul",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*/scan",
@@ -1432,6 +1435,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license/update",
 			"v1/system/config/webhook",
+			"v1/system/config/remote_repository",
 		},
 		CONST_API_IBMSA: []string{
 			"v1/partner/ibm_sa/*/setup/*",
@@ -1521,6 +1525,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/config",
 			"v2/system/config",
 			"v1/system/config/webhook/*",
+			"v1/system/config/remote_repository/*",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/cluster/*/**",
@@ -1583,6 +1588,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		CONST_API_SYSTEM_CONFIG: []string{
 			"v1/system/license",
 			"v1/system/config/webhook/*",
+			"v1/system/config/remote_repository/*",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/cluster/*",

@@ -5,6 +5,8 @@ if check_argument "$CIS_ETCD_CMD" '--cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_ETCD_CMD" '--key-file' >/dev/null 2>&1; then
         cfile=$(get_argument_value "$CIS_ETCD_CMD" '--cert-file')
         kfile=$(get_argument_value "$CIS_ETCD_CMD" '--key-file')
+        cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+        kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
         pass "$check_1_5_1"
         pass "       * cert-file: $cfile"
         pass "       * key-file: $kfile"
@@ -34,6 +36,8 @@ if check_argument "$CIS_ETCD_CMD" '--peer-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_ETCD_CMD" '--peer-key-file' >/dev/null 2>&1; then
         cfile=$(get_argument_value "$CIS_ETCD_CMD" '--peer-cert-file')
         kfile=$(get_argument_value "$CIS_ETCD_CMD" '--peer-key-file')
+        cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+        kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
         pass "$check_1_5_4"
         pass "       * peer-cert-file: $cfile"
         pass "       * peer-key-file: $kfile"

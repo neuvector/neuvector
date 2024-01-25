@@ -23,8 +23,10 @@ import (
 	"syscall"
 	"time"
 
+	"errors"
+
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
@@ -37,6 +39,7 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/remote_repository"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
@@ -155,6 +158,8 @@ var restErrMessage = []string{
 	api.RESTErrPromoteFail:           "Failed to promote rules",
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
+	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
+	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -1310,7 +1315,7 @@ func initJWTSignKey() error {
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+				return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
 			}
 			return &share.CLUSX509Cert{
 				CN:   share.CLUSJWTKey,
@@ -1669,6 +1674,9 @@ func StartRESTServer() {
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
 	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
@@ -1758,6 +1766,11 @@ func StartRESTServer() {
 	r.POST("/v1/api_key", handlerApikeyCreate)
 	r.DELETE("/v1/api_key/:name", handlerApikeyDelete)
 	r.GET("/v1/selfapikey", handlerSelfApikeyShow) // Skip API document
+
+	// remote export repository
+	r.POST("/v1/system/config/remote_repository", handlerRemoteRepositoryPost)
+	r.PATCH("/v1/system/config/remote_repository/:nickname", handlerRemoteRepositoryPatch)
+	r.DELETE("/v1/system/config/remote_repository/:nickname", handlerRemoteRepositoryDelete)
 
 	// csp billing adapter integration
 	r.POST("/v1/csp/file/support", handlerCspSupportExport) // Skip API document. For downloading the tar ball that can be submitted to support portal
@@ -2015,4 +2028,35 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	}
 
 	return err
+}
+
+func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+	var data []byte
+	json_data, _ := json.MarshalIndent(resp, "", "  ")
+	data, _ = yaml.JSONToYAML(json_data)
+
+	if remoteExportOptions != nil {
+		remoteExport := remote_repository.Export{
+			DefaultFilePath: filename,
+			Options:         remoteExportOptions,
+			Content:         data,
+			Cacher:          cacher,
+			AccessControl:   acc,
+		}
+		err := remoteExport.Do()
+		if err != nil {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, err.Error())
+			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
+			return
+		}
+		msg := fmt.Sprintf("Export %s to remote repository", exportType)
+		restRespSuccess(w, r, nil, acc, login, nil, msg)
+	} else {
+		// tell the browser the returned content should be downloaded
+		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
+		w.Header().Set("Content-Encoding", "gzip")
+		data = utils.GzipBytes(data)
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	}
 }

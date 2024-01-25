@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -705,6 +706,11 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if cache != nil {
 			evhdls.Trigger(EV_HOST_DELETE, hostID, cache)
 		}
+
+		// cleanup records in database
+		if err := db.DeleteAssetByID(db.AssetNode, hostID); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": hostID}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
@@ -1045,7 +1051,7 @@ func addrWorkloadAdd(id string, param interface{}) {
 				}
 
 				//NVSHAS-8155, previous host ip reused by POD, remove it from iphost cache
-				if !host_mode {//NVSHAS-8249, only for non-hostmode wl
+				if !host_mode { //NVSHAS-8249, only for non-hostmode wl
 					if _, ok1 := ipHostMap[key]; ok1 {
 						delete(ipHostMap, key)
 						hostip_reused = true
@@ -1547,6 +1553,11 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if wlCache != nil {
 			evhdls.Trigger(EV_WORKLOAD_DELETE, id, wlCache)
 		}
+
+		// cleanup records in database
+		if err := db.DeleteAssetByID(db.AssetWorkload, id); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
@@ -1666,6 +1677,8 @@ func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mod
 		userRoleConfigUpdate(nType, key, value)
 	case share.CFGEndpointPwdProfile:
 		pwdProfileConfigUpdate(nType, key, value)
+	case share.CFGEndpointQuerySession:
+		querySessionRequest(nType, key, value)
 	}
 
 	// Only the lead run backup, because the typical use case for backup is to save config
@@ -2231,4 +2244,30 @@ func (kvs *kvConfigStore) GetBackupKvStore(key string) ([]byte, bool) {
 		return value, ok
 	}
 	return nil, false
+}
+
+func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []byte) {
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+
+	switch nType {
+	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
+		var qsr api.QuerySessionRequest
+		json.Unmarshal(value, &qsr)
+
+		log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr}).Debug("[multi-cluster] consul kv watcher added event. Will call rest.CreateQuerySession()")
+
+		err := cctx.CreateQuerySessionFunc(&qsr)
+		if err != nil {
+			log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr, "err": err}).Debug("[multi-cluster] consul kv watcher added event. call rest.CreateQuerySession() error")
+		}
+	case cluster.ClusterNotifyDelete:
+		queryToken := share.CLUSKeyLastToken(key)
+
+		err := cctx.DeleteQuerySessionFunc(queryToken)
+		if err != nil {
+			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event, call cctx.DeleteQuerySessionFunc() error")
+		} else {
+			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event")
+		}
+	}
 }

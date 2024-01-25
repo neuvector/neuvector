@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -39,7 +38,7 @@ type ClusterHelper interface {
 	AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error)
 	ReleaseLock(cluster.LockInterface) error
 
-	UpgradeClusterKV()
+	UpgradeClusterKV(version string)
 	UpgradeClusterImport(ver *share.CLUSCtrlVersion)
 	FixMissingClusterKV()
 
@@ -298,6 +297,8 @@ type ClusterHelper interface {
 	GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error)
 	PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreTimestamp() (string, *uint64, error)
+	CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error
+	DeleteQuerySessionRequest(queryToken string)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -2041,7 +2042,7 @@ func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, ou
 		}
 		return nil
 	} else {
-		return errors.Wrap(err, "cert is not there after PutIfNotExist")
+		return fmt.Errorf("cert is not there after PutIfNotExist: %w", err)
 	}
 }
 
@@ -3340,4 +3341,15 @@ func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
 	}
 
 	return string(configData), &rev, nil
+}
+
+func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error {
+	key := share.CLUSQuerySessionKey(qsr.QueryToken)
+	value, _ := json.Marshal(qsr)
+	return cluster.PutIfNotExist(key, value, false)
+}
+
+func (m clusterHelper) DeleteQuerySessionRequest(queryToken string) {
+	key := share.CLUSQuerySessionKey(queryToken)
+	cluster.Delete(key)
 }

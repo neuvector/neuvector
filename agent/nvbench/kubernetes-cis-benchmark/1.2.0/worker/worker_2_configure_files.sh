@@ -1,13 +1,15 @@
 info "2.2 - Configuration Files"
 
 check_2_2_1="2.2.1  - Ensure that the config file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/config" ]; then
-    file="/etc/kubernetes/config"
-elif [ -f "/var/lib/kubelet/kubeconfig" ]; then
-    # kops
-    file="/var/lib/kubelet/kubeconfig"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/config")
+kubeletconfig=$(append_prefix "$CONFIG_PREFIX" "/var/lib/kubelet/kubeconfig")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
+elif [ -f $kubeletconfig ]; then
+    file=$kubeletconfig
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -35,13 +37,15 @@ else
 fi
 
 check_2_2_3="2.2.3  - Ensure that the kubelet file permissions are set to 644 or more restrictive"
-if [ -f "/etc/kubernetes/kubelet" ]; then
-    file="/etc/kubernetes/kubelet"
-elif [ -f "/etc/sysconfig/kubelet" ]; then
-    # kops
-    file="/etc/sysconfig/kubelet"
+config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet")
+kubelet_sysconfig=$(append_prefix "$CONFIG_PREFIX" "/etc/sysconfig/kubelet")
+kubelet_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet.conf")
+if [ -f $config ]; then
+    file=$config
+elif [ -f $kubelet_sysconfig ]; then
+    file=$kubelet_sysconfig
 else
-    file="/etc/kubernetes/kubelet.conf"
+    file=$kubelet_config
 fi
 
 if [ -f "$file" ]; then
@@ -69,11 +73,12 @@ else
 fi
 
 check_2_2_5="2.2.5  - Ensure that the proxy file permissions are set to 644 or more restrictive"
-if [ -f "/var/lib/kube-proxy/kubeconfig" ]; then
-    # kops
-    file="/var/lib/kube-proxy/kubeconfig"
+config=$(append_prefix "$CONFIG_PREFIX" "/var/lib/kube-proxy/kubeconfig")
+proxy_config=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/proxy")
+if [ -f $config ]; then
+    file=$config
 else
-    file="/etc/kubernetes/proxy"
+    file=$proxy_config
 fi
 
 if [ -f "$file" ]; then
@@ -103,6 +108,7 @@ fi
 check_2_2_7="2.2.7  - Ensure that the certificate authorities file permissions are set to 644 or more restrictive"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_2_2_7"
     pass "       * client-ca-file: $file"
@@ -118,6 +124,7 @@ fi
 check_2_2_8="2.2.8  - Ensure that the client certificate authorities file ownership is set to root:root"
 if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
   file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+  file=$(append_prefix "$CONFIG_PREFIX" "$file")
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_2_2_8"
     pass "       * client-ca-file: $file"

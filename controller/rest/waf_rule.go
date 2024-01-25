@@ -17,7 +17,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -26,7 +25,6 @@ import (
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerWafSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1109,16 +1107,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		resp.Items = append(resp.Items, &resptmp)
 	}
 
-	// tell the browser the returned content should be downloaded
-	var data []byte
-	filename := "cfgWafExport.yaml"
-	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(http.StatusOK)
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
-	data = utils.GzipBytes(data)
-	w.Write(data)
+	doExport("cfgWafExport.yaml", "WAF sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerWafImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

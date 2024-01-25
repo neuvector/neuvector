@@ -410,7 +410,7 @@ func (m *mockCache) GetComplianceProfile(name string, acc *access.AccessControl)
 		}
 
 		// Add checks that are not in the override list
-		_, metaMap := scanUtils.GetComplianceMeta()
+		_, metaMap := scanUtils.InitComplianceMeta("", "", false)
 		for _, m := range metaMap {
 			if _, ok := filter[m.TestNum]; !ok {
 				filter[m.TestNum] = m.Tags

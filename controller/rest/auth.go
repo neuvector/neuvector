@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/julienschmidt/httprouter"
@@ -1231,7 +1231,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Error("failed to get installation ID")
-		return nil, errors.Wrap(err, "failed to get installation ID")
+		return nil, fmt.Errorf("failed to get installation ID: %w", err)
 	}
 
 	if secret == "" {

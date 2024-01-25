@@ -1,0 +1,190 @@
+version: "rh-1.4"
+id: 2
+title: "2 - etcd"
+type: "master"
+groups:
+  - id: 2.1
+    title: ""
+    checks:
+      - id: '2.1'
+        description: Ensure that the --cert-file and --key-file arguments are set as appropriate (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output_cert=$(grep "\(--cert-file=\)" $file)
+              output_key=$(grep "\(--key-file=\)" $file)
+              if [ -z "$output_cert" ] || [ -z "$output_key" ]; then
+                warn "$check"
+              else
+                pass "$check"
+              fi   
+        remediation: OpenShift does not use the etcd-certfile or etcd-keyfile flags. Certificates for etcd are managed by the etcd cluster operator.
+  - id: 2.2
+    title: ""
+    checks:
+      - id: '2.2'
+        description: Ensure that the --client-cert-auth argument is set to true (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output=$(grep "\(--client-cert-auth=true\)" $file)
+              if [ -z "$output" ]; then
+                  warn "$check"
+              else
+                  pass "$check"
+              fi
+        remediation: This setting is managed by the cluster etcd operator. No remediation required.
+  - id: 2.3
+    title: ""
+    checks:
+      - id: '2.3'
+        description: Ensure that the --auto-tls argument is not set to true (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output=$(grep "\(--auto-tls=true\)" $file)
+              if [ -z "$output" ]; then
+                  pass "$check"
+              else
+                  warn "$check"
+              fi
+        remediation: This setting is managed by the cluster etcd operator. No remediation required.
+  - id: 2.4
+    title: ""
+    checks:
+      - id: '2.4'
+        description: Ensure that the --peer-cert-file and --peer-key-file arguments are set as appropriate (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output_cert=$(grep "\(--peer-cert-file=\)" $file)
+              output_key=$(grep "\(--peer-key-file=\)" $file)
+              if [ -z "$output_cert" ] || [ -z "$output_key" ]; then
+                warn "$check"
+              else
+                pass "$check"
+              fi
+        remediation: This setting is managed by the cluster etcd operator. No remediation required.
+  - id: 2.5
+    title: ""
+    checks:
+      - id: '2.5'
+        description: Ensure that the --peer-client-cert-auth argument is set to true (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output=$(grep "\(--peer-client-cert-auth=true\)" $file)
+              if [ -z "$output" ]; then
+                  warn "$check"
+              else
+                  pass "$check"
+              fi    
+        remediation: This setting is managed by the cluster etcd operator. No remediation required.
+  - id: 2.6
+    title: ""
+    checks:
+      - id: '2.6'
+        description: Ensure that the --peer-auto-tls argument is not set to true (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output=$(grep "\(--peer-auto-tls=true\)" $file)
+              if [ -z "$output" ]; then
+                  pass "$check"
+              else
+                  warn "$check"
+              fi  
+        remediation: This setting is managed by the cluster etcd operator. No remediation required.
+  - id: 2.7
+    title: ""
+    checks:
+      - id: '2.7'
+        description: Ensure that a unique Certificate Authority is used for etcd (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags:
+        - HIPAA
+        - NIST
+        - PCI
+        - GDPR
+        audit: |
+              check="$id  - $description"
+              file="/etc/kubernetes/manifests/etcd-pod.yaml"
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              output_1=$(grep "\(--trusted-ca-file=\)" $file)
+              output_2=$(grep "\(--peer-trusted-ca-file=\)" $file)
+              if [ -z "$output_1" ] || [ -z "$output_2" ]; then
+                  warn "$check"
+              else
+                  pass "$check"
+              fi
+        remediation: None required. Certificates for etcd are managed by the OpenShift cluster etcd operator.

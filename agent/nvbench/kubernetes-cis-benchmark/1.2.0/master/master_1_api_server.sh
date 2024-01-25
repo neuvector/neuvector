@@ -219,6 +219,7 @@ fi
 check_1_1_25="1.1.25  - Ensure that the --service-account-key-file argument is set as appropriate"
 if check_argument "$CIS_APISERVER_CMD" '--service-account-key-file' >/dev/null 2>&1; then
     file=$(get_argument_value "$CIS_APISERVER_CMD" '--service-account-key-file')
+    file=$(append_prefix "$CONFIG_PREFIX" "$file")
     pass "$check_1_1_25"
     pass "        * service-account-key-file: $file"
 else
@@ -230,6 +231,8 @@ if check_argument "$CIS_APISERVER_CMD" '--etcd-certfile' >/dev/null 2>&1; then
     if check_argument "$CIS_APISERVER_CMD" '--etcd-keyfile' >/dev/null 2>&1; then
         certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-certfile')
         keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-keyfile')
+        certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+        keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
         pass "$check_1_1_26"
         pass "        * etcd-certfile: $certfile"
         pass "        * etcd-keyfile: $keyfile"
@@ -252,6 +255,8 @@ if check_argument "$CIS_APISERVER_CMD" '--tls-cert-file' >/dev/null 2>&1; then
     if check_argument "$CIS_APISERVER_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
         certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cert-file')
         keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-private-key-file')
+        certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+        keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
         pass "$check_1_1_28"
         pass "        * tls-cert-file: $certfile"
         pass "        * tls-private-key-file: $keyfile"
@@ -265,6 +270,7 @@ fi
 check_1_1_29="1.1.29  - Ensure that the --client-ca-file argument is set as appropriate"
 if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_1_29"
     pass "        * client-ca-file: $cafile"
 else
@@ -274,6 +280,7 @@ fi
 check_1_1_30="1.1.30  - Ensure that the --etcd-cafile argument is set as appropriate"
 if check_argument "$CIS_APISERVER_CMD" '--etcd-cafile' >/dev/null 2>&1; then
     cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-cafile')
+    cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
     pass "$check_1_1_30"
     pass "        * etcd-cafile: $cafile"
 else

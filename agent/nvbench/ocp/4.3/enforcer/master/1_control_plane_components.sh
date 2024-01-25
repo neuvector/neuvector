@@ -5,6 +5,7 @@ info "1.1 - Master Node Configuration Files"
 check_1_1_1="1.1.1  - Ensure that the API server pod specification file permissions are set to 644 or more restrictive (Scored)"
 
 file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f $file ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
     pass "$check_1_1_1"
@@ -20,6 +21,7 @@ fi
 check_1_1_2="1.1.2  - Ensure that the API server pod specification file ownership is set to root:root (Scored)"
 
 file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_2"
@@ -34,6 +36,7 @@ fi
 check_1_1_3="1.1.3  - Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive (Scored)"
 
 file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_3"
@@ -49,6 +52,7 @@ fi
 check_1_1_4="1.1.4  - Ensure that the controller manager pod specification file ownership is set to root:root (Scored)"
 
 file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_4"
@@ -63,6 +67,7 @@ fi
 check_1_1_5="1.1.5  - Ensure that the scheduler pod specification file permissions are set to 644 or more restrictive (Scored)"
 
 file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_5"
@@ -78,6 +83,7 @@ fi
 check_1_1_6="1.1.6  - Ensure that the scheduler pod specification file ownership is set to root:root (Scored)"
 
 file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_6"
@@ -92,6 +98,7 @@ fi
 check_1_1_7="1.1.7  - Ensure that the etcd pod specification file permissions are set to 644 or more restrictive (Scored)"
 
 file="/etc/kubernetes/manifests/etcd-member.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_7"
@@ -107,6 +114,7 @@ fi
 check_1_1_8="1.1.8  - Ensure that the etcd pod specification file ownership is set to root:root (Scored)"
 
 file="/etc/kubernetes/manifests/etcd-member.yaml"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_8"
@@ -122,15 +130,17 @@ fi
 check_1_1_9="1.1.9  - Ensure that the Container Network Interface file permissions are set to 644 or more restrictive (Not Scored)"
 
 valid_permission=true
-path_cni_netd="/etc/cni/net.d"
-path_cni_bin="/opt/cni/bin"
-path_sdn_lib_ocpsdn="/var/lib/cni/networks/openshift-sdn"
-path_sdn_run_ocpsdn="/var/run/openshift-sdn"
-path_ovs_openv="/var/run/openvswitch"
-path_ovs_k8s="/var/run/kubernetes"
-path_ovs_etc_openv="/etc/openvswitch"
-path_ovs_run_openv="/run/openvswitch"
-path_ovs_var_openv="/var/run/openvswitch"
+path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+path_cni_bin=$(append_prefix "$CONFIG_PREFIX" "/opt/cni/bin")
+
+path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
+path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
+
+path_ovs_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
+path_ovs_k8s=$(append_prefix "$CONFIG_PREFIX" "/var/run/kubernetes")
+path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
+path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
+path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
 
 invalid_file_list=""
 
@@ -161,17 +171,17 @@ fi
 check_1_1_10="1.1.10  - Ensure that the Container Network Interface file ownership is set to root:root (Not Scored)"
 
 valid_ownership=true
-path_cni_netd="/etc/cni/net.d"
-path_cni_bin="/opt/cni/bin"
+path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+path_cni_bin=$(append_prefix "$CONFIG_PREFIX" "/opt/cni/bin")
 
-path_sdn_lib_ocpsdn="/var/lib/cni/networks/openshift-sdn"
-path_sdn_run_ocpsdn="/var/run/openshift-sdn"
+path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
+path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
 
-path_ovs_openv="/var/run/openvswitch"
-path_ovs_k8s="/var/run/kubernetes"
-path_ovs_etc_openv="/etc/openvswitch"
-path_ovs_run_openv="/run/openvswitch"
-path_ovs_var_openv="/var/run/openvswitch"
+path_ovs_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
+path_ovs_k8s=$(append_prefix "$CONFIG_PREFIX" "/var/run/kubernetes")
+path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
+path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
+path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
 
 invalid_file_list=""
 
@@ -216,6 +226,7 @@ fi
 check_1_1_11="1.1.11  - Ensure that the etcd data directory permissions are set to 700 or more restrictive (Scored)"
 
 file="/var/lib/etcd"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -d "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 700 ]; then
     pass "$check_1_1_11"
@@ -230,6 +241,7 @@ fi
 check_1_1_12="1.1.12  - Ensure that the etcd data directory ownership is set to etcd:etcd (Scored)"
 
 file="/var/lib/etcd"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -d "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_12"
@@ -244,6 +256,7 @@ fi
 check_1_1_13="1.1.13  - Ensure that the admin.conf file permissions are set to 644 or more restrictive (Scored)"
 
 file="/etc/kubernetes/kubeconfig"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
     pass "$check_1_1_13"
@@ -259,6 +272,7 @@ fi
 check_1_1_14="1.1.14  - Ensure that the admin.conf file ownership is set to root:root (Scored)"
 
 file="/etc/kubernetes/kubeconfig"
+file=$(append_prefix "$CONFIG_PREFIX" "$file")
 if [ -f "$file" ]; then
   if [ "$(stat -c %u%g $file)" -eq 00 ]; then
     pass "$check_1_1_14"
@@ -271,8 +285,7 @@ else
 fi
 
 check_1_1_15="1.1.15  - Ensure that the scheduler.conf file permissions are set to 644 or more restrictive (Scored)"
-
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
 
 valid_permission=false
 for i in $files
@@ -292,8 +305,7 @@ else
 fi
 
 check_1_1_16="1.1.16  - Ensure that the scheduler.conf file ownership is set to root:root (Scored)"
-
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
 
 valid_permission=false
 for i in $files
@@ -313,8 +325,7 @@ else
 fi
 
 check_1_1_17="1.1.17  - Ensure that the controller-manager.conf file permissions are set to 644 or more restrictive (Scored)"
-
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
 
 valid_permission=false
 for i in $files
@@ -334,8 +345,7 @@ else
 fi
 
 check_1_1_18="1.1.18  - Ensure that the controller-manager.conf file ownership is set to root:root (Scored)"
-
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
 
 valid_permission=false
 for i in $files
@@ -355,9 +365,8 @@ else
 fi
 
 check_1_1_19="1.1.19  - Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Scored)"
-
-directories=$(find /etc/kubernetes/static-pod-resources -type d -wholename '*/secrets*')
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/secrets*')
+directories=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type d -wholename '*/secrets*')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/secrets*')
 
 valid_perm_dir=false
 for i in $directories
@@ -388,7 +397,7 @@ else
 fi
 
 check_1_1_20="1.1.20  - Ensure that the Kubernetes PKI certificate file permissions are set to 644 or more restrictive (Not Scored)"
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/secrets/*.crt')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/secrets/*.crt')
 valid_perm_file=false
 for i in $files
 do
@@ -407,7 +416,7 @@ else
 fi
 
 check_1_1_21="1.1.21  - Ensure that the Kubernetes PKI key file permissions are set to 600 (Not Scored)"
-files=$(find /etc/kubernetes/static-pod-resources -type f -wholename '*/secrets/*.key')
+files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/secrets/*.key')
 valid_perm_file=false
 for i in $files
 do

@@ -58,6 +58,7 @@ require (
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0
+	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 	github.com/gogo/googleapis v1.4.1 // indirect
@@ -72,11 +73,11 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/neuvector/k8s v1.2.1-0.20220214174348-d0b3f377461e
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
-	github.com/pkg/errors v0.9.1
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	github.com/russellhaering/gosaml2 v0.9.1
 	github.com/russellhaering/goxmldsig v1.4.0
@@ -96,6 +97,7 @@ require (
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/square/go-jose.v2 v2.2.2
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.22.5
 	k8s.io/apimachinery v0.25.2
 	k8s.io/cri-api v0.0.0

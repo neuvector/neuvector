@@ -16,15 +16,14 @@ import (
 	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -1451,16 +1450,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		resp.Spec.Rules = admissionRules
 	}
 
-	// tell the browser the returned content should be downloaded
-	var data []byte
-	filename := "cfgAdmissionRulesExport.yaml"
-	w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(http.StatusOK)
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
-	data = utils.GzipBytes(data)
-	w.Write(data)
+	doExport("cfgAdmissionRulesExport.yaml", "admission control settings", rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerAdmCtrlImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

@@ -116,6 +116,7 @@ func getLocalInfo(selfID string, pid2ID map[int]string) error {
 	}
 
 	agentEnv.startsAt = time.Now().UTC()
+	Agent.Pid = os.Getpid()
 	if agentEnv.runInContainer {
 		dev, meta, err := global.RT.GetDevice(selfID)
 		if err != nil {
@@ -136,7 +137,6 @@ func getLocalInfo(selfID string, pid2ID map[int]string) error {
 		}
 	} else {
 		Agent.ID = Host.ID
-		Agent.Pid = os.Getpid()
 		Agent.NetworkMode = "host"
 		Agent.PidMode = "host"
 		Agent.SelfHostname = Host.Name

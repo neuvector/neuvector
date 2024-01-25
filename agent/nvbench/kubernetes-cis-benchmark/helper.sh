@@ -40,6 +40,11 @@ yell "# ------------------------------------------------------------------------
 # security concerns slow down your CI/CD processes.
 # ------------------------------------------------------------------------------"
 
+BASE_IMAGE_BIN_PATH="<<<.Replace_baseImageBin_path>>>"
+export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
+export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
+CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
+
 #get a process command line from /proc
 get_command_line_args() {
     PROC="$1"
@@ -65,7 +70,7 @@ get_argument_value() {
         |
     grep "^${OPTION}" |
     sed \
-        -e "s/^${OPTION}=//g"
+        -E "s/^${OPTION}(=|\s+)//g"
 }
 
 #check whether an argument exist in command line
@@ -80,3 +85,16 @@ check_argument() {
     grep "^${OPTION}" 
 }
 
+append_prefix() {
+  local prefix="$1"
+  local file="$2"
+
+  # Remove any trailing slash from prefix
+  prefix="${prefix%/}"
+
+  # Remove a leading slash from file, if it exists
+  file="${file#/}"
+
+  # Concatenate and return the result
+  echo "$prefix/$file"
+}
