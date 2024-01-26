@@ -415,6 +415,48 @@ func PrepareSingleLayerAbsSymlink(root string) []MockFile {
 			ResolvePath:  filepath.Join(root, "proc", "14", "root", "test", "v2", "nvbin", "rpm"),
 			ExpectResult: "lstat " + filepath.Join(root, "proc", "14", "root", "current", "utils", "rpm") + ": no such file or directory",
 		},
+		{
+			Pid:          19,
+			SymlinkFile:  filepath.Join(root, "proc", "19", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/current", "utils", "rpm"),
+			DirsToCreate: []string {
+				filepath.Join(root, "proc", "19", "root", "current"),
+				filepath.Join(root, "proc", "19", "root", "test"),
+				filepath.Join(root, "proc", "19", "root", "nv"),
+				filepath.Join(root, "proc", "19", "root", "test", "v2", "nvbin"),
+				filepath.Join(root, "proc", "19", "root", "test", "v2", "utils"),
+			},
+			SymlinkFolders : map[string]string{
+				filepath.Join(root, "proc", "19", "root", "current"): filepath.Join("test", "v1"),
+				filepath.Join(root, "proc", "19", "root", "nv"): filepath.Join("test"),
+				filepath.Join(root, "proc", "19", "root", "test", "v1"): filepath.Join("test", "v2"),
+				filepath.Join(root, "proc", "19", "root", "test", "v2", "utils"): filepath.Join("test", "v2", "nvbin"),
+			},
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "19", "root", "test", "v2", "nvbin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          20,
+			SymlinkFile:  filepath.Join(root, "proc", "20", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("/current", "utils", "rpm"),
+			DirsToCreate: []string {
+				filepath.Join(root, "proc", "20", "root", "current"),
+				filepath.Join(root, "proc", "20", "root", "test"),
+				filepath.Join(root, "proc", "19", "root", "nv"),
+				filepath.Join(root, "proc", "20", "root", "test", "v2", "nvbin"),
+				filepath.Join(root, "proc", "20", "root", "test", "v2", "utils"),
+			},
+			SymlinkFolders : map[string]string{
+				filepath.Join(root, "proc", "20", "root", "current"): filepath.Join("test", "v1"),
+				filepath.Join(root, "proc", "20", "root", "nv"): filepath.Join("test"),
+				filepath.Join(root, "proc", "20", "root", "test", "v1"): filepath.Join("test", "v2"),
+				filepath.Join(root, "proc", "20", "root", "test", "v2", "utils"): filepath.Join("test", "v2", "nvbin"),
+			},
+			Exist:        false,
+			ResolvePath:  filepath.Join(root, "proc", "20", "root", "test", "v2", "nvbin", "rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "20", "root", "current", "utils", "rpm") + ": no such file or directory",
+		},
 	}
 }
 
@@ -513,6 +555,48 @@ func PrepareSingleLayerSymlink(root string) []MockFile {
 			Exist:        false,
 			ResolvePath:  filepath.Join(root, "proc", "16", "root", "test", "v2", "nvbin", "rpm"),
 			ExpectResult: "lstat " + filepath.Join(root, "proc", "16", "root", "current", "utils", "rpm") + ": no such file or directory",
+		},
+		{
+			Pid:          17,
+			SymlinkFile:  filepath.Join(root, "proc", "17", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("..", "..", "current", "utils", "rpm"),
+			DirsToCreate: []string {
+				filepath.Join(root, "proc", "17", "root", "current"),
+				filepath.Join(root, "proc", "17", "root", "test"),
+				filepath.Join(root, "proc", "17", "root", "nv"),
+				filepath.Join(root, "proc", "17", "root", "test", "v2", "nvbin"),
+				filepath.Join(root, "proc", "17", "root", "test", "v2", "utils"),
+			},
+			SymlinkFolders : map[string]string{
+				filepath.Join(root, "proc", "17", "root", "current"): filepath.Join("nv", "v1"),
+				filepath.Join(root, "proc", "17", "root", "nv"): filepath.Join("test"),
+				filepath.Join(root, "proc", "17", "root", "test", "v1"): filepath.Join("test", "v2"),
+				filepath.Join(root, "proc", "17", "root", "test", "v2", "utils"): filepath.Join("test", "v2", "nvbin"),
+			},
+			Exist:        true,
+			ResolvePath:  filepath.Join(root, "proc", "17", "root", "test", "v2", "nvbin", "rpm"),
+			ExpectResult: "",
+		},
+		{
+			Pid:          18,
+			SymlinkFile:  filepath.Join(root, "proc", "18", "root", "bin", "rpmverify"),
+			Symlink:      filepath.Join("..", "..", "current", "utils", "rpm"),
+			DirsToCreate: []string {
+				filepath.Join(root, "proc", "18", "root", "current"),
+				filepath.Join(root, "proc", "18", "root", "test"),
+				filepath.Join(root, "proc", "18", "root", "nv"),
+				filepath.Join(root, "proc", "18", "root", "test", "v2", "nvbin"),
+				filepath.Join(root, "proc", "18", "root", "test", "v2", "utils"),
+			},
+			SymlinkFolders : map[string]string{
+				filepath.Join(root, "proc", "18", "root", "current"): filepath.Join("nv", "v1"),
+				filepath.Join(root, "proc", "18", "root", "nv"): filepath.Join("test"),
+				filepath.Join(root, "proc", "18", "root", "test", "v1"): filepath.Join("test", "v2"),
+				filepath.Join(root, "proc", "18", "root", "test", "v2", "utils"): filepath.Join("test", "v2", "nvbin"),
+			},
+			Exist:        false,
+			ResolvePath:  filepath.Join(root, "proc", "18", "root", "test", "v2", "nvbin", "rpm"),
+			ExpectResult: "lstat " + filepath.Join(root, "proc", "18", "root", "current", "utils", "rpm") + ": no such file or directory",
 		},
 	}
 }

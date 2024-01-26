@@ -21,6 +21,7 @@ const (
 	linkMaxLayers     = 5
 	fileSizeHashLimit = 16 * 1024
 	fileHashKeep      = 8
+	maxTraverseCount       = 1000
 )
 
 // true is package file, to trigger re-scan
@@ -82,65 +83,60 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 }
 
 // The retryResolveSymlink splits the path into parts and checks each segment for symlinks, updating the path as it resolves them.
-func retryResolveSymlink(procRoot, prefix, remaining string) (bool, string) {
-    visited := make(map[string]bool)
+func retryResolveSymlink(procRoot, prefix, remaining string, currentTraverseCount, maxTraverseCount int) (bool, string) {
     parts := strings.Split(remaining, "/")
+	var currentPath string
 
     for i, part := range parts {
+		currentTraverseCount += 1
+		// meet the max level of travrse
+		if currentTraverseCount > maxTraverseCount {
+			return false, ""
+		}
+
         if part == "" {
             continue
         }
 
         // Construct the current path
-        currentPath := filepath.Join(prefix, part)
+        currentPath = filepath.Join(prefix, part)
 		suffix := strings.Join(parts[i+1:], "/")
 
 		var resolvedPath string
-
-		// It could be nest symlink in one folder
-		for {
-			// Check if the current path segment is a symlink
-			fileInfo, err := os.Lstat(currentPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					// If the path doesn't exist, continue to the next part
-					prefix = currentPath
-					break
-				}
-				// Handle other errors
-				return false, err.Error()
-			}
-
-			if fileInfo.Mode()&os.ModeSymlink != 0 {
-
-				if symlink, err := os.Readlink(currentPath); err != nil {
-					fmt.Printf("Read file link fail")
-					return false, ""
-				} else {
-					resolvedPath = filepath.Join(procRoot, symlink)
-				}
-
-				// Avoid loops
-				if visited[resolvedPath] {
-					return false, "Detected a loop in symlinks"
-				}
-				visited[resolvedPath] = true
-
-				// Check if the resolved path is under procRoot
-				if !strings.HasPrefix(resolvedPath, procRoot) {
-					return false, ""
-				}
-
-				// Update the prefix with the resolved path
-				currentPath = resolvedPath
-			} else {
-				// Update the prefix with the current path segment
-				prefix = currentPath
-				break
-			}
+		// Check if the current path segment is a symlink
+		fileInfo, err := os.Lstat(currentPath)
+		if err != nil {
+			return false, err.Error()
 		}
 
-        // Check if the path exists
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			if symlink, err := os.Readlink(currentPath); err != nil {
+				return false, ""
+			} else {
+				resolvedPath = filepath.Join(procRoot, symlink)
+			}
+
+			// Check if the resolved path is under procRoot
+			if !strings.HasPrefix(resolvedPath, procRoot) {
+				return false, ""
+			}
+
+			// Update the prefix with the resolved path => recursive it with new function
+			if exist, resolvedPathFromRescursive := retryResolveSymlink(procRoot, procRoot, strings.TrimPrefix(resolvedPath, procRoot), currentTraverseCount, maxTraverseCount); exist {
+				prefix = resolvedPathFromRescursive
+			} else {
+				return false, ""
+			}
+		} else {
+			// Update the prefix with the current path segment
+			prefix = currentPath
+		}
+
+		// Check if the resolved path is under procRoot
+		if !strings.HasPrefix(prefix, procRoot) {
+			return false, "Resolved path is outside of procRoot"
+		}
+	
         if _, err := os.Stat(filepath.Join(prefix, suffix)); err == nil {
             return true, filepath.Join(prefix, suffix)
         }
@@ -210,7 +206,7 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 			if _, err := os.Lstat(resolvedPath); err != nil {
 				var exist bool
 				// There can be an edge cases for the symbolic link folder in the middle of path
-				exist, resolvedPath = retryResolveSymlink(procRoot, procRoot, strings.TrimPrefix(resolvedPath, procRoot))
+				exist, resolvedPath = retryResolveSymlink(procRoot, procRoot, strings.TrimPrefix(resolvedPath, procRoot), 0, maxTraverseCount)
 
 				if !exist {
 					log.WithError(err).Debug("Failed to read resolvedPath")
