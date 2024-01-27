@@ -56,7 +56,6 @@ const (
 )
 
 type scanInfo struct {
-	initStateLoaded                bool
 	agentId                        string
 	status                         int
 	lastResult                     share.ScanErrorCode
@@ -231,7 +230,6 @@ func (t *scanTask) Handler(scanner string) scheduler.Action {
 			}
 		*/
 		info.status = statusScanning
-		info.initStateLoaded = false
 		ret = scheduler.TaskActionWait
 	}
 	scanMutexUnlock()
@@ -698,11 +696,16 @@ func scanMapAdd(taskId string, agentId string, idns []api.RESTIDName, objType sh
 	// If controller simply restarts or rolling upgraded, don't rescan
 	// the object. Only start automatically for new workload.
 	if value, err := cluster.Get(skey); err == nil {
+		// state key exists, the workload has been added in another controller or in previous run
 		scanMutexUnlock()
 
+		// We must call scanStateHandler() here because if the kv callback comes earlier,
+		// scanMap[] entry does not exist yet.
 		scanStateHandler(cluster.ClusterNotifyAdd, skey, value)
-		// avoid scanStateHandler to be processed again if it happens after object is added
-		info.initStateLoaded = true
+
+		// However, if the kv callback comes later, can we skip it? We used to set a flag
+		// here, but when the kv callback does come, we don't know if the value has changed
+		// or not, so for now, we let it call once again.
 	} else if isScanner() {
 		// Always scan the platform even auto-scan is disabled
 		if objType == share.ScanObjectType_PLATFORM {
@@ -891,9 +894,6 @@ func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte)
 	info, ok := scanMap[id]
 	scanMutexRUnlock()
 	if !ok {
-		return
-	} else if info.initStateLoaded {
-		info.initStateLoaded = false
 		return
 	}
 
