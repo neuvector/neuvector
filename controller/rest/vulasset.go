@@ -205,8 +205,6 @@ func createQueryStat(login *loginSession, queryFilter *db.VulQueryFilter) error 
 func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 
-	// elapsed := time.Since(createQuerySessionTS)
-
 	// get access control
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -219,6 +217,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	// get query parameters
 	queryObj, err := db.GetVulnerabilityQuery(r)
 	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("GetVulnerabilityQuery fail")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
 		return
 	}
@@ -226,6 +225,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 	if queryObj.QueryToken != "" {
 		resp, allAssets, err := db.GetVulAssetSessionV2(queryObj)
 		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("GetVulAssetSessionV2 fail")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get session vuls error %s", err))
 			return
 		}
@@ -233,6 +233,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		assetMaps, err := db.GetAssetsMeta(allAssets)
 		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("GetAssetsMeta fail")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get assets error %s", err))
 			return
 		}
