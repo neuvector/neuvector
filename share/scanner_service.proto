@@ -26,6 +26,7 @@ message SigstoreRootOfTrust {
   string RootCert = 3;
   string SCTPublicKey = 4;
   repeated SigstoreVerifier Verifiers = 5;
+  bool RootlessKeypairsOnly = 6;
 }
 
 message SigstoreVerifier {
