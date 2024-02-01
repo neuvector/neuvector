@@ -47,9 +47,10 @@ type DbVulAsset struct {
 
 	DebugLog []string
 
-	Skip       bool
-	MeetSearch bool // for static data which needs all data even not within search result
-	DBKey      string
+	Skip         bool
+	MeetSearch   bool // for static data which needs all data even not within search result
+	DBKey        string
+	ImpactWeight int
 }
 
 type DbCVESource struct {
@@ -153,7 +154,8 @@ const (
 	dbFile_Vulassets      string = "/tmp/vulasset.db"
 	dbFile_VulassetsLocal string = "./vulasset.db"
 	dbFile_Folder         string = "/tmp"
-	memoryDbFile          string = ":memory:"
+	// https://github.com/mattn/go-sqlite3?tab=readme-ov-file#faq
+	memoryDbFile string = "file::memory:?cache=shared"
 
 	Table_vulassets  = "vulassets"
 	Table_assetvuls  = "assetvuls"
@@ -164,7 +166,6 @@ var dbHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
 var GetCveRecordFunc func(string, string, string) *DbVulAsset
 var memdbMutex sync.RWMutex
-var vulassetdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
 	dbFile := dbFile_Vulassets
@@ -268,7 +269,7 @@ func getVulassetSchema() []string {
 		"nodes TEXT", "images TEXT", "platforms TEXT",
 		"cve_sources TEXT",
 		"f_withFix INTEGER", "f_profile INTEGER", "debuglog TEXT",
-		"score_str TEXT", "scorev3_str TEXT"}
+		"score_str TEXT", "scorev3_str TEXT", "impact_weight INTEGER"}
 	return schema
 }
 
