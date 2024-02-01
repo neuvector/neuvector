@@ -1665,6 +1665,7 @@ const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
+const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 
@@ -1677,6 +1678,7 @@ func startWorkerThread(ctx *Context) {
 	if !cacher.rmNsGrps {
 		pruneTicker.Stop()
 	}
+	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
 
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1702,6 +1704,10 @@ func startWorkerThread(ctx *Context) {
 			case <-usageReportTicker.C:
 				if isLeader() {
 					writeUsageReport()
+				}
+			case <-groupMetricCheckTicker.C:
+				if isLeader() {
+					CheckGroupMetric()
 				}
 			case <-teleReportTicker.C:
 				if isLeader() {
