@@ -164,9 +164,6 @@ func dpMsgConnection(msg []byte) {
 			Application:  uint32(conn.Application),
 			PolicyId:     uint32(conn.PolicyId),
 			Violates:     uint32(conn.Violates),
-			EpSessCurIn:  uint32(conn.EpSessCurIn),
-			EpSessIn60:   uint32(conn.EpSessIn60),
-			EpByteIn60:   uint64(conn.EpByteIn60),
 		}
 		switch uint16(conn.EtherType) {
 		case syscall.ETH_P_IP:

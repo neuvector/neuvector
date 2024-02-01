@@ -51,9 +51,6 @@ type Connection struct {
 	LinkLocal    bool
 	TmpOpen      bool
 	UwlIp        bool
-	EpSessCurIn  uint32
-	EpSessIn60   uint32
-	EpByteIn60   uint64
 }
 
 type ConnectionData struct {

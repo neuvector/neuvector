@@ -2633,9 +2633,6 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
                     log->ClientBytes > TUNNEL_THRESHOLD) {
                 conn->ClientPort = log->ClientPort;
             }
-            conn->EpSessCurIn = log->EpSessCurIn;
-            conn->EpSessIn60 = log->EpSessIn60;
-            conn->EpByteIn60 = log->EpByteIn60;
         } else if (dp_rate_limiter_check(rl) == 0 && (n = calloc(sizeof(*n), 1)) != NULL) {
             DPMsgConnect *conn = &n->conn;
             mac_cpy(conn->EPMAC, log->EPMAC);
@@ -2682,9 +2679,6 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             conn->ThreatID = log->ThreatID;
             conn->Severity = log->Severity;
             conn->PolicyId = log->PolicyId;
-            conn->EpSessCurIn = log->EpSessCurIn;
-            conn->EpSessIn60 = log->EpSessIn60;
-            conn->EpByteIn60 = log->EpByteIn60;
             rcu_map_add(conn4_map, n, &key);
             (*cnt)++;
         }
@@ -2729,9 +2723,6 @@ static void netify_connects(DPMsgConnect *conn)
     conn->LastSeenAt = htonl(conn->LastSeenAt);
     conn->PolicyId = htonl(conn->PolicyId);
     conn->ThreatID = htonl(conn->ThreatID);
-    conn->EpSessCurIn = htonl(conn->EpSessCurIn);
-    conn->EpSessIn60 = htonl(conn->EpSessIn60);
-    conn->EpByteIn60 = htonll(conn->EpByteIn60);
 }
 
 static void dp_ctrl_update_connects(void)

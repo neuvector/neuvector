@@ -30,6 +30,7 @@ const (
 
 const UnusedGroupAgingDefault uint8 = 24 //aging time in Hour
 const UnusedGroupAgingMax uint8 = 168    //aging time in Hour,24*7
+
 const (
 	PolicyModeLearn       string = "Discover"
 	PolicyModeEvaluate    string = "Monitor"

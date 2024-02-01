@@ -103,9 +103,8 @@ var grpSvcIpByDomainMap map[string]utils.Set = make(map[string]utils.Set) //key 
 var addr2ExtIpMap map[string][]net.IP = make(map[string][]net.IP)         //key svc cluster ip, value is externalIPs
 var extIp2addrMap map[string]net.IP = make(map[string]net.IP)             //key externalIP, value is svc cluster ip
 var addr2ExtIpRefreshMap map[string]bool = make(map[string]bool)          //key svc cluster ip
-var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)          //fqdn->group name(s)
-var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)          //group->fqdn name(s)
-var groupMetricMap map[string]*share.CLUSGroupMetric = make(map[string]*share.CLUSGroupMetric)
+var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)         //fqdn->group name(s)
+var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)         //group->fqdn name(s)
 
 func getSvcAddrGroupNameByExtIP(ip net.IP, port uint16) string {
 	if addrip, ok := extIp2addrMap[ip.String()]; ok {
@@ -182,10 +181,6 @@ func group2BriefREST(cache *groupCache, withCap bool) *api.RESTGroupBrief {
 		Kind:            cache.group.Kind,
 		PlatformRole:    cache.group.PlatformRole,
 		BaselineProfile: cache.group.BaselineProfile,
-		MonMetric:       cache.group.MonMetric,
-		GrpSessCur:      cache.group.GrpSessCur,
-		GrpSessRate:     cache.group.GrpSessRate,
-		GrpBandWidth:    cache.group.GrpBandWidth,
 	}
 	if withCap {
 		g.CapChgMode = &cache.capChgMode
@@ -553,7 +548,6 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			}
 
 			delete(groupCacheMap, name)
-			refreshGroupMetricMap(name, "", true)
 		}
 		cacheMutexUnlock()
 
@@ -1149,38 +1143,6 @@ func SchedulePruneGroups() {
 	}
 }
 
-//caller hold cacheMutexLock
-func refreshGroupMetricMap(groupname string, wlid string, deletegrp bool) {
-	if deletegrp {
-		if grpmet, ok := groupMetricMap[groupname]; ok {
-			grpmet.WlMetric = nil
-			delete(groupMetricMap, groupname)
-		}
-	} else {
-		if grpMet, ok := groupMetricMap[groupname]; ok {
-			if grpMet.WlMetric == nil {
-				grpMet.WlMetric = make(map[string]*share.CLUSWlMetric)
-			}
-			if _, exst := grpMet.WlMetric[wlid]; exst {
-				delete(grpMet.WlMetric, wlid)
-			}
-			if len(grpMet.WlMetric) == 0 {
-				delete(groupMetricMap, groupname)
-			} else {
-				//reset group metric
-				grpMet.GroupSessCurIn = 0
-				grpMet.GroupSessIn60 = 0
-				grpMet.GroupByteIn60 = 0
-				for _, cwlmet := range grpMet.WlMetric {
-					grpMet.GroupSessCurIn += cwlmet.WlSessCurIn
-					grpMet.GroupSessIn60 += cwlmet.WlSessIn60
-					grpMet.GroupByteIn60 += cwlmet.WlByteIn60
-				}
-			}
-		}
-	}
-}
-
 func groupWorkloadLeave(id string, param interface{}) {
 	wlc := param.(*workloadCache)
 	wl := wlc.workload
@@ -1211,7 +1173,6 @@ func groupWorkloadLeave(id string, param interface{}) {
 		//it needs to inform dp that a fqdn
 		//is no longer needed
 		scheduleIPPolicyCalculation(false)
-		refreshGroupMetricMap(wlc.learnedGroupName, id, false)
 	}
 	cacheMutexUnlock()
 
@@ -1482,11 +1443,7 @@ func refreshGroupMember(cache *groupCache) {
 	if cache.group.Kind != share.GroupKindContainer {
 		return
 	}
-	if (cache.group.CfgType == share.Learned ||
-		cache.group.CfgType == share.UserCreated) &&
-		!cache.group.Reserved && !cache.group.MonMetric {
-		refreshGroupMetricMap(cache.group.Name, "", true)
-	}
+
 	// for openshift platform, add nv.ip.xxx to group if domain matches
 	if !policyApplyIngress && cache.group.CfgType != share.Learned {
 		//remove existing grp->nv.ip.xxx mapping

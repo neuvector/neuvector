@@ -328,7 +328,6 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvAuthDefAdminPwdUnchanged:    {api.EventNameAuthDefAdminPwdUnchanged, api.EventCatAuth, api.LogLevelWARNING},
 	share.CLUSEvScannerAutoScaleDisabled:    {api.EventNameScannerAutoScaleDisabled, api.EventCatConfig, api.LogLevelNOTICE},
 	share.CLUSEvK8sAdmissionWebhookCChange:  {api.EventNameK8sAdmissionWebhookChange, api.EventCatAdmCtrl, api.LogLevelNOTICE},
-	share.CLUSEvGroupMetricViolation:        {api.EventNameGroupMetricViolation, api.EventCatGroup, api.LogLevelWARNING},
 }
 
 type LogIncidentInfo struct {
