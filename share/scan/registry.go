@@ -18,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	"github.com/neuvector/neuvector/share/scan/registry"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 const mediaTypeCosign = "application/vnd.dev.cosign.simplesigning.v1+json"
@@ -314,13 +315,71 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 }
 
 //this function will be called at scanner side
-func (rc *RegClient) DownloadRemoteImage(ctx context.Context, name, imgPath string, layers []string, sizes map[string]int64) (map[string]*LayerFiles, share.ScanErrorCode) {
-	log.WithFields(log.Fields{"name": name}).Debug()
+func (rc *RegClient) DownloadRemoteImage(ctx context.Context, name, imgPath string, layers []string, sizes map[string]int64, cacher *LayerCacher, keepers utils.Set, bForceDownload bool) (map[string]*LayerFiles, share.ScanErrorCode) {
+	log.WithFields(log.Fields{"name": name, "bForceDownload": bForceDownload}).Debug()
+	var downloads []string		// download layer requests
+	var layerFile LayerFiles
+	cacheFiles := make(map[string]*LayerFiles)
+	cacheLayers := utils.NewSet()
+	for i := len(layers) - 1; i >= 0; i-- {  // v2
+		layer := layers[i]
+		if layer == "" {
+			continue
+		}
+
+		// log.WithFields(log.Fields{"i": i, "layer": layer, "size": sizes[layer]}).Debug()
+		keepers.Add(cacher.RecordName(layer, &layerFile))	// reference for write recor
+		if cacheLayers.Cardinality() < 2 {	// take bottom 0, 1 layers
+			cacheLayers.Add(layer)	// reference for write layers
+		}
+
+		if cacher == nil || bForceDownload {
+			downloads = append(downloads, layer)
+			continue
+		}
+
+		if _, err := cacher.ReadRecordCache(layer, &layerFile); err == nil {
+			// log.WithFields(log.Fields{"fpath": fpath}).Debug("rec")
+			cacheFiles[layer] = &layerFile
+		} else {
+			downloads = append(downloads, layer)
+		}
+	}
 
 	// scheme is always set to v1 because layers of v2 image have been reversed in GetImageInfo.
-	return getImageLayerIterate(ctx, layers, sizes, true, imgPath, func(ctx context.Context, layer string) (interface{}, int64, error) {
-		return rc.DownloadLayer(ctx, name, goDigest.Digest(layer))
+	layerFiles, err := getImageLayerIterate(ctx, downloads, sizes, true, imgPath, func(ctx context.Context, layer string) (interface{}, int64, error) {
+		if cacher == nil || (cacher != nil && cacher.IsLayerDataDisable()) {
+			return rc.DownloadLayer(ctx, name, goDigest.Digest(layer))
+		}
+
+		rd, size, err := cacher.ReadLayerDataCache(layer)
+		if err != nil { // the data cache has been purged or not existed.
+			if rd, size, err = rc.DownloadLayer(ctx, name, goDigest.Digest(layer)); err == nil {
+				if cacheLayers.Contains(layer) {
+					rd, _ = cacher.WriteLayerDataCache(layer, rd, size, cacheLayers)
+				}
+			}
+		}
+		return rd, size, err
 	})
+
+	if cacher != nil {
+		var total_downloaded int64
+		// save downloaded records
+		for layer, files := range layerFiles {
+			if err := cacher.WriteRecordCache(layer, files, keepers); err != nil {
+				log.WithFields(log.Fields{"error": err, "layer": layer}).Error()
+			}
+			total_downloaded += files.Size
+		}
+		log.WithFields(log.Fields{"total_downloaded": total_downloaded}).Debug()
+
+		// merging cacher's records
+		for layer, files := range cacheFiles {
+			layerFiles[layer] = files
+		}
+	}
+	return layerFiles, err
 }
 
 func (rc *RegClient) getSchemaV1Id(manV1 *manifestV1.SignedManifest) string {

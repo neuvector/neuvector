@@ -386,6 +386,27 @@ func getDpkgStatus(fullpath, kernel string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func getApkPackages(fullpath string) ([]byte, error)  {
+	inputFile, err := os.Open(fullpath)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	scanner := bufio.NewScanner(inputFile)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "P:") ||
+			strings.HasPrefix(line, "V:") ||
+			strings.HasPrefix(line, "o:") ||
+			line == "" {
+			buf.WriteString(line)
+			buf.WriteString("\n")
+		}
+	}
+	return buf.Bytes(), nil
+}
+
 func ParseRegistryURI(ur string) (string, error) {
 	u, err := url.ParseRequestURI(ur)
 	if err != nil {
@@ -790,6 +811,11 @@ func getImageLayerIterate(ctx context.Context, layers []string, sizes map[string
 			} else if filename == dpkgStatus || strings.HasPrefix(filename, dpkgStatusDir) {
 				// get the dpkg status file
 				data, err = getDpkgStatus(fullpath, "")
+				if err != nil {
+					continue
+				}
+			} else if filename == apkPackages {
+				data, err = getApkPackages(fullpath)
 				if err != nil {
 					continue
 				}
