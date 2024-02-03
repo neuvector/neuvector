@@ -67,6 +67,21 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	if flavor == share.FlavorOpenShift && platform == "" {
 		platform = share.PlatformKubernetes
 	}
+	if platform == share.PlatformGoogleGKE {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		flavor = share.FlavorGKE
+	}
+	if platform == share.PlatformAzureAKS {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		flavor = share.FlavorAKS
+	}
+	if platform == share.PlatformAmazonEKS {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		flavor = share.FlavorEKS
+	}
 
 	ORCH = &orchHub{Driver: orchAPI.GetDriver(platform, flavor, network, k8sVer, ocVer, SYS, RT)}
 	if regResource != nil {
@@ -79,6 +94,15 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 func getContainerPlatform(c *container.ContainerMeta) string {
 	if _, ok := c.Labels[container.RancherKeyContainerSystem]; ok {
 		return share.PlatformRancher
+	}
+	if strings.Contains(c.Image, "gke") {
+		return share.PlatformGoogleGKE
+	}	
+	if strings.Contains(c.Image, "amazonaws") {
+		return share.PlatformAmazonEKS
+	}
+	if strings.Contains(c.Name, "azure") {
+		return share.PlatformAzureAKS
 	}
 	if _, ok := c.Labels[container.KubeKeyPodNamespace]; ok {
 		return share.PlatformKubernetes
@@ -136,6 +160,7 @@ func getPlatform(containers []*container.ContainerMeta) (string, string, string)
 	// First decide the platform
 	envParser := utils.NewEnvironParser(os.Environ())
 	platform, flavor := normalize(envParser.GetPlatformName())
+
 	switch platform {
 	case share.PlatformDocker, share.PlatformKubernetes, share.PlatformAmazonECS, share.PlatformAliyun:
 		if flavor != "" {

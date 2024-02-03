@@ -24,6 +24,9 @@ var (
 	kube124YAMLFolder	= dstPrefix + "cis-1.24/"
 	kube180YAMLFolder	= dstPrefix + "cis-1.8.0/"
 	rh140YAMLFolder		= dstPrefix + "rh-1.4.0/"
+	gke140YAMLFolder	= dstPrefix + "gke-1.4.0/"
+	aks140YAMLFolder	= dstPrefix + "aks-1.4.0/"
+	eks140YAMLFolder	= dstPrefix + "eks-1.4.0/"
 	defaultYAMLFolder  	= dstPrefix + "cis-1.8.0/"
 	catchDescription 	= regexp.MustCompile(`^(.*?) \([^)]*\)$`)
 	complianceMetas []api.RESTBenchMeta
@@ -2430,8 +2433,22 @@ func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string {
 	var remediationFolder string
 	if inProductionK8s {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
-
-		if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
+		if platform == share.PlatformKubernetes && flavor == share.FlavorGKE {
+			kVer, err := version.NewVersion(k8sVer)
+			if err != nil {
+				remediationFolder = gke140YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+				remediationFolder = gke140YAMLFolder
+			} else {
+				remediationFolder = defaultYAMLFolder
+			}
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorAKS {
+			// Currently support AKS-1.4.0 only
+			remediationFolder = aks140YAMLFolder
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorEKS {
+			// Currently support EKS-1.4.0 only
+			remediationFolder = eks140YAMLFolder
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
 			ocVer, err := version.NewVersion(ocVer)
 			if err != nil {
 				remediationFolder = rh140YAMLFolder

@@ -565,17 +565,11 @@ groups:
         - GDPR
         audit: |
               check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--event-qps' >/dev/null 2>&1; then
-                  event=$(get_argument_value "$CIS_KUBELET_CMD" '--event-qps' | cut -d " " -f 1)
-                  if [ $event = "0" ]; then
-                      pass "$check"
-                  else
-                      warn "$check"
-                      warn "      * event-qps: $event"
-                  fi
+              if check_argument "$CIS_KUBELET_CMD" '--rotate-certificates=false' >/dev/null 2>&1; then
+                warn "$check"
               else
-                  warn "$check"
-              fi        
+                pass "$check"
+              fi         
         remediation: |
                     If using a Kubelet config file, edit the file to add the line rotateCertificates: true or remove it altogether to use the default value.
                     If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and remove --rotate-certificates=false argument from the KUBELET_CERTIFICATE_ARGS variable.

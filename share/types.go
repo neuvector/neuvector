@@ -79,6 +79,9 @@ const DomainDelimiter string = "."
 const (
 	PlatformDocker     = "Docker"
 	PlatformAmazonECS  = "Amazon-ECS"
+	PlatformAmazonEKS  = "Amazon-EKS"
+	PlatformAzureAKS   = "Azure-AKS"
+	PlatformGoogleGKE  = "Google-GKE"
 	PlatformKubernetes = "Kubernetes"
 	PlatformRancher    = "Rancher"
 	PlatformAliyun     = "Aliyun"
@@ -89,6 +92,8 @@ const (
 	FlavorRancher   = "Rancher"
 	FlavorIKE       = "IKE"
 	FlavorGKE       = "GKE"
+	FlavorAKS 	   	= "AKS"
+	FlavorEKS 	   	= "EKS"
 
 	NetworkFlannel   = "Flannel"
 	NetworkCalico    = "Calico"
