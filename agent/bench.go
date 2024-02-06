@@ -59,6 +59,9 @@ const (
 	kube124YAMLFolder	= dstSh + "cis-1.24/"
 	kube180YAMLFolder	= dstSh + "cis-1.8.0/"
 	rh140YAMLFolder		= dstSh + "rh-1.4.0/"
+	gke140YAMLFolder  	= dstSh + "gke-1.4.0/"
+	aks140YAMLFolder  	= dstSh + "aks-1.4.0/"
+	eks140YAMLFolder  	= dstSh + "eks-1.4.0/"	
 	kubeGKEMasterTmpl   = srcSh + "kube_master_gke_1_0_0.tmpl"
 	kubeGKEWorkerTmpl   = srcSh + "kube_worker_gke_1_0_0.tmpl"
 	kubeGKERemediation  = srcSh + "kubecis_gke_1_0_0.rem"
@@ -246,11 +249,36 @@ func (b *Bench) BenchLoop() {
 				// 1.16- : 1.6.0
 				// GKE: GKE 1.0.0
 				if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorGKE {
-					b.cisYAMLMode = false
-					b.kubeCISVer = "GKE-1.0.0"
-					masterScript = kubeGKEMasterTmpl
-					workerScript = kubeGKEWorkerTmpl
-					remediation = kubeGKERemediation
+					kVer, err := version.NewVersion(k8sVer)
+					if err != nil {
+						b.kubeCISVer = "GKE-1.4.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = gke140YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+						b.kubeCISVer = "GKE-1.4.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = gke140YAMLFolder
+					} else {
+						b.cisYAMLMode = false
+						b.kubeCISVer = "GKE-1.0.0"
+						masterScript = kubeGKEMasterTmpl
+						workerScript = kubeGKEWorkerTmpl
+						remediation = kubeGKERemediation
+					}
+				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorAKS {
+					// Currently support AKS-1.4.0 only
+					b.kubeCISVer = "AKS-1.4.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = aks140YAMLFolder
+				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorEKS {
+					// Currently support EKS-1.4.0 only
+					b.kubeCISVer = "EKS-1.4.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = eks140YAMLFolder
 				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorOpenShift {
 					ocVer, err := version.NewVersion(ocVer)
 					if err != nil {
