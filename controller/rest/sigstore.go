@@ -49,13 +49,14 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 	}
 
 	clusRootOfTrust := share.CLUSSigstoreRootOfTrust{
-		Name:           rootOfTrust.Name,
-		IsPrivate:      rootOfTrust.IsPrivate,
-		RekorPublicKey: rootOfTrust.RekorPublicKey,
-		RootCert:       rootOfTrust.RootCert,
-		SCTPublicKey:   rootOfTrust.SCTPublicKey,
-		CfgType:        share.UserCreated,
-		Comment:        rootOfTrust.Comment,
+		Name:                 rootOfTrust.Name,
+		RootlessKeypairsOnly: rootOfTrust.RootlessKeypairsOnly,
+		IsPrivate:            rootOfTrust.IsPrivate,
+		RekorPublicKey:       rootOfTrust.RekorPublicKey,
+		RootCert:             rootOfTrust.RootCert,
+		SCTPublicKey:         rootOfTrust.SCTPublicKey,
+		CfgType:              share.UserCreated,
+		Comment:              rootOfTrust.Comment,
 	}
 
 	if err := validateCLUSRootOfTrust(&clusRootOfTrust); err != nil {
@@ -81,7 +82,7 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	msg := fmt.Sprintf("Added verifier \"%s\"", clusRootOfTrust.Name)
+	msg := fmt.Sprintf("Added root of trust \"%s\"", clusRootOfTrust.Name)
 	restRespSuccess(w, r, nil, nil, nil, nil, msg)
 }
 
@@ -278,6 +279,24 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	if verifier.VerifierType == "keyless" {
+		// check if root of trust type allows keyless verifiers
+		rootName := ps.ByName("root_name")
+		rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
+		if err == common.ErrObjectNotFound || rootOfTrust == nil {
+			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, fmt.Sprintf("could not find root of trust %s", rootName))
+			return
+		} else if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+			return
+		}
+
+		if rootOfTrust.RootlessKeypairsOnly {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "only keypair verifiers are allowed for this root")
+			return
+		}
+	}
+
 	clusVerifier := share.CLUSSigstoreVerifier{
 		Name:         verifier.Name,
 		VerifierType: verifier.VerifierType,
@@ -382,6 +401,24 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 
 	updateCLUSVerifier(clusVerifier, &restVerifier)
 
+	if clusVerifier.VerifierType == "keyless" {
+		// check if root of trust type allows keyless verifiers
+		rootName := ps.ByName("root_name")
+		rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
+		if err == common.ErrObjectNotFound || rootOfTrust == nil {
+			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, fmt.Sprintf("could not find root of trust %s", rootName))
+			return
+		} else if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailReadCluster, err.Error())
+			return
+		}
+
+		if rootOfTrust.RootlessKeypairsOnly {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Patch would result in invalid verifier: only keypair verifiers are allowed for this root")
+			return
+		}
+	}
+
 	if validationError := validateCLUSVerifier(clusVerifier); validationError != nil {
 		msg := fmt.Sprintf("Patch would result in invalid verifier: %s", validationError.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -471,13 +508,14 @@ func handlerSigstoreVerifierGetAll(w http.ResponseWriter, r *http.Request, ps ht
 
 func CLUSRootToRESTRoot_GET(clusRoot *share.CLUSSigstoreRootOfTrust) api.REST_SigstoreRootOfTrust_GET {
 	return api.REST_SigstoreRootOfTrust_GET{
-		Name:           clusRoot.Name,
-		IsPrivate:      clusRoot.IsPrivate,
-		RekorPublicKey: clusRoot.RekorPublicKey,
-		RootCert:       clusRoot.RootCert,
-		SCTPublicKey:   clusRoot.SCTPublicKey,
-		CfgType:        cfgTypeMap2Api[clusRoot.CfgType],
-		Comment:        clusRoot.Comment,
+		Name:                 clusRoot.Name,
+		RootlessKeypairsOnly: clusRoot.RootlessKeypairsOnly,
+		IsPrivate:            clusRoot.IsPrivate,
+		RekorPublicKey:       clusRoot.RekorPublicKey,
+		RootCert:             clusRoot.RootCert,
+		SCTPublicKey:         clusRoot.SCTPublicKey,
+		CfgType:              cfgTypeMap2Api[clusRoot.CfgType],
+		Comment:              clusRoot.Comment,
 	}
 }
 
@@ -498,6 +536,10 @@ func withVerifiers(r *http.Request) bool {
 }
 
 func validateCLUSRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust) error {
+	if rootOfTrust.RootlessKeypairsOnly {
+		return nil
+	}
+
 	rootOfTrust.Name = strings.TrimSpace(rootOfTrust.Name)
 	if rootOfTrust.IsPrivate {
 		rootOfTrust.RekorPublicKey = strings.TrimSpace(rootOfTrust.RekorPublicKey)
