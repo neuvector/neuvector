@@ -220,6 +220,23 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 	return buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }
 
+func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.ScanErrorCode) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, nil, share.ScanErrorCode_ScanErrFileSystem
+	} else if !info.Mode().IsRegular() || info.Size() == 0 {
+		return nil, nil, share.ScanErrorCode_ScanErrNotSupport
+	}
+
+	apps := NewScanApps(true)
+	apps.extractAppPkg(path, path)
+	pkgs := apps.marshal()
+	files := []utils.TarFileInfo{utils.TarFileInfo{AppFileName, pkgs}}
+	buf, _ := utils.MakeTar(files)
+	appPkgs, _ := apps.data()[path]
+	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
+}
+
 func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
 	apps := NewScanApps(true)
 	exclDirs := utils.NewSet("bin", "boot", "dev", "proc", "run", "sys", "tmp")
