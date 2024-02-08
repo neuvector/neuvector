@@ -388,7 +388,7 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 			}
 		} else {
 			pod, err = criPodSandboxStatus(d.criClient, ctx, cInfo.Info.SandboxID)
-			if err != nil {
+			if err != nil || pod == nil {
 				log.WithFields(log.Fields{"id": id, "cInfo": cInfo, "error": err}).Error("Fail to get its pod")
 				return nil, err
 			}
@@ -449,52 +449,49 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 			log.WithFields(log.Fields{"cs": cs}).Debug("fail to obtain image id")
 		}
 	} else {
-		if pod, err = criPodSandboxStatus(d.criClient, ctx, id); err == nil && pod != nil {
-			// log.WithFields(log.Fields{"pod": pod}).Debug("pod")
-			if pod.Status == nil {
-				log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
+		if pod, err = criPodSandboxStatus(d.criClient, ctx, id); err != nil || pod == nil || pod.Status == nil {
+			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
+			return nil, err
+		}
+		// log.WithFields(log.Fields{"pod": pod}).Debug("pod")
+		if pod.Info != nil {
+			cInfo, err = d.getContainerInfo(pod.Info)
+			if err != nil {
+				log.WithFields(log.Fields{"id": id, "info": pod.Info}).Error("Fail to get pod info")
 				return nil, err
 			}
+		}
 
-			if pod.Info != nil {
-				cInfo, err = d.getContainerInfo(pod.Info)
-				if err != nil {
-					log.WithFields(log.Fields{"id": id, "info": pod.Info}).Error("Fail to get pod info")
-					return nil, err
-				}
-			}
+		// a POD
+		meta = &ContainerMetaExtra{
+			ContainerMeta: *d.getPodMeta(id, pod, cInfo),
+			Privileged:    d.isPrivileged(pod.Status, nil),
+			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
+			Networks:      utils.NewSet(),
+		}
 
-			// a POD
-			meta = &ContainerMetaExtra{
-				ContainerMeta: *d.getPodMeta(id, pod, cInfo),
-				Privileged:    d.isPrivileged(pod.Status, nil),
-				Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
-				Networks:      utils.NewSet(),
-			}
+		if pod.Status.CreatedAt > 0 {
+			meta.CreatedAt = time.Unix(0, pod.Status.CreatedAt)
+			meta.StartedAt = meta.CreatedAt
+		}
 
-			if pod.Status.CreatedAt > 0 {
-				meta.CreatedAt = time.Unix(0, pod.Status.CreatedAt)
-				meta.StartedAt = meta.CreatedAt
-			}
-
-			// image ID
-			if meta.Image == "" {
-				// from host's crio information
-				meta.Image = d.podImgRepoDigest
-				meta.ImageID = d.podImgID
-				meta.ImageDigest = d.podImgDigest
-			} else {
-				meta.ImageDigest = imageRef2Digest(meta.Image)
-				if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
-					meta.ImageID = imageMeta.ID
-					meta.Author = imageMeta.Author
-				}
+		// image ID
+		if meta.Image == "" {
+			// from host's crio information
+			meta.Image = d.podImgRepoDigest
+			meta.ImageID = d.podImgID
+			meta.ImageDigest = d.podImgDigest
+		} else {
+			meta.ImageDigest = imageRef2Digest(meta.Image)
+			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
+				meta.ImageID = imageMeta.ID
+				meta.Author = imageMeta.Author
 			}
 		}
 	}
 
 	// retrive its network/pid namespace from the POD
-	if pod.Status.Linux == nil || pod.Status.Linux.Namespaces == nil || pod.Status.Linux.Namespaces.Options == nil {
+	if pod.Status == nil || pod.Status.Linux == nil || pod.Status.Linux.Namespaces == nil || pod.Status.Linux.Namespaces.Options == nil {
 		log.Error("Fail to get sandbox linux namespaces")
 	} else {
 		opts := pod.Status.Linux.Namespaces.Options
