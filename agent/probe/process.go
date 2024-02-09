@@ -3146,12 +3146,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				ppe.Action = share.PolicyActionAllow
 				mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "svcGroup": svcGroup}).Debug()
 			}
-		case share.PolicyActionAllow, share.PolicyActionViolate:
-			if ppe.Action == share.PolicyActionViolate && ppe.Uuid != share.CLUSReservedUuidNotAlllowed {
-				// a real deny rule
-				break
-			}
-
+		case share.PolicyActionAllow:
 			bPass = true
 			ppe.Action = share.PolicyActionAllow
 			if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
@@ -3161,11 +3156,8 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					ppe.Uuid = share.CLUSReservedUuidAnchorMode
 				}
 			}
-		case share.PolicyActionDeny: // from pmon during Protect mode
-			if ppe.Uuid == share.CLUSReservedUuidNotAlllowed {
-				// not a real deny rule
-				bPass = bImageFile
-			}
+		case share.PolicyActionDeny, share.PolicyActionViolate:
+			ppe.Uuid = share.CLUSReservedUuidNotAlllowed
 		}
 	} else {
 		switch ppe.Action {
