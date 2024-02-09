@@ -2863,13 +2863,14 @@ type CLUSApikey struct {
 }
 
 type CLUSSigstoreRootOfTrust struct {
-	Name           string   `json:"name"`
-	IsPrivate      bool     `json:"is_private"`
-	RekorPublicKey string   `json:"rekor_public_key"`
-	RootCert       string   `json:"root_cert"`
-	SCTPublicKey   string   `json:"sct_public_key"`
-	CfgType        TCfgType `json:"cfg_type"`
-	Comment        string   `json:"comment"`
+	Name                 string   `json:"name"`
+	IsPrivate            bool     `json:"is_private"`
+	RootlessKeypairsOnly bool     `json:"rootless_keypairs_only"`
+	RekorPublicKey       string   `json:"rekor_public_key"`
+	RootCert             string   `json:"root_cert"`
+	SCTPublicKey         string   `json:"sct_public_key"`
+	CfgType              TCfgType `json:"cfg_type"`
+	Comment              string   `json:"comment"`
 }
 
 type CLUSSigstoreVerifier struct {

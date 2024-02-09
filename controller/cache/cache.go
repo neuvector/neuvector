@@ -1671,6 +1671,7 @@ var unManagedWlTimer *time.Timer
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
+	emptyGrpTicker := time.NewTicker(rmEmptyGroupPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
@@ -1726,6 +1727,8 @@ func startWorkerThread(ctx *Context) {
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
+			case <-emptyGrpTicker.C:
+				rmEmptyGroupsFromCluster()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
 				refreshInternalIPNet()

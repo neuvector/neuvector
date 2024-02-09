@@ -65,11 +65,11 @@ type SignatureData struct {
 	Payloads map[string]string `json:"Payloads"`
 }
 
-func IsPotentialCosignSignatureTag(tag string) bool {
+func isPotentialCosignSignatureTag(tag string) bool {
 	return (strings.HasPrefix(tag, "sha256-") && strings.HasSuffix(tag, cosignSignatureTagSuffix))
 }
 
-func IsQuayRegistry(rc *RegClient) bool {
+func isQuayRegistry(rc *RegClient) bool {
 	if len(rc.URL) >= len(quayRegistryURL) {
 		return strings.EqualFold(rc.URL[:len(quayRegistryURL)], quayRegistryURL)
 	}
@@ -112,15 +112,17 @@ func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *regist
 	return allLayersAreCosignPayloads
 }
 
-func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context, name, dg string, body []byte) (parsedSchemaVersion int, err error) {
+func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context, name, dg string, body []byte) (
+	parsedSchemaVersion int, configMediaType string, err error,
+) {
 	var manV2 manifestV2.Manifest
 
 	err = json.Unmarshal(body, &manV2)
 	if err != nil {
-		return manV2.SchemaVersion, err
+		return manV2.SchemaVersion, "", err
 	}
 	if manV2.SchemaVersion != 2 {
-		return manV2.SchemaVersion, fmt.Errorf("unexpected manifest schema version: %d", manV2.SchemaVersion)
+		return manV2.SchemaVersion, "", fmt.Errorf("unexpected manifest schema version: %d", manV2.SchemaVersion)
 	}
 
 	// use v2 config.Digest as repo id
@@ -141,9 +143,11 @@ func (rc *RegClient) buildV2ImageInfo(imageInfo *ImageInfo, ctx context.Context,
 	imageInfo.IsSignatureImage = copyV2Layers(imageInfo, &manV2, ccmi)
 
 	log.WithFields(log.Fields{
-		"layers": len(manV2.Layers), "version": manV2.SchemaVersion, "digest": dg, "cmds": len(imageInfo.Cmds), "created": imageInfo.Created,
+		"mediaType": manV2.Config.MediaType, "version": manV2.SchemaVersion, "digest": dg,
+		"layers": len(manV2.Layers), "cmds": len(imageInfo.Cmds), "created": imageInfo.Created,
 	}).Debug("v2 manifest")
-	return manV2.SchemaVersion, nil
+
+	return manV2.SchemaVersion, manV2.Config.MediaType, nil
 }
 
 func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifestReqType registry.ManifestRequestType) (*ImageInfo, share.ScanErrorCode) {
@@ -163,10 +167,10 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		Sizes:  make(map[string]int64),
 	}
 
-	if IsPotentialCosignSignatureTag(tag) && IsQuayRegistry(rc) {
+	if isPotentialCosignSignatureTag(tag) && isQuayRegistry(rc) {
 		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, registry.ManifestRequest_CosignSignature)
 		if err == nil {
-			_, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
+			_, _, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
 			if err == nil {
 				isQuaySpecialCase = true
 			} else {
@@ -213,9 +217,15 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		// get schema v2 first
 		if err == nil {
 			var parsedSchemaVersion int
-			parsedSchemaVersion, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
+			var cfgMediaType string
+
+			parsedSchemaVersion, cfgMediaType, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
+			}
+			if cfgMediaType != registry.MediaTypeContainerImage && cfgMediaType != registry.MediaTypeOCIImageConfig {
+				log.WithFields(log.Fields{"mediaType": cfgMediaType}).Info("Not an OCI image")
+				return imageInfo, share.ScanErrorCode_ScanErrImageNotFound
 			}
 		}
 	}
@@ -226,9 +236,9 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		log.WithFields(log.Fields{"error": err}).Error("Get Manifest v1 fail")
 	} else {
 		log.WithFields(log.Fields{
-			"layers": len(manV1.SignedManifest.FSLayers), "cmds": len(manV1.Cmds), "digest": manV1.Digest,
-			"version": manV1.SignedManifest.SchemaVersion, "created": manV1.Created,
-		}).Debug("v1 manifest request")
+			"mediaType": manV1.SignedManifest.MediaType, "version": manV1.SignedManifest.SchemaVersion, "digest": manV1.Digest,
+			"layers": len(manV1.SignedManifest.FSLayers), "cmds": len(manV1.Cmds), "created": manV1.Created,
+		}).Debug("v1 manifest")
 
 		// Even we send request with accept v1 manifest, we still get v2 format back
 		if manV1.SignedManifest.SchemaVersion <= 1 {
@@ -287,7 +297,12 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 			return imageInfo, share.ScanErrorCode_ScanErrNone
 		}
 		log.WithFields(log.Fields{"imageInfo": imageInfo}).Error("Get metadata fail")
-		return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
+
+		if imageInfo.ID == "" {
+			return imageInfo, share.ScanErrorCode_ScanErrImageNotFound
+		} else {
+			return imageInfo, share.ScanErrorCode_ScanErrRegistryAPI
+		}
 	}
 
 	for i, c := range imageInfo.Cmds {

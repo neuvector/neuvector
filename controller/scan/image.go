@@ -277,10 +277,11 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 	reqRootsOfTrust := []*share.SigstoreRootOfTrust{}
 	for _, clusRootOfTrust := range clusRootsOfTrust {
 		reqRootOfTrust := &share.SigstoreRootOfTrust{
-			Name:           clusRootOfTrust.Name,
-			RekorPublicKey: clusRootOfTrust.RekorPublicKey,
-			RootCert:       clusRootOfTrust.RootCert,
-			SCTPublicKey:   clusRootOfTrust.SCTPublicKey,
+			Name:                 clusRootOfTrust.Name,
+			RekorPublicKey:       clusRootOfTrust.RekorPublicKey,
+			RootCert:             clusRootOfTrust.RootCert,
+			SCTPublicKey:         clusRootOfTrust.SCTPublicKey,
+			RootlessKeypairsOnly: clusRootOfTrust.RootlessKeypairsOnly,
 		}
 
 		clusVerifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRootOfTrust.Name)

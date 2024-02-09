@@ -3662,23 +3662,25 @@ type RESTSelfApikeyData struct {
 }
 
 type REST_SigstoreRootOfTrust_GET struct {
-	Name           string                  `json:"name"`
-	IsPrivate      bool                    `json:"is_private"`
-	RekorPublicKey string                  `json:"rekor_public_key,omitempty"`
-	RootCert       string                  `json:"root_cert,omitempty"`
-	SCTPublicKey   string                  `json:"sct_public_key,omitempty"`
-	Verifiers      []REST_SigstoreVerifier `json:"verifiers,omitempty"`
-	CfgType        string                  `json:"cfg_type"`
-	Comment        string                  `json:"comment"`
+	Name                 string                  `json:"name"`
+	IsPrivate            bool                    `json:"is_private"`
+	RootlessKeypairsOnly bool                    `json:"rootless_keypairs_only"`
+	RekorPublicKey       string                  `json:"rekor_public_key,omitempty"`
+	RootCert             string                  `json:"root_cert,omitempty"`
+	SCTPublicKey         string                  `json:"sct_public_key,omitempty"`
+	Verifiers            []REST_SigstoreVerifier `json:"verifiers,omitempty"`
+	CfgType              string                  `json:"cfg_type"`
+	Comment              string                  `json:"comment"`
 }
 
 type REST_SigstoreRootOfTrust_POST struct {
-	Name           string `json:"name"`
-	IsPrivate      bool   `json:"is_private"`
-	RekorPublicKey string `json:"rekor_public_key,omitempty"`
-	RootCert       string `json:"root_cert,omitempty"`
-	SCTPublicKey   string `json:"sct_public_key,omitempty"`
-	Comment        string `json:"comment"`
+	Name                 string `json:"name"`
+	IsPrivate            bool   `json:"is_private"`
+	RootlessKeypairsOnly bool   `json:"rootless_keypairs_only"`
+	RekorPublicKey       string `json:"rekor_public_key,omitempty"`
+	RootCert             string `json:"root_cert,omitempty"`
+	SCTPublicKey         string `json:"sct_public_key,omitempty"`
+	Comment              string `json:"comment"`
 }
 
 type REST_SigstoreRootOfTrust_PATCH struct {

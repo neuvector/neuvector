@@ -210,8 +210,8 @@ func Connect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		}
 
 		if IsPidHost() {
-			if rtEndpoint, ok := obtainRtEndpointFromKubelet(sys); ok {
-				log.WithFields(log.Fields{"rtEndpoint": rtEndpoint}).Info()
+			if rtEndpoint, pause_img, ok := obtainRtEndpointFromKubelet(sys); ok {
+				log.WithFields(log.Fields{"rtEndpoint": rtEndpoint, "pause_img": pause_img}).Info()
 				edpt := filepath.Join("/proc/1/root", rtEndpoint)
 				if rt, err := tryConnectRt(edpt, sys); err == nil {
 					return rt, nil
@@ -318,17 +318,21 @@ func tryConnectRt(rtPath string, sys *system.SystemTools) (Runtime, error) {
 
 	// guessing RT from the socket name
 	sock := filepath.Base(rtPath)
+	if strings.Contains(sock, "crio") || strings.Contains(sock, "cri-") {
+		if rt, err := connectRt(rtPath, RuntimeCriO, sys); err == nil {
+			return rt, nil
+		}
+	}
+
 	if strings.Contains(sock, "docker") {
 		// prefer docker
 		if rt, err := connectRt(rtPath, RuntimeDocker, sys); err == nil {
 			return rt, nil
 		}
-	} else if strings.Contains(sock, "containerd") {
+	}
+
+	if strings.Contains(sock, "containerd") {
 		if rt, err := connectRt(rtPath, RuntimeContainerd, sys); err == nil {
-			return rt, nil
-		}
-	} else if strings.Contains(sock, "crio") {
-		if rt, err := connectRt(rtPath, RuntimeCriO, sys); err == nil {
 			return rt, nil
 		}
 	}
@@ -357,10 +361,14 @@ func tryConnectDefaultRt(rootPath string, sys *system.SystemTools) (Runtime, err
 	if rt, err := connectRt(filepath.Join(rootPath, defaultCriOSock), RuntimeCriO, sys); err == nil {
 		return rt, nil
 	}
+
+	if rt, err := connectRt(filepath.Join(rootPath, defaultCriDockerSock), RuntimeCriO, sys); err == nil {
+		return rt, nil
+	}
 	return nil, ErrUnknownRuntime
 }
 
-func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, bool) {
+func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool) {
 	// (1) iterating proc paths to find the "kubelet"
 	if d, err := os.Open("/proc"); err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("open")
@@ -382,23 +390,30 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, bool) {
 						//     --container-runtime-endpoint=unix:///run/k3s/containerd/containerd.sock
 						//     --container-runtime-endpoint=unix:///var/run/crio/crio.sock
 						//     if not found, return "defaultDockerSocket"
+						//     --pod-infra-container-image=registry.k8s.io/pause:3.8
+						endpoint := defaultDockerSocket
+						pause_img := ""
 						for _, cmd := range cmds {
 							// log.WithFields(log.Fields{"cmd": cmd}).Debug()
 							if strings.HasPrefix(cmd, "--container-runtime-endpoint=") {
 								// log.WithFields(log.Fields{"cmd": cmd}).Debug("found")
 								cmd = strings.TrimPrefix(cmd, "--container-runtime-endpoint=")
 								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
-								return cmd, true
+								endpoint = cmd
+							}
+
+							if strings.HasPrefix(cmd, "--pod-infra-container-image=") {
+								pause_img = strings.TrimPrefix(cmd, "--pod-infra-container-image=")
 							}
 						}
 						// pre-k8s-1.24, docker is the default runtime
-						return defaultDockerSocket, true
+						return endpoint, pause_img, true
 					}
 				}
 			}
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 func IsPidHost() bool {	// pid host, pid-1 is the Linux bootup process

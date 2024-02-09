@@ -26,7 +26,8 @@ const (
 	// (v1.17) and
 	// ListVolumes, {Remove,Create}Volume, ListNetworks,
 	// {Inspect,Create,Connect,Disconnect,Remove}Network (v1.21)
-	APIVersion = "v1.21"
+	// Feb1, 2024: API versions before v1.24 are deprecated.
+	APIVersion = "v1.24"
 )
 
 var (
