@@ -30,6 +30,7 @@ const (
 	wpname           = "Wordpress"
 	WPVerFileSuffix  = "wp-includes/version.php"
 	wpVersionMaxSize = 4 * 1024
+	ComposerFile     = "/composer.lock"
 
 	jar                = "jar"
 	javaPOMXML         = "/pom.xml"
@@ -62,6 +63,16 @@ var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]
 var pyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\.]+)-([a-zA-Z0-9\.]+)[\-a-zA-Z0-9\.]*\.(egg-info\/PKG-INFO|dist-info\/WHEEL)$`)
 var rubyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\-]+)-([0-9\.]+)\.gemspec$`)
 var javaInvalidVendorIds = map[string]bool{"%providerName": true}
+
+type ComposerLock struct {
+	Packages    []ComposerPackage `json:"packages"`
+	DevPackages []ComposerPackage `json:"packages-dev"`
+}
+
+type ComposerPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
 
 type AppPackage struct {
 	AppName    string `json:"app_name"`
@@ -115,7 +126,7 @@ func NewScanApps(v2 bool) *ScanApps {
 
 func isAppsPkgFile(filename, fullpath string) bool {
 	if isNodejs(filename) || IsJava(filename) || isPython(filename) ||
-		isRuby(filename) || isDotNet(filename) || isWordpress(filename) {
+		isRuby(filename) || isDotNet(filename) || isWordpress(filename) || isPhpComposer(filename) {
 		return true
 	}
 	// Keep golang check at last as it requires reading file data
@@ -175,6 +186,8 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 		s.parseDotNetPackage(filename, fullpath)
 	} else if isWordpress(filename) {
 		s.parseWordpressPackage(filename, fullpath)
+	} else if isPhpComposer(filename) {
+		s.parsePhpComposerJson(filename, fullpath)
 	} else {
 		s.parseGolangPackage(filename, fullpath)
 	}
@@ -521,6 +534,42 @@ func isDotNet(filename string) bool {
 
 func isWordpress(filename string) bool {
 	return strings.HasSuffix(filename, WPVerFileSuffix)
+}
+
+func isPhpComposer(filename string) bool {
+	return strings.HasSuffix(filename, ComposerFile)
+}
+
+func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
+	data := ComposerLock{}
+	//extract json data
+	bytes, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "file": filename}).Error("failed to read composer.lock file")
+		return
+	}
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "file": filename}).Error("failed to unmarshal json data from composer.lock file")
+		return
+	}
+	//convert json data to one or more AppPackage
+	for _, composerPackage := range data.Packages {
+		packageNameSplit := strings.Split(composerPackage.Name, "/")
+		packageName := packageNameSplit[len(packageNameSplit)-1]
+		appPackage := AppPackage{
+			AppName:    "php",
+			ModuleName: fmt.Sprintf("php:%s", packageName),
+			Version:    composerPackage.Version,
+			FileName:   filename,
+		}
+		//add each AppPackage to s.pkgs map, append if entry already exists.
+		if _, ok := s.pkgs[appPackage.ModuleName]; !ok {
+			s.pkgs[appPackage.ModuleName] = []AppPackage{appPackage}
+		} else {
+			s.pkgs[appPackage.ModuleName] = append(s.pkgs[appPackage.ModuleName], appPackage)
+		}
+	}
 }
 
 func (s *ScanApps) parsePythonPackage(filename string) {
