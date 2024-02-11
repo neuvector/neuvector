@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	manifestList "github.com/docker/distribution/manifest/manifestlist"
 	manifestV1 "github.com/docker/distribution/manifest/schema1"
 	manifestV2 "github.com/docker/distribution/manifest/schema2"
-	goDigest "github.com/opencontainers/go-digest"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
@@ -53,16 +51,6 @@ type ImageInfo struct {
 	IsSignatureImage bool
 	RawManifest      []byte
 	SignatureDigest  string
-}
-
-// SignatureData represents signature image data retrieved from the registry to be
-// used in verification.
-type SignatureData struct {
-	// The raw manifest JSON retrieved from the registry
-	Manifest string `json:"Manifest"`
-
-	// A collection of signature payloads referenced by the manifest to be verified.
-	Payloads map[string]string `json:"Payloads"`
 }
 
 func isPotentialCosignSignatureTag(tag string) bool {
@@ -328,16 +316,6 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	return imageInfo, share.ScanErrorCode_ScanErrNone
 }
 
-//this function will be called at scanner side
-func (rc *RegClient) DownloadRemoteImage(ctx context.Context, name, imgPath string, layers []string, sizes map[string]int64) (map[string]*LayerFiles, share.ScanErrorCode) {
-	log.WithFields(log.Fields{"name": name}).Debug()
-
-	// scheme is always set to v1 because layers of v2 image have been reversed in GetImageInfo.
-	return getImageLayerIterate(ctx, layers, sizes, true, imgPath, func(ctx context.Context, layer string) (interface{}, int64, error) {
-		return rc.DownloadLayer(ctx, name, goDigest.Digest(layer))
-	})
-}
-
 func (rc *RegClient) getSchemaV1Id(manV1 *manifestV1.SignedManifest) string {
 	var id string
 	if len(manV1.History) > 0 {
@@ -373,32 +351,4 @@ func GetCosignSignatureTagFromDigest(digest string) string {
 		log.WithFields(log.Fields{"digest": digest}).Warn("unrecongnized image digest")
 		return ""
 	}
-}
-
-// GetSignatureDataForImage fetches the signature image's maniest and layers for the
-// given repository and digest. The layers are small JSON blobs that represent the payload created and signed
-// by Sigstore's Cosign to be used in verification later.
-//
-// More information about the cosign's signature specification can be found here:
-// https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
-func (rc *RegClient) GetSignatureDataForImage(ctx context.Context, repo string, digest string) (s SignatureData, errCode share.ScanErrorCode) {
-	signatureTag := GetCosignSignatureTagFromDigest(digest)
-	info, errCode := rc.GetImageInfo(ctx, repo, signatureTag, registry.ManifestRequest_CosignSignature)
-	if errCode != share.ScanErrorCode_ScanErrNone {
-		return SignatureData{}, errCode
-	}
-	s.Payloads = make(map[string]string)
-	for _, layer := range info.Layers {
-		rdr, _, err := rc.DownloadLayer(context.Background(), repo, goDigest.Digest(layer))
-		if err != nil {
-			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
-		}
-		layerBytes, err := ioutil.ReadAll(rdr)
-		if err != nil {
-			return SignatureData{}, share.ScanErrorCode_ScanErrRegistryAPI
-		}
-		s.Payloads[layer] = string(layerBytes)
-	}
-	s.Manifest = string(info.RawManifest)
-	return s, share.ScanErrorCode_ScanErrNone
 }

@@ -124,7 +124,7 @@ func NewScanApps(v2 bool) *ScanApps {
 	return &ScanApps{pkgs: make(map[string][]AppPackage), dedup: utils.NewSet(), replace: v2}
 }
 
-func isAppsPkgFile(filename, fullpath string) bool {
+func IsAppsPkgFile(filename, fullpath string) bool {
 	if isNodejs(filename) || IsJava(filename) || isPython(filename) ||
 		isRuby(filename) || isDotNet(filename) || isWordpress(filename) || isPhpComposer(filename) {
 		return true
@@ -141,7 +141,7 @@ func (s *ScanApps) empty() bool {
 	return len(s.pkgs) == 0
 }
 
-func (s *ScanApps) data() map[string][]AppPackage {
+func (s *ScanApps) Data() map[string][]AppPackage {
 	return s.pkgs
 }
 
@@ -164,7 +164,7 @@ func (s *ScanApps) marshal() []byte {
 	return buf.Bytes()
 }
 
-func (s *ScanApps) extractAppPkg(filename, fullpath string) {
+func (s *ScanApps) ExtractAppPkg(filename, fullpath string) {
 	if _, ok := s.pkgs[filename]; ok && !s.replace {
 		return
 	}
