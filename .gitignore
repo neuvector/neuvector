@@ -3,3 +3,5 @@
 .vscode
 *.code-workspace
 *.bak
+
+db/*.db
