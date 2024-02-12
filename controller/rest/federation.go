@@ -535,6 +535,17 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicke
 		_httpClientMutex.RLock()
 		nvHttpClient = _nvHttpClients[proxyOption]
 		_httpClientMutex.RUnlock()
+		if nvHttpClient == nil {
+			httpClient, proxyUrlStr, basicAuth := createHttpClient(proxyOption, clusterAuthTimeout)
+			nvHttpClient = &tNvHttpClient{
+				httpClient:  httpClient,
+				proxyUrlStr: proxyUrlStr,
+				basicAuth:   basicAuth,
+			}
+			_httpClientMutex.Lock()
+			_nvHttpClients[proxyOption] = nvHttpClient
+			_httpClientMutex.Unlock()
+		}
 		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, cntType,
 			jointTicket, jointID, proxyOption, cookie, body, logError); err == nil {
 
