@@ -22,6 +22,12 @@ type NetIface struct {
 	Addrs []NetAddr `json:"addrs"`
 }
 
+type NetLinkAttrs struct {
+	Index     int    `json:"index"`
+	Name      string `json:"name"`
+	OperState bool   `json:"OperState"`
+}
+
 func GetGlobalAddrs() map[string]NetIface {
 	ifaces := make(map[string]NetIface)
 
@@ -89,4 +95,27 @@ func GetRouteIfaceAddr(ip net.IP) (string, *net.IPNet, error) {
 	}
 
 	return link.Attrs().Name, addrs[0].IPNet, nil
+}
+
+func GetNetLinkAttrs() map[string]NetLinkAttrs {
+	linkAttrs := make(map[string]NetLinkAttrs)
+
+	links, err := netlink.LinkList()
+	if err != nil {
+		return linkAttrs
+	}
+
+	for _, link := range links {
+		attrs := link.Attrs()
+
+		linkAttr := NetLinkAttrs{
+			Index:     attrs.Index,
+			Name:      attrs.Name,
+			OperState: attrs.OperState == netlink.OperUp,
+		}
+
+		linkAttrs[attrs.Name] = linkAttr
+	}
+
+	return linkAttrs
 }

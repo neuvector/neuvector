@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -27,6 +28,7 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/vishvananda/netlink"
 )
 
 const containerWaitParentPeriod time.Duration = (time.Second * 1)
@@ -116,6 +118,7 @@ type localSystemInfo struct {
 	disableNetPolicy  bool
 	detectUnmanagedWl bool
 	enableIcmpPolicy  bool
+	linkStates        map[string]bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -148,6 +151,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	jumboFrameMTU:    false,
 	xffEnabled:       defaultXffEnabled,
 	ciliumCNI:        false,
+	linkStates:       make(map[string]bool),
 }
 
 func gInfoLock() {
@@ -2460,4 +2464,58 @@ func cbGetAllContainerList() utils.Set {
 	gInfoRLock()
 	defer gInfoRUnlock()
 	return gInfo.allContainers.Clone()
+}
+
+func StartMonitorHostInterface(hid string, pid int, stopCh chan struct{}) {
+	log.WithFields(log.Fields{"hostid": hid}).Debug("")
+	global.SYS.CallNetNamespaceFunc(pid, func(params interface{}) {
+		intfHostMonitorLoop(hid, stopCh)
+	}, nil)
+}
+
+func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
+	var err error
+	chLink := make(chan netlink.LinkUpdate)
+	doneLink := make(chan struct{})	
+	defer close(doneLink)
+
+	if err = netlink.LinkSubscribe(chLink, doneLink); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Link change subscription failed")
+	}
+	
+	chAddr := make(chan netlink.AddrUpdate)
+	doneAddr := make(chan struct{})	
+	defer close(doneAddr)
+
+	if err = netlink.AddrSubscribe(chAddr, doneAddr); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Address change subscription failed")
+	}
+ 
+	log.Debug("Start monitoring Host Interface changes...")
+
+	for {
+		select {
+		case <-stopCh:
+			log.WithFields(log.Fields{"hostid": hid}).Debug("Monitor host i/f Stopped")
+			return
+		case updateLink := <-chLink:
+			linkName := updateLink.Link.Attrs().Name
+			isUp := (updateLink.IfInfomsg.Flags&syscall.IFF_UP != 0) && (updateLink.IfInfomsg.Flags&syscall.IFF_RUNNING != 0)
+			if prevState, exists := gInfo.linkStates[linkName]; exists {
+				if (prevState && isUp) || (!prevState && !isUp) {
+					continue
+				}
+			}
+			taskReexamHostIntf()
+		case updateAddr := <-chAddr:
+			// only monitor ipv4 for now
+			if utils.IsIPv4(updateAddr.LinkAddress.IP) {
+				if updateAddr.NewAddr && gInfo.hostIPs.Contains(updateAddr.LinkAddress.IP.String()) {
+					continue
+				}
+				// for all other conditions(includes address delete) re-exam host interface
+				taskReexamHostIntf()
+			}
+		}
+	}
 }
