@@ -37,6 +37,10 @@ func GetGlobalAddrs() map[string]NetIface {
 	}
 
 	for _, link := range links {
+		if link.Attrs() == nil {
+			continue
+		}
+		
 		attrs := link.Attrs()
 
 		iface := NetIface{
@@ -106,6 +110,10 @@ func GetNetLinkAttrs() map[string]NetLinkAttrs {
 	}
 
 	for _, link := range links {
+		if link.Attrs() == nil {
+			continue
+		}
+
 		attrs := link.Attrs()
 
 		linkAttr := NetLinkAttrs{
