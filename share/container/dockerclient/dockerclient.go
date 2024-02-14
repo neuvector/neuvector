@@ -27,7 +27,8 @@ const (
 	// ListVolumes, {Remove,Create}Volume, ListNetworks,
 	// {Inspect,Create,Connect,Disconnect,Remove}Network (v1.21)
 	// Feb1, 2024: API versions before v1.24 are deprecated.
-	APIVersion = "v1.24"
+	APIVersion = "v1.21"
+	APIVersion124 = "v1.24"
 )
 
 var (
@@ -631,7 +632,7 @@ func (client *DockerClient) TagImage(nameOrID string, repo string, tag string, f
 }
 
 func (client *DockerClient) Version() (*Version, error) {
-	uri := fmt.Sprintf("/%s/version", APIVersion)
+	uri := fmt.Sprintf("/%s/version", APIVersion124)
 	data, err := client.doRequest("GET", uri, nil, nil)
 	if err != nil {
 		return nil, err
