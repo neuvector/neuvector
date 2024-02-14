@@ -494,6 +494,10 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		} else {
 			refreshGroupMember(cache)
 			groupCacheMap[group.Name] = cache
+			//for imported empty group
+			if cache.members.Cardinality() == 0 && cacher.GetUnusedGroupAging() != 0 {
+				scheduleGroupRemoval(cache)
+			}
 		}
 		if ok := isCreateDlpGroup(&group); ok {
 			createDlpGroup(group.Name, group.CfgType)
