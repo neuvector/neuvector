@@ -2499,7 +2499,7 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 			log.WithFields(log.Fields{"hostid": hid}).Debug("Monitor host i/f Stopped")
 			return
 		case updateLink := <-chLink:
-			if updateLink.Link.Attrs() == nil {
+			if updateLink.Link == nil || updateLink.Link.Attrs() == nil {
 				continue
 			}
 			linkName := updateLink.Link.Attrs().Name
