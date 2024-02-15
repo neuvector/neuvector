@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	dstPrefix           = "/tmp/"
+	dstPrefix           = "/usr/local/bin/cis_yamls/"
 	kube160YAMLFolder	= dstPrefix + "cis-1.6.0/"
 	kube123YAMLFolder	= dstPrefix + "cis-1.23/"
 	kube124YAMLFolder	= dstPrefix + "cis-1.24/"
