@@ -5,10 +5,9 @@ BASE_IMAGE_TAG = latest
 BUILD_IMAGE_TAG = latest
 
 copy_ctrl:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/cis_yamls/
 	mkdir -p ${STAGE_DIR}/etc/
 	mkdir -p ${STAGE_DIR}/etc/neuvector/templates
-	mkdir -p ${STAGE_DIR}/tmp/
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
@@ -19,19 +18,18 @@ copy_ctrl:
 	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/templates/podTemplate.json ${STAGE_DIR}/etc/neuvector/templates/podTemplate.json
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
 
 copy_enf:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/cis_yamls/
 	mkdir -p ${STAGE_DIR}/etc/
-	mkdir -p ${STAGE_DIR}/tmp/
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/agent ${STAGE_DIR}/usr/local/bin/
@@ -67,15 +65,15 @@ copy_enf:
 	cp neuvector/agent/nvbench/kubecis_ocp_4_5.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/nvbench/kubecis_ocp_4_3.rem ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/utils/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/tmp/
-	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/tmp/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/utils/ ${STAGE_DIR}/usr/local/bin/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/usr/local/bin/cis_yamls/
 
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
