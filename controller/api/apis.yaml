@@ -8164,6 +8164,11 @@ definitions:
         type: string
         format: password
         example: password
+      no_proxy_hosts:
+        type: array
+        items:
+          type: string
+        example: ["quay.io", "hub.docker.com"]
   RESTSystemConfigAutoscale:
     type: object
     required:
@@ -13376,6 +13381,9 @@ definitions:
         type: string
         example: example_name
       is_private:
+        type: boolean
+        example: true
+      rootless_keypairs_only:
         type: boolean
         example: true
       rekor_public_key:
