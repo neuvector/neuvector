@@ -129,9 +129,8 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 	perf := make([]string, 0)
 	columns := []interface{}{"id", "type", "assetid", "cve_lists"}
 
-	// we cannot apply asset-based filter to filter out assets in sql query
-	// In the v5.2.4 UI, the impact will include all relevant assets, regardless of asset-based filters.
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Prepared(true).ToSQL()
+	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("GetVulAssetSessionV2, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
 		return nil, 0, perf, err
@@ -214,15 +213,6 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 	elapsed := time.Since(start)
 	perf = append(perf, fmt.Sprintf("2a, derive vuls from assets, assetCount=%d, dbVulAssets=%d, took=%v", assetCount, len(dbVulAssets), elapsed))
 
-	// execute asset-based filter
-	start = time.Now()
-	matchedAssets, err := applyAssetBasedFilters(allowed, queryFilter)
-	if err != nil {
-		return nil, 0, perf, err
-	}
-	elapsed = time.Since(start)
-	perf = append(perf, fmt.Sprintf("2b, applyAssetBasedFilters, took=%v", elapsed))
-
 	// foreach vulassset
 	start = time.Now()
 	nTotalCVE := 0
@@ -241,14 +231,6 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		// CVE based filter
 		if !meetCVEBasedFilter(vulasset, queryFilter) {
 			vulasset.MeetSearch = false // for static data summary
-			dataSlice = append(dataSlice, vulasset)
-			continue
-		}
-
-		// Asset based filter
-		evaluateAssetBasedFilters(vulasset, matchedAssets, queryFilter)
-		if vulasset.Skip {
-			vulasset.MeetSearch = false
 			dataSlice = append(dataSlice, vulasset)
 			continue
 		}
@@ -470,11 +452,11 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 		defer db.Close() // close it after done
 
 		memTables := GetAllTableInMemoryDb()
-		log.WithFields(log.Fields{"memTables": memTables}).Debug("debugme, GetVulAssetSessionV2, use filedb")
+		log.WithFields(log.Fields{"memTables": memTables}).Debug("GetVulAssetSessionV2, use filedb")
 	} else {
 		db = memoryDbHandle
 		memTables := GetAllTableInMemoryDb()
-		log.WithFields(log.Fields{"memTables": memTables}).Debug("debugme, GetVulAssetSessionV2, use memdb")
+		log.WithFields(log.Fields{"memTables": memTables}).Debug("GetVulAssetSessionV2, use memdb")
 	}
 
 	rows, err := db.Query(statement, args...)
@@ -959,4 +941,13 @@ func fillCvePackages(cvePackages map[string]map[string]utils.Set, packagesBytes 
 			}
 		}
 	}
+}
+
+func buildAssetFilterWhereClause(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
+	exp1 := buildWhereClauseForImage(nil, queryFilter)
+	exp2 := buildWhereClauseForWorkload(nil, queryFilter)
+	exp3 := buildWhereClauseForNode(nil, queryFilter)
+	exp4 := buildWhereClauseForPlatform(nil, queryFilter)
+
+	return goqu.Or(exp1, exp2, exp3, exp4)
 }
