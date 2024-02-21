@@ -577,6 +577,14 @@ static void dpi_arrange_search_buffer (dpi_packet_t *p)
                 dlparea->dlp_ptr = dpi_pkt_ptr(p);
                 dlparea->dlp_offset = pkt_seq - dlparea->dlp_start;
             } else {
+                // ignore this pkt for dlp detection
+                if (dpi_pkt_ptr(p) + dlparea->dlp_start - pkt_seq > dpi_pkt_end(p)) {
+                    dlparea->dlp_ptr = dpi_pkt_end(p);
+                    dlparea->dlp_offset = 0;
+                    dlparea->dlp_len = 0;
+                    break;
+                }
+
                 dlparea->dlp_ptr = dpi_pkt_ptr(p) + dlparea->dlp_start - pkt_seq;
                 dlparea->dlp_offset = 0;
             }
