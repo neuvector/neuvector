@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.3'
+  version: '5.3.1'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -2797,7 +2797,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/SigstoreAllRootsOfTrustGet'
+            $ref: '#/definitions/REST_SigstoreRootOfTrustCollection'
     post:
       tags:
         - Scan
@@ -2813,7 +2813,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustPost'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_POST'
       responses:
         '200':
           description: Success
@@ -2837,7 +2837,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustGet'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_GET'
     patch:
       tags:
         - Scan
@@ -2858,7 +2858,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustPatch'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_PATCH'
       responses:
         '200':
           description: Success
@@ -2898,7 +2898,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/SigstoreAllVerifiersGet'
+            $ref: '#/definitions/REST_SigstoreVerifierCollection'
     post:
       tags:
         - Scan
@@ -2919,7 +2919,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifier'
+            $ref: '#/definitions/REST_SigstoreVerifier'
       responses:
         '200':
           description: Success
@@ -2948,7 +2948,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifier'
+            $ref: '#/definitions/REST_SigstoreVerifier'
     patch:
       tags:
         - Scan
@@ -2974,7 +2974,7 @@ paths:
           description: Verifier patch data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifierPatch'
+            $ref: '#/definitions/REST_SigstoreVerifier_PATCH'
       responses:
         '200':
           description: Success
@@ -10863,7 +10863,7 @@ definitions:
           $ref: '#/definitions/RESTRemoteRepository'
   RESTSystemConfigConfigV2:
     type: object
-    description: only for POST(v2/system/config)
+    description: only for PATCH(v2/system/config)
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
@@ -13335,11 +13335,11 @@ definitions:
       apikey_secret:
         type: string
         example: 0u+tVOWNPRfpCK7p9qz
-  SigstoreAllRootsOfTrustGet:
+  REST_SigstoreRootOfTrustCollection:
     type: array
     items:
-      $ref: '#/definitions/RESTSigstoreRootOfTrustGet'
-  RESTSigstoreRootOfTrustGet:
+      $ref: '#/definitions/REST_SigstoreRootOfTrust_GET'
+  REST_SigstoreRootOfTrust_GET:
     type: object
     properties:
       name:
@@ -13347,6 +13347,10 @@ definitions:
         example: example_name
       is_private:
         type: boolean
+        example: true
+      rootless_keypairs_only:
+        type: boolean
+        description: it overrides is_private attribute
         example: true
       rekor_public_key:
         type: string
@@ -13360,14 +13364,14 @@ definitions:
       verifiers:
         type: array
         items:
-          $ref: '#/definitions/RESTSigstoreVerifier'
+          $ref: '#/definitions/REST_SigstoreVerifier'
       cfg_type:
         type: string
         enum: [user_created, ground, federal]
       comment:
         type: string
         example: example comment
-  RESTSigstoreRootOfTrustPost:
+  REST_SigstoreRootOfTrust_POST:
     type: object
     required:
     - name
@@ -13377,6 +13381,10 @@ definitions:
         example: example_name
       is_private:
         type: boolean
+        example: true
+      rootless_keypairs_only:
+        type: boolean
+        description: it overrides is_private attribute
         example: true
       rekor_public_key:
         type: string
@@ -13390,7 +13398,7 @@ definitions:
       comment:
         type: string
         example: example comment
-  RESTSigstoreRootOfTrustPatch:
+  REST_SigstoreRootOfTrust_PATCH:
     type: object
     properties:
       rekor_public_key:
@@ -13405,11 +13413,11 @@ definitions:
       comment:
         type: string
         example: example comment
-  SigstoreAllVerifiersGet:
+  REST_SigstoreVerifierCollection:
     type: array
     items:
-      $ref: '#/definitions/RESTSigstoreVerifier'
-  RESTSigstoreVerifier:
+      $ref: '#/definitions/REST_SigstoreVerifier'
+  REST_SigstoreVerifier:
     type: object
     required:
     - name
@@ -13433,7 +13441,7 @@ definitions:
       comment:
         type: string
         example: example comment
-  RESTSigstoreVerifierPatch:
+  REST_SigstoreVerifier_PATCH:
     type: object
     properties:
       verifier_type:

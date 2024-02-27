@@ -103,7 +103,7 @@ var restErrWorkloadNotFound error = errors.New("Container is not found")
 var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
-var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
+var checkCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 
 var CertManager *kv.CertManager
 
@@ -1259,7 +1259,7 @@ type Context struct {
 	CspType            share.TCspType
 	CspPauseInterval   uint   // in minutes
 	CustomCheckControl string // disable / strict / loose
-	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
+	CheckCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 	CertManager        *kv.CertManager
 }
 

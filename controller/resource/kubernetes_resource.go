@@ -215,8 +215,6 @@ type NvAdmRegRuleSetting struct {
 	Scope      string
 }
 
-type NvCrdInitFunc func(leader bool, cspType share.TCspType)
-
 type NvQueryK8sVerFunc func()
 
 type NvVerifyK8sNsFunc func(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
@@ -309,7 +307,6 @@ var ocVersionMajor int
 
 var cacheEventFunc common.CacheEventFunc
 
-var nvCrdInitFunc NvCrdInitFunc
 var nvQueryK8sVerFunc NvQueryK8sVerFunc
 var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
 var isLeader bool
@@ -1972,10 +1969,9 @@ func AdjustAdmResForOC() {
 	}
 }
 
-func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
-	nvCrdInitFunc = f1
-	nvQueryK8sVerFunc = f2
-	nvVerifyK8sNsFunc = f3
+func AdjustAdmWebhookName(f1 NvQueryK8sVerFunc, f2 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
+	nvQueryK8sVerFunc = f1
+	nvVerifyK8sNsFunc = f2
 	cspType = cspType_
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc

@@ -428,7 +428,7 @@ func main() {
 	}
 
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs, cspType)
+		resource.AdjustAdmWebhookName(cache.QueryK8sVersion, admission.VerifyK8sNs, cspType)
 	}
 
 	// Assign controller interface/IP scope
@@ -589,6 +589,7 @@ func main() {
 	// So, for the new cluster, we only want the lead to upgrade the KV. In the rolling
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
+	crossCheckCRD := false
 	if Ctrler.Leader || !isNewCluster {
 		nvImageVersion := Version
 		if strings.HasPrefix(nvImageVersion, "interim/") {
@@ -597,7 +598,13 @@ func main() {
 				nvImageVersion = *teleCurrentVer
 			}
 		}
-		clusHelper.UpgradeClusterKV(nvImageVersion)
+		verUpdated := clusHelper.UpgradeClusterKV(nvImageVersion)
+		if Ctrler.Leader || verUpdated {
+			// corss-check existing CRs in k9s in situations:
+			// 1. the 1st lead controller in fresh deployment
+			// 2. the 1st new-version controller in rolling upgrade
+			crossCheckCRD = true
+		}
 		clusHelper.FixMissingClusterKV()
 	}
 
@@ -747,6 +754,10 @@ func main() {
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
 	orchConnector.Start(ocImageRegistered, cspType)
+
+	if platform == share.PlatformKubernetes {
+		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)
+	}
 
 	// GRPC should be started after cacher as the handler are cache functions
 	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
