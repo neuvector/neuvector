@@ -14,8 +14,8 @@ copy_ctrl:
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
-	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/scripts/
 	#
 	cp neuvector/templates/podTemplate.json ${STAGE_DIR}/etc/neuvector/templates/podTemplate.json
 	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
@@ -41,7 +41,7 @@ copy_enf:
 	cp neuvector/agent/nvbench/rh_runner.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
 	cp neuvector/agent/nvbench/host.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
 	cp neuvector/agent/nvbench/container.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
-	cp neuvector/agent/nvbench/check_kube_version.sh ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/agent/nvbench/check_kube_version.sh ${STAGE_DIR}/usr/local/bin/scripts/
 	cp neuvector/agent/nvbench/kube_master_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
 	cp neuvector/agent/nvbench/kube_worker_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
 	cp neuvector/agent/nvbench/kube_master_1_2_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
@@ -79,9 +79,9 @@ copy_enf:
 
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
-	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/scripts/
 
 copy_dp:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
@@ -137,7 +137,6 @@ ctrl_image: pull_fleet_base stage_ctrl
 	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/controller -f neuvector/build/Dockerfile.controller .
 
 enf_image: pull_fleet_base stage_enf
-
 	docker build --build-arg NV_TAG=$(NV_TAG) --build-arg BASE_IMAGE_TAG=${BASE_IMAGE_TAG} -t neuvector/enforcer -f neuvector/build/Dockerfile.enforcer .
 
 all_image: pull_all_base stage_all

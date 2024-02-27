@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	srcSh               = "/usr/local/bin/"
+	srcSh               = "/usr/local/bin/scripts/"
 	srcTmpl             = "/usr/local/bin/scripts/tmpl/"
 	srcRem             = "/usr/local/bin/scripts/rem/"
 	dstSh               = "/tmp/"
