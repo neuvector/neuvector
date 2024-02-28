@@ -3458,6 +3458,25 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTSystemConfigDataV2'
+    patch:
+      tags:
+        - System
+      summary: System configure (starting from 5.0, rest client should call this api.)
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: System configure data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTSystemConfigConfigDataV2'
+      responses:
+        '200':
+          description: Success
   /v1/system/config/webhook:
     post:
       tags:
@@ -10751,7 +10770,6 @@ definitions:
         $ref: '#/definitions/RESTFedSystemConfig'
   RESTSystemConfigConfig:
     type: object
-    description: only for POST(v1/system/config)
     properties:
       new_service_policy_mode:
         type: string
@@ -10863,7 +10881,6 @@ definitions:
           $ref: '#/definitions/RESTRemoteRepository'
   RESTSystemConfigConfigV2:
     type: object
-    description: only for PATCH(v2/system/config)
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
@@ -10896,9 +10913,20 @@ definitions:
           $ref: '#/definitions/RESTWebhook'
   RESTSystemConfigConfigData:
     type: object
+    description: it leverages RESTSystemConfigConfigData in apis.go
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
+      fed_config:
+        $ref: '#/definitions/RESTFedSystemConfigConfig'
+      net_config:
+        $ref: '#/definitions/RESTSysNetConfigConfig'
+      atmo_config:
+        $ref: '#/definitions/RESTSysAtmoConfigConfig'
+  RESTSystemConfigConfigDataV2:
+    type: object
+    description: it leverages RESTSystemConfigConfigData in apis.go
+    properties:
       config_v2:
         $ref: '#/definitions/RESTSystemConfigConfigV2'
       fed_config:
