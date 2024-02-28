@@ -1938,7 +1938,7 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
 				leader = true
 			}
-			nvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
+			nvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, false, cctx.CspType)
 		}
 	}
 

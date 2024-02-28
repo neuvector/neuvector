@@ -38,7 +38,7 @@ type ClusterHelper interface {
 	AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error)
 	ReleaseLock(cluster.LockInterface) error
 
-	UpgradeClusterKV(version string)
+	UpgradeClusterKV(version string) (verUpdated bool)
 	UpgradeClusterImport(ver *share.CLUSCtrlVersion)
 	FixMissingClusterKV()
 

@@ -822,7 +822,7 @@ func putControlVersion(ver *share.CLUSCtrlVersion) error {
 }
 
 // version param is the NV Version embedded in the controller process
-func (m clusterHelper) UpgradeClusterKV(version string) {
+func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 	var run bool
 
 	lock, err := m.AcquireLock(share.CLUSLockUpgradeKey, upgradeClusterLockWait)
@@ -865,8 +865,16 @@ func (m clusterHelper) UpgradeClusterKV(version string) {
 	if ver != newVer {
 		putControlVersion(newVer)
 		cfgHelper.writeBackupVersion()
+
+		if !strings.HasPrefix(version, "interim/") {
+			if ver.CtrlVersion != version {
+				verUpdated = true
+			}
+		}
 	}
 	log.WithFields(log.Fields{"version": newVer}).Info("After upgrade")
+
+	return
 }
 
 func (m clusterHelper) UpgradeClusterImport(importVer *share.CLUSCtrlVersion) {
