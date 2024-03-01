@@ -8029,6 +8029,9 @@ definitions:
       ibm_cloud_account:
         type: string
         example: ""
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistryConfigData:
     type: object
     required:

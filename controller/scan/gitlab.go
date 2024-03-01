@@ -97,7 +97,10 @@ func newHttpClient(proxy string, insecure bool) (*http.Client, error) {
 
 func (r *gitlab) newGitlabClient() error {
 	var err error
-	proxy := GetProxy(r.apiUrl)
+	var proxy string
+	if !r.ignoreProxy {
+		proxy = GetProxy(r.apiUrl)
+	}
 	r.gitlabClient, err = newHttpClient(proxy, true)
 	return err
 }

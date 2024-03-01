@@ -650,10 +650,14 @@ func isPublicRegistry(cfg *share.CLUSRegistryConfig) bool {
 func newRegistryDriver(cfg *share.CLUSRegistryConfig, public bool, tracer httptrace.HTTPTrace) registryDriver {
 	baseDriver := base{
 		regURL:      cfg.Registry,
-		proxy:       GetProxy(cfg.Registry),
 		scanLayers:  cfg.ScanLayers,
 		scanSecrets: !cfg.DisableFiles,
 		tracer:      tracer,
+		ignoreProxy: cfg.IgnoreProxy,
+	}
+
+	if !baseDriver.ignoreProxy {
+		baseDriver.proxy = GetProxy(cfg.Registry)
 	}
 
 	if cfg.Type == share.RegistryTypeJFrog {

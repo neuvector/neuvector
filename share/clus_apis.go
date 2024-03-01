@@ -1701,6 +1701,7 @@ type CLUSRegistryConfig struct {
 	IBMCloudAccount    string                `json:"ibmcloud_account"`
 	IBMCloudTokenURL   string                `json:"ibmcloud_token_url"`
 	CfgType            TCfgType              `json:"cfg_type"`
+	IgnoreProxy        bool                  `json:"ignore_proxy"`
 }
 
 type CLUSImage struct {
