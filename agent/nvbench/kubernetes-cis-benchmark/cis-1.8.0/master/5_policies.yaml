@@ -481,5 +481,5 @@ groups:
         audit: |
               check="$id  - $description"
               manual "$check"
-              manual "      * Run this command in default namespace.  kubectl get $(kubectl api-resources --verbs=list --namespaced=true -o name | paste -sd, -) --ignore-not-found -n default . The only entries there should be system managed resources such as the kubernetes service"
+              manual "      * Run this command in default namespace.  kubectl get \$(kubectl api-resources --verbs=list --namespaced=true -o name | paste -sd, -) --ignore-not-found -n default . The only entries there should be system managed resources such as the kubernetes service"
         remediation: Ensure that namespaces are created to allow for appropriate segregation of Kubernetes resources and that all new resources are created in a specific namespace.
