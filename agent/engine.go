@@ -34,7 +34,7 @@ import (
 const containerWaitParentPeriod time.Duration = (time.Second * 1)
 const containerReexamIntfMax time.Duration = (time.Second * 180)
 const containerReexamIntfIPv4Min time.Duration = (time.Second * 4)
-const containerTaskChanSizeMin = 256
+const containerTaskChanSizeMin = 512
 
 var errHostModeUnsupported = errors.New("Host mode not supported")
 var errChildUnsupported = errors.New("Child container not supported")
