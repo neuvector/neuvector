@@ -1703,6 +1703,7 @@ func (rs *Registry) getConfig(acc *access.AccessControl) *api.RESTRegistry {
 		GitlabPrivateToken: rs.config.GitlabPrivateToken,
 		IBMCloudTokenURL:   rs.config.IBMCloudTokenURL,
 		IBMCloudAccount:    rs.config.IBMCloudAccount,
+		IgnoreProxy:        rs.config.IgnoreProxy,
 	}
 	if len(rs.config.Domains) != 0 {
 		reg.Domains = rs.config.Domains

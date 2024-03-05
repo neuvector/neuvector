@@ -3176,6 +3176,7 @@ type RESTRegistry struct {
 	IBMCloudTokenURL   string             `json:"ibm_cloud_token_url"`
 	IBMCloudAccount    string             `json:"ibm_cloud_account"`
 	CfgType            string             `json:"cfg_type"`
+	IgnoreProxy        bool               `json:"ignore_proxy"`
 }
 
 type RESTRegistryConfig struct {
