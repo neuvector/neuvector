@@ -596,6 +596,7 @@ func main() {
 		ProcPolicyLookupFunc: processPolicyLookup,
 		IsK8sGroupWithProbe:  pe.IsK8sGroupWithProbe,
 		ReportLearnProc:      addLearnedProcess,
+		IsNeuvectorContainer: isNeuvectorContainerById,
 		ContainerInContainer: agentEnv.containerInContainer,
 		GetContainerPid:      cbGetContainerPid,
 		GetAllContainerList:  cbGetAllContainerList,

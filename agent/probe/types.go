@@ -21,6 +21,7 @@ type ProbeConfig struct {
 	ProcPolicyLookupFunc func(id, riskType, pname, ppath string, pid, pgid, shellCmd int, proc *share.CLUSProcessProfileEntry) (string, string, string, string, bool, error)
 	IsK8sGroupWithProbe  func(svcGroup string) bool
 	ReportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
+	IsNeuvectorContainer func(id string) (string, bool)
 	ContainerInContainer bool
 	GetContainerPid      func(id string) int
 	GetAllContainerList  func() utils.Set
