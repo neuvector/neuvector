@@ -64,7 +64,7 @@ const (
 	rh140YAMLFolder		= dstYaml + "rh-1.4.0/"
 	gke140YAMLFolder  	= dstYaml + "gke-1.4.0/"
 	aks140YAMLFolder  	= dstYaml + "aks-1.4.0/"
-	eks140YAMLFolder  	= dstYaml + "eks-1.4.0/"	
+	eks140YAMLFolder  	= dstYaml + "eks-1.4.0/"
 	kubeGKEMasterTmpl   = srcTmpl + "kube_master_gke_1_0_0.tmpl"
 	kubeGKEWorkerTmpl   = srcTmpl + "kube_worker_gke_1_0_0.tmpl"
 	kubeGKERemediation  = srcRem + "kubecis_gke_1_0_0.rem"
@@ -237,12 +237,22 @@ func (b *Bench) BenchLoop() {
 		select {
 		case <-b.hostTimer.C:
 			if agentEnv.autoBenchmark {
+				if prober.IsNvProtectAlerted {
+					log.Info("Alerted: Ignore host bench tests")
+					continue
+				}
 				b.doDockerHostBench()
 			}
 		case <-b.kubeTimer.C:
 			if !agentEnv.autoBenchmark {
 				continue
 			}
+
+			if prober.IsNvProtectAlerted {
+				log.Info("Alerted: Ignore Kube bench tests")
+				continue
+			}
+
 			// Check version whenever the benchmark is rerun
 			k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 			if masterScript == "" {
@@ -366,6 +376,11 @@ func (b *Bench) BenchLoop() {
 			b.doKubeBench(masterScript, workerScript, remediation)
 		case <-b.conTimer.C:
 			containers := b.cloneAllNewContainers()
+			if prober.IsNvProtectAlerted {
+				log.Info("Alerted: Ignore benchmarks")
+				continue
+			}
+
 			if agentEnv.autoBenchmark {
 				if Host.CapDockerBench {
 					b.doDockerContainerBench(containers)
@@ -1239,7 +1254,7 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 	var errb, outb bytes.Buffer
 	log.WithFields(log.Fields{"type": bench}).Debug("Running Kubernetes CIS bench")
 
-	var cmd *exec.Cmd 
+	var cmd *exec.Cmd
 	var config string
 
 	if b.cisYAMLMode {
@@ -1376,7 +1391,7 @@ func (b *Bench) loadRemediationFromRem(path string) map[string]string {
 			remediationMap[strings.TrimSpace(line[:i-1])] = line[i+1:]
 		}
 	}
-	return remediationMap 
+	return remediationMap
 }
 
 func (b *Bench) loadRemediation(path string) map[string]string {
