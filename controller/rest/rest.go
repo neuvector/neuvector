@@ -1380,8 +1380,8 @@ func initJWTSignKey() error {
 	return nil
 }
 
-// InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
-func InitContext(ctx *Context) {
+// PreInitContext() must be called before orch connector starts in main()
+func PreInitContext(ctx *Context) {
 	cctx = ctx
 	localDev = ctx.LocalDev
 	cacher = ctx.Cacher
@@ -1393,6 +1393,10 @@ func InitContext(ctx *Context) {
 	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
+}
+
+// InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
+func InitContext(ctx *Context) {
 
 	_restPort = ctx.RESTPort
 	_fedPort = ctx.FedPort
