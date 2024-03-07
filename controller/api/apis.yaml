@@ -8610,6 +8610,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-06-20T19:00:53Z
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistrySummaryData:
     type: object
     required:
