@@ -454,6 +454,10 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		config.ParsedFilters = make([]*share.CLUSRegistryFilter, 0)
 	}
 
+	if rconf.IgnoreProxy != nil {
+		config.IgnoreProxy = *rconf.IgnoreProxy
+	}
+
 	// For every domain that a registry is in, the user must have PERM_REG_SCAN(modify) permission in the domain
 	// (use a copy object without parsed filters so that the registr's domains/creatorDomains are used for access control checking)
 	configTemp := config
@@ -737,6 +741,10 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 			config.Filters = filters
 			config.ParsedFilters = rfilters
+		}
+
+		if rconf.IgnoreProxy != nil {
+			config.IgnoreProxy = *rconf.IgnoreProxy
 		}
 
 		// For every domain that a registry is in, the user must have PERM_REG_SCAN(modify) permission in the domain

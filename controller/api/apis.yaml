@@ -8048,6 +8048,9 @@ definitions:
       ibm_cloud_account:
         type: string
         example: ""
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistryConfigData:
     type: object
     required:
@@ -8626,6 +8629,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-06-20T19:00:53Z
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistrySummaryData:
     type: object
     required:
