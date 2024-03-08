@@ -548,8 +548,8 @@ func initTest() {
 	router.DELETE("/v1/server/:name", handlerServerDelete)
 	router.GET("/v1/token_auth_server/:server/slo", handlerGenerateSLORequest)
 
-	router.POST("/v1/scan/registry", handlerRegistryCreate)
-	router.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
+	router.POST("/v1/scan/registry", handlerRegistryCreateV1)
+	router.PATCH("/v1/scan/registry/:name", handlerRegistryConfigV1)
 	router.GET("/v1/scan/registry", handlerRegistryList)
 	router.GET("/v1/scan/registry/:name", handlerRegistryShow)
 	router.DELETE("/v1/scan/registry/:name", handlerRegistryDelete)

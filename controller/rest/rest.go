@@ -1661,8 +1661,10 @@ func StartRESTServer() {
 	r.GET("/v1/scan/platform/platform", handlerScanPlatformReport)
 	r.POST("/v1/scan/result/repository", handlerScanRepositorySubmit) // Used by CI-integration, for scanner submit scan result. Skip API
 	r.POST("/v1/scan/repository", handlerScanRepositoryReq)           // Used by CI-integration, for scanning container image
-	r.POST("/v1/scan/registry", handlerRegistryCreate)
-	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
+	r.POST("/v1/scan/registry", handlerRegistryCreateV1)
+	r.POST("/v2/scan/registry", handlerRegistryCreateV2)
+	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfigV1)
+	r.PATCH("/v2/scan/registry/:name", handlerRegistryConfigV2)
 	r.POST("/v1/scan/registry/:name/test", handlerRegistryTest)         // debug
 	r.DELETE("/v1/scan/registry/:name/test", handlerRegistryTestCancel) // debug
 	r.GET("/v1/scan/registry", handlerRegistryList)                     // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload

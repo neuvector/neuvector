@@ -3206,8 +3206,51 @@ type RESTRegistryConfig struct {
 	IgnoreProxy        *bool                    `json:"ignore_proxy"`
 }
 
+type RESTRegistryConfigV2 struct {
+	Name         string                          `json:"name"`
+	Type         string                          `json:"registry_type"`
+	Registry     *string                         `json:"registry,omitempty"`
+	Domains      *[]string                       `json:"domains,omitempty"`
+	Filters      *[]string                       `json:"filters,omitempty"`
+	CfgType      string                          `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	Auth         *RESTRegistryConfigAuth         `json:"auth"`
+	Scan         *RESTRegistryConfigScan         `json:"scan"`
+	Integrations *RESTRegistryConfigIntegrations `json:"integrations"`
+}
+
+type RESTRegistryConfigAuth struct {
+	Username      *string                  `json:"username,omitempty"`
+	Password      *string                  `json:"password,omitempty,cloak"`
+	AuthToken     *string                  `json:"auth_token,omitempty,cloak"`
+	AuthWithToken *bool                    `json:"auth_with_token,omitempty"`
+	AwsKey        *RESTAWSAccountKeyConfig `json:"aws_key,omitempty"`
+	GcrKey        *RESTGCRKeyConfig        `json:"gcr_key,omitempty"`
+}
+
+type RESTRegistryConfigScan struct {
+	RescanImage *bool             `json:"rescan_after_db_update,omitempty"`
+	ScanLayers  *bool             `json:"scan_layers,omitempty"`
+	RepoLimit   *int              `json:"repo_limit,omitempty"`
+	TagLimit    *int              `json:"tag_limit,omitempty"`
+	Schedule    *RESTScanSchedule `json:"schedule,omitempty"`
+	IgnoreProxy *bool             `json:"ignore_proxy"`
+}
+
+type RESTRegistryConfigIntegrations struct {
+	JfrogMode          *string `json:"jfrog_mode,omitempty"`
+	JfrogAQL           *bool   `json:"jfrog_aql,omitempty"`
+	GitlabApiUrl       *string `json:"gitlab_external_url,omitempty"`
+	GitlabPrivateToken *string `json:"gitlab_private_token,omitempty,cloak"`
+	IBMCloudTokenURL   *string `json:"ibm_cloud_token_url,omitempty"`
+	IBMCloudAccount    *string `json:"ibm_cloud_account,omitempty"`
+}
+
 type RESTRegistryConfigData struct {
 	Config *RESTRegistryConfig `json:"config"`
+}
+
+type RESTRegistryConfigDataV2 struct {
+	Config *RESTRegistryConfigV2 `json:"config"`
 }
 
 type RESTRegistrySummary struct {
