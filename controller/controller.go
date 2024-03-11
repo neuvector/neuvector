@@ -751,18 +751,6 @@ func main() {
 	// start OPA server, should be started before RegisterStoreWatcher()
 	opa.InitOpaServer()
 
-	// Orch connector should be started after cacher so the listeners are ready
-	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered, cspType)
-
-	if platform == share.PlatformKubernetes {
-		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)
-	}
-
-	// GRPC should be started after cacher as the handler are cache functions
-	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
-
-	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
 		LocalDev:           dev,
 		EvQueue:            evqueue,
@@ -782,6 +770,21 @@ func main() {
 		CustomCheckControl: *custom_check_control,
 		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
 	}
+	// rest.PreInitContext() must be called before orch connector because existing CRD handling could happen right after orch connecter starts
+	rest.PreInitContext(&rctx)
+
+	// Orch connector should be started after cacher so the listeners are ready
+	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
+	orchConnector.Start(ocImageRegistered, cspType)
+
+	if platform == share.PlatformKubernetes {
+		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)
+	}
+
+	// GRPC should be started after cacher as the handler are cache functions
+	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
+
+	// init rest server context before listening KV object store, as federation server can be started from there.
 	rest.InitContext(&rctx)
 
 	// Registry cluster event handlers
