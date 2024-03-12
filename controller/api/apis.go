@@ -3203,7 +3203,7 @@ type RESTRegistryConfig struct {
 	IBMCloudTokenURL   *string                  `json:"ibm_cloud_token_url,omitempty"`
 	IBMCloudAccount    *string                  `json:"ibm_cloud_account,omitempty"`
 	CfgType            string                   `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	IgnoreProxy        *bool                    `json:"ignore_proxy"`
+	IgnoreProxy        *bool                    `json:"ignore_proxy,omitempty"`
 }
 
 type RESTRegistryConfigV2 struct {
@@ -3213,9 +3213,9 @@ type RESTRegistryConfigV2 struct {
 	Domains      *[]string                       `json:"domains,omitempty"`
 	Filters      *[]string                       `json:"filters,omitempty"`
 	CfgType      string                          `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	Auth         *RESTRegistryConfigAuth         `json:"auth"`
-	Scan         *RESTRegistryConfigScan         `json:"scan"`
-	Integrations *RESTRegistryConfigIntegrations `json:"integrations"`
+	Auth         *RESTRegistryConfigAuth         `json:"auth,omitempty"`
+	Scan         *RESTRegistryConfigScan         `json:"scan,omitempty"`
+	Integrations *RESTRegistryConfigIntegrations `json:"integrations,omitempty"`
 }
 
 type RESTRegistryConfigAuth struct {
@@ -3233,7 +3233,7 @@ type RESTRegistryConfigScan struct {
 	RepoLimit   *int              `json:"repo_limit,omitempty"`
 	TagLimit    *int              `json:"tag_limit,omitempty"`
 	Schedule    *RESTScanSchedule `json:"schedule,omitempty"`
-	IgnoreProxy *bool             `json:"ignore_proxy"`
+	IgnoreProxy *bool             `json:"ignore_proxy,omitempty"`
 }
 
 type RESTRegistryConfigIntegrations struct {
