@@ -195,59 +195,7 @@ func registryConfigV2ToV1(v2data api.RESTRegistryConfigDataV2) api.RESTRegistryC
 	return v1data
 }
 
-func handlerRegistryCreateV1(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	body, _ := ioutil.ReadAll(r.Body)
-
-	var data api.RESTRegistryConfigData
-	err := json.Unmarshal(body, &data)
-	if err != nil || data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	handlerRegistryCreate(data, w, r, ps)
-}
-
-func handlerRegistryCreateV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	body, _ := ioutil.ReadAll(r.Body)
-
-	var v2data api.RESTRegistryConfigDataV2
-	err := json.Unmarshal(body, &v2data)
-	if err != nil || v2data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	handlerRegistryCreate(registryConfigV2ToV1(v2data), w, r, ps)
-}
-
-func handlerRegistryConfigV1(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	body, _ := ioutil.ReadAll(r.Body)
-
-	var data api.RESTRegistryConfigData
-	err := json.Unmarshal(body, &data)
-	if err != nil || data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	handlerRegistryConfig(data, w, r, ps)
-}
-
-func handlerRegistryConfigV2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	body, _ := ioutil.ReadAll(r.Body)
-
-	var v2data api.RESTRegistryConfigDataV2
-	err := json.Unmarshal(body, &v2data)
-	if err != nil || v2data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	handlerRegistryConfig(registryConfigV2ToV1(v2data), w, r, ps)
-}
-
-func handlerRegistryCreate(data api.RESTRegistryConfigData, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 	var err error
@@ -263,6 +211,25 @@ func handlerRegistryCreate(data api.RESTRegistryConfigData, w http.ResponseWrite
 	if licenseAllowScan() != true {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
+	}
+
+	var data api.RESTRegistryConfigData
+	body, _ := ioutil.ReadAll(r.Body)
+
+	if getRequestApiVersion(r) == ApiVersion2 {
+		var v2data api.RESTRegistryConfigDataV2
+		err := json.Unmarshal(body, &v2data)
+		if err != nil || v2data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		data = registryConfigV2ToV1(v2data)
+	} else {
+		err = json.Unmarshal(body, &data)
+		if err != nil || data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
 	}
 
 	rconf := data.Config
@@ -568,7 +535,7 @@ func handlerRegistryCreate(data api.RESTRegistryConfigData, w http.ResponseWrite
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Create registry")
 }
 
-func handlerRegistryConfig(data api.RESTRegistryConfigData, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 
@@ -580,6 +547,25 @@ func handlerRegistryConfig(data api.RESTRegistryConfigData, w http.ResponseWrite
 	if licenseAllowScan() != true {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
+	}
+
+	var data api.RESTRegistryConfigData
+	body, _ := ioutil.ReadAll(r.Body)
+
+	if getRequestApiVersion(r) == ApiVersion2 {
+		var v2data api.RESTRegistryConfigDataV2
+		err := json.Unmarshal(body, &v2data)
+		if err != nil || v2data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		data = registryConfigV2ToV1(v2data)
+	} else {
+		err := json.Unmarshal(body, &data)
+		if err != nil || data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
 	}
 
 	name := ps.ByName("name")
