@@ -153,9 +153,52 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 	return repoFilters, nil
 }
 
+func registryConfigV2ToV1(v2data api.RESTRegistryConfigDataV2) api.RESTRegistryConfigData {
+	v1data := api.RESTRegistryConfigData{
+		Config: &api.RESTRegistryConfig{},
+	}
+
+	if v2data.Config != nil {
+		v1data.Config.Name = v2data.Config.Name
+		v1data.Config.Type = v2data.Config.Type
+		v1data.Config.Registry = v2data.Config.Registry
+		v1data.Config.Domains = v2data.Config.Domains
+		v1data.Config.Filters = v2data.Config.Filters
+		v1data.Config.CfgType = v2data.Config.CfgType
+
+		if v2data.Config.Auth != nil {
+			v1data.Config.Username = v2data.Config.Auth.Username
+			v1data.Config.Password = v2data.Config.Auth.Password
+			v1data.Config.AuthToken = v2data.Config.Auth.AuthToken
+			v1data.Config.AuthWithToken = v2data.Config.Auth.AuthWithToken
+			v1data.Config.AwsKey = v2data.Config.Auth.AwsKey
+			v1data.Config.GcrKey = v2data.Config.Auth.GcrKey
+		}
+		if v2data.Config.Scan != nil {
+			v1data.Config.RescanImage = v2data.Config.Scan.RescanImage
+			v1data.Config.ScanLayers = v2data.Config.Scan.ScanLayers
+			v1data.Config.RepoLimit = v2data.Config.Scan.RepoLimit
+			v1data.Config.TagLimit = v2data.Config.Scan.TagLimit
+			v1data.Config.Schedule = v2data.Config.Scan.Schedule
+			v1data.Config.IgnoreProxy = v2data.Config.Scan.IgnoreProxy
+		}
+		if v2data.Config.Integrations != nil {
+			v1data.Config.JfrogMode = v2data.Config.Integrations.JfrogMode
+			v1data.Config.JfrogAQL = v2data.Config.Integrations.JfrogAQL
+			v1data.Config.GitlabApiUrl = v2data.Config.Integrations.GitlabApiUrl
+			v1data.Config.GitlabPrivateToken = v2data.Config.Integrations.GitlabPrivateToken
+			v1data.Config.IBMCloudTokenURL = v2data.Config.Integrations.IBMCloudTokenURL
+			v1data.Config.IBMCloudAccount = v2data.Config.Integrations.IBMCloudAccount
+		}
+	}
+
+	return v1data
+}
+
 func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
+	var err error
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
@@ -170,13 +213,23 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	var data api.RESTRegistryConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 
-	var data api.RESTRegistryConfigData
-	err := json.Unmarshal(body, &data)
-	if err != nil || data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
+	if getRequestApiVersion(r) == ApiVersion2 {
+		var v2data api.RESTRegistryConfigDataV2
+		err := json.Unmarshal(body, &v2data)
+		if err != nil || v2data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		data = registryConfigV2ToV1(v2data)
+	} else {
+		err = json.Unmarshal(body, &data)
+		if err != nil || data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
 	}
 
 	rconf := data.Config
@@ -496,17 +549,26 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	name := ps.ByName("name")
-
+	var data api.RESTRegistryConfigData
 	body, _ := ioutil.ReadAll(r.Body)
 
-	var data api.RESTRegistryConfigData
-	if err := json.Unmarshal(body, &data); err != nil || data.Config == nil {
-		log.WithFields(log.Fields{"error": err}).Error()
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
+	if getRequestApiVersion(r) == ApiVersion2 {
+		var v2data api.RESTRegistryConfigDataV2
+		err := json.Unmarshal(body, &v2data)
+		if err != nil || v2data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		data = registryConfigV2ToV1(v2data)
+	} else {
+		err := json.Unmarshal(body, &data)
+		if err != nil || data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
 	}
 
+	name := ps.ByName("name")
 	rconf := data.Config
 
 	if rconf.Name != name {

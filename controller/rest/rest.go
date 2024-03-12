@@ -51,6 +51,13 @@ import (
 const retryClusterMax int = 3
 const clusterLockWait = time.Duration(time.Second * 20)
 
+type ApiVersion int
+
+const (
+	ApiVersion1 ApiVersion = iota
+	ApiVersion2
+)
+
 const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's give ip/tcp/http header 300 bytes
 
 var evqueue cluster.ObjectQueueInterface
@@ -1666,7 +1673,9 @@ func StartRESTServer() {
 	r.POST("/v1/scan/result/repository", handlerScanRepositorySubmit) // Used by CI-integration, for scanner submit scan result. Skip API
 	r.POST("/v1/scan/repository", handlerScanRepositoryReq)           // Used by CI-integration, for scanning container image
 	r.POST("/v1/scan/registry", handlerRegistryCreate)
+	r.POST("/v2/scan/registry", handlerRegistryCreate)
 	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
+	r.PATCH("/v2/scan/registry/:name", handlerRegistryConfig)
 	r.POST("/v1/scan/registry/:name/test", handlerRegistryTest)         // debug
 	r.DELETE("/v1/scan/registry/:name/test", handlerRegistryTestCancel) // debug
 	r.GET("/v1/scan/registry", handlerRegistryList)                     // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
@@ -2063,4 +2072,19 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
 	}
+}
+
+// api version is always the first path element
+// Ex: /v1/scan/registry
+//      ^^
+func getRequestApiVersion(r *http.Request) ApiVersion {
+	if r.URL == nil || len(r.URL.Path) == 0 {
+		return ApiVersion1
+	}
+	trimmedPath := strings.Trim(r.URL.Path, "/")
+	splitPath := strings.Split(trimmedPath, "/")
+	if splitPath[0] == "v2" {
+		return ApiVersion2
+	}
+	return ApiVersion1
 }
