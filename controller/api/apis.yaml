@@ -2538,6 +2538,26 @@ paths:
       responses:
         '200':
           description: Success
+  /v2/scan/registry:
+    post:
+      tags:
+        - Scan
+      summary: Create a registry
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Registry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRegistryConfigDataV2'
+      responses:
+        '200':
+          description: Success
   /v1/scan/registry/{name}:
     get:
       tags:
@@ -2596,6 +2616,31 @@ paths:
           description: Name of the registry
           required: true
           type: string
+      responses:
+        '200':
+          description: Success
+  /v2/scan/registry/{name}:
+    patch:
+      tags:
+        - Scan
+      summary: Update registry
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: path
+          name: name
+          description: Name of the registry
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Registry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRegistryConfigDataV2'
       responses:
         '200':
           description: Success
@@ -8151,6 +8196,105 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTRegistryImageSummary'
+  RESTRegistryConfigAuth:
+    type: object
+    properties:
+      username:
+        type: string
+        example: myusername
+      password:
+        type: string
+        format: password
+        example: mypassword
+      auth_token:
+        type: string
+        example: ""
+      auth_with_token:
+        type: boolean
+        example: true
+      aws_key:
+        $ref: '#/definitions/RESTAWSAccountKeyConfig'
+      gcr_key:
+        $ref: '#/definitions/RESTGCRKeyConfig'
+  RESTRegistryConfigScan:
+    type: object
+    properties:
+      rescan_after_db_update:
+        type: boolean
+        example: false
+      scan_layers:
+        type: boolean
+        example: false
+      repo_limit:
+        type: integer
+        example: 1
+      tag_limit:
+        type: integer
+        example: 1
+      schedule:
+        $ref: '#/definitions/RESTScanSchedule'
+      ignore_proxy:
+        type: boolean
+        example: false
+  RESTRegistryConfigIntegrations:
+    type: object
+    properties:
+      jfrog_mode:
+        type: string
+        example: ""
+      jfrog_aql:
+        type: boolean
+        example: false
+      gitlab_external_url:
+        type: string
+        example: ""
+      gitlab_private_token:
+        type: string
+        example: ""
+      ibm_cloud_token_url:
+        type: string
+        example: ""
+      ibm_cloud_account:
+        type: string
+        example: ""
+  RESTRegistryConfigV2:
+    type: object
+    required:
+      - name
+      - registry_type
+    properties:
+      name:
+        type: string
+        example: myregistry
+      registry_type:
+        type: string
+        example: docker
+      registry:
+        type: string
+        example: https://registry.hub.docker.com/
+      domains:
+        type: array
+        items:
+          type: string
+          example: ""
+      filters:
+        type: array
+        items:
+          type: string
+          example: neuvector/*:*
+      auth:
+        $ref: '#/definitions/RESTRegistryConfigAuth'
+      scan:
+        $ref: '#/definitions/RESTRegistryConfigScan'
+      integrations:
+        $ref: '#/definitions/RESTRegistryConfigIntegrations'
+  RESTRegistryConfigDataV2:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTRegistryConfigV2'
   RESTProxy:
     type: object
     required:
