@@ -153,7 +153,7 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 	return repoFilters, nil
 }
 
-func RegistryConfigV2ToV1(v2data api.RESTRegistryConfigDataV2) api.RESTRegistryConfigData {
+func registryConfigV2ToV1(v2data api.RESTRegistryConfigDataV2) api.RESTRegistryConfigData {
 	v1data := api.RESTRegistryConfigData{
 		Config: &api.RESTRegistryConfig{},
 	}
@@ -218,7 +218,7 @@ func handlerRegistryCreateV2(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	handlerRegistryCreate(RegistryConfigV2ToV1(v2data), w, r, ps)
+	handlerRegistryCreate(registryConfigV2ToV1(v2data), w, r, ps)
 }
 
 func handlerRegistryConfigV1(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -244,7 +244,7 @@ func handlerRegistryConfigV2(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	handlerRegistryConfig(RegistryConfigV2ToV1(v2data), w, r, ps)
+	handlerRegistryConfig(registryConfigV2ToV1(v2data), w, r, ps)
 }
 
 func handlerRegistryCreate(data api.RESTRegistryConfigData, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
