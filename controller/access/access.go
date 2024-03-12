@@ -627,9 +627,7 @@ func CompileUriPermitsMapping() {
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry",
-				"v2/scan/registry",
 				"v1/scan/registry/*",
-				"v2/scan/registry/*",
 				"v1/scan/registry/*/images",
 				"v1/scan/registry/*/image/*",
 				"v1/scan/registry/*/layers/*",
@@ -994,7 +992,6 @@ func CompileUriPermitsMapping() {
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry/*/scan",
 				"v1/scan/registry/*",
-				"v2/scan/registry/*",
 				"v1/scan/registry/*/test",
 				"v1/scan/sigstore/root_of_trust/*",
 				"v1/scan/sigstore/root_of_trust/*/verifier/*",
