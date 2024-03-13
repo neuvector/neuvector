@@ -638,11 +638,11 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 	if (q.PublishedType == "before" || q.PublishedType == "after") && q.PublishedTime > 0 {
 		expectedMeetCount += 1
 
-		if q.PublishedType == "before" && q.PublishedTime < vulasset.PublishedTS {
+		if q.PublishedType == "before" && q.PublishedTime >= vulasset.PublishedTS {
 			meetCount += 1
 		}
 
-		if q.PublishedType == "after" && q.PublishedTime >= vulasset.PublishedTS {
+		if q.PublishedType == "after" && q.PublishedTime < vulasset.PublishedTS {
 			meetCount += 1
 		}
 	}
