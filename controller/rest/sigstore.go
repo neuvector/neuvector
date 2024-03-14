@@ -59,6 +59,10 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		Comment:              rootOfTrust.Comment,
 	}
 
+	if clusRootOfTrust.RootlessKeypairsOnly {
+		clusRootOfTrust.IsPrivate = false // RootlessKeypairsOnly overrides IsPrivate
+	}
+
 	if err := validateCLUSRootOfTrust(&clusRootOfTrust); err != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
