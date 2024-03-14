@@ -58,7 +58,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Filters.ScoreType = validateOrDefault(q.Filters.ScoreType, []string{"v2", "v3"}, "v3")
 	q.Filters.ViewType = validateOrDefault(q.Filters.ViewType, []string{"all", "containers", "infrastructure", "registry"}, "all")
 	q.Filters.SeverityType = validateOrDefault(q.Filters.SeverityType, []string{"all", "high", "medium", "low"}, "all")
-	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withfix", "withoutfix"}, "all")
+	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withFix", "withoutFix"}, "all")
 	q.Filters.PublishedType = validateOrDefault(q.Filters.PublishedType, []string{"all", "before", "after"}, "all")
 
 	q.Filters.ServiceNameMatchType = validateOrDefault(q.Filters.ServiceNameMatchType, []string{"equals", "contains"}, "")
@@ -181,7 +181,7 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		}
 
 		for _, c := range cveList {
-			name, dbkey := parseCVEDbKey(c)
+			name, dbkey, fix := parseCVEDbKey(c)
 			if _, ok := dbVulAssets[name]; !ok {
 				dbVulAssets[name] = &DbVulAsset{
 					Name:          name,
@@ -207,6 +207,10 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 				case AssetImage:
 					dbVulAsset.ImageItems = append(dbVulAsset.ImageItems, assetid)
 				}
+			}
+
+			if fix == "wf" {
+				dbVulAsset.F_withFix = 1
 			}
 		}
 	}
@@ -623,14 +627,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 
 	q := qf.Filters
 
-	if q.PackageType == "withfix" || q.PackageType == "withoutfix" {
+	if q.PackageType == "withFix" || q.PackageType == "withoutFix" {
 		expectedMeetCount += 1
 
-		if q.PackageType == "withfix" && vulasset.F_withFix == 1 {
+		if q.PackageType == "withFix" && vulasset.F_withFix == 1 {
 			meetCount += 1
 		}
 
-		if q.PackageType == "withoutfix" && vulasset.F_withFix == 0 {
+		if q.PackageType == "withoutFix" && vulasset.F_withFix == 0 {
 			meetCount += 1
 		}
 	}
