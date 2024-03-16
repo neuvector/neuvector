@@ -98,10 +98,9 @@ func NewScanUtil(sys *system.SystemTools) *ScanUtil {
 	return s
 }
 
-func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string) ([]utils.TarFileInfo, bool) {
+func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string, pidHost bool) ([]utils.TarFileInfo, bool) {
 	var files []utils.TarFileInfo
 	var hasPackage bool
-
 	for itr := range OSPkgFiles.Iter() {
 		var data []byte
 		var err error
@@ -143,7 +142,8 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			// NVSHAS-5589, on some containers, we somehow identify the base os as the host's os.
 			// The container shares host mount and pid namespace, but it still shouldn't result in this.
 			// The real cause is unknown, switching the namespace fixes the problem.
-			if pid != 1 && strings.HasSuffix(lib, "release") {
+
+			if pid != 1 && !pidHost && strings.HasSuffix(lib, "release") {
 				data, err = s.sys.NsGetFile(prefix+lib, pid, false, 0, 0)
 			} else {
 				data, err = s.sys.ReadContainerFile(prefix+lib, pid, 0, 0)
@@ -162,12 +162,12 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 	return files, hasPackage
 }
 
-func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int, kernel string) ([]byte, share.ScanErrorCode) {
-	files, hasPkgMgr := s.readRunningPackages(id, pid, "/", kernel)
+func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int, kernel string, pidHost bool) ([]byte, share.ScanErrorCode) {
+	files, hasPkgMgr := s.readRunningPackages(id, pid, "/", kernel, pidHost)
 	if len(files) == 0 && !hasPkgMgr && objType == share.ScanObjectType_HOST {
 		// In RancherOS, host os-release file is at /host/proc/1/root/usr/etc/os-release
 		// but sometimes this file is not accessible.
-		files, hasPkgMgr = s.readRunningPackages(id, pid, "/usr/", kernel)
+		files, hasPkgMgr = s.readRunningPackages(id, pid, "/usr/", kernel, pidHost)
 	}
 
 	if objType == share.ScanObjectType_CONTAINER {
