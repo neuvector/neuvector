@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"os"
 	"os/exec"
 	"strings"

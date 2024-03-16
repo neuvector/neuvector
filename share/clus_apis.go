@@ -1482,7 +1482,7 @@ type CLUSAuditLog struct {
 	ProjectName  string               `json:"project_name,omitempty"`
 }
 
-const SnifferIdAgentField = 8
+const SnifferIdAgentField = 12
 
 type CLUSComplianceProfileEntry struct {
 	TestNum string   `json:"test_num"`
