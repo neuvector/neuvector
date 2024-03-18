@@ -238,7 +238,7 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -290,7 +290,7 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -340,7 +340,7 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -391,7 +391,7 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -920,15 +920,17 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 	return record
 }
 
-func parseCVEDbKey(cvedbkey string) (string, string) {
+func parseCVEDbKey(cvedbkey string) (string, string, string) {
 	name := cvedbkey
 	dbkey := cvedbkey
+	fix := "nf"
 	parts := strings.Split(cvedbkey, ";")
-	if len(parts) >= 2 {
+	if len(parts) >= 3 {
 		name = parts[0]
 		dbkey = parts[1]
+		fix = parts[2]
 	}
-	return name, dbkey
+	return name, dbkey, fix
 }
 
 // for perf testing
