@@ -430,62 +430,43 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			defer rc.Close()
 
 			scanner := bufio.NewScanner(rc)
-			carry := ""
 			for scanner.Scan() {
 				line := scanner.Text()
 				switch {
 				case strings.HasPrefix(line, javaMnfstVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
+					if vendorId == "" {
+						vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
+					}
 				case strings.HasPrefix(line, javaMnfstVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
+					if version == "" {
+						version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
+					}
 				case strings.HasPrefix(line, javaMnfstTitle):
-					if title != "" {
-						carry = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-					} else {
+					if title == "" {
 						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
 					}
 				case strings.HasPrefix(line, javaMnfstBundleVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
+					if vendorId == "" {
+						vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
+					}
 				case strings.HasPrefix(line, javaMnfstBundleVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-				case strings.HasPrefix(line, javaMnfstBundleName):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
+					if version == "" {
+						version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+					}
 				case strings.HasPrefix(line, javaMnfstBundleTitle):
-					//prefer javaMnfstBundleName
 					if title == "" {
 						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
+					}
+				case strings.HasPrefix(line, javaMnfstBundleName):
+					if title == "" {
+						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
 					}
 				}
 
 				title = strings.Split(title, ";")[0]
-
-				//If we see next title, make entry and carry title to next entry.
-				if carry != "" {
-					if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
-						vendorId = "jar"
-					}
-
-					//Suppress incomplete entries as we can't use them later.
-					if title == "" || version == "" {
-						// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-						continue
-					}
-
-					pkg := AppPackage{
-						AppName:    jar,
-						FileName:   path,
-						ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
-						Version:    version,
-					}
-					key := fmt.Sprintf("%s-%s", path, title)
-					pkgs[key] = []AppPackage{pkg}
-
-					title = carry
-					carry = ""
-					version = ""
-					vendorId = ""
+				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
+					break
 				}
-
 			}
 
 			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
