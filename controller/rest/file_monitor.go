@@ -28,17 +28,28 @@ var fileAccessOptionList []string = []string{
 }
 var fileAccessOptionSet utils.Set = utils.NewSetFromSliceKind(fileAccessOptionList)
 
+// parseFileFilter - takes a filter name and  returns the directory, the regex expression, and bool if successful
+// It is also important to note that this function returns:
+// * the directory path the filter is to operate on
+// * the regular expression to append the path (eg, adding .*)
+// * boolean to signify if an error occurred parsing the filter.
 // only support simple wildcard
 // 1. /dir/xxx
 // 2. /dir/xxx.*
 // 3. /dir/*.xxx
 // 4. /dir/*/abc/*
 // not support [] () regexp
+// NVSHAS-7554 notes - If a trailing `/` is found in the path, then we will treat the filter to work on _directories_.
+// This means we will add the `/.*` suffix to the path for the regex so it can pick up files in the directory.
+// Otherwise, omitting the trailling `/` means that we will treat the filter to work only on _files_.
+// So `/tmp` will mean "watch the existing file /tmp for changes"
+// And `/tmp/` will mean "watch the directory /tmp for changes such as new files or modified existing files"
+
 func parseFileFilter(filter string) (string, string, bool) {
 	if strings.HasSuffix(filter, "/") {
 		filter += "*"
 	}
-	var base string
+	var directory string
 	var regxStr string
 	filter = filepath.Clean(filter)
 	if strings.ContainsAny(filter, "[]()<>") ||
@@ -49,7 +60,7 @@ func parseFileFilter(filter string) (string, string, bool) {
 	filter = strings.Replace(filter, ".", "\\.", -1)
 	filter = strings.Replace(filter, "*", ".*", -1)
 	if a := strings.LastIndex(filter, "/"); a >= 0 {
-		base = filter[:a]
+		directory = filter[:a]
 		regxStr = filter[a+1:]
 	} else {
 		return "", "", false
@@ -58,16 +69,16 @@ func parseFileFilter(filter string) (string, string, bool) {
 		return "", "", false
 	} else if !strings.Contains(regxStr, "*") {
 		// single file
-		base += "/" + regxStr
+		directory += "/" + regxStr
 		regxStr = ""
 	}
-	if _, err := regexp.Compile(base); err != nil {
+	if _, err := regexp.Compile(directory); err != nil {
 		return "", "", false
 	}
 	if _, err := regexp.Compile(regxStr); err != nil {
 		return "", "", false
 	}
-	return base, regxStr, true
+	return directory, regxStr, true
 }
 
 // caller has been verified for federal admin access right, no CRD rules
@@ -227,7 +238,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 			}
 
 			for i, cfilter := range profConf.Filters {
-				if cfilter.Filter == filter.Filter {
+				if (cfilter.Filter == filter.Filter) || (cfilter.Path == base) {
 					// conflict, delete predefined
 					if !cfilter.CustomerAdd {
 						profConf.Filters = append(profConf.Filters[:i], profConf.Filters[i+1:]...)
@@ -237,7 +248,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 						break
 					} else {
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest,
-							fmt.Sprintf("duplicate filter: %s", filter.Filter))
+							fmt.Sprintf("duplicate filter path: Filter %s path already exists", filter.Filter))
 						return
 					}
 				}
