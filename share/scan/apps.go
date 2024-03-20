@@ -51,7 +51,6 @@ const (
 	javaMnfstBundleVendorId = "Bundle-Vendor:"
 	javaMnfstBundleVersion  = "Bundle-Version:"
 	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
-	javaMnfstBundleName     = "Bundle-Name:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -336,6 +335,7 @@ func IsJava(filename string) bool {
 		strings.HasSuffix(filename, ".jar") ||
 		strings.HasSuffix(filename, ".ear")
 }
+
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
@@ -381,6 +381,32 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				jarFile.Close()
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
+			}
+		} else if strings.HasSuffix(f.Name, javaServerInfo) {
+			rc, err := f.Open()
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "file": f.Name}).Error("Open file fail")
+				continue
+			}
+			defer rc.Close()
+
+			scanner := bufio.NewScanner(rc)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "server.info=") {
+					prod := strings.TrimPrefix(line, "server.info=")
+					if strings.HasPrefix(prod, "Apache Tomcat/") {
+						if ver := strings.TrimPrefix(prod, "Apache Tomcat/"); len(ver) > 0 {
+							pkg := AppPackage{
+								AppName:    tomcatName,
+								ModuleName: tomcatName,
+								Version:    ver,
+								FileName:   path,
+							}
+							pkgs[path] = []AppPackage{pkg}
+						}
+					}
+				}
 			}
 		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
@@ -430,7 +456,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			defer rc.Close()
 
 			scanner := bufio.NewScanner(rc)
-			carry := ""
 			for scanner.Scan() {
 				line := scanner.Text()
 				switch {
@@ -439,53 +464,19 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				case strings.HasPrefix(line, javaMnfstVersion):
 					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
 				case strings.HasPrefix(line, javaMnfstTitle):
-					if title != "" {
-						carry = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-					} else {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-					}
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
 				case strings.HasPrefix(line, javaMnfstBundleVendorId):
 					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
 				case strings.HasPrefix(line, javaMnfstBundleVersion):
 					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-				case strings.HasPrefix(line, javaMnfstBundleName):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
 				case strings.HasPrefix(line, javaMnfstBundleTitle):
-					//prefer javaMnfstBundleName
-					if title == "" {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
-					}
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
 				}
 
 				title = strings.Split(title, ";")[0]
-
-				//If we see next title, make entry and carry title to next entry.
-				if carry != "" {
-					if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
-						vendorId = "jar"
-					}
-
-					//Suppress incomplete entries as we can't use them later.
-					if title == "" || version == "" {
-						// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-						continue
-					}
-
-					pkg := AppPackage{
-						AppName:    jar,
-						FileName:   path,
-						ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
-						Version:    version,
-					}
-					key := fmt.Sprintf("%s-%s", path, title)
-					pkgs[key] = []AppPackage{pkg}
-
-					title = carry
-					carry = ""
-					version = ""
-					vendorId = ""
+				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
+					break
 				}
-
 			}
 
 			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
