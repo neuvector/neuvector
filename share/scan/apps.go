@@ -51,7 +51,6 @@ const (
 	javaMnfstBundleVendorId = "Bundle-Vendor:"
 	javaMnfstBundleVersion  = "Bundle-Version:"
 	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
-	javaMnfstBundleName     = "Bundle-Name:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -336,6 +335,7 @@ func IsJava(filename string) bool {
 		strings.HasSuffix(filename, ".jar") ||
 		strings.HasSuffix(filename, ".ear")
 }
+
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
@@ -381,6 +381,32 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				jarFile.Close()
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
+			}
+		} else if strings.HasSuffix(f.Name, javaServerInfo) {
+			rc, err := f.Open()
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "file": f.Name}).Error("Open file fail")
+				continue
+			}
+			defer rc.Close()
+
+			scanner := bufio.NewScanner(rc)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "server.info=") {
+					prod := strings.TrimPrefix(line, "server.info=")
+					if strings.HasPrefix(prod, "Apache Tomcat/") {
+						if ver := strings.TrimPrefix(prod, "Apache Tomcat/"); len(ver) > 0 {
+							pkg := AppPackage{
+								AppName:    tomcatName,
+								ModuleName: tomcatName,
+								Version:    ver,
+								FileName:   path,
+							}
+							pkgs[path] = []AppPackage{pkg}
+						}
+					}
+				}
 			}
 		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
@@ -434,33 +460,17 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				line := scanner.Text()
 				switch {
 				case strings.HasPrefix(line, javaMnfstVendorId):
-					if vendorId == "" {
-						vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
-					}
+					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
 				case strings.HasPrefix(line, javaMnfstVersion):
-					if version == "" {
-						version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
-					}
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
 				case strings.HasPrefix(line, javaMnfstTitle):
-					if title == "" {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-					}
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
 				case strings.HasPrefix(line, javaMnfstBundleVendorId):
-					if vendorId == "" {
-						vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
-					}
+					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
 				case strings.HasPrefix(line, javaMnfstBundleVersion):
-					if version == "" {
-						version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-					}
+					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
 				case strings.HasPrefix(line, javaMnfstBundleTitle):
-					if title == "" {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
-					}
-				case strings.HasPrefix(line, javaMnfstBundleName):
-					if title == "" {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
-					}
+					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
 				}
 
 				title = strings.Split(title, ";")[0]
