@@ -413,6 +413,10 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	}
 
+	if conn.ClientIP.IsLinkLocalUnicast() || conn.ServerIP.IsLinkLocalUnicast() {
+		return 0, C.DP_POLICY_ACTION_OPEN, false
+	}
+
 	// Use parent's policy if the connection is reported on child
 	var wlID *string
 	if conn.Ingress {

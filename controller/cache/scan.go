@@ -559,7 +559,12 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 				DbKey:          vul.DbKey,
 			}
 
-			cveLists.Add(fmt.Sprintf("%s;%s", vul.Name, vul.DbKey))
+			fix := "nf"
+			if len(vul.FixedVersion) > 0 {
+				fix = "wf"
+			}
+
+			cveLists.Add(fmt.Sprintf("%s;%s;%s", vul.Name, vul.DbKey, fix))
 			dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
 		}
 

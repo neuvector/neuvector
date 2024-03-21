@@ -549,7 +549,11 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 					FixedVersion:   vul.FixedVersion,
 				}
 
-				cveLists.Add(fmt.Sprintf("%s;%s", vul.Name, vul.DbKey))
+				fix := "nf"
+				if len(vul.FixedVersion) > 0 {
+					fix = "wf"
+				}
+				cveLists.Add(fmt.Sprintf("%s;%s;%s", vul.Name, vul.DbKey, fix))
 				dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
 			}
 
