@@ -3152,6 +3152,45 @@ type RESTGCRKeyConfig struct {
 	JsonKey *string `json:"json_key,omitempty,cloak"`
 }
 
+type RESTRegistryV2 struct {
+	Name         string                   `json:"name"`
+	Type         string                   `json:"registry_type"`
+	Registry     string                   `json:"registry"`
+	Domains      []string                 `json:"domains"`
+	Filters      []string                 `json:"filters"`
+	CfgType      string                   `json:"cfg_type"`
+	Auth         RESTRegistryAuth         `json:"auth,omitempty"`
+	Scan         RESTRegistryScan         `json:"scan,omitempty"`
+	Integrations RESTRegistryIntegrations `json:"integrations,omitempty"`
+}
+
+type RESTRegistryAuth struct {
+	Username      string            `json:"username,omitempty"`
+	Password      string            `json:"password,omitempty,cloak"`
+	AuthToken     string            `json:"auth_token,omitempty,cloak"`
+	AuthWithToken bool              `json:"auth_with_token,omitempty"`
+	AwsKey        RESTAWSAccountKey `json:"aws_key,omitempty"`
+	GcrKey        RESTGCRKey        `json:"gcr_key,omitempty"`
+}
+
+type RESTRegistryScan struct {
+	RescanImage bool             `json:"rescan_after_db_update,omitempty"`
+	ScanLayers  bool             `json:"scan_layers,omitempty"`
+	RepoLimit   int              `json:"repo_limit,omitempty"`
+	TagLimit    int              `json:"tag_limit,omitempty"`
+	Schedule    RESTScanSchedule `json:"schedule,omitempty"`
+	IgnoreProxy bool             `json:"ignore_proxy,omitempty"`
+}
+
+type RESTRegistryIntegrations struct {
+	JfrogMode          string `json:"jfrog_mode,omitempty"`
+	JfrogAQL           bool   `json:"jfrog_aql,omitempty"`
+	GitlabApiUrl       string `json:"gitlab_external_url,omitempty"`
+	GitlabPrivateToken string `json:"gitlab_private_token,omitempty,cloak"`
+	IBMCloudTokenURL   string `json:"ibm_cloud_token_url,omitempty"`
+	IBMCloudAccount    string `json:"ibm_cloud_account,omitempty"`
+}
+
 type RESTRegistry struct {
 	Name               string             `json:"name"`
 	Type               string             `json:"registry_type"`

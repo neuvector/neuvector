@@ -1677,6 +1677,7 @@ func StartRESTServer() {
 	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
 	r.PATCH("/v2/scan/registry/:name", handlerRegistryConfig)
 	r.POST("/v1/scan/registry/:name/test", handlerRegistryTest)         // debug
+	r.POST("/v2/scan/registry/:name/test", handlerRegistryTest)         // debug
 	r.DELETE("/v1/scan/registry/:name/test", handlerRegistryTestCancel) // debug
 	r.GET("/v1/scan/registry", handlerRegistryList)                     // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v1/scan/registry/:name", handlerRegistryShow)
