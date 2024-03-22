@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -332,6 +333,91 @@ func IsJava(filename string) bool {
 		strings.HasSuffix(filename, ".jar") ||
 		strings.HasSuffix(filename, ".ear")
 }
+
+func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
+	var vendorId, version, title, symName string
+	var vendorSet, titleSet bool
+	var lineCount int
+
+	scanner := bufio.NewScanner(rc)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if !strings.HasPrefix(line, " ") {
+			lineCount++
+			if lineCount > javaMnfstMaxLines {
+				break
+			}
+		}
+		if len(line) == 0 && version != "" && vendorId != "" && title != "" {
+			// if we have all the info and reach an empty line, the first section is done
+			break
+		}
+
+		switch {
+		case strings.HasPrefix(line, javaMnfstImplVendorId):
+			// preferred vendor name
+			vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVendorId))
+			vendorSet = true
+		case strings.HasPrefix(line, javaMnfstImplVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVersion))
+		case strings.HasPrefix(line, javaMnfstImplTitle):
+			// preferred title name
+			title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplTitle))
+			title = strings.Split(title, ";")[0]
+			titleSet = true
+		case strings.HasPrefix(line, javaMnfstBundleVendor):
+			if !vendorSet {
+				vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendor))
+			}
+		case strings.HasPrefix(line, javaMnfstBundleVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+		case strings.HasPrefix(line, javaMnfstBundleSymName):
+			symName = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleSymName))
+		case strings.HasPrefix(line, javaMnfstBundleName):
+			if !titleSet {
+				title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
+				title = strings.Split(title, ";")[0]
+			}
+		}
+
+		if len(version) > 0 && titleSet && vendorSet {
+			// stop we have all the fields confirmed
+			break
+		}
+	}
+
+	if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
+		vendorId = "jar"
+	}
+
+	// Suppress incomplete entries as we can't use them later.
+	if title == "" || version == "" {
+		// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
+		return nil, errors.New("Unable to parse the package name")
+	}
+
+	// NVSHAS-8730
+	if symName == "org.apache.tomcat-embed-core" {
+		vendorId = "org.apache.tomcat.embed"
+		title = "tomcat-embed-core"
+	}
+	// NVSHAS-8757
+	if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
+		vendorId = "org.postgresql"
+		title = "postgresql"
+	}
+
+	pkg := AppPackage{
+		AppName:    jar,
+		FileName:   path,
+		ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
+		Version:    version,
+	}
+
+	return &pkg, nil
+}
+
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
@@ -419,94 +505,16 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			pkgs[path] = []AppPackage{pkg}
 			continue //higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
-			var vendorId, version, title, symName string
-			var vendorSet, titleSet bool
-			var lineCount int
-
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
-
-			scanner := bufio.NewScanner(rc)
-			for scanner.Scan() {
-				line := scanner.Text()
-
-				if !strings.HasPrefix(line, " ") {
-					lineCount++
-					if lineCount > javaMnfstMaxLines {
-						break
-					}
-				}
-				if len(line) == 0 && version != "" && vendorId != "" && title != "" {
-					// if we have all the info and reach an empty line, the first section is done
-					break
-				}
-
-				switch {
-				case strings.HasPrefix(line, javaMnfstImplVendorId):
-					// preferred vendor name
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVendorId))
-					vendorSet = true
-				case strings.HasPrefix(line, javaMnfstImplVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVersion))
-				case strings.HasPrefix(line, javaMnfstImplTitle):
-					// preferred title name
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplTitle))
-					title = strings.Split(title, ";")[0]
-					titleSet = true
-				case strings.HasPrefix(line, javaMnfstBundleVendor):
-					if !vendorSet {
-						vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendor))
-					}
-				case strings.HasPrefix(line, javaMnfstBundleVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-				case strings.HasPrefix(line, javaMnfstBundleSymName):
-					symName = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleSymName))
-				case strings.HasPrefix(line, javaMnfstBundleName):
-					if !titleSet {
-						title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
-						title = strings.Split(title, ";")[0]
-					}
-				}
-
-				if len(version) > 0 && titleSet && vendorSet {
-					// stop we have all the fields confirmed
-					break
-				}
-			}
-
 			rc.Close()
 
-			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
-				vendorId = "jar"
+			if pkg, err := parseJarManifestFile(path, rc); err == nil {
+				pkgs[path] = []AppPackage{*pkg}
 			}
-
-			// Suppress incomplete entries as we can't use them later.
-			if title == "" || version == "" {
-				// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-				continue
-			}
-
-			// NVSHAS-8730
-			if symName == "org.apache.tomcat-embed-core" {
-				vendorId = "org.apache.tomcat.embed"
-				title = "tomcat-embed-core"
-			}
-			// NVSHAS-8757
-			if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
-				vendorId = "org.postgresql"
-				title = "postgresql"
-			}
-
-			pkg := AppPackage{
-				AppName:    jar,
-				FileName:   path,
-				ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
-				Version:    version,
-			}
-			pkgs[path] = []AppPackage{pkg}
 		}
 	}
 
