@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,25 +33,22 @@ const (
 	wpVersionMaxSize = 4 * 1024
 	ComposerFile     = "/composer.lock"
 
-	jar                = "jar"
-	javaPOMXML         = "/pom.xml"
-	pomReadSize        = 1024 * 1024
-	javaServerInfo     = "/ServerInfo.properties"
-	serverInfoMaxLines = 100
-	tomcatName         = "Tomcat"
-	jarMaxDepth        = 2
+	jar         = "jar"
+	jarMaxDepth = 2
 
-	javaPOMproperty         = "/pom.properties"
-	javaPOMgroupId          = "groupId="
-	javaPOMartifactId       = "artifactId="
-	javaPOMversion          = "version="
-	javaManifest            = "MANIFEST.MF"
-	javaMnfstVendorId       = "Implementation-Vendor-Id:"
-	javaMnfstVersion        = "Implementation-Version:"
-	javaMnfstTitle          = "Implementation-Title:"
-	javaMnfstBundleVendorId = "Bundle-Vendor:"
-	javaMnfstBundleVersion  = "Bundle-Version:"
-	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
+	javaPOMproperty        = "/pom.properties"
+	javaPOMgroupId         = "groupId="
+	javaPOMartifactId      = "artifactId="
+	javaPOMversion         = "version="
+	javaManifest           = "MANIFEST.MF"
+	javaMnfstMaxLines      = 20
+	javaMnfstImplVendorId  = "Implementation-Vendor-Id:"
+	javaMnfstImplVersion   = "Implementation-Version:"
+	javaMnfstImplTitle     = "Implementation-Title:"
+	javaMnfstBundleVendor  = "Bundle-Vendor:"
+	javaMnfstBundleVersion = "Bundle-Version:"
+	javaMnfstBundleSymName = "Bundle-SymbolicName:"
+	javaMnfstBundleName    = "Bundle-Name:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -336,6 +334,90 @@ func IsJava(filename string) bool {
 		strings.HasSuffix(filename, ".ear")
 }
 
+func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
+	var vendorId, version, title, symName string
+	var vendorSet, titleSet bool
+	var lineCount int
+
+	scanner := bufio.NewScanner(rc)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if !strings.HasPrefix(line, " ") {
+			lineCount++
+			if lineCount > javaMnfstMaxLines {
+				break
+			}
+		}
+		if len(line) == 0 && version != "" && vendorId != "" && title != "" {
+			// if we have all the info and reach an empty line, the first section is done
+			break
+		}
+
+		switch {
+		case strings.HasPrefix(line, javaMnfstImplVendorId):
+			// preferred vendor name
+			vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVendorId))
+			vendorSet = true
+		case strings.HasPrefix(line, javaMnfstImplVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVersion))
+		case strings.HasPrefix(line, javaMnfstImplTitle):
+			// preferred title name
+			title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplTitle))
+			title = strings.Split(title, ";")[0]
+			titleSet = true
+		case strings.HasPrefix(line, javaMnfstBundleVendor):
+			if !vendorSet {
+				vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendor))
+			}
+		case strings.HasPrefix(line, javaMnfstBundleVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+		case strings.HasPrefix(line, javaMnfstBundleSymName):
+			symName = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleSymName))
+		case strings.HasPrefix(line, javaMnfstBundleName):
+			if !titleSet {
+				title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
+				title = strings.Split(title, ";")[0]
+			}
+		}
+
+		if len(version) > 0 && titleSet && vendorSet {
+			// stop we have all the fields confirmed
+			break
+		}
+	}
+
+	if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
+		vendorId = "jar"
+	}
+
+	// Suppress incomplete entries as we can't use them later.
+	if title == "" || version == "" {
+		// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
+		return nil, errors.New("Unable to parse the package name")
+	}
+
+	// NVSHAS-8730
+	if symName == "org.apache.tomcat-embed-core" {
+		vendorId = "org.apache.tomcat.embed"
+		title = "tomcat-embed-core"
+	}
+	// NVSHAS-8757
+	if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
+		vendorId = "org.postgresql"
+		title = "postgresql"
+	}
+
+	pkg := AppPackage{
+		AppName:    jar,
+		FileName:   path,
+		ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
+		Version:    version,
+	}
+
+	return &pkg, nil
+}
+
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
@@ -382,32 +464,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
 			}
-		} else if strings.HasSuffix(f.Name, javaServerInfo) {
-			rc, err := f.Open()
-			if err != nil {
-				log.WithFields(log.Fields{"err": err, "file": f.Name}).Error("Open file fail")
-				continue
-			}
-			defer rc.Close()
-
-			scanner := bufio.NewScanner(rc)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasPrefix(line, "server.info=") {
-					prod := strings.TrimPrefix(line, "server.info=")
-					if strings.HasPrefix(prod, "Apache Tomcat/") {
-						if ver := strings.TrimPrefix(prod, "Apache Tomcat/"); len(ver) > 0 {
-							pkg := AppPackage{
-								AppName:    tomcatName,
-								ModuleName: tomcatName,
-								Version:    ver,
-								FileName:   path,
-							}
-							pkgs[path] = []AppPackage{pkg}
-						}
-					}
-				}
-			}
 		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
 			rc, err := f.Open()
@@ -415,7 +471,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				log.WithFields(log.Fields{"err": err}).Error("open pom property fail")
 				continue
 			}
-			defer rc.Close()
 
 			scanner := bufio.NewScanner(rc)
 			for scanner.Scan() {
@@ -433,6 +488,9 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					break
 				}
 			}
+
+			rc.Close()
+
 			if groupId == "" || version == "" || artifactId == "" {
 				log.WithFields(log.Fields{"path": path}).Info("Missing artifactId, groupId, or version")
 				continue
@@ -447,55 +505,16 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			pkgs[path] = []AppPackage{pkg}
 			continue //higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
-			var vendorId, version, title string
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
-			defer rc.Close()
+			rc.Close()
 
-			scanner := bufio.NewScanner(rc)
-			for scanner.Scan() {
-				line := scanner.Text()
-				switch {
-				case strings.HasPrefix(line, javaMnfstVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
-				case strings.HasPrefix(line, javaMnfstVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
-				case strings.HasPrefix(line, javaMnfstTitle):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-				case strings.HasPrefix(line, javaMnfstBundleVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
-				case strings.HasPrefix(line, javaMnfstBundleVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-				case strings.HasPrefix(line, javaMnfstBundleTitle):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
-				}
-
-				title = strings.Split(title, ";")[0]
-				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
-					break
-				}
+			if pkg, err := parseJarManifestFile(path, rc); err == nil {
+				pkgs[path] = []AppPackage{*pkg}
 			}
-
-			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
-				vendorId = "jar"
-			}
-
-			//Suppress incomplete entries as we can't use them later.
-			if title == "" || version == "" {
-				// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-				continue
-			}
-
-			pkg := AppPackage{
-				AppName:    jar,
-				FileName:   path,
-				ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
-				Version:    version,
-			}
-			pkgs[path] = []AppPackage{pkg}
 		}
 	}
 
