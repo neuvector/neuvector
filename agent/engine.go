@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/pipe"
 	"github.com/neuvector/neuvector/agent/probe"
+	"github.com/neuvector/neuvector/agent/policy"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
@@ -129,7 +130,6 @@ var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
 var defaultDetectUnmanagedWl bool = false
 var defaultEnableIcmpPolicy bool = false
-var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
 var gInfo localSystemInfo = localSystemInfo{
@@ -2189,7 +2189,7 @@ func taskDPConnect() {
 	dp.DPCtrlConfigAgent(debug)
 
 	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
-	dp.DPCtrlConfigSpecialIPSubnet(specialSubnets)
+	dp.DPCtrlConfigSpecialIPSubnet(policy.SpecialSubnets)
 
 	if driver != pipe.PIPE_NOTC && driver != pipe.PIPE_CLM {
 		jumboFrame := gInfo.jumboFrameMTU
