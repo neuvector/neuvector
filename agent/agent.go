@@ -552,7 +552,8 @@ func main() {
 
 	agentTimerWheel = utils.NewTimerWheel()
 	agentTimerWheel.Start()
-
+	//save a reference in policy engine
+	policySetTimerWheel(agentTimerWheel)
 	// Read existing containers again, cluster start can take a while.
 	existing, _ := global.RT.ListContainerIDs()
 
