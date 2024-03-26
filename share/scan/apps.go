@@ -510,27 +510,12 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
-			rc.Close()
 
 			if pkg, err := parseJarManifestFile(path, rc); err == nil {
 				pkgs[path] = []AppPackage{*pkg}
 			}
-		}
-	}
 
-	// If no package found, use filename
-	if len(pkgs) == 0 && isJavaJar(filename) {
-		fn := filepath.Base(filename)
-		dash := strings.LastIndex(fn, "-")
-		dot := strings.LastIndex(fn, ".")
-		if dash > 0 && dash+1 < dot {
-			pkg := AppPackage{
-				AppName:    jar,
-				ModuleName: fmt.Sprintf("jar:%s", fn[:dash]),
-				Version:    fn[dash+1 : dot],
-				FileName:   path,
-			}
-			pkgs[path] = []AppPackage{pkg}
+			rc.Close()
 		}
 	}
 
