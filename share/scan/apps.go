@@ -60,7 +60,6 @@ const (
 var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
 var pyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\.]+)-([a-zA-Z0-9\.]+)[\-a-zA-Z0-9\.]*\.(egg-info\/PKG-INFO|dist-info\/WHEEL)$`)
 var rubyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\-]+)-([0-9\.]+)\.gemspec$`)
-var javaInvalidVendorIds = map[string]bool{"%providerName": true}
 
 type ComposerLock struct {
 	Packages    []ComposerPackage `json:"packages"`
@@ -343,15 +342,15 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		if len(line) == 0 && lineCount > 0 {
+			// if we reach an empty line, the first section is done
+			break
+		}
 		if !strings.HasPrefix(line, " ") {
 			lineCount++
 			if lineCount > javaMnfstMaxLines {
 				break
 			}
-		}
-		if len(line) == 0 && version != "" && vendorId != "" && title != "" {
-			// if we have all the info and reach an empty line, the first section is done
-			break
 		}
 
 		switch {
@@ -387,25 +386,33 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 		}
 	}
 
-	if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
+	if symName != "" {
+		if s := strings.LastIndex(symName, ";"); s > 0 {
+			symName = symName[:s]
+		}
+		if symName == "org.apache.tomcat-embed-core" {
+			// NVSHAS-8730
+			vendorId = "org.apache.tomcat.embed"
+			title = "tomcat-embed-core"
+		} else if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
+			// NVSHAS-8757
+			vendorId = "org.postgresql"
+			title = "postgresql"
+		} else if len(vendorId) == 0 || vendorId[0] == '%' || title[0] == '%' {
+			if dot := strings.LastIndex(symName, "."); dot > 0 {
+				vendorId = symName[:dot]
+				title = symName[dot+1:]
+			}
+		}
+	}
+
+	if len(vendorId) == 0 || vendorId[0] == '%' {
 		vendorId = "jar"
 	}
 
 	// Suppress incomplete entries as we can't use them later.
 	if title == "" || version == "" {
-		// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-		return nil, errors.New("Unable to parse the package name")
-	}
-
-	// NVSHAS-8730
-	if symName == "org.apache.tomcat-embed-core" {
-		vendorId = "org.apache.tomcat.embed"
-		title = "tomcat-embed-core"
-	}
-	// NVSHAS-8757
-	if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
-		vendorId = "org.postgresql"
-		title = "postgresql"
+		return nil, errors.New("Missing title or version")
 	}
 
 	pkg := AppPackage{
@@ -510,27 +517,12 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
-			rc.Close()
 
 			if pkg, err := parseJarManifestFile(path, rc); err == nil {
 				pkgs[path] = []AppPackage{*pkg}
 			}
-		}
-	}
 
-	// If no package found, use filename
-	if len(pkgs) == 0 && isJavaJar(filename) {
-		fn := filepath.Base(filename)
-		dash := strings.LastIndex(fn, "-")
-		dot := strings.LastIndex(fn, ".")
-		if dash > 0 && dash+1 < dot {
-			pkg := AppPackage{
-				AppName:    jar,
-				ModuleName: fmt.Sprintf("jar:%s", fn[:dash]),
-				Version:    fn[dash+1 : dot],
-				FileName:   path,
-			}
-			pkgs[path] = []AppPackage{pkg}
+			rc.Close()
 		}
 	}
 
