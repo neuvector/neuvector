@@ -118,9 +118,9 @@ func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, sel
 }
 
 func UpdateAllowedK8sNs(isLead, admCtrlEnabled bool, newAllowedNS, newAllowedNsWild utils.Set) {
+	allowedNamespaces = newAllowedNS
+	allowedNamespacesWild = newAllowedNsWild
 	if isLead {
-		allowedNamespaces = newAllowedNS
-		allowedNamespacesWild = newAllowedNsWild
 		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
 			for _, obj := range objs {
 				if nsObj := obj.(*resource.Namespace); nsObj != nil {
@@ -130,9 +130,6 @@ func UpdateAllowedK8sNs(isLead, admCtrlEnabled bool, newAllowedNS, newAllowedNsW
 		} else {
 			log.WithFields(log.Fields{"enabled": admCtrlEnabled, "err": err}).Error()
 		}
-	} else {
-		allowedNamespaces = newAllowedNS
-		allowedNamespacesWild = newAllowedNsWild
 	}
 }
 
@@ -774,44 +771,58 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 }
 
 func workSingleK8sNsLabels(nsName string, labelKeys map[string]*bool) error {
-	obj, err := global.ORCH.GetResource(resource.RscTypeNamespace, "", nsName)
-	if err != nil {
-		log.WithFields(log.Fields{"labelKeys": labelKeys, "namespace": nsName, "err": err}).Error("resource no found")
-		return err
-	} else {
-		nsObj := obj.(*corev1.Namespace)
-		if nsObj != nil && nsObj.Metadata != nil {
-			if nsObj.Metadata.Labels == nil {
-				nsObj.Metadata.Labels = make(map[string]string)
-			}
-			needUpdate := false
-			for labelKey, shouldExist := range labelKeys {
-				if shouldExist != nil {
-					_, exists := nsObj.Metadata.Labels[labelKey]
-					if *shouldExist && !exists {
-						nsObj.Metadata.Labels[labelKey] = nsSelectorValue
-						needUpdate = true
-					} else if !*shouldExist && exists {
-						delete(nsObj.Metadata.Labels, labelKey)
-						needUpdate = true
+	var errRet error
+	for i := 0; i < 3; i++ {
+		obj, err := global.ORCH.GetResource(resource.RscTypeNamespace, "", nsName)
+		if err != nil {
+			log.WithFields(log.Fields{"labelKeys": labelKeys, "namespace": nsName, "err": err}).Error("resource no found")
+			return err
+		} else {
+			nsObj := obj.(*corev1.Namespace)
+			if nsObj != nil && nsObj.Metadata != nil {
+				if nsObj.Metadata.Labels == nil {
+					nsObj.Metadata.Labels = make(map[string]string)
+				}
+				needUpdate := false
+				for labelKey, shouldExist := range labelKeys {
+					if shouldExist != nil {
+						_, exists := nsObj.Metadata.Labels[labelKey]
+						if *shouldExist && !exists {
+							nsObj.Metadata.Labels[labelKey] = nsSelectorValue
+							needUpdate = true
+						} else if !*shouldExist && exists {
+							delete(nsObj.Metadata.Labels, labelKey)
+							needUpdate = true
+						}
 					}
 				}
-			}
-			if needUpdate {
-				err = global.ORCH.UpdateResource(resource.RscTypeNamespace, nsObj)
-				if err != nil {
-					log.WithFields(log.Fields{"nsName": nsName, "err": err}).Error("update resource failed")
-					return err
+				if needUpdate {
+					err = global.ORCH.UpdateResource(resource.RscTypeNamespace, nsObj)
+					if err != nil {
+						// 409 means conflict. i.e. namespace is updated by others before our update. retry
+						if strings.Index(err.Error(), " 409 ") > 0 {
+							errRet = err
+						} else {
+							log.WithFields(log.Fields{"nsName": nsName, "err": err}).Error("update resource failed")
+							return err
+						}
+					} else {
+						errRet = nil
+						break
+					}
+				} else {
+					errRet = nil
+					break
 				}
+			} else {
+				err = fmt.Errorf("ns/metadata is nil")
+				log.WithFields(log.Fields{"nsName": nsName}).Error(err)
+				return err
 			}
-		} else {
-			err = fmt.Errorf("ns/metadata is nil")
-			log.WithFields(log.Fields{"nsName": nsName}).Error(err)
-			return err
 		}
 	}
 
-	return nil
+	return errRet
 }
 
 func IsNsSelectorSupported() bool {

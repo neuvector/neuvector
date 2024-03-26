@@ -933,21 +933,24 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 		}
 		log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole}).Debug("Update role")
 
-		// in case the clusterrole neuvector-binding-customresourcedefinition is recreated/updated(after nv 5.0 deployment)
-		// to have "update" verb so that nv can upgrade the CRD schema
-		if n.name == nvCrdRole && n.apiRtVerbs != nil && nvCrdInitFunc != nil {
-			if roleInfo, ok := rbacRolesWanted[n.name]; ok && !roleInfo.k8sReserved {
-				if nRtVerbs, ok1 := n.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok1 {
-					if nVerbs, ok1 := nRtVerbs[RscNameCustomResourceDefinitions]; ok1 {
-						if old == nil {
-							nvCrdInitFunc(isLeader, cspType)
-						} else {
-							if o = old.(*k8sRole); o.apiRtVerbs != nil {
-								if oRtVerbs, ok2 := o.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok2 {
-									if oVerbs, ok2 := oRtVerbs[RscNameCustomResourceDefinitions]; ok2 {
-										if (nVerbs.Contains("update") || nVerbs.Contains("*")) &&
-											(!oVerbs.Contains("update") && !oVerbs.Contains("*")) {
-											nvCrdInitFunc(isLeader, cspType)
+		// starting from 5.1.3, we do not upgrade CRD schema anymore
+		/*
+			// in case the clusterrole neuvector-binding-customresourcedefinition is recreated/updated(after nv 5.0 deployment)
+			// to have "update" verb so that nv can upgrade the CRD schema
+			if n.name == nvCrdRole && n.apiRtVerbs != nil && nvCrdInitFunc != nil {
+				if roleInfo, ok := rbacRolesWanted[n.name]; ok && !roleInfo.k8sReserved {
+					if nRtVerbs, ok1 := n.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok1 {
+						if nVerbs, ok1 := nRtVerbs[RscNameCustomResourceDefinitions]; ok1 {
+							if old == nil {
+								nvCrdInitFunc(isLeader, false, false, cspType)
+							} else {
+								if o = old.(*k8sRole); o.apiRtVerbs != nil {
+									if oRtVerbs, ok2 := o.apiRtVerbs[roleInfo.rules[0].apiGroup]; ok2 {
+										if oVerbs, ok2 := oRtVerbs[RscNameCustomResourceDefinitions]; ok2 {
+											if (nVerbs.Contains("update") || nVerbs.Contains("*")) &&
+												(!oVerbs.Contains("update") && !oVerbs.Contains("*")) {
+												nvCrdInitFunc(isLeader, false, false, cspType)
+											}
 										}
 									}
 								}
@@ -956,7 +959,7 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 					}
 				}
 			}
-		}
+		*/
 
 		// re-evaluate users who bind to the role
 		for u, roleRefs := range d.userCache {

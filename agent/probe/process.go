@@ -50,6 +50,7 @@ type procContainer struct {
 	outsider utils.Set // pid pool from outside
 	newBorn  int
 	userns   *userNs
+	startAt  time.Time
 	//map of port listened by multiple processes
 	portsMap         map[osutil.SocketInfo]*procApp
 	checkRemovedPort uint
@@ -415,6 +416,7 @@ func (p *Probe) addHost(pid int) {
 		userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
 		portsMap: make(map[osutil.SocketInfo]*procApp),
 		fInfo:    make(map[string]*fileInfo),
+		startAt:  time.Now(),
 	}
 
 	p.containerMap[""] = c
@@ -457,6 +459,7 @@ func (p *Probe) addContainer(id string, proc *procInternal, scanMode bool) {
 		userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
 		portsMap: make(map[osutil.SocketInfo]*procApp),
 		fInfo:    make(map[string]*fileInfo),
+		startAt:  time.Now(),
 	}
 
 	if p.containerStops.Contains(c.id) {
@@ -3185,6 +3188,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 				userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
 				portsMap: make(map[osutil.SocketInfo]*procApp),
 				fInfo:    make(map[string]*fileInfo),
+				startAt: time.Now(),
 			}
 			p.containerMap[id] = c
 		} else {

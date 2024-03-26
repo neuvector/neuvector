@@ -105,6 +105,10 @@ type RESTRegistryDebugImageData struct {
 	Images []*RESTRegistryDebugImage `json:"images"`
 }
 
+type RESTRegistryTestDataV2 struct {
+	Config *RESTRegistryV2 `json:"config"`
+}
+
 type RESTRegistryTestData struct {
 	Config *RESTRegistry `json:"config"`
 }

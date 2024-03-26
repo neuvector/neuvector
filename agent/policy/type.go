@@ -22,6 +22,7 @@ type WorkloadIPPolicyInfo struct {
 	SkipPush   bool
 	HostMode   bool
 	CapIntcp   bool
+	PolVer     uint16
 }
 
 type DlpBuildInfo struct {
@@ -41,6 +42,7 @@ type Engine struct {
 	Mutex          sync.Mutex
 	getGroupRule   GroupProcPolicyCallback
 	PolicyAddrMap  map[string]share.CLUSSubnet
+	PolTimerWheel  *utils.TimerWheel
 }
 
 func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb GroupProcPolicyCallback, pad int) {
@@ -56,4 +58,8 @@ func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb
 	e.getGroupRule = cb
 	e.PolicyAddrMap = make(map[string]share.CLUSSubnet)
 	polAppDir = pad
+}
+
+func (e *Engine) SetTimerWheel(aTimerWheel *utils.TimerWheel) {
+	e.PolTimerWheel = aTimerWheel
 }

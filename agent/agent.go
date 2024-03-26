@@ -35,6 +35,8 @@ var errRestartChan chan interface{} = make(chan interface{}, 1)
 var restartChan chan interface{} = make(chan interface{}, 1)
 var monitorExitChan chan interface{} = make(chan interface{}, 1)
 
+var monitorHostIfaceStopCh chan struct{} = make(chan struct{})
+
 var Host share.CLUSHost = share.CLUSHost{
 	Platform: share.PlatformDocker,
 	Network:  share.NetworkDefault,
@@ -74,6 +76,7 @@ func isAgentContainer(id string) bool {
 }
 
 func getHostIPs() {
+	gInfo.linkStates = getHostLinks()
 	addrs := getHostAddrs()
 	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
@@ -438,6 +441,9 @@ func main() {
 		time.Sleep(time.Second * 4)
 	}
 
+	//NVSHAS-6638,monitor host to see whether there is i/f or IP changes
+	go StartMonitorHostInterface(Host.ID, 1, monitorHostIfaceStopCh)
+
 	// Check anti-affinity
 	var retry int
 	retryDuration := time.Duration(time.Second * 2)
@@ -546,7 +552,8 @@ func main() {
 
 	agentTimerWheel = utils.NewTimerWheel()
 	agentTimerWheel.Start()
-
+	//save a reference in policy engine
+	policySetTimerWheel(agentTimerWheel)
 	// Read existing containers again, cluster start can take a while.
 	existing, _ := global.RT.ListContainerIDs()
 
@@ -652,8 +659,6 @@ func main() {
 	Agent.JoinedAt = time.Now().UTC()
 	putLocalInfo()
 	logAgent(share.CLUSEvAgentJoin)
-	//NVSHAS-6638,monitor host to see whether there is i/f or IP changes
-	prober.StartMonitorHostInterface(Host.ID, 1)
 
 	clusterLoop(existing)
 	existing = nil
@@ -704,6 +709,7 @@ func main() {
 	fileWatcher.Close()
 	bench.Close()
 
+	close(monitorHostIfaceStopCh) // stop host interface monitor 
 	stopMonitorLoop()
 	closeCluster()
 

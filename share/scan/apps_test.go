@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -199,5 +200,78 @@ func TestParseRubyPackage(t *testing.T) {
 		if !found {
 			t.Errorf("not found pkg: %v:%v\n", pk.ModuleName, pk.Version)
 		}
+	}
+}
+
+func TestParseJarPackage(t *testing.T) {
+	// NVSHAS-8757
+	m := `
+Manifest-Version: 1.0
+Automatic-Module-Name: org.postgresql.jdbc
+Bundle-Activator: org.postgresql.osgi.PGBundleActivator
+Bundle-Copyright: Copyright (c) 2003-2020, PostgreSQL Global Developme
+ nt Group
+Bundle-Description: Java JDBC driver for PostgreSQL database
+Bundle-DocURL: https://jdbc.postgresql.org/
+Bundle-License: BSD-2-Clause
+Bundle-ManifestVersion: 2
+Bundle-Name: PostgreSQL JDBC Driver
+Bundle-SymbolicName: org.postgresql.jdbc
+Bundle-Vendor: PostgreSQL Global Development Group
+Bundle-Version: 42.2.23
+`
+	r := strings.NewReader(m)
+	pkg, _ := parseJarManifestFile("", r)
+	if pkg.ModuleName != "org.postgresql:postgresql" {
+		t.Errorf("Wrong jar package: %+v\n", pkg)
+	}
+
+	m = `
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: tomcat-embed-core
+Bundle-SymbolicName: org.apache.tomcat-embed-core
+Bundle-Version: 10.1.11
+Implementation-Title: Apache Tomcat
+Implementation-Vendor: Apache Software Foundation
+Implementation-Version: 10.1.11
+Specification-Title: Apache Tomcat
+Specification-Vendor: Apache Software Foundation
+Specification-Version: 10.1
+X-Compile-Source-JDK: 11
+X-Compile-Target-JDK: 11
+`
+	r = strings.NewReader(m)
+	pkg, _ = parseJarManifestFile("", r)
+	if pkg.ModuleName != "org.apache.tomcat.embed:tomcat-embed-core" && pkg.Version != "10.1.11" {
+		t.Errorf("Wrong jar package: %+v\n", pkg)
+	}
+
+	m = `
+Manifest-Version: 1.0
+Ant-Version: Apache Ant 1.10.6
+Created-By: 1.8.0_201-b09 (Oracle Corporation)
+Main-Class: com.sun.jna.Native
+Implementation-Title: com.sun.jna
+Implementation-Vendor: JNA Development Team
+Implementation-Version: 5.5.0 (b0)
+Specification-Title: Java Native Access (JNA)
+Specification-Vendor: JNA Development Team
+Specification-Version: 5
+Automatic-Module-Name: com.sun.jna
+Bundle-Category: jni
+Bundle-ManifestVersion: 2
+Bundle-Name: jna
+Bundle-Description: JNA Library
+Bundle-SymbolicName: com.sun.jna
+Bundle-Version: 5.5.0
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-Vendor: JNA Development Team
+Bundle-ActivationPolicy: lazy
+`
+	r = strings.NewReader(m)
+	pkg, _ = parseJarManifestFile("", r)
+	if pkg.ModuleName != "JNA Development Team:com.sun.jna" && pkg.Version != "5.5.0" {
+		t.Errorf("Wrong jar package: %+v\n", pkg)
 	}
 }

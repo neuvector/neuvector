@@ -15,7 +15,7 @@ var intfMonitorPollTimeoutShort = syscall.Timeval{0, 500000}
 
 type intfMonitorInterface interface {
 	WaitAddrChange(*syscall.Timeval) (bool, error)
-	WaitHostAddrChange(*syscall.Timeval) (bool, error)
+	WaitHostAddrChange(*syscall.Timeval) (bool, error) // obsolete
 	Close()
 }
 
@@ -89,6 +89,7 @@ func (p *Probe) StopMonitorInterface(id string) {
 	}
 }
 
+// obsolete
 func (p *Probe) intfHostMonitorLoop(hid string, m intfMonitorInterface, stopCh chan struct{}) {
 	toNotify := false
 	pollTimeout := intfMonitorPollTimeoutLong
@@ -120,6 +121,7 @@ func (p *Probe) intfHostMonitorLoop(hid string, m intfMonitorInterface, stopCh c
 	}
 }
 
+// obsolete
 func (p *Probe) StartMonitorHostInterface(hid string, pid int) {
 	log.WithFields(log.Fields{"hostid": hid}).Debug("")
 

@@ -1121,7 +1121,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
 			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
-		if pod.Status.Phase == "Running" {
+		// if pod is middle resource(i.e. has owner) & it's already at running phase(i.e. this is an UPDATE pod request), skip handling this request
+		if len(pod.ObjectMeta.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
 			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
