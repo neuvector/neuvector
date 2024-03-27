@@ -661,12 +661,20 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
             if (is_ingress) {
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(dip);
+                    //we still need to consider newly added node
+                    if (inPolicyAddr) {
+                        inPolicyAddr = dpi_is_policy_addr(sip);
+                    }
                 } else {
                     inPolicyAddr = dpi_is_policy_addr(sip);
                 }
             } else {
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(sip);
+                    //we still need to consider newly added node
+                    if (inPolicyAddr) {
+                        inPolicyAddr = dpi_is_policy_addr(dip);
+                    }
                 } else {
                     inPolicyAddr = dpi_is_policy_addr(dip);
                 }
