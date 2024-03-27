@@ -133,161 +133,6 @@ func UpdateHostContainers(id string, containers int) error {
 	return err
 }
 
-func applyAssetBasedFilters(allowed map[string]utils.Set, queryFilter *VulQueryFilter) (map[string]utils.Set, error) {
-	matchedAssets := map[string]utils.Set{
-		AssetRuleDomain:    utils.NewSet(),
-		AssetRuleService:   utils.NewSet(),
-		AssetRuleNode:      utils.NewSet(),
-		AssetRuleContainer: utils.NewSet(),
-		AssetRuleImage:     utils.NewSet(),
-		AssetRulePlatform:  utils.NewSet(),
-	}
-
-	stats := queryFilter.GetAssestBasedFilters()
-	if len(stats) > 0 {
-		if stats[AssetRuleNode] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetNode], buildWhereClauseForNode_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRuleNode] = assets
-			}
-		}
-
-		if stats[AssetRuleImage] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetImage], buildWhereClauseForImage_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRuleImage] = assets
-			}
-		}
-
-		if stats[AssetRuleDomain] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetWorkload], buildWhereClauseForDomain_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRuleDomain] = assets
-			}
-		}
-
-		if stats[AssetRuleService] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetWorkload], buildWhereClauseForService_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRuleService] = assets
-			}
-		}
-
-		if stats[AssetRuleContainer] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetWorkload], buildWhereClauseForContainer_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRuleContainer] = assets
-			}
-		}
-
-		if stats[AssetRulePlatform] > 0 {
-			assets, err := _applyAssetBaseFilter(queryFilter, allowed[AssetPlatform], buildWhereClauseForPlatform_All)
-			if err != nil {
-				return nil, err
-			} else {
-				matchedAssets[AssetRulePlatform] = assets
-			}
-		}
-	}
-
-	return matchedAssets, nil
-}
-
-func _applyAssetBaseFilter(q *VulQueryFilter, allowed utils.Set, buildWhereFunc BuildWhereClauseAllFunc) (utils.Set, error) {
-	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid").Where(buildWhereFunc(q.Filters)).Prepared(true).ToSQL()
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	results := utils.NewSet()
-	for rows.Next() {
-		var assetId string
-		err = rows.Scan(&assetId)
-		if err != nil {
-			return nil, err
-		}
-
-		if allowed.Contains(assetId) {
-			results.Add(assetId)
-		}
-	}
-
-	return results, nil
-}
-
-func isOneAssetMatch(matchedAssets utils.Set, assets []string) bool {
-	for _, t := range assets {
-		if matchedAssets.Contains(t) {
-			return true
-		}
-	}
-	return false
-}
-
-func evaluateAssetBasedFilters(vulasset *DbVulAsset, matchedAssets map[string]utils.Set, queryFilter *VulQueryFilter) {
-
-	//	all the assets under this CVE need to meet ALL the count, not just one.
-	stats := queryFilter.GetAssestBasedFilters()
-
-	stats[AssetRulePlatform] = 0 // no need to check platform
-
-	if len(stats) > 0 {
-		if stats[AssetRuleNode] > 0 {
-			if isOneAssetMatch(matchedAssets[AssetRuleNode], vulasset.NodeItems) {
-				stats[AssetRuleNode] = 0
-			}
-		}
-
-		if stats[AssetRuleImage] > 0 {
-			if isOneAssetMatch(matchedAssets[AssetRuleImage], vulasset.ImageItems) {
-				stats[AssetRuleImage] = 0
-			}
-		}
-
-		if stats[AssetRuleDomain] > 0 {
-			if isOneAssetMatch(matchedAssets[AssetRuleDomain], vulasset.WorkloadItems) {
-				stats[AssetRuleDomain] = 0
-			}
-		}
-
-		if stats[AssetRuleService] > 0 {
-			if isOneAssetMatch(matchedAssets[AssetRuleService], vulasset.WorkloadItems) {
-				stats[AssetRuleService] = 0
-			}
-		}
-
-		if stats[AssetRuleContainer] > 0 {
-			if isOneAssetMatch(matchedAssets[AssetRuleContainer], vulasset.WorkloadItems) {
-				stats[AssetRuleContainer] = 0
-			}
-		}
-
-		// check stats
-		result := 0
-		for _, value := range stats {
-			result += value
-		}
-
-		if result != 0 {
-			// not all filters are matched, need to skip this CVE
-			vulasset.Skip = true
-		}
-	}
-}
-
 // for REST[asset]AssetView, used in /v1/assetvul
 func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]string, queryFilter *VulQueryFilter) (*api.RESTAssetView, error) {
 	var err error
@@ -393,7 +238,7 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -445,7 +290,7 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -495,7 +340,7 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -546,7 +391,7 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		}
 
 		for _, c := range cveList {
-			name, _ := parseCVEDbKey(c)
+			name, _, _ := parseCVEDbKey(c)
 			if v, exist := vulMap[name]; exist {
 				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
 			}
@@ -1075,15 +920,17 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 	return record
 }
 
-func parseCVEDbKey(cvedbkey string) (string, string) {
+func parseCVEDbKey(cvedbkey string) (string, string, string) {
 	name := cvedbkey
 	dbkey := cvedbkey
+	fix := "nf"
 	parts := strings.Split(cvedbkey, ";")
-	if len(parts) >= 2 {
+	if len(parts) >= 3 {
 		name = parts[0]
 		dbkey = parts[1]
+		fix = parts[2]
 	}
-	return name, dbkey
+	return name, dbkey, fix
 }
 
 // for perf testing

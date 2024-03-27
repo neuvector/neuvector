@@ -1592,8 +1592,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 }
 
 // do not update CustomResourceDefinition resource(schema) anymore
-func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
-
+func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []string {
 	nvCrdInfo := []*resource.NvCrdInfo{}
 	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
@@ -1716,17 +1715,15 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		// [2023/04] no more crd schema upgrade.
 		crdConfigured, crdUpToDate, err := isCrdUpToDate(leader, crdInfo)
 		if crdConfigured {
-			if leader && create {
-				if crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
-					rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
-				}
+			if crossCheck && crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
+				rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
 			}
 
 			if !crdUpToDate {
 				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)
 				continue
 			}
-		} else if create {
+		} else if init {
 			for retry := 0; retry < 3; retry++ {
 				if err = createK8sCrdSchema(crdInfo); err == nil {
 					log.WithFields(log.Fields{"crd": crdInfo.MetaName}).Info("configured crd schema in k8s")
@@ -1747,7 +1744,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		}
 
 		if err != nil {
-			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "err": err}).Error("crd schema")
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "init": init, "err": err}).Error("crd schema")
 			errors = append(errors, err.Error())
 		}
 	}
@@ -1760,7 +1757,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 	return errors
 }
 
-func Init(leader bool, cspType share.TCspType) {
+func Init(leader, crossCheck bool, cspType share.TCspType) {
 	var crdconf *share.CLUSAdmissionState
 	clusHelper := kv.GetClusterHelper()
 	crdconf, _ = clusHelper.GetAdmissionStateRev(resource.NvCrdSvcName)
@@ -1769,7 +1766,7 @@ func Init(leader bool, cspType share.TCspType) {
 	}
 	crdconf.CtrlStates[admission.NvAdmValidateType].Enable = true // always enable NV CRD feature
 
-	CheckCrdSchema(leader, true, cspType)
+	CheckCrdSchema(leader, true, crossCheck, cspType)
 
 	// register crd admission control(ValidatingWebhookConfiguration neuvector-validating-crd-webhook) to k8s
 	k8sResInfo := admission.ValidatingWebhookConfigInfo{

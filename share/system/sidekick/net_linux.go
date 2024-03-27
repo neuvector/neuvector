@@ -22,6 +22,12 @@ type NetIface struct {
 	Addrs []NetAddr `json:"addrs"`
 }
 
+type NetLinkAttrs struct {
+	Index     int    `json:"index"`
+	Name      string `json:"name"`
+	OperState bool   `json:"OperState"`
+}
+
 func GetGlobalAddrs() map[string]NetIface {
 	ifaces := make(map[string]NetIface)
 
@@ -31,6 +37,10 @@ func GetGlobalAddrs() map[string]NetIface {
 	}
 
 	for _, link := range links {
+		if link == nil || link.Attrs() == nil {
+			continue
+		}
+		
 		attrs := link.Attrs()
 
 		iface := NetIface{
@@ -76,6 +86,9 @@ func GetRouteIfaceAddr(ip net.IP) (string, *net.IPNet, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	if link == nil || link.Attrs() == nil {
+		return "", nil, errors.New("no link to address")
+	}
 	if link.Attrs().Flags&net.FlagLoopback != 0 {
 		// If route is resolved to loopback interface, then it's a local IP
 		return link.Attrs().Name, &net.IPNet{IP: ip, Mask: net.CIDRMask(0, 128)}, nil
@@ -89,4 +102,31 @@ func GetRouteIfaceAddr(ip net.IP) (string, *net.IPNet, error) {
 	}
 
 	return link.Attrs().Name, addrs[0].IPNet, nil
+}
+
+func GetNetLinkAttrs() map[string]NetLinkAttrs {
+	linkAttrs := make(map[string]NetLinkAttrs)
+
+	links, err := netlink.LinkList()
+	if err != nil {
+		return linkAttrs
+	}
+
+	for _, link := range links {
+		if link == nil || link.Attrs() == nil {
+			continue
+		}
+
+		attrs := link.Attrs()
+
+		linkAttr := NetLinkAttrs{
+			Index:     attrs.Index,
+			Name:      attrs.Name,
+			OperState: attrs.OperState == netlink.OperUp,
+		}
+
+		linkAttrs[attrs.Name] = linkAttr
+	}
+
+	return linkAttrs
 }

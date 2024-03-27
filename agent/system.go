@@ -51,6 +51,10 @@ func policyInit() {
 	pe.Init(Host.ID, gInfo.hostIPs, Host.TunnelIP, ObtainGroupProcessPolicy, policyApplyDir)
 }
 
+func policySetTimerWheel(aTimerWheel *utils.TimerWheel) {
+	pe.SetTimerWheel(aTimerWheel)
+}
+
 func updateContainerPolicyMode(id, policyMode string) {
 	cid := ""
 	if c, ok := gInfoReadActiveContainer(id); ok {
@@ -179,7 +183,11 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 	}
 }
 
+var policyVerVal uint64 = 0
+const polVerMax uint64 = (1<<16-1)
 func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
+	policyVerVal++
+	policyVer := uint16(policyVerVal%polVerMax)
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
 	for wlID, c := range gInfo.activeContainers {
 		//container that has no datapath needs not be
@@ -201,6 +209,7 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 			HostMode:   c.hostMode,
 			CapIntcp:   c.capIntcp,
 			Configured: false,
+			PolVer: policyVer,
 		}
 
 		for _, pair := range c.intcpPairs {
@@ -413,6 +422,10 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	}
 
+	if conn.ClientIP.IsLinkLocalUnicast() || conn.ServerIP.IsLinkLocalUnicast() {
+		return 0, C.DP_POLICY_ACTION_OPEN, false
+	}
+
 	// Use parent's policy if the connection is reported on child
 	var wlID *string
 	if conn.Ingress {
@@ -502,8 +515,8 @@ func systemConfigSpecialSubnet(nType cluster.ClusterNotifyType, key string, valu
 		newSpecialSubnets[subnet.Subnet.String()] = subnet
 	}
 
-	if reflect.DeepEqual(specialSubnets, newSpecialSubnets) == false {
-		specialSubnets = newSpecialSubnets
+	if reflect.DeepEqual(policy.SpecialSubnets, newSpecialSubnets) == false {
+		policy.SpecialSubnets = newSpecialSubnets
 		dp.DPCtrlConfigSpecialIPSubnet(newSpecialSubnets)
 	}
 }

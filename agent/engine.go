@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,12 +22,14 @@ import (
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/pipe"
 	"github.com/neuvector/neuvector/agent/probe"
+	"github.com/neuvector/neuvector/agent/policy"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/vishvananda/netlink"
 )
 
 const containerWaitParentPeriod time.Duration = (time.Second * 1)
@@ -81,6 +84,7 @@ type containerData struct {
 	pushPHistory   bool
 	examIntface    bool
 	scanCache      []byte
+	nvRole         string
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -116,6 +120,7 @@ type localSystemInfo struct {
 	disableNetPolicy  bool
 	detectUnmanagedWl bool
 	enableIcmpPolicy  bool
+	linkStates        map[string]bool
 }
 
 var defaultPolicyMode string = share.PolicyModeLearn
@@ -126,7 +131,6 @@ var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
 var defaultDetectUnmanagedWl bool = false
 var defaultEnableIcmpPolicy bool = false
-var specialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var rtStorageDriver string
 
 var gInfo localSystemInfo = localSystemInfo{
@@ -148,6 +152,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	jumboFrameMTU:    false,
 	xffEnabled:       defaultXffEnabled,
 	ciliumCNI:        false,
+	linkStates:       make(map[string]bool),
 }
 
 func gInfoLock() {
@@ -173,6 +178,13 @@ func gInfoRUnlock() {
 func gInfoReadActiveContainer(id string) (*containerData, bool) {
 	gInfoRLock()
 	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
+	return c, ok
+}
+
+func gInfoReadNeuvectorContainer(id string) (*containerData, bool) {
+	gInfoRLock()
+	c, ok := gInfo.neuContainers[id]
 	gInfoRUnlock()
 	return c, ok
 }
@@ -1004,7 +1016,7 @@ func programUpdatePairs(c *containerData, restore bool) (bool, bool, bool, map[s
 }
 
 func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, restartMonitor bool) {
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		if info != nil && c.pid != info.Pid {
 			return
 		}
@@ -1604,11 +1616,11 @@ func examNeuVectorInterface(c *containerData, change int) {
 	}
 }
 
-func isNeuvectorContainerById(id string) bool {
-	gInfoRLock()
-	defer gInfoRUnlock()
-	_, ok := gInfo.neuContainers[id]
-	return ok
+func isNeuvectorContainerById(id string) (string, bool) {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
+		return c.nvRole, true
+	}
+	return "", false
 }
 
 // oc49 and above: pod process is none on the cri-o
@@ -1624,7 +1636,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	log.WithFields(log.Fields{"id": id, "name": info.Name, "role": role, "pid": info.Pid}).Info()
 
 	// log.WithFields(log.Fields{"container": info}).Debug("PROC:")
-	if isNeuvectorContainerById(id) { // existed and ignore it
+	if _, ok := isNeuvectorContainerById(id); ok { // existed and ignore it
 		return
 	}
 
@@ -1640,6 +1652,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		pods:           utils.NewSet(),
 		ownListenPorts: utils.NewSet(),
 		capBlock:       true, // intentional for process monitor
+		nvRole:         role,
 	}
 
 	// Because activePid2ID doesn't have neuvector container in it, we cannot always get
@@ -1687,17 +1700,37 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
-
+		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+		prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, c.pid)
 		// file monitors : protect mode, core-definitions, only modification alerts
 		fileWatcher.ContainerCleanup(info.Pid)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
 		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
-			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true,
+			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
 		})
+
+		var filters []share.CLUSFileMonitorFilter
+		if role ==  "enforcer" || role == "controller+enforcer+manager" || role == "controller+enforcer" || role == "allinone" {
+			for _, fltr := range conf.Profile.Filters {
+				switch fltr.Path {
+				case "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin" : // skipped
+				default:
+					filters = append(filters, fltr)
+				}
+			}
+			filters = append(filters, share.CLUSFileMonitorFilter{
+				Behavior: share.FileAccessBehaviorBlock, Path: "/usr/local/bin/scripts", Regex: ".*", Recursive: true, CustomerAdd: true,
+			})
+			filters = append(filters, share.CLUSFileMonitorFilter{
+				Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
+			})
+			conf.Profile.Filters = filters // customized
+		}
+
 		conf.Profile.Mode = share.PolicyModeEnforce
 		conf.Profile.Group = group
 		if info.Pid != 0 {
-			go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
+			go fileWatcher.StartWatch(id, info.Pid, conf, true, true)
 		}
 	}
 
@@ -1757,6 +1790,7 @@ func stopNeuVectorMonitor(c *containerData) {
 		pe.DeleteProcessPolicy(group)
 	}
 
+	prober.HandleAnchorNvProtectChange(false, c.id, c.upperDir, c.pid)
 	log.WithFields(log.Fields{"id": c.id, "pid": c.pid}).Debug("FMON:")
 	fileWatcher.ContainerCleanup(c.pid)
 
@@ -1769,7 +1803,6 @@ func stopNeuVectorMonitor(c *containerData) {
 		ev = ClusterEvent{event: EV_DEL_CONTAINER, id: c.id}
 		ClusterEventChan <- &ev
 	}
-
 	return
 }
 
@@ -2046,7 +2079,7 @@ func delProgramNfqDP(c *containerData, ns string) {
 }
 
 func taskStopContainer(id string, pid int) {
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		stopNeuVectorMonitor(c)
 		return
 	}
@@ -2152,7 +2185,7 @@ func taskStopContainer(id string, pid int) {
 
 func taskDelContainer(id string) {
 	// If the container stop event is missed, call stop first.
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		stopNeuVectorMonitor(c)
 		return
 	}
@@ -2185,7 +2218,7 @@ func taskDPConnect() {
 	dp.DPCtrlConfigAgent(debug)
 
 	dp.DPCtrlConfigInternalSubnet(gInfo.internalSubnets)
-	dp.DPCtrlConfigSpecialIPSubnet(specialSubnets)
+	dp.DPCtrlConfigSpecialIPSubnet(policy.SpecialSubnets)
 
 	if driver != pipe.PIPE_NOTC && driver != pipe.PIPE_CLM {
 		jumboFrame := gInfo.jumboFrameMTU
@@ -2437,7 +2470,7 @@ func getContainerService(id string) (string, bool, bool) {
 		return c.service, c.capBlock, false
 	}
 
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		return c.service, c.capBlock, true
 	}
 	return "", false, false
@@ -2460,4 +2493,61 @@ func cbGetAllContainerList() utils.Set {
 	gInfoRLock()
 	defer gInfoRUnlock()
 	return gInfo.allContainers.Clone()
+}
+
+func StartMonitorHostInterface(hid string, pid int, stopCh chan struct{}) {
+	log.WithFields(log.Fields{"hostid": hid}).Debug("")
+	global.SYS.CallNetNamespaceFunc(pid, func(params interface{}) {
+		intfHostMonitorLoop(hid, stopCh)
+	}, nil)
+}
+
+func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
+	var err error
+	chLink := make(chan netlink.LinkUpdate)
+	doneLink := make(chan struct{})	
+	defer close(doneLink)
+
+	if err = netlink.LinkSubscribe(chLink, doneLink); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Link change subscription failed")
+	}
+	
+	chAddr := make(chan netlink.AddrUpdate)
+	doneAddr := make(chan struct{})	
+	defer close(doneAddr)
+
+	if err = netlink.AddrSubscribe(chAddr, doneAddr); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Address change subscription failed")
+	}
+ 
+	log.Debug("Start monitoring Host Interface changes...")
+
+	for {
+		select {
+		case <-stopCh:
+			log.WithFields(log.Fields{"hostid": hid}).Debug("Monitor host i/f Stopped")
+			return
+		case updateLink := <-chLink:
+			if updateLink.Link == nil || updateLink.Link.Attrs() == nil {
+				continue
+			}
+			linkName := updateLink.Link.Attrs().Name
+			isUp := (updateLink.IfInfomsg.Flags&syscall.IFF_UP != 0) && (updateLink.IfInfomsg.Flags&syscall.IFF_RUNNING != 0)
+			if prevState, exists := gInfo.linkStates[linkName]; exists {
+				if (prevState && isUp) || (!prevState && !isUp) {
+					continue
+				}
+			}
+			taskReexamHostIntf()
+		case updateAddr := <-chAddr:
+			// only monitor ipv4 for now
+			if utils.IsIPv4(updateAddr.LinkAddress.IP) {
+				if updateAddr.NewAddr && gInfo.hostIPs.Contains(updateAddr.LinkAddress.IP.String()) {
+					continue
+				}
+				// for all other conditions(includes address delete) re-exam host interface
+				taskReexamHostIntf()
+			}
+		}
+	}
 }

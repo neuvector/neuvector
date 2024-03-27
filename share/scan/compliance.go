@@ -1,37 +1,41 @@
 package scan
 
 import (
-	"sort"
-	"sync"
 	"fmt"
-	"path/filepath"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
+	"sync"
+
 	"gopkg.in/yaml.v3"
 
-	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/share/global"
-	"github.com/neuvector/neuvector/share"
 	"github.com/hashicorp/go-version"
+	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/global"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	dstPrefix           = "/tmp/"
-	kube160YAMLFolder	= dstPrefix + "cis-1.6.0/"
-	kube123YAMLFolder	= dstPrefix + "cis-1.23/"
-	kube124YAMLFolder	= dstPrefix + "cis-1.24/"
-	kube180YAMLFolder	= dstPrefix + "cis-1.8.0/"
-	rh140YAMLFolder		= dstPrefix + "rh-1.4.0/"
-	defaultYAMLFolder  	= dstPrefix + "cis-1.8.0/"
-	catchDescription 	= regexp.MustCompile(`^(.*?) \([^)]*\)$`)
-	complianceMetas []api.RESTBenchMeta
-	complianceMetaMap map[string]api.RESTBenchMeta
-	once sync.Once
-	backup_cis_items = make(map[string]api.RESTBenchCheck)
+	dstPrefix                     = "/usr/local/bin/scripts/cis_yamls/"
+	kube160YAMLFolder             = dstPrefix + "cis-1.6.0/"
+	kube123YAMLFolder             = dstPrefix + "cis-1.23/"
+	kube124YAMLFolder             = dstPrefix + "cis-1.24/"
+	kube180YAMLFolder             = dstPrefix + "cis-1.8.0/"
+	rh140YAMLFolder               = dstPrefix + "rh-1.4.0/"
+	gke140YAMLFolder              = dstPrefix + "gke-1.4.0/"
+	aks140YAMLFolder              = dstPrefix + "aks-1.4.0/"
+	eks140YAMLFolder              = dstPrefix + "eks-1.4.0/"
+	defaultYAMLFolder             = dstPrefix + "cis-1.8.0/"
+	catchDescription              = regexp.MustCompile(`^(.*?) \([^)]*\)$`)
+	complianceMetas               []api.RESTBenchMeta
+	complianceMetaMap             map[string]api.RESTBenchMeta
+	once                          sync.Once
+	backup_cis_items              = make(map[string]api.RESTBenchCheck)
 	backup_docker_image_cis_items = make(map[string]api.RESTBenchCheck)
-	backup_complianceSet = make(map[string]map[string]bool)
+	backup_complianceSet          = make(map[string]map[string]bool)
 )
 
 var complianceHIPAA []string = []string{
@@ -2328,38 +2332,38 @@ var cis_items = map[string]api.RESTBenchCheck{
 var complianceSet = map[string]map[string]bool{
 	api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
 	api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
-	api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
-	api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+	api.ComplianceTemplatePCI:   TransformArrayToMap(compliancePCI),
+	api.ComplianceTemplateGDPR:  TransformArrayToMap(complianceGDPR),
 }
 
 type Check struct {
-    ID          string `yaml:"id"`
-	Description string `yaml:"description"`
-	Type	 	string `yaml:"type"`
-	Category 	string `yaml:"category"`
-	Scored 		bool `yaml:"scored"`
-	Profile 	string `yaml:"profile"`
-	Automated 	bool `yaml:"automated"`
-	Tags	 	[]string `yaml:"tags"`
-    Remediation string `yaml:"remediation"`
+	ID          string   `yaml:"id"`
+	Description string   `yaml:"description"`
+	Type        string   `yaml:"type"`
+	Category    string   `yaml:"category"`
+	Scored      bool     `yaml:"scored"`
+	Profile     string   `yaml:"profile"`
+	Automated   bool     `yaml:"automated"`
+	Tags        []string `yaml:"tags"`
+	Remediation string   `yaml:"remediation"`
 }
 
 type Group struct {
-    Checks []Check `yaml:"checks"`
+	Checks []Check `yaml:"checks"`
 }
 
 type YamlFile struct {
-    Groups []Group `yaml:"groups"`
+	Groups []Group `yaml:"groups"`
 }
 
-func InitComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
+func InitComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	// Ensuring initialization happens only once
 	once.Do(func() {
 		// For fast rollback to original setting when fail
 		PrepareBackup()
 		// inProductionK8s flag means we will read yaml provided from the pod environment, which we are not allowed to read in test environment
-        complianceMetas, complianceMetaMap = PrepareComplianceMeta(platform, flavor, inProductionK8s)
-    })
+		complianceMetas, complianceMetaMap = PrepareComplianceMeta(platform, flavor, inProductionK8s)
+	})
 
 	return complianceMetas, complianceMetaMap
 }
@@ -2386,8 +2390,8 @@ func PrepareBackup() {
 	backup_complianceSet = map[string]map[string]bool{
 		api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
 		api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
-		api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
-		api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+		api.ComplianceTemplatePCI:   TransformArrayToMap(compliancePCI),
+		api.ComplianceTemplateGDPR:  TransformArrayToMap(complianceGDPR),
 	}
 }
 
@@ -2428,10 +2432,24 @@ func PrepareComplianceMeta(platform, flavor string, inProductionK8s bool) ([]api
 // Currently update the k8s Folder only
 func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string {
 	var remediationFolder string
-	if inProductionK8s {
+	if inProductionK8s && global.ORCH != nil {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
-
-		if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
+		if platform == share.PlatformKubernetes && flavor == share.FlavorGKE {
+			kVer, err := version.NewVersion(k8sVer)
+			if err != nil {
+				remediationFolder = gke140YAMLFolder
+			} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+				remediationFolder = gke140YAMLFolder
+			} else {
+				remediationFolder = defaultYAMLFolder
+			}
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorAKS {
+			// Currently support AKS-1.4.0 only
+			remediationFolder = aks140YAMLFolder
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorEKS {
+			// Currently support EKS-1.4.0 only
+			remediationFolder = eks140YAMLFolder
+		} else if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
 			ocVer, err := version.NewVersion(ocVer)
 			if err != nil {
 				remediationFolder = rh140YAMLFolder
@@ -2489,7 +2507,7 @@ func processYAMLFile(path string) error {
 				Description: catchDescription.ReplaceAllString(check.Description, "$1"),
 				Remediation: check.Remediation,
 			}
-			
+
 			envolvedCompliance := TransformArrayToMap(check.Tags)
 			for compliance := range complianceSet {
 				// Update the compliance
@@ -2509,20 +2527,20 @@ func processYAMLFile(path string) error {
 func GetK8sCISMeta(platform, flavor string, inProductionK8s bool) {
 	// Check the current k8s version, then read the correct folder
 	remediationFolder := GetK8sCISFolder(platform, flavor, inProductionK8s)
-	
+
 	// Read every yaml under the folder, then dynamically update the cis_items and complianceSet
 	err := filepath.Walk(remediationFolder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
-			return err 
+			return err
 		}
 
 		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
 			return processYAMLFile(path)
 		}
-		return nil 
+		return nil
 	})
-	
+
 	// if Failed at walk, stay with original value
 	if err != nil {
 		cis_items = backup_cis_items
@@ -2531,9 +2549,9 @@ func GetK8sCISMeta(platform, flavor string, inProductionK8s bool) {
 	}
 }
 
-// Transform the array as set, implement with built-in map 
-func TransformArrayToMap(array []string) map [string]bool{
-	arrayItemMap := make(map [string]bool)
+// Transform the array as set, implement with built-in map
+func TransformArrayToMap(array []string) map[string]bool {
+	arrayItemMap := make(map[string]bool)
 	for _, arrrayItem := range array {
 		arrayItemMap[arrrayItem] = true
 	}

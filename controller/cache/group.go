@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"sync"
 	"strings"
 	"time"
 
@@ -498,6 +499,10 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		} else {
 			refreshGroupMember(cache)
 			groupCacheMap[group.Name] = cache
+			//for imported empty group
+			if cache.members.Cardinality() == 0 && cacher.GetUnusedGroupAging() != 0 {
+				scheduleGroupRemoval(cache)
+			}
 		}
 		if ok := isCreateDlpGroup(&group); ok {
 			createDlpGroup(group.Name, group.CfgType)
@@ -1007,6 +1012,9 @@ type groupRemovalEvent struct {
 	groupname string
 }
 
+var emptyGroups []string
+var emptyGroupsMutex sync.Mutex
+
 func (p *groupRemovalEvent) Expire() {
 	cacheMutexLock()
 	if cache, ok := groupCacheMap[p.groupname]; ok {
@@ -1023,13 +1031,60 @@ func (p *groupRemovalEvent) Expire() {
 		//is really deleted or not
 		cache.timerTask = ""
 		cacheMutexUnlock()
-		deleted := deleteGroupFromCluster(p.groupname)
 
-		if deleted {
-			groupRemoveEvent(share.CLUSEvGroupAutoRemove, p.groupname)
-		}
+		//log.WithFields(log.Fields{"group": p.groupname}).Info("To be deleted")
+		emptyGroupsMutex.Lock()
+		emptyGroups = append(emptyGroups, p.groupname)
+		emptyGroupsMutex.Unlock()
 	} else {
 		cacheMutexUnlock()
+	}
+}
+
+func rmEmptyGroupsFromCluster() {
+	if isLeader() == false {
+		return
+	}
+	emptyGroupsMutex.Lock()
+	groups := emptyGroups
+	emptyGroups = nil
+	emptyGroupsMutex.Unlock()
+
+	if len(groups) <= 0 {
+		return
+	}
+
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	//log.WithFields(log.Fields{"groups": groups}).Debug("")
+	kv.DeletePolicyByGroups(groups)
+	kv.DeleteResponseRuleByGroups(groups)
+
+	accAll := access.NewAdminAccessControl()
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	for _, name := range groups {
+		cg, _, _ := clusHelper.GetGroup(name, accAll)
+		if cg == nil {
+			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
+			if _, ok := groupCacheMap[name]; ok {
+				delete(groupCacheMap, name)
+			}
+		} else {
+			clusHelper.DeleteGroupTxn(txn, name)
+		}
+	}
+	if ok, err1 := txn.Apply(); err1 != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
+	}
+	for _, name := range groups {
+		groupRemoveEvent(share.CLUSEvGroupAutoRemove, name)
 	}
 }
 

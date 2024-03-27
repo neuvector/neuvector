@@ -186,6 +186,7 @@ type base struct {
 	scanLayers  bool
 	scanSecrets bool
 	tracer      httptrace.HTTPTrace
+	ignoreProxy bool
 }
 
 func (r *base) url(pathTemplate string, args ...interface{}) string {
@@ -206,7 +207,10 @@ func (r *base) SetConfig(cfg *share.CLUSRegistryConfig) {
 	r.regURL = cfg.Registry
 	r.scanLayers = cfg.ScanLayers
 	r.scanSecrets = !cfg.DisableFiles
-	r.proxy = GetProxy(cfg.Registry)
+	r.ignoreProxy = cfg.IgnoreProxy
+	if !r.ignoreProxy {
+		r.proxy = GetProxy(cfg.Registry)
+	}
 }
 
 func (r *base) GetTracer() httptrace.HTTPTrace {
@@ -277,10 +281,11 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 	reqRootsOfTrust := []*share.SigstoreRootOfTrust{}
 	for _, clusRootOfTrust := range clusRootsOfTrust {
 		reqRootOfTrust := &share.SigstoreRootOfTrust{
-			Name:           clusRootOfTrust.Name,
-			RekorPublicKey: clusRootOfTrust.RekorPublicKey,
-			RootCert:       clusRootOfTrust.RootCert,
-			SCTPublicKey:   clusRootOfTrust.SCTPublicKey,
+			Name:                 clusRootOfTrust.Name,
+			RekorPublicKey:       clusRootOfTrust.RekorPublicKey,
+			RootCert:             clusRootOfTrust.RootCert,
+			SCTPublicKey:         clusRootOfTrust.SCTPublicKey,
+			RootlessKeypairsOnly: clusRootOfTrust.RootlessKeypairsOnly,
 		}
 
 		clusVerifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRootOfTrust.Name)

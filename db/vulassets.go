@@ -58,7 +58,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Filters.ScoreType = validateOrDefault(q.Filters.ScoreType, []string{"v2", "v3"}, "v3")
 	q.Filters.ViewType = validateOrDefault(q.Filters.ViewType, []string{"all", "containers", "infrastructure", "registry"}, "all")
 	q.Filters.SeverityType = validateOrDefault(q.Filters.SeverityType, []string{"all", "high", "medium", "low"}, "all")
-	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withfix", "withoutfix"}, "all")
+	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withFix", "withoutFix"}, "all")
 	q.Filters.PublishedType = validateOrDefault(q.Filters.PublishedType, []string{"all", "before", "after"}, "all")
 
 	q.Filters.ServiceNameMatchType = validateOrDefault(q.Filters.ServiceNameMatchType, []string{"equals", "contains"}, "")
@@ -129,9 +129,8 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 	perf := make([]string, 0)
 	columns := []interface{}{"id", "type", "assetid", "cve_lists"}
 
-	// we cannot apply asset-based filter to filter out assets in sql query
-	// In the v5.2.4 UI, the impact will include all relevant assets, regardless of asset-based filters.
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Prepared(true).ToSQL()
+	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("GetVulAssetSessionV2, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
 		return nil, 0, perf, err
@@ -182,7 +181,7 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		}
 
 		for _, c := range cveList {
-			name, dbkey := parseCVEDbKey(c)
+			name, dbkey, fix := parseCVEDbKey(c)
 			if _, ok := dbVulAssets[name]; !ok {
 				dbVulAssets[name] = &DbVulAsset{
 					Name:          name,
@@ -209,19 +208,14 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 					dbVulAsset.ImageItems = append(dbVulAsset.ImageItems, assetid)
 				}
 			}
+
+			if fix == "wf" {
+				dbVulAsset.F_withFix = 1
+			}
 		}
 	}
 	elapsed := time.Since(start)
 	perf = append(perf, fmt.Sprintf("2a, derive vuls from assets, assetCount=%d, dbVulAssets=%d, took=%v", assetCount, len(dbVulAssets), elapsed))
-
-	// execute asset-based filter
-	start = time.Now()
-	matchedAssets, err := applyAssetBasedFilters(allowed, queryFilter)
-	if err != nil {
-		return nil, 0, perf, err
-	}
-	elapsed = time.Since(start)
-	perf = append(perf, fmt.Sprintf("2b, applyAssetBasedFilters, took=%v", elapsed))
 
 	// foreach vulassset
 	start = time.Now()
@@ -241,14 +235,6 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		// CVE based filter
 		if !meetCVEBasedFilter(vulasset, queryFilter) {
 			vulasset.MeetSearch = false // for static data summary
-			dataSlice = append(dataSlice, vulasset)
-			continue
-		}
-
-		// Asset based filter
-		evaluateAssetBasedFilters(vulasset, matchedAssets, queryFilter)
-		if vulasset.Skip {
-			vulasset.MeetSearch = false
 			dataSlice = append(dataSlice, vulasset)
 			continue
 		}
@@ -470,11 +456,11 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 		defer db.Close() // close it after done
 
 		memTables := GetAllTableInMemoryDb()
-		log.WithFields(log.Fields{"memTables": memTables}).Debug("debugme, GetVulAssetSessionV2, use filedb")
+		log.WithFields(log.Fields{"memTables": memTables}).Debug("GetVulAssetSessionV2, use filedb")
 	} else {
 		db = memoryDbHandle
 		memTables := GetAllTableInMemoryDb()
-		log.WithFields(log.Fields{"memTables": memTables}).Debug("debugme, GetVulAssetSessionV2, use memdb")
+		log.WithFields(log.Fields{"memTables": memTables}).Debug("GetVulAssetSessionV2, use memdb")
 	}
 
 	rows, err := db.Query(statement, args...)
@@ -641,14 +627,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 
 	q := qf.Filters
 
-	if q.PackageType == "withfix" || q.PackageType == "withoutfix" {
+	if q.PackageType == "withFix" || q.PackageType == "withoutFix" {
 		expectedMeetCount += 1
 
-		if q.PackageType == "withfix" && vulasset.F_withFix == 1 {
+		if q.PackageType == "withFix" && vulasset.F_withFix == 1 {
 			meetCount += 1
 		}
 
-		if q.PackageType == "withoutfix" && vulasset.F_withFix == 0 {
+		if q.PackageType == "withoutFix" && vulasset.F_withFix == 0 {
 			meetCount += 1
 		}
 	}
@@ -656,11 +642,11 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 	if (q.PublishedType == "before" || q.PublishedType == "after") && q.PublishedTime > 0 {
 		expectedMeetCount += 1
 
-		if q.PublishedType == "before" && q.PublishedTime < vulasset.PublishedTS {
+		if q.PublishedType == "before" && q.PublishedTime >= vulasset.PublishedTS {
 			meetCount += 1
 		}
 
-		if q.PublishedType == "after" && q.PublishedTime >= vulasset.PublishedTS {
+		if q.PublishedType == "after" && q.PublishedTime < vulasset.PublishedTS {
 			meetCount += 1
 		}
 	}
@@ -959,4 +945,13 @@ func fillCvePackages(cvePackages map[string]map[string]utils.Set, packagesBytes 
 			}
 		}
 	}
+}
+
+func buildAssetFilterWhereClause(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
+	exp1 := buildWhereClauseForImage(nil, queryFilter)
+	exp2 := buildWhereClauseForWorkload(nil, queryFilter)
+	exp3 := buildWhereClauseForNode(nil, queryFilter)
+	exp4 := buildWhereClauseForPlatform(nil, queryFilter)
+
+	return goqu.Or(exp1, exp2, exp3, exp4)
 }

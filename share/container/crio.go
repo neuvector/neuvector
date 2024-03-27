@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	crioAPI "github.com/cri-o/cri-o/client"
-	"github.com/cri-o/cri-o/types"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -27,6 +25,9 @@ import (
 
 const defaultCriOSock = "/var/run/crio/crio.sock"
 
+// standard CRI runtime drivers
+const defaultCriDockerSock = "/var/run/cri-dockerd.sock"
+
 type crioDriver struct {
 	sys          *system.SystemTools
 	sysInfo      *sysinfo.SysInfo
@@ -36,9 +37,9 @@ type crioDriver struct {
 	selfID       string
 	criClient    *grpc.ClientConn
 	version      *criRT.VersionResponse
-	daemonInfo   types.CrioInfo
 
 	/////
+	storageDriver    string
 	podImgRepoDigest string
 	podImgDigest     string
 	podImgID         string
@@ -52,7 +53,7 @@ type imageInfo struct {
 	digest  string
 }
 
-func getPauseImageRepoDigests() (string, error) {
+func getPauseImageRepoDigests(sys *system.SystemTools) (string, error) {
 	config_files := []string{
 		"/proc/1/root/etc/crio/crio.conf",
 		"/proc/1/root/etc/crio/crio.conf.d/00-default.conf",
@@ -77,6 +78,11 @@ func getPauseImageRepoDigests() (string, error) {
 			}
 		}
 	}
+
+	// already pidHost
+	if _, pause_img, ok := obtainRtEndpointFromKubelet(sys); ok && pause_img != "" {
+		return pause_img, nil
+	}
 	return "", fmt.Errorf("no found")
 }
 
@@ -85,18 +91,6 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	crio, err := crioAPI.New(endpoint)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to create crio client")
-		return nil, err
-	}
-
-	daemon, err := crio.DaemonInfo()
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to get daemon info")
-		return nil, err
-	}
 
 	cri, ver, err := newCriClient(endpoint, ctx)
 	if err != nil {
@@ -112,16 +106,17 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 	}
 
-	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver}).Info("crio connected")
+	storageDev, _ := criGetStorageDevice(cri, ctx)
+	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver, "storageDriver": storageDev}).Info("cri connected")
 	driver := crioDriver{
 		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod", endpoint: endpoint, endpointHost: sockPath,
 		// Read /host/proc/sys/kernel/hostname doesn't give the correct node hostname. Change UTS namespace to read it
-		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), daemonInfo: daemon, selfID: id,
+		sysInfo: sys.GetSystemInfo(), nodeHostname: sys.GetHostname(1), storageDriver: storageDev, selfID: id,
 	}
 
 	driver.pidHost = IsPidHost()
 	if driver.pidHost {
-		if repoDig, err := getPauseImageRepoDigests(); err != nil {
+		if repoDig, err := getPauseImageRepoDigests(sys); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Fail to get pause image info")
 		} else {
 			driver.podImgRepoDigest = repoDig
@@ -156,28 +151,17 @@ func (d *crioDriver) reConnect() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	crio, err := crioAPI.New(endpoint)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to create crio client")
-		return err
-	}
-
-	daemon, err := crio.DaemonInfo()
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to get daemon info")
-		return err
-	}
-
 	cri, ver, err := newCriClient(endpoint, ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Fail to create cri client")
 		return err
 	}
 
+	d.storageDriver, _ = criGetStorageDevice(cri, ctx)
+
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("cri-o connected")
 
 	// update records
-	d.daemonInfo = daemon
 	d.criClient = cri
 	d.version = ver
 	return nil
@@ -250,8 +234,6 @@ func (d *crioDriver) getPodMeta(id string, pod *criRT.PodSandboxStatusResponse, 
 	meta := &ContainerMeta{
 		ID:       id,
 		Name:     name,
-		Pid:      info.Info.Pid,
-		Image:    info.Info.Image,
 		Labels:   pod.Status.Labels,
 		Hostname: "",
 		Envs:     make([]string, 0),
@@ -259,7 +241,9 @@ func (d *crioDriver) getPodMeta(id string, pod *criRT.PodSandboxStatusResponse, 
 		isChild:  false,
 	}
 
-	if meta.Image == "" {
+	if info != nil {
+		meta.Pid = info.Info.Pid
+		meta.Image = info.Info.Image
 		if img, ok := info.Info.RuntimeSpec.Annotations["io.kubernetes.cri-o.ImageName"]; ok {
 			meta.Image = img
 		}
@@ -368,74 +352,55 @@ func (d *crioDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 }
 
 func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMetaExtra, error) {
+	var pod *criRT.PodSandboxStatusResponse
 	var meta *ContainerMetaExtra
-	pod, err := criPodSandboxStatus(d.criClient, ctx, id)
-	if err == nil && pod != nil {
-		if pod.Status == nil || pod.Info == nil {
-			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
+	var cInfo *criContainerInfo
+
+	// log.WithFields(log.Fields{"id": id}).Debug()
+	if cs, err := criContainerStatus(d.criClient, ctx, id); err == nil && cs != nil {
+		// log.WithFields(log.Fields{"cs": cs}).Debug("container")
+		if cInfo, err = d.getContainerInfo(cs.Info); err != nil {
+			log.WithFields(log.Fields{"id": id, "info": cs.Info}).Error("Fail to get cInfo")
 			return nil, err
 		}
 
-		podInfo, err2 := d.getContainerInfo(pod.Info)
-		if err2 != nil {
-			log.WithFields(log.Fields{"id": id, "info": pod.Info}).Error("Fail to get pod info")
-			return nil, err
-		}
-
-		// a POD
-		meta = &ContainerMetaExtra{
-			ContainerMeta: *d.getPodMeta(id, pod, podInfo),
-			Privileged:    d.isPrivileged(pod.Status, nil),
-			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
-			Networks:      utils.NewSet(),
-		}
-
-		if pod.Status.CreatedAt > 0 {
-			meta.CreatedAt = time.Unix(0, pod.Status.CreatedAt)
-			meta.StartedAt = meta.CreatedAt
-		}
-
-		// image ID
-		if meta.Image == "" {
-			// from host's crio information
-			meta.Image = d.podImgRepoDigest
-			meta.ImageID = d.podImgID
-			meta.ImageDigest = d.podImgDigest
-		} else {
-			meta.ImageDigest = imageRef2Digest(meta.Image)
-			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
-				meta.ImageID = imageMeta.ID
-				meta.Author = imageMeta.Author
+		if cInfo.Info.SandboxID == "" { // a pod
+			// a POD
+			pod, err = criPodSandboxStatus(d.criClient, ctx, id)
+			if err != nil {
+				log.WithFields(log.Fields{"id": id, "cInfo": cInfo, "error": err}).Error("Fail to get its pod")
+				return nil, err
 			}
-		}
-	} else {
-		// an APP container
-		cs, err2 := criContainerStatus(d.criClient, ctx, id)
-		if err2 != nil || cs.Status == nil || cs.Info == nil {
-			log.WithFields(log.Fields{"id": id, "error": err2, "cs": cs}).Error("Fail to get container")
-			return nil, err
-		}
 
-		csInfo, err2 := d.getContainerInfo(cs.Info)
-		if err2 != nil {
-			log.WithFields(log.Fields{"id": id, "info": cs.Info}).Error("Fail to get cs info")
-			return nil, err
-		}
+			meta = &ContainerMetaExtra{
+				ContainerMeta: *d.getPodMeta(id, pod, cInfo),
+				Privileged:    d.isPrivileged(pod.Status, nil),
+				ExitCode:      int(cs.Status.ExitCode),
+				Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
+				Networks:      utils.NewSet(),
+				ImageDigest:   imageRef2Digest(cs.Status.ImageRef),
+			}
 
-		pod, err = criPodSandboxStatus(d.criClient, ctx, csInfo.Info.SandboxID)
-		if err2 != nil {
-			log.WithFields(log.Fields{"id": id, "csInfo": csInfo, "error": err}).Error("Fail to get its pod")
-			return nil, err
-		}
-
-		meta = &ContainerMetaExtra{
-			ContainerMeta: *d.getContainerMeta(id, cs, pod, csInfo),
-			ImageDigest:   imageRef2Digest(cs.Status.ImageRef),
-			Privileged:    d.isPrivileged(pod.Status, csInfo),
-			ExitCode:      int(cs.Status.ExitCode),
-			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
-			Networks:      utils.NewSet(),
-			LogPath:       cs.Status.LogPath,
+			if cs.Status.Image != nil {
+				meta.Image = cs.Status.Image.Image
+			} else {
+				meta.Image = cs.Status.ImageRef
+			}
+		} else {
+			pod, err = criPodSandboxStatus(d.criClient, ctx, cInfo.Info.SandboxID)
+			if err != nil || pod == nil {
+				log.WithFields(log.Fields{"id": id, "cInfo": cInfo, "error": err}).Error("Fail to get its pod")
+				return nil, err
+			}
+			meta = &ContainerMetaExtra{
+				ContainerMeta: *d.getContainerMeta(id, cs, pod, cInfo),
+				ImageDigest:   imageRef2Digest(cs.Status.ImageRef),
+				Privileged:    d.isPrivileged(pod.Status, cInfo),
+				ExitCode:      int(cs.Status.ExitCode),
+				Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
+				Networks:      utils.NewSet(),
+				LogPath:       cs.Status.LogPath,
+			}
 		}
 
 		if cs.Status.CreatedAt > 0 {
@@ -483,10 +448,50 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 		if meta.ImageID == "" {
 			log.WithFields(log.Fields{"cs": cs}).Debug("fail to obtain image id")
 		}
+	} else {
+		if pod, err = criPodSandboxStatus(d.criClient, ctx, id); err != nil || pod == nil || pod.Status == nil {
+			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
+			return nil, err
+		}
+		// log.WithFields(log.Fields{"pod": pod}).Debug("pod")
+		if pod.Info != nil {
+			cInfo, err = d.getContainerInfo(pod.Info)
+			if err != nil {
+				log.WithFields(log.Fields{"id": id, "info": pod.Info}).Error("Fail to get pod info")
+				return nil, err
+			}
+		}
+
+		// a POD
+		meta = &ContainerMetaExtra{
+			ContainerMeta: *d.getPodMeta(id, pod, cInfo),
+			Privileged:    d.isPrivileged(pod.Status, nil),
+			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
+			Networks:      utils.NewSet(),
+		}
+
+		if pod.Status.CreatedAt > 0 {
+			meta.CreatedAt = time.Unix(0, pod.Status.CreatedAt)
+			meta.StartedAt = meta.CreatedAt
+		}
+
+		// image ID
+		if meta.Image == "" {
+			// from host's crio information
+			meta.Image = d.podImgRepoDigest
+			meta.ImageID = d.podImgID
+			meta.ImageDigest = d.podImgDigest
+		} else {
+			meta.ImageDigest = imageRef2Digest(meta.Image)
+			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
+				meta.ImageID = imageMeta.ID
+				meta.Author = imageMeta.Author
+			}
+		}
 	}
 
 	// retrive its network/pid namespace from the POD
-	if pod.Status.Linux == nil || pod.Status.Linux.Namespaces == nil || pod.Status.Linux.Namespaces.Options == nil {
+	if pod.Status == nil || pod.Status.Linux == nil || pod.Status.Linux.Namespaces == nil || pod.Status.Linux.Namespaces.Options == nil {
 		log.Error("Fail to get sandbox linux namespaces")
 	} else {
 		opts := pod.Status.Linux.Namespaces.Options
@@ -635,7 +640,7 @@ func (d *crioDriver) GetDefaultRegistries() []string {
 }
 
 func (d *crioDriver) GetStorageDriver() string {
-	return d.daemonInfo.StorageDriver
+	return d.storageDriver
 }
 
 func (d *crioDriver) setPodImageInfo() error {

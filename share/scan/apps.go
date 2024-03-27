@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,26 +31,24 @@ const (
 	wpname           = "Wordpress"
 	WPVerFileSuffix  = "wp-includes/version.php"
 	wpVersionMaxSize = 4 * 1024
+	ComposerFile     = "/composer.lock"
 
-	jar                = "jar"
-	javaPOMXML         = "/pom.xml"
-	pomReadSize        = 1024 * 1024
-	javaServerInfo     = "/ServerInfo.properties"
-	serverInfoMaxLines = 100
-	tomcatName         = "Tomcat"
-	jarMaxDepth        = 2
+	jar         = "jar"
+	jarMaxDepth = 2
 
-	javaPOMproperty         = "/pom.properties"
-	javaPOMgroupId          = "groupId="
-	javaPOMartifactId       = "artifactId="
-	javaPOMversion          = "version="
-	javaManifest            = "MANIFEST.MF"
-	javaMnfstVendorId       = "Implementation-Vendor-Id:"
-	javaMnfstVersion        = "Implementation-Version:"
-	javaMnfstTitle          = "Implementation-Title:"
-	javaMnfstBundleVendorId = "Bundle-Vendor:"
-	javaMnfstBundleVersion  = "Bundle-Version:"
-	javaMnfstBundleTitle    = "Bundle-SymbolicName:"
+	javaPOMproperty        = "/pom.properties"
+	javaPOMgroupId         = "groupId="
+	javaPOMartifactId      = "artifactId="
+	javaPOMversion         = "version="
+	javaManifest           = "MANIFEST.MF"
+	javaMnfstMaxLines      = 20
+	javaMnfstImplVendorId  = "Implementation-Vendor-Id:"
+	javaMnfstImplVersion   = "Implementation-Version:"
+	javaMnfstImplTitle     = "Implementation-Title:"
+	javaMnfstBundleVendor  = "Bundle-Vendor:"
+	javaMnfstBundleVersion = "Bundle-Version:"
+	javaMnfstBundleSymName = "Bundle-SymbolicName:"
+	javaMnfstBundleName    = "Bundle-Name:"
 
 	python            = "python"
 	ruby              = "ruby"
@@ -61,7 +60,16 @@ const (
 var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
 var pyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\.]+)-([a-zA-Z0-9\.]+)[\-a-zA-Z0-9\.]*\.(egg-info\/PKG-INFO|dist-info\/WHEEL)$`)
 var rubyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\-]+)-([0-9\.]+)\.gemspec$`)
-var javaInvalidVendorIds = map[string]bool{"%providerName": true}
+
+type ComposerLock struct {
+	Packages    []ComposerPackage `json:"packages"`
+	DevPackages []ComposerPackage `json:"packages-dev"`
+}
+
+type ComposerPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
 
 type AppPackage struct {
 	AppName    string `json:"app_name"`
@@ -113,9 +121,9 @@ func NewScanApps(v2 bool) *ScanApps {
 	return &ScanApps{pkgs: make(map[string][]AppPackage), dedup: utils.NewSet(), replace: v2}
 }
 
-func isAppsPkgFile(filename, fullpath string) bool {
+func IsAppsPkgFile(filename, fullpath string) bool {
 	if isNodejs(filename) || IsJava(filename) || isPython(filename) ||
-		isRuby(filename) || isDotNet(filename) || isWordpress(filename) {
+		isRuby(filename) || isDotNet(filename) || isWordpress(filename) || isPhpComposer(filename) {
 		return true
 	}
 	// Keep golang check at last as it requires reading file data
@@ -130,7 +138,7 @@ func (s *ScanApps) empty() bool {
 	return len(s.pkgs) == 0
 }
 
-func (s *ScanApps) data() map[string][]AppPackage {
+func (s *ScanApps) Data() map[string][]AppPackage {
 	return s.pkgs
 }
 
@@ -153,7 +161,7 @@ func (s *ScanApps) marshal() []byte {
 	return buf.Bytes()
 }
 
-func (s *ScanApps) extractAppPkg(filename, fullpath string) {
+func (s *ScanApps) ExtractAppPkg(filename, fullpath string) {
 	if _, ok := s.pkgs[filename]; ok && !s.replace {
 		return
 	}
@@ -175,6 +183,8 @@ func (s *ScanApps) extractAppPkg(filename, fullpath string) {
 		s.parseDotNetPackage(filename, fullpath)
 	} else if isWordpress(filename) {
 		s.parseWordpressPackage(filename, fullpath)
+	} else if isPhpComposer(filename) {
+		s.parsePhpComposerJson(filename, fullpath)
 	} else {
 		s.parseGolangPackage(filename, fullpath)
 	}
@@ -323,6 +333,98 @@ func IsJava(filename string) bool {
 		strings.HasSuffix(filename, ".ear")
 }
 
+func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
+	var vendorId, version, title, symName string
+	var vendorSet, titleSet bool
+	var lineCount int
+
+	scanner := bufio.NewScanner(rc)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if len(line) == 0 && lineCount > 0 {
+			// if we reach an empty line, the first section is done
+			break
+		}
+		if !strings.HasPrefix(line, " ") {
+			lineCount++
+			if lineCount > javaMnfstMaxLines {
+				break
+			}
+		}
+
+		switch {
+		case strings.HasPrefix(line, javaMnfstImplVendorId):
+			// preferred vendor name
+			vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVendorId))
+			vendorSet = true
+		case strings.HasPrefix(line, javaMnfstImplVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplVersion))
+		case strings.HasPrefix(line, javaMnfstImplTitle):
+			// preferred title name
+			title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstImplTitle))
+			title = strings.Split(title, ";")[0]
+			titleSet = true
+		case strings.HasPrefix(line, javaMnfstBundleVendor):
+			if !vendorSet {
+				vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendor))
+			}
+		case strings.HasPrefix(line, javaMnfstBundleVersion):
+			version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
+		case strings.HasPrefix(line, javaMnfstBundleSymName):
+			symName = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleSymName))
+		case strings.HasPrefix(line, javaMnfstBundleName):
+			if !titleSet {
+				title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleName))
+				title = strings.Split(title, ";")[0]
+			}
+		}
+
+		if len(version) > 0 && titleSet && vendorSet {
+			// stop we have all the fields confirmed
+			break
+		}
+	}
+
+	if symName != "" {
+		if s := strings.LastIndex(symName, ";"); s > 0 {
+			symName = symName[:s]
+		}
+		if symName == "org.apache.tomcat-embed-core" {
+			// NVSHAS-8730
+			vendorId = "org.apache.tomcat.embed"
+			title = "tomcat-embed-core"
+		} else if symName == "org.postgresql.jdbc" && title == "PostgreSQL JDBC Driver" {
+			// NVSHAS-8757
+			vendorId = "org.postgresql"
+			title = "postgresql"
+		} else if len(vendorId) == 0 || vendorId[0] == '%' || title[0] == '%' {
+			if dot := strings.LastIndex(symName, "."); dot > 0 {
+				vendorId = symName[:dot]
+				title = symName[dot+1:]
+			}
+		}
+	}
+
+	if len(vendorId) == 0 || vendorId[0] == '%' {
+		vendorId = "jar"
+	}
+
+	// Suppress incomplete entries as we can't use them later.
+	if title == "" || version == "" {
+		return nil, errors.New("Missing title or version")
+	}
+
+	pkg := AppPackage{
+		AppName:    jar,
+		FileName:   path,
+		ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
+		Version:    version,
+	}
+
+	return &pkg, nil
+}
+
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir(filepath.Dir(fullpath), "")
 	if err == nil {
@@ -369,32 +471,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
 			}
-		} else if strings.HasSuffix(f.Name, javaServerInfo) {
-			rc, err := f.Open()
-			if err != nil {
-				log.WithFields(log.Fields{"err": err, "file": f.Name}).Error("Open file fail")
-				continue
-			}
-			defer rc.Close()
-
-			scanner := bufio.NewScanner(rc)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasPrefix(line, "server.info=") {
-					prod := strings.TrimPrefix(line, "server.info=")
-					if strings.HasPrefix(prod, "Apache Tomcat/") {
-						if ver := strings.TrimPrefix(prod, "Apache Tomcat/"); len(ver) > 0 {
-							pkg := AppPackage{
-								AppName:    tomcatName,
-								ModuleName: tomcatName,
-								Version:    ver,
-								FileName:   path,
-							}
-							pkgs[path] = []AppPackage{pkg}
-						}
-					}
-				}
-			}
 		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
 			rc, err := f.Open()
@@ -402,7 +478,6 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				log.WithFields(log.Fields{"err": err}).Error("open pom property fail")
 				continue
 			}
-			defer rc.Close()
 
 			scanner := bufio.NewScanner(rc)
 			for scanner.Scan() {
@@ -420,6 +495,9 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					break
 				}
 			}
+
+			rc.Close()
+
 			if groupId == "" || version == "" || artifactId == "" {
 				log.WithFields(log.Fields{"path": path}).Info("Missing artifactId, groupId, or version")
 				continue
@@ -434,71 +512,17 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			pkgs[path] = []AppPackage{pkg}
 			continue //higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
-			var vendorId, version, title string
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
 				continue
 			}
-			defer rc.Close()
 
-			scanner := bufio.NewScanner(rc)
-			for scanner.Scan() {
-				line := scanner.Text()
-				switch {
-				case strings.HasPrefix(line, javaMnfstVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVendorId))
-				case strings.HasPrefix(line, javaMnfstVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstVersion))
-				case strings.HasPrefix(line, javaMnfstTitle):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstTitle))
-				case strings.HasPrefix(line, javaMnfstBundleVendorId):
-					vendorId = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVendorId))
-				case strings.HasPrefix(line, javaMnfstBundleVersion):
-					version = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleVersion))
-				case strings.HasPrefix(line, javaMnfstBundleTitle):
-					title = strings.TrimSpace(strings.TrimPrefix(line, javaMnfstBundleTitle))
-				}
-
-				title = strings.Split(title, ";")[0]
-				if len(vendorId) > 0 && len(title) > 0 && len(version) > 0 {
-					break
-				}
+			if pkg, err := parseJarManifestFile(path, rc); err == nil {
+				pkgs[path] = []AppPackage{*pkg}
 			}
 
-			if len(vendorId) == 0 || javaInvalidVendorIds[vendorId] {
-				vendorId = "jar"
-			}
-
-			//Suppress incomplete entries as we can't use them later.
-			if title == "" || version == "" {
-				// log.WithFields(log.Fields{"path": path}).Info("Missing title, vendorId, or version")
-				continue
-			}
-
-			pkg := AppPackage{
-				AppName:    jar,
-				FileName:   path,
-				ModuleName: fmt.Sprintf("%s:%s", vendorId, title),
-				Version:    version,
-			}
-			pkgs[path] = []AppPackage{pkg}
-		}
-	}
-
-	// If no package found, use filename
-	if len(pkgs) == 0 && isJavaJar(filename) {
-		fn := filepath.Base(filename)
-		dash := strings.LastIndex(fn, "-")
-		dot := strings.LastIndex(fn, ".")
-		if dash > 0 && dash+1 < dot {
-			pkg := AppPackage{
-				AppName:    jar,
-				ModuleName: fmt.Sprintf("jar:%s", fn[:dash]),
-				Version:    fn[dash+1 : dot],
-				FileName:   path,
-			}
-			pkgs[path] = []AppPackage{pkg}
+			rc.Close()
 		}
 	}
 
@@ -521,6 +545,42 @@ func isDotNet(filename string) bool {
 
 func isWordpress(filename string) bool {
 	return strings.HasSuffix(filename, WPVerFileSuffix)
+}
+
+func isPhpComposer(filename string) bool {
+	return strings.HasSuffix(filename, ComposerFile)
+}
+
+func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
+	data := ComposerLock{}
+	//extract json data
+	bytes, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "file": filename}).Error("failed to read composer.lock file")
+		return
+	}
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "file": filename}).Error("failed to unmarshal json data from composer.lock file")
+		return
+	}
+	//convert json data to one or more AppPackage
+	for _, composerPackage := range data.Packages {
+		packageNameSplit := strings.Split(composerPackage.Name, "/")
+		packageName := packageNameSplit[len(packageNameSplit)-1]
+		appPackage := AppPackage{
+			AppName:    "php",
+			ModuleName: fmt.Sprintf("php:%s", packageName),
+			Version:    composerPackage.Version,
+			FileName:   filename,
+		}
+		//add each AppPackage to s.pkgs map, append if entry already exists.
+		if _, ok := s.pkgs[appPackage.ModuleName]; !ok {
+			s.pkgs[appPackage.ModuleName] = []AppPackage{appPackage}
+		} else {
+			s.pkgs[appPackage.ModuleName] = append(s.pkgs[appPackage.ModuleName], appPackage)
+		}
+	}
 }
 
 func (s *ScanApps) parsePythonPackage(filename string) {

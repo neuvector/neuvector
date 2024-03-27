@@ -21,6 +21,21 @@ func getHostAddrs() map[string]sk.NetIface {
 	return ifaces
 }
 
+func getHostLinks() map[string]bool {
+	var linkAttrs map[string]sk.NetLinkAttrs
+	links := make(map[string]bool)
+
+	global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
+		linkAttrs = sk.GetNetLinkAttrs()
+	}, nil)
+
+	for name, linkAttr := range linkAttrs {
+		links[name] = linkAttr.OperState
+	}
+
+	return links
+}
+
 /*
 With Azure advanced networking plugin:
  link - link=eth0 type=device

@@ -607,7 +607,6 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	}
 
 	// log.WithFields(log.Fields{"path": linkPath}).Debug("FMON:")
-
 	// lookup the root pid
 	r, pInfo := fn.lookupContainer(pid)
 	if r == nil {
@@ -617,13 +616,26 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	}
 
 	// skip our containers, host runc, system containers
-	if (r.bNeuVectorSvc || pInfo.RootPid == 1 || !r.capBlock) && perm {
+	if (pInfo.RootPid == 1 || !r.capBlock) && perm {
 		return true, 0, nil, nil
 	}
 
 	ifile, _, mask := fn.lookupFile(r, linkPath, pInfo)
 	if ifile == nil {
 		return true, mask, nil, nil
+	}
+
+	if r.bNeuVectorSvc {
+		if strings.HasPrefix(linkPath, "/usr/local/bin/scripts/") {
+			if filepath.Dir(pInfo.Path) == "/usr/local/bin" {
+				switch filepath.Base(pInfo.Path) {
+				case "agent", "monitor", "controller", "nstools", "workerlet", "dp":
+					return true, 0, nil, nil
+				}
+			}
+			return false, mask, nil, nil
+		}
+		return true, 0, nil, nil
 	}
 
 	// log.WithFields(log.Fields{"protect": ifile.protect, "perm": perm, "path": linkPath, "ifile": ifile, "evMask": fmt.Sprintf("0x%08x", fmask)}).Debug("FMON:")

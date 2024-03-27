@@ -1665,12 +1665,14 @@ const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
+const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
 const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
+	emptyGrpTicker := time.NewTicker(rmEmptyGroupPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
@@ -1726,6 +1728,8 @@ func startWorkerThread(ctx *Context) {
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
+			case <-emptyGrpTicker.C:
+				rmEmptyGroupsFromCluster()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
 				refreshInternalIPNet()

@@ -1502,7 +1502,7 @@ type CLUSAuditLog struct {
 	ProjectName  string               `json:"project_name,omitempty"`
 }
 
-const SnifferIdAgentField = 8
+const SnifferIdAgentField = 12
 
 type CLUSComplianceProfileEntry struct {
 	TestNum string   `json:"test_num"`
@@ -1721,6 +1721,7 @@ type CLUSRegistryConfig struct {
 	IBMCloudAccount    string                `json:"ibmcloud_account"`
 	IBMCloudTokenURL   string                `json:"ibmcloud_token_url"`
 	CfgType            TCfgType              `json:"cfg_type"`
+	IgnoreProxy        bool                  `json:"ignore_proxy"`
 }
 
 type CLUSImage struct {
@@ -2863,13 +2864,14 @@ type CLUSApikey struct {
 }
 
 type CLUSSigstoreRootOfTrust struct {
-	Name           string   `json:"name"`
-	IsPrivate      bool     `json:"is_private"`
-	RekorPublicKey string   `json:"rekor_public_key"`
-	RootCert       string   `json:"root_cert"`
-	SCTPublicKey   string   `json:"sct_public_key"`
-	CfgType        TCfgType `json:"cfg_type"`
-	Comment        string   `json:"comment"`
+	Name                 string   `json:"name"`
+	IsPrivate            bool     `json:"is_private"`
+	RootlessKeypairsOnly bool     `json:"rootless_keypairs_only"`
+	RekorPublicKey       string   `json:"rekor_public_key"`
+	RootCert             string   `json:"root_cert"`
+	SCTPublicKey         string   `json:"sct_public_key"`
+	CfgType              TCfgType `json:"cfg_type"`
+	Comment              string   `json:"comment"`
 }
 
 type CLUSSigstoreVerifier struct {
