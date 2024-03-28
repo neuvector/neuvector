@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -791,5 +792,73 @@ func handlerAssetVul(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	if r.Method == http.MethodPost {
 		getAssetViewSession(w, r)
 		return
+	}
+}
+
+func handlerScanCacheStat(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	if licenseAllowScan() != true {
+		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+		return
+	}
+
+	id := ps.ByName("id")
+	if res, err := rpc.ScanCacheGetStat(id); err != nil {
+		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
+	} else {
+		resp := &api.RESTScanCacheStat {
+			RecordCnt: 	res.RecordCnt,
+			RecordSize: res.RecordSize,
+			MissCnt: 	res.MissCnt,
+			HitCnt:  	res.HitCnt,
+		}
+		restRespSuccess(w, r, resp, acc, login, nil, "Get scan cache stat")
+	}
+}
+
+func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	if licenseAllowScan() != true {
+		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+		return
+	}
+
+	id := ps.ByName("id")
+	if res, err := rpc.ScanCacheGetData(id); err != nil {
+		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
+	} else {
+		var data scanUtils.CacherData
+		uzb := utils.GunzipBytes(res.DataZb)
+		json.Unmarshal([]byte(uzb), &data)
+		resp := &api.RESTScanCacheData {
+			MissCnt: 	data.MissCnt,
+			HitCnt: 	data.HitCnt,
+			RecordSize:	data.CurRecordSize,
+		}
+
+		for _, rec := range data.CacheRecords {
+			r := api.RESTScanCacheRecord {
+				Layer: 	rec.Layer,
+				Size:	rec.Size,
+				RefCnt:	rec.RefCnt,
+				RefLast:rec.RefLast,
+			}
+			resp.CacheRecords = append(resp.CacheRecords, r)
+		}
+		restRespSuccess(w, r, resp, acc, login, nil, "Get scan cache data")
 	}
 }
