@@ -34,7 +34,7 @@ func (m *CronJobV1) GetMetadata() *metav1.ObjectMeta {
 			Labels:                     m.Labels,
 			Annotations:                m.Annotations,
 			Finalizers:                 m.Finalizers,
-			ClusterName:                &m.ClusterName,
+			//ClusterName:                &m.ClusterName,
 			//CreationTimestamp:          m.CreationTimestamp,
 			//DeletionTimestamp:          m.DeletionTimestamp,
 			//OwnerReferences:            &m.OwnerReferences,
