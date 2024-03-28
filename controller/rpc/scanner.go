@@ -311,13 +311,13 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 }
 
 func ScanCacheGetStat(scanner string) (*share.ScanCacheStatRes, error) {
+	log.WithFields(log.Fields{"scanner": scanner}).Debug()
 	client, err := getScannerServiceClient(scanner, true)
 	if err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-	defer decScanningCount(scanner)
 	defer cancel()
 	return client.ScanCacheGetStat(ctx, &share.RPCVoid{})
 }
@@ -329,7 +329,6 @@ func ScanCacheGetData(scanner string) (*share.ScanCacheDataRes, error) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-	defer decScanningCount(scanner)
 	defer cancel()
 	return client.ScanCacheGetData(ctx, &share.RPCVoid{})
 }
