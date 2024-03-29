@@ -1,8 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.21
-
-toolchain go1.22.1
+go 1.22
 
 replace (
 	github.com/containerd/cri => github.com/containerd/cri v1.19.0
