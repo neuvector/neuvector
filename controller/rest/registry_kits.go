@@ -294,6 +294,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			config.AuthToken = rconf.AuthToken
 			config.AuthWithToken = rconf.AuthWithToken
 			config.CreaterDomains = acc.GetAdminDomains(share.PERM_REG_SCAN)
+			config.IgnoreProxy = rconf.IgnoreProxy
 
 			if config.AuthWithToken && config.AuthToken == "" {
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Missing authentication token")
