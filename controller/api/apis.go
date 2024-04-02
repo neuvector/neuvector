@@ -1193,10 +1193,10 @@ type RESTGroupBrief struct {
 	PlatformRole    string   `json:"platform_role"`
 	CfgType         string   `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	BaselineProfile string   `json:"baseline_profile"`
-	MonMetric       bool     `json:"mon_metric"`
-	GrpSessCur      uint32   `json:"grp_sess_cur"`
-	GrpSessRate     uint32   `json:"grp_sess_rate"`
-	GrpBandWidth    uint32   `json:"grp_band_width"`
+	MonMetric       bool     `json:"monitor_metric"`
+	GrpSessCur      uint32   `json:"group_sess_cur"`
+	GrpSessRate     uint32   `json:"group_sess_rate"`
+	GrpBandWidth    uint32   `json:"group_band_width"`
 	RESTGroupCaps
 }
 
@@ -1221,10 +1221,10 @@ type RESTGroupConfig struct {
 	Comment  *string              `json:"comment"`
 	Criteria *[]RESTCriteriaEntry `json:"criteria,omitempty"`
 	CfgType  string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	MonMetric    *bool            `json:"mon_metric,omitempty"`
-	GrpSessCur   *uint32          `json:"grp_sess_cur,omitempty"`
-	GrpSessRate  *uint32          `json:"grp_sess_rate,omitempty"`
-	GrpBandWidth *uint32          `json:"grp_band_width,omitempty"`
+	MonMetric    *bool            `json:"monitor_metric,omitempty"`
+	GrpSessCur   *uint32          `json:"group_sess_cur,omitempty"`
+	GrpSessRate  *uint32          `json:"group_sess_rate,omitempty"`
+	GrpBandWidth *uint32          `json:"group_band_width,omitempty"`
 }
 
 type RESTCrdGroupConfig struct {

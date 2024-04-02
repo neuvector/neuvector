@@ -1114,10 +1114,10 @@ type CLUSGroup struct {
 	CapIntcp        bool                `json:"cap_intcp"`
 	CfgType         TCfgType            `json:"cfg_type"`
 	BaselineProfile string              `json:"baseline_profile"`
-	MonMetric       bool                `json:"mon_metric,omitempty"`
-	GrpSessCur      uint32              `json:"grp_sess_cur,omitempty"`
-	GrpSessRate     uint32              `json:"grp_sess_rate,omitempty"`
-	GrpBandWidth    uint32              `json:"grp_band_width,omitempty"`
+	MonMetric       bool                `json:"monitor_metric,omitempty"`
+	GrpSessCur      uint32              `json:"group_sess_cur,omitempty"`
+	GrpSessRate     uint32              `json:"group_sess_rate,omitempty"`
+	GrpBandWidth    uint32              `json:"group_band_width,omitempty"`
 }
 
 type CLUSPolicyRule struct {
