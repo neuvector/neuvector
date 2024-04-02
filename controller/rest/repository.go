@@ -22,7 +22,7 @@ import (
 
 const (
 	repositoryDefaultTag      = "latest"
-	maxRepoScanTasks          = 8
+	maxRepoScanTasks          = 32
 	repoScanTimeout           = time.Minute * 20
 	repoScanLingeringDuration = time.Second * 30
 	repoScanLongPollTimeout   = time.Second * 30
