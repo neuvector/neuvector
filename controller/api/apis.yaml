@@ -7033,6 +7033,10 @@ definitions:
       - platform_role
       - cfg_type
       - baseline_profile
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
     properties:
       name:
         type: string
@@ -7076,6 +7080,21 @@ definitions:
       baseline_profile:
         type: string
         example: ""
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       cap_change_mode:
         type: boolean
         example: false
@@ -7101,6 +7120,10 @@ definitions:
       - platform_role
       - cap_change_mode
       - cfg_type
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
       - criteria
       - members
       - policy_rules
@@ -7138,6 +7161,21 @@ definitions:
       cfg_type:
         type: string
         enum: [learned, user_created, ground, federal]
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       criteria:
         type: array
         items:
