@@ -89,6 +89,7 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			Port:             cs.LDAP.Port,
 			SSL:              cs.LDAP.SSL,
 			BaseDN:           cs.LDAP.BaseDN,
+			GroupDN:          cs.LDAP.GroupDN,
 			BindDN:           cs.LDAP.BindDN,
 			BindPasswd:       cs.LDAP.BindPasswd,
 			GroupMemberAttr:  cs.LDAP.GroupMemberAttr,
@@ -658,6 +659,9 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 	}
 	if ldap.BaseDN != nil {
 		cldap.BaseDN = *ldap.BaseDN
+	}
+	if ldap.GroupDN != nil {
+		cldap.GroupDN = *ldap.GroupDN
 	}
 	if ldap.BindDN != nil {
 		cldap.BindDN = *ldap.BindDN

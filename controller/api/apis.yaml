@@ -9794,6 +9794,7 @@ definitions:
       - port
       - ssl
       - base_dn
+      - group_dn
       - bind_dn
       - group_member_attr
       - username_attr
@@ -9814,6 +9815,9 @@ definitions:
         type: boolean
         example: false
       base_dn:
+        type: string
+        example: dc=example,dc=org
+      group_dn:
         type: string
         example: dc=example,dc=org
       bind_dn:
@@ -10064,6 +10068,9 @@ definitions:
         type: boolean
         example: true
       base_dn:
+        type: string
+        example: dc=win,dc=nv,dc=com
+      group_dn:
         type: string
         example: dc=win,dc=nv,dc=com
       bind_dn:
