@@ -762,6 +762,14 @@ func addWlGlobalAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrM
 	}
 }
 
+func addWlHostModeAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrMap map[string]share.CLUSSubnet) {
+	for _, nip := range from.NatIP {
+		nipnet := &net.IPNet{IP: nip, Mask: net.CIDRMask(32, 32)}
+		log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("@gfeng add hostmode nat ip")
+		addPolicyAddrIPNet(newPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
+	}
+}
+
 func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyMap map[string]*WorkloadIPPolicyInfo,
 	newPolicyAddrMap map[string]share.CLUSSubnet) {
 	addrMap := make(map[string]*share.CLUSWorkloadAddr)
@@ -775,6 +783,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 				if from.PolicyMode == share.PolicyModeEvaluate ||
 					from.PolicyMode == share.PolicyModeEnforce {
 					addWlGlobalAddrToPolicyAddrMap(from, newPolicyAddrMap)
+					//add IP of host-mode workload in monitor/protect mode
+					if (from.GlobalIP == nil || len(from.GlobalIP) == 0) && (from.LocalIP == nil || len(from.LocalIP) == 0) {
+						addWlHostModeAddrToPolicyAddrMap(from, newPolicyAddrMap)
+					}
 				}
 				if pInfo, ok := workloadPolicyMap[from.WlID]; ok {
 					pInfo.Configured = true
@@ -1120,12 +1132,20 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 			if conn.Ingress {
 				if iptype == share.SpecInternalHostIP || iptype == share.SpecInternalTunnelIP {
 					inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+					//we still need to consider newly added node
+					if inPolicyAddr {
+						inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+					}
 				} else {
 					inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
 				}
 			} else {
 				if iptype == share.SpecInternalHostIP || iptype == share.SpecInternalTunnelIP {
 					inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+					//we still need to consider newly added node
+					if inPolicyAddr {
+						inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+					}
 				} else {
 					inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
 				}

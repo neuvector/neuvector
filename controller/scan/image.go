@@ -208,7 +208,9 @@ func (r *base) SetConfig(cfg *share.CLUSRegistryConfig) {
 	r.scanLayers = cfg.ScanLayers
 	r.scanSecrets = !cfg.DisableFiles
 	r.ignoreProxy = cfg.IgnoreProxy
-	if !r.ignoreProxy {
+	if r.ignoreProxy {
+		r.proxy = ""
+	} else {
 		r.proxy = GetProxy(cfg.Registry)
 	}
 }

@@ -68,14 +68,14 @@ static bool injection_0 (dpi_packet_t *p, pcre2_code *recompiled, char *signatur
 }
 
 static sql_injection_t sql_injections[] ={   
-{injection_0, NULL, 0, "(?i)^SELECT.*\'\\s+(?:or|OR)\\s+((?:\'|\")?[0-9a-zA-Z_]+(?:\'|\")?)\\s*=\\s*\\1"}, // SELECT * FROM users WHERE name='adam' or 'x' = 'x'
-{injection_0, NULL, 0, "(?:sleep|SLEEP)\\s*\\(\\s*(?:\\d+|__TIME__)\\s*\\)"},                              // ' or sleep(__TIME__)'
-{injection_0, NULL, 0, "(?:benchmark|BENCHMARK)\\s*\\(\\s*(?:\\s*[1-9][0-9]{4,}\\s*,)"},                   // benchmark iteration greater than 10000
-{injection_0, NULL, 0, "(?:benchmark|BENCHMARK)\\s*\\(\\s*(?:\\s*[0-9]{0,4}\\s*,).*(?:--|#|\\/\\*)"},      // benchmark iteration less than 10000 but with comment symbols at the end
-{injection_0, NULL, 0, "(?:waitfor|WAITFOR)\\s*(?:delay|DELAY).*(?:--|#|\\/\\*)"},                         // ;waitfor delay '0:0:__TIME__'--
-{injection_0, NULL, 0, "(?:1|\"|\')\\s*(?:union|UNION).*(?:--|#|\\/\\*)"},                                 // ' union (select @@version) --'
-{injection_0, NULL, 0, "(?:exec|EXEC).*(?:--|#|\\/\\*)"},                                                  // exec master..xp_cmdshell <attacker command> --
-{injection_0, NULL, 0, "(?:or|OR)\\s1.*(?:--|#|\\/\\*)"},                                                  // -1" or 1 order by id desc --
+{injection_0, NULL, 0, "(?i)^SELECT.*\'\\s+OR\\s+((?:\'|\")?[0-9a-zA-Z_]+(?:\'|\")?)\\s*=\\s*\\1"},         // SELECT * FROM users WHERE name='adam' or 'x' = 'x'
+{injection_0, NULL, 0, "(?i)SLEEP\\s*\\(\\s*(?:\\d+|__TIME__)\\s*\\)"},                                     // ' or sleep(__TIME__)'
+{injection_0, NULL, 0, "(?i)BENCHMARK\\s*\\(\\s*(?:\\s*[1-9][0-9]{4,}\\s*,)"},                              // benchmark iteration greater than 10000
+{injection_0, NULL, 0, "(?i)BENCHMARK\\s*\\(\\s*(?:\\s*[0-9]{0,4}\\s*,).*(?:--|#|\\/\\*)"},                 // benchmark iteration less than 10000 but with comment symbols at the end
+{injection_0, NULL, 0, "(?i)WAITFOR\\s+DELAY.*(?:--|#|\\/\\*)"},                                            // ;waitfor delay '0:0:__TIME__'--
+{injection_0, NULL, 0, "(?i)(?:1|\"|\'|\\))\\s*UNION.*(?:--|#|\\/\\*)"},                                    // ' union (select @@version) --'
+{injection_0, NULL, 0, "(?i)EXEC\\s+.*(?:--|#|\\/\\*)"},                                                    // exec master..xp_cmdshell <attacker command> --
+{injection_0, NULL, 0, "(?i)OR\\s+(?:1|((?:\'|\")?[0-9a-zA-Z_]+(?:\'|\")?)\\s*=\\s*\\1).*(?:--|#|\\/\\*)"}, // -1" or 1 order by id desc --
 };
 
 void sql_injection_init()

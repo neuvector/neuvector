@@ -330,6 +330,7 @@ type RESTServerLDAP struct {
 	Port            uint16 `json:"port"`
 	SSL             bool   `json:"ssl"`
 	BaseDN          string `json:"base_dn"`
+	GroupDN         string `json:"group_dn"`
 	BindDN          string `json:"bind_dn"`
 	BindPasswd      string `json:"bind_password,cloak"`
 	GroupMemberAttr string `json:"group_member_attr"`
@@ -412,6 +413,7 @@ type RESTServerLDAPConfig struct {
 	Port            *uint16 `json:"port,omitempty"`
 	SSL             *bool   `json:"ssl,omitempty"`
 	BaseDN          *string `json:"base_dn,omitempty"`
+	GroupDN         *string `json:"group_dn,omitempty"`
 	BindDN          *string `json:"bind_dn,omitempty"`
 	BindPasswd      *string `json:"bind_password,cloak,omitempty"`
 	GroupMemberAttr *string `json:"group_member_attr,omitempty"`
