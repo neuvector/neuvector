@@ -42,7 +42,7 @@ import (
 
 	"golang.org/x/net/http2"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -346,8 +346,8 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	if e.Status != nil && e.Status.Message != nil && e.Status.Status != nil {
-		return fmt.Sprintf("kubernetes api: %s %d %s", *e.Status.Status, e.Code, *e.Status.Message)
+	if e.Status != nil {
+		return fmt.Sprintf("kubernetes api: %s %d %s", e.Status.Status, e.Code, e.Status.Message)
 	}
 	return fmt.Sprintf("%#v", e)
 }
@@ -394,7 +394,7 @@ func (c *Client) client() *http.Client {
 //		// resource is updated with response of create request
 //		fmt.Println(conifgMap.Metaata.GetCreationTimestamp())
 //
-func (c *Client) Create(ctx context.Context, req Resource, options ...Option) error {
+func (c *Client) Create(ctx context.Context, req metav1.Object, options ...Option) error {
 	url, err := resourceURL(c.Endpoint, req, false, options...)
 	if err != nil {
 		return err
@@ -402,7 +402,7 @@ func (c *Client) Create(ctx context.Context, req Resource, options ...Option) er
 	return c.do(ctx, "POST", url, req, req)
 }
 
-func (c *Client) Delete(ctx context.Context, req Resource, options ...Option) error {
+func (c *Client) Delete(ctx context.Context, req metav1.Object, options ...Option) error {
 	url, err := resourceURL(c.Endpoint, req, true, options...)
 	if err != nil {
 		return err
@@ -419,7 +419,7 @@ func (c *Client) Delete(ctx context.Context, req Resource, options ...Option) er
 	return c.do(ctx, "DELETE", url, o, nil)
 }
 
-func (c *Client) Update(ctx context.Context, req Resource, options ...Option) error {
+func (c *Client) Update(ctx context.Context, req metav1.Object, options ...Option) error {
 	url, err := resourceURL(c.Endpoint, req, true, options...)
 	if err != nil {
 		return err
@@ -427,7 +427,7 @@ func (c *Client) Update(ctx context.Context, req Resource, options ...Option) er
 	return c.do(ctx, "PUT", url, req, req)
 }
 
-func (c *Client) Get(ctx context.Context, namespace, name string, resp Resource, options ...Option) error {
+func (c *Client) Get(ctx context.Context, namespace, name string, resp metav1.Object, options ...Option) error {
 	url, err := resourceGetURL(c.Endpoint, namespace, name, resp, options...)
 	if err != nil {
 		return err
@@ -435,7 +435,7 @@ func (c *Client) Get(ctx context.Context, namespace, name string, resp Resource,
 	return c.do(ctx, "GET", url, nil, resp)
 }
 
-func (c *Client) List(ctx context.Context, namespace string, resp ResourceList, options ...Option) error {
+func (c *Client) List(ctx context.Context, namespace string, resp metav1.ListInterface, options ...Option) error {
 	url, err := resourceListURL(c.Endpoint, namespace, resp, options...)
 	if err != nil {
 		return err

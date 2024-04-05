@@ -1179,8 +1179,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/config",
 			"v1/scan/status",
-			"/v1/scan/cache_stat/*",
-			"/v1/scan/cache_data/*",
+			"v1/scan/cache_stat/*",
+			"v1/scan/cache_data/*",
 			"v1/scan/workload/*",
 			"v1/scan/image",
 			"v1/scan/image/*",

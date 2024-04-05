@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/neuvector/k8s/runtime"
 	"github.com/golang/protobuf/proto"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (

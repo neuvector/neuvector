@@ -15,8 +15,8 @@ import (
 
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -1606,9 +1606,11 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	apiVersion := resource.NvSecurityRuleVersion
 	resp := resource.NvDlpSecurityRuleList{
-		Kind:       &resource.NvListKind,
-		ApiVersion: &apiVersion,
-		Items:      make([]*resource.NvDlpSecurityRule, 0, len(rconf.Names)),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       resource.NvListKind,
+			APIVersion: apiVersion,
+		},
+		Items: make([]resource.NvDlpSecurityRule, 0, len(rconf.Names)),
 	}
 
 	// export dlp sensors
@@ -1657,11 +1659,13 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 		kind := resource.NvDlpSecurityRuleKind
 		resptmp := resource.NvDlpSecurityRule{
-			Kind: &kind,
-			Metadata: &cmetav1.ObjectMeta{
-				Name: &sensor.Name,
+			TypeMeta: metav1.TypeMeta{
+				Kind:       kind,
+				APIVersion: apiversion,
 			},
-			ApiVersion: &apiversion,
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sensor.Name,
+			},
 			Spec: resource.NvSecurityDlpSpec{
 				Sensor: &resource.NvSecurityDlpSensor{
 					Name:     sensor.Name,
@@ -1670,7 +1674,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				},
 			},
 		}
-		resp.Items = append(resp.Items, &resptmp)
+		resp.Items = append(resp.Items, resptmp)
 	}
 
 	doExport("cfgDlpExport.yaml", "DLP sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
@@ -1702,18 +1706,18 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvDlpSecurityRuleList
 	var secRule resource.NvDlpSecurityRule
-	var secRules []*resource.NvDlpSecurityRule = []*resource.NvDlpSecurityRule{nil}
+	var secRules []resource.NvDlpSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules[0] = &secRule
+			secRules = append(secRules, secRule)
 		}
 	} else {
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.Kind == nil || *r.Kind != resource.NvDlpSecurityRuleKind {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvDlpSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -1743,10 +1747,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
-				continue
-			}
-			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdDlpContent(secRule, share.ReviewTypeImportDLP, share.ReviewTypeDisplayDLP)
+			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdDlpContent(&secRule, share.ReviewTypeImportDLP, share.ReviewTypeDisplayDLP)
 			if errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break

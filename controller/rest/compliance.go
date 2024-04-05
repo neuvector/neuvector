@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/julienschmidt/httprouter"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -21,6 +20,7 @@ import (
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -448,8 +448,10 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 	apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvCompProfileSecurityRuleVersion)
 	kind := resource.NvCompProfileSecurityRuleKind
 	resp := resource.NvCompProfileSecurityRuleList{
-		Kind:       &resource.NvListKind,
-		ApiVersion: &apiVersion,
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiVersion,
+			Kind:       resource.NvListKind,
+		},
 	}
 
 	// export compliance profile (currently only default profile is supported)
@@ -485,10 +487,12 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		})
 
 		resptmp := resource.NvCompProfileSecurityRule{
-			ApiVersion: &apiVersion,
-			Kind:       &kind,
-			Metadata: &cmetav1.ObjectMeta{
-				Name: &name,
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: apiVersion,
+				Kind:       kind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
 			},
 			Spec: resource.NvSecurityCompProfileSpec{
 				Templates: &resource.NvSecurityCompTemplates{
@@ -497,7 +501,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 				},
 			},
 		}
-		resp.Items = append(resp.Items, &resptmp)
+		resp.Items = append(resp.Items, resptmp)
 		vpNames.Add(name)
 	}
 
@@ -530,18 +534,18 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule
-	var secRules []*resource.NvCompProfileSecurityRule = []*resource.NvCompProfileSecurityRule{nil}
+	var secRules []resource.NvCompProfileSecurityRule = []resource.NvCompProfileSecurityRule{}
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules[0] = &secRule
+			secRules = append(secRules, secRule)
 		}
 	} else {
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.Kind == nil || (*r.Kind != resource.NvCompProfileSecurityRuleKind && *r.Kind != resource.NvCompProfileSecurityRuleListKind) {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvCompProfileSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -571,10 +575,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if secRule == nil || secRule.Kind == nil || secRule.ApiVersion == nil {
-				continue
-			}
-			if cpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdCompProfileContent(secRule, share.ReviewTypeImportCompProfile, share.ReviewTypeDisplayCompProfile); errCount > 0 {
+			if cpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdCompProfileContent(&secRule, share.ReviewTypeImportCompProfile, share.ReviewTypeDisplayCompProfile); errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break
 			} else {
