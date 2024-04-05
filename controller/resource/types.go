@@ -181,13 +181,6 @@ type RBAC struct {
 	Roles  map[string]string // domain -> role
 }
 
-type CRD struct {
-	UID     string
-	Name    string
-	Domain  string
-	Version string
-}
-
 type ConfigMap struct {
 	UID    string
 	Name   string

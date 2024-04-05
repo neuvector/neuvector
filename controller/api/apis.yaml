@@ -2789,6 +2789,48 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanStatusData'
+  /v1/scan/cache_stat/{id}:
+    get:
+      tags:
+        - Scan
+      summary: Get scanner cache statistic data
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: id
+          description: Scanner ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanCacheStat'
+  /v1/scan/cache_data/{id}:
+    get:
+      tags:
+        - Scan
+      summary: Get scanner cache index data
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: id
+          description: Scanner ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanCacheData'
   /v1/scan/workload/{id}:
     get:
       tags:
@@ -6991,6 +7033,10 @@ definitions:
       - platform_role
       - cfg_type
       - baseline_profile
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
     properties:
       name:
         type: string
@@ -7034,6 +7080,21 @@ definitions:
       baseline_profile:
         type: string
         example: ""
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       cap_change_mode:
         type: boolean
         example: false
@@ -7059,6 +7120,10 @@ definitions:
       - platform_role
       - cap_change_mode
       - cfg_type
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
       - criteria
       - members
       - policy_rules
@@ -7096,6 +7161,21 @@ definitions:
       cfg_type:
         type: string
         enum: [learned, user_created, ground, federal]
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       criteria:
         type: array
         items:
@@ -9767,6 +9847,77 @@ definitions:
     properties:
       status:
         $ref: '#/definitions/RESTScanStatus'
+  RESTScanCacheStat:
+    type: object
+    required:
+      - record_count
+      - record_total_size
+      - cache_misses
+      - cache_hits
+    properties:
+      record_count:
+        type: integer
+        format: uint64
+        example: 0
+      record_total_size:
+        type: integer
+        format: uint64
+        example: 0
+      cache_misses:
+        type: integer
+        format: uint64
+        example: 0
+      cache_hits:
+        type: integer
+        format: uint64
+        example: 0
+  RESTScanCacheData:
+    type: object
+    required:
+      - cache_records
+      - record_total_size
+      - cache_misses
+      - cache_hits
+    properties:
+      cache_records:
+        type: array
+        items:
+          $ref: '#/definitions/RESTScanCacheRecord'
+      record_total_size:
+        type: integer
+        format: uint64
+        example: 0
+      cache_misses:
+        type: integer
+        format: uint64
+        example: 0
+      cache_hits:
+        type: integer
+        format: uint64
+        example: 0
+  RESTScanCacheRecord:
+    type: object
+    required:
+      - layer_id
+      - size
+      - reference_count
+      - last_referred
+    properties:
+      layer_id:
+        type: string
+        example: ""
+      size:
+        type: integer
+        format: uint64
+        example: 0
+      reference_count:
+        type: integer
+        format: uint32
+        example: 0
+      last_referred:
+        type: string
+        format: date-time
+        example: "2022-03-17T17:31:55.832768041Z"
   RESTSecurityData:
     type: object
     required:

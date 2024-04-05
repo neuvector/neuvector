@@ -1661,6 +1661,8 @@ func StartRESTServer() {
 	r.PATCH("/v1/scan/config", handlerScanConfig)
 	r.GET("/v1/scan/config", handlerScanConfigGet)
 	r.GET("/v1/scan/status", handlerScanStatus)
+	r.GET("/v1/scan/cache_stat/:id", handlerScanCacheStat)
+	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
 	r.GET("/v1/scan/image", handlerScanImageSummary)

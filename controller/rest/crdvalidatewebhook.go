@@ -82,8 +82,8 @@ LOOP:
 				} else {
 					raw = req.Object.Raw
 				}
-				if err := json.Unmarshal(raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
-					crUid = secRulePartial.Metadata.GetUid()
+				if err := json.Unmarshal(raw, &secRulePartial); err == nil {
+					crUid = string(secRulePartial.GetUID())
 				}
 				msg := fmt.Sprintf("CRD request(%s %s %s %s) Failed", req.Operation, req.Kind.Kind, req.Name, crUid)
 				k8sResourceLog(share.CLUSEvCrdErrDetected, msg, []string{detail})
@@ -168,83 +168,22 @@ func (q *tCrdRequestsMgr) crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) (
 	return "", nil
 }
 
-func (q *tCrdRequestsMgr) deleteCrInK8s(kind, recordName string, crdSecRule interface{}) {
+func (q *tCrdRequestsMgr) deleteCrInK8s(rscType, recordName string, crdSecRule interface{}) {
 	if crdSecRule == nil {
 		return
 	}
 
 	var err error
 	for i := 0; i < 5; i++ {
-		switch kind {
-		case resource.NvSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdSecurityRule, crdSecRule)
-		case resource.NvClusterSecurityRuleKind:
-			if gfwrule, ok := crdSecRule.(*resource.NvSecurityRule); ok && gfwrule != nil {
-				r := resource.NvClusterSecurityRule(*gfwrule)
-				err = global.ORCH.DeleteResource(resource.RscTypeCrdClusterSecurityRule, &r)
-			}
-		case resource.NvAdmCtrlSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdAdmCtrlSecurityRule, crdSecRule)
-		case resource.NvDlpSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdDlpSecurityRule, crdSecRule)
-		case resource.NvWafSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdWafSecurityRule, crdSecRule)
-		case resource.NvVulnProfileSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdVulnProfile, crdSecRule)
-		case resource.NvCompProfileSecurityRuleKind:
-			err = global.ORCH.DeleteResource(resource.RscTypeCrdCompProfile, crdSecRule)
-		}
+		err = global.ORCH.DeleteResource(rscType, crdSecRule)
 		if err == nil || strings.Index(err.Error(), " 404 ") < 0 {
 			break
 		}
 		time.Sleep(time.Second)
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"kind": kind, "error": err}).Error(recordName)
+		log.WithFields(log.Fields{"rscType": rscType, "error": err}).Error(recordName)
 	}
-}
-
-// for CRD only.
-// it returns non-nil error to indicate skipping the crd request.
-func (q *tCrdRequestsMgr) noExistingObj(rscType, ns, crUid, mdName string) error {
-
-	if obj, err := global.ORCH.GetResource(rscType, ns, mdName); err == nil {
-		var uidExisting string
-		switch rscType {
-		case resource.RscTypeCrdSecurityRule, resource.RscTypeCrdClusterSecurityRule:
-			if rscType == resource.RscTypeCrdSecurityRule {
-				r := obj.(*resource.NvSecurityRule)
-				uidExisting = *r.Metadata.Uid
-			} else {
-				r1 := obj.(*resource.NvClusterSecurityRule)
-				r := resource.NvSecurityRule(*r1)
-				uidExisting = *r.Metadata.Uid
-			}
-		case resource.RscTypeCrdAdmCtrlSecurityRule:
-			r := obj.(*resource.NvAdmCtrlSecurityRule)
-			uidExisting = *r.Metadata.Uid
-		case resource.RscTypeCrdDlpSecurityRule:
-			r := obj.(*resource.NvDlpSecurityRule)
-			if r != nil {
-				uidExisting = *r.Metadata.Uid
-			}
-		case resource.RscTypeCrdWafSecurityRule:
-			r := obj.(*resource.NvWafSecurityRule)
-			uidExisting = *r.Metadata.Uid
-		case resource.RscTypeCrdVulnProfile:
-			r := obj.(*resource.NvVulnProfileSecurityRule)
-			uidExisting = *r.Metadata.Uid
-		case resource.RscTypeCrdCompProfile:
-			r := obj.(*resource.NvCompProfileSecurityRule)
-			uidExisting = *r.Metadata.Uid
-		}
-		if crUid != uidExisting {
-			// cr in k8s & crd request's uid are different!
-			//log.WithFields(log.Fields{"name": mdName, "uid": uid, "crUid": crUid}).Warn()
-			return fmt.Errorf("UID in Kubernetes is %s but UID in request is %s", uidExisting, crUid)
-		}
-	}
-	return nil
 }
 
 func (q *tCrdRequestsMgr) writeCrOpEvent(kind, recordName, uid string, ev share.TLogEvent, msg string, subMsgs []string) {
@@ -336,13 +275,8 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			crdEventsCount = len(crdEventQueue.CrdEventRecord)
 
 			var kind string
+			var rscType string
 			var secRulePartial resource.NvSecurityRulePartial
-			var gfwrule resource.NvSecurityRule
-			var admCtrlSecRule resource.NvAdmCtrlSecurityRule
-			var dlpSecRule resource.NvDlpSecurityRule
-			var wafSecRule resource.NvWafSecurityRule
-			var vulnProfileSecRule resource.NvVulnProfileSecurityRule
-			var compProfileSecRule resource.NvCompProfileSecurityRule
 			var crdSecRule interface{}
 			var errCount, cachedRecords int
 			var errMsg string
@@ -353,6 +287,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 
 			err = nil
 			kind = req.Kind.Kind
+			rscType = req.Resource.Resource
 			ruleNs := req.Namespace
 			if req.Namespace == "" {
 				ruleNs = "default"
@@ -361,64 +296,48 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 
 			switch req.Operation {
 			case "DELETE":
-				if err = json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
-					kind = *secRulePartial.Kind
+				if err = json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil {
+					kind = secRulePartial.Kind
 					if req.Name == "" {
-						req.Name = secRulePartial.Metadata.GetName()
+						req.Name = secRulePartial.GetName()
 					}
-					crdHandler.crUid = secRulePartial.Metadata.GetUid()
+					crdHandler.crUid = string(secRulePartial.GetUID())
 					crdHandler.mdName = req.Name
 				} else {
 					errCount = 1
 					errMsg = fmt.Sprintf("CRD Rule format error")
 				}
 			case "CREATE", "UPDATE":
-				var rscType string
-
-				switch kind {
-				case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &gfwrule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &gfwrule, gfwrule.Metadata)
-						if req.Namespace != "" {
-							// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
-							_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
-							if err2 != nil && strings.Contains(err2.Error(), " 404 ") {
-								crInfo = "namespace not found"
-								goto SKIP_CRD_HANDLER
+				if crdSecRule, err = resource.CreateNvCrdObject(rscType); crdSecRule != nil {
+					if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
+						crdMD5, _, err = crdHandler.getCrInfo(crdSecRule)
+						if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
+							if req.Namespace != "" {
+								// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
+								_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
+								if err2 != nil && strings.Contains(err2.Error(), " 404 ") {
+									crInfo = "namespace not found"
+									goto SKIP_CRD_HANDLER
+								}
 							}
 						}
 					}
-				case resource.NvAdmCtrlSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &admCtrlSecRule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &admCtrlSecRule, admCtrlSecRule.Metadata)
-					}
-				case resource.NvDlpSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &dlpSecRule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &dlpSecRule, dlpSecRule.Metadata)
-					}
-				case resource.NvWafSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &wafSecRule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &wafSecRule, wafSecRule.Metadata)
-					}
-				case resource.NvVulnProfileSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &vulnProfileSecRule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &vulnProfileSecRule, vulnProfileSecRule.Metadata)
-					}
-				case resource.NvCompProfileSecurityRuleKind:
-					if err = json.Unmarshal(req.Object.Raw, &compProfileSecRule); err == nil {
-						crdMD5, rscType, crdSecRule, _, err = crdHandler.getCrInfo(kind, &compProfileSecRule, compProfileSecRule.Metadata)
-					}
-				default:
-					err = fmt.Errorf("unsupported Kubernetese resource kind")
+				} else {
+					err = fmt.Errorf("unsupported Kubernetese resource type (%s)", err.Error())
 				}
 				if err != nil {
 					errCount = 1
 					errMsg = fmt.Sprintf("CRD Rule format error")
 				} else {
 					if crdHandler.mdName != "" && rscType != "" {
-						if err = q.noExistingObj(rscType, req.Namespace, crdHandler.crUid, crdHandler.mdName); err != nil {
-							errCount = 1
-							errMsg = err.Error()
+						if obj, err := global.ORCH.GetResource(rscType, req.Namespace, crdHandler.mdName); err == nil {
+							if o, ok := obj.(metav1.Object); ok {
+								if crdHandler.crUid != string(o.GetUID()) {
+									// cr in k8s & crd request's uid are different!
+									errCount = 1
+									errMsg = fmt.Sprintf("UID in Kubernetes is %s but UID in request is %s", string(o.GetUID()), string(o.GetUID()))
+								}
+							}
 						}
 					}
 				}
@@ -483,7 +402,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					log.WithFields(logFields).Info("CRD deleted")
 				case "CREATE", "UPDATE":
 					if errCount > 0 {
-						q.deleteCrInK8s(kind, recordName, crdSecRule)
+						q.deleteCrInK8s(rscType, recordName, crdSecRule)
 						msg := fmt.Sprintf("CRD %s Removed", recordName)
 						q.writeCrOpEvent(kind, recordName, crdHandler.crUid, share.CLUSEvCrdErrDetected, msg, detail)
 						log.WithFields(logFields).Error("Failed to add CRD")
@@ -521,8 +440,8 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			req := ar.Request
 			if req != nil && reqOp == admissionv1beta1.Delete && req.Name == "" {
 				var secRulePartial resource.NvSecurityRulePartial
-				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
-					req.Name = secRulePartial.Metadata.GetName()
+				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil {
+					req.Name = secRulePartial.GetName()
 				} else {
 					recordName := fmt.Sprintf("%s-%s-%s", req.Kind.Kind, req.Namespace, req.Name)
 					msg := fmt.Sprintf("CRD request(%s %s) Error", recordName, reqOp)
@@ -553,8 +472,8 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			allowedName := ""
 			var secRulePartial resource.NvSecurityRulePartial
 			req := ar.Request
-			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil && secRulePartial.Metadata != nil {
-				mdName = secRulePartial.Metadata.GetName()
+			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil {
+				mdName = secRulePartial.GetName()
 			}
 			switch ar.Request.Kind.Kind {
 			case resource.NvAdmCtrlSecurityRuleKind:

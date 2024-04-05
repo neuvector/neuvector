@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/neuvector/k8s"
-	apiv1 "github.com/neuvector/k8s/apis/admissionregistration/v1"
-	apiv1beta1 "github.com/neuvector/k8s/apis/admissionregistration/v1beta1"
-	corev1 "github.com/neuvector/k8s/apis/core/v1"
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	admregv1 "k8s.io/api/admissionregistration/v1"
+	admregv1b1 "k8s.io/api/admissionregistration/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/resource"
@@ -108,7 +108,7 @@ func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, sel
 	defAllowedNamespaces = defAllowedNS
 	if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
 		for _, obj := range objs {
-			if nsObj := obj.(*resource.Namespace); nsObj != nil {
+			if nsObj, ok := obj.(*resource.Namespace); nsObj != nil && ok {
 				VerifyK8sNs(admCtrlEnabled, nsObj.Name, nsObj.Labels)
 			}
 		}
@@ -205,6 +205,23 @@ func GetAdmissionCtrlTypes(platform string) []string {
 	return admCtrlTypes
 }
 
+func convertOperationsToStrings(ops interface{}) []string {
+	var opsRet []string
+	if opsIn, ok := ops.([]admregv1.OperationType); ok {
+		opsRet = make([]string, len(opsIn))
+		for i, op := range opsIn {
+			opsRet[i] = string(op)
+		}
+	} else if opsIn, ok := ops.([]admregv1b1.OperationType); ok {
+		opsRet = make([]string, len(opsIn))
+		for i, op := range opsIn {
+			opsRet[i] = string(op)
+		}
+	}
+
+	return opsRet
+}
+
 func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, bool, string, error) { // returns (found, matchedCfg, verRead, error)
 	var rt string
 	if k8sResInfo.Name == resource.NvAdmValidatingName || k8sResInfo.Name == resource.NvCrdValidatingName {
@@ -221,9 +238,9 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 
 	useApiV1 := false
 	k8sVersionMajor, k8sVersionMinor := resource.GetK8sVersion()
-	if _, ok := obj.(*apiv1.ValidatingWebhookConfiguration); ok {
+	if _, ok := obj.(*admregv1.ValidatingWebhookConfiguration); ok {
 		useApiV1 = true
-	} else if _, ok := obj.(*apiv1beta1.ValidatingWebhookConfiguration); !ok {
+	} else if _, ok := obj.(*admregv1b1.ValidatingWebhookConfiguration); !ok {
 		err := fmt.Errorf("type assertion failed(%d.%d)", k8sVersionMajor, k8sVersionMinor)
 		log.WithFields(log.Fields{"name": k8sResInfo.Name}).Error(err.Error())
 		return true, false, "", err
@@ -232,13 +249,12 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 	var verRead string
 	var config *resource.K8sAdmRegValidatingWebhookConfiguration
 	if useApiV1 {
-		k8sConfig := obj.(*apiv1.ValidatingWebhookConfiguration)
-		verRead = *k8sConfig.Metadata.ResourceVersion
+		k8sConfig := obj.(*admregv1.ValidatingWebhookConfiguration)
+		verRead = k8sConfig.ResourceVersion
 		if len(k8sConfig.Webhooks) != len(k8sResInfo.WebhooksInfo) {
 			return true, false, verRead, nil
 		}
 		config = &resource.K8sAdmRegValidatingWebhookConfiguration{
-			Metadata: k8sConfig.Metadata,
 			Webhooks: make([]*resource.K8sAdmRegWebhook, len(k8sConfig.Webhooks)),
 		}
 		for idx, wh := range k8sConfig.Webhooks {
@@ -246,54 +262,54 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 				Name:                    wh.Name,
 				AdmissionReviewVersions: wh.AdmissionReviewVersions,
 				ClientConfig: &resource.K8sAdmRegWebhookClientConfig{
-					Url:      wh.ClientConfig.Url,
-					CaBundle: wh.ClientConfig.CaBundle,
+					Url:      wh.ClientConfig.URL,
+					CaBundle: wh.ClientConfig.CABundle,
 				},
 				Rules:             make([]*resource.K8sAdmRegRuleWithOperations, len(wh.Rules)),
-				FailurePolicy:     wh.FailurePolicy,
+				FailurePolicy:     (*string)(wh.FailurePolicy),
 				NamespaceSelector: wh.NamespaceSelector,
-				SideEffects:       wh.SideEffects,
+				SideEffects:       (*string)(wh.SideEffects),
 			}
 			if wh.ClientConfig.Service != nil {
 				config.Webhooks[idx].ClientConfig.Service = &resource.K8sAdmRegServiceReference{
 					Namespace: wh.ClientConfig.Service.Namespace,
 					Name:      wh.ClientConfig.Service.Name,
 					Path:      wh.ClientConfig.Service.Path,
+					Port:      wh.ClientConfig.Service.Port,
 				}
 			}
 			for j, rops := range wh.Rules {
 				config.Webhooks[idx].Rules[j] = &resource.K8sAdmRegRuleWithOperations{
-					Operations: rops.Operations,
+					Operations: convertOperationsToStrings(rops.Operations),
 					Rule: &resource.K8sAdmRegRule{
-						ApiGroups:   rops.Rule.ApiGroups,
-						ApiVersions: rops.Rule.ApiVersions,
+						ApiGroups:   rops.Rule.APIGroups,
+						ApiVersions: rops.Rule.APIVersions,
 						Resources:   rops.Rule.Resources,
-						Scope:       rops.Rule.Scope,
+						Scope:       (*string)(rops.Rule.Scope),
 					},
 				}
 			}
 		}
 	} else {
-		k8sConfig := obj.(*apiv1beta1.ValidatingWebhookConfiguration)
-		verRead = *k8sConfig.Metadata.ResourceVersion
+		k8sConfig := obj.(*admregv1b1.ValidatingWebhookConfiguration)
+		verRead = k8sConfig.ResourceVersion
 		if len(k8sConfig.Webhooks) != len(k8sResInfo.WebhooksInfo) {
 			return true, false, verRead, nil
 		}
 		config = &resource.K8sAdmRegValidatingWebhookConfiguration{
-			Metadata: k8sConfig.Metadata,
 			Webhooks: make([]*resource.K8sAdmRegWebhook, len(k8sConfig.Webhooks)),
 		}
 		for idx, wh := range k8sConfig.Webhooks {
 			config.Webhooks[idx] = &resource.K8sAdmRegWebhook{
 				Name: wh.Name,
 				ClientConfig: &resource.K8sAdmRegWebhookClientConfig{
-					Url:      wh.ClientConfig.Url,
-					CaBundle: wh.ClientConfig.CaBundle,
+					Url:      wh.ClientConfig.URL,
+					CaBundle: wh.ClientConfig.CABundle,
 				},
 				Rules:             make([]*resource.K8sAdmRegRuleWithOperations, len(wh.Rules)),
-				FailurePolicy:     wh.FailurePolicy,
+				FailurePolicy:     (*string)(wh.FailurePolicy),
 				NamespaceSelector: wh.NamespaceSelector,
-				SideEffects:       wh.SideEffects,
+				SideEffects:       (*string)(wh.SideEffects),
 			}
 			if wh.ClientConfig.Service != nil {
 				config.Webhooks[idx].ClientConfig.Service = &resource.K8sAdmRegServiceReference{
@@ -304,12 +320,12 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 			}
 			for j, rops := range wh.Rules {
 				config.Webhooks[idx].Rules[j] = &resource.K8sAdmRegRuleWithOperations{
-					Operations: rops.Operations,
+					Operations: convertOperationsToStrings(rops.Operations),
 					Rule: &resource.K8sAdmRegRule{
-						ApiGroups:   rops.Rule.ApiGroups,
-						ApiVersions: rops.Rule.ApiVersions,
+						ApiGroups:   rops.Rule.APIGroups,
+						ApiVersions: rops.Rule.APIVersions,
 						Resources:   rops.Rule.Resources,
-						Scope:       rops.Rule.Scope,
+						Scope:       (*string)(rops.Rule.Scope),
 					},
 				}
 			}
@@ -322,7 +338,7 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 	for _, wh := range config.Webhooks {
 		whFound := false
 		for _, whInfo := range k8sResInfo.WebhooksInfo {
-			if wh.Name == nil || *wh.Name != whInfo.Name {
+			if wh.Name != whInfo.Name {
 				continue
 			}
 			whFound = true // found a webhook with the same name
@@ -358,8 +374,7 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 									}
 								}
 							} else {
-								if clientCfg.Service.Namespace != nil && *clientCfg.Service.Namespace == resource.NvAdmSvcNamespace &&
-									clientCfg.Service.Name != nil && *clientCfg.Service.Name == svcName {
+								if clientCfg.Service.Namespace == resource.NvAdmSvcNamespace && clientCfg.Service.Name == svcName {
 									if clientCfg.Service.Path != nil && strings.EqualFold(*clientCfg.Service.Path, whInfo.ClientConfig.Path) {
 										if resource.IsK8sNvWebhookConfigured(whInfo.Name, whInfo.FailurePolicy, wh, nsSelectorSupported, k8sResInfo.RevertCount, unexpectedMatchKeys) {
 											whMatched = true
@@ -389,22 +404,44 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 	return true, true, verRead, nil
 }
 
+func convertOperationsV1(operations utils.Set) []admregv1.OperationType {
+	ops := operations.ToStringSlice()
+	sort.Strings(ops)
+	opsRet := make([]admregv1.OperationType, len(ops))
+	for i, op := range ops {
+		opsRet[i] = admregv1.OperationType(op)
+	}
+
+	return opsRet
+}
+
+func convertOperationsV1B1(operations utils.Set) []admregv1b1.OperationType {
+	ops := operations.ToStringSlice()
+	sort.Strings(ops)
+	opsRet := make([]admregv1b1.OperationType, len(ops))
+	for i, op := range ops {
+		opsRet[i] = admregv1b1.OperationType(op)
+	}
+
+	return opsRet
+}
+
 func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *ValidatingWebhookConfigInfo) error {
 	var err error
 	k8sVersionMajor, k8sVersionMinor := resource.GetK8sVersion()
 	if op == K8sResOpDelete {
 		// delete resource when admission control is configured in k8s & we are asked to disable admission control
 		if k8sVersionMajor == 1 && k8sVersionMinor >= 22 {
-			res := &apiv1.ValidatingWebhookConfiguration{
-				Metadata: &metav1.ObjectMeta{
-					Name: &k8sResInfo.Name,
+			res := &admregv1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: k8sResInfo.Name,
 				},
 			}
 			err = global.ORCH.DeleteResource(resource.RscTypeValidatingWebhookConfiguration, res)
 		} else {
-			res := &apiv1beta1.ValidatingWebhookConfiguration{
-				Metadata: &metav1.ObjectMeta{
-					Name: &k8sResInfo.Name,
+			res := &admregv1b1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: k8sResInfo.Name,
 				},
 			}
 			err = global.ORCH.DeleteResource(resource.RscTypeValidatingWebhookConfiguration, res)
@@ -416,7 +453,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 			// admissionregistration.k8s.io/v1beta1 ValidatingWebhookConfiguration is deprecated in v1.16+, unavailable in v1.22+
 			// k8s stops serving the admissionregistration.k8s.io/v1beta1 API by default in v1.19.
 			matchPolicyExact := "Exact"
-			webhooks := make([]*apiv1.ValidatingWebhook, len(k8sResInfo.WebhooksInfo)) // only for RscTypeValidatingWebhookConfiguration
+			webhooks := make([]admregv1.ValidatingWebhook, len(k8sResInfo.WebhooksInfo)) // only for RscTypeValidatingWebhookConfiguration
 			for i, whInfo := range k8sResInfo.WebhooksInfo {
 				svcName := whInfo.ClientConfig.ServiceName
 				if len(admCaBundle[svcName]) == 0 {
@@ -445,57 +482,56 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					nsSelectorOp = resource.NsSelectorOpExists
 					failurePolicy = resource.Ignore
 				}
-				webhooks[i] = &apiv1.ValidatingWebhook{
-					Name: &whInfo.Name,
-					ClientConfig: &apiv1.WebhookClientConfig{
-						CaBundle: []byte(admCaBundle[svcName]),
+				webhooks[i] = admregv1.ValidatingWebhook{
+					Name: whInfo.Name,
+					ClientConfig: admregv1.WebhookClientConfig{
+						CABundle: []byte(admCaBundle[svcName]),
 					},
-					Rules:                   make([]*apiv1.RuleWithOperations, 0, len(nvOpResources)),
-					FailurePolicy:           &failurePolicy,
+					Rules:                   make([]admregv1.RuleWithOperations, 0, len(nvOpResources)),
+					FailurePolicy:           (*admregv1.FailurePolicyType)(&failurePolicy),
 					AdmissionReviewVersions: []string{resource.K8sApiVersionV1Beta1}, // we don't support k8s.io/api/admission/v1 yet
-					MatchPolicy:             &matchPolicyExact,
-					SideEffects:             &sideEffects, // SideEffects is supported starting from K8s 1.12
+					MatchPolicy:             (*admregv1.MatchPolicyType)(&matchPolicyExact),
+					SideEffects:             (*admregv1.SideEffectClass)(&sideEffects), // SideEffects is supported starting from K8s 1.12
 					TimeoutSeconds:          &whInfo.TimeoutSeconds,
 				}
 				for _, opRes := range nvOpResources {
-					ro := &apiv1.RuleWithOperations{
-						Operations: opRes.Operations.ToStringSlice(),
-						Rule: &apiv1.Rule{
-							ApiGroups:   opRes.ApiGroups.ToStringSlice(),
-							ApiVersions: v1b1b2ApiVersions,
+					ro := admregv1.RuleWithOperations{
+						Operations: convertOperationsV1(opRes.Operations),
+						Rule: admregv1.Rule{
+							APIGroups:   opRes.ApiGroups.ToStringSlice(),
+							APIVersions: v1b1b2ApiVersions,
 							Resources:   opRes.Resources.ToStringSlice(),
-							Scope:       &opRes.Scope, // Scope is supported starting from K8s 1.14
+							Scope:       (*admregv1.ScopeType)(&opRes.Scope), // Scope is supported starting from K8s 1.14
 						},
 					}
-					sort.Strings(ro.Operations)
 					sort.Strings(ro.Rule.Resources)
 					webhooks[i].Rules = append(webhooks[i].Rules, ro)
 				}
 				// NamespaceSelector is supported starting from K8s 1.14
 				if nsSelectorKey != "" && nsSelectorOp != "" {
 					webhooks[i].NamespaceSelector = &metav1.LabelSelector{
-						MatchExpressions: []*metav1.LabelSelectorRequirement{
-							&metav1.LabelSelectorRequirement{
-								Key:      &nsSelectorKey,
-								Operator: &nsSelectorOp,
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							metav1.LabelSelectorRequirement{
+								Key:      nsSelectorKey,
+								Operator: metav1.LabelSelectorOperator(nsSelectorOp),
 							},
 						},
 					}
 				}
 				if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
 					expectedUrl := fmt.Sprintf("https://%s.%s.svc:%d%s", svcName, resource.NvAdmSvcNamespace, whInfo.ClientConfig.Port, whInfo.ClientConfig.Path)
-					webhooks[i].ClientConfig.Url = &expectedUrl
+					webhooks[i].ClientConfig.URL = &expectedUrl
 				} else {
-					webhooks[i].ClientConfig.Service = &apiv1.ServiceReference{
-						Namespace: &resource.NvAdmSvcNamespace,
-						Name:      &svcName,
+					webhooks[i].ClientConfig.Service = &admregv1.ServiceReference{
+						Namespace: resource.NvAdmSvcNamespace,
+						Name:      svcName,
 						Path:      &whInfo.ClientConfig.Path,
 					}
 				}
 			}
-			res := &apiv1.ValidatingWebhookConfiguration{
-				Metadata: &metav1.ObjectMeta{
-					Name: &k8sResInfo.Name,
+			res := &admregv1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: k8sResInfo.Name,
 				},
 				Webhooks: webhooks,
 			}
@@ -504,11 +540,11 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				err = global.ORCH.AddResource(resource.RscTypeValidatingWebhookConfiguration, res)
 			} else if op == K8sResOpUpdate {
 				// update resource when admission control is configured in k8s with different setting & admission control is enabled in NV
-				res.Metadata.ResourceVersion = &resVersion
+				res.ResourceVersion = resVersion
 				err = global.ORCH.UpdateResource(resource.RscTypeValidatingWebhookConfiguration, res)
 			}
 		} else {
-			webhooks := make([]*apiv1beta1.Webhook, len(k8sResInfo.WebhooksInfo))
+			webhooks := make([]admregv1b1.ValidatingWebhook, len(k8sResInfo.WebhooksInfo))
 			for i, whInfo := range k8sResInfo.WebhooksInfo {
 				svcName := whInfo.ClientConfig.ServiceName
 				if len(admCaBundle[svcName]) == 0 {
@@ -537,28 +573,27 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					nsSelectorOp = resource.NsSelectorOpExists
 					failurePolicy = resource.Ignore
 				}
-				webhooks[i] = &apiv1beta1.Webhook{
-					Name: &whInfo.Name,
-					ClientConfig: &apiv1beta1.WebhookClientConfig{
-						CaBundle: []byte(admCaBundle[svcName]),
+				webhooks[i] = admregv1b1.ValidatingWebhook{
+					Name: whInfo.Name,
+					ClientConfig: admregv1b1.WebhookClientConfig{
+						CABundle: []byte(admCaBundle[svcName]),
 					},
-					Rules:         make([]*apiv1beta1.RuleWithOperations, 0, len(nvOpResources)),
-					FailurePolicy: &failurePolicy,
+					Rules:         make([]admregv1b1.RuleWithOperations, 0, len(nvOpResources)),
+					FailurePolicy: (*admregv1b1.FailurePolicyType)(&failurePolicy),
 				}
 				for _, opRes := range nvOpResources {
-					ro := &apiv1beta1.RuleWithOperations{
-						Operations: opRes.Operations.ToStringSlice(),
-						Rule: &apiv1beta1.Rule{
-							ApiGroups:   opRes.ApiGroups.ToStringSlice(),
-							ApiVersions: v1b1b2ApiVersions,
+					ro := admregv1b1.RuleWithOperations{
+						Operations: convertOperationsV1B1(opRes.Operations),
+						Rule: admregv1b1.Rule{
+							APIGroups:   opRes.ApiGroups.ToStringSlice(),
+							APIVersions: v1b1b2ApiVersions,
 							Resources:   opRes.Resources.ToStringSlice(),
 						},
 					}
-					sort.Strings(ro.Operations)
 					sort.Strings(ro.Rule.Resources)
 					if IsNsSelectorSupported() {
 						// Scope is supported starting from K8s 1.14
-						ro.Rule.Scope = &opRes.Scope
+						ro.Rule.Scope = (*admregv1b1.ScopeType)(&opRes.Scope)
 					}
 					webhooks[i].Rules = append(webhooks[i].Rules, ro)
 				}
@@ -566,10 +601,10 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					// NamespaceSelector is supported starting from K8s 1.14
 					if nsSelectorKey != "" && nsSelectorOp != "" {
 						webhooks[i].NamespaceSelector = &metav1.LabelSelector{
-							MatchExpressions: []*metav1.LabelSelectorRequirement{
-								&metav1.LabelSelectorRequirement{
-									Key:      &nsSelectorKey,
-									Operator: &nsSelectorOp,
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								metav1.LabelSelectorRequirement{
+									Key:      nsSelectorKey,
+									Operator: metav1.LabelSelectorOperator(nsSelectorOp),
 								},
 							},
 						}
@@ -577,24 +612,24 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				}
 				if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
 					expectedUrl := fmt.Sprintf("https://%s.%s.svc:%d%s", svcName, resource.NvAdmSvcNamespace, whInfo.ClientConfig.Port, whInfo.ClientConfig.Path)
-					webhooks[i].ClientConfig.Url = &expectedUrl
+					webhooks[i].ClientConfig.URL = &expectedUrl
 				} else {
-					webhooks[i].ClientConfig.Service = &apiv1beta1.ServiceReference{
-						Namespace: &resource.NvAdmSvcNamespace,
-						Name:      &svcName,
+					webhooks[i].ClientConfig.Service = &admregv1b1.ServiceReference{
+						Namespace: resource.NvAdmSvcNamespace,
+						Name:      svcName,
 						Path:      &whInfo.ClientConfig.Path,
 					}
 				}
 				if k8sVersionMajor == 1 {
 					if k8sVersionMinor > 11 {
 						// SideEffects is supported starting from K8s 1.12
-						webhooks[i].SideEffects = &sideEffects
+						webhooks[i].SideEffects = (*admregv1b1.SideEffectClass)(&sideEffects)
 					}
 				}
 			}
-			res := &apiv1beta1.ValidatingWebhookConfiguration{
-				Metadata: &metav1.ObjectMeta{
-					Name: &k8sResInfo.Name,
+			res := &admregv1b1.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: k8sResInfo.Name,
 				},
 				Webhooks: webhooks,
 			}
@@ -603,7 +638,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				err = global.ORCH.AddResource(resource.RscTypeValidatingWebhookConfiguration, res)
 			} else if op == K8sResOpUpdate {
 				// update resource when admission control is configured in k8s with different setting & admission control is enabled in NV
-				res.Metadata.ResourceVersion = &resVersion
+				res.ResourceVersion = resVersion
 				err = global.ORCH.UpdateResource(resource.RscTypeValidatingWebhookConfiguration, res)
 			}
 		}
@@ -693,18 +728,20 @@ func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) 
 		}
 	} else {
 		if svc, ok := obj.(*corev1.Service); ok && svc != nil {
-			if keys, exist := svcLabelKeys[svcname]; exist {
-				if tag, ok := svc.Metadata.Labels[keys.TagKey]; ok {
-					svcInfo.LabelTag = tag
-				}
-				if echo, ok := svc.Metadata.Labels[keys.EchoKey]; ok {
-					svcInfo.LabelEcho = echo
+			if labels := svc.GetLabels(); len(labels) > 0 {
+				if keys, exist := svcLabelKeys[svcname]; exist {
+					if tag, ok := svc.Labels[keys.TagKey]; ok {
+						svcInfo.LabelTag = tag
+					}
+					if echo, ok := svc.Labels[keys.EchoKey]; ok {
+						svcInfo.LabelEcho = echo
+					}
 				}
 			}
-			if svc.Spec != nil && svc.Spec.Type != nil && *svc.Spec.Type == resource.ServiceTypeNodePort {
+			if string(svc.Spec.Type) == resource.ServiceTypeNodePort {
 				for _, ports := range svc.Spec.Ports {
-					if ports != nil && ports.NodePort != nil {
-						svcInfo.SvcNodePort = *ports.NodePort
+					if ports.NodePort != 0 {
+						svcInfo.SvcNodePort = ports.NodePort
 						svcInfo.SvcType = resource.ServiceTypeNodePort
 						return nil, svcInfo
 					}
@@ -730,15 +767,14 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 			log.WithFields(log.Fields{"service": svcname}).Error("svc labels unknown")
 			return TestFailedAtRead, errors.New("svc labels unknown")
 		}
-		svc := obj.(*corev1.Service)
-		if svc != nil && svc.Metadata != nil && svc.Metadata.ResourceVersion != nil {
-			if svc.Metadata.Labels == nil {
-				svc.Metadata.Labels = make(map[string]string)
+		if svc, ok := obj.(*corev1.Service); ok && svc != nil {
+			if svc.GetLabels() == nil {
+				svc.Labels = make(map[string]string)
 			}
 			tag := fmt.Sprintf("%d", time.Now().Unix())
-			svc.Metadata.Labels[keys.TagKey] = tag
-			if _, ok := svc.Metadata.Labels[keys.EchoKey]; ok {
-				delete(svc.Metadata.Labels, keys.EchoKey)
+			svc.Labels[keys.TagKey] = tag
+			if _, ok := svc.Labels[keys.EchoKey]; ok {
+				delete(svc.Labels, keys.EchoKey)
 				// we need adm webhook server to add 'echo' label later
 			}
 			err = global.ORCH.UpdateResource(resource.RscTypeService, svc)
@@ -778,20 +814,19 @@ func workSingleK8sNsLabels(nsName string, labelKeys map[string]*bool) error {
 			log.WithFields(log.Fields{"labelKeys": labelKeys, "namespace": nsName, "err": err}).Error("resource no found")
 			return err
 		} else {
-			nsObj := obj.(*corev1.Namespace)
-			if nsObj != nil && nsObj.Metadata != nil {
-				if nsObj.Metadata.Labels == nil {
-					nsObj.Metadata.Labels = make(map[string]string)
+			if nsObj, ok := obj.(*corev1.Namespace); ok && nsObj != nil {
+				if nsObj.GetLabels() == nil {
+					nsObj.Labels = make(map[string]string)
 				}
 				needUpdate := false
 				for labelKey, shouldExist := range labelKeys {
 					if shouldExist != nil {
-						_, exists := nsObj.Metadata.Labels[labelKey]
+						_, exists := nsObj.Labels[labelKey]
 						if *shouldExist && !exists {
-							nsObj.Metadata.Labels[labelKey] = nsSelectorValue
+							nsObj.Labels[labelKey] = nsSelectorValue
 							needUpdate = true
 						} else if !*shouldExist && exists {
-							delete(nsObj.Metadata.Labels, labelKey)
+							delete(nsObj.Labels, labelKey)
 							needUpdate = true
 						}
 					}
@@ -846,10 +881,9 @@ func EchoAdmWebhookConnection(tagExpected, svcname string) {
 			if err != nil {
 				log.WithFields(log.Fields{"namespace": resource.NvAdmSvcNamespace, "service": svcname, "err": err}).Error("resource no found")
 			} else {
-				svc, ok := obj.(*corev1.Service)
-				if ok && svc != nil && svc.Metadata != nil && svc.Metadata.ResourceVersion != nil && len(svc.Metadata.Labels) > 0 {
-					if tag, ok := svc.Metadata.Labels[keys.TagKey]; ok && tag == tagExpected {
-						svc.Metadata.Labels[keys.EchoKey] = tag
+				if svc, ok := obj.(*corev1.Service); ok && svc != nil && len(svc.GetLabels()) > 0 {
+					if tag, ok := svc.Labels[keys.TagKey]; ok && tag == tagExpected {
+						svc.Labels[keys.EchoKey] = tag
 						err = global.ORCH.UpdateResource(resource.RscTypeService, svc)
 						if err != nil {
 							log.WithFields(log.Fields{"service": svcname, "svc": svc, "err": err}).Error("update resource failed")

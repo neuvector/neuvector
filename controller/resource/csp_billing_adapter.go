@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/global"

@@ -15,8 +15,8 @@ import (
 
 	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"github.com/julienschmidt/httprouter"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -1040,9 +1040,11 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	apiVersion := resource.NvSecurityRuleVersion
 	resp := resource.NvWafSecurityRuleList{
-		Kind:       &resource.NvListKind,
-		ApiVersion: &apiVersion,
-		Items:      make([]*resource.NvWafSecurityRule, 0, len(rconf.Names)),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       resource.NvListKind,
+			APIVersion: apiVersion,
+		},
+		Items: make([]resource.NvWafSecurityRule, 0, len(rconf.Names)),
 	}
 
 	// export waf sensors
@@ -1091,11 +1093,13 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 		kind := resource.NvWafSecurityRuleKind
 		resptmp := resource.NvWafSecurityRule{
-			Kind: &kind,
-			Metadata: &cmetav1.ObjectMeta{
-				Name: &sensor.Name,
+			TypeMeta: metav1.TypeMeta{
+				Kind:       kind,
+				APIVersion: apiversion,
 			},
-			ApiVersion: &apiversion,
+			ObjectMeta: metav1.ObjectMeta{
+				Name: sensor.Name,
+			},
 			Spec: resource.NvSecurityWafSpec{
 				Sensor: &resource.NvSecurityWafSensor{
 					Name:     sensor.Name,
@@ -1104,7 +1108,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				},
 			},
 		}
-		resp.Items = append(resp.Items, &resptmp)
+		resp.Items = append(resp.Items, resptmp)
 	}
 
 	doExport("cfgWafExport.yaml", "WAF sensors", rconf.RemoteExportOptions, resp, w, r, acc, login)
@@ -1136,18 +1140,18 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvWafSecurityRuleList
 	var secRule resource.NvWafSecurityRule
-	var secRules []*resource.NvWafSecurityRule = []*resource.NvWafSecurityRule{nil}
+	var secRules []resource.NvWafSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules[0] = &secRule
+			secRules = append(secRules, secRule)
 		}
 	} else {
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.Kind == nil || *r.Kind != resource.NvWafSecurityRuleKind {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvWafSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -1177,10 +1181,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
-				continue
-			}
-			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdWafContent(secRule, share.ReviewTypeImportWAF, share.ReviewTypeDisplayWAF)
+			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdWafContent(&secRule, share.ReviewTypeImportWAF, share.ReviewTypeDisplayWAF)
 			if errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break

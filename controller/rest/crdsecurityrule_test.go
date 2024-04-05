@@ -232,7 +232,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 						t.Errorf("[admission rules: %d] unmarshal error\n %v", idx, err)
 					}
 				} else {
-					crdHandler.mdName = admCtrlSecRule.Metadata.GetName()
+					crdHandler.mdName = admCtrlSecRule.GetName()
 					_, errCount, err, _ := crdHandler.parseCurCrdAdmCtrlContent(&admCtrlSecRule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 					if errCount != errCountExpected[idx] {
 						t.Errorf("[admission rules: %d] %d parse error, %d parse error expected\n %v", idx, errCount, errCountExpected[idx], err)
@@ -268,7 +268,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 						t.Errorf("[admission config: %d] unmarshal error\n %v", idx, err)
 					}
 				} else {
-					crdHandler.mdName = admCtrlSecRule.Metadata.GetName()
+					crdHandler.mdName = admCtrlSecRule.GetName()
 					_, errCount, err, _ := crdHandler.parseCurCrdAdmCtrlContent(&admCtrlSecRule, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 					if errCount != errCountExpected[idx] {
 						t.Errorf("[admission config: %d] %d parse error, %d parse error expected\n %v", idx, errCount, errCountExpected[idx], err)

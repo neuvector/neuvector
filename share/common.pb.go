@@ -106,6 +106,8 @@ It has these top-level messages:
 	SigstoreVerifier
 	SigstoreKeypairOptions
 	SigstoreKeylessOptions
+	ScanCacheStatRes
+	ScanCacheDataRes
 */
 package share
 
