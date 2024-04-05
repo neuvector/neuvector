@@ -2828,7 +2828,7 @@ const (
 	ReviewTypeDisplayDLP         = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF         = "WAF Configurations"               // interactive import
 	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"            // interactive import
-	ReviewTypeDisplayCompProfile = "compliance Profile"               // interactive import
+	ReviewTypeDisplayCompProfile = "Compliance Profile"               // interactive import
 )
 
 // Telemetry (upgrade responder)

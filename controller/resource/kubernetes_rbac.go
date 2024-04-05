@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/neuvector/k8s"
-	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
-	rbacv1b1 "github.com/neuvector/k8s/apis/rbac/v1beta1"
 	log "github.com/sirupsen/logrus"
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1b1 "k8s.io/api/rbac/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -383,17 +383,16 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{
 
 	_, getVerbs := rbacRolesWanted[rbacRoleName]
 	ag2r2v := make(map[string]map[string]utils.Set) // apiGroup -> (resource -> verbs)
-	if rules, ok := objs.([]*rbacv1.PolicyRule); ok {
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
-			verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-			rscs := rule.GetResources()
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
 
-			if verbs.Cardinality() == 0 && len(rscs) == 0 {
+			if verbs.Cardinality() == 0 && len(rule.Resources) == 0 {
 				continue
 			}
 			var apiGroup string
-			if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-				apiGroup = apiGroups[0]
+			if len(rule.APIGroups) > 0 {
+				apiGroup = rule.APIGroups[0]
 			}
 			r2v, ok := ag2r2v[apiGroup]
 
@@ -401,7 +400,7 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{
 				r2v = make(map[string]utils.Set)
 				ag2r2v[apiGroup] = r2v
 			}
-			for _, rsc := range rscs {
+			for _, rsc := range rule.Resources {
 				if v, ok := r2v[rsc]; ok {
 					v.Union(verbs)
 				} else {
@@ -409,23 +408,22 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{
 				}
 			}
 		}
-	} else if rules, ok := objs.([]*rbacv1b1.PolicyRule); ok {
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
 		for _, rule := range rules {
-			verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-			rscs := rule.GetResources()
-			if verbs.Cardinality() == 0 && len(rscs) == 0 {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			if verbs.Cardinality() == 0 && len(rule.Resources) == 0 {
 				continue
 			}
 			var apiGroup string
-			if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-				apiGroup = apiGroups[0]
+			if len(rule.APIGroups) > 0 {
+				apiGroup = rule.APIGroups[0]
 			}
 			r2v, ok := ag2r2v[apiGroup]
 			if !ok {
 				r2v = make(map[string]utils.Set)
 				ag2r2v[apiGroup] = r2v
 			}
-			for _, rsc := range rscs {
+			for _, rsc := range rule.Resources {
 				if v, ok := r2v[rsc]; ok {
 					v.Union(verbs)
 				} else {
@@ -502,12 +500,12 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 		return nil
 	}
 	ag2r2v := make(map[string]map[string]utils.Set) // collected apiGroup -> (resource -> verbs) in k8s rbac
-	if rules, ok := objs.([]*rbacv1.PolicyRule); ok {
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
 			for _, roleInfoRule := range roleInfo.rules {
 				var apiGroup string
-				if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-					apiGroup = apiGroups[0]
+				if len(rule.APIGroups) > 0 {
+					apiGroup = rule.APIGroups[0]
 				}
 				if roleInfoRule.apiGroup != apiGroup {
 					continue
@@ -517,8 +515,8 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 					r2v = make(map[string]utils.Set)
 					ag2r2v[apiGroup] = r2v
 				}
-				verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-				for _, rsc := range rule.GetResources() {
+				verbs := utils.NewSetFromSliceKind(rule.Verbs)
+				for _, rsc := range rule.Resources {
 					if roleInfoRule.resources.Contains(rsc) {
 						if v, ok := r2v[rsc]; ok {
 							r2v[rsc] = v.Union(verbs)
@@ -529,12 +527,12 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 				}
 			}
 		}
-	} else if rules, ok := objs.([]*rbacv1b1.PolicyRule); ok {
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
 		for _, rule := range rules {
 			for _, roleInfoRule := range roleInfo.rules {
 				var apiGroup string
-				if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-					apiGroup = apiGroups[0]
+				if len(rule.APIGroups) > 0 {
+					apiGroup = rule.APIGroups[0]
 				}
 				if roleInfoRule.apiGroup != apiGroup {
 					continue
@@ -544,8 +542,8 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 					r2v = make(map[string]utils.Set)
 					ag2r2v[apiGroup] = r2v
 				}
-				verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-				for _, rsc := range rule.GetResources() {
+				verbs := utils.NewSetFromSliceKind(rule.Verbs)
+				for _, rsc := range rule.Resources {
 					if roleInfoRule.resources.Contains(rsc) {
 						if v, ok := r2v[rsc]; ok {
 							r2v[rsc] = v.Union(verbs)
@@ -594,268 +592,224 @@ CHECK:
 	return nil
 }
 
-func xlateRole(obj k8s.Resource) (string, interface{}) {
+func xlateRole(obj metav1.Object) (string, interface{}) {
+	var ver string
+	var role k8sRole
+	var rules interface{}
+
 	if o, ok := obj.(*rbacv1.Role); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1"
+		role = k8sRole{
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
-		role := &k8sRole{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
-		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, role.domain, rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1")
-		return role.uid, role
+		rules = o.Rules
 	} else if o, ok := obj.(*rbacv1b1.Role); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1beta1"
+		role = k8sRole{
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
-		role := &k8sRole{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
-		}
+		rules = o.Rules
+	}
 
-		rules := o.GetRules()
+	if rules != nil {
 		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, role.domain, rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1beta1")
-		return role.uid, role
+		log.WithFields(log.Fields{"role": role}).Debug(ver)
+		return role.uid, &role
 	}
 
 	return "", nil
 }
 
-func xlateClusRole(obj k8s.Resource) (string, interface{}) {
+func xlateClusRole(obj metav1.Object) (string, interface{}) {
+	var ver string
+	var role k8sRole
+	var rules interface{}
+
 	if o, ok := obj.(*rbacv1.ClusterRole); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1"
+		role = k8sRole{
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
-		role := &k8sRole{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
-		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, "", rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1")
-		return role.uid, role
+		rules = o.Rules
 	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1beta1"
+		role = k8sRole{
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
-		role := &k8sRole{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
-		}
+		rules = o.Rules
+	}
 
-		rules := o.GetRules()
+	if rules != nil {
 		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, "", rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1beta1")
-		return role.uid, role
+		log.WithFields(log.Fields{"clusterrole": role}).Debug(ver)
+		return role.uid, &role
 	}
 
 	return "", nil
 }
 
-func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
+func xlateRoleBinding(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*rbacv1.RoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "Role":
-			roleBind.role = k8sObjectRef{name: role.GetName(), domain: roleBind.domain}
+			roleBind.role = k8sObjectRef{name: role.Name, domain: roleBind.domain}
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
 				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					objRef := k8sObjectRef{name: s.Name, domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
 
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1")
+		log.WithFields(log.Fields{"rolebinding": roleBind}).Debug("v1")
 		return roleBind.uid, roleBind
 	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "Role":
-			roleBind.role = k8sObjectRef{name: role.GetName(), domain: roleBind.domain}
+			roleBind.role = k8sObjectRef{name: role.Name, domain: roleBind.domain}
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
 				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					objRef := k8sObjectRef{name: s.Name, domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
 
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1beta1")
+		log.WithFields(log.Fields{"rolebinding": roleBind}).Debug("v1beta1")
 		return roleBind.uid, roleBind
 	}
 
 	return "", nil
 }
 
-func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
+func xlateClusRoleBinding(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
 				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					objRef := k8sObjectRef{name: s.Name, domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
 
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1")
+		log.WithFields(log.Fields{"clusterrolebinding": roleBind}).Debug("v1")
 		return roleBind.uid, roleBind
 	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
 				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
+					objRef := k8sObjectRef{name: s.Name, domain: ns}
 					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 				}
 			}
 		}
 
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1beta1")
+		log.WithFields(log.Fields{"clusterrolebinding": roleBind}).Debug("v1beta1")
 		return roleBind.uid, roleBind
 	}
 
@@ -1301,15 +1255,15 @@ func VerifyNvRbacRoles(roleNames []string, existOnly bool) ([]string, bool) { //
 						var ruleObj interface{}
 						if roleWanted.namespace == "" {
 							if r, ok := obj.(*rbacv1.ClusterRole); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							} else if r, ok := obj.(*rbacv1b1.ClusterRole); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							}
 						} else {
 							if r, ok := obj.(*rbacv1.Role); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							} else if r, ok := obj.(*rbacv1b1.Role); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							}
 						}
 						if ruleObj != nil {
@@ -1636,96 +1590,95 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	return clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors
 }
 
-func xlateRole2(obj k8s.Resource, action string) {
+func xlateRole2(obj metav1.Object, action string) {
+	var namespace string
+	var name string
+	var rbacBytes []byte
+
 	if o, ok := obj.(*rbacv1.Role); ok {
-
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-
+		namespace = o.GetNamespace()
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
 	} else if o, ok := obj.(*rbacv1b1.Role); ok {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
-		rbacv1, _ := json.Marshal(o)
+		namespace = o.GetNamespace()
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
+	}
+
+	if name != "" {
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", namespace, name)
 
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacBytes))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
 	}
 }
 
-func xlateRoleBinding2(obj k8s.Resource, action string) {
+func xlateRoleBinding2(obj metav1.Object, action string) {
+	var namespace string
+	var name string
+	var rbacBytes []byte
+
 	if o, ok := obj.(*rbacv1.RoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
+		namespace = o.GetNamespace()
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
 	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
-		rbacv1, _ := json.Marshal(o)
+		namespace = o.GetNamespace()
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
+	}
 
+	if name != "" {
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", namespace, name)
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacBytes))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
 	}
 }
 
-func xlateClusRole2(obj k8s.Resource, action string) {
+func xlateClusRole2(obj metav1.Object, action string) {
+	var name string
+	var rbacBytes []byte
+
 	if o, ok := obj.(*rbacv1.ClusterRole); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
 	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
+	}
 
+	if name != "" {
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", name)
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacBytes))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}
 	}
 }
 
-func xlateClusRoleBinding2(obj k8s.Resource, action string) {
+func xlateClusRoleBinding2(obj metav1.Object, action string) {
+	var name string
+	var rbacBytes []byte
+
 	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
 	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
+		name = o.GetName()
+		rbacBytes, _ = json.Marshal(o)
+	}
 
+	if name != "" {
+		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", name)
 		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
+			opa.AddDocument(docKey, string(rbacBytes))
 		} else if action == "DELETED" {
 			opa.DeleteDocument(docKey)
 		}

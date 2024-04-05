@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/system"
