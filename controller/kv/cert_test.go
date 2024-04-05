@@ -43,7 +43,7 @@ func VerifyCert(t *testing.T, cn string, cacertfile string, certfile string, key
 
 // Generate CA cert.  The key should be loadable.
 func TestGenerateCA(t *testing.T) {
-	cert, key, err := generateCAWithRSAKey(nil, 1024)
+	cert, key, err := GenerateCAWithRSAKey(nil, 1024)
 	assert.Nil(t, err)
 	assert.NotNil(t, cert)
 	assert.NotNil(t, key)
@@ -66,7 +66,7 @@ func TestGenerateCA(t *testing.T) {
 // Save private key to filesystem.  The cert/key should be loadable.
 func TestSavePrivKeyCert(t *testing.T) {
 	// Self-signed certs
-	cert, key, err := generateTLSCertWithRSAKey(nil, 1024, nil, nil)
+	cert, key, err := GenerateTLSCertWithRSAKey(nil, 1024, nil, nil)
 	assert.Nil(t, err)
 	assert.NotNil(t, cert)
 	assert.NotNil(t, key)
@@ -252,7 +252,7 @@ func TestExistingCAFiles(t *testing.T) {
 	cakeyfile := filepath.Join(dir, "cakey.pem")
 
 	// Create cacert first to simulate users create their own cert.
-	cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
+	cert, key, err := GenerateCAWithRSAKey(nil, RSAKeySize)
 	assert.Nil(t, err)
 	err = savePrivKeyCert(cert, key, cacertfile, cakeyfile)
 	assert.Nil(t, err)

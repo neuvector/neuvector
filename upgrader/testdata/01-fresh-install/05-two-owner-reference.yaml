@@ -1,0 +1,230 @@
+apiVersion: v1
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/controller-secret: 297a219907164b497f8976e073f07793ec3a0c644df1ad738936fd98a13b6113
+      creationTimestamp: '2024-01-25T18:53:25Z'
+      generateName: neuvector-controller-pod-b6cb65b59-
+      labels:
+        app: neuvector-controller-pod
+        pod-template-hash: b6cb65b59
+        release: release-name
+      name: neuvector-controller-pod-b6cb65b59-249c8
+      namespace: neuvector
+      ownerReferences:
+        - name: owner1
+        - name: owner2
+      resourceVersion: '1278534'
+      uid: 5621d45b-113e-422b-9421-c5381349cf44
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - neuvector-controller-pod
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imagePullPolicy: Always
+          name: neuvector-controller-pod
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config-volume
+              readOnly: true
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-zpnsl
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      initContainers:
+        - command:
+            - /usr/local/bin/upgrader
+            - pre-sync-hook
+            - --image
+            - 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: OVERRIDE_CHECKSUM
+              value: 922e4985206e3c35c67a97fa1444dd409c7287b14143a9975013ecb466fe095f
+            - name: IMAGE_PULL_SECRET
+              value: my-docker-secret
+            - name: IMAGE_PULL_POLICY
+              value: Always
+            - name: EXPIRY_CERT_THRESHOLD
+              value: 87601h
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imagePullPolicy: Always
+          name: init
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-zpnsl
+              readOnly: true
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: config-volume
+          projected:
+            defaultMode: 420
+            sources:
+              - configMap:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-secret
+                  optional: true
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-controller-secret
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-zpnsl
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T18:53:26Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T18:53:40Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T18:53:40Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T18:53:25Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://a6d23d15f69fa9ba7648d65599cc78897bb4b91f0787ef9cd878907063cb27ac
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller@sha256:5e81815f077c6c00d1d765f57ac522ff296d4313b3be5dbc687d3bd7d1f06343
+          lastState: {}
+          name: neuvector-controller-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T18:53:27Z'
+      hostIP: 192.168.46.147
+      initContainerStatuses:
+        - containerID: containerd://9457afc34165422c11ca40feb509db99909ff20b019b5e9524b8ddabfbf61bd8
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller@sha256:5e81815f077c6c00d1d765f57ac522ff296d4313b3be5dbc687d3bd7d1f06343
+          lastState: {}
+          name: init
+          ready: true
+          restartCount: 0
+          state:
+            terminated:
+              containerID: containerd://9457afc34165422c11ca40feb509db99909ff20b019b5e9524b8ddabfbf61bd8
+              exitCode: 0
+              finishedAt: '2024-01-25T18:53:26Z'
+              reason: Completed
+              startedAt: '2024-01-25T18:53:26Z'
+      phase: Running
+      podIP: 192.168.43.244
+      podIPs:
+        - ip: 192.168.43.244
+      qosClass: BestEffort
+      startTime: '2024-01-25T18:53:25Z'
+kind: List
+metadata:
+  resourceVersion: ''
