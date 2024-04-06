@@ -398,7 +398,7 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 			// NVSHAS-8757
 			vendorId = "org.postgresql"
 			title = "postgresql"
-		} else if len(vendorId) == 0 || vendorId[0] == '%' || title[0] == '%' {
+		} else if len(vendorId) == 0 || vendorId[0] == '%' || len(title) == 0 || title[0] == '%' {
 			if dot := strings.LastIndex(symName, "."); dot > 0 {
 				vendorId = symName[:dot]
 				title = symName[dot+1:]
