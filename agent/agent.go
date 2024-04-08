@@ -507,7 +507,7 @@ func main() {
 		}
 	}()
 
-	var controllerCancel context.CancelFunc
+	var internalCertControllerCancel context.CancelFunc
 	var ctx context.Context
 
 	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
@@ -520,7 +520,8 @@ func main() {
 			}
 		}()
 
-		ctx, controllerCancel = context.WithCancel(context.Background())
+		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
+		defer internalCertControllerCancel()
 		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
 		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
 			// Reload consul
@@ -759,13 +760,11 @@ func main() {
 		walkerTask.Close()
 	}
 
-	controllerCancel()
-
 	prober.Close() // both file monitors should be released at first
 	fileWatcher.Close()
 	bench.Close()
 
-	close(monitorHostIfaceStopCh) // stop host interface monitor 
+	close(monitorHostIfaceStopCh) // stop host interface monitor
 	stopMonitorLoop()
 	closeCluster()
 
