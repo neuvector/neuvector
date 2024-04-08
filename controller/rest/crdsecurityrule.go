@@ -3798,6 +3798,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		var mdNameDisplay string
 		var recordName string
 		var metaData *cmetav1.ObjectMeta
+		var gfwRule resource.NvSecurityRule
 
 		switch kind {
 		case resource.NvSecurityRuleKind:
@@ -3834,6 +3835,11 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		}
 		if crdMd5, _, _, skip, _ = crdHandler.getCrInfo(kind, obj, metaData); skip {
 			continue
+		}
+		if kind == resource.NvClusterSecurityRuleKind {
+			r := obj.(*resource.NvClusterSecurityRule)
+			gfwRule = resource.NvSecurityRule(*r)
+			obj = &gfwRule
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {
 			continue
