@@ -464,7 +464,7 @@ func main() {
 	}
 
 	var grpcServer *cluster.GRPCServer
-	var controllerCancel context.CancelFunc
+	var internalCertControllerCancel context.CancelFunc
 	var ctx context.Context
 
 	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
@@ -477,7 +477,8 @@ func main() {
 			}
 		}()
 
-		ctx, controllerCancel = context.WithCancel(context.Background())
+		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
+		defer internalCertControllerCancel()
 		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
 		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
 			// Reload consul
@@ -939,7 +940,6 @@ func main() {
 	log.Info("Exiting ...")
 	atomic.StoreInt32(&exitingFlag, 1)
 
-	controllerCancel()
 	cache.Close()
 	orchConnector.Close()
 	ctrlDeleteLocalInfo()
