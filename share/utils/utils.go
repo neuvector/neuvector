@@ -867,6 +867,8 @@ func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 
 // encrypt/decrypt
 
+// When using `nmap -sV --script ssl-enum-ciphers` to check cipher suites, ECDHE will not be detected.
+// This is because of a golang issue fixed in 1.20: https://github.com/golang/go/issues/49126
 func GetSupportedTLSCipherSuites() []uint16 {
 	return []uint16{
 		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,

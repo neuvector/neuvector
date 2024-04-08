@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -1368,10 +1367,12 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	metadatadName := share.ScopeLocal
 	kind := resource.NvAdmCtrlSecurityRuleKind
 	resp := resource.NvAdmCtrlSecurityRule{
-		ApiVersion: &apiversion,
-		Kind:       &kind,
-		Metadata: &cmetav1.ObjectMeta{
-			Name: &metadatadName,
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiversion,
+			Kind:       kind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: metadatadName,
 		},
 		Spec: resource.NvSecurityAdmCtrlSpec{},
 	}
@@ -1475,7 +1476,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRule resource.NvAdmCtrlSecurityRule
-	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.Kind == nil || *secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
+	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)

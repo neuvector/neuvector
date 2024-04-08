@@ -1,0 +1,2257 @@
+apiVersion: v1
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/controller-secret: e24f2c528e3c724e35e3e3cd115272668e387a978f4bad66c4eb14b7bbe69bbc
+      creationTimestamp: '2024-01-25T23:00:05Z'
+      generateName: neuvector-controller-pod-7b5c578f7c-
+      labels:
+        app: neuvector-controller-pod
+        pod-template-hash: 7b5c578f7c
+        release: release-name
+      name: neuvector-controller-pod-7b5c578f7c-7wqlc
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-controller-pod-7b5c578f7c
+          uid: 0bd63c31-c3f8-45c7-a741-2a7ee35eff51
+      resourceVersion: '1316063'
+      uid: ea151ce2-c4ec-41b9-bb68-8718c7f8c9f0
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - neuvector-controller-pod
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imagePullPolicy: Always
+          name: neuvector-controller-pod
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config-volume
+              readOnly: true
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-2fzsp
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      initContainers:
+        - command:
+            - /usr/local/bin/upgrader
+            - pre-sync-hook
+            - --image
+            - 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: OVERRIDE_CHECKSUM
+              value: e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+            - name: IMAGE_PULL_SECRET
+              value: my-docker-secret
+            - name: IMAGE_PULL_POLICY
+              value: Always
+            - name: EXPIRY_CERT_THRESHOLD
+              value: 87600h
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imagePullPolicy: Always
+          name: init
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-2fzsp
+              readOnly: true
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: config-volume
+          projected:
+            defaultMode: 420
+            sources:
+              - configMap:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-secret
+                  optional: true
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-controller-secret
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-2fzsp
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:09Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          message: 'containers with unready status: [neuvector-controller-pod]'
+          reason: ContainersNotReady
+          status: 'False'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          message: 'containers with unready status: [neuvector-controller-pod]'
+          reason: ContainersNotReady
+          status: 'False'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://8cd6cbdd6afadfcf6954150288b937278c32b6c2b4c169c13c63794167200fea
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller@sha256:5e81815f077c6c00d1d765f57ac522ff296d4313b3be5dbc687d3bd7d1f06343
+          lastState: {}
+          name: neuvector-controller-pod
+          ready: false
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:09Z'
+      hostIP: 192.168.46.147
+      initContainerStatuses:
+        - containerID: containerd://b87106b2429b91bd17eee8eb39a0e80a9fb862d789a6cb8993c1d864fd0b6449
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller@sha256:5e81815f077c6c00d1d765f57ac522ff296d4313b3be5dbc687d3bd7d1f06343
+          lastState: {}
+          name: init
+          ready: true
+          restartCount: 0
+          state:
+            terminated:
+              containerID: containerd://b87106b2429b91bd17eee8eb39a0e80a9fb862d789a6cb8993c1d864fd0b6449
+              exitCode: 0
+              finishedAt: '2024-01-25T23:00:08Z'
+              reason: Completed
+              startedAt: '2024-01-25T23:00:07Z'
+      phase: Running
+      podIP: 192.168.40.48
+      podIPs:
+        - ip: 192.168.40.48
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:05Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/controller-secret: d80737694bc4fa56bba39e94bf9717e9d3ac735417d70428e5f27777f26a4437
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generateName: neuvector-controller-pod-7d85664766-
+      labels:
+        app: neuvector-controller-pod
+        pod-template-hash: 7d85664766
+        release: release-name
+      name: neuvector-controller-pod-7d85664766-5l525
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-controller-pod-7d85664766
+          uid: 9cb3800d-2c3e-4fb6-b650-b0321210846b
+      resourceVersion: '1315711'
+      uid: d4529400-ea73-46f8-b352-3adb659d2b1d
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - neuvector-controller-pod
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: docker.io/neuvector/controller:5.2.4
+          imagePullPolicy: Always
+          name: neuvector-controller-pod
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/containerd/containerd.sock
+              name: runtime-sock
+              readOnly: true
+            - mountPath: /host/proc
+              name: proc-vol
+              readOnly: true
+            - mountPath: /host/cgroup
+              name: cgroup-vol
+              readOnly: true
+            - mountPath: /etc/config
+              name: config-volume
+              readOnly: true
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-hzrbw
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - hostPath:
+            path: /var/run/containerd/containerd.sock
+            type: ''
+          name: runtime-sock
+        - hostPath:
+            path: /proc
+            type: ''
+          name: proc-vol
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: ''
+          name: cgroup-vol
+        - name: config-volume
+          projected:
+            defaultMode: 420
+            sources:
+              - configMap:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-secret
+                  optional: true
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-controller-secret
+        - name: kube-api-access-hzrbw
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://21ed69b6342ac5d82a6a3532112335644b010d02f35511bb1914133a18bbf888
+          image: docker.io/neuvector/controller:5.2.4
+          imageID: docker.io/neuvector/controller@sha256:435412993f864bb421bd4fa3331bd671ad4e628fddcd4908505de0eeff2cc1ad
+          lastState: {}
+          name: neuvector-controller-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:02Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.6.33
+      podIPs:
+        - ip: 192.168.6.33
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/controller-secret: d80737694bc4fa56bba39e94bf9717e9d3ac735417d70428e5f27777f26a4437
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generateName: neuvector-controller-pod-7d85664766-
+      labels:
+        app: neuvector-controller-pod
+        pod-template-hash: 7d85664766
+        release: release-name
+      name: neuvector-controller-pod-7d85664766-dgfmj
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-controller-pod-7d85664766
+          uid: 9cb3800d-2c3e-4fb6-b650-b0321210846b
+      resourceVersion: '1315712'
+      uid: d07109dc-3659-48d0-b0a5-2894c7b7b236
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - neuvector-controller-pod
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: docker.io/neuvector/controller:5.2.4
+          imagePullPolicy: Always
+          name: neuvector-controller-pod
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/containerd/containerd.sock
+              name: runtime-sock
+              readOnly: true
+            - mountPath: /host/proc
+              name: proc-vol
+              readOnly: true
+            - mountPath: /host/cgroup
+              name: cgroup-vol
+              readOnly: true
+            - mountPath: /etc/config
+              name: config-volume
+              readOnly: true
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-fk98c
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - hostPath:
+            path: /var/run/containerd/containerd.sock
+            type: ''
+          name: runtime-sock
+        - hostPath:
+            path: /proc
+            type: ''
+          name: proc-vol
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: ''
+          name: cgroup-vol
+        - name: config-volume
+          projected:
+            defaultMode: 420
+            sources:
+              - configMap:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-secret
+                  optional: true
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-controller-secret
+        - name: kube-api-access-fk98c
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://61f100c4127ee668a76f58a41d4688c99d8eaa2f1833889182e5aada7b73ebf7
+          image: docker.io/neuvector/controller:5.2.4
+          imageID: docker.io/neuvector/controller@sha256:435412993f864bb421bd4fa3331bd671ad4e628fddcd4908505de0eeff2cc1ad
+          lastState: {}
+          name: neuvector-controller-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:03Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.59.107
+      podIPs:
+        - ip: 192.168.59.107
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/controller-secret: d80737694bc4fa56bba39e94bf9717e9d3ac735417d70428e5f27777f26a4437
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generateName: neuvector-controller-pod-7d85664766-
+      labels:
+        app: neuvector-controller-pod
+        pod-template-hash: 7d85664766
+        release: release-name
+      name: neuvector-controller-pod-7d85664766-htbwk
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-controller-pod-7d85664766
+          uid: 9cb3800d-2c3e-4fb6-b650-b0321210846b
+      resourceVersion: '1315702'
+      uid: 9468a7a1-96e8-4f6b-b8ad-1df18eaf2756
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - neuvector-controller-pod
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: docker.io/neuvector/controller:5.2.4
+          imagePullPolicy: Always
+          name: neuvector-controller-pod
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/containerd/containerd.sock
+              name: runtime-sock
+              readOnly: true
+            - mountPath: /host/proc
+              name: proc-vol
+              readOnly: true
+            - mountPath: /host/cgroup
+              name: cgroup-vol
+              readOnly: true
+            - mountPath: /etc/config
+              name: config-volume
+              readOnly: true
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-ffwq4
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - hostPath:
+            path: /var/run/containerd/containerd.sock
+            type: ''
+          name: runtime-sock
+        - hostPath:
+            path: /proc
+            type: ''
+          name: proc-vol
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: ''
+          name: cgroup-vol
+        - name: config-volume
+          projected:
+            defaultMode: 420
+            sources:
+              - configMap:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-init
+                  optional: true
+              - secret:
+                  name: neuvector-secret
+                  optional: true
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-controller-secret
+        - name: kube-api-access-ffwq4
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:11Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://e64fe480c53851f27f76fbd494155369fcb8fcf102157dd2377c1f59c15e7264
+          image: docker.io/neuvector/controller:5.2.4
+          imageID: docker.io/neuvector/controller@sha256:435412993f864bb421bd4fa3331bd671ad4e628fddcd4908505de0eeff2cc1ad
+          lastState: {}
+          name: neuvector-controller-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:02Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.28.231
+      podIPs:
+        - ip: 192.168.28.231
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generateName: neuvector-enforcer-pod-
+      labels:
+        app: neuvector-enforcer-pod
+        controller-revision-hash: 769dcf7fdd
+        pod-template-generation: '1'
+        release: release-name
+      name: neuvector-enforcer-pod-9n78z
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: DaemonSet
+          name: neuvector-enforcer-pod
+          uid: 3f992475-44fa-4960-b743-03111d84e4fe
+      resourceVersion: '1315606'
+      uid: bee0def3-228e-4093-88fd-81fa844f1075
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchFields:
+                  - key: metadata.name
+                    operator: In
+                    values:
+                      - ip-192-168-7-231.ec2.internal
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: docker.io/neuvector/enforcer:5.2.4
+          imagePullPolicy: IfNotPresent
+          name: neuvector-enforcer-pod
+          resources: {}
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/containerd/containerd.sock
+              name: runtime-sock
+              readOnly: true
+            - mountPath: /host/proc
+              name: proc-vol
+              readOnly: true
+            - mountPath: /host/cgroup
+              name: cgroup-vol
+              readOnly: true
+            - mountPath: /lib/modules
+              name: modules-vol
+              readOnly: true
+            - mountPath: /var/nv_debug
+              name: nv-debug
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-s9pht
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      hostPID: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 1200
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/pid-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/unschedulable
+          operator: Exists
+      volumes:
+        - hostPath:
+            path: /var/run/containerd/containerd.sock
+            type: ''
+          name: runtime-sock
+        - hostPath:
+            path: /proc
+            type: ''
+          name: proc-vol
+        - hostPath:
+            path: /sys/fs/cgroup
+            type: ''
+          name: cgroup-vol
+        - hostPath:
+            path: /lib/modules
+            type: ''
+          name: modules-vol
+        - hostPath:
+            path: /var/nv_debug
+            type: ''
+          name: nv-debug
+        - name: kube-api-access-s9pht
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:02Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:02Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://46795dbccb83bbc7418fc7a3fc331e48330fd365c0892f02a4afad59ceb618b8
+          image: docker.io/neuvector/enforcer:5.2.4
+          imageID: docker.io/neuvector/enforcer@sha256:5bea0fc8951589f060f47c0d08a2b5c167def7d5bbf05679a94b6bef3a8fbc0d
+          lastState: {}
+          name: neuvector-enforcer-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:02Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.31.134
+      podIPs:
+        - ip: 192.168.31.134
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T23:00:12Z'
+      generateName: neuvector-enforcer-pod-
+      labels:
+        app: neuvector-enforcer-pod
+        controller-revision-hash: 5c4bdc9f97
+        pod-template-generation: '2'
+        release: release-name
+      name: neuvector-enforcer-pod-lz95d
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: DaemonSet
+          name: neuvector-enforcer-pod
+          uid: 3f992475-44fa-4960-b743-03111d84e4fe
+      resourceVersion: '1316096'
+      uid: 2502227d-ff4a-4e48-ae5d-50c5aadec67f
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchFields:
+                  - key: metadata.name
+                    operator: In
+                    values:
+                      - ip-192-168-46-147.ec2.internal
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: CLUSTER_ADVERTISED_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: CLUSTER_BIND_ADDR
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+            - name: ENFORCER_SKIP_NV_PROTECT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/enforcer:5.3.0-dev
+          imagePullPolicy: Always
+          name: neuvector-enforcer-pod
+          resources: {}
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /lib/modules
+              name: modules-vol
+              readOnly: true
+            - mountPath: /var/nv_debug
+              name: nv-debug
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-2djlp
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      hostPID: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 1200
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/pid-pressure
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/unschedulable
+          operator: Exists
+      volumes:
+        - hostPath:
+            path: /lib/modules
+            type: ''
+          name: modules-vol
+        - hostPath:
+            path: /var/nv_debug
+            type: ''
+          name: nv-debug
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-2djlp
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:12Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:12Z'
+          message: 'containers with unready status: [neuvector-enforcer-pod]'
+          reason: ContainersNotReady
+          status: 'False'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:12Z'
+          message: 'containers with unready status: [neuvector-enforcer-pod]'
+          reason: ContainersNotReady
+          status: 'False'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:12Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/enforcer:5.3.0-dev
+          imageID: ''
+          lastState: {}
+          name: neuvector-enforcer-pod
+          ready: false
+          restartCount: 0
+          started: false
+          state:
+            waiting:
+              reason: ContainerCreating
+      hostIP: 192.168.46.147
+      phase: Pending
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:12Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/manager-secret: d8397b2817280a0d838fafb8d530adcd4e6c957cdd7bb736ece01889ffa697eb
+      creationTimestamp: '2024-01-25T23:00:05Z'
+      generateName: neuvector-manager-pod-fccbd7678-
+      labels:
+        app: neuvector-manager-pod
+        pod-template-hash: fccbd7678
+        release: release-name
+      name: neuvector-manager-pod-fccbd7678-b4wrf
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-manager-pod-fccbd7678
+          uid: a2dcbf85-f7e5-466b-ac7b-e5e6c0791ea0
+      resourceVersion: '1315963'
+      uid: c3445e01-7d12-4631-9d00-7fe9f243be70
+    spec:
+      containers:
+        - env:
+            - name: CTRL_SERVER_IP
+              value: neuvector-svc-controller.neuvector
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/manager:5.3.0-dev
+          imagePullPolicy: IfNotPresent
+          name: neuvector-manager-pod
+          ports:
+            - containerPort: 8443
+              name: http
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/neuvector/certs/ssl-cert.key
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.key
+            - mountPath: /etc/neuvector/certs/ssl-cert.pem
+              name: cert
+              readOnly: true
+              subPath: ssl-cert.pem
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-d8kw9
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-manager-secret
+        - name: kube-api-access-d8kw9
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://e41f1fe61bd5ffa267991bb3a5a1e4e8034da7f201170e215bd3489ad7448fec
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/manager:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/manager@sha256:d8db44a5cc4b51e7713518daf5a960a8671659d95855ecc53c7ef64a92e41fa9
+          lastState: {}
+          name: neuvector-manager-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:07Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.63.202
+      podIPs:
+        - ip: 192.168.63.202
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:05Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        checksum/registry-adapter-secret: 675f56a38411ca20002d46f475fbb13072503cea2b94f437f30f0be994ddd474
+      creationTimestamp: '2024-01-25T23:00:05Z'
+      generateName: neuvector-registry-adapter-pod-5985cdc6c7-
+      labels:
+        app: neuvector-registry-adapter-pod
+        pod-template-hash: 5985cdc6c7
+        release: release-name
+      name: neuvector-registry-adapter-pod-5985cdc6c7-dbsjt
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-registry-adapter-pod-5985cdc6c7
+          uid: 9da43a88-9e33-467c-8235-37fae92cbe27
+      resourceVersion: '1315956'
+      uid: a43b4c43-0f74-4100-9453-bbea1a5c7863
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: HARBOR_SERVER_PROTO
+              value: https
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/registry-adapter:latest
+          imagePullPolicy: Always
+          name: neuvector-registry-adapter-pod
+          resources:
+            limits:
+              cpu: 400m
+            requests:
+              cpu: 100m
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-77tth
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: neuvector-registry-adapter-secret
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-77tth
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:07Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:07Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:05Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://944231e708b75ed1363df1256d885a04fd34a099bc143a3b8e5c34839a57dc8d
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/registry-adapter:latest
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/registry-adapter@sha256:eb268c4ccfba99a9591023cefb5ef6034331a6e61d4edb0c5348d8e8bc7a0db3
+          lastState: {}
+          name: neuvector-registry-adapter-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:06Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.25.180
+      podIPs:
+        - ip: 192.168.25.180
+      qosClass: Burstable
+      startTime: '2024-01-25T23:00:05Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T23:00:08Z'
+      generateName: neuvector-scanner-pod-7cdcb54779-
+      labels:
+        app: neuvector-scanner-pod
+        pod-template-hash: 7cdcb54779
+      name: neuvector-scanner-pod-7cdcb54779-67hzf
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-scanner-pod-7cdcb54779
+          uid: 85ef02c5-361f-4b3c-af52-e4ac0cab6c48
+      resourceVersion: '1316031'
+      uid: c85ce976-994e-47c6-b70d-4a52c4044ae6
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imagePullPolicy: Always
+          name: neuvector-scanner-pod
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-6cng5
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-6cng5
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:09Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:09Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://b1c97c10c1014d959df24c845773cb0e1d06ac017675ef811244366251c208ce
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner@sha256:d317774889780478ad4dde6aaeb4ecd2c4747c26f7faba5c44200a40f2c24849
+          lastState: {}
+          name: neuvector-scanner-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:09Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.14.132
+      podIPs:
+        - ip: 192.168.14.132
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:08Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T23:00:06Z'
+      generateName: neuvector-scanner-pod-7cdcb54779-
+      labels:
+        app: neuvector-scanner-pod
+        pod-template-hash: 7cdcb54779
+      name: neuvector-scanner-pod-7cdcb54779-hwsb6
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-scanner-pod-7cdcb54779
+          uid: 85ef02c5-361f-4b3c-af52-e4ac0cab6c48
+      resourceVersion: '1315976'
+      uid: e5ee6ae7-51dd-4428-b62a-c4b06f529e0d
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imagePullPolicy: Always
+          name: neuvector-scanner-pod
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-lg4wf
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-lg4wf
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:06Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:06Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://14b7b755386108cf8474ac730cec7c5246289980164c417535edeec98ed60d75
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner@sha256:d317774889780478ad4dde6aaeb4ecd2c4747c26f7faba5c44200a40f2c24849
+          lastState: {}
+          name: neuvector-scanner-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:07Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.47.182
+      podIPs:
+        - ip: 192.168.47.182
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:06Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T23:00:09Z'
+      generateName: neuvector-scanner-pod-7cdcb54779-
+      labels:
+        app: neuvector-scanner-pod
+        pod-template-hash: 7cdcb54779
+      name: neuvector-scanner-pod-7cdcb54779-j2rxl
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-scanner-pod-7cdcb54779
+          uid: 85ef02c5-361f-4b3c-af52-e4ac0cab6c48
+      resourceVersion: '1316075'
+      uid: 25e04b31-c624-4bd7-8f99-92465ef70e91
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+            - name: AUTO_INTERNAL_CERT
+              value: '1'
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imagePullPolicy: Always
+          name: neuvector-scanner-pod
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/neuvector/certs/internal/
+              name: internal-cert-dir
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-wwd5q
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - emptyDir:
+            sizeLimit: 50Mi
+          name: internal-cert-dir
+        - name: kube-api-access-wwd5q
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:09Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:11Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:11Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:09Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://27ec09f35b1db9a8662b53fbeaf2d909e17710aa51be3545156ecd203cf86397
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner@sha256:d317774889780478ad4dde6aaeb4ecd2c4747c26f7faba5c44200a40f2c24849
+          lastState: {}
+          name: neuvector-scanner-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:10Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.48.76
+      podIPs:
+        - ip: 192.168.48.76
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:09Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      deletionGracePeriodSeconds: 30
+      deletionTimestamp: '2024-01-25T23:00:39Z'
+      generateName: neuvector-scanner-pod-f68d78f4d-
+      labels:
+        app: neuvector-scanner-pod
+        pod-template-hash: f68d78f4d
+      name: neuvector-scanner-pod-f68d78f4d-bqplv
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-scanner-pod-f68d78f4d
+          uid: 92fc14d8-c120-4083-bdf5-ce70f7a55176
+      resourceVersion: '1316037'
+      uid: 9e549806-358d-4833-9dd5-10df02939041
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+          image: docker.io/neuvector/scanner:latest
+          imagePullPolicy: Always
+          name: neuvector-scanner-pod
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-mr4zj
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: kube-api-access-mr4zj
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:04Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:04Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://55af103e6faaebc3057d1f4de4db348219213cf47610b107034166e886ef6c51
+          image: docker.io/neuvector/scanner:latest
+          imageID: docker.io/neuvector/scanner@sha256:ecc8702fcbb237f33994ea566b29acf18c330e43a4178754ba05c0360b604a3e
+          lastState: {}
+          name: neuvector-scanner-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:03Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.56.90
+      podIPs:
+        - ip: 192.168.56.90
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      deletionGracePeriodSeconds: 30
+      deletionTimestamp: '2024-01-25T23:00:41Z'
+      generateName: neuvector-scanner-pod-f68d78f4d-
+      labels:
+        app: neuvector-scanner-pod
+        pod-template-hash: f68d78f4d
+      name: neuvector-scanner-pod-f68d78f4d-ftk9f
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: apps/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: ReplicaSet
+          name: neuvector-scanner-pod-f68d78f4d
+          uid: 92fc14d8-c120-4083-bdf5-ce70f7a55176
+      resourceVersion: '1316080'
+      uid: f5a80894-1fe7-4f98-b3a0-8d568c37d763
+    spec:
+      containers:
+        - env:
+            - name: CLUSTER_JOIN_ADDR
+              value: neuvector-svc-controller.neuvector
+          image: docker.io/neuvector/scanner:latest
+          imagePullPolicy: Always
+          name: neuvector-scanner-pod
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-stxs5
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-7-231.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: kube-api-access-stxs5
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:03Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:03Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T22:59:01Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://d8a52aeab5411352340accf6b9aa1a3d24efe1a73c616fc8534754db401a2cbc
+          image: docker.io/neuvector/scanner:latest
+          imageID: docker.io/neuvector/scanner@sha256:ecc8702fcbb237f33994ea566b29acf18c330e43a4178754ba05c0360b604a3e
+          lastState: {}
+          name: neuvector-scanner-pod
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T22:59:02Z'
+      hostIP: 192.168.7.231
+      phase: Running
+      podIP: 192.168.16.166
+      podIPs:
+        - ip: 192.168.16.166
+      qosClass: BestEffort
+      startTime: '2024-01-25T22:59:01Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: '2024-01-25T23:00:08Z'
+      finalizers:
+        - batch.kubernetes.io/job-tracking
+      generateName: neuvector-cert-upgrader-job-
+      labels:
+        batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        batch.kubernetes.io/job-name: neuvector-cert-upgrader-job
+        controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        job-name: neuvector-cert-upgrader-job
+      name: neuvector-cert-upgrader-job-spkrw
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: batch/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: Job
+          name: neuvector-cert-upgrader-job
+          uid: 26921c92-cfef-4056-97c0-e0a03a633308
+      resourceVersion: '1316078'
+      uid: f521c162-3dae-4a26-9190-81a22e149747
+    spec:
+      containers:
+        - command:
+            - /usr/local/bin/upgrader
+            - upgrader-job
+          env:
+            - name: OVERRIDE_CHECKSUM
+              value: e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+            - name: EXPIRY_CERT_THRESHOLD
+              value: 87600h
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imagePullPolicy: Always
+          name: cert-upgrader
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-xx5sz
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      imagePullSecrets:
+        - name: my-docker-secret
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: kube-api-access-xx5sz
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:11Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:11Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-25T23:00:08Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://4dd90b6dc2cafec448ce533ba28070de415de6980e6829790a44ea4bf87e7208
+          image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+          imageID: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller@sha256:5e81815f077c6c00d1d765f57ac522ff296d4313b3be5dbc687d3bd7d1f06343
+          lastState: {}
+          name: cert-upgrader
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-25T23:00:10Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.60.9
+      podIPs:
+        - ip: 192.168.60.9
+      qosClass: BestEffort
+      startTime: '2024-01-25T23:00:08Z'
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"v1","kind":"Pod","metadata":{"annotations":{},"labels":{"app":"ubuntu"},"name":"ubuntu","namespace":"neuvector"},"spec":{"containers":[{"command":["sleep","604800"],"image":"ubuntu","imagePullPolicy":"IfNotPresent","name":"ubuntu"}],"restartPolicy":"Always"}}
+      creationTimestamp: '2024-01-22T18:04:08Z'
+      labels:
+        app: ubuntu
+      name: ubuntu
+      namespace: neuvector
+      resourceVersion: '594985'
+      uid: c01c8367-1621-483f-b830-33a1668290f7
+    spec:
+      containers:
+        - command:
+            - sleep
+            - '604800'
+          image: ubuntu
+          imagePullPolicy: IfNotPresent
+          name: ubuntu
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-tk22c
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      nodeName: ip-192-168-46-147.ec2.internal
+      preemptionPolicy: PreemptLowerPriority
+      priority: 0
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      volumes:
+        - name: kube-api-access-tk22c
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+    status:
+      conditions:
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-22T18:04:08Z'
+          status: 'True'
+          type: Initialized
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-22T18:04:12Z'
+          status: 'True'
+          type: Ready
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-22T18:04:12Z'
+          status: 'True'
+          type: ContainersReady
+        - lastProbeTime: null
+          lastTransitionTime: '2024-01-22T18:04:08Z'
+          status: 'True'
+          type: PodScheduled
+      containerStatuses:
+        - containerID: containerd://81b7dc4bd427557a9f1dd1e715361c13a595c8436d4c41a2b4226f3021072c32
+          image: docker.io/library/ubuntu:latest
+          imageID: docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74
+          lastState: {}
+          name: ubuntu
+          ready: true
+          restartCount: 0
+          started: true
+          state:
+            running:
+              startedAt: '2024-01-22T18:04:12Z'
+      hostIP: 192.168.46.147
+      phase: Running
+      podIP: 192.168.44.25
+      podIPs:
+        - ip: 192.168.44.25
+      qosClass: BestEffort
+      startTime: '2024-01-22T18:04:08Z'
+kind: List
+metadata:
+  resourceVersion: ''

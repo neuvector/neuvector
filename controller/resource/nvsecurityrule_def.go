@@ -2,8 +2,8 @@ package resource
 
 import (
 	//	"github.com/neuvector/k8s"
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	"github.com/neuvector/neuvector/controller/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const constApiGroupNV = "neuvector.com"
@@ -163,56 +163,35 @@ type NvSecurityRuleSpec struct {
 }
 
 type NvSecurityRulePartial struct {
-	Kind             *string            `json:"kind,omitempty"`
-	ApiVersion       *string            `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ObjectMeta `json:"metadata"`
-	XXX_unrecognized []byte             `json:"-"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	XXX_unrecognized  []byte `json:"-"`
 }
 
 type NvSecurityRule struct {
-	Kind       *string            `json:"kind,omitempty"`
-	ApiVersion *string            `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta `json:"metadata"`
-	Spec       NvSecurityRuleSpec `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvSecurityRuleList struct {
-	Kind             *string           `json:"kind,omitempty"`
-	ApiVersion       *string           `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta  `json:"metadata"`
-	Items            []*NvSecurityRule `json:"items"`
-	XXX_unrecognized []byte            `json:"-"`
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte           `json:"-"`
 }
 
 type NvClusterSecurityRule struct {
-	Kind       *string            `json:"kind,omitempty"`
-	ApiVersion *string            `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta `json:"metadata"`
-	Spec       NvSecurityRuleSpec `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvClusterSecurityRuleList struct {
-	Kind             *string                  `json:"kind,omitempty"`
-	ApiVersion       *string                  `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta         `json:"metadata"`
-	Items            []*NvClusterSecurityRule `json:"items"`
-	XXX_unrecognized []byte                   `json:"-"`
-}
-
-func (m *NvSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
-}
-
-func (m *NvClusterSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvClusterSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvClusterSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                  `json:"-"`
 }
 
 /*
@@ -251,27 +230,31 @@ type NvSecurityAdmCtrlSpec struct {
 	Rules  []*NvSecurityAdmCtrlRule `json:"rules,omitempty"`
 }
 
+/*
 type NvAdmCtrlSecurityRule struct {
-	Kind       *string               `json:"kind,omitempty"`
-	ApiVersion *string               `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta    `json:"metadata"`
-	Spec       NvSecurityAdmCtrlSpec `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              NvSecurityAdmCtrlSpec `json:"spec"`
 }
 
 type NvAdmCtrlSecurityRuleList struct {
-	Kind             *string                  `json:"kind,omitempty"`
-	ApiVersion       *string                  `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta         `json:"metadata"`
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty"`
 	Items            []*NvAdmCtrlSecurityRule `json:"items"`
 	XXX_unrecognized []byte                   `json:"-"`
 }
-
-func (m *NvAdmCtrlSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
+*/
+type NvAdmCtrlSecurityRule struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityAdmCtrlSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-func (m *NvAdmCtrlSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+type NvAdmCtrlSecurityRuleList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvAdmCtrlSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                  `json:"-"`
 }
 
 // DLP
@@ -291,26 +274,16 @@ type NvSecurityDlpSpec struct {
 }
 
 type NvDlpSecurityRule struct {
-	Kind       *string            `json:"kind,omitempty"`
-	ApiVersion *string            `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta `json:"metadata"`
-	Spec       NvSecurityDlpSpec  `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityDlpSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvDlpSecurityRuleList struct {
-	Kind             *string              `json:"kind,omitempty"`
-	ApiVersion       *string              `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta     `json:"metadata"`
-	Items            []*NvDlpSecurityRule `json:"items"`
-	XXX_unrecognized []byte               `json:"-"`
-}
-
-func (m *NvDlpSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvDlpSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvDlpSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte              `json:"-"`
 }
 
 // WAF
@@ -330,26 +303,16 @@ type NvSecurityWafSpec struct {
 }
 
 type NvWafSecurityRule struct {
-	Kind       *string            `json:"kind,omitempty"`
-	ApiVersion *string            `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta `json:"metadata"`
-	Spec       NvSecurityWafSpec  `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityWafSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvWafSecurityRuleList struct {
-	Kind             *string              `json:"kind,omitempty"`
-	ApiVersion       *string              `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta     `json:"metadata"`
-	Items            []*NvWafSecurityRule `json:"items"`
-	XXX_unrecognized []byte               `json:"-"`
-}
-
-func (m *NvWafSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvWafSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvWafSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte              `json:"-"`
 }
 
 // vulnerability profile
@@ -370,26 +333,16 @@ type NvSecurityVulnProfileSpec struct {
 }
 
 type NvVulnProfileSecurityRule struct {
-	Kind       *string                   `json:"kind,omitempty"`
-	ApiVersion *string                   `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta        `json:"metadata"`
-	Spec       NvSecurityVulnProfileSpec `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityVulnProfileSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvVulnProfileSecurityRuleList struct {
-	Kind             *string                      `json:"kind,omitempty"`
-	ApiVersion       *string                      `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta             `json:"metadata"`
-	Items            []*NvVulnProfileSecurityRule `json:"items"`
-	XXX_unrecognized []byte                       `json:"-"`
-}
-
-func (m *NvVulnProfileSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvVulnProfileSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvVulnProfileSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                      `json:"-"`
 }
 
 // compliance profile
@@ -403,51 +356,31 @@ type NvSecurityCompProfileSpec struct {
 }
 
 type NvCompProfileSecurityRule struct {
-	Kind       *string                   `json:"kind,omitempty"`
-	ApiVersion *string                   `json:"apiVersion,omitempty"`
-	Metadata   *metav1.ObjectMeta        `json:"metadata"`
-	Spec       NvSecurityCompProfileSpec `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityCompProfileSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvCompProfileSecurityRuleList struct {
-	Kind             *string                      `json:"kind,omitempty"`
-	ApiVersion       *string                      `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta             `json:"metadata"`
-	Items            []*NvCompProfileSecurityRule `json:"items"`
-	XXX_unrecognized []byte                       `json:"-"`
-}
-
-func (m *NvCompProfileSecurityRule) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvCompProfileSecurityRuleList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvCompProfileSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                      `json:"-"`
 }
 
 // csp billing adapter integration
 type NvCspUsage struct {
-	Kind             *string            `json:"kind,omitempty"`
-	ApiVersion       *string            `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ObjectMeta `json:"metadata"`
-	ManagedNodeCount int                `json:"managed_node_count"` // sum of all reachable clusters' nodes count. 0 means "do not report to CSP API"
-	ReportingTime    string             `json:"reporting_time"`
-	BaseProduct      string             `json:"base_product"`
-	XXX_unrecognized []byte             `json:"-"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	ManagedNodeCount  int    `json:"managed_node_count"` // sum of all reachable clusters' nodes count. 0 means "do not report to CSP API"
+	ReportingTime     string `json:"reporting_time"`
+	BaseProduct       string `json:"base_product"`
+	XXX_unrecognized  []byte `json:"-"`
 }
 
 type NvCspUsageList struct {
-	Kind             *string          `json:"kind,omitempty"`
-	ApiVersion       *string          `json:"apiVersion,omitempty"`
-	Metadata         *metav1.ListMeta `json:"metadata"`
-	Items            []*NvCspUsage    `json:"items"`
-	XXX_unrecognized []byte           `json:"-"`
-}
-
-func (m *NvCspUsage) GetMetadata() *metav1.ObjectMeta {
-	return m.Metadata
-}
-
-func (m *NvCspUsageList) GetMetadata() *metav1.ListMeta {
-	return m.Metadata
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvCspUsage `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte       `json:"-"`
 }

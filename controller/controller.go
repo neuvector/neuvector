@@ -30,10 +30,13 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/healthz"
+	"github.com/neuvector/neuvector/share/migration"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 var Host share.CLUSHost = share.CLUSHost{
@@ -460,6 +463,53 @@ func main() {
 		Ctrler: &Ctrler,
 	}
 
+	var grpcServer *cluster.GRPCServer
+	var controllerCancel context.CancelFunc
+	var ctx context.Context
+
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+
+		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
+
+		go func() {
+			if err := healthz.StartHealthzServer(); err != nil {
+				log.WithError(err).Warn("failed to start healthz server")
+			}
+		}()
+
+		ctx, controllerCancel = context.WithCancel(context.Background())
+		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
+		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
+			// Reload consul
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading consul config")
+				if err := cluster.Reload(nil); err != nil {
+					return fmt.Errorf("failed to reload consul: %w", err)
+				}
+
+				return nil
+			},
+			// Reload grpc servers/clients
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading gRPC servers/clients")
+				if err := cluster.ReloadInternalCert(); err != nil {
+					return fmt.Errorf("failed to reload gRPC's certificate: %w", err)
+				}
+				return nil
+			},
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to initialize internal secret controller")
+			os.Exit(-2)
+		}
+		log.Info("internal certificate is initialized")
+	}
+
+	err = cluster.ReloadInternalCert()
+	if err != nil {
+		log.WithError(err).Fatal("failed to reload internal certificate")
+	}
+
 	eventLogKey := share.CLUSControllerEventLogKey(Host.ID, Ctrler.ID)
 	evqueue = cluster.NewObjectQueue(eventLogKey, cluster.DefaultMaxQLen)
 	auditLogKey := share.CLUSAuditLogKey(Host.ID, Ctrler.ID)
@@ -498,7 +548,6 @@ func main() {
 	}
 
 	// get grpc port before put controller info to cluster
-	var grpcServer *cluster.GRPCServer
 	if *grpcPort == 0 {
 		*grpcPort = cluster.DefaultControllerGRPCPort
 	}
@@ -890,6 +939,7 @@ func main() {
 	log.Info("Exiting ...")
 	atomic.StoreInt32(&exitingFlag, 1)
 
+	controllerCancel()
 	cache.Close()
 	orchConnector.Close()
 	ctrlDeleteLocalInfo()

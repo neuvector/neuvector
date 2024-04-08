@@ -2,7 +2,7 @@
 
 STAGE_DIR = stage
 BASE_IMAGE_TAG = latest
-BUILD_IMAGE_TAG = latest
+BUILD_IMAGE_TAG = v2
 
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
@@ -11,6 +11,7 @@ copy_ctrl:
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/upgrader/upgrader ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/

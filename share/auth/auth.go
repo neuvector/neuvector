@@ -69,7 +69,8 @@ const oidcUserInfoTimeout = time.Duration(time.Second * 20)
 // 2. When running in a container, use --env LDAP_TLS_VERIFY_CLIENT=try to disable client certificate validation
 func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password string) (map[string]string, []string, error) {
 	client := &LDAPClient{
-		Base:               cldap.BaseDN,
+		BaseDN:             cldap.BaseDN,
+		GroupDN:            cldap.GroupDN,
 		Host:               cldap.Hostname,
 		Port:               int(cldap.Port),
 		UseSSL:             cldap.SSL,
@@ -80,6 +81,10 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 		Attributes:         []string{"dn", "gidNumber"},
 		Timeout:            defaultLDAPAuthTimeout,
 	}
+	if client.GroupDN == "" {
+		client.GroupDN = cldap.BaseDN
+	}
+
 	defer client.Close()
 
 	username = ldap.EscapeFilter(username)

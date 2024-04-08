@@ -866,6 +866,7 @@ type CLUSServerLDAP struct {
 	Port            uint16 `json:"port"`
 	SSL             bool   `json:"ssl"`
 	BaseDN          string `json:"base_dn"`
+	GroupDN         string `json:"group_dn"`
 	BindDN          string `json:"bind_dn"` // Must handle upgrade if it is cloaked
 	BindPasswd      string `json:"bind_password,cloak"`
 	GroupMemberAttr string `json:"group_member_attr"`
@@ -1114,10 +1115,10 @@ type CLUSGroup struct {
 	CapIntcp        bool                `json:"cap_intcp"`
 	CfgType         TCfgType            `json:"cfg_type"`
 	BaselineProfile string              `json:"baseline_profile"`
-	MonMetric       bool                `json:"mon_metric,omitempty"`
-	GrpSessCur      uint32              `json:"grp_sess_cur,omitempty"`
-	GrpSessRate     uint32              `json:"grp_sess_rate,omitempty"`
-	GrpBandWidth    uint32              `json:"grp_band_width,omitempty"`
+	MonMetric       bool                `json:"monitor_metric,omitempty"`
+	GrpSessCur      uint32              `json:"group_sess_cur,omitempty"`
+	GrpSessRate     uint32              `json:"group_sess_rate,omitempty"`
+	GrpBandWidth    uint32              `json:"group_band_width,omitempty"`
 }
 
 type CLUSPolicyRule struct {
@@ -2828,7 +2829,7 @@ const (
 	ReviewTypeDisplayDLP         = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF         = "WAF Configurations"               // interactive import
 	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"            // interactive import
-	ReviewTypeDisplayCompProfile = "compliance Profile"               // interactive import
+	ReviewTypeDisplayCompProfile = "Compliance Profile"               // interactive import
 )
 
 // Telemetry (upgrade responder)

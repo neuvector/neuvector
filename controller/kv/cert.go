@@ -194,7 +194,7 @@ func CreateCAFilesAndStoreInKv(certpath, keypath string) error {
 		}).Debug("found existing CA files")
 	} else {
 		// Only RSA is supported for now.
-		cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
+		cert, key, err := GenerateCAWithRSAKey(nil, RSAKeySize)
 		if err != nil {
 			return fmt.Errorf("failed to create ca certificate: %w", err)
 		}
@@ -254,7 +254,7 @@ func GetDefaultTLSCertTemplate() *x509.Certificate {
 
 // Generate CA cert/key
 // When succeeds, it returns cert (der) and key.
-func generateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []byte, error) {
+func GenerateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []byte, error) {
 	// If user specifies one, use template provided.
 	var certTemplate *x509.Certificate
 	if template != nil {
@@ -269,7 +269,7 @@ func generateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []by
 // Generate TLS cert/key
 // When parent == nil, it will be self-signed.
 // When succeeds, it returns cert (der) and key.
-func generateTLSCertWithRSAKey(template *x509.Certificate, keysize int, parent *x509.Certificate, parentPrivateKey interface{}) ([]byte, []byte, error) {
+func GenerateTLSCertWithRSAKey(template *x509.Certificate, keysize int, parent *x509.Certificate, parentPrivateKey interface{}) ([]byte, []byte, error) {
 	// If user specifies one, use template provided.
 	var certTemplate *x509.Certificate
 	if template != nil {
@@ -456,7 +456,7 @@ func GenTlsKeyCert(cn string, caCertPath string, caKeyPath string, validityPerio
 			return nil, nil, fmt.Errorf("failed to parse ca cert: %w", err)
 		}
 		// Only RSA is supported for now.
-		cert, key, err = generateTLSCertWithRSAKey(template, RSAKeySize, ca, catls.PrivateKey)
+		cert, key, err = GenerateTLSCertWithRSAKey(template, RSAKeySize, ca, catls.PrivateKey)
 		if err != nil {
 			log.WithError(err).Error("Failed to create TLS certificate")
 			return nil, nil, fmt.Errorf("failed to create TLS certificate: %w", err)
@@ -464,7 +464,7 @@ func GenTlsKeyCert(cn string, caCertPath string, caKeyPath string, validityPerio
 	} else {
 		// Only RSA is supported for now.
 		// Self sign
-		cert, key, err = generateTLSCertWithRSAKey(template, RSAKeySize, nil, nil)
+		cert, key, err = GenerateTLSCertWithRSAKey(template, RSAKeySize, nil, nil)
 		if err != nil {
 			log.WithError(err).Error("Failed to create TLS certificate")
 			return nil, nil, fmt.Errorf("failed to create TLS certificate: %w", err)

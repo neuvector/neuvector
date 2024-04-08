@@ -7,6 +7,7 @@ echo "Machine hardware architecture is \"$machine\""
 echo "==> Unitest"
 go test github.com/neuvector/neuvector/share/... || exit $?
 go test github.com/neuvector/neuvector/controller/... || exit $?
+go test github.com/neuvector/neuvector/upgrader/... || exit $?
 go test github.com/neuvector/neuvector/agent/... || exit $?
 
 echo "==> Making agent"
@@ -22,5 +23,8 @@ cd agent; make || exit $?; cd ..
 
 echo "==> Making controller"
 cd controller; make || exit $?; cd ..
+
+echo "==> Making upgrader"
+cd upgrader; make || exit $?; cd ..
 
 exit 0

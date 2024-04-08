@@ -426,17 +426,17 @@ func validateGroupConfig(rg *api.RESTGroupConfig, create bool) (int, string) {
 	}
 	if rg.GrpSessCur != nil && *rg.GrpSessCur > api.GrpMetricMax {
 		e := "Metric group active session number exceed max limit"
-		log.WithFields(log.Fields{"GrpSessCur": *rg.GrpSessCur, "Max":api.GrpMetricMax}).Error(e)
+		log.WithFields(log.Fields{"GrpSessCur": *rg.GrpSessCur, "Max": api.GrpMetricMax}).Error(e)
 		return api.RESTErrInvalidRequest, e
 	}
 	if rg.GrpSessRate != nil && *rg.GrpSessRate > api.GrpMetricMax {
 		e := "Metric group session rate exceed max limit"
-		log.WithFields(log.Fields{"GrpSessRate": *rg.GrpSessRate, "Max":api.GrpMetricMax}).Error(e)
+		log.WithFields(log.Fields{"GrpSessRate": *rg.GrpSessRate, "Max": api.GrpMetricMax}).Error(e)
 		return api.RESTErrInvalidRequest, e
 	}
 	if rg.GrpBandWidth != nil && *rg.GrpBandWidth > api.GrpMetricMax {
 		e := "Metric group bandwidth exceed max limit"
-		log.WithFields(log.Fields{"GrpBandWidth": *rg.GrpBandWidth, "Max":api.GrpMetricMax}).Error(e)
+		log.WithFields(log.Fields{"GrpBandWidth": *rg.GrpBandWidth, "Max": api.GrpMetricMax}).Error(e)
 		return api.RESTErrInvalidRequest, e
 	}
 	switch rg.CfgType {
@@ -1758,18 +1758,18 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvSecurityRuleList
 	var secRule resource.NvSecurityRule
-	var secRules []*resource.NvSecurityRule = []*resource.NvSecurityRule{nil}
+	var secRules []resource.NvSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules[0] = &secRule
+			secRules = append(secRules, secRule)
 		}
 	} else {
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.Kind == nil || (*r.Kind != resource.NvSecurityRuleKind && *r.Kind != resource.NvClusterSecurityRuleKind) {
+		if r.APIVersion != "neuvector.com/v1" || (r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
 			invalidCrdKind = true
 			break
 		}
@@ -1807,10 +1807,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		// ---------------------------------------------------
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
-				continue
-			}
-			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
+			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break
 			} else {
