@@ -45,6 +45,17 @@ message SigstoreKeylessOptions {
   string CertSubject = 2;
 }
 
+message ScanCacheStatRes {
+	uint64 RecordCnt = 1;
+	uint64 RecordSize = 2;
+	uint64 MissCnt = 3;
+	uint64 HitCnt = 4;
+}
+
+message ScanCacheDataRes {
+    bytes DataZb = 1;
+}
+
 service ScannerService {
   rpc ScanRunning(ScanRunningRequest) returns (ScanResult);
   rpc ScanImageData(ScanData) returns (ScanResult);
@@ -52,4 +63,6 @@ service ScannerService {
   rpc ScanAppPackage(ScanAppRequest) returns (ScanResult);
   rpc Ping(RPCVoid) returns (RPCVoid);
   rpc ScanAwsLambda(ScanAwsLambdaRequest) returns (ScanResult);
+  rpc ScanCacheGetStat(RPCVoid) returns (ScanCacheStatRes);
+  rpc ScanCacheGetData(RPCVoid) returns (ScanCacheDataRes);
 }
