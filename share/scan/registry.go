@@ -211,7 +211,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
 			}
-			if cfgMediaType != registry.MediaTypeContainerImage && cfgMediaType != registry.MediaTypeOCIImageConfig {
+			if cfgMediaType != registry.MediaTypeContainerImage && cfgMediaType != registry.MediaTypeOCIImageConfig && cfgMediaType != "" {
 				log.WithFields(log.Fields{"mediaType": cfgMediaType}).Info("Not an OCI image")
 				return imageInfo, share.ScanErrorCode_ScanErrImageNotFound
 			}
