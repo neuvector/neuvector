@@ -96,7 +96,7 @@ type CustomResourceDefinitionSpec struct {
 	// Defaults to true in v1beta for backwards compatibility.
 	// Deprecated: will be required to be false in v1. Preservation of unknown fields can be specified
 	// in the validation schema using the `x-kubernetes-preserve-unknown-fields: true` extension.
-	// See https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#pruning-versus-preserving-unknown-fields for details.
+	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
 	// +optional
 	PreserveUnknownFields *bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }
@@ -396,7 +396,10 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // <.spec.name>.<.spec.group>.
 // Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 type CustomResourceDefinition struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec describes how the user wants the resources to appear
@@ -415,6 +418,10 @@ type CustomResourceDefinition struct {
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items list individual CustomResourceDefinition objects

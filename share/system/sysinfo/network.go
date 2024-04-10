@@ -112,13 +112,13 @@ func (si *SysInfo) getNetworkInfo() {
 			continue
 		}
 
-		supp := getSupported(link.Name())
+		//		supp := getSupported(link.Name())
 
 		device := NetworkDevice{
 			Name:       link.Name(),
 			MACAddress: slurpFile(path.Join(fullpath, "address")),
-			Port:       getPortType(supp),
-			Speed:      getMaxSpeed(supp),
+			//			Port:       getPortType(supp),
+			//			Speed:      getMaxSpeed(supp),
 		}
 
 		if driver, err := readLink(path.Join(fullpath, "device", "driver")); err == nil {

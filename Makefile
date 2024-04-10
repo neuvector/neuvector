@@ -2,7 +2,7 @@
 
 STAGE_DIR = stage
 BASE_IMAGE_TAG = latest
-BUILD_IMAGE_TAG = latest
+BUILD_IMAGE_TAG = v2
 
 copy_ctrl:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
