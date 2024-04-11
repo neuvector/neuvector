@@ -624,10 +624,10 @@ func isStringCriterionMet(crt *share.CLUSAdmRuleCriterion, value string) (bool, 
 		return strings.Contains(value, crt.Value), true
 	case share.CriteriaOpPrefix:
 		return strings.HasPrefix(value, crt.Value), true
-	case share.CriteriaOpRegex:
+	case share.CriteriaOpRegex, share.CriteriaOpRegex_Deprecated:
 		matched, _ := regexp.MatchString(crt.Value, value)
 		return matched, true
-	case share.CriteriaOpNotRegex:
+	case share.CriteriaOpNotRegex, share.CriteriaOpNotRegex_Deprecated:
 		matched, _ := regexp.MatchString(crt.Value, value)
 		return !matched, false
 	case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
@@ -1544,9 +1544,9 @@ func getOpDisplay(crt *share.CLUSAdmRuleCriterion) string {
 	switch crt.Op {
 	case share.CriteriaOpEqual, share.CriteriaOpNotEqual, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan, "":
 		return crt.Op
-	case share.CriteriaOpRegex:
+	case share.CriteriaOpRegex, share.CriteriaOpRegex_Deprecated:
 		return "matches"
-	case share.CriteriaOpNotRegex:
+	case share.CriteriaOpNotRegex, share.CriteriaOpNotRegex_Deprecated:
 		return "does not match"
 	case share.CriteriaOpContainsAll:
 		return "contains all in"
@@ -1620,7 +1620,7 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 					} else {
 						str = fmt.Sprintf("(%s %s {%s})", displayName, opDsiplay, crt.Value)
 					}
-				case share.CriteriaOpRegex:
+				case share.CriteriaOpRegex, share.CriteriaOpRegex_Deprecated:
 					str = fmt.Sprintf("(%s %s regex(%s) )", displayName, opDsiplay, crt.Value)
 				case share.CriteriaOpExist, share.CriteriaOpNotExist:
 					str = fmt.Sprintf("(%s, path %s %s)", displayName, crt.Path, opDsiplay)
@@ -1641,14 +1641,16 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 			str = fmt.Sprintf("(%s)", str)
 		}
 		if !firstCriterion {
-			if !positive && (crt.Op == share.CriteriaOpNotContainsAny || crt.Op == share.CriteriaOpNotEqual || crt.Op == share.CriteriaOpNotRegex) {
+			if !positive && (crt.Op == share.CriteriaOpNotContainsAny || crt.Op == share.CriteriaOpNotEqual ||
+				crt.Op == share.CriteriaOpNotRegex || crt.Op == share.CriteriaOpNotRegex_Deprecated) {
 				sb.WriteString(andDelim)
 			} else {
 				sb.WriteString(orDelim)
 				positive = true
 			}
 		} else {
-			if crt.Op != share.CriteriaOpNotContainsAny && crt.Op != share.CriteriaOpNotEqual && crt.Op != share.CriteriaOpNotRegex {
+			if crt.Op != share.CriteriaOpNotContainsAny && crt.Op != share.CriteriaOpNotEqual &&
+				crt.Op != share.CriteriaOpNotRegex && crt.Op != share.CriteriaOpNotRegex_Deprecated {
 				positive = true
 			}
 		}
