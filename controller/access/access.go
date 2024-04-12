@@ -63,7 +63,6 @@ var apiPermissions map[int8]uint64 = map[int8]uint64{ // key is apiCategoryID
 	CONST_API_RT_SCAN:         share.PERMS_RUNTIME_SCAN,
 	CONST_API_REG_SCAN:        share.PERM_REG_SCAN,
 	CONST_API_CICD_SCAN:       share.PERM_CICD_SCAN,
-	CONST_API_CLOUD:           share.PERM_CLOUD,
 	CONST_API_INFRA:           share.PERM_INFRA_BASIC,
 	CONST_API_NV_RESOURCE:     share.PERM_NV_RESOURCE,
 	CONST_API_WORKLOAD:        share.PERM_WORKLOAD_BASIC,
@@ -81,6 +80,7 @@ var apiPermissions map[int8]uint64 = map[int8]uint64{ // key is apiCategoryID
 	CONST_API_FED:             share.PERM_FED,
 	CONST_API_PWD_PROFILE:     share.PERMS_PWD_PROFILE,  // i.e. for password profile
 	CONST_API_VULNERABILITY:   share.PERM_VULNERABILITY, // i.e. for vulnerability profile
+	//CONST_API_CLOUD:         share.PERM_CLOUD,
 }
 
 // key is permission id that is visible to the world. Regarding to the value,
@@ -158,11 +158,13 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
-		ID:           share.PERM_CLOUD_ID,
-		Value:        share.PERM_CLOUD,
-		SupportScope: CONST_PERM_SUPPORT_GLOBAL,
-	},
+	/*
+		&api.RESTRolePermitOptionInternal{
+			ID:           share.PERM_CLOUD_ID,
+			Value:        share.PERM_CLOUD,
+			SupportScope: CONST_PERM_SUPPORT_GLOBAL,
+		},
+	*/
 	&api.RESTRolePermitOptionInternal{
 		ID:             share.PERMS_RUNTIME_POLICIES_ID,
 		Value:          share.PERMS_RUNTIME_POLICIES,
@@ -400,7 +402,16 @@ func getRolePermitValues(roleName, domain string) (uint64, uint64) {
 			}
 		} else {
 			if domain == AccessDomainGlobal {
-				return role.ReadPermits & share.PERMS_FED_READ, role.WritePermits & share.PERMS_FED_WRITE // filter out unsupported permission on global role
+				// filter out unsupported permission on global role
+				roleReadPermits := role.ReadPermits & share.PERMS_FED_READ
+				if !role.Reserved {
+					// it's custom role on global domain
+					if roleReadPermits == share.PERMS_GLOBAL_CONFIGURABLE_READ {
+						// if this custom role has all selectable read permissions, let it has all local(including hidden) read permissions
+						roleReadPermits = share.PERMS_CLUSTER_READ
+					}
+				}
+				return roleReadPermits, role.WritePermits & share.PERMS_FED_WRITE
 			} else {
 				return role.ReadPermits & share.PERMS_DOMAIN_READ, role.WritePermits & share.PERMS_DOMAIN_WRITE // filter out unsupported permission on domain role
 			}
@@ -567,18 +578,19 @@ func parseForRequiredPermits(ssUri []string, parentNode *UriApiNode, apiID int8)
 
 /*
 func dumpApiUriParts(verb, parentURI string, nodes map[string]*UriApiNode) { // ssUri is like {"v1", "log", "event"} for GET("/v1/log/event"). return true means caller is leaf node.
-	if len(nodes) == 0 {
+
+		if len(nodes) == 0 {
+			return
+		}
+		for part, node := range nodes {
+			if node != nil {
+				nodeURI := fmt.Sprintf("%s/%s", parentURI, part)
+				dumpApiUriParts(verb, nodeURI, node.childNodes)
+				fmt.Printf("[dump] --------------> verb=%s, nodeURI=%s, apiID=%d\n", verb, nodeURI, node.apiCategoryID)
+			}
+		}
 		return
 	}
-	for part, node := range nodes {
-		if node != nil {
-			nodeURI := fmt.Sprintf("%s/%s", parentURI, part)
-			dumpApiUriParts(verb, nodeURI, node.childNodes)
-			fmt.Printf("[dump] --------------> verb=%s, nodeURI=%s, apiID=%d\n", verb, nodeURI, node.apiCategoryID)
-		}
-	}
-	return
-}
 */
 func CompileUriPermitsMapping() {
 	if uriRequiredPermitsMappings == nil {
@@ -1213,7 +1225,6 @@ func GetReservedRoleNames() utils.Set {
 	return names
 }
 
-//--------
 type AccessOP string
 
 const (
@@ -1366,7 +1377,7 @@ func (acc *AccessControl) isDomainRoleAllowedToAccess(role, domain string, readP
 }
 
 // The domain-param containing wildcard char or not (except for global domain),
-// 	if there is any entry(domain, role) in acc.roles/acc.wroles that the entry.domain is superset of domain-param & the entry.role has the required permissions, it's allowed.
+// if there is any entry(domain, role) in acc.roles/acc.wroles that the entry.domain is superset of domain-param & the entry.role has the required permissions, it's allowed.
 // Here 'superset' means string matching using regex.
 // For global domain, even user has permission on "*" namespaces only, it's still a namespace user and cannot access global-only objects
 // See TestWildcardDomainAccess*() & TestWildcardOwnAccess*() in access_test.go about the examples
