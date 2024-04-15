@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,11 +14,11 @@ import (
 
 func VerifyCert(t *testing.T, cn string, cacertfile string, certfile string, keyfile string) {
 	// Load CA cert
-	cacertdata, err := ioutil.ReadFile(cacertfile)
+	cacertdata, err := os.ReadFile(cacertfile)
 	assert.Nil(t, err)
 
 	// Load CA cert
-	certdata, err := ioutil.ReadFile(certfile)
+	certdata, err := os.ReadFile(certfile)
 	assert.Nil(t, err)
 
 	block, _ := pem.Decode([]byte(certdata))
@@ -71,7 +70,7 @@ func TestSavePrivKeyCert(t *testing.T) {
 	assert.NotNil(t, cert)
 	assert.NotNil(t, key)
 
-	dir, err := ioutil.TempDir("", "test-cert")
+	dir, err := os.MkdirTemp("", "test-cert")
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
@@ -93,7 +92,7 @@ func TestCASignTLSCert(t *testing.T) {
 	clusHelper = &mockCluster
 
 	// Generate CA
-	dir, err := ioutil.TempDir("", "test-cert")
+	dir, err := os.MkdirTemp("", "test-cert")
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
@@ -121,7 +120,7 @@ func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 
-	dir, err := ioutil.TempDir("", "test-cert")
+	dir, err := os.MkdirTemp("", "test-cert")
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
@@ -140,17 +139,17 @@ func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	VerifyCert(t, "CN", certfile, certfile, keyfile)
 
 	// Run again. The existing certs should be reused.
-	keydata, err := ioutil.ReadFile(keyfile)
+	keydata, err := os.ReadFile(keyfile)
 	assert.Nil(t, err)
-	certdata, err := ioutil.ReadFile(certfile)
+	certdata, err := os.ReadFile(certfile)
 	assert.Nil(t, err)
 
 	err = GenTlsCertWithCaAndStoreInKv("CN", certfile, keyfile, "", "", ValidityPeriod{Year: 1})
 	assert.Nil(t, err)
 
-	keydata2, err := ioutil.ReadFile(keyfile)
+	keydata2, err := os.ReadFile(keyfile)
 	assert.Nil(t, err)
-	certdata2, err := ioutil.ReadFile(certfile)
+	certdata2, err := os.ReadFile(certfile)
 	assert.Nil(t, err)
 
 	assert.Equal(t, keydata, keydata2)
@@ -164,7 +163,7 @@ func TestGenTlsCertWithCaAndStoreInKv_WithCA(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 
-	dir, err := ioutil.TempDir("", "test-cert")
+	dir, err := os.MkdirTemp("", "test-cert")
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
@@ -186,17 +185,17 @@ func TestGenTlsCertWithCaAndStoreInKv_WithCA(t *testing.T) {
 	VerifyCert(t, "CN", cacertfile, certfile, keyfile)
 
 	// Run again. The existing CA should be kept.
-	cakeydata, err := ioutil.ReadFile(cakeyfile)
+	cakeydata, err := os.ReadFile(cakeyfile)
 	assert.Nil(t, err)
-	cacertdata, err := ioutil.ReadFile(cacertfile)
+	cacertdata, err := os.ReadFile(cacertfile)
 	assert.Nil(t, err)
 
 	err = CreateCAFilesAndStoreInKv(cacertfile, cakeyfile)
 	assert.Nil(t, err)
 
-	cakeydata2, err := ioutil.ReadFile(cakeyfile)
+	cakeydata2, err := os.ReadFile(cakeyfile)
 	assert.Nil(t, err)
-	cacertdata2, err := ioutil.ReadFile(cacertfile)
+	cacertdata2, err := os.ReadFile(cacertfile)
 	assert.Nil(t, err)
 
 	assert.Equal(t, cakeydata, cakeydata2)
@@ -244,7 +243,7 @@ func TestExistingCAFiles(t *testing.T) {
 	clusHelper = &mockCluster
 
 	// Generate CA
-	dir, err := ioutil.TempDir("", "test-cert")
+	dir, err := os.MkdirTemp("", "test-cert")
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
@@ -262,9 +261,9 @@ func TestExistingCAFiles(t *testing.T) {
 	assert.Nil(t, kvcert)
 
 	// 2. Make sure the data is consistent among kv and fs after rerun CreateCAFilesAndStoreInKv().
-	cakeydata, err := ioutil.ReadFile(cakeyfile)
+	cakeydata, err := os.ReadFile(cakeyfile)
 	assert.Nil(t, err)
-	cacertdata, err := ioutil.ReadFile(cacertfile)
+	cacertdata, err := os.ReadFile(cacertfile)
 	assert.Nil(t, err)
 
 	err = CreateCAFilesAndStoreInKv(cacertfile, cakeyfile)

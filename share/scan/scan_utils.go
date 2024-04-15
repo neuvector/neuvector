@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,7 +129,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			}
 			hasPackage = true
 		} else if lib == DpkgStatusDir {
-			dpkgfiles, err := ioutil.ReadDir(path)
+			dpkgfiles, err := os.ReadDir(path)
 			if err != nil {
 				continue
 			}
@@ -547,7 +546,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	defer os.Remove(fileName) // clean up
 
 	apps := NewScanApps(true)
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "scan_lambda")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "scan_lambda")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Create temp directory fail")
 		return nil, err
@@ -563,7 +562,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 			}
 			defer zFile.Close()
 
-			tmpfile, err := ioutil.TempFile(tmpDir, "extract")
+			tmpfile, err := os.CreateTemp(tmpDir, "extract")
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "filename": file.Name}).Error("write to temp file fail")
 				continue

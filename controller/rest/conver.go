@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -135,7 +135,7 @@ func handlerConverEndpointConfig(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTConversationEndpointConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -254,7 +254,7 @@ func handlerConverShow(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	from := ps.ByName("from")
 	to := ps.ByName("to")
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTConversationQueryData
 	err := json.Unmarshal(body, &data)

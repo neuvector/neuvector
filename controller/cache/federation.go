@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -139,7 +138,7 @@ func serializeFile(fileName string, dataBase64 string) {
 		_, err := os.Stat(fileName)
 		if err != nil && os.IsNotExist(err) {
 			if data, err := base64.StdEncoding.DecodeString(dataBase64); err == nil {
-				if err = ioutil.WriteFile(fileName, data, 0600); err == nil {
+				if err = os.WriteFile(fileName, data, 0600); err == nil {
 					return
 				} else {
 					log.WithFields(log.Fields{"error": err, "path": fileName}).Error("serialize")

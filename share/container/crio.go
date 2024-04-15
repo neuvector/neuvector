@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,7 +60,7 @@ func getPauseImageRepoDigests(sys *system.SystemTools) (string, error) {
 	}
 
 	for _, filename := range config_files {
-		dat, err := ioutil.ReadFile(filename)
+		dat, err := os.ReadFile(filename)
 		if err != nil {
 			continue
 		}

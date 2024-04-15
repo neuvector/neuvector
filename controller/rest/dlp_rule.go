@@ -6,7 +6,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -517,7 +517,7 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpSensorConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -606,7 +606,7 @@ func handlerDlpRuleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpRuleConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -924,7 +924,7 @@ func handlerDlpSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpSensorConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -1012,7 +1012,7 @@ func handlerDlpRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpRuleConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -1110,7 +1110,7 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpGroupConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -1596,7 +1596,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTDlpSensorExport
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1703,7 +1703,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvDlpSecurityRuleList
 	var secRule resource.NvDlpSecurityRule
 	var secRules []resource.NvDlpSecurityRule

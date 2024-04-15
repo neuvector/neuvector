@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -667,7 +667,7 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTResponseRuleActionData
 	err := json.Unmarshal(body, &rconf)
@@ -718,7 +718,7 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTResponseRuleConfigData
 	err = json.Unmarshal(body, &rconf)

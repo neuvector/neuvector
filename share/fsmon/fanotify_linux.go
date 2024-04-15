@@ -2,7 +2,6 @@ package fsmon
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -79,7 +78,7 @@ func NewFaNotify(endFaChan chan bool, cb PidLookupCallback, sys *system.SystemTo
 }
 
 func (fn *FaNotify) checkConfigPerm() bool {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "fan_test")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "fan_test")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FMON: Create temp directory fail")
 		return false

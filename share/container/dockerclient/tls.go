@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
@@ -13,15 +13,15 @@ import (
 // path is usually what is set by the environment variable `DOCKER_CERT_PATH`,
 // or `$HOME/.docker`.
 func TLSConfigFromCertPath(path string) (*tls.Config, error) {
-	cert, err := ioutil.ReadFile(filepath.Join(path, "cert.pem"))
+	cert, err := os.ReadFile(filepath.Join(path, "cert.pem"))
 	if err != nil {
 		return nil, err
 	}
-	key, err := ioutil.ReadFile(filepath.Join(path, "key.pem"))
+	key, err := os.ReadFile(filepath.Join(path, "key.pem"))
 	if err != nil {
 		return nil, err
 	}
-	ca, err := ioutil.ReadFile(filepath.Join(path, "ca.pem"))
+	ca, err := os.ReadFile(filepath.Join(path, "ca.pem"))
 	if err != nil {
 		return nil, err
 	}

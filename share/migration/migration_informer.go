@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -72,13 +71,13 @@ func verifyCert(cacert []byte, cert []byte, key []byte) error {
 }
 
 func GetCurrentInternalCerts() (cacert []byte, cert []byte, key []byte, err error) {
-	if cacert, err = ioutil.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCACert)); err != nil {
+	if cacert, err = os.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCACert)); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read cacert: %w", err)
 	}
-	if cert, err = ioutil.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCert)); err != nil {
+	if cert, err = os.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCert)); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read cert: %w", err)
 	}
-	if key, err = ioutil.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCertKey)); err != nil {
+	if key, err = os.ReadFile(path.Join(cluster.InternalCertDir, cluster.InternalCertKey)); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read key: %w", err)
 	}
 	return
@@ -89,13 +88,13 @@ func ReloadCert(cacert []byte, cert []byte, key []byte) error {
 		return fmt.Errorf("invalid key/cert: %w", err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCACert), []byte(cacert), 0600); err != nil {
+	if err := os.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCACert), []byte(cacert), 0600); err != nil {
 		return fmt.Errorf("failed to write cacert: %w", err)
 	}
-	if err := ioutil.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCert), []byte(cert), 0600); err != nil {
+	if err := os.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCert), []byte(cert), 0600); err != nil {
 		return fmt.Errorf("failed to write cert: %w", err)
 	}
-	if err := ioutil.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCertKey), []byte(key), 0600); err != nil {
+	if err := os.WriteFile(path.Join(cluster.InternalCertDir, cluster.InternalCertKey), []byte(key), 0600); err != nil {
 		return fmt.Errorf("failed to write key: %w", err)
 	}
 	return nil

@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"fmt"
 	"net"

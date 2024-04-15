@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -42,7 +41,7 @@ func qword(data []byte, index int) uint64 {
 }
 
 func getStructureTable() ([]byte, error) {
-	data, err := ioutil.ReadFile("/sys/firmware/dmi/tables/DMI")
+	data, err := os.ReadFile("/sys/firmware/dmi/tables/DMI")
 	if err != nil {
 		return nil, err
 	}
