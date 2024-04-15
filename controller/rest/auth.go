@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	mathRand "math/rand"
 	"net/http"
@@ -2148,7 +2148,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		remote = r.RemoteAddr
 	} else {
 		// Read body
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 
 		err := json.Unmarshal(body, &auth)
 		if err != nil || auth.Password == nil {
@@ -2371,7 +2371,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err = json.Unmarshal(body, &auth)
 	if err != nil || auth.MasterToken == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -2442,7 +2442,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTAuthData
 	err := json.Unmarshal(body, &data)

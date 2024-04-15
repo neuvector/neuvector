@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -3186,7 +3186,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTGroupExport
 
 	err := json.Unmarshal(body, &rconf)

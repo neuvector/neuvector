@@ -19,7 +19,6 @@ import (
 	"hash/crc32"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
 	"math/big"
 	mathrand "math/rand"
 	"net"
@@ -203,7 +202,7 @@ func GunzipBytes(buf []byte) []byte {
 		return nil
 	}
 	defer r.Close()
-	uzb, _ := ioutil.ReadAll(r)
+	uzb, _ := io.ReadAll(r)
 	return uzb
 }
 

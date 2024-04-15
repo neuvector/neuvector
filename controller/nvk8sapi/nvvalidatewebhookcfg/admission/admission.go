@@ -2,7 +2,7 @@ package nvsysadmission
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -656,7 +656,7 @@ func GetCustomCriteriaTemplates() []*api.RESTAdminCriteriaTemplate {
 	}
 
 	for k, v := range sources {
-		bytesData, err := ioutil.ReadFile(v)
+		bytesData, err := os.ReadFile(v)
 		if err != nil {
 			return templates
 		}

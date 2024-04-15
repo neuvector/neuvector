@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -2004,8 +2004,8 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 					b1 := md5.Sum([]byte(cert.Cert))
 					b2 := md5.Sum([]byte(certExisting.Cert))
 					log.WithFields(log.Fields{"cn": cn, "certIn": hex.EncodeToString(b1[:]), "certExisting": hex.EncodeToString(b2[:])}).Info("md5")
-					err1 := ioutil.WriteFile(keyPath, []byte(certExisting.Key), 0600)
-					err2 := ioutil.WriteFile(certPath, []byte(certExisting.Cert), 0600)
+					err1 := os.WriteFile(keyPath, []byte(certExisting.Key), 0600)
+					err2 := os.WriteFile(certPath, []byte(certExisting.Cert), 0600)
 					if err1 == nil && err2 == nil {
 						return nil
 					} else {

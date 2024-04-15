@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -1171,8 +1170,8 @@ func restoreKeyCertFromOldKvKey(certSvcNames []string, svcName, cn, keyPath, cer
 	if err := clusHelper.PutObjectCert(cn, keyPath, certPath, cert); err == nil {
 		if cn == share.CLUSRootCAKey && len(cert.Key) > 0 && len(cert.Cert) > 0 {
 			certData := []byte(cert.Cert)
-			err1 := ioutil.WriteFile(keyPath, []byte(cert.Key), 0600)
-			err2 := ioutil.WriteFile(certPath, certData, 0600)
+			err1 := os.WriteFile(keyPath, []byte(cert.Key), 0600)
+			err2 := os.WriteFile(certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
 				return true
 			} else {
@@ -1290,8 +1289,8 @@ func ValidateWebhookCert() {
 						}
 					} else {
 						if cert != nil {
-							err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
-							err2 := ioutil.WriteFile(certInfo.certPath, []byte(cert.Cert), 0600)
+							err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
+							err2 := os.WriteFile(certInfo.certPath, []byte(cert.Cert), 0600)
 							log.WithFields(log.Fields{"err1": err1, "err2": err2}).Info()
 						}
 					}
@@ -1314,8 +1313,8 @@ func ValidateWebhookCert() {
 		}
 		if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); !cert.IsEmpty() {
 			certData := []byte(cert.Cert)
-			err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
-			err2 := ioutil.WriteFile(certInfo.certPath, certData, 0600)
+			err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
+			err2 := os.WriteFile(certInfo.certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
 				if certInfo.cn != share.CLUSRootCAKey {
 					if orchPlatform == share.PlatformKubernetes {

@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -98,7 +98,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserData
 	err := json.Unmarshal(body, &rconf)
@@ -463,7 +463,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	fullname, _ = url.PathUnescape(fullname)
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -720,7 +720,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var errMsg string
 	var rconf api.RESTUserPwdConfigData
@@ -867,7 +867,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserRoleDomainsConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1188,7 +1188,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTApikeyCreationData
 	err := json.Unmarshal(body, &rconf)

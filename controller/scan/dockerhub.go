@@ -3,7 +3,7 @@ package scan
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 
 	"github.com/neuvector/neuvector/share"
@@ -58,7 +58,7 @@ func (r dockerhub) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 	}
 
 	var regQuery dockerhubRegistryQuery
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

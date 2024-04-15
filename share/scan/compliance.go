@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -2481,7 +2480,7 @@ func GetK8sCISFolder(platform, flavor string, inProductionK8s bool) string {
 }
 
 func processYAMLFile(path string) error {
-	fileContent, err := ioutil.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error reading file")
 		return err
