@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
@@ -161,7 +160,7 @@ func (t *regTracer) SendRequest(method, url string) {
 }
 
 func (t *regTracer) GotResponse(statusCode int, status string, header http.Header, body io.ReadCloser) io.Reader {
-	c, _ := ioutil.ReadAll(body)
+	c, _ := io.ReadAll(body)
 	body.Close()
 
 	t.steps = append(t.steps, &api.RESTRegistryTestStep{
@@ -231,7 +230,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	var data api.RESTRegistryTestData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var err error
 
 	if getRequestApiVersion(r) == ApiVersion2 {

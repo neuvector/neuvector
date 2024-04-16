@@ -19,7 +19,6 @@ import (
 	"hash/crc32"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
 	"math/big"
 	mathrand "math/rand"
 	"net"
@@ -203,7 +202,7 @@ func GunzipBytes(buf []byte) []byte {
 		return nil
 	}
 	defer r.Close()
-	uzb, _ := ioutil.ReadAll(r)
+	uzb, _ := io.ReadAll(r)
 	return uzb
 }
 
@@ -251,6 +250,44 @@ func CompareSliceWithoutOrder(a, b interface{}) bool {
 
 // ---
 
+func parseQuery(query string) (map[string][]string, error) {
+	var err error
+	m := make(map[string][]string)
+
+	for query != "" {
+		key := query
+		if i := strings.IndexAny(key, ";&"); i >= 0 {
+			key, query = key[:i], key[i+1:]
+		} else {
+			query = ""
+		}
+		if key == "" {
+			continue
+		}
+		value := ""
+		if i := strings.Index(key, "="); i >= 0 {
+			key, value = key[:i], key[i+1:]
+		}
+		key, err1 := url.QueryUnescape(key)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		value, err1 = url.QueryUnescape(value)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		m[key] = append(m[key], value)
+	}
+
+	return m, err
+}
+
 type EnvironParser struct {
 	kvPairs     map[string]string
 	platformEnv map[string][]string
@@ -273,7 +310,7 @@ func NewEnvironParser(envs []string) *EnvironParser {
 				switch k {
 				case share.ENV_PLATFORM_INFO:
 					// platform=aliyun;if-eth0=local;if-eth1=global
-					p.platformEnv, _ = url.ParseQuery(v)
+					p.platformEnv, _ = parseQuery(v)
 				case share.ENV_SYSTEM_GROUPS:
 					// NV_SYSTEM_GROUPS=ucp-*;calico-*
 					p.sysGroups = make([]*regexp.Regexp, 0)

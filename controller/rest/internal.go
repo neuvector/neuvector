@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -46,7 +46,7 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	var rconf api.RESTAcceptedAlerts
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

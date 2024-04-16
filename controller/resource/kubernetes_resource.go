@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"reflect"
@@ -839,12 +838,12 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 		r.HostNet = o.Spec.HostNetwork
 		for _, c := range o.Spec.Containers {
 			if c.LivenessProbe != nil {
-				if exec := c.LivenessProbe.Handler.Exec; exec != nil {
+				if exec := c.LivenessProbe.ProbeHandler.Exec; exec != nil {
 					r.LivenessCmds = append(r.LivenessCmds, exec.Command)
 				}
 			}
 			if c.ReadinessProbe != nil {
-				if exec := c.ReadinessProbe.Handler.Exec; exec != nil {
+				if exec := c.ReadinessProbe.ProbeHandler.Exec; exec != nil {
 					r.ReadinessCmds = append(r.ReadinessCmds, exec.Command)
 				}
 			}
@@ -1537,7 +1536,7 @@ func getVersion(url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("Read data fail")
 		return "", err
@@ -1727,7 +1726,8 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 }
 
 // revertCount: how many times the ValidatingWebhookConfiguration resource has been reverted by this controller.
-//              if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
+//
+//	if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool, revertCount *uint32,
 	unexpectedMatchKeys utils.Set) bool {
 

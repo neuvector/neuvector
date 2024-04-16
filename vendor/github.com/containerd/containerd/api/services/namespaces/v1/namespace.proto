@@ -1,8 +1,23 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
 syntax = "proto3";
 
 package containerd.services.namespaces.v1;
 
-import weak "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 
@@ -44,7 +59,7 @@ message GetNamespaceRequest {
 }
 
 message GetNamespaceResponse {
-	Namespace namespace = 1 [(gogoproto.nullable) = false];
+	Namespace namespace = 1;
 }
 
 message ListNamespacesRequest {
@@ -52,15 +67,15 @@ message ListNamespacesRequest {
 }
 
 message ListNamespacesResponse {
-	repeated Namespace namespaces = 1 [(gogoproto.nullable) = false];
+	repeated Namespace namespaces = 1;
 }
 
 message CreateNamespaceRequest {
-	Namespace namespace = 1 [(gogoproto.nullable) = false];
+	Namespace namespace = 1;
 }
 
 message CreateNamespaceResponse {
-	Namespace namespace = 1 [(gogoproto.nullable) = false];
+	Namespace namespace = 1;
 }
 
 // UpdateNamespaceRequest updates the metadata for a namespace.
@@ -72,7 +87,7 @@ message UpdateNamespaceRequest {
 	// Namespace provides the target value, as declared by the mask, for the update.
 	//
 	// The namespace field must be set.
-	Namespace namespace = 1 [(gogoproto.nullable) = false];
+	Namespace namespace = 1;
 
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
@@ -84,7 +99,7 @@ message UpdateNamespaceRequest {
 }
 
 message UpdateNamespaceResponse {
-	Namespace namespace = 1 [(gogoproto.nullable) = false];
+	Namespace namespace = 1;
 }
 
 message DeleteNamespaceRequest {

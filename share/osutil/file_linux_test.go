@@ -1,7 +1,6 @@
 package osutil
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -480,7 +479,7 @@ func TestGetContainerRealFilePath(t *testing.T) {
 	// 2. abs path for symlink
 	// 3. append another layer on type 1, make it a nest link
 	// 4. circular link
-	tempDir, err := ioutil.TempDir("", "proc")
+	tempDir, err := os.MkdirTemp("", "proc")
 	if err != nil {
 		t.Fatal(err)
 	}

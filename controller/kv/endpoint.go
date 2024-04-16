@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -316,7 +315,7 @@ func (ep cfgEndpoint) backup(fedRole string) error {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("Failed to walk directory")
 	}
 
-	tmpfile, err := ioutil.TempFile(configBackupDir, prefix)
+	tmpfile, err := os.CreateTemp(configBackupDir, prefix)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create temp. file")
 		return err

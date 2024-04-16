@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -568,7 +568,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTGroupConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -670,7 +670,7 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTGroupConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -962,7 +962,7 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1048,7 +1048,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1468,7 +1468,7 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1571,7 +1571,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1755,7 +1755,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvSecurityRuleList
 	var secRule resource.NvSecurityRule
 	var secRules []resource.NvSecurityRule

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -27,7 +27,7 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rootOfTrust api.REST_SigstoreRootOfTrust_POST
 	err := json.Unmarshal(body, &rootOfTrust)
 	if err != nil {
@@ -148,7 +148,7 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var restRootOfTrust api.REST_SigstoreRootOfTrust_PATCH
 	err = json.Unmarshal(body, &restRootOfTrust)
 	if err != nil {
@@ -269,7 +269,7 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var verifier api.REST_SigstoreVerifier
 	err := json.Unmarshal(body, &verifier)
 	if err != nil {
@@ -394,7 +394,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var restVerifier api.REST_SigstoreVerifier_PATCH
 	err = json.Unmarshal(body, &restVerifier)
 	if err != nil {

@@ -450,7 +450,7 @@ func ConsulGet(url string) (string, bool) {
 	log.Printf("Status of Get %s %d for %s", resp.Status, resp.StatusCode, url)
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		var jsonBody []consulBody
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		err = json.Unmarshal(body, &jsonBody)
 		existingValue, err := b64.StdEncoding.DecodeString(jsonBody[0].Value)
 		if err != nil {
@@ -494,7 +494,7 @@ func GetAll(store string) ([][]byte, []int, bool) {
 		var jsonBody []consulBody
 		valueArr := make([][]byte, 0)
 		indexArr := make([]int, 0)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		err = json.Unmarshal(body, &jsonBody)
 		for _, body := range jsonBody {
 			existingValue, _ := b64.StdEncoding.DecodeString(body.Value)

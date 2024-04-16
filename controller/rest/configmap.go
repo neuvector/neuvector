@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -422,7 +421,7 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 
 	var profile share.CLUSPwdProfile
 	if _, err := os.Stat(pwdprofileconfigmap); err == nil {
-		if profileyaml_data, err := ioutil.ReadFile(pwdprofileconfigmap); err == nil {
+		if profileyaml_data, err := os.ReadFile(pwdprofileconfigmap); err == nil {
 			if json_data, err := yaml.YAMLToJSON(profileyaml_data); err == nil {
 				var rconf api.RESTPwdProfilesDataCfgMap
 				if err := json.Unmarshal(json_data, &rconf); err == nil {
@@ -791,7 +790,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 
 func HandleAdminUserUpdate() {
 	if _, err := os.Stat(authconfigmap); err == nil {
-		if useryaml_data, err := ioutil.ReadFile(authconfigmap); err == nil {
+		if useryaml_data, err := os.ReadFile(authconfigmap); err == nil {
 			json_data, err1 := yaml.YAMLToJSON(useryaml_data)
 			if err1 != nil {
 				log.WithFields(log.Fields{"error": err1}).Error("user config to json convert error")
@@ -866,7 +865,7 @@ func LoadInitCfg(load bool, platform string) {
 		var errMsg string
 		context.subDetail = ""
 		if _, err := os.Stat(configMap.FileName); err == nil {
-			if yaml_data, err := ioutil.ReadFile(configMap.FileName); err == nil {
+			if yaml_data, err := os.ReadFile(configMap.FileName); err == nil {
 				skip = false
 				err = configMap.HandlerFunc(yaml_data, load, &skip, &context)
 				log.WithFields(log.Fields{"cfg": configMap.Type, "skip": skip, "error": err}).Debug()

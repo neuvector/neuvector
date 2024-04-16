@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -1392,7 +1392,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -1555,7 +1555,7 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 
 	if clientAuth {
 		clientCACert := tlsClientCA
-		caCert, err := ioutil.ReadFile(clientCACert)
+		caCert, err := os.ReadFile(clientCACert)
 		if err != nil {
 			log.WithFields(log.Fields{"svcName": svcName}).Info("Cannot load CA cert for client authentication")
 			log.Fatal(err)

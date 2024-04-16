@@ -3,7 +3,7 @@ package resource
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -116,7 +116,7 @@ var ocReaderVerbs utils.Set = utils.NewSet(
 )
 
 // Rancher SSO: apiGroup									resources		verbs
-//------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // fedAdmin:    in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
 // fedReader:   in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"get}   // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
 // admin:       in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // clusterrole(with clusterrolebinding)
@@ -1465,7 +1465,7 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	cacheEventFunc = objFunc
 	nvControllerSA := ctrlerSubjectWanted
 	filePath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	if data, err := ioutil.ReadFile(filePath); err == nil {
+	if data, err := os.ReadFile(filePath); err == nil {
 		if sa, err := GetSaFromJwtToken(string(data)); err == nil {
 			nvControllerSA = sa
 		}

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -219,7 +219,7 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTComplianceProfileConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -301,7 +301,7 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTComplianceProfileEntryConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -426,7 +426,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	var rconf api.RESTCompProfilesExport
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err == nil {
 		for _, name := range rconf.Names {
@@ -531,7 +531,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule
 	var secRules []resource.NvCompProfileSecurityRule = []resource.NvCompProfileSecurityRule{}
