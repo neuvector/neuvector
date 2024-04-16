@@ -1288,6 +1288,20 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 	}
 }
 
+func isMultiNetworkContainer(c *containerData) bool {
+	if c.intcpPairs != nil {
+		if len(c.intcpPairs) < 2 {
+			return false
+		}
+		for _, pair := range c.intcpPairs {
+			if pair.Peer == "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
 	if c.hostMode {
 		return nil, errHostModeUnsupported
@@ -1319,7 +1333,7 @@ func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, err
 }
 
 func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
-	if driver == pipe.PIPE_CLM {
+	if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 		return programNfqPorts(c, restore)
 	}
 	// Platform containers' interfaces should be inspected, so instead of check against hasDatapath,
@@ -1371,7 +1385,7 @@ func programBridge(c *containerData) {
 		for _, pair := range c.intcpPairs {
 			pipe.ResetPortPair(c.pid, pair)
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, true)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create quarantine iptable rules")
@@ -1381,14 +1395,14 @@ func programBridge(c *containerData) {
 		for _, pair := range c.intcpPairs {
 			pipe.FwdPortPair(c.pid, pair)
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, false)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
 			}
 		}
 	} else {
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, false)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
@@ -1482,7 +1496,7 @@ func programBridgeNoTc(c *containerData) {
 }
 
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
-	if driver == pipe.PIPE_CLM {
+	if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 		programNfqDP(c, cfgApp, macChangePairs)
 		return
 	}
@@ -2101,7 +2115,7 @@ func taskStopContainer(id string, pid int) {
 		prober.StopMonitorInterface(id)
 
 		if c.inline || c.quar {
-			if driver != pipe.PIPE_CLM {
+			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				pipe.CleanupContainer(c.pid, c.intcpPairs)
 			}
 			for _, pair := range c.intcpPairs {
@@ -2116,7 +2130,7 @@ func taskStopContainer(id string, pid int) {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
@@ -2364,7 +2378,7 @@ func containerTaskExit() {
 
 		prober.StopMonitorInterface(c.id)
 		if c.inline || c.quar {
-			if driver != pipe.PIPE_CLM {
+			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
 				pipe.RestoreContainer(c.pid, c.intcpPairs)
 			}
@@ -2389,7 +2403,7 @@ func containerTaskExit() {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
