@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -2493,7 +2492,7 @@ func GetCISFolder(platform, flavor string) {
 }
 
 func processCISBenchmarkYAML(path string, cis_bench_items map[string]api.RESTBenchCheck, benchComplianceSets map[string]map[string]bool) error {
-	fileContent, err := ioutil.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error reading file")
 		return err
