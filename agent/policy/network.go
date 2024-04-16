@@ -765,7 +765,7 @@ func addWlGlobalAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrM
 func addWlHostModeAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrMap map[string]share.CLUSSubnet) {
 	for _, nip := range from.NatIP {
 		nipnet := &net.IPNet{IP: nip, Mask: net.CIDRMask(32, 32)}
-		log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("@gfeng add hostmode nat ip")
+		//log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("add hostmode nat ip")
 		addPolicyAddrIPNet(newPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
 	}
 }
