@@ -173,6 +173,7 @@ type registryDriver interface {
 	GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode)
 	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult
 	SetConfig(cfg *share.CLUSRegistryConfig)
+	SetProxy()
 	SetTracer(tracer httptrace.HTTPTrace)
 	GetTracer() httptrace.HTTPTrace
 }
@@ -208,10 +209,14 @@ func (r *base) SetConfig(cfg *share.CLUSRegistryConfig) {
 	r.scanLayers = cfg.ScanLayers
 	r.scanSecrets = !cfg.DisableFiles
 	r.ignoreProxy = cfg.IgnoreProxy
+	r.SetProxy()
+}
+
+func (r *base) SetProxy() {
 	if r.ignoreProxy {
 		r.proxy = ""
 	} else {
-		r.proxy = GetProxy(cfg.Registry)
+		r.proxy = GetProxy(r.regURL)
 	}
 }
 
