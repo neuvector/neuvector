@@ -764,6 +764,18 @@ func isCveScoreCountCriterionMet(crt *share.CLUSAdmRuleCriterion, highVulInfo, m
 func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (bool, bool) {
 	if valueSet.Cardinality() > 0 {
 		switch crt.Op {
+		case share.CriteriaOpRegex, share.CriteriaOpNotRegex:
+			if regex, err := regexp.Compile(crt.Value); err == nil {
+				for value := range valueSet.Iter() {
+					if regex.MatchString(value.(string)) {
+						if crt.Op == share.CriteriaOpRegex {
+							return true, true
+						} else {
+							return false, false
+						}
+					}
+				}
+			}
 		case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
 			share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
 			for _, crtValue := range crt.ValueSlice {
@@ -829,9 +841,9 @@ func isSetCriterionMet(crt *share.CLUSAdmRuleCriterion, valueSet utils.Set) (boo
 		} else {
 			return false, true
 		}
-	case share.CriteriaOpContainsAny, share.CriteriaOpRegexContainsAny:
+	case share.CriteriaOpContainsAny, share.CriteriaOpRegexContainsAny, share.CriteriaOpRegex:
 		return false, true
-	case share.CriteriaOpNotContainsAny, share.CriteriaOpRegexNotContainsAny:
+	case share.CriteriaOpNotContainsAny, share.CriteriaOpRegexNotContainsAny, share.CriteriaOpNotRegex:
 		return true, false
 	case share.CriteriaOpContainsOtherThan:
 		return false, true
