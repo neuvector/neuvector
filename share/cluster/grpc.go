@@ -111,8 +111,6 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		return nil, err
 	}
 
-	fmt.Println(options)
-
 	s := GRPCServer{
 		stopped: true,
 		listen:  listen,
