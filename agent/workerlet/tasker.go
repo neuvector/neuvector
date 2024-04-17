@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,7 +75,7 @@ func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 		if _, err := os.Stat(workingPath); err != nil { // not existed
 			args = append(args, "-u", uid)
 			os.MkdirAll(workingPath, os.ModePerm)
-			if err = ioutil.WriteFile(filepath.Join(workingPath, RequestJson), data, 0644); err == nil {
+			if err = os.WriteFile(filepath.Join(workingPath, RequestJson), data, 0644); err == nil {
 				return workingPath, args, nil
 			}
 		}
@@ -86,7 +86,7 @@ func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 func (ts *Tasker) openResult(workingFolder, file string) ([]byte, error) {
 	jsonFile, err := os.Open(filepath.Join(workingFolder, file))
 	if err == nil {
-		byteValue, _ := ioutil.ReadAll(jsonFile)
+		byteValue, _ := io.ReadAll(jsonFile)
 		jsonFile.Close()
 		return byteValue, nil
 	}

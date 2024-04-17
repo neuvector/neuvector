@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -437,7 +437,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTAdmissionConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -955,7 +955,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &confData)
 	if err != nil || confData.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1116,7 +1116,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 	code := 0
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &confData)
 	ruleCfg := confData.Config
 	if err != nil || confData.Config == nil {
@@ -1355,7 +1355,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var rconf api.RESTAdmCtrlRulesExport
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1474,7 +1474,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRule resource.NvAdmCtrlSecurityRule
 	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
@@ -1564,7 +1564,7 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	var promoteData api.RESTAdmCtrlPromoteRequestData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &promoteData)
 	if err != nil || promoteData.Request == nil || len(promoteData.Request.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

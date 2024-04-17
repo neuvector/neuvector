@@ -10,7 +10,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"strconv"
@@ -119,11 +118,11 @@ cleanup:
 // If data is not consistent, the data in kv will be used and files in keyPath and certPath will be modified.
 func StoreKeyCertFilesInKV(kvkey string, certPath string, keyPath string) error {
 	log.Info("store key/cert in new kv")
-	certData, err := ioutil.ReadFile(certPath)
+	certData, err := os.ReadFile(certPath)
 	if err != nil {
 		return fmt.Errorf("failed to read ca cert: %w", err)
 	}
-	keyData, err := ioutil.ReadFile(keyPath)
+	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read ca key: %w", err)
 	}
@@ -490,8 +489,8 @@ func GetFedCaCertPath(masterID string) (string, error) { // returns caCertPath
 	var caCertData []byte
 	var err error
 	caCertPath := fmt.Sprintf("/etc/neuvector/certs/fed.master.%s.cert.pem", masterID)
-	if caCertData, err = ioutil.ReadFile(AdmCACertPath); err == nil {
-		if err = ioutil.WriteFile(caCertPath, caCertData, 0600); err == nil {
+	if caCertData, err = os.ReadFile(AdmCACertPath); err == nil {
+		if err = os.WriteFile(caCertPath, caCertData, 0600); err == nil {
 			return caCertPath, nil
 		} else {
 			log.WithFields(log.Fields{"error": err, "cert": caCertPath}).Error("failed to write")

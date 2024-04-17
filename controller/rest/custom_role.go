@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -181,7 +181,7 @@ func handlerRoleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserRoleConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -244,7 +244,7 @@ func handlerRoleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserRoleConfigData
 	err := json.Unmarshal(body, &rconf)

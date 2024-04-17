@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	//"math/rand"
 	"mime"
@@ -485,7 +485,7 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	switch action {
 	case "configuration":
 		err = json.Unmarshal(body, &cfg)
@@ -611,7 +611,7 @@ func ibmsaGetToken(cfg *share.CLUSIBMSAConfig) (string, error) {
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"url": cfg.TokenURL, "error": err}).Error("Failed to read IAM token")
 		return "", err
@@ -669,7 +669,7 @@ func ibmsaCreateOccurence(url string, value []byte, cfg *share.CLUSIBMSAConfig) 
 
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"url": url, "error": err}).Error("Failed to read body")
 		return err
@@ -781,7 +781,7 @@ func ibmsaGetNvNote(accessToken, noteID string, cfg *share.CLUSIBMSAConfig) erro
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"url": url, "error": err}).Error("Failed to read NV note")
 		return err
@@ -931,7 +931,7 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err = json.Unmarshal(body, &occur)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")

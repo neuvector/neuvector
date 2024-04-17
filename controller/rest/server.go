@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -386,7 +386,7 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTTokenRedirect
 	err := json.Unmarshal(body, &data)
@@ -1006,7 +1006,7 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1285,7 +1285,7 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1403,7 +1403,7 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 	role := ps.ByName("role")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerRoleGroupsConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1543,7 +1543,7 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 	group := ps.ByName("group")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerGroupRoleDomainsConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1747,7 +1747,7 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerGroupsOrderConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1903,7 +1903,7 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServerTestData
 	err := json.Unmarshal(body, &rconf)

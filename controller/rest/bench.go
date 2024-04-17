@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -296,7 +296,7 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTCustomCheckConfigData
 	err := json.Unmarshal(body, &rconf)

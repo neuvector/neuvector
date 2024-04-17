@@ -3,7 +3,6 @@ package kv
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -43,7 +42,7 @@ func writeRegistryImageSummary(name, id string, dat []byte) error {
 		os.MkdirAll(path, 0755)
 	}
 	filename := registryImageSummaryFileName(name, id)
-	if err := ioutil.WriteFile(filename, dat, 0755); err != nil {
+	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
 	}
@@ -56,7 +55,7 @@ func writeRegistryImageReport(name, id string, dat []byte) error {
 		os.MkdirAll(path, 0755)
 	}
 	filename := registryImageReportFileName(name, id)
-	if err := ioutil.WriteFile(filename, dat, 0755); err != nil {
+	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
 	}
@@ -75,7 +74,7 @@ func deleteRegistryImageReport(name, id string) error {
 
 func readRegistryImageSummary(name, id string) ([]byte, error) {
 	filename := registryImageSummaryFileName(name, id)
-	if dat, err := ioutil.ReadFile(filename); err != nil {
+	if dat, err := os.ReadFile(filename); err != nil {
 		return nil, err
 	} else {
 		return dat, nil
@@ -84,7 +83,7 @@ func readRegistryImageSummary(name, id string) ([]byte, error) {
 
 func readRegistryImageReport(name, id string) ([]byte, error) {
 	filename := registryImageReportFileName(name, id)
-	if dat, err := ioutil.ReadFile(filename); err != nil {
+	if dat, err := os.ReadFile(filename); err != nil {
 		return nil, err
 	} else {
 		return dat, nil
@@ -119,7 +118,7 @@ func restoreToCluster(reg, fedRole string) {
 	if !isFedReg || fedRole == api.FedRoleMaster || (fedRole == api.FedRoleJoint && isFedReg) {
 		filepath.Walk(regPath, func(path string, info os.FileInfo, err error) error {
 			if info != nil && strings.HasSuffix(path, summarySuffix) {
-				value, err := ioutil.ReadFile(path)
+				value, err := os.ReadFile(path)
 				if err == nil {
 					var sum share.CLUSRegistryImageSummary
 					if err = json.Unmarshal(value, &sum); err == nil {
@@ -155,7 +154,7 @@ func restoreToCluster(reg, fedRole string) {
 	// 3. Read the report and write both into kv
 	for _, sum := range sums {
 		rptFile := fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix)
-		vReport, vErr := ioutil.ReadFile(rptFile)
+		vReport, vErr := os.ReadFile(rptFile)
 		if vErr == nil {
 			// 3-1. must restore scan/data/image/{reg}/{id} key first !
 			vKey := share.CLUSRegistryImageDataKey(reg, sum.ImageID)
@@ -181,7 +180,7 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 	scanRevs, _, _ := clusHelper.GetFedScanRevisions()
 	if !scanRevs.Restoring {
 		// assign random numbers to RegConfigRev, ScannedRegRevs & ScannedRepoRev on managed clusters so that the first scan data polling is always triggered
-		files, err := ioutil.ReadDir(registryDataDir)
+		files, err := os.ReadDir(registryDataDir)
 		if err != nil {
 			log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Debug("Failed to read registry directory")
 		} else {

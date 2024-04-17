@@ -6,8 +6,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -137,7 +137,7 @@ func ReloadInternalCert() error {
 	certCacheLock.Lock()
 	defer certCacheLock.Unlock()
 	var err error
-	caCert, err := ioutil.ReadFile(path.Join(InternalCertDir, InternalCACert))
+	caCert, err := os.ReadFile(path.Join(InternalCertDir, InternalCACert))
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,5 @@
 package rest
 
-import "C"
-
 import (
 	"encoding/json"
 	"fmt"

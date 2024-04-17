@@ -1,12 +1,9 @@
 package rest
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -412,7 +409,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTWafSensorConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -725,7 +722,7 @@ func handlerWafSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTWafSensorConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -833,7 +830,7 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTWafGroupConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -1030,7 +1027,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTWafSensorExport
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1137,7 +1134,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvWafSecurityRuleList
 	var secRule resource.NvWafSecurityRule
 	var secRules []resource.NvWafSecurityRule

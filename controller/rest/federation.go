@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"mime"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -632,7 +632,7 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cnt
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"url": urlStr, "status": resp.Status, "proxyOption": proxyOption}).Error("Read data fail")
 		return nil, 0, err
@@ -819,7 +819,7 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if logError {
 			log.WithFields(log.Fields{"url": urlStr, "tag": tag, "error": err, "proxyOption": proxyOption, "timeout": httpClient.Timeout}).Error("Read data fail")
@@ -1378,7 +1378,7 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var reqData api.RESTFedConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &reqData); err != nil || (reqData.Name != nil && *reqData.Name == "") ||
 		(reqData.RestInfo != nil && (reqData.RestInfo.Server == "" || reqData.RestInfo.Port == 0)) ||
 		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
@@ -1513,7 +1513,7 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	var restInfo share.CLUSRestServerInfo
 	var useProxy string
 	var msg string
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err = json.Unmarshal(body, &reqData); err != nil || (reqData.UseProxy != nil && *reqData.UseProxy != "" && *reqData.UseProxy != "https") {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1759,7 +1759,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	var specificProxy int8
 	var joinToken joinToken
 	var msgProxy string
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil || (req.UseProxy != nil && *req.UseProxy != "" && *req.UseProxy != "https") {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1850,7 +1850,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 			caCertPath, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
 			if respTo.CACert != "" && respTo.ClientCert != "" && respTo.ClientKey != "" {
 				if caCert, err := base64.StdEncoding.DecodeString(respTo.CACert); err == nil {
-					if err = ioutil.WriteFile(caCertPath, caCert, 0600); err == nil {
+					if err = os.WriteFile(caCertPath, caCert, 0600); err == nil {
 						mtlsAvailable = true
 					}
 				}
@@ -1937,7 +1937,7 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	}
 
 	var req api.RESTFedLeaveReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -2050,7 +2050,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedJoinReqInternal
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	for ok := true; ok; ok = false {
 		if err := json.Unmarshal(body, &reqData); err == nil {
 			masterName := cacher.GetSystemConfigClusterName(accReadAll)
@@ -2117,11 +2117,11 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	_, privKeyPath, certPath := kv.GetFedTlsKeyCertPath("", reqData.JointCluster.ID)
 	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath, kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
 		masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
-		caCertData, err = ioutil.ReadFile(masterCaCertPath)
+		caCertData, err = os.ReadFile(masterCaCertPath)
 		if err == nil {
-			privKeyData, err = ioutil.ReadFile(privKeyPath)
+			privKeyData, err = os.ReadFile(privKeyPath)
 			if err == nil {
-				certData, err = ioutil.ReadFile(certPath)
+				certData, err = os.ReadFile(certPath)
 				if err != nil {
 					log.WithFields(log.Fields{"err": err}).Error("read certData failed")
 				}
@@ -2211,7 +2211,7 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var req api.RESTFedLeaveReqInternal
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil || req.ID == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2248,7 +2248,7 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		if err := json.Unmarshal(body, &req); err == nil {
 			accReadAll := access.NewReaderAccessControl()
 			if jointCluster := cacher.GetFedLocalJointCluster(accReadAll); jointCluster.ID != "" {
@@ -2371,7 +2371,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var req api.RESTDeployFedRulesReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2913,7 +2913,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 	var err error
 	var req api.RESTPollFedRulesReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3033,7 +3033,7 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	ce := r.Header.Get("Content-Encoding")
 
 	var req api.RESTPollFedScanDataReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if ce == "gzip" {
 		body = utils.GunzipBytes(body)
 	}
@@ -3083,7 +3083,7 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var req api.RESTFedInternalCommandReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -3155,7 +3155,7 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var err error
 	var req api.RESTFedCspSupportReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3325,7 +3325,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 		return
 	}
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
 	remoteExport := false
 

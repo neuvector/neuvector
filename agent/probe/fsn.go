@@ -3,7 +3,6 @@ package probe
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -761,7 +760,7 @@ type BtrfsLayerData struct {
 func (fsn *FileNotificationCtr) lookupBtrfsLayerFile(rootPath, sublayer string) (string, error) {
 	// go up 2 layers, then find the "layers.json"
 	file := filepath.Join("/proc/1/root", filepath.Dir(filepath.Dir(rootPath)), "btrfs-layers", "layers.json")
-	value, err := ioutil.ReadFile(file)
+	value, err := os.ReadFile(file)
 	if err == nil {
 		var layers []BtrfsLayerData
 		if err = json.Unmarshal(value, &layers); err == nil {

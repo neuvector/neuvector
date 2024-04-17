@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -50,11 +50,11 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 			dec.Unmarshal(value, &cert)
 
 			if len(cert.Key) > 0 && len(cert.Cert) > 0 {
-				if err := ioutil.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {
+				if err := os.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {
 					certData := []byte(cert.Cert)
 					b := md5.Sum(certData)
 					log.WithFields(log.Fields{"svcName": pathInfo.svcName, "cert": hex.EncodeToString(b[:])}).Info("md5")
-					if err = ioutil.WriteFile(pathInfo.certPath, certData, 0600); err == nil {
+					if err = os.WriteFile(pathInfo.certPath, certData, 0600); err == nil {
 						if localDev.Host.Platform == share.PlatformKubernetes && pathInfo.svcName != share.CLUSRootCAKey {
 							// return value of ResetCABundle() tells us whether remembered cert is different from new cert
 							if admission.ResetCABundle(pathInfo.svcName, certData) {
