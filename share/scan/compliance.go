@@ -2409,7 +2409,7 @@ func InitImageBenchMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	return imageBenchMetas, imageBenchMetaMap
 }
 
-func GetImageBencheMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+func GetImageBenchMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 
 	if imageBenchMetas == nil || imageBenchMetaMap == nil {
 		// if this is still nil, wait for the InitComplianceMeta
