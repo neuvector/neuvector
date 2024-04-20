@@ -11,6 +11,7 @@ func TestSLESPackageList(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
+	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
@@ -36,6 +37,7 @@ func TestUbiPackageList(t *testing.T) {
 	if err != nil {
 		t.Errorf("%s", err.Error())
 	}
+	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {

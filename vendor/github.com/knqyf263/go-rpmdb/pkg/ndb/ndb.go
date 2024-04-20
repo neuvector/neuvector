@@ -126,6 +126,10 @@ func Open(path string) (*RpmNDB, error) {
 	}, nil
 }
 
+func (db *RpmNDB) Close() error {
+	return db.file.Close()
+}
+
 func (db *RpmNDB) Read() <-chan dbi.Entry {
 	entries := make(chan dbi.Entry)
 

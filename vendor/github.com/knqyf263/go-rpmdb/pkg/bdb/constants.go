@@ -3,7 +3,8 @@ package bdb
 const (
 	NoEncryptionAlgorithm = 0
 
-	HashMagicNumber = 0x061561
+	HashMagicNumber   = 0x00061561
+	HashMagicNumberBE = 0x61150600
 
 	// the size (in bytes) of an in-page offset
 	HashIndexEntrySize = 2
