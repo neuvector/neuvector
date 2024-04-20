@@ -2,18 +2,17 @@ package scan
 
 import (
 	"fmt"
-	"sort"
-	"testing"
 	"path/filepath"
-	
+	"testing"
+
 	"github.com/neuvector/neuvector/controller/api"
 )
 
 var (
-	mockComplianceMetas []api.RESTBenchMeta
-	mockComplianceMetaMap map[string]api.RESTBenchMeta
+	mockComplianceMetas   []api.RESTBenchMeta
+	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
+	mockComplianceSets    = make(map[string]map[string]bool)
 )
-
 
 var mock_docker_image_cis_items = map[string]api.RESTBenchCheck{
 	"I.4.1": api.RESTBenchCheck{
@@ -2096,214 +2095,52 @@ var mock_cis_items = map[string]api.RESTBenchCheck{
 	},
 }
 
-var mockComplianceSet = map[string]map[string]bool{
-	api.ComplianceTemplateGDPR: {
-		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
-		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
-		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
-		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
-		"D.1.1.9": true, "D.2.7": true, "D.3.1": true, "D.3.10": true,
-		"D.3.11": true, "D.3.12": true, "D.3.13": true, "D.3.14": true,
-		"D.3.15": true, "D.3.16": true, "D.3.17": true, "D.3.18": true,
-		"D.3.19": true, "D.3.2": true, "D.3.20": true, "D.3.21": true,
-		"D.3.22": true, "D.3.3": true, "D.3.4": true, "D.3.5": true,
-		"D.3.6": true, "D.3.7": true, "D.3.8": true, "D.3.9": true,
-		"K.1.1.1": true, "K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true,
-		"K.1.1.13": true, "K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true,
-		"K.1.1.17": true, "K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true,
-		"K.1.1.20": true, "K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true,
-		"K.1.1.5": true, "K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true,
-		"K.1.1.9": true, "K.1.2.1": true, "K.1.2.18": true, "K.1.2.19": true,
-		"K.1.2.2": true, "K.1.2.20": true, "K.1.2.22": true, "K.1.2.23": true,
-		"K.1.2.24": true, "K.1.2.25": true, "K.1.2.27": true, "K.1.2.28": true,
-		"K.1.2.29": true, "K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true,
-		"K.1.2.32": true, "K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true,
-		"K.1.2.4": true, "K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true,
-		"K.1.2.8": true, "K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true,
-		"K.1.3.5": true, "K.1.3.6": true, "K.2.1": true, "K.2.2": true,
-		"K.2.3": true, "K.2.4": true, "K.2.5": true, "K.2.6": true,
-		// remove GDPR in 4.1.1 for mocking
-		"K.2.7": true, "K.3.2.1": true, "K.3.2.2": true,
-		"K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true, "K.4.1.4": true,
-		"K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true, "K.4.1.8": true,
-		"K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true, "K.4.2.11": true,
-		"K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true, "K.4.2.3": true,
-		"K.4.2.4": true, "K.4.2.6": true,
-	},
-	api.ComplianceTemplateHIPAA: {
-		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
-		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
-		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
-		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
-		"D.1.1.9": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
-		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
-		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
-		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
-		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
-		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
-		"D.3.8": true, "D.3.9": true, "D.5.12": true, "D.5.15": true,
-		"D.5.16": true, "D.5.17": true, "D.5.20": true, "D.5.25": true,
-		"D.5.30": true, "D.5.31": true, "D.5.4": true, "D.5.5": true,
-		"D.5.6": true, "D.5.7": true, "D.5.9": true, "K.1.1.1": true,
-		"K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true, "K.1.1.13": true,
-		"K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true, "K.1.1.17": true,
-		"K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true, "K.1.1.20": true,
-		"K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true, "K.1.1.5": true,
-		"K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true, "K.1.1.9": true,
-		"K.1.2.1": true, "K.1.2.10": true, "K.1.2.11": true, "K.1.2.12": true,
-		"K.1.2.13": true, "K.1.2.14": true, "K.1.2.15": true, "K.1.2.16": true,
-		"K.1.2.17": true, "K.1.2.18": true, "K.1.2.19": true, "K.1.2.2": true,
-		"K.1.2.20": true, "K.1.2.22": true, "K.1.2.23": true, "K.1.2.24": true,
-		"K.1.2.25": true, "K.1.2.27": true, "K.1.2.28": true, "K.1.2.29": true,
-		"K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true, "K.1.2.32": true,
-		"K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true, "K.1.2.4": true,
-		"K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true, "K.1.2.8": true,
-		"K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true, "K.1.3.5": true,
-		"K.1.3.6": true, "K.2.1": true, "K.2.2": true, "K.2.3": true,
-		"K.2.4": true, "K.2.5": true, "K.2.6": true, "K.2.7": true,
-		"K.3.2.1": true, "K.3.2.2": true, "K.4.1.1": true, "K.4.1.10": true,
-		"K.4.1.2": true, "K.4.1.3": true, "K.4.1.4": true, "K.4.1.5": true,
-		"K.4.1.6": true, "K.4.1.7": true, "K.4.1.8": true, "K.4.1.9": true,
-		"K.4.2.1": true, "K.4.2.10": true, "K.4.2.11": true, "K.4.2.12": true,
-		"K.4.2.13": true, "K.4.2.2": true, "K.4.2.3": true, "K.4.2.4": true,
-		"K.4.2.6": true,
-	},   
-	api.ComplianceTemplateNIST: {
-		"D.1.1.10": true, "D.1.1.11": true, "D.1.1.12": true, "D.1.1.13": true,
-		"D.1.1.14": true, "D.1.1.15": true, "D.1.1.16": true, "D.1.1.17": true,
-		"D.1.1.18": true, "D.1.1.2": true, "D.1.1.3": true, "D.1.1.4": true,
-		"D.1.1.5": true, "D.1.1.6": true, "D.1.1.7": true, "D.1.1.8": true,
-		"D.1.1.9": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
-		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
-		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
-		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
-		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
-		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
-		"D.3.8": true, "D.3.9": true, "D.4.1": true, "D.4.10": true,
-		"D.4.8": true, "D.5.12": true, "D.5.15": true, "D.5.16": true,
-		"D.5.17": true, "D.5.20": true, "D.5.25": true, "D.5.30": true,
-		"D.5.31": true, "D.5.4": true, "D.5.5": true, "D.5.6": true,
-		"D.5.7": true, "D.5.9": true, "I.4.1": true, "I.4.10": true,
-		"I.4.8": true, "K.1.1.1": true, "K.1.1.10": true, "K.1.1.11": true,
-		"K.1.1.12": true, "K.1.1.13": true, "K.1.1.14": true, "K.1.1.15": true,
-		"K.1.1.16": true, "K.1.1.17": true, "K.1.1.18": true, "K.1.1.19": true,
-		"K.1.1.2": true, "K.1.1.20": true, "K.1.1.21": true, "K.1.1.3": true,
-		"K.1.1.4": true, "K.1.1.5": true, "K.1.1.6": true, "K.1.1.7": true,
-		"K.1.1.8": true, "K.1.1.9": true, "K.1.2.1": true, "K.1.2.10": true,
-		"K.1.2.11": true, "K.1.2.12": true, "K.1.2.13": true, "K.1.2.14": true,
-		"K.1.2.15": true, "K.1.2.16": true, "K.1.2.17": true, "K.1.2.18": true,
-		"K.1.2.19": true, "K.1.2.2": true, "K.1.2.20": true, "K.1.2.22": true,
-		"K.1.2.23": true, "K.1.2.24": true, "K.1.2.25": true, "K.1.2.27": true,
-		"K.1.2.28": true, "K.1.2.29": true, "K.1.2.3": true, "K.1.2.30": true,
-		"K.1.2.31": true, "K.1.2.32": true, "K.1.2.33": true, "K.1.2.34": true,
-		"K.1.2.35": true, "K.1.2.4": true, "K.1.2.5": true, "K.1.2.6": true,
-		"K.1.2.7": true, "K.1.2.8": true, "K.1.2.9": true, "K.1.3.3": true,
-		"K.1.3.4": true, "K.1.3.5": true, "K.1.3.6": true, "K.2.1": true,
-		"K.2.2": true, "K.2.3": true, "K.2.4": true, "K.2.5": true,
-		"K.2.6": true, "K.2.7": true, "K.3.2.1": true, "K.3.2.2": true,
-		"K.4.1.1": true, "K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true,
-		"K.4.1.4": true, "K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true,
-		"K.4.1.8": true, "K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true,
-		"K.4.2.11": true, "K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true,
-		"K.4.2.3": true, "K.4.2.4": true, "K.4.2.6": true,
-	},
-	api.ComplianceTemplatePCI: {
-		"D.1.1.2": true, "D.2.14": true, "D.2.5": true, "D.2.7": true,
-		"D.3.1": true, "D.3.10": true, "D.3.11": true, "D.3.12": true,
-		"D.3.13": true, "D.3.14": true, "D.3.15": true, "D.3.16": true,
-		"D.3.17": true, "D.3.18": true, "D.3.19": true, "D.3.2": true,
-		"D.3.20": true, "D.3.21": true, "D.3.22": true, "D.3.3": true,
-		"D.3.4": true, "D.3.5": true, "D.3.6": true, "D.3.7": true,
-		"D.3.8": true, "D.3.9": true, "D.5.12": true, "D.5.15": true,
-		"D.5.16": true, "D.5.17": true, "D.5.20": true, "D.5.25": true,
-		"D.5.30": true, "D.5.31": true, "D.5.4": true, "D.5.5": true,
-		"D.5.6": true, "D.5.7": true, "D.5.9": true, "K.1.1.1": true,
-		"K.1.1.10": true, "K.1.1.11": true, "K.1.1.12": true, "K.1.1.13": true,
-		"K.1.1.14": true, "K.1.1.15": true, "K.1.1.16": true, "K.1.1.17": true,
-		"K.1.1.18": true, "K.1.1.19": true, "K.1.1.2": true, "K.1.1.20": true,
-		"K.1.1.21": true, "K.1.1.3": true, "K.1.1.4": true, "K.1.1.5": true,
-		"K.1.1.6": true, "K.1.1.7": true, "K.1.1.8": true, "K.1.1.9": true,
-		"K.1.2.1": true, "K.1.2.10": true, "K.1.2.11": true, "K.1.2.12": true,
-		"K.1.2.13": true, "K.1.2.14": true, "K.1.2.15": true, "K.1.2.16": true,
-		"K.1.2.17": true, "K.1.2.18": true, "K.1.2.19": true, "K.1.2.2": true,
-		"K.1.2.20": true, "K.1.2.27": true, "K.1.2.28": true, "K.1.2.29": true,
-		"K.1.2.3": true, "K.1.2.30": true, "K.1.2.31": true, "K.1.2.32": true,
-		"K.1.2.33": true, "K.1.2.34": true, "K.1.2.35": true, "K.1.2.4": true,
-		"K.1.2.5": true, "K.1.2.6": true, "K.1.2.7": true, "K.1.2.8": true,
-		"K.1.2.9": true, "K.1.3.3": true, "K.1.3.4": true, "K.1.3.5": true,
-		"K.1.3.6": true, "K.2.1": true, "K.2.2": true, "K.2.3": true,
-		"K.2.4": true, "K.2.5": true, "K.2.6": true, "K.2.7": true,
-		"K.4.1.1": true, "K.4.1.10": true, "K.4.1.2": true, "K.4.1.3": true,
-		"K.4.1.4": true, "K.4.1.5": true, "K.4.1.6": true, "K.4.1.7": true,
-		"K.4.1.8": true, "K.4.1.9": true, "K.4.2.1": true, "K.4.2.10": true,
-		"K.4.2.11": true, "K.4.2.12": true, "K.4.2.13": true, "K.4.2.2": true,
-		"K.4.2.3": true, "K.4.2.4": true, "K.4.2.6": true,
-	},
-}
-
-func initMockData(mock_docker_image_cis_items map[string]api.RESTBenchCheck, mock_cis_items map[string]api.RESTBenchCheck, mockComplianceSet map[string]map[string]bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta){
-	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
-
-	var all []api.RESTBenchMeta
-
-	for _, item := range mock_cis_items {
-		all = append(all, api.RESTBenchMeta{RESTBenchCheck: item})
-	}
-	for _, item := range mock_docker_image_cis_items {
-		all = append(all, api.RESTBenchMeta{RESTBenchCheck: item})
-	}
-
-	for i, _ := range all {
-		item := &all[i]
-		item.Tags = make([]string, 0)
-
-		// Mock the mockComplianceSet
-		for compliance, _ := range mockComplianceSet {
-			if _, exists := mockComplianceSet[compliance][item.TestNum]; exists {
-				item.Tags = append(item.Tags, compliance)
-			}
-		}
-
-		sort.Strings(item.Tags)
-		mockComplianceMetaMap[item.TestNum] = *item
-	}
-
-	sort.Slice(all, func(i, j int) bool { return all[i].TestNum < all[j].TestNum })
-	mockComplianceMetas = all
-
-	return mockComplianceMetas, mockComplianceMetaMap
-}
-
 // restore the related data
 func restoreMockData() {
-	for key, value := range cis_items {
-		backup_cis_items[key] = value
+	for key, value := range backup_cis_items {
+		mock_cis_items[key] = value
+		cis_items[key] = value
 	}
 
-	for key, value := range docker_image_cis_items {
-		backup_docker_image_cis_items[key] = value
+	for key, value := range backup_docker_image_cis_items {
+		mock_docker_image_cis_items[key] = value
+		docker_image_cis_items[key] = value
 	}
 
-	backup_complianceSet = map[string]map[string]bool{
+	mockComplianceSets = map[string]map[string]bool{
 		api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
 		api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
-		api.ComplianceTemplatePCI: TransformArrayToMap(compliancePCI),
-		api.ComplianceTemplateGDPR: TransformArrayToMap(complianceGDPR),
+		api.ComplianceTemplatePCI:   TransformArrayToMap(compliancePCI),
+		api.ComplianceTemplateGDPR:  TransformArrayToMap(complianceGDPR),
 	}
+
+	complianceSets = map[string]map[string]bool{
+		api.ComplianceTemplateHIPAA: TransformArrayToMap(complianceHIPAA),
+		api.ComplianceTemplateNIST:  TransformArrayToMap(complianceNIST),
+		api.ComplianceTemplatePCI:   TransformArrayToMap(compliancePCI),
+		api.ComplianceTemplateGDPR:  TransformArrayToMap(complianceGDPR),
+	}
+
+	complianceMetaMap = make(map[string]api.RESTBenchMeta)
+	complianceMetas = nil
+	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
+	mockComplianceMetas = nil
 }
 
-func TestSetup(t *testing.T) { 
+func TestSetup(t *testing.T) {
 	// must PrepareBackup() in the first test function to store the original cis_items
 	PrepareBackup()
 }
 
-func TestGetComplianceMeta(t *testing.T) { 
+func TestGetK8sCISMeta(t *testing.T) {
 	restoreMockData()
-	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis")
-	mockComplianceMetas, mockComplianceMetaMap := initMockData(mock_docker_image_cis_items, mock_cis_items, mockComplianceSet)
-	complianceMetas, complianceMetaMap := PrepareComplianceMeta("", "", false)
+	remediationFolder = filepath.Join(".", "testdata", "mock-cis")
+	GetK8sCISMeta(remediationFolder, cis_items, complianceSets)
+	PrepareBenchMeta(cis_items, &complianceMetas, complianceMetaMap, complianceSets)
+	GetK8sCISMeta(remediationFolder, mock_cis_items, mockComplianceSets)
+	PrepareBenchMeta(mock_cis_items, &mockComplianceMetas, mockComplianceMetaMap, mockComplianceSets)
 
-	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
+	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {
 		t.Errorf("complianceMetas is not update correctly")
 	}
 
@@ -2311,18 +2148,20 @@ func TestGetComplianceMeta(t *testing.T) {
 		t.Errorf("complianceMetaMap is not update correctly")
 	}
 
-	if fmt.Sprint(mockComplianceSet) != fmt.Sprint(complianceSet) {
+	if fmt.Sprint(mockComplianceSets) != fmt.Sprint(complianceSets) {
 		t.Errorf("complianceSet is not update correctly")
 	}
 }
 
-func TestComplianceMetaFilepathWalkFailure(t *testing.T) { 
+func TestGetK8sCISMetaFilepathWalkFailure(t *testing.T) {
 	restoreMockData()
-	defaultYAMLFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
-	mockComplianceMetas, mockComplianceMetaMap := initMockData(backup_docker_image_cis_items, backup_cis_items, backup_complianceSet)
-	complianceMetas, complianceMetaMap := PrepareComplianceMeta("", "", false)
+	remediationFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
+	GetK8sCISMeta(remediationFolder, cis_items, complianceSets)
+	PrepareBenchMeta(cis_items, &complianceMetas, complianceMetaMap, complianceSets)
+	GetK8sCISMeta(remediationFolder, mock_cis_items, mockComplianceSets)
+	PrepareBenchMeta(mock_cis_items, &mockComplianceMetas, mockComplianceMetaMap, mockComplianceSets)
 
-	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {	
+	if fmt.Sprint(mockComplianceMetas) != fmt.Sprint(complianceMetas) {
 		t.Errorf("complianceMetas should not update when filepath.walk fail")
 	}
 
@@ -2330,7 +2169,7 @@ func TestComplianceMetaFilepathWalkFailure(t *testing.T) {
 		t.Errorf("complianceMetaMap should not update when filepath.walk fail")
 	}
 
-	if fmt.Sprint(backup_complianceSet) != fmt.Sprint(complianceSet) {
+	if fmt.Sprint(backup_complianceSets) != fmt.Sprint(complianceSets) {
 		t.Errorf("complianceSet should not update when filepath.walk fail")
 	}
 }
