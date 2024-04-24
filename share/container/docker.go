@@ -324,12 +324,26 @@ func (d *dockerDriver) GetImage(name string) (*ImageMeta, error) {
 			repo = name[:i]
 		}
 
-		// get the first digest
+		// repo=index.docker.io/library/redis
+		// redis@sha256:6c9f9cb9a250b12c15a92d8042a44f4557c .....
+		// it is matched at by its last element
+		lastElement := repo
+		if tokens := strings.Split(repo, "/"); len(tokens) > 0 {
+			lastElement = tokens[len(tokens)-1]
+		}
+
+		// get the first completely matched repo
 		for _, str := range info.RepoDigests {
 			if i := strings.Index(str, "@"); i > 0 {
-				if str[:i] == repo {
+				if str[:i] == repo { // fully-matched
 					meta.Digest = str[i+1:]
 					break
+				}
+			}
+
+			if i := strings.Index(str, "@"); i > 0 {
+				if str[:i] == lastElement { // keep the record
+					meta.Digest = str[i+1:]
 				}
 			}
 		}
