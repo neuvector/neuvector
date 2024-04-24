@@ -12,8 +12,11 @@ import (
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	types1 "github.com/gogo/protobuf/types"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
@@ -27,7 +30,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Plugin struct {
 	// Type defines the type of plugin.
@@ -85,7 +88,7 @@ func (m *Plugin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Plugin.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +115,7 @@ type PluginsRequest struct {
 	// filters. Expanded, plugins that match the following will be
 	// returned:
 	//
-	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//	filters[0] or filters[1] or ... or filters[n-1] or filters[n]
 	//
 	// If filters is zero-length or nil, all items will be returned.
 	Filters              []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
@@ -134,7 +137,7 @@ func (m *PluginsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return xxx_messageInfo_PluginsRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +176,7 @@ func (m *PluginsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return xxx_messageInfo_PluginsResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -193,10 +196,13 @@ func (m *PluginsResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_PluginsResponse proto.InternalMessageInfo
 
 type ServerResponse struct {
-	UUID                 string   `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	UUID                 string                `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	Pid                  uint64                `protobuf:"varint,2,opt,name=pid,proto3" json:"pid,omitempty"`
+	Pidns                uint64                `protobuf:"varint,3,opt,name=pidns,proto3" json:"pidns,omitempty"`
+	Deprecations         []*DeprecationWarning `protobuf:"bytes,4,rep,name=deprecations,proto3" json:"deprecations,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
+	XXX_unrecognized     []byte                `json:"-"`
+	XXX_sizecache        int32                 `json:"-"`
 }
 
 func (m *ServerResponse) Reset()      { *m = ServerResponse{} }
@@ -212,7 +218,7 @@ func (m *ServerResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return xxx_messageInfo_ServerResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -231,12 +237,54 @@ func (m *ServerResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ServerResponse proto.InternalMessageInfo
 
+type DeprecationWarning struct {
+	ID                   string            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Message              string            `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	LastOccurrence       *types1.Timestamp `protobuf:"bytes,3,opt,name=last_occurrence,json=lastOccurrence,proto3" json:"last_occurrence,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+}
+
+func (m *DeprecationWarning) Reset()      { *m = DeprecationWarning{} }
+func (*DeprecationWarning) ProtoMessage() {}
+func (*DeprecationWarning) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1a14fda866f10715, []int{4}
+}
+func (m *DeprecationWarning) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeprecationWarning) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeprecationWarning.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *DeprecationWarning) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeprecationWarning.Merge(m, src)
+}
+func (m *DeprecationWarning) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeprecationWarning) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeprecationWarning.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeprecationWarning proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*Plugin)(nil), "containerd.services.introspection.v1.Plugin")
 	proto.RegisterMapType((map[string]string)(nil), "containerd.services.introspection.v1.Plugin.ExportsEntry")
 	proto.RegisterType((*PluginsRequest)(nil), "containerd.services.introspection.v1.PluginsRequest")
 	proto.RegisterType((*PluginsResponse)(nil), "containerd.services.introspection.v1.PluginsResponse")
 	proto.RegisterType((*ServerResponse)(nil), "containerd.services.introspection.v1.ServerResponse")
+	proto.RegisterType((*DeprecationWarning)(nil), "containerd.services.introspection.v1.DeprecationWarning")
 }
 
 func init() {
@@ -244,42 +292,49 @@ func init() {
 }
 
 var fileDescriptor_1a14fda866f10715 = []byte{
-	// 549 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0xad, 0x9d, 0x34, 0x6e, 0x37, 0xa5, 0xa0, 0x55, 0x55, 0x2c, 0x83, 0x9c, 0x28, 0xe2, 0x10,
-	0x21, 0x58, 0xab, 0x01, 0x24, 0x5a, 0x24, 0x0e, 0x51, 0x73, 0x88, 0xd4, 0x43, 0xe5, 0xa8, 0x08,
-	0x71, 0xa9, 0x1c, 0x67, 0x63, 0x56, 0x38, 0xde, 0xed, 0xee, 0xda, 0x22, 0x37, 0x3e, 0x2f, 0x47,
-	0x8e, 0x9c, 0x02, 0xf5, 0x37, 0xf0, 0x01, 0xc8, 0xbb, 0x76, 0x9a, 0xdc, 0x12, 0x71, 0x9b, 0x79,
-	0x33, 0x6f, 0xe6, 0xcd, 0xf3, 0xca, 0xc0, 0x8f, 0x88, 0xfc, 0x9a, 0x8e, 0x51, 0x48, 0x67, 0x5e,
-	0x48, 0x13, 0x19, 0x90, 0x04, 0xf3, 0xc9, 0x7a, 0x18, 0x30, 0xe2, 0x09, 0xcc, 0x33, 0x12, 0x62,
-	0xe1, 0x91, 0x44, 0x72, 0x2a, 0x18, 0x0e, 0x25, 0xa1, 0x89, 0x97, 0x9d, 0x6d, 0x02, 0x88, 0x71,
-	0x2a, 0x29, 0x7c, 0xf1, 0xc0, 0x46, 0x15, 0x13, 0x6d, 0x36, 0x66, 0x67, 0xce, 0xf9, 0x56, 0x9b,
-	0xe5, 0x9c, 0x61, 0xe1, 0xb1, 0x38, 0x90, 0x53, 0xca, 0x67, 0x7a, 0x81, 0xf3, 0x34, 0xa2, 0x34,
-	0x8a, 0xb1, 0xc7, 0x59, 0xe8, 0x09, 0x19, 0xc8, 0x54, 0x94, 0x85, 0x67, 0x65, 0x41, 0x65, 0xe3,
-	0x74, 0xea, 0xe1, 0x19, 0x93, 0xf3, 0xb2, 0x78, 0x12, 0xd1, 0x88, 0xaa, 0xd0, 0x2b, 0x22, 0x8d,
-	0x76, 0xfe, 0x9a, 0xa0, 0x71, 0x1d, 0xa7, 0x11, 0x49, 0x20, 0x04, 0xf5, 0x62, 0x9d, 0x6d, 0xb4,
-	0x8d, 0xee, 0xa1, 0xaf, 0x62, 0x78, 0x0a, 0x4c, 0x32, 0xb1, 0xcd, 0x02, 0xe9, 0x37, 0xf2, 0x65,
-	0xcb, 0x1c, 0x5e, 0xfa, 0x26, 0x99, 0x40, 0x07, 0x1c, 0x70, 0x7c, 0x97, 0x12, 0x8e, 0x85, 0x5d,
-	0x6b, 0xd7, 0xba, 0x87, 0xfe, 0x2a, 0x87, 0x1f, 0xc1, 0x61, 0x25, 0x58, 0xd8, 0xf5, 0x76, 0xad,
-	0xdb, 0xec, 0x39, 0x68, 0xcd, 0x13, 0x75, 0x13, 0xba, 0x2e, 0x5b, 0xfa, 0xf5, 0xc5, 0xb2, 0xb5,
-	0xe7, 0x3f, 0x50, 0xe0, 0x08, 0x58, 0xf8, 0x3b, 0xa3, 0x5c, 0x0a, 0x7b, 0x5f, 0xb1, 0xcf, 0xd1,
-	0x36, 0x8e, 0x22, 0x7d, 0x06, 0x1a, 0x68, 0xee, 0x20, 0x91, 0x7c, 0xee, 0x57, 0x93, 0x60, 0x07,
-	0x1c, 0x85, 0x01, 0x0b, 0xc6, 0x24, 0x26, 0x92, 0x60, 0x61, 0x37, 0x94, 0xe8, 0x0d, 0x0c, 0xbe,
-	0x06, 0x07, 0x24, 0x21, 0xf2, 0x16, 0x73, 0x6e, 0x5b, 0x6d, 0xa3, 0xdb, 0xec, 0x41, 0xa4, 0x1d,
-	0x45, 0x9c, 0x85, 0x68, 0xa4, 0xac, 0xf6, 0xad, 0xa2, 0x67, 0xc0, 0xb9, 0x73, 0x01, 0x8e, 0xd6,
-	0x77, 0xc1, 0x27, 0xa0, 0xf6, 0x0d, 0xcf, 0x4b, 0xfb, 0x8a, 0x10, 0x9e, 0x80, 0xfd, 0x2c, 0x88,
-	0x53, 0xac, 0x0d, 0xf4, 0x75, 0x72, 0x61, 0xbe, 0x37, 0x3a, 0x2f, 0xc1, 0xb1, 0x96, 0x2b, 0x7c,
-	0x7c, 0x97, 0x62, 0x21, 0xa1, 0x0d, 0xac, 0x29, 0x89, 0x25, 0xe6, 0xc2, 0x36, 0x94, 0xb6, 0x2a,
-	0xed, 0xdc, 0x82, 0xc7, 0xab, 0x5e, 0xc1, 0x68, 0x22, 0x30, 0xbc, 0x02, 0x16, 0xd3, 0x90, 0x6a,
-	0x6e, 0xf6, 0x5e, 0xed, 0x62, 0x51, 0x69, 0x79, 0x35, 0xa2, 0x83, 0xc0, 0xf1, 0x08, 0xf3, 0x0c,
-	0xf3, 0xd5, 0xfc, 0xe7, 0xa0, 0x9e, 0xa6, 0x64, 0xa2, 0x6f, 0xe9, 0x1f, 0xe4, 0xcb, 0x56, 0xfd,
-	0xe6, 0x66, 0x78, 0xe9, 0x2b, 0xb4, 0xf7, 0xdb, 0x00, 0x8f, 0x86, 0xeb, 0xa3, 0x61, 0x06, 0xac,
-	0x52, 0x22, 0x7c, 0xbb, 0x8b, 0x92, 0xea, 0x7a, 0xe7, 0xdd, 0x8e, 0xac, 0x52, 0xe7, 0x27, 0xd0,
-	0xd0, 0xca, 0xe1, 0x69, 0xf5, 0xa5, 0xaa, 0xb7, 0x8f, 0x06, 0xc5, 0xdb, 0x77, 0xb6, 0x94, 0xb3,
-	0x79, 0x7f, 0x7f, 0xba, 0xb8, 0x77, 0xf7, 0x7e, 0xdd, 0xbb, 0x7b, 0x3f, 0x72, 0xd7, 0x58, 0xe4,
-	0xae, 0xf1, 0x33, 0x77, 0x8d, 0x3f, 0xb9, 0x6b, 0x7c, 0xb9, 0xfa, 0xbf, 0x1f, 0xc6, 0x87, 0x0d,
-	0xe0, 0x73, 0x6d, 0xdc, 0x50, 0x7a, 0xdf, 0xfc, 0x0b, 0x00, 0x00, 0xff, 0xff, 0x0c, 0xb3, 0x50,
-	0xdc, 0x89, 0x04, 0x00, 0x00,
+	// 667 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xcd, 0x6e, 0xd3, 0x40,
+	0x10, 0xae, 0x93, 0x34, 0x6e, 0xb7, 0xa5, 0x45, 0xab, 0xaa, 0x58, 0x06, 0x25, 0x51, 0xc4, 0x21,
+	0x42, 0xb0, 0x56, 0x03, 0x48, 0x6d, 0x91, 0x38, 0x84, 0xe6, 0x50, 0xa9, 0x12, 0xd5, 0x96, 0x02,
+	0x42, 0x48, 0x95, 0xe3, 0x4c, 0xcc, 0x0a, 0xc7, 0xbb, 0xdd, 0x5d, 0x47, 0xe4, 0xc6, 0x9d, 0xd7,
+	0xe1, 0x21, 0x7a, 0xe4, 0xc8, 0xa9, 0xd0, 0x3c, 0x03, 0x0f, 0x80, 0xd6, 0x3f, 0x69, 0x42, 0x2f,
+	0xa9, 0xb8, 0xcd, 0xcc, 0xce, 0xb7, 0xfb, 0x7d, 0x33, 0x9f, 0x8d, 0x68, 0xc8, 0xf4, 0xa7, 0xa4,
+	0x47, 0x02, 0x3e, 0xf4, 0x02, 0x1e, 0x6b, 0x9f, 0xc5, 0x20, 0xfb, 0xb3, 0xa1, 0x2f, 0x98, 0xa7,
+	0x40, 0x8e, 0x58, 0x00, 0xca, 0x63, 0xb1, 0x96, 0x5c, 0x09, 0x08, 0x34, 0xe3, 0xb1, 0x37, 0xda,
+	0x99, 0x2f, 0x10, 0x21, 0xb9, 0xe6, 0xf8, 0xe1, 0x35, 0x9a, 0x14, 0x48, 0x32, 0xdf, 0x38, 0xda,
+	0x71, 0xf7, 0x16, 0x7a, 0x59, 0x8f, 0x05, 0x28, 0x4f, 0x44, 0xbe, 0x1e, 0x70, 0x39, 0xcc, 0x1e,
+	0x70, 0xef, 0x85, 0x9c, 0x87, 0x11, 0x78, 0x52, 0x04, 0x9e, 0xd2, 0xbe, 0x4e, 0x54, 0x7e, 0x70,
+	0x3f, 0x3f, 0x48, 0xb3, 0x5e, 0x32, 0xf0, 0x60, 0x28, 0xf4, 0x38, 0x3f, 0xdc, 0x0a, 0x79, 0xc8,
+	0xd3, 0xd0, 0x33, 0x51, 0x5e, 0xad, 0xff, 0x0b, 0xd1, 0x6c, 0x08, 0x4a, 0xfb, 0x43, 0x91, 0x35,
+	0x34, 0xff, 0x94, 0x50, 0xf5, 0x38, 0x4a, 0x42, 0x16, 0x63, 0x8c, 0x2a, 0x86, 0x8f, 0x63, 0x35,
+	0xac, 0xd6, 0x2a, 0x4d, 0x63, 0xbc, 0x8d, 0x4a, 0xac, 0xef, 0x94, 0x4c, 0xa5, 0x53, 0x9d, 0x5c,
+	0xd6, 0x4b, 0x87, 0x07, 0xb4, 0xc4, 0xfa, 0xd8, 0x45, 0x2b, 0x12, 0xce, 0x13, 0x26, 0x41, 0x39,
+	0xe5, 0x46, 0xb9, 0xb5, 0x4a, 0xa7, 0x39, 0x7e, 0x89, 0x56, 0x0b, 0x45, 0xca, 0xa9, 0x34, 0xca,
+	0xad, 0xb5, 0xb6, 0x4b, 0x66, 0x86, 0x96, 0x8a, 0x26, 0xc7, 0x79, 0x4b, 0xa7, 0x72, 0x71, 0x59,
+	0x5f, 0xa2, 0xd7, 0x10, 0x7c, 0x82, 0x6c, 0xf8, 0x22, 0xb8, 0xd4, 0xca, 0x59, 0x4e, 0xd1, 0x7b,
+	0x64, 0x91, 0x91, 0x93, 0x4c, 0x06, 0xe9, 0x66, 0xd8, 0x6e, 0xac, 0xe5, 0x98, 0x16, 0x37, 0xe1,
+	0x26, 0x5a, 0x0f, 0x7c, 0xe1, 0xf7, 0x58, 0xc4, 0x34, 0x03, 0xe5, 0x54, 0x53, 0xd2, 0x73, 0x35,
+	0xfc, 0x04, 0xad, 0xb0, 0x98, 0xe9, 0x33, 0x90, 0xd2, 0xb1, 0x1b, 0x56, 0x6b, 0xad, 0x8d, 0x49,
+	0x36, 0x3f, 0x22, 0x45, 0x40, 0x4e, 0xd2, 0x5d, 0x50, 0xdb, 0xf4, 0x74, 0xa5, 0x74, 0xf7, 0xd1,
+	0xfa, 0xec, 0x5b, 0xf8, 0x2e, 0x2a, 0x7f, 0x86, 0x71, 0x3e, 0x3e, 0x13, 0xe2, 0x2d, 0xb4, 0x3c,
+	0xf2, 0xa3, 0x04, 0xb2, 0x01, 0xd2, 0x2c, 0xd9, 0x2f, 0xed, 0x5a, 0xcd, 0x47, 0x68, 0x23, 0xa3,
+	0xab, 0x28, 0x9c, 0x27, 0xa0, 0x34, 0x76, 0x90, 0x3d, 0x60, 0x91, 0x06, 0xa9, 0x1c, 0x2b, 0xe5,
+	0x56, 0xa4, 0xcd, 0x33, 0xb4, 0x39, 0xed, 0x55, 0x82, 0xc7, 0x0a, 0xf0, 0x11, 0xb2, 0x45, 0x56,
+	0x4a, 0x9b, 0xd7, 0xda, 0x8f, 0x6f, 0x33, 0xa2, 0x7c, 0xe4, 0xc5, 0x15, 0xcd, 0xef, 0x16, 0xda,
+	0x38, 0x01, 0x39, 0x02, 0x39, 0x7d, 0xe0, 0x01, 0xaa, 0x24, 0x09, 0xeb, 0x67, 0x62, 0x3a, 0x2b,
+	0x93, 0xcb, 0x7a, 0xe5, 0xf4, 0xf4, 0xf0, 0x80, 0xa6, 0x55, 0xa3, 0x54, 0xe4, 0xb6, 0xa8, 0x50,
+	0x13, 0x1a, 0xa5, 0x82, 0xf5, 0x63, 0x63, 0x06, 0x53, 0xcb, 0x12, 0xfc, 0x11, 0xad, 0xf7, 0x41,
+	0x48, 0x08, 0x7c, 0x43, 0xa0, 0x30, 0xc3, 0xee, 0x62, 0x5c, 0x0f, 0xae, 0x91, 0xef, 0x7c, 0x19,
+	0xb3, 0x38, 0xa4, 0x73, 0xb7, 0x35, 0xbf, 0x59, 0x08, 0xdf, 0x6c, 0xca, 0x2d, 0x6b, 0xdd, 0xb0,
+	0xac, 0x83, 0xec, 0x21, 0x28, 0xe5, 0x87, 0xc5, 0x3a, 0x8a, 0x14, 0xbf, 0x42, 0x9b, 0x91, 0xaf,
+	0xf4, 0x19, 0x0f, 0x82, 0x44, 0x4a, 0x88, 0x03, 0x48, 0x65, 0x18, 0xdb, 0xe6, 0xeb, 0x2f, 0x3e,
+	0x1f, 0xf2, 0xa6, 0xf8, 0x7c, 0xe8, 0x86, 0x81, 0xbc, 0x9e, 0x22, 0xda, 0xbf, 0x2c, 0x74, 0xe7,
+	0x70, 0x56, 0x03, 0x1e, 0x21, 0x3b, 0xdf, 0x1b, 0x7e, 0x76, 0x9b, 0xf5, 0x14, 0x96, 0x70, 0x9f,
+	0xdf, 0x12, 0x95, 0xef, 0xee, 0x2d, 0xaa, 0x66, 0xdb, 0xc4, 0xdb, 0x37, 0xf8, 0x77, 0xcd, 0x1f,
+	0xc3, 0x5d, 0x90, 0xce, 0xbc, 0x27, 0x3a, 0x83, 0x8b, 0xab, 0xda, 0xd2, 0xcf, 0xab, 0xda, 0xd2,
+	0xd7, 0x49, 0xcd, 0xba, 0x98, 0xd4, 0xac, 0x1f, 0x93, 0x9a, 0xf5, 0x7b, 0x52, 0xb3, 0x3e, 0x1c,
+	0xfd, 0xdf, 0x6f, 0xf6, 0xc5, 0x5c, 0xe1, 0x7d, 0xb9, 0x57, 0x4d, 0xf9, 0x3e, 0xfd, 0x1b, 0x00,
+	0x00, 0xff, 0xff, 0x96, 0x7c, 0xc3, 0x0b, 0xbf, 0x05, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -338,6 +393,17 @@ type IntrospectionServer interface {
 	Plugins(context.Context, *PluginsRequest) (*PluginsResponse, error)
 	// Server returns information about the containerd server
 	Server(context.Context, *types1.Empty) (*ServerResponse, error)
+}
+
+// UnimplementedIntrospectionServer can be embedded to have forward compatible implementations.
+type UnimplementedIntrospectionServer struct {
+}
+
+func (*UnimplementedIntrospectionServer) Plugins(ctx context.Context, req *PluginsRequest) (*PluginsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Plugins not implemented")
+}
+func (*UnimplementedIntrospectionServer) Server(ctx context.Context, req *types1.Empty) (*ServerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Server not implemented")
 }
 
 func RegisterIntrospectionServer(s *grpc.Server, srv IntrospectionServer) {
@@ -400,7 +466,7 @@ var _Introspection_serviceDesc = grpc.ServiceDesc{
 func (m *Plugin) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -408,101 +474,103 @@ func (m *Plugin) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Plugin) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Plugin) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Type) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Type)))
-		i += copy(dAtA[i:], m.Type)
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if len(m.ID) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.ID)))
-		i += copy(dAtA[i:], m.ID)
-	}
-	if len(m.Requires) > 0 {
-		for _, s := range m.Requires {
-			dAtA[i] = 0x1a
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
-	if len(m.Platforms) > 0 {
-		for _, msg := range m.Platforms {
-			dAtA[i] = 0x22
-			i++
-			i = encodeVarintIntrospection(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
+	if m.InitErr != nil {
+		{
+			size, err := m.InitErr.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
-			i += n
+			i -= size
+			i = encodeVarintIntrospection(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.Capabilities) > 0 {
+		for iNdEx := len(m.Capabilities) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Capabilities[iNdEx])
+			copy(dAtA[i:], m.Capabilities[iNdEx])
+			i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Capabilities[iNdEx])))
+			i--
+			dAtA[i] = 0x32
 		}
 	}
 	if len(m.Exports) > 0 {
-		for k, _ := range m.Exports {
-			dAtA[i] = 0x2a
-			i++
+		for k := range m.Exports {
 			v := m.Exports[k]
-			mapSize := 1 + len(k) + sovIntrospection(uint64(len(k))) + 1 + len(v) + sovIntrospection(uint64(len(v)))
-			i = encodeVarintIntrospection(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintIntrospection(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
 			i = encodeVarintIntrospection(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintIntrospection(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintIntrospection(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x2a
 		}
 	}
-	if len(m.Capabilities) > 0 {
-		for _, s := range m.Capabilities {
-			dAtA[i] = 0x32
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
+	if len(m.Platforms) > 0 {
+		for iNdEx := len(m.Platforms) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Platforms[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintIntrospection(dAtA, i, uint64(size))
 			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
+			i--
+			dAtA[i] = 0x22
 		}
 	}
-	if m.InitErr != nil {
-		dAtA[i] = 0x3a
-		i++
-		i = encodeVarintIntrospection(dAtA, i, uint64(m.InitErr.Size()))
-		n1, err := m.InitErr.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+	if len(m.Requires) > 0 {
+		for iNdEx := len(m.Requires) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Requires[iNdEx])
+			copy(dAtA[i:], m.Requires[iNdEx])
+			i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Requires[iNdEx])))
+			i--
+			dAtA[i] = 0x1a
 		}
-		i += n1
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.ID) > 0 {
+		i -= len(m.ID)
+		copy(dAtA[i:], m.ID)
+		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.ID)))
+		i--
+		dAtA[i] = 0x12
 	}
-	return i, nil
+	if len(m.Type) > 0 {
+		i -= len(m.Type)
+		copy(dAtA[i:], m.Type)
+		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Type)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *PluginsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -510,35 +578,35 @@ func (m *PluginsRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PluginsRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PluginsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Filters) > 0 {
-		for _, s := range m.Filters {
+		for iNdEx := len(m.Filters) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Filters[iNdEx])
+			copy(dAtA[i:], m.Filters[iNdEx])
+			i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Filters[iNdEx])))
+			i--
 			dAtA[i] = 0xa
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *PluginsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -546,32 +614,40 @@ func (m *PluginsResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PluginsResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PluginsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	if len(m.Plugins) > 0 {
-		for _, msg := range m.Plugins {
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintIntrospection(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
+		for iNdEx := len(m.Plugins) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Plugins[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintIntrospection(dAtA, i, uint64(size))
 			}
-			i += n
+			i--
+			dAtA[i] = 0xa
 		}
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *ServerResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -579,30 +655,116 @@ func (m *ServerResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ServerResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServerResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.UUID) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.UUID)))
-		i += copy(dAtA[i:], m.UUID)
-	}
 	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	return i, nil
+	if len(m.Deprecations) > 0 {
+		for iNdEx := len(m.Deprecations) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Deprecations[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintIntrospection(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if m.Pidns != 0 {
+		i = encodeVarintIntrospection(dAtA, i, uint64(m.Pidns))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.Pid != 0 {
+		i = encodeVarintIntrospection(dAtA, i, uint64(m.Pid))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.UUID) > 0 {
+		i -= len(m.UUID)
+		copy(dAtA[i:], m.UUID)
+		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.UUID)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *DeprecationWarning) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeprecationWarning) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeprecationWarning) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.LastOccurrence != nil {
+		{
+			size, err := m.LastOccurrence.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintIntrospection(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.Message) > 0 {
+		i -= len(m.Message)
+		copy(dAtA[i:], m.Message)
+		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.Message)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.ID) > 0 {
+		i -= len(m.ID)
+		copy(dAtA[i:], m.ID)
+		i = encodeVarintIntrospection(dAtA, i, uint64(len(m.ID)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintIntrospection(dAtA []byte, offset int, v uint64) int {
+	offset -= sovIntrospection(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *Plugin) Size() (n int) {
 	if m == nil {
@@ -700,6 +862,42 @@ func (m *ServerResponse) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovIntrospection(uint64(l))
 	}
+	if m.Pid != 0 {
+		n += 1 + sovIntrospection(uint64(m.Pid))
+	}
+	if m.Pidns != 0 {
+		n += 1 + sovIntrospection(uint64(m.Pidns))
+	}
+	if len(m.Deprecations) > 0 {
+		for _, e := range m.Deprecations {
+			l = e.Size()
+			n += 1 + l + sovIntrospection(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DeprecationWarning) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovIntrospection(uint64(l))
+	}
+	l = len(m.Message)
+	if l > 0 {
+		n += 1 + l + sovIntrospection(uint64(l))
+	}
+	if m.LastOccurrence != nil {
+		l = m.LastOccurrence.Size()
+		n += 1 + l + sovIntrospection(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -707,14 +905,7 @@ func (m *ServerResponse) Size() (n int) {
 }
 
 func sovIntrospection(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozIntrospection(x uint64) (n int) {
 	return sovIntrospection(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -723,6 +914,11 @@ func (this *Plugin) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForPlatforms := "[]Platform{"
+	for _, f := range this.Platforms {
+		repeatedStringForPlatforms += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForPlatforms += "}"
 	keysForExports := make([]string, 0, len(this.Exports))
 	for k, _ := range this.Exports {
 		keysForExports = append(keysForExports, k)
@@ -737,7 +933,7 @@ func (this *Plugin) String() string {
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`Requires:` + fmt.Sprintf("%v", this.Requires) + `,`,
-		`Platforms:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Platforms), "Platform", "types.Platform", 1), `&`, ``, 1) + `,`,
+		`Platforms:` + repeatedStringForPlatforms + `,`,
 		`Exports:` + mapStringForExports + `,`,
 		`Capabilities:` + fmt.Sprintf("%v", this.Capabilities) + `,`,
 		`InitErr:` + strings.Replace(fmt.Sprintf("%v", this.InitErr), "Status", "rpc.Status", 1) + `,`,
@@ -761,8 +957,13 @@ func (this *PluginsResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForPlugins := "[]Plugin{"
+	for _, f := range this.Plugins {
+		repeatedStringForPlugins += strings.Replace(strings.Replace(f.String(), "Plugin", "Plugin", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForPlugins += "}"
 	s := strings.Join([]string{`&PluginsResponse{`,
-		`Plugins:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Plugins), "Plugin", "Plugin", 1), `&`, ``, 1) + `,`,
+		`Plugins:` + repeatedStringForPlugins + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -772,8 +973,29 @@ func (this *ServerResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForDeprecations := "[]*DeprecationWarning{"
+	for _, f := range this.Deprecations {
+		repeatedStringForDeprecations += strings.Replace(f.String(), "DeprecationWarning", "DeprecationWarning", 1) + ","
+	}
+	repeatedStringForDeprecations += "}"
 	s := strings.Join([]string{`&ServerResponse{`,
 		`UUID:` + fmt.Sprintf("%v", this.UUID) + `,`,
+		`Pid:` + fmt.Sprintf("%v", this.Pid) + `,`,
+		`Pidns:` + fmt.Sprintf("%v", this.Pidns) + `,`,
+		`Deprecations:` + repeatedStringForDeprecations + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeprecationWarning) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeprecationWarning{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`LastOccurrence:` + strings.Replace(fmt.Sprintf("%v", this.LastOccurrence), "Timestamp", "types1.Timestamp", 1) + `,`,
 		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
@@ -1062,7 +1284,7 @@ func (m *Plugin) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthIntrospection
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -1147,10 +1369,7 @@ func (m *Plugin) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthIntrospection
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthIntrospection
 			}
 			if (iNdEx + skippy) > l {
@@ -1233,10 +1452,7 @@ func (m *PluginsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthIntrospection
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthIntrospection
 			}
 			if (iNdEx + skippy) > l {
@@ -1321,10 +1537,7 @@ func (m *PluginsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthIntrospection
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthIntrospection
 			}
 			if (iNdEx + skippy) > l {
@@ -1401,16 +1614,236 @@ func (m *ServerResponse) Unmarshal(dAtA []byte) error {
 			}
 			m.UUID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			m.Pid = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pid |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pidns", wireType)
+			}
+			m.Pidns = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Pidns |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Deprecations", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Deprecations = append(m.Deprecations, &DeprecationWarning{})
+			if err := m.Deprecations[len(m.Deprecations)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipIntrospection(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthIntrospection
 			}
-			if (iNdEx + skippy) < 0 {
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeprecationWarning) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowIntrospection
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeprecationWarning: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeprecationWarning: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastOccurrence", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowIntrospection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthIntrospection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.LastOccurrence == nil {
+				m.LastOccurrence = &types1.Timestamp{}
+			}
+			if err := m.LastOccurrence.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipIntrospection(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthIntrospection
 			}
 			if (iNdEx + skippy) > l {
@@ -1429,6 +1862,7 @@ func (m *ServerResponse) Unmarshal(dAtA []byte) error {
 func skipIntrospection(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -1460,10 +1894,8 @@ func skipIntrospection(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -1484,55 +1916,30 @@ func skipIntrospection(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthIntrospection
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthIntrospection
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowIntrospection
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipIntrospection(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthIntrospection
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupIntrospection
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthIntrospection
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthIntrospection = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowIntrospection   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthIntrospection        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowIntrospection          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupIntrospection = fmt.Errorf("proto: unexpected end of group")
 )

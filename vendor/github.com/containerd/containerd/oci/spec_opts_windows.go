@@ -1,5 +1,3 @@
-// +build windows
-
 /*
    Copyright The containerd Authors.
 
@@ -20,10 +18,13 @@ package oci
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/containerd/containerd/containers"
+
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
@@ -52,7 +53,7 @@ func WithWindowsIgnoreFlushesDuringBoot() SpecOpts {
 	}
 }
 
-// WithWindowNetworksAllowUnqualifiedDNSQuery sets `Windows.IgnoreFlushesDuringBoot`.
+// WithWindowNetworksAllowUnqualifiedDNSQuery sets `Windows.Network.AllowUnqualifiedDNSQuery`.
 func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Windows == nil {
@@ -67,6 +68,50 @@ func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
 	}
 }
 
-func deviceFromPath(path, permissions string) (*specs.LinuxDevice, error) {
+// WithProcessCommandLine replaces the command line on the generated spec
+func WithProcessCommandLine(cmdLine string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		s.Process.Args = nil
+		s.Process.CommandLine = cmdLine
+		return nil
+	}
+}
+
+// WithHostDevices adds all the hosts device nodes to the container's spec
+//
+// Not supported on windows
+func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	return nil
+}
+
+func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	return nil, errors.New("device from path not supported on Windows")
+}
+
+// WithWindowsNetworkNamespace sets the network namespace for a Windows container.
+func WithWindowsNetworkNamespace(ns string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		if s.Windows.Network == nil {
+			s.Windows.Network = &specs.WindowsNetwork{}
+		}
+		s.Windows.Network.NetworkNamespace = ns
+		return nil
+	}
+}
+
+// Windows containers have default path configured at bootup
+func WithDefaultPathEnv(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	return nil
+}
+
+func escapeAndCombineArgs(args []string) string {
+	escaped := make([]string, len(args))
+	for i, a := range args {
+		escaped[i] = windows.EscapeArg(a)
+	}
+	return strings.Join(escaped, " ")
 }

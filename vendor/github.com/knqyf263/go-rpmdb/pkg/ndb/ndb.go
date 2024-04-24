@@ -96,6 +96,11 @@ func Open(path string) (*RpmNDB, error) {
 		return nil, err
 	}
 
+	err = syscallFlock(int(file.Fd()), syscallLOCK_SH)
+	if err != nil {
+		return nil, err
+	}
+
 	hdrBuff := ndbHeader{}
 	err = binary.Read(file, binary.LittleEndian, &hdrBuff)
 	if err != nil {
@@ -124,6 +129,11 @@ func Open(path string) (*RpmNDB, error) {
 		file:  file,
 		slots: slots,
 	}, nil
+}
+
+func (db *RpmNDB) Close() error {
+	_ = syscallFlock(int(db.file.Fd()), syscallLOCK_UN)
+	return db.file.Close()
 }
 
 func (db *RpmNDB) Read() <-chan dbi.Entry {

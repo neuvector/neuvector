@@ -62,8 +62,7 @@ func DecodeHookExec(
 func ComposeDecodeHookFunc(fs ...DecodeHookFunc) DecodeHookFunc {
 	return func(f reflect.Value, t reflect.Value) (interface{}, error) {
 		var err error
-		data := f.Interface()
-
+		var data interface{}
 		newFrom := f
 		for _, f1 := range fs {
 			data, err = DecodeHookExec(f1, newFrom, t)

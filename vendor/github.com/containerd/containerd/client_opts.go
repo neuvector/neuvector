@@ -22,6 +22,9 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/snapshots"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"google.golang.org/grpc"
 )
 
@@ -31,6 +34,7 @@ type clientOpts struct {
 	defaultPlatform platforms.MatchComparer
 	services        *services
 	dialOptions     []grpc.DialOption
+	callOptions     []grpc.CallOption
 	timeout         time.Duration
 }
 
@@ -68,6 +72,14 @@ func WithDefaultPlatform(platform platforms.MatchComparer) ClientOpt {
 func WithDialOpts(opts []grpc.DialOption) ClientOpt {
 	return func(c *clientOpts) error {
 		c.dialOptions = opts
+		return nil
+	}
+}
+
+// WithCallOpts allows grpc.CallOptions to be set on the connection
+func WithCallOpts(opts []grpc.CallOption) ClientOpt {
+	return func(c *clientOpts) error {
+		c.callOptions = opts
 		return nil
 	}
 }
@@ -130,10 +142,19 @@ func WithPullUnpack(_ *Client, c *RemoteContext) error {
 	return nil
 }
 
-// WithPullSnapshotter specifies snapshotter name used for unpacking
-func WithPullSnapshotter(snapshotterName string) RemoteOpt {
+// WithUnpackOpts is used to add unpack options to the unpacker.
+func WithUnpackOpts(opts []UnpackOpt) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.UnpackOpts = append(c.UnpackOpts, opts...)
+		return nil
+	}
+}
+
+// WithPullSnapshotter specifies snapshotter name used for unpacking.
+func WithPullSnapshotter(snapshotterName string, opts ...snapshots.Opt) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
 		c.Snapshotter = snapshotterName
+		c.SnapshotterOpts = opts
 		return nil
 	}
 }
@@ -160,6 +181,18 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 		for k, v := range labels {
 			rc.Labels[k] = v
 		}
+		return nil
+	}
+}
+
+// WithChildLabelMap sets the map function used to define the labels set
+// on referenced child content in the content store. This can be used
+// to overwrite the default GC labels or filter which labels get set
+// for content.
+// The default is `images.ChildGCLabels`.
+func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ChildLabelMap = fn
 		return nil
 	}
 }
@@ -200,6 +233,14 @@ func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.MaxConcurrentDownloads = max
+		return nil
+	}
+}
+
+// WithMaxConcurrentUploadedLayers sets max concurrent uploaded layer limit.
+func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.MaxConcurrentUploadedLayers = max
 		return nil
 	}
 }

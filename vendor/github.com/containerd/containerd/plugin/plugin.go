@@ -17,12 +17,9 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/containerd/ttrpc"
-	"github.com/pkg/errors"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -44,7 +41,7 @@ var (
 
 // IsSkipPlugin returns true if the error is skipping the plugin
 func IsSkipPlugin(err error) bool {
-	return errors.Cause(err) == ErrSkipPlugin
+	return errors.Is(err, ErrSkipPlugin)
 }
 
 // Type is the type of the plugin
@@ -63,6 +60,8 @@ const (
 	ServicePlugin Type = "io.containerd.service.v1"
 	// GRPCPlugin implements a grpc service
 	GRPCPlugin Type = "io.containerd.grpc.v1"
+	// TTRPCPlugin implements a ttrpc shim service
+	TTRPCPlugin Type = "io.containerd.ttrpc.v1"
 	// SnapshotPlugin implements a snapshotter
 	SnapshotPlugin Type = "io.containerd.snapshotter.v1"
 	// TaskMonitorPlugin implements a task monitor
@@ -75,6 +74,12 @@ const (
 	ContentPlugin Type = "io.containerd.content.v1"
 	// GCPlugin implements garbage collection policy
 	GCPlugin Type = "io.containerd.gc.v1"
+	// EventPlugin implements event handling
+	EventPlugin Type = "io.containerd.event.v1"
+	// TracingProcessorPlugin implements a open telemetry span processor
+	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
+	// WarningPlugin implements a warning service
+	WarningPlugin Type = "io.containerd.warning.v1"
 )
 
 const (
@@ -83,7 +88,8 @@ const (
 	// RuntimeRuncV1 is the runc runtime that supports a single container
 	RuntimeRuncV1 = "io.containerd.runc.v1"
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
-	RuntimeRuncV2 = "io.containerd.runc.v2"
+	RuntimeRuncV2      = "io.containerd.runc.v2"
+	DeprecationsPlugin = "deprecations"
 )
 
 // Registration contains information for registering a plugin
@@ -122,28 +128,13 @@ func (r *Registration) URI() string {
 	return fmt.Sprintf("%s.%s", r.Type, r.ID)
 }
 
-// Service allows GRPC services to be registered with the underlying server
-type Service interface {
-	Register(*grpc.Server) error
-}
-
-// TTRPCService allows TTRPC services to be registered with the underlying server
-type TTRPCService interface {
-	RegisterTTRPC(*ttrpc.Server) error
-}
-
-// TCPService allows GRPC services to be registered with the underlying tcp server
-type TCPService interface {
-	RegisterTCP(*grpc.Server) error
-}
-
 var register = struct {
 	sync.RWMutex
 	r []*Registration
 }{}
 
 // Load loads all plugins at the provided path into containerd
-func Load(path string) (err error) {
+func Load(path string) (count int, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			rerr, ok := v.(error)
@@ -171,14 +162,10 @@ func Register(r *Registration) {
 		panic(err)
 	}
 
-	var last bool
 	for _, requires := range r.Requires {
-		if requires == "*" {
-			last = true
+		if requires == "*" && len(r.Requires) != 1 {
+			panic(ErrInvalidRequires)
 		}
-	}
-	if last && len(r.Requires) != 1 {
-		panic(ErrInvalidRequires)
 	}
 
 	register.r = append(register.r, r)
@@ -187,7 +174,7 @@ func Register(r *Registration) {
 func checkUnique(r *Registration) error {
 	for _, registered := range register.r {
 		if r.URI() == registered.URI() {
-			return errors.Wrap(ErrIDRegistered, r.URI())
+			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
 		}
 	}
 	return nil

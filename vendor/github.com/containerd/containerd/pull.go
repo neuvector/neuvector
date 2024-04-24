@@ -18,6 +18,12 @@ package containerd
 
 import (
 	"context"
+	"errors"
+	"fmt"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -25,9 +31,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/semaphore"
 )
 
 // Pull downloads the provided content into containerd's content store
@@ -48,7 +51,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		} else {
 			p, err := platforms.Parse(pullCtx.Platforms[0])
 			if err != nil {
-				return nil, errors.Wrapf(err, "invalid platform %s", pullCtx.Platforms[0])
+				return nil, fmt.Errorf("invalid platform %s: %w", pullCtx.Platforms[0], err)
 			}
 
 			pullCtx.PlatformMatcher = platforms.Only(p)
@@ -62,22 +65,20 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	defer done(ctx)
 
 	var unpacks int32
+	var unpackEg *errgroup.Group
+	var unpackWrapper func(f images.Handler) images.Handler
+
 	if pullCtx.Unpack {
 		// unpacker only supports schema 2 image, for schema 1 this is noop.
 		u, err := c.newUnpacker(ctx, pullCtx)
 		if err != nil {
-			return nil, errors.Wrap(err, "create unpacker")
+			return nil, fmt.Errorf("create unpacker: %w", err)
 		}
-		unpackWrapper, eg := u.handlerWrapper(ctx, &unpacks)
+		unpackWrapper, unpackEg = u.handlerWrapper(ctx, pullCtx, &unpacks)
 		defer func() {
-			if retErr != nil {
-				// Forcibly stop the unpacker if there is
-				// an error.
-				eg.Cancel()
-			}
-			if err := eg.Wait(); err != nil {
+			if err := unpackEg.Wait(); err != nil {
 				if retErr == nil {
-					retErr = errors.Wrap(err, "unpack")
+					retErr = fmt.Errorf("unpack: %w", err)
 				}
 			}
 		}()
@@ -86,11 +87,27 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			if wrapper == nil {
 				return unpackWrapper(h)
 			}
-			return wrapper(unpackWrapper(h))
+			return unpackWrapper(wrapper(h))
 		}
 	}
 
 	img, err := c.fetch(ctx, pullCtx, ref, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE(fuweid): unpacker defers blobs download. before create image
+	// record in ImageService, should wait for unpacking(including blobs
+	// download).
+	if pullCtx.Unpack {
+		if unpackEg != nil {
+			if err := unpackEg.Wait(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	img, err = c.createNewImage(ctx, img)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +119,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			// Try to unpack is none is done previously.
 			// This is at least required for schema 1 image.
 			if err := i.Unpack(ctx, pullCtx.Snapshotter, pullCtx.UnpackOpts...); err != nil {
-				return nil, errors.Wrapf(err, "failed to unpack image on snapshotter %s", pullCtx.Snapshotter)
+				return nil, fmt.Errorf("failed to unpack image on snapshotter %s: %w", pullCtx.Snapshotter, err)
 			}
 		}
 	}
@@ -114,20 +131,21 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
-		return images.Image{}, errors.Wrapf(err, "failed to resolve reference %q", ref)
+		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
-		return images.Image{}, errors.Wrapf(err, "failed to get fetcher for %q", name)
+		return images.Image{}, fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
 
 	var (
 		handler images.Handler
 
-		isConvertible bool
-		converterFunc func(context.Context, ocispec.Descriptor) (ocispec.Descriptor, error)
-		limiter       *semaphore.Weighted
+		isConvertible         bool
+		originalSchema1Digest string
+		converterFunc         func(context.Context, ocispec.Descriptor) (ocispec.Descriptor, error)
+		limiter               *semaphore.Weighted
 	)
 
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest && rCtx.ConvertSchema1 {
@@ -140,11 +158,13 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		converterFunc = func(ctx context.Context, _ ocispec.Descriptor) (ocispec.Descriptor, error) {
 			return schema1Converter.Convert(ctx)
 		}
+
+		originalSchema1Digest = desc.Digest.String()
 	} else {
 		// Get all the children for a descriptor
 		childrenHandler := images.ChildrenHandler(store)
 		// Set any children labels for that content
-		childrenHandler = images.SetChildrenLabels(store, childrenHandler)
+		childrenHandler = images.SetChildrenMappedLabels(store, childrenHandler, rCtx.ChildLabelMap)
 		if rCtx.AllMetadata {
 			// Filter manifests by platforms but allow to handle manifest
 			// and configuration for not-target platforms
@@ -206,12 +226,21 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		}
 	}
 
-	img := images.Image{
+	if originalSchema1Digest != "" {
+		if rCtx.Labels == nil {
+			rCtx.Labels = make(map[string]string)
+		}
+		rCtx.Labels[images.ConvertedDockerSchema1LabelKey] = originalSchema1Digest
+	}
+
+	return images.Image{
 		Name:   name,
 		Target: desc,
 		Labels: rCtx.Labels,
-	}
+	}, nil
+}
 
+func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
 	is := c.ImageService()
 	for {
 		if created, err := is.Create(ctx, img); err != nil {

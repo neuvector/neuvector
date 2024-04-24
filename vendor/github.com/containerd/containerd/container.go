@@ -19,6 +19,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,12 +33,12 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/containerd/sys"
+	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl"
 	prototypes "github.com/gogo/protobuf/types"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
+	"github.com/opencontainers/selinux/go-selinux/label"
 )
 
 const (
@@ -172,7 +173,7 @@ func (c *container) Spec(ctx context.Context) (*oci.Spec, error) {
 // an error is returned if the container has running tasks
 func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
 	if _, err := c.loadTask(ctx, nil); err == nil {
-		return errors.Wrapf(errdefs.ErrFailedPrecondition, "cannot delete running task %v", c.id)
+		return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
 	}
 	r, err := c.get(ctx)
 	if err != nil {
@@ -197,11 +198,11 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 		return nil, err
 	}
 	if r.Image == "" {
-		return nil, errors.Wrap(errdefs.ErrNotFound, "container not created from an image")
+		return nil, fmt.Errorf("container not created from an image: %w", errdefs.ErrNotFound)
 	}
 	i, err := c.client.ImageService().Get(ctx, r.Image)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get image %s for container", r.Image)
+		return nil, fmt.Errorf("failed to get image %s for container: %w", r.Image, err)
 	}
 	return NewImage(c.client, i), nil
 }
@@ -231,7 +232,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	}
 	if r.SnapshotKey != "" {
 		if r.Snapshotter == "" {
-			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
+			return nil, fmt.Errorf("unable to resolve rootfs mounts without snapshotter on container: %w", errdefs.ErrInvalidArgument)
 		}
 
 		// get the rootfs from the snapshotter and add it to the request
@@ -243,7 +244,17 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		if err != nil {
 			return nil, err
 		}
+		spec, err := c.Spec(ctx)
+		if err != nil {
+			return nil, err
+		}
 		for _, m := range mounts {
+			if spec.Linux != nil && spec.Linux.MountLabel != "" {
+				context := label.FormatMountLabel("", spec.Linux.MountLabel)
+				if context != "" {
+					m.Options = append(m.Options, context)
+				}
+			}
 			request.Rootfs = append(request.Rootfs, &types.Mount{
 				Type:    m.Type,
 				Source:  m.Source,
@@ -268,6 +279,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			})
 		}
 	}
+	request.RuntimePath = info.RuntimePath
 	if info.Options != nil {
 		any, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
@@ -279,6 +291,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		client: c.client,
 		io:     i,
 		id:     c.id,
+		c:      c,
 	}
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
@@ -379,7 +392,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 	if err != nil {
 		err = errdefs.FromGRPC(err)
 		if errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "no running task found")
+			return nil, fmt.Errorf("no running task found: %w", err)
 		}
 		return nil, err
 	}
@@ -396,6 +409,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 		io:     i,
 		id:     response.Process.ID,
 		pid:    response.Process.Pid,
+		c:      c,
 	}
 	return t, nil
 }
@@ -422,12 +436,12 @@ func loadFifos(response *tasks.GetResponse) *cio.FIFOSet {
 			err  error
 			dirs = map[string]struct{}{}
 		)
-		for _, fifo := range fifos {
-			if isFifo, _ := sys.IsFifo(fifo); isFifo {
-				if rerr := os.Remove(fifo); err == nil {
+		for _, f := range fifos {
+			if isFifo, _ := fifo.IsFifo(f); isFifo {
+				if rerr := os.Remove(f); err == nil {
 					err = rerr
 				}
-				dirs[filepath.Dir(fifo)] = struct{}{}
+				dirs[filepath.Dir(f)] = struct{}{}
 			}
 		}
 		for dir := range dirs {

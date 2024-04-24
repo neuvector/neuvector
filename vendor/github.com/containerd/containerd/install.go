@@ -19,17 +19,17 @@ package containerd
 import (
 	"archive/tar"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/pkg/errors"
 )
 
 // Install a binary image into the opt service
@@ -67,6 +67,7 @@ func (c *Client) Install(ctx context.Context, image Image, opts ...InstallOpts) 
 		cr := content.NewReader(ra)
 		r, err := compression.DecompressStream(cr)
 		if err != nil {
+			ra.Close()
 			return err
 		}
 		if _, err := archive.Apply(ctx, path, r, archive.WithFilter(func(hdr *tar.Header) (bool, error) {
@@ -82,15 +83,17 @@ func (c *Client) Install(ctx context.Context, image Image, opts ...InstallOpts) 
 			}
 			if result && !config.Replace {
 				if _, err := os.Lstat(filepath.Join(path, hdr.Name)); err == nil {
-					return false, errors.Errorf("cannot replace %s in %s", hdr.Name, path)
+					return false, fmt.Errorf("cannot replace %s in %s", hdr.Name, path)
 				}
 			}
 			return result, nil
 		})); err != nil {
 			r.Close()
+			ra.Close()
 			return err
 		}
 		r.Close()
+		ra.Close()
 	}
 	return nil
 }
@@ -99,11 +102,8 @@ func (c *Client) getInstallPath(ctx context.Context, config InstallConfig) (stri
 	if config.Path != "" {
 		return config.Path, nil
 	}
-	resp, err := c.IntrospectionService().Plugins(ctx, &introspectionapi.PluginsRequest{
-		Filters: []string{
-			"id==opt",
-		},
-	})
+	filters := []string{"id==opt"}
+	resp, err := c.IntrospectionService().Plugins(ctx, filters)
 	if err != nil {
 		return "", err
 	}
