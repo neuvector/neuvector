@@ -3329,7 +3329,7 @@ func (h *nvCrdHandler) crdDeleteRecordEx(kvCrdKind, recordName, profileName stri
 	}
 }
 
-//// utility functions for process and file profiles
+// utility functions for process and file profiles
 func (h *nvCrdHandler) crdGetProcessRules(profile *api.RESTProcessProfile) []share.CLUSCrdProcessRule {
 	rules := make([]share.CLUSCrdProcessRule, 0)
 	for _, proc := range profile.ProcessList {
@@ -3785,6 +3785,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		var crdMd5 string
 		var mdNameDisplay string
 		var recordName string
+		var gfwRule resource.NvSecurityRule
 
 		metaData, ok := obj.(metav1.Object)
 		if !ok {
@@ -3799,6 +3800,11 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		}
 		if crdMd5, skip, _ = crdHandler.getCrInfo(obj); skip {
 			continue
+		}
+		if kind == resource.NvClusterSecurityRuleKind {
+			r := obj.(*resource.NvClusterSecurityRule)
+			gfwRule = resource.NvSecurityRule(*r)
+			obj = &gfwRule
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {
 			continue

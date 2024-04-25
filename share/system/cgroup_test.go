@@ -1473,3 +1473,46 @@ func TestContainerd_Container_Cgroupv2(t *testing.T) {
 		t.Errorf("detect wrong pod ID, cgroup:  %v, %v\n", id, found)
 	}
 }
+
+func TestK8sContainerdInDocker_Cgroupv2(t *testing.T) {
+	// docker version: 25.0.4
+	// containerd: v1.7.1
+	// k8s: 1.28
+	// container process: /proc/<pid>
+
+	mountinfo := `
+2911 1227 0:354 / / rw,relatime - overlay overlay rw,lowerdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/113/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/45/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/44/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/22/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs,upperdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/117/fs,workdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/117/work,index=off,uuid=on
+2913 2911 0:364 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+2918 2911 0:367 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+2922 2918 0:372 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+2928 2918 0:217 / /dev/mqueue rw,nosuid,nodev,noexec,relatime - mqueue mqueue rw
+2932 2911 0:229 / /sys ro,nosuid,nodev,noexec,relatime - sysfs sysfs ro
+2934 2932 0:25 / /sys/fs/cgroup ro,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw,nsdelegate,memory_recursiveprot
+2938 2911 0:191 / /etc/config ro,relatime - tmpfs tmpfs rw,size=131639468k,inode64
+2940 2911 259:3 /var/lib/docker/volumes/b0ee1af6a79635bcba4a66e30fb5e9d1d42dd828f2f79ce193f19186bdcef187/_data/pods/3b4761bd-6088-4844-9b6a-2cfb38b5dff1/etc-hosts /etc/hosts rw,relatime - ext4 /dev/nvme1n1p2 rw
+2941 2918 259:3 /var/lib/docker/volumes/b0ee1af6a79635bcba4a66e30fb5e9d1d42dd828f2f79ce193f19186bdcef187/_data/pods/3b4761bd-6088-4844-9b6a-2cfb38b5dff1/containers/neuvector-controller-pod/d78e0e4b /dev/termination-log rw,relatime - ext4 /dev/nvme1n1p2 rw
+2942 2911 259:3 /var/lib/docker/volumes/afa40c74a6c0dd0d639769d5c164f642c6154e769cc05b8436ec85214b7e13af/_data/agent/containerd/io.containerd.grpc.v1.cri/sandboxes/d6fd144634f3c538705128592681c533d2c1907d2b6a574f24e79ad5eaf3a68e/hostname /etc/hostname rw,relatime - ext4 /dev/nvme1n1p2 rw
+2943 2911 259:3 /var/lib/docker/volumes/afa40c74a6c0dd0d639769d5c164f642c6154e769cc05b8436ec85214b7e13af/_data/agent/containerd/io.containerd.grpc.v1.cri/sandboxes/d6fd144634f3c538705128592681c533d2c1907d2b6a574f24e79ad5eaf3a68e/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/nvme1n1p2 rw
+2944 2918 0:203 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=65536k,inode64
+2947 2911 0:188 /..2024_04_03_01_49_30.49536134/ssl-cert.key /etc/neuvector/certs/ssl-cert.key ro,relatime - tmpfs tmpfs rw,size=131639468k,inode64
+2948 2911 0:188 /..2024_04_03_01_49_30.49536134/ssl-cert.pem /etc/neuvector/certs/ssl-cert.pem ro,relatime - tmpfs tmpfs rw,size=131639468k,inode64
+2949 2911 0:197 / /run/secrets/kubernetes.io/serviceaccount ro,relatime - tmpfs tmpfs rw,size=131639468k,inode64
+1228 2913 0:364 /bus /proc/bus ro,nosuid,nodev,noexec,relatime - proc proc rw
+1233 2913 0:364 /fs /proc/fs ro,nosuid,nodev,noexec,relatime - proc proc rw
+1254 2913 0:364 /irq /proc/irq ro,nosuid,nodev,noexec,relatime - proc proc rw
+1255 2913 0:364 /sys /proc/sys ro,nosuid,nodev,noexec,relatime - proc proc rw
+1257 2913 0:364 /sysrq-trigger /proc/sysrq-trigger ro,nosuid,nodev,noexec,relatime - proc proc rw
+1259 2913 0:376 / /proc/asound ro,relatime - tmpfs tmpfs ro,inode64
+1260 2913 0:620 / /proc/acpi ro,relatime - tmpfs tmpfs ro,inode64
+1262 2913 0:367 /null /proc/kcore rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+1264 2913 0:367 /null /proc/keys rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+1269 2913 0:367 /null /proc/timer_list rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
+1281 2913 0:828 / /proc/scsi ro,relatime - tmpfs tmpfs ro,inode64
+1282 2932 0:829 / /sys/firmware ro,relatime - tmpfs tmpfs ro,inode64
+	`
+	r := strings.NewReader(mountinfo)
+	id, _, found := getContainerIDByCgroupReaderV2(r, from_hostname)
+	if id != "d6fd144634f3c538705128592681c533d2c1907d2b6a574f24e79ad5eaf3a68e" || !found {
+		t.Errorf("detect wrong pod ID, mountinfo: %v, %v\n", id, found)
+	}
+}

@@ -328,18 +328,19 @@ func testWildcardDomainAccess(caller string, t *testing.T, obj *domainObjectTest
 }
 
 // Example 1: user A1 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*" only and creates a group G1 ( i.e. group G1's CreaterDomains is ["app-US-*"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-2" cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-JP-*"       cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*", "qa" can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*", "qa"    can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "", "qa"         can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""               can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"              can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev-*"   cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-US-dev" ,"*b" cannot access group G1
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-2" cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-JP-*"       cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*", "qa" can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*", "qa"    can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "", "qa"         can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""               can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"              can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev-*"   cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-US-dev" ,"*b" cannot access group G1
 func TestWildcardDomainAccess1(t *testing.T) {
 	preTest()
 
@@ -381,19 +382,20 @@ func TestWildcardDomainAccess1(t *testing.T) {
 }
 
 // Example 2: user A2 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" and creates a group G2 ( i.e. group G2's CreaterDomains is ["app-1", "app-US-dev"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev"     		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "qa"    		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" 	can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "","app-JP"       		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""       				can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"       				can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev"       			can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US"       			cannot access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-2","app-JP-*"       cannot access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev-US"       		cannot access group G2
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev"     		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "qa"    		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" 	can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "","app-JP"       		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""       				can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"       				can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev"       			can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US"       			cannot access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-2","app-JP-*"       cannot access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev-US"       		cannot access group G2
 func TestWildcardDomainAccess2(t *testing.T) {
 	preTest()
 
@@ -436,17 +438,18 @@ func TestWildcardDomainAccess2(t *testing.T) {
 }
 
 // Example 3: user A3 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-*" and creates a group G3 ( i.e. group G3's CreaterDomains is ["app-1", "app-US-*"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app*"          			can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1","qa"     		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*","app-JP-*" 	can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1" 				cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1","app-JP-2" 	cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "bpp-*"          		cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa" 					cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa","app-JP-*" 			cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-UK-1","app-JP-2" 	cannot access group G3
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app*"          			can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1","qa"     		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*","app-JP-*" 	can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1" 				cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1","app-JP-2" 	cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "bpp-*"          		cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa" 					cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa","app-JP-*" 			cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-UK-1","app-JP-2" 	cannot access group G3
 func TestWildcardDomainAccess3(t *testing.T) {
 	preTest()
 
@@ -1073,15 +1076,15 @@ func TestSimplePermission(t *testing.T) {
 	readOnlyPermissions := utils.NewSet(share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS)
 	writeOnlyPermissions := utils.NewSet(share.PERM_CICD_SCAN)
 	globalOnlyPermissions := utils.NewSet(share.PERM_CICD_SCAN, share.PERM_NV_RESOURCE, share.PERM_ADM_CONTROL, share.PERM_AUTHENTICATION, share.PERM_SYSTEM_CONFIG,
-		share.PERM_CLOUD, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY)
+		/*share.PERM_CLOUD,*/ share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY)
 
 	globalReadPermissions := []uint64{share.PERM_NV_RESOURCE, share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC,
 		share.PERM_GROUP_BASIC, share.PERM_ADM_CONTROL, share.PERM_COMPLIANCE_BASIC, share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS, share.PERM_AUTHENTICATION,
-		share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG, share.PERM_CLOUD, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY}
+		share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG /*share.PERM_CLOUD,*/, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY}
 
 	globalWritePermissions := []uint64{share.PERM_NV_RESOURCE, share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC,
 		share.PERM_GROUP_BASIC, share.PERM_ADM_CONTROL, share.PERM_COMPLIANCE_BASIC, share.PERM_AUTHENTICATION, share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG,
-		share.PERM_CLOUD, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_CICD_SCAN, share.PERM_VULNERABILITY}
+		/*share.PERM_CLOUD,*/ share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_CICD_SCAN, share.PERM_VULNERABILITY}
 
 	domainReadPermissions := []uint64{share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC, share.PERM_GROUP_BASIC,
 		share.PERM_COMPLIANCE_BASIC, share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG, share.PERM_WORKLOAD_BASIC, share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS}

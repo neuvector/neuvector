@@ -242,13 +242,13 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 				if oldCfg.Registry != config.Registry || oldCfg.AuthWithToken != config.AuthWithToken ||
 					(oldCfg.AuthWithToken && oldCfg.AuthToken != config.AuthToken) ||
 					(!oldCfg.AuthWithToken && (oldCfg.Username != config.Username || oldCfg.Password != config.Password)) ||
-					public != reg.public {
+					!oldCfg.IgnoreProxy != config.IgnoreProxy || public != reg.public {
 					// URL or credential changed, stop scan and force logout
 					credChanged = true
 					reg.driver.Logout(true)
 					reg.backupDrv.Logout(true)
-					// if the public change, need to renew the driver type.
-					if public != reg.public {
+					// if the ignoreProxy flag or the public flag change, need to renew the driver type.
+					if !oldCfg.IgnoreProxy != config.IgnoreProxy || public != reg.public {
 						reg.public = public
 						reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
 					}

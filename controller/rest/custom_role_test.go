@@ -376,8 +376,16 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 		})
 		// CLUSAgent requires PERM_NV_RESOURCE permission and the custom role should not be able to access it
 		authz := accRead.Authorize(&obj, nil)
-		if authz { // can not read cluster
-			t.Fatalf("Surpirsed authz successfully for read")
+		if idx == 0 {
+			// idx 0 entry has all selectable read permissions
+			// custom role with all selectable read permissions is given nv_resource(r) intentionally since 5.3.3
+			if !authz { // expect to read cluster successfully
+				t.Fatalf("Surpirsed authz failed for read")
+			}
+		} else {
+			if authz { // can not read cluster expected
+				t.Fatalf("Surpirsed authz successfully for read")
+			}
 		}
 		authz = accWrite.Authorize(&obj, nil) // can not write cluster
 		if authz {
@@ -428,8 +436,8 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 	})
 	// CLUSAgent requires PERM_NV_RESOURCE permission and no custom role can access it
 	authz := accRead.Authorize(&obj, nil)
-	if authz {
-		t.Fatalf("Surprised to authorize successfully for read")
+	if !authz { // custom role with all selectable write permissions is given nv_resource(r) intentionally since 5.3.3
+		t.Fatalf("Surprised to authorize failed for read")
 	}
 	authz = accWrite.Authorize(&obj, nil)
 	if authz {
