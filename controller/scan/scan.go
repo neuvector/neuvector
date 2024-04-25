@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -334,14 +335,42 @@ func parseProxy(proxy *share.CLUSProxy) string {
 func UpdateProxy(httpProxy, httpsProxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"http": httpProxy, "https": httpsProxy}).Debug()
 
+	// This can be called before InitContext is called
 	if smd == nil {
 		smd = &scanMethod{
 			httpProxy:  parseProxy(httpProxy),
 			httpsProxy: parseProxy(httpsProxy),
 		}
+
+		// It is startup state if smd is nil, let registry init to handle proxy settings
 	} else {
 		smd.httpProxy = parseProxy(httpProxy)
 		smd.httpsProxy = parseProxy(httpsProxy)
+
+		var getFed bool
+		// when proxy setting changes, do nothing for fed registry on non-master cluster
+		if smd.fedRole == api.FedRoleMaster {
+			getFed = true
+		}
+
+		regs := regMapToArray(true, getFed)
+		for _, reg := range regs {
+			reg.driver.SetProxy()
+			reg.backupDrv.SetProxy()
+			reg.driver.Logout(true)
+			reg.backupDrv.Logout(true)
+			reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
+			if isScanner() {
+				reg.stateLock()
+				if reg.state.Status == api.RegistryStatusScanning {
+					if reg.sctx != nil {
+						reg.stopScan()
+					}
+					reg.startScan()
+				}
+				reg.stateUnlock()
+			}
+		}
 	}
 }
 

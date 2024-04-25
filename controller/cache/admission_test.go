@@ -1706,3 +1706,49 @@ func TestIsAnnotationCriterionMet(t *testing.T) {
 
 	postTest()
 }
+
+func TestIsUserGroupCriterionMet(t *testing.T) {
+	preTest()
+
+	type matchResult struct {
+		met      bool
+		positive bool
+	}
+
+	crts := []*share.CLUSAdmRuleCriterion{
+		&share.CLUSAdmRuleCriterion{
+			Name:  share.CriteriaKeyK8sGroups,
+			Op:    share.CriteriaOpRegex,
+			Value: "[1-9]{1,5}",
+		},
+	}
+	userGroups := []string{"65535", "abcde"}
+	expected := []matchResult{
+		matchResult{met: true, positive: true},
+	}
+	valueSet := utils.NewSetFromStringSlice(userGroups)
+	for idx, crt := range crts {
+		crt.ValueSlice = strings.Split(crt.Value, ",")
+		met, positive := isSetCriterionMet(crt, valueSet)
+		if met != expected[idx].met || positive != expected[idx].positive {
+			t.Errorf("Unexpected isSetCriterionMet[%d] result(%+v) for: %+v, %+v\n", idx, expected[idx], crt, valueSet)
+			break
+		}
+	}
+
+	userGroups = []string{"abcde"}
+	expected = []matchResult{
+		matchResult{met: false, positive: true},
+	}
+	valueSet = utils.NewSetFromStringSlice(userGroups)
+	for idx, crt := range crts {
+		crt.ValueSlice = strings.Split(crt.Value, ",")
+		met, positive := isSetCriterionMet(crt, valueSet)
+		if met != expected[idx].met || positive != expected[idx].positive {
+			t.Errorf("Unexpected isSetCriterionMet[%d] result(%+v) for: %+v, %+v\n", idx, expected[idx], crt, valueSet)
+			break
+		}
+	}
+
+	postTest()
+}

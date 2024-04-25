@@ -276,7 +276,8 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 				fstab := strings.Fields(line)
 				if len(fstab) > 3 { //
 					tokens := strings.Split(fstab[3], "/")
-					for _, token := range tokens {
+					for i := len(tokens) - 1; i >= 0; i-- {
+						token := tokens[i]
 						if isContainerID(token) {
 							return token, false, true
 						}

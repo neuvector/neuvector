@@ -425,7 +425,7 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 }
 
 func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
-	tempDir, err := os.MkdirTemp(filepath.Dir(fullpath), "")
+	tempDir, err := os.MkdirTemp("", "")
 	if err == nil {
 		defer os.RemoveAll(tempDir)
 	} else {

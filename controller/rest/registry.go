@@ -334,7 +334,10 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 			config.AwsKey.Region = *rconf.AwsKey.Region
 		}
 
-		proxy := scan.GetProxy(config.Registry)
+		var proxy string
+		if !config.IgnoreProxy {
+			proxy = scan.GetProxy(config.Registry)
+		}
 		auth, err := scan.GetAwsEcrAuthToken(config.AwsKey, proxy)
 		if err != nil {
 			e := "Failed to get authorization token by AWS keys"
@@ -645,7 +648,10 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 					config.AwsKey.Region = *rconf.AwsKey.Region
 				}
 
-				proxy := scan.GetProxy(config.Registry)
+				var proxy string
+				if !config.IgnoreProxy {
+					proxy = scan.GetProxy(config.Registry)
+				}
 				auth, err := scan.GetAwsEcrAuthToken(config.AwsKey, proxy)
 				if err != nil {
 					e := "Failed to get authorization token by AWS keys"

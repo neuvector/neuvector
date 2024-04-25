@@ -76,11 +76,14 @@ const (
 	CriteriaOpContainsAny         string = "containsAny"
 	CriteriaOpNotContainsAny      string = "notContainsAny"
 	CriteriaOpContainsOtherThan   string = "containsOtherThan"
-	CriteriaOpRegexContainsAny    string = "regexContainsAny"
-	CriteriaOpRegexNotContainsAny string = "!regexContainsAny"
+	CriteriaOpRegexContainsAny    string = "regexContainsAnyEx"
+	CriteriaOpRegexNotContainsAny string = "!regexContainsAnyEx"
 	CriteriaOpExist               string = "exist"
 	CriteriaOpNotExist            string = "notExist"
 	CriteriaOpContainsTagAny      string = "containsTagAny"
+
+	CriteriaOpRegex_Deprecated    string = "regexContainsAny"  // notice: it's the same as CriteriaOpRegex since 5.3.2
+	CriteriaOpNotRegex_Deprecated string = "!regexContainsAny" // notice: it's the same as CriteriaOpNotRegex since 5.3.2
 )
 
 const (
