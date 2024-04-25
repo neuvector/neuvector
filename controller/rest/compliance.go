@@ -35,7 +35,9 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	// Remove Metas replace with new [] get it dynamically
 	metas, _ := scanUtils.GetComplianceMeta()
+
 	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
 }

@@ -134,7 +134,7 @@ const DlpRulePatternMaxNum int = 16
 const DlpRulePatternMaxLen int = 512
 const DlpRulePatternTotalMaxLen int = 1024
 
-const GrpMetricMax uint32 = (1<<32-1)
+const GrpMetricMax uint32 = (1<<32 - 1)
 
 const ConfSectionAll string = "all"
 const ConfSectionUser string = "user"
@@ -1219,14 +1219,14 @@ type RESTGroupDetail struct {
 }
 
 type RESTGroupConfig struct {
-	Name     string               `json:"name"`
-	Comment  *string              `json:"comment"`
-	Criteria *[]RESTCriteriaEntry `json:"criteria,omitempty"`
-	CfgType  string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	MonMetric    *bool            `json:"monitor_metric,omitempty"`
-	GrpSessCur   *uint32          `json:"group_sess_cur,omitempty"`
-	GrpSessRate  *uint32          `json:"group_sess_rate,omitempty"`
-	GrpBandWidth *uint32          `json:"group_band_width,omitempty"`
+	Name         string               `json:"name"`
+	Comment      *string              `json:"comment"`
+	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
+	CfgType      string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	MonMetric    *bool                `json:"monitor_metric,omitempty"`
+	GrpSessCur   *uint32              `json:"group_sess_cur,omitempty"`
+	GrpSessRate  *uint32              `json:"group_sess_rate,omitempty"`
+	GrpBandWidth *uint32              `json:"group_band_width,omitempty"`
 }
 
 type RESTCrdGroupConfig struct {
@@ -2125,24 +2125,24 @@ type RESTScanStatusData struct {
 }
 
 type RESTScanCacheStat struct {
-	RecordCnt       uint64  `json:"record_count,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	RecordCnt  uint64 `json:"record_count,omitempty"`
+	RecordSize uint64 `json:"record_total_size,omitempty"`
+	MissCnt    uint64 `json:"cache_misses,omitempty"`
+	HitCnt     uint64 `json:"cache_hits,omitempty"`
 }
 
 type RESTScanCacheRecord struct {
-	Layer	string		`json:"layer_id,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"reference_count,omitempty"`
-	RefLast	time.Time	`json:"last_referred,omitempty"`
+	Layer   string    `json:"layer_id,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"reference_count,omitempty"`
+	RefLast time.Time `json:"last_referred,omitempty"`
 }
 
 type RESTScanCacheData struct {
-	CacheRecords 	[]RESTScanCacheRecord	`json:"cache_records,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	CacheRecords []RESTScanCacheRecord `json:"cache_records,omitempty"`
+	RecordSize   uint64                `json:"record_total_size,omitempty"`
+	MissCnt      uint64                `json:"cache_misses,omitempty"`
+	HitCnt       uint64                `json:"cache_hits,omitempty"`
 }
 
 const ScanStatusIdle string = ""
@@ -2567,16 +2567,22 @@ type RESTWorkloadInterceptData struct {
 	Intercept *RESTWorkloadIntercept `json:"intercept"`
 }
 
+type TagDetail struct {
+	ID          string `yaml:"id" json:"id"`
+	Title       string `yaml:"title" json:"title"`
+	Description string `yaml:"description" json:"description"`
+}
+
 type RESTBenchCheck struct {
-	TestNum     string   `json:"test_number"`
-	Category    string   `json:"category"`
-	Type        string   `json:"type"`
-	Profile     string   `json:"profile"`
-	Scored      bool     `json:"scored"`
-	Automated   bool     `json:"automated"`
-	Description string   `json:"description"`
-	Remediation string   `json:"remediation"`
-	Tags        []string `json:"tags"`
+	TestNum     string                   `json:"test_number"`
+	Category    string                   `json:"category"`
+	Type        string                   `json:"type"`
+	Profile     string                   `json:"profile"`
+	Scored      bool                     `json:"scored"`
+	Automated   bool                     `json:"automated"`
+	Description string                   `json:"description"`
+	Remediation string                   `json:"remediation"`
+	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
 }
 
 type RESTBenchMeta struct {
@@ -2608,21 +2614,21 @@ type RESTComplianceData struct {
 }
 
 type RESTComplianceAsset struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Type        string   `json:"type"`
-	Level       string   `json:"level"`
-	Profile     string   `json:"profile"`
-	Scored      bool     `json:"scored"`
-	Description string   `json:"description"`
-	Message     []string `json:"message"`
-	Remediation string   `json:"remediation"`
-	Group       string   `json:"group"`
-	Tags        []string `json:"tags"`
-	Workloads   []string `json:"workloads"`
-	Nodes       []string `json:"nodes"`
-	Images      []string `json:"images"`
-	Platforms   []string `json:"platforms"`
+	Name        string                   `json:"name"`
+	Category    string                   `json:"category"`
+	Type        string                   `json:"type"`
+	Level       string                   `json:"level"`
+	Profile     string                   `json:"profile"`
+	Scored      bool                     `json:"scored"`
+	Description string                   `json:"description"`
+	Message     []string                 `json:"message"`
+	Remediation string                   `json:"remediation"`
+	Group       string                   `json:"group"`
+	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
+	Workloads   []string                 `json:"workloads"`
+	Nodes       []string                 `json:"nodes"`
+	Images      []string                 `json:"images"`
+	Platforms   []string                 `json:"platforms"`
 }
 
 type RESTComplianceAssetData struct {

@@ -103,7 +103,14 @@ func buildComplianceFilter(ccp *share.CLUSComplianceProfile) map[string][]string
 	_, metaMap := scanUtils.GetComplianceMeta()
 	for _, m := range metaMap {
 		if _, ok := filter[m.TestNum]; !ok {
-			filter[m.TestNum] = m.Tags
+			var complianceTags []string
+			for _, complianceTagMap := range m.Tags {
+				for tag, _ := range complianceTagMap {
+					complianceTags = append(complianceTags, tag)
+				}
+			}
+
+			filter[m.TestNum] = complianceTags
 		}
 	}
 
