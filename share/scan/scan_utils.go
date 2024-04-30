@@ -78,17 +78,17 @@ var scanErrString = []string{
 }
 
 type CacheRecord struct {
-	Layer	string		`json:"layerID,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"ref_cnt,omitempty"`
-	RefLast	time.Time	`json:"ref_last,omitempty"`
+	Layer   string    `json:"layerID,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"ref_cnt,omitempty"`
+	RefLast time.Time `json:"ref_last,omitempty"`
 }
 
 type CacherData struct {
-	CacheRecords 	[]CacheRecord	`json:"cache_records,omitempty"`
-	MissCnt         uint64			`json:"cache_misses,omitempty"`
-	HitCnt          uint64			`json:"cache_hits,omitempty"`
-	CurRecordSize   uint64			`json:"current_record_size"`
+	CacheRecords  []CacheRecord `json:"cache_records,omitempty"`
+	MissCnt       uint64        `json:"cache_misses,omitempty"`
+	HitCnt        uint64        `json:"cache_hits,omitempty"`
+	CurRecordSize uint64        `json:"current_record_size"`
 }
 
 func ScanErrorToStr(e share.ScanErrorCode) string {
@@ -293,6 +293,7 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
@@ -305,12 +306,17 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	list := make([]RPMPackage, 0, len(pkgs))
 	for _, p := range pkgs {
 		if p.Name != "gpg-pubkey" {
+			var epoch int
+			if p.Epoch != nil {
+				epoch = *p.Epoch
+			}
+
 			if kernel == "" {
-				list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+				list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 			} else {
 				// filter kernels that are not running
 				if k := isRpmKernelPackage(p); k == "" || strings.HasPrefix(kernel, k) {
-					list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+					list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 				}
 			}
 		}

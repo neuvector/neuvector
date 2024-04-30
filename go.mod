@@ -35,7 +35,7 @@ require (
 	github.com/jonboulle/clockwork v0.3.0
 	github.com/jrhouston/k8slock v0.1.1
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/knqyf263/go-rpmdb v0.0.0-20220209103220-0f7a6d951a6d
+	github.com/knqyf263/go-rpmdb v0.0.0-20231008124120-ac49267ab4e1
 	github.com/mattn/go-sqlite3 v1.14.18
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neuvector/k8s v1.4.1-0.20240405192846-f2f129a7880d
@@ -92,17 +92,15 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
@@ -116,7 +114,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.45.0 // indirect
@@ -138,16 +135,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661
-	lukechampine.com/uint128 v1.1.1 // indirect
-	modernc.org/cc/v3 v3.35.22 // indirect
-	modernc.org/ccgo/v3 v3.15.1 // indirect
-	modernc.org/libc v1.14.1 // indirect
-	modernc.org/mathutil v1.4.1 // indirect
-	modernc.org/memory v1.0.5 // indirect
-	modernc.org/opt v0.1.1 // indirect
-	modernc.org/sqlite v1.14.5 // indirect
-	modernc.org/strutil v1.1.1 // indirect
-	modernc.org/token v1.0.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
@@ -167,6 +154,7 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/pprof v0.0.0-20221118152302-e6195bd50e26 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
