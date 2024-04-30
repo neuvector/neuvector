@@ -3,6 +3,7 @@ package bdb
 import (
 	"bytes"
 	"encoding/binary"
+
 	"golang.org/x/xerrors"
 )
 
@@ -14,10 +15,9 @@ type HashOffPageEntry struct {
 	Length   uint32  `struct:"uint32"`  /* 08-11: Total length of item. */
 }
 
-func ParseHashOffPageEntry(data []byte) (*HashOffPageEntry, error) {
+func ParseHashOffPageEntry(data []byte, swapped bool) (*HashOffPageEntry, error) {
 	var entry HashOffPageEntry
-
-	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &entry)
+	err := binary.Read(bytes.NewReader(data), byteOrder(swapped), &entry)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to unpack HashOffPageEntry: %w", err)
 	}
