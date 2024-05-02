@@ -575,10 +575,10 @@ func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
 			FileName:   filename,
 		}
 		//add each AppPackage to s.pkgs map, append if entry already exists.
-		if _, ok := s.pkgs[appPackage.ModuleName]; !ok {
-			s.pkgs[appPackage.ModuleName] = []AppPackage{appPackage}
+		if _, ok := s.pkgs[filename]; !ok {
+			s.pkgs[filename] = []AppPackage{appPackage}
 		} else {
-			s.pkgs[appPackage.ModuleName] = append(s.pkgs[appPackage.ModuleName], appPackage)
+			s.pkgs[filename] = append(s.pkgs[appPackage.ModuleName], appPackage)
 		}
 	}
 }
