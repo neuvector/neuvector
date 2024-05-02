@@ -1901,8 +1901,21 @@ func startWorkerThread(ctx *Context) {
 					if n != nil {
 						if o == nil { // create
 							if !isNeuvectorContainerName(n.Name) {
-								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
-									addK8sPodEvent(*n)
+								var probeCmds [][]string
+								var bPrivileged bool
+								for _, c := range n.Containers {
+									if len(c.LivenessCmds) > 0 {
+										probeCmds = append(probeCmds, c.LivenessCmds)
+									}
+									if len(c.ReadinessCmds) > 0 {
+										probeCmds = append(probeCmds, c.ReadinessCmds)
+									}
+									if c.Privileged {
+										bPrivileged = true
+									}
+								}
+								if len(probeCmds) > 0 || bPrivileged {
+									addK8sPodEvent(*n, probeCmds)
 								}
 							}
 
