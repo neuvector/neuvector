@@ -854,24 +854,31 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 			}
 		}
 
+		r.Containers = make([]Container, 0)
 		if o.Spec != nil {
 			r.Node = o.Spec.GetNodeName()
 			r.HostNet = o.Spec.GetHostNetwork()
 			for _, c := range o.Spec.GetContainers() {
+				var ctr Container
+				ctr.Name = c.GetName()
 				liveness := c.GetLivenessProbe()
 				readiness := c.GetReadinessProbe()
 				if liveness != nil || readiness != nil {
 					if handler := liveness.GetHandler(); handler != nil {
 						if exec := handler.GetExec(); exec != nil {
-							r.LivenessCmds = append(r.LivenessCmds, exec.GetCommand())
+							ctr.LivenessCmds = exec.GetCommand()
 						}
 					}
 					if handler := readiness.GetHandler(); handler != nil {
 						if exec := handler.GetExec(); exec != nil {
-							r.ReadinessCmds = append(r.ReadinessCmds, exec.GetCommand())
+							ctr.ReadinessCmds = exec.GetCommand()
 						}
 					}
 				}
+				if secContext := c.GetSecurityContext(); secContext != nil {
+					ctr.Privileged = secContext.GetPrivileged()
+				}
+				r.Containers = append(r.Containers, ctr)
 			}
 			if r.SA = o.Spec.GetServiceAccountName(); r.SA == "" {
 				r.SA = o.Spec.GetServiceAccount()
@@ -893,13 +900,20 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 			}
 
 			if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
-				for _, cs := range o.Status.GetContainerStatuses() {
+				for i, cs := range o.Status.GetContainerStatuses() {
 					if cs != nil {
+						var id string
 						containerID := cs.GetContainerID()
 						for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
 							if strings.HasPrefix(containerID, prefix) {
-								r.ContainerIDs = append(r.ContainerIDs, containerID[len(prefix):])
+								id = containerID[len(prefix):]
+								r.ContainerIDs = append(r.ContainerIDs, id)
 							}
+						}
+						if i < len(r.Containers) {
+							r.Containers[i].Id = id
+						} else {
+							log.WithFields(log.Fields{"id": id, "containers": r.Containers}).Error("Not matched")
 						}
 					}
 				}
