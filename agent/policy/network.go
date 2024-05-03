@@ -762,16 +762,16 @@ func addWlGlobalAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrM
 	}
 }
 
-func addWlHostModeAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrMap map[string]share.CLUSSubnet) {
+func addWlHostModeAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newHostPolicyAddrMap map[string]share.CLUSSubnet) {
 	for _, nip := range from.NatIP {
 		nipnet := &net.IPNet{IP: nip, Mask: net.CIDRMask(32, 32)}
-		log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("@gfeng add hostmode nat ip")
-		addPolicyAddrIPNet(newPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
+		//log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("add hostmode nat ip")
+		addPolicyAddrIPNet(newHostPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
 	}
 }
 
 func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyMap map[string]*WorkloadIPPolicyInfo,
-	newPolicyAddrMap map[string]share.CLUSSubnet) {
+	newPolicyAddrMap, newHostPolicyAddrMap map[string]share.CLUSSubnet) {
 	addrMap := make(map[string]*share.CLUSWorkloadAddr)
 	for i, pp := range p {
 		// The first rule is the default rule that contains all container
@@ -785,7 +785,7 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					addWlGlobalAddrToPolicyAddrMap(from, newPolicyAddrMap)
 					//add IP of host-mode workload in monitor/protect mode
 					if (from.GlobalIP == nil || len(from.GlobalIP) == 0) && (from.LocalIP == nil || len(from.LocalIP) == 0) {
-						addWlHostModeAddrToPolicyAddrMap(from, newPolicyAddrMap)
+						addWlHostModeAddrToPolicyAddrMap(from, newHostPolicyAddrMap)
 					}
 				}
 				if pInfo, ok := workloadPolicyMap[from.WlID]; ok {
@@ -1120,6 +1120,7 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 		return 0, action, action > C.DP_POLICY_ACTION_CHECK_APP
 	}
 	policyAddrMap := e.GetPolicyAddrMap()
+	hostPolicyAddrMap := e.GetHostPolicyAddrMap()
 	iptype := ""
 	inPolicyAddr := false
 	if !conn.ExternalPeer {
@@ -1157,9 +1158,9 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 	} else {
 		if action == C.DP_POLICY_ACTION_VIOLATE || action == C.DP_POLICY_ACTION_DENY {
 			if (conn.Ingress) {
-				inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+				inPolicyAddr = is_policy_addr(conn.ServerIP, hostPolicyAddrMap)
 			} else {
-				inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+				inPolicyAddr = is_policy_addr(conn.ClientIP, hostPolicyAddrMap)
 			}
 			if (!inPolicyAddr) {
 				if (conn.Ingress) {
@@ -1181,7 +1182,8 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	fqdnInfoPrePolicyCalc()
 
 	newPolicyAddrMap := make(map[string]share.CLUSSubnet)
-	e.parseGroupIPPolicy(ps, newPolicy, newPolicyAddrMap)
+	newHostPolicyAddrMap := make(map[string]share.CLUSSubnet)
+	e.parseGroupIPPolicy(ps, newPolicy, newPolicyAddrMap, newHostPolicyAddrMap)
 
 	dpConnected := dp.Connected()
 
@@ -1235,6 +1237,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	e.Mutex.Lock()
 	e.NetworkPolicy = newPolicy
 	e.PolicyAddrMap = newPolicyAddrMap
+	e.HostPolicyAddrMap = newHostPolicyAddrMap
 	e.Mutex.Unlock()
 
 	return hostPolicyChangeSet
@@ -1252,6 +1255,13 @@ func (e *Engine) GetPolicyAddrMap() map[string]share.CLUSSubnet {
 	defer e.Mutex.Unlock()
 
 	return e.PolicyAddrMap
+}
+
+func (e *Engine) GetHostPolicyAddrMap() map[string]share.CLUSSubnet {
+	e.Mutex.Lock()
+	defer e.Mutex.Unlock()
+
+	return e.HostPolicyAddrMap
 }
 
 func (e *Engine) DeleteNetworkPolicy(id string) {
