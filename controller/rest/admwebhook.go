@@ -1310,7 +1310,7 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 		}
 		return
 	} else {
-		if whsvr.dumpRequestObj && ar.Request.Operation != admissionv1beta1.Delete {
+		if ar.Request.Operation != admissionv1beta1.Delete {
 			if b, err := json.Marshal(ar); err == nil {
 				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug()
 			}
