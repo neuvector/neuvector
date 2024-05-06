@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"mime"
 	"io"
+	"mime"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -341,7 +341,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 		case _fedAdminRequired:
 			ok = acc.IsFedAdmin()
 		case _fedReaderRequired:
-			ok = acc.IsFedReader() || acc.IsFedAdmin()
+			ok = acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed()
 		case _adminRequired:
 			ok = acc.CanWriteCluster()
 		case _localAdminRequired:
@@ -359,8 +359,8 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 
 	var fedRole string
 	var err error
-	if acc.IsFedReader() {
-		fedRole, err = cacher.GetFedMembershipRole(access.NewFedAdminAccessControl())
+	if acc.HasPermFed() {
+		fedRole, err = cacher.GetFedMembershipRole(access.NewReaderAccessControl())
 	} else {
 		fedRole, err = cacher.GetFedMembershipRole(acc)
 	}
@@ -850,30 +850,23 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 // called by master cluster only
 func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, user *share.CLUSUser, refreshToken bool,
 	acc *access.AccessControl, login *loginSession) (string, error) {
-	if user == nil || (user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader) {
+
+	if user == nil || (user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader && !user.ExtraPermits.HasPermFed()) {
 		return "", common.ErrObjectAccessDenied
 	}
+
 	reqTokenLock.Lock()
 	defer reqTokenLock.Unlock()
 
 	if !refreshToken {
 		return cacher.GetFedJoinedClusterToken(clusterID, login.id, acc)
 	} else {
-		var remoteRole string
-		switch user.Role {
-		case api.UserRoleFedAdmin:
-			remoteRole = api.UserRoleAdmin
-		case api.UserRoleFedReader:
-			remoteRole = api.UserRoleReader
-		default:
-			return "", common.ErrObjectAccessDenied
-		}
 		reqTo := &api.RESTFedAuthData{
 			ClientIP:       _masterClusterIP,
 			MasterUsername: login.fullname,
 			JointUsername:  common.DefaultAdminUser,
-			// master token is for requesting regular token from joint cluster. It can be validated by joint cluster based on shared secret/key/cert between master & joint clusters
-			MasterToken: jwtGenFedMasterToken(user, login, remoteRole, rc.ID, rc.Secret),
+			// master token is for requesting regular jwt token from joint cluster. It can be validated by joint cluster based on shared secret/key/cert between master & joint clusters
+			MasterToken: jwtGenFedMasterToken(user, login, rc.ID, rc.Secret),
 		}
 		if reqTo.MasterToken == "" {
 			return "", common.ErrObjectAccessDenied
@@ -909,14 +902,17 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 }
 
 func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, tag string, body []byte, ch chan<- cmdResponse,
-	acc *access.AccessControl, login *loginSession) int {
+	acc *access.AccessControl, login *loginSession, talkRounds []bool) int {
 	log.WithFields(log.Fields{"method": method, "id": id}).Debug()
 	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
 	var status int
 
+	if len(talkRounds) == 0 {
+		talkRounds = []bool{false, true}
+	}
 	// we cache the token for forwarded requests(to joint clusters). so we try the cached token first and ask for a new token if necessary.
-	for _, refreshToken := range []bool{false, true} {
+	for _, refreshToken := range talkRounds {
 		status = http.StatusBadRequest
 		if token, err := getJointClusterToken(rc, id, user, refreshToken, acc, login); token != "" { // get a regular token for accessing joint cluster
 			if _, statusCode, data, proxyUsed, err := sendReqToJointCluster(rc.RestInfo, id, token, method,
@@ -934,6 +930,7 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 					break
 				} else {
 					status = statusCode
+					cacher.SetFedJoinedClusterToken(id, login.id, "")
 					log.WithFields(log.Fields{"cluster": rc.RestInfo.Server, "status": status, "proxyUsed": proxyUsed}).Error("failed to send")
 				}
 			}
@@ -952,7 +949,7 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 
 // share.CLUSLockFedKey lock is owned by caller
 func informFedDismissed(joinedCluster share.CLUSFedJointClusterInfo, bodyTo []byte, ch chan<- bool, acc *access.AccessControl, login *loginSession) {
-	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", joinedCluster.ID, _tagDismissFed, bodyTo, nil, acc, login)
+	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", joinedCluster.ID, _tagDismissFed, bodyTo, nil, acc, login, nil)
 	_, jointKeyPath, jointCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
 	os.Remove(jointKeyPath)
 	os.Remove(jointCertPath)
@@ -1165,7 +1162,7 @@ func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
 				if jointCluster.ID == id {
 					notify++
 					bodyTo, _ := json.Marshal(&reqTo)
-					go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagDeployFedPolicy, bodyTo, ch, acc, login)
+					go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagDeployFedPolicy, bodyTo, ch, acc, login, nil)
 				}
 			}
 		}
@@ -1548,8 +1545,9 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed)
 		return
 	}
-	// any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
-	if login.fullname != common.DefaultAdminUser {
+	// Any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
+	// However, Rancher SSO user's role is defined in Rancher so we don't promote the shadow user created by Rancher SSO
+	if login.fullname != common.DefaultAdminUser && login.server != share.FlavorRancher {
 		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
 	}
 
@@ -2021,7 +2019,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		User: login.fullname, // user on master cluster who issues remove-from-federation request
 	}
 	bodyTo, _ := json.Marshal(&reqTo)
-	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login)
+	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login, nil)
 
 	status, code := removeFromFederation(&joinedCluster, acc) // remove the joint cluster's entry from master cluster
 	if status != http.StatusOK {
@@ -2412,7 +2410,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 				deploy++
 				bodyTo, _ := json.Marshal(&reqTo)
 				// make sure share.CLUSLockFedKey is not locked because talkToJointCluster may lock it !
-				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login)
+				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login, nil)
 			} else if jointCluster.Disabled && len(ids) == 1 {
 				restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 				return
@@ -3231,7 +3229,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 		return
 	}
-	accCaller, login := isFedOpAllowed(api.FedRoleMaster, _fedReaderRequired, w, r) // reject non-FedAdmin/FedReader login
+	accCaller, login := isFedOpAllowed(api.FedRoleMaster, _fedReaderRequired, w, r) // reject non-FedAdmin/FedReader & non-PERM_FED login
 	if accCaller == nil || login == nil {
 		return
 	}
@@ -3243,7 +3241,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	forbidden := false
 	regScanTest := false
 	txnID := ""
-	if accCaller.IsFedReader() {
+	if accCaller.IsFedReader() || accCaller.HasPermFed() {
 		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") {
 			// forward is allowed
 			// In fedReader user sessions, controller needs to update cluster state as well. So the acc needs to have write permissions for that purpose.

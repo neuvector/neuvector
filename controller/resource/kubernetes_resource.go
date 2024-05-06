@@ -31,6 +31,7 @@ import (
 	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
@@ -709,18 +710,24 @@ type kubernetes struct {
 	version   *k8s.Version
 	watchers  map[string]*resourceWatcher
 
-	roleCache map[k8sObjectRef]string                // role -> nv role
-	userCache map[k8sSubjectObjRef]utils.Set         // user -> set of k8sRoleRef
-	rbacCache map[k8sSubjectObjRef]map[string]string // user -> (domain -> nv role); it's updated after rbacEvaluateUser() call
+	userCache map[k8sSubjectObjRef]utils.Set         // k8s user -> set of k8sRoleRef
+	roleCache map[k8sObjectRef]string                // k8s (cluster)role -> nv reserved role
+	rbacCache map[k8sSubjectObjRef]map[string]string // k8s user -> (domain -> nv reserved role). it's updated after rbacEvaluateUser() call
+
+	// for Rancher SSO only.
+	permitsCache     map[k8sObjectRef]share.NvPermissions                // k8s (cluster)role -> nv permissions.
+	permitsRbacCache map[k8sSubjectObjRef]map[string]share.NvPermissions // k8s user -> (domain -> nv permissions). it's updated after rbacEvaluateUser() call
 }
 
 func newKubernetesDriver(platform, flavor, network string) *kubernetes {
 	d := &kubernetes{
-		noop:      newNoopDriver(platform, flavor, network),
-		watchers:  make(map[string]*resourceWatcher),
-		roleCache: make(map[k8sObjectRef]string),
-		userCache: make(map[k8sSubjectObjRef]utils.Set),
-		rbacCache: make(map[k8sSubjectObjRef]map[string]string),
+		noop:             newNoopDriver(platform, flavor, network),
+		watchers:         make(map[string]*resourceWatcher),
+		roleCache:        make(map[k8sObjectRef]string),
+		userCache:        make(map[k8sSubjectObjRef]utils.Set),
+		rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
+		permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
+		permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvPermissions),
 	}
 	return d
 }
@@ -1903,28 +1910,66 @@ func IsRancherFlavor() bool {
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 	} else {
-		svcnames := []string{"cattle-cluster-agent", "rancher"}
-		for _, svcname := range svcnames {
-			if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
-				log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
-				nvPermissions := []string{"*"}
-				/* Rancher SSO:
-				nvPermissions := []string{"*", "admctrl", "audit_events", "authentication", "authorization", "ci_scan",
-					"compliance", "config", "events", "reg_scan", "rt_policy", "rt_scan", "vulnerability", "security_events"}
-				nvPermissionIndex = make(map[string]int, len(nvPermissions)+1) // permission -> index in the pseudo role's [pseudo name]
-				nvIndexPermission = make(map[int]string, len(nvPermissions)+1) // index -> permission in the pseudo role's [pseudo name]
-				// reserve [0] in pseudo role's pseudo name
-				for i, p := range nvPermissions {
-					nvPermissionIndex[p] = i + 1
-					nvIndexPermission[i+1] = p
-				}*/
-				nvPermissionRscs = utils.NewSetFromSliceKind(nvPermissions)
-				nvRscsMap = map[string]utils.Set{ // apiGroup to resources
-					"read-only.neuvector.api.io": nvPermissionRscs,
-					"*":                          nvPermissionRscs,
+		if len(nvRscMapSSO) == 0 {
+			svcnames := []string{"cattle-cluster-agent", "rancher"}
+			nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
+				share.PERM_REG_SCAN_ID,
+				share.PERM_CICD_SCAN_ID,
+				share.PERM_ADM_CONTROL_ID,
+				share.PERM_AUDIT_EVENTS_ID,
+				share.PERM_EVENTS_ID,
+				share.PERM_AUTHENTICATION_ID,
+				share.PERM_AUTHORIZATION_ID,
+				share.PERM_SYSTEM_CONFIG_ID,
+				share.PERM_VULNERABILITY_ID,
+				share.PERMS_RUNTIME_SCAN_ID,
+				share.PERMS_RUNTIME_POLICIES_ID,
+				share.PERMS_COMPLIANCE_ID,
+				share.PERMS_SECURITY_EVENTS_ID,
+				share.PERM_FED_ID,
+			})
+			for _, svcname := range svcnames {
+				if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
+					log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
+					// For Rancher SSO only: nv permission string -> nv permission uint32 value
+					nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality())
+					for _, option := range access.PermissionOptions {
+						if nvPermitsRscSSO.Contains(option.ID) {
+							var readPermits uint32
+							var writePermits uint32
+							if len(option.ComplexPermits) > 0 {
+								for _, option2 := range option.ComplexPermits {
+									if option.ReadSupported && option2.ReadSupported {
+										readPermits |= option2.Value
+									}
+									if option.WriteSupported && option2.WriteSupported {
+										writePermits |= option2.Value
+									}
+								}
+							} else {
+								if option.ReadSupported {
+									readPermits |= option.Value
+								}
+								if option.WriteSupported {
+									writePermits |= option.Value
+								}
+							}
+							optionID := strings.ReplaceAll(option.ID, "_", "-")
+							nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+						}
+					}
+
+					nvRscMapSSO = map[string]utils.Set{ // apiGroup -> nv-perm resources
+						"read-only.neuvector.api.io": nvPermitsRscSSO,
+						"api.neuvector.com":          nvPermitsRscSSO,
+						"*":                          nvPermitsRscSSO,
+					}
+
+					return true
 				}
-				return true
 			}
+		} else {
+			return true
 		}
 	}
 

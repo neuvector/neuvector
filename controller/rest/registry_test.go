@@ -112,7 +112,7 @@ func TestRegistryURL(t *testing.T) {
 func countRegistry(role string, roles map[string][]string) int {
 	login := mockLoginUser("someuser", role, api.FedRoleNone, roles)
 	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/scan/registry", nil)
-	acc := access.NewAccessControl(r, access.AccessOPRead, login.domainRoles)
+	acc := access.NewAccessControl(r, access.AccessOPRead, login.domainRoles, nil)
 
 	var count int
 	all := clusHelper.GetAllRegistry(share.ScopeLocal)

@@ -363,7 +363,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 		return
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
-	log.WithFields(log.Fields{"roles": login.domainRoles, "nvPage": login.nvPage}).Error("Object access denied")
+	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
 	if login.nvPage != api.RESTNvPageDashboard {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
@@ -968,6 +968,7 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		if login.mainSessionID == _interactiveSessionID || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
 			clog.User = login.fullname
 			clog.UserRoles = login.domainRoles
+			clog.UserPermits = login.extraDomainPermits
 		} else {
 			userRole := api.UserRoleFedAdmin
 			if r, ok := login.domainRoles[access.AccessDomainGlobal]; ok && r == api.UserRoleReader {
@@ -1446,7 +1447,7 @@ func StartRESTServer() {
 	r.POST("/v1/auth/:server", handlerAuthLoginServer)
 	r.PATCH("/v1/auth", handlerAuthRefresh)
 	r.DELETE("/v1/auth", handlerAuthLogout)
-	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document
+	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document. Called by master cluster
 	r.GET("/v1/eula", handlerEULAShow)
 	r.POST("/v1/eula", handlerEULAConfig)
 	r.GET("/v1/user", handlerUserList)
@@ -2079,7 +2080,8 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 // api version is always the first path element
 // Ex: /v1/scan/registry
-//      ^^
+//
+//	^^
 func getRequestApiVersion(r *http.Request) ApiVersion {
 	if r.URL == nil || len(r.URL.Path) == 0 {
 		return ApiVersion1
