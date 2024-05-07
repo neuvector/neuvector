@@ -111,6 +111,14 @@ type Service struct {
 	ExternalIPs []net.IP
 }
 
+type Container struct {
+	Id            string
+	Name          string
+	Privileged    bool
+	LivenessCmds  []string
+	ReadinessCmds []string
+}
+
 type Pod struct {
 	UID           string
 	Name          string
@@ -122,8 +130,7 @@ type Pod struct {
 	OwnerUID      string
 	OwnerName     string
 	OwnerType     string
-	LivenessCmds  [][]string
-	ReadinessCmds [][]string
+	Containers    []Container
 	SA            string   // service account of this pod
 	ContainerIDs  []string // all workload id
 	Labels        map[string]string
