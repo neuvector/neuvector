@@ -945,7 +945,20 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         uint8_t iptype = dpi_ip4_iptype(key.dip);
         fqdn_ipv4_entry_t *ipv4_ent = NULL;
         ipv4_ent = rcu_map_lookup(&g_fqdn_hdl->fqdn_ipv4_map, &(key.dip));
+        bool is_src_internal = dpi_is_ip4_internal(key.sip);
 
+        //NVSHAS-8989, we see only partial packets from long session
+        //which could cause session direction be mistaken in openshift,
+        //then this can cause false alert, we need to let such special
+        //passthrough packet from external to bypass policy match in the
+        //intermediate container, the policy match need to be done at the
+        //source/destination container
+        if (is_internal && !is_src_internal && (hdl->apply_dir & DP_POLICY_APPLY_EGRESS)) {
+            desc->id = 0;
+            desc->action = DP_POLICY_ACTION_OPEN;
+            desc->flags = POLICY_DESC_INTERNAL;
+            goto exit;
+        }
         //client inside cluster connect to server service
         //with type externalIP has MITM (man in the middle)
         //risk, implicitly warn/block it
