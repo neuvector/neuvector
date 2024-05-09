@@ -150,7 +150,7 @@ func (exp GitHubExport) getExistingFileSha() (sha string, ver string, reterr err
 	}
 	defer func() {
 		err = resp.Body.Close()
-		if reterr == nil {
+		if reterr == nil && err != nil {
 			reterr = fmt.Errorf("error closing response body: %s", err.Error())
 		}
 	}()
