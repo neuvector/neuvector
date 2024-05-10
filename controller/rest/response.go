@@ -241,7 +241,7 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	}
-	if (scope == share.ScopeFed && (!acc.IsFedReader() && !acc.IsFedAdmin())) || !acc.Authorize(&share.CLUSResponseRuleOptionsDummy{}, nil) {
+	if (scope == share.ScopeFed && (!acc.IsFedReader() && !acc.IsFedAdmin() && !acc.HasPermFed())) || !acc.Authorize(&share.CLUSResponseRuleOptionsDummy{}, nil) {
 		restRespAccessDenied(w, login)
 		return
 	}

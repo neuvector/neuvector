@@ -581,7 +581,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, server not enable: status=%v.", w.status)
 	}
-	if _, authz := lookupShadowUser(saml.Name, username, "", "", "", make(map[string][]string)); authz {
+	if _, authz := lookupShadowUser(saml.Name, username, "", "", "", make(map[string][]string), share.NvPermissions{}, nil); authz {
 		t.Errorf("No shadow user should be created.")
 	}
 
@@ -1017,7 +1017,7 @@ func TestJWTSignValidate(t *testing.T) {
 	}
 	remote := "10.1.2.3"
 
-	_, tokenString, _ := jwtGenerateToken(user, roles, remote, "", "", nil)
+	_, tokenString, _ := jwtGenerateToken(user, roles, nil, remote, "", "", nil)
 
 	token, _ := jwtValidateToken(tokenString, "", nil)
 	if token.Fullname != user.Fullname {
