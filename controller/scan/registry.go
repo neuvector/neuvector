@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -175,6 +176,7 @@ func registryInit() {
 		regMap[config.Name] = newRegistry(config)
 		regUnlock()
 	}
+	db.InitGetCVECount(GetImageCVECount)
 }
 
 func becomeScanner() {
@@ -1913,15 +1915,45 @@ func IsRegistryImageScanned(id string) bool {
 }
 
 func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, highs, meds, lows []string) *db.DbAssetVul {
+	b, _ := json.Marshal(sum.Images)
+
+	assetid := fmt.Sprintf("%s/%s", sum.RegName, sum.ImageID)
+
 	d := &db.DbAssetVul{
-		Type:       db.AssetImage,
-		AssetID:    sum.ImageID,
-		CVE_high:   c.highVuls,
-		CVE_medium: c.medVuls,
-		CVE_low:    len(lows),
+		Type:              db.AssetImage,
+		AssetID:           assetid, // image: repository/assetid
+		AssetID2:          sum.ImageID,
+		CVE_high:          c.highVuls,
+		CVE_medium:        c.medVuls,
+		CVE_low:           len(lows),
+		I_created_at:      sum.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		I_scanned_at:      sum.ScannedAt.Format("2006-01-02T15:04:05Z"),
+		I_digest:          sum.Digest,
+		I_base_os:         sum.BaseOS,
+		I_repository_name: sum.RegName,
+		I_repository_url:  sum.Registry,
+		I_size:            sum.Size,
+		I_images:          string(b),
 	}
 	if len(sum.Images) > 0 {
 		d.Name = fmt.Sprintf("%s:%s", sum.Images[0].Repo, sum.Images[0].Tag)
 	}
 	return d
+}
+
+func GetImageCVECount(name, id string) (int, int, error) {
+	var rs *Registry
+	if name == common.RegistryRepoScanName {
+		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
+	} else if rs, _ = regMapLookup(name); rs == nil {
+		return 0, 0, errors.New("registry not found")
+	}
+
+	if c, ok := rs.cache[id]; ok {
+		return c.highVuls, c.medVuls, nil
+	}
+
+	return 0, 0, errors.New("id not found")
 }

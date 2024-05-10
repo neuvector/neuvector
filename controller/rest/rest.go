@@ -1689,10 +1689,12 @@ func StartRESTServer() {
 	r.DELETE("/v1/scan/registry/:name/scan", handlerRegistryStop)
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
-	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
-	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
-	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
-	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
+	r.GET("/v1/scan/asset", handlerAssetVulnerability)          // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)               // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)                   // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)                     // skip API document
+	r.POST("/v1/scan/asset/view/asset", handlerAssetViewCreate) // skip API document
+	r.GET("/v1/scan/asset/view/asset", handlerAssetViewGet)     // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
@@ -2079,7 +2081,8 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 // api version is always the first path element
 // Ex: /v1/scan/registry
-//      ^^
+//
+//	^^
 func getRequestApiVersion(r *http.Request) ApiVersion {
 	if r.URL == nil || len(r.URL.Path) == 0 {
 		return ApiVersion1

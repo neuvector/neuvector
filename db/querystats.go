@@ -21,6 +21,7 @@ type QueryStat struct {
 	Data2        string
 	Data3        string
 	FileDBReady  int
+	Type         int // 0=Vul, 1=Asset
 }
 
 const queryStatTablename = "querystats"
@@ -37,6 +38,7 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 			"data1":            queryStat.Data1,
 			"data2":            queryStat.Data2,
 			"data3":            queryStat.Data3,
+			"type":             queryStat.Type,
 		},
 	)
 	sql, args, _ := ds.Prepared(true).ToSQL()
@@ -72,7 +74,7 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 func GetQueryStat(token string) (*QueryStat, error) {
 	dialect := goqu.Dialect("sqlite3")
 
-	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready"}
+	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready", "type"}
 	sql, args, _ := dialect.From(queryStatTablename).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
 
 	var lastErr error
@@ -91,7 +93,7 @@ func GetQueryStat(token string) (*QueryStat, error) {
 		stat := &QueryStat{}
 		for rows.Next() {
 			rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
-				&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady)
+				&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady, &stat.Type)
 			if err != nil {
 				return nil, err
 			}
@@ -111,7 +113,7 @@ func GetQueryStatsByLoginName(loginName string) ([]*QueryStat, error) {
 	dialect := goqu.Dialect("sqlite3")
 
 	records := make([]*QueryStat, 0)
-	columns := []interface{}{"id", "token", "login_type", "login_id", "login_name", "create_timestamp"}
+	columns := []interface{}{"id", "token", "login_type", "login_id", "login_name", "create_timestamp", "type"}
 	sql, args, _ := dialect.From("querystats").Select(columns...).Where(goqu.C("login_name").Eq(loginName)).Order(goqu.C("create_timestamp").Asc()).Prepared(true).ToSQL()
 
 	rows, err := dbHandle.Query(sql, args...)
@@ -122,7 +124,7 @@ func GetQueryStatsByLoginName(loginName string) ([]*QueryStat, error) {
 
 	for rows.Next() {
 		stat := &QueryStat{}
-		err = rows.Scan(&stat.Db_ID, &stat.Token, &stat.LoginType, &stat.LoginID, &stat.LoginName, &stat.CreationTime)
+		err = rows.Scan(&stat.Db_ID, &stat.Token, &stat.LoginType, &stat.LoginID, &stat.LoginName, &stat.CreationTime, &stat.Type)
 		if err != nil {
 			return nil, err
 		}

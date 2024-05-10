@@ -1063,6 +1063,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			}
 			fedScanDataCacheMutexUnlock()
 		}
+
+		if err := db.DeleteAssetByID(db.AssetImage, id); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
@@ -1486,6 +1490,7 @@ func getWorkloadDbAssetVul(c *workloadCache, highs, meds, lows []string, lastSca
 	d := &db.DbAssetVul{
 		Type:             db.AssetWorkload,
 		AssetID:          c.workload.ID,
+		AssetID2:         c.workload.ID,
 		Name:             c.podName,
 		W_domain:         c.workload.Domain,
 		W_service_group:  c.serviceName,
@@ -1510,6 +1515,7 @@ func getHostDbAssetVul(c *hostCache, highs, meds, lows []string, lastScanTime ti
 	d := &db.DbAssetVul{
 		Type:         db.AssetNode,
 		AssetID:      c.host.ID,
+		AssetID2:     c.host.ID,
 		Name:         c.host.Name,
 		CVE_high:     len(highs),
 		CVE_medium:   len(meds),
@@ -1530,6 +1536,7 @@ func getPlatformDbAssetVul(highs, meds, lows []string, baseOS string, lastScanTi
 	d := &db.DbAssetVul{
 		Type:       db.AssetPlatform,
 		AssetID:    common.ScanPlatformID,
+		AssetID2:   common.ScanPlatformID,
 		Name:       localDev.Host.Platform,
 		CVE_high:   len(highs),
 		CVE_medium: len(meds),

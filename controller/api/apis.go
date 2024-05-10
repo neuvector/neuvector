@@ -2115,24 +2115,24 @@ type RESTScanStatusData struct {
 }
 
 type RESTScanCacheStat struct {
-	RecordCnt       uint64  `json:"record_count,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	RecordCnt  uint64 `json:"record_count,omitempty"`
+	RecordSize uint64 `json:"record_total_size,omitempty"`
+	MissCnt    uint64 `json:"cache_misses,omitempty"`
+	HitCnt     uint64 `json:"cache_hits,omitempty"`
 }
 
 type RESTScanCacheRecord struct {
-	Layer	string		`json:"layer_id,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"reference_count,omitempty"`
-	RefLast	time.Time	`json:"last_referred,omitempty"`
+	Layer   string    `json:"layer_id,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"reference_count,omitempty"`
+	RefLast time.Time `json:"last_referred,omitempty"`
 }
 
 type RESTScanCacheData struct {
-	CacheRecords 	[]RESTScanCacheRecord	`json:"cache_records,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	CacheRecords []RESTScanCacheRecord `json:"cache_records,omitempty"`
+	RecordSize   uint64                `json:"record_total_size,omitempty"`
+	MissCnt      uint64                `json:"cache_misses,omitempty"`
+	HitCnt       uint64                `json:"cache_hits,omitempty"`
 }
 
 const ScanStatusIdle string = ""
@@ -3917,6 +3917,13 @@ type VulQueryFilterViewModel struct {
 	DebugCVEName     string `json:"debugcve"`
 }
 
+type AssetQueryFilterViewModel struct {
+	Type          string `json:"type"`
+	QuickFilter   string `json:"quickFilter"`
+	OrderByColumn string `json:"orderbyColumn"`
+	OrderByType   string `json:"orderby"`
+}
+
 type UserAccessControl struct {
 	LoginName           string
 	LoginID             string
@@ -3930,10 +3937,12 @@ type UserAccessControl struct {
 }
 
 type QuerySessionRequest struct {
+	Type         int // 0=vul, 1=asset
 	QueryToken   string
 	CreationTime int64
 	UserAccess   *UserAccessControl
 	Filters      *VulQueryFilterViewModel
+	FiltersAsset *AssetQueryFilterViewModel
 }
 
 type RESTAssetView struct {
@@ -3942,7 +3951,7 @@ type RESTAssetView struct {
 	Platforms []*RESTPlatformAssetView    `json:"platforms"`
 	Images    []*RESTImageAssetView       `json:"images"`
 	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
-	QueryStat *RESTScanAssetQueryStats    `json:"summary"`
+	QueryStat *RESTVulQueryStats          `json:"summary"`
 }
 
 type RESTWorkloadAssetView struct {
@@ -3995,12 +4004,39 @@ type RESTImageAssetView struct {
 	Vulnerabilities []string `json:"vulnerabilities"`
 }
 
-type RESTScanAssetQueryStats struct {
+type RESTImageAssetViewV2 struct {
+	ID                string `json:"image_id"`
+	Name              string `json:"repository"`
+	High              int    `json:"high"`
+	Medium            int    `json:"medium"`
+	I_created_at      string `json:"created_at"`
+	I_scanned_at      string `json:"scanned_at"`
+	I_digest          string `json:"digest"`
+	I_base_os         string `json:"base_os"`
+	I_repository_name string `json:"reg_name"`
+	I_repository_url  string `json:"repo_url"`
+	I_size            int    `json:"size"`
+	I_tag             string `json:"tag"`
+}
+
+type RESTVulQueryStats struct {
 	TotalRecordCount        int                     `json:"total_records"`
 	TotalMatchedRecordCount int                     `json:"total_matched_records"`
 	QueryToken              string                  `json:"query_token"`
 	PerfStats               []string                `json:"debug_perf_stats"`
 	Summary                 *VulAssetSessionSummary `json:"summary"`
+}
+
+// for asset pagination
+type RESTAssetQueryStats struct {
+	TotalRecordCount int                  `json:"total_records"`
+	QueryToken       string               `json:"query_token"`
+	PerfStats        []string             `json:"debug_perf_stats"`
+	Summary          *AssetSessionSummary `json:"summary"`
+}
+
+type AssetSessionSummary struct {
+	TopImages []*AssetCVECount `json:"top_images"`
 }
 
 type VulAssetSessionSummary struct {

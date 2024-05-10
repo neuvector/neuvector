@@ -18,7 +18,8 @@ import (
 )
 
 type BuildWhereClauseFunc func(allowedID []string, queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
-type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
+
+// type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 	dialect := goqu.Dialect("sqlite3")
@@ -308,7 +309,7 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTImageAssetView, error) {
 	records := make([]*api.RESTImageAssetView, 0)
 
-	columns := []interface{}{"assetid", "name",
+	columns := []interface{}{"assetid2", "name",
 		"cve_high", "cve_medium", "cve_low", "cve_lists", "packagesb"}
 
 	dialect := goqu.Dialect("sqlite3")
@@ -617,13 +618,13 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 }
 
 func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error) {
-	columns := []interface{}{"assetid", "name", "w_domain", "policy_mode"}
+	columns := []interface{}{"assetid2", "name", "w_domain", "policy_mode"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
 
 	expAssetType := goqu.Ex{"type": "image"}
-	expAssets := goqu.Ex{"assetid": assets}
+	expAssets := goqu.Ex{"assetid2": assets}
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
 
 	var lastErr error
@@ -731,7 +732,7 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 	part2_allowed := goqu.Ex{}
 	if len(allowedID) > 0 {
 		part2_allowed = goqu.Ex{
-			"assetid": allowedID,
+			"assetid2": allowedID,
 		}
 	}
 
@@ -795,89 +796,6 @@ func buildWhereClauseForPlatform(allowedID []string, queryFilter *api.VulQueryFi
 	return goqu.And(part1_assetType, part2_allowed)
 }
 
-func buildWhereClauseForNode_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	return buildWhereClauseForNode([]string{}, queryFilter)
-}
-
-func buildWhereClauseForImage_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	return buildWhereClauseForImage([]string{}, queryFilter)
-}
-
-func buildWhereClauseForDomain_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// domains
-	part3_domain_equals := goqu.Ex{}
-	domain_contains := make([]exp.Expression, 0)
-	if queryFilter.MatchType4Ns != "" && len(queryFilter.SelectedDomains) > 0 {
-		if queryFilter.MatchType4Ns == "equals" {
-			part3_domain_equals = goqu.Ex{
-				"w_domain": queryFilter.SelectedDomains,
-			}
-		} else if queryFilter.MatchType4Ns == "contains" {
-			for _, d := range queryFilter.SelectedDomains {
-				domain_contains = append(domain_contains, goqu.C("w_domain").Like(fmt.Sprintf("%%%s%%", d)))
-			}
-		}
-	}
-
-	return goqu.And(part1_assetType, part3_domain_equals, goqu.Or(domain_contains...))
-}
-
-func buildWhereClauseForService_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// service
-	part_service_equal := goqu.Ex{}
-	part_service_contains := make([]exp.Expression, 0)
-	if queryFilter.ServiceNameMatchType != "" && queryFilter.ServiceName != "" {
-		if queryFilter.ServiceNameMatchType == "equals" {
-			part_service_equal = goqu.Ex{
-				"w_service_group": queryFilter.ServiceName,
-			}
-		} else if queryFilter.ServiceNameMatchType == "contains" {
-			// goqu.C("a").Like("%a%")
-			// goqu.Op{"like": "a%"},
-			part_service_contains = append(part_service_contains, goqu.C("w_service_group").Like(fmt.Sprintf("%%%s%%", queryFilter.ServiceName)))
-		}
-	}
-
-	return goqu.And(part1_assetType, part_service_equal, goqu.Or(part_service_contains...))
-}
-
-func buildWhereClauseForContainer_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// container
-	part_container_equal := goqu.Ex{}
-	part_container_contains := make([]exp.Expression, 0)
-	if queryFilter.ContainerNameMatchType != "" && queryFilter.ContainerName != "" {
-		if queryFilter.ContainerNameMatchType == "equals" {
-			part_container_equal = goqu.Ex{
-				"name": queryFilter.ContainerName,
-			}
-		} else if queryFilter.ContainerNameMatchType == "contains" {
-			part_container_contains = append(part_container_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ContainerName)))
-		}
-	}
-
-	return goqu.And(part1_assetType, part_container_equal, goqu.Or(part_container_contains...))
-}
-
-func buildWhereClauseForPlatform_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "platform",
-	}
-
-	return goqu.And(part1_assetType)
-}
-
 func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 	var zipBytes []byte
 	if len(assetVul.Packages) > 0 {
@@ -889,9 +807,10 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 	}
 
 	record := &goqu.Record{
-		"type":    assetVul.Type,
-		"assetid": assetVul.AssetID,
-		"name":    assetVul.Name,
+		"type":     assetVul.Type,
+		"assetid":  assetVul.AssetID,
+		"assetid2": assetVul.AssetID2,
+		"name":     assetVul.Name,
 
 		"w_domain":        assetVul.W_domain,
 		"w_applications":  assetVul.W_applications,
@@ -915,6 +834,16 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 		"p_version":    assetVul.P_version,
 		"p_base_os":    assetVul.P_base_os,
 		"packagesb":    zipBytes,
+
+		"I_created_at":      assetVul.I_created_at,
+		"I_scanned_at":      assetVul.I_scanned_at,
+		"I_digest":          assetVul.I_digest,
+		"I_base_os":         assetVul.I_base_os,
+		"I_repository_name": assetVul.I_repository_name,
+		"I_repository_url":  assetVul.I_repository_url,
+		"I_size":            assetVul.I_size,
+		"I_images":          assetVul.I_images,
+		"I_tag":             assetVul.I_tag,
 	}
 
 	return record
