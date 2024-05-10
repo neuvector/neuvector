@@ -2115,24 +2115,24 @@ type RESTScanStatusData struct {
 }
 
 type RESTScanCacheStat struct {
-	RecordCnt       uint64  `json:"record_count,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	RecordCnt  uint64 `json:"record_count,omitempty"`
+	RecordSize uint64 `json:"record_total_size,omitempty"`
+	MissCnt    uint64 `json:"cache_misses,omitempty"`
+	HitCnt     uint64 `json:"cache_hits,omitempty"`
 }
 
 type RESTScanCacheRecord struct {
-	Layer	string		`json:"layer_id,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"reference_count,omitempty"`
-	RefLast	time.Time	`json:"last_referred,omitempty"`
+	Layer   string    `json:"layer_id,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"reference_count,omitempty"`
+	RefLast time.Time `json:"last_referred,omitempty"`
 }
 
 type RESTScanCacheData struct {
-	CacheRecords 	[]RESTScanCacheRecord	`json:"cache_records,omitempty"`
-	RecordSize      uint64	`json:"record_total_size,omitempty"`
-	MissCnt         uint64	`json:"cache_misses,omitempty"`
-	HitCnt          uint64	`json:"cache_hits,omitempty"`
+	CacheRecords []RESTScanCacheRecord `json:"cache_records,omitempty"`
+	RecordSize   uint64                `json:"record_total_size,omitempty"`
+	MissCnt      uint64                `json:"cache_misses,omitempty"`
+	HitCnt       uint64                `json:"cache_hits,omitempty"`
 }
 
 const ScanStatusIdle string = ""
@@ -2145,6 +2145,7 @@ const ScanStatusUnsupported string = "unsupported"
 
 type RESTScanBrief struct {
 	Status           string `json:"status"`
+	CriticalVuls     int    `json:"critical"`
 	HighVuls         int    `json:"high"`
 	MedVuls          int    `json:"medium"`
 	Result           string `json:"result"`
@@ -4010,6 +4011,7 @@ type VulAssetSessionSummary struct {
 }
 
 type VulAssetCountDist struct {
+	Critical   int `json:"critical"`
 	High       int `json:"high"`
 	Medium     int `json:"medium"`
 	Low        int `json:"low"`
@@ -4022,6 +4024,7 @@ type VulAssetCountDist struct {
 type AssetCVECount struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
+	Critical    int    `json:"critical"`
 	High        int    `json:"high"`
 	Medium      int    `json:"medium"`
 	Low         int    `json:"low"`

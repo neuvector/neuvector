@@ -48,12 +48,14 @@ type pollContext struct {
 
 // This structure is derived from image summary and scan report. Mostly used for admisssion control
 type imageInfoCache struct {
+	criticalVuls                   int
 	highVuls                       int
 	medVuls                        int
+	criticalVulsWithFix            int
 	highVulsWithFix                int
 	vulScore                       float32
 	vulTraits                      []*scanUtils.VulTrait
-	vulInfo                        map[string]map[string]share.CLUSScannedVulInfo // 1st key is "high"/"medium". 2nd key is "{vul_name}::{package_name}"
+	vulInfo                        map[string]map[string]share.CLUSScannedVulInfo // 1st key is "Critical"/"High"/"Medium". 2nd key is "{vul_name}::{package_name}"
 	lowVulInfo                     []share.CLUSScannedVulInfoSimple
 	layers                         []string
 	envs                           []string
@@ -436,7 +438,7 @@ func RegistryStateUpdate(name string, state *share.CLUSRegistryState) {
 }
 
 func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, calculateLayers bool, vpf scanUtils.VPFInterface) (
-	utils.Set, []string, []string, []scanUtils.FixedVulInfo, map[string][]string, map[string][]string) {
+	utils.Set, []string, []string, []string, []scanUtils.FixedVulInfo, []scanUtils.FixedVulInfo, map[string][]string, map[string][]string, map[string][]string) {
 
 	smd.scanLog.WithFields(log.Fields{"registry": name, "id": id}).Debug()
 
@@ -448,15 +450,17 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	} else if name == common.RegistryFedRepoScanName {
 		rs = repoFedScanRegistry
 	} else if rs, _ = regMapLookup(name); rs == nil {
-		return nil, nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil
 	}
 
 	var c *imageInfoCache
-	var highs, meds, lows []string
+	var criticals, highs, meds, lows []string
 	var alives utils.Set // vul names that are not filtered
+	layerCriticalMap := make(map[string][]string, 0)
 	layerHighMap := make(map[string][]string, 0)
 	layerMedMap := make(map[string][]string, 0)
-	fixedHighsInfo := make([]scanUtils.FixedVulInfo, 0) // fixed high vul info
+	fixedCriticalsInfo := make([]scanUtils.FixedVulInfo, 0) // fixed critical vul info
+	fixedHighsInfo := make([]scanUtils.FixedVulInfo, 0)     // fixed high vul info
 
 	if sum != nil && sum.Status == api.ScanStatusFinished {
 		key := share.CLUSRegistryImageDataKey(name, id)
@@ -475,7 +479,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				}
 			}
 
-			highs, meds, lows, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
+			criticals, highs, meds, lows, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
+			if info, ok := c.vulInfo[share.VulnSeverityCritical]; ok {
+				fixedCriticalsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
+				for _, v := range info {
+					// ks is in format "{vul name}::{package name}"
+					fixedCriticalsInfo = append(fixedCriticalsInfo, scanUtils.FixedVulInfo{PubTS: v.PublishDate})
+				}
+			}
 			if info, ok := c.vulInfo[share.VulnSeverityHigh]; ok {
 				fixedHighsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
 				for _, v := range info {
@@ -483,6 +494,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 					fixedHighsInfo = append(fixedHighsInfo, scanUtils.FixedVulInfo{PubTS: v.PublishDate})
 				}
 			}
+			c.criticalVuls = len(criticals)
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.envs = report.Envs
@@ -504,6 +516,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 				if calculateLayers {
 					// calculate highs and meds in layers
+					layerCriticals := make([]string, 0)
 					layerHighs := make([]string, 0)
 					layerMeds := make([]string, 0)
 					var layerAlives utils.Set // vul names that are not filtered
@@ -522,13 +535,16 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 							continue
 						}
 
-						if v.Severity == share.VulnSeverityHigh {
+						if v.Severity == share.VulnSeverityCritical {
+							layerCriticals = append(layerCriticals, v.Name)
+						} else if v.Severity == share.VulnSeverityHigh {
 							layerHighs = append(layerHighs, v.Name)
 						} else if v.Severity == share.VulnSeverityMedium {
 							layerMeds = append(layerMeds, v.Name)
 						}
 					}
 
+					layerCriticalMap[l.Digest] = layerCriticals
 					layerHighMap[l.Digest] = layerHighs
 					layerMedMap[l.Digest] = layerMeds
 				}
@@ -536,7 +552,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 			sdb := scanUtils.GetScannerDB()
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, "", false)
-			dbAssetVul := getImageDbAssetVul(c, sum, highs, meds, lows)
+			dbAssetVul := getImageDbAssetVul(c, sum, criticals, highs, meds, lows)
 
 			// extract all package info, and assign to dbAssetVul
 			dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
@@ -595,7 +611,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 		delete(rs.cache, id)
 	}
 
-	return alives, highs, meds, fixedHighsInfo, layerHighMap, layerMedMap
+	return alives, criticals, highs, meds, fixedCriticalsInfo, fixedHighsInfo, layerCriticalMap, layerHighMap, layerMedMap
 }
 
 func RegistryScanCacheRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
@@ -1912,13 +1928,14 @@ func IsRegistryImageScanned(id string) bool {
 	return scanned
 }
 
-func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, highs, meds, lows []string) *db.DbAssetVul {
+func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, criticals, highs, meds, lows []string) *db.DbAssetVul {
 	d := &db.DbAssetVul{
-		Type:       db.AssetImage,
-		AssetID:    sum.ImageID,
-		CVE_high:   c.highVuls,
-		CVE_medium: c.medVuls,
-		CVE_low:    len(lows),
+		Type:         db.AssetImage,
+		AssetID:      sum.ImageID,
+		CVE_critical: c.criticalVuls,
+		CVE_high:     c.highVuls,
+		CVE_medium:   c.medVuls,
+		CVE_low:      len(lows),
 	}
 	if len(sum.Images) > 0 {
 		d.Name = fmt.Sprintf("%s:%s", sum.Images[0].Repo, sum.Images[0].Tag)

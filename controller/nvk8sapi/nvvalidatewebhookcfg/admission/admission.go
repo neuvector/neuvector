@@ -19,47 +19,51 @@ const (
 )
 
 const (
-	AuditLogPropMessage     = "Message"
-	AuditLogPropUser        = "User"
-	AuditLogPropImage       = "Image"
-	AuditLogPropImageID     = "ImageID"
-	AuditLogPropRegistry    = "Registry"
-	AuditLogPropRepository  = "Repository"
-	AuditLogPropTag         = "Tag"
-	AuditLogPropBaseOS      = "BaseOS"
-	AuditLogPropHighVulsCnt = "HighVulsCnt"
-	AuditLogPropMedVulsCnt  = "MedVulsCnt"
-	AuditLogPropNamespace   = "Namespace"
-	AuditLogPropFirstLogAt  = "FirstLogAt"
-	AuditLogPropLastLogAt   = "LastLogAt"
+	AuditLogPropMessage         = "Message"
+	AuditLogPropUser            = "User"
+	AuditLogPropImage           = "Image"
+	AuditLogPropImageID         = "ImageID"
+	AuditLogPropRegistry        = "Registry"
+	AuditLogPropRepository      = "Repository"
+	AuditLogPropTag             = "Tag"
+	AuditLogPropBaseOS          = "BaseOS"
+	AuditLogPropCriticalVulsCnt = "CriticalVulsCnt"
+	AuditLogPropHighVulsCnt     = "HighVulsCnt"
+	AuditLogPropMedVulsCnt      = "MedVulsCnt"
+	AuditLogPropNamespace       = "Namespace"
+	AuditLogPropFirstLogAt      = "FirstLogAt"
+	AuditLogPropLastLogAt       = "LastLogAt"
 )
 
 type ScannedImageSummary struct {
-	ImageID         string
-	BaseOS          string
-	Registry        string
-	RegName         string
-	Digest          string
-	Author          string
-	ScannedAt       time.Time
-	Result          int32
-	HighVuls        int
-	MedVuls         int
-	HighVulsWithFix int
-	VulScore        float32
-	VulNames        utils.Set
-	Scanned         bool
-	Signed          bool
-	Verifiers       []string
-	RunAsRoot       bool
-	EnvVars         map[string]string
-	Labels          map[string]string
-	HighVulInfo     map[string]share.CLUSScannedVulInfo // key is vul name
-	MediumVulInfo   map[string]share.CLUSScannedVulInfo // key is vul name
-	LowVulInfo      []share.CLUSScannedVulInfoSimple    // only care about score
-	SetIDPermCnt    int                                 // setuid and set gid from image scan
-	SecretsCnt      int                                 // secrets from image scan
-	Modules         []*share.ScanModule
+	ImageID             string
+	BaseOS              string
+	Registry            string
+	RegName             string
+	Digest              string
+	Author              string
+	ScannedAt           time.Time
+	Result              int32
+	CriticalVuls        int
+	HighVuls            int
+	MedVuls             int
+	CriticalVulsWithFix int
+	HighVulsWithFix     int
+	VulScore            float32
+	VulNames            utils.Set
+	Scanned             bool
+	Signed              bool
+	Verifiers           []string
+	RunAsRoot           bool
+	EnvVars             map[string]string
+	Labels              map[string]string
+	CriticalVulInfo     map[string]share.CLUSScannedVulInfo // key is vul name
+	HighVulInfo         map[string]share.CLUSScannedVulInfo // key is vul name
+	MediumVulInfo       map[string]share.CLUSScannedVulInfo // key is vul name
+	LowVulInfo          []share.CLUSScannedVulInfoSimple    // only care about score
+	SetIDPermCnt        int                                 // setuid and set gid from image scan
+	SecretsCnt          int                                 // secrets from image scan
+	Modules             []*share.ScanModule
 }
 
 type K8sContainerType string

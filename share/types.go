@@ -158,14 +158,16 @@ const (
 )
 
 const (
-	EventCondTypeName           string = "name"
-	EventCondTypeCVEName        string = "cve-name"
-	EventCondTypeCVEHigh        string = "cve-high"
-	EventCondTypeCVEMedium      string = "cve-medium"
-	EventCondTypeCVEHighWithFix string = "cve-high-with-fix"
-	EventCondTypeLevel          string = "level"
-	EventCondTypeProc           string = "process"
-	EventCondTypeBenchNumber    string = "number"
+	EventCondTypeName               string = "name"
+	EventCondTypeCVEName            string = "cve-name"
+	EventCondTypeCVECritical        string = "cve-critical"
+	EventCondTypeCVEHigh            string = "cve-high"
+	EventCondTypeCVEMedium          string = "cve-medium"
+	EventCondTypeCVECriticalWithFix string = "cve-critical-with-fix"
+	EventCondTypeCVEHighWithFix     string = "cve-high-with-fix"
+	EventCondTypeLevel              string = "level"
+	EventCondTypeProc               string = "process"
+	EventCondTypeBenchNumber        string = "number"
 )
 
 const (
