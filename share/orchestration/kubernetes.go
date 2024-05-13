@@ -168,10 +168,13 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 	}
 	if resp, err = client.Do(req); err != nil {
 		return "", fmt.Errorf("Get Version fail - error=%s", err)
-	} else if resp != nil && resp.StatusCode != http.StatusOK {
+	}
+
+	defer resp.Body.Close()
+
+	if resp != nil && resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("getVersion fail - code=%d, tag=%s, useToken=%v", resp.StatusCode, tag, useToken)
 	}
-	defer resp.Body.Close()
 
 	var data []byte
 	data, err = io.ReadAll(resp.Body)
@@ -436,14 +439,15 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 
 /*
 pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
-    "io.kubernetes.container.name": "POD"
-    "io.kubernetes.pod.name": "frontend-3823415956-853n5"
-    "pod-template-hash": "3823415956"
-       |
-       |
-       |--- d8f2f70211b0 gb-frontend k8s_php-redis_frontend-3823415956-853n5_default_...
-       |        "io.kubernetes.container.name": "php-redis"
-       |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
+
+	"io.kubernetes.container.name": "POD"
+	"io.kubernetes.pod.name": "frontend-3823415956-853n5"
+	"pod-template-hash": "3823415956"
+	   |
+	   |
+	   |--- d8f2f70211b0 gb-frontend k8s_php-redis_frontend-3823415956-853n5_default_...
+	   |        "io.kubernetes.container.name": "php-redis"
+	   |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
 */
 func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Service {
 	namespace, _ := meta.Labels[container.KubeKeyPodNamespace]

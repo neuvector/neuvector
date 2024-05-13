@@ -87,9 +87,9 @@ func discoverAuthzEndpoint(endpoint string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -231,9 +231,9 @@ func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
 	if err != nil {
 		return groups, err
 	}
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
 	if err != nil {
 		return groups, err
 	}

@@ -753,8 +753,9 @@ int dpi_session_log_xff(dpi_session_t *s, DPMsgSession *dps)
             dps->Flags |= DPSESS_FLAG_EXTERNAL;
         }
         dps->Flags |= DPSESS_FLAG_XFF;
-        dps->Application = s->xff_app;
-        dps->ServerPort = s->xff_port;
+        //NVSHAS-8908, using X-Forwarded-Port in security event confuses customer
+        //dps->Application = s->xff_app;
+        //dps->ServerPort = s->xff_port;
         dps->PolicyAction = s->xff_desc.action;
         dps->PolicyId = s->xff_desc.id;
     } else {//no need to send a duplicate connect report if not ipv4

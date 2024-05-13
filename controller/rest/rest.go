@@ -1812,6 +1812,11 @@ func StartRESTServer() {
 	}
 	for {
 		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+			if err == http.ErrServerClosed {
+				if cfgmapRetryTimer != nil {
+					cfgmapRetryTimer.Stop()
+				}
+			}
 			log.WithFields(log.Fields{"error": err}).Error("Fail to start SSL rest")
 			time.Sleep(time.Second * 5)
 		} else {

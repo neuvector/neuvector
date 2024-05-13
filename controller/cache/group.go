@@ -1388,7 +1388,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
-					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}
 			}
 			// Members is calculated when group change is handled
@@ -1435,9 +1435,10 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
 		if localDev.Host.Platform == share.PlatformKubernetes {
-			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") { // ignore POD
+			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") {
+				// app containers
 				cacheMutexLock()
-				updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+				wl.Privileged = updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				cacheMutexUnlock()
 			}
 		}

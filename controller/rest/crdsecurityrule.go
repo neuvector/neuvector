@@ -3786,6 +3786,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		var mdNameDisplay string
 		var recordName string
 		var gfwRule resource.NvSecurityRule
+		var objOrig interface{}
 
 		metaData, ok := obj.(metav1.Object)
 		if !ok {
@@ -3802,6 +3803,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			continue
 		}
 		if kind == resource.NvClusterSecurityRuleKind {
+			objOrig = obj
 			r := obj.(*resource.NvClusterSecurityRule)
 			gfwRule = resource.NvSecurityRule(*r)
 			obj = &gfwRule
@@ -3815,7 +3817,12 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 				log.WithFields(log.Fields{"error": errMsg, "name": mdNameDisplay}).Error()
 				e := fmt.Sprintf("%s deleted due to error: %s", mdNameDisplay, errMsg)
 				deleted = append(deleted, e)
-				global.ORCH.DeleteResource(rscType, obj)
+				if kind == resource.NvClusterSecurityRuleKind {
+					obj = objOrig
+				}
+				if err := global.ORCH.DeleteResource(rscType, obj); err != nil {
+					log.WithFields(log.Fields{"rscType": rscType, "name": mdNameDisplay, "err": err}).Error()
+				}
 			}
 		} else {
 			switch kind {

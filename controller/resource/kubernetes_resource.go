@@ -844,16 +844,18 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 		r.Node = o.Spec.NodeName
 		r.HostNet = o.Spec.HostNetwork
 		for _, c := range o.Spec.Containers {
-			if c.LivenessProbe != nil {
-				if exec := c.LivenessProbe.ProbeHandler.Exec; exec != nil {
-					r.LivenessCmds = append(r.LivenessCmds, exec.Command)
-				}
+			var ctr Container
+			ctr.Name = c.Name
+			if c.LivenessProbe != nil && c.LivenessProbe.Exec != nil {
+				ctr.LivenessCmds = c.LivenessProbe.Exec.Command
 			}
-			if c.ReadinessProbe != nil {
-				if exec := c.ReadinessProbe.ProbeHandler.Exec; exec != nil {
-					r.ReadinessCmds = append(r.ReadinessCmds, exec.Command)
-				}
+			if c.ReadinessProbe != nil && c.ReadinessProbe.Exec != nil {
+				ctr.ReadinessCmds = c.ReadinessProbe.Exec.Command
 			}
+			if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
+				ctr.Privileged = *c.SecurityContext.Privileged
+			}
+			r.Containers = append(r.Containers, ctr)
 		}
 		if r.SA = o.Spec.ServiceAccountName; r.SA == "" {
 			r.SA = o.Spec.DeprecatedServiceAccount
@@ -874,12 +876,19 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 		}
 
 		if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
-			for _, cs := range o.Status.ContainerStatuses {
+			for i, cs := range o.Status.ContainerStatuses {
+				var id string
 				containerID := cs.ContainerID
 				for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
 					if strings.HasPrefix(containerID, prefix) {
-						r.ContainerIDs = append(r.ContainerIDs, containerID[len(prefix):])
+						id = containerID[len(prefix):]
+						r.ContainerIDs = append(r.ContainerIDs, id)
 					}
+				}
+				if i < len(r.Containers) {
+					r.Containers[i].Id = id
+				} else {
+					log.WithFields(log.Fields{"id": id, "containers": r.Containers}).Error("Not matched")
 				}
 			}
 		}

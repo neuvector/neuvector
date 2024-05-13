@@ -28,13 +28,11 @@ func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, err
 	}
 	if authService := isTokenDemand(resp); authService != nil {
-		_, err := io.ReadAll(resp.Body)
-		if err == nil {
-			err = resp.Body.Close()
-		}
-		if err != nil {
-			return nil, fmt.Errorf("http: failed to close token demand response (status=%v, err=%q)", resp.StatusCode, err)
-		}
+		// We need authentication.
+		// At this point, we don't need resp.Body anymore.  Consume its buffer and close it, so golang can reuse its TCP connection.
+		// While resp.Body.Close() and io.ReadAll() can fail, there is no point to stop the processing here.
+		_, _ = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		resp, err = t.authAndRetry(authService, req)
 	}
 	return resp, err
@@ -56,6 +54,7 @@ func (t *TokenTransport) authAndRetry(authService *authService, req *http.Reques
 }
 
 func (t *TokenTransport) auth(authService *authService) (string, *http.Response, error) {
+
 	authReq, err := authService.Request(t.Username, t.Password)
 	if err != nil {
 		return "", nil, err
@@ -70,10 +69,18 @@ func (t *TokenTransport) auth(authService *authService) (string, *http.Response,
 		return "", nil, err
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return "", response, err
-	}
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		var newerr error
+		errmsg, err := io.ReadAll(response.Body)
+		if err != nil {
+			newerr = fmt.Errorf("failed to authenticate: %d: failed to read error message: %w", response.StatusCode, err)
+		} else {
+			newerr = fmt.Errorf("failed to authenticate: %d: %s", response.StatusCode, errmsg)
+		}
+		return "", nil, newerr
+	}
 
 	var authToken authToken
 	decoder := json.NewDecoder(response.Body)

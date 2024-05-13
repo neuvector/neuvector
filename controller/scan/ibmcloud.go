@@ -77,11 +77,12 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 		return err
 	}
 
+	defer response.Body.Close()
+
 	if response.StatusCode != http.StatusOK {
 		smd.scanLog.WithFields(log.Fields{"StatusCode": response.StatusCode}).Debug("aquire token fail")
 		return fmt.Errorf("fail to get the IBM Cloud IAM access token")
 	}
-	defer response.Body.Close()
 
 	var authToken authToken
 	decoder := json.NewDecoder(response.Body)

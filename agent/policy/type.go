@@ -32,17 +32,18 @@ type DlpBuildInfo struct {
 }
 
 type Engine struct {
-	NetworkPolicy  map[string]*WorkloadIPPolicyInfo
-	ProcessPolicy  map[string]*share.CLUSProcessProfile
-	DlpWlRulesInfo map[string]*dp.DPWorkloadDlpRule
-	DlpBldInfo     *DlpBuildInfo
-	HostID         string
-	HostIPs        utils.Set
-	TunnelIP       []net.IPNet
-	Mutex          sync.Mutex
-	getGroupRule   GroupProcPolicyCallback
-	PolicyAddrMap  map[string]share.CLUSSubnet
-	PolTimerWheel  *utils.TimerWheel
+	NetworkPolicy      map[string]*WorkloadIPPolicyInfo
+	ProcessPolicy      map[string]*share.CLUSProcessProfile
+	DlpWlRulesInfo     map[string]*dp.DPWorkloadDlpRule
+	DlpBldInfo         *DlpBuildInfo
+	HostID             string
+	HostIPs            utils.Set
+	TunnelIP           []net.IPNet
+	Mutex              sync.Mutex
+	getGroupRule       GroupProcPolicyCallback
+	PolicyAddrMap      map[string]share.CLUSSubnet
+	HostPolicyAddrMap  map[string]share.CLUSSubnet
+	PolTimerWheel      *utils.TimerWheel
 }
 
 func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb GroupProcPolicyCallback, pad int) {
@@ -57,6 +58,7 @@ func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb
 	}
 	e.getGroupRule = cb
 	e.PolicyAddrMap = make(map[string]share.CLUSSubnet)
+	e.HostPolicyAddrMap = make(map[string]share.CLUSSubnet)
 	polAppDir = pad
 }
 

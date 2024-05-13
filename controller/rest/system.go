@@ -353,10 +353,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 				},
 			}
 			if respV2.Config.ModeAuto.ModeAutoD2MDuration == 0 {
-				respV2.Config.ModeAuto.ModeAutoD2MDuration = 1
+				respV2.Config.ModeAuto.ModeAutoD2MDuration = 3600
 			}
 			if respV2.Config.ModeAuto.ModeAutoM2PDuration == 0 {
-				respV2.Config.ModeAuto.ModeAutoM2PDuration = 1
+				respV2.Config.ModeAuto.ModeAutoM2PDuration = 3600
 			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
@@ -1059,14 +1059,30 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 		}
 
 		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
-			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
-				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
-				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+			if rconf.AtmoConfig.ModeAutoD2MDuration != nil {
+				if *rconf.AtmoConfig.ModeAutoD2MDuration < 3600 {
+					e := fmt.Sprintf("Invalid D2M automate duration time [%d] (minimum 3600 seconds)", *rconf.AtmoConfig.ModeAutoD2MDuration)
+					log.WithFields(log.Fields{"d2m duration": *rconf.AtmoConfig.ModeAutoD2MDuration}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+				if rconf.AtmoConfig.ModeAutoD2M != nil {
+					cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
+					cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+				}
 			}
 
-			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
-				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
-				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
+			if rconf.AtmoConfig.ModeAutoM2PDuration != nil {
+				if *rconf.AtmoConfig.ModeAutoM2PDuration < 3600 {
+					e := fmt.Sprintf("Invalid M2P automate duration time [%d] (minimum 3600 seconds)", *rconf.AtmoConfig.ModeAutoM2PDuration)
+					log.WithFields(log.Fields{"m2p duration": *rconf.AtmoConfig.ModeAutoM2PDuration}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+				if rconf.AtmoConfig.ModeAutoM2P != nil {
+					cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
+					cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
+				}
 			}
 		}
 
