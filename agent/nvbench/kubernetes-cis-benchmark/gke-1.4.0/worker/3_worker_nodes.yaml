@@ -1,126 +1,130 @@
-version: "gke-1.4.0"
+version: gke-1.4.0
 id: 3
-title: "3 - Worker Nodes"
-type: "node"
+title: 3 - Worker Nodes
+type: node
 groups:
   - id: 3.1
-    title: "3.1 Worker Node Configuration Files"
+    title: 3.1 Worker Node Configuration Files
     checks:
-      - id: 3.1.1
-        description: Ensure that the proxy kubeconfig file permissions are set to 644 or more restrictive (Manual)
+      - id: K.3.1.1
+        description: Ensure that the proxy kubeconfig file permissions are set to
+          644 or more restrictive (Manual)
         type: worker
         category: kubernetes
         scored: false
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/var/lib/kube-proxy/kubeconfig"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                  pass "      * read check_argument for $file"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * The kubeconfig service file, $file not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the each worker node. For example, chmod 644 /proc/1/root/var/lib/kube-proxy/kubeconfig
-      - id: 3.1.2
-        description: Ensure that the proxy kubeconfig file ownership is set to root:root (Manual)
+          check="$id  - $description"
+          file="/var/lib/kube-proxy/kubeconfig"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+              pass "      * read check_argument for $file"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * The kubeconfig service file, $file not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the each worker node. For example, chmod 644 /proc/1/root/var/lib/kube-proxy/kubeconfig
+      - id: K.3.1.2
+        description: Ensure that the proxy kubeconfig file ownership is set to root:root
+          (Manual)
         type: worker
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * The kubeconfig service file, $file not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the each worker node. For example, chown root:root /proc/1/root/var/lib/kube-proxy/kubeconfig
-      - id: 3.1.3
-        description: Ensure that the kubelet configuration file has permissions set to 644 or more restrictive (Manual)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * The kubeconfig service file, $file not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the each worker node. For example, chown root:root /proc/1/root/var/lib/kube-proxy/kubeconfig
+      - id: K.3.1.3
+        description: Ensure that the kubelet configuration file has permissions set
+          to 644 or more restrictive (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file=""
-              file="/home/kubernetes/kubelet-config.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                  pass "      * read check_argument for $file"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * kubelet configuration file, $file not found"
-              fi        
-        remediation: Run the below command (based on the file location on your system) on the each worker node. For example, chmod chmod 644 /proc/1/root/home/kubernetes/kubelet-config.yaml
-      - id: 3.1.4
-        description: Ensure that the kubelet configuration file ownership is set to root:root (Manual)
+          check="$id  - $description"
+          file=""
+          file="/home/kubernetes/kubelet-config.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+              pass "      * read check_argument for $file"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * kubelet configuration file, $file not found"
+          fi        
+        remediation: Run the below command (based on the file location on your system)
+          on the each worker node. For example, chmod chmod 644 /proc/1/root/home/kubernetes/kubelet-config.yaml
+      - id: K.3.1.4
+        description: Ensure that the kubelet configuration file ownership is set to
+          root:root (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"           
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * kubelet configuration file, $file not found"
-              fi        
-        remediation: Run the below command (based on the file location on your system) on the each worker node. For example, chown root:root /proc/1/root/home/kubernetes/kubelet-config.yaml
+          check="$id  - $description"           
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * kubelet configuration file, $file not found"
+          fi        
+        remediation: Run the below command (based on the file location on your system)
+          on the each worker node. For example, chown root:root /proc/1/root/home/kubernetes/kubelet-config.yaml
   - id: 3.2
-    title: "3.2 - Kubelet"
+    title: 3.2 - Kubelet
     checks:
-      - id: 3.2.1
+      - id: K.3.2.1
         description: Ensure that the --anonymous-auth argument is set to false (Automated)
         type: worker
         category: kubernetes
@@ -128,80 +132,79 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: |
-                    If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false.
-                    If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-                    --anonymous-auth=false
-                    Based on your system, restart the kubelet service. For example:   
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service                   
-      - id: 3.2.2
-        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)
+          If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false.
+          If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+          --anonymous-auth=false
+          Based on your system, restart the kubelet service. For example:   
+          systemctl daemon-reload 
+          systemctl restart kubelet.service                   
+      - id: K.3.2.2
+        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--authorization-mode=AlwaysAllow' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--authorization-mode=AlwaysAllow' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
         remediation: |
-                    If using a Kubelet config file, edit the file to set authorization: mode to Webhook.
-                    If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.        
-                    --authorization-mode=Webhook
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service
-      - id: 3.2.3
-        description: Ensure that the --client-ca-file argument is set as appropriate (Automated)
+          If using a Kubelet config file, edit the file to set authorization: mode to Webhook.
+          If using executable arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.        
+          --authorization-mode=Webhook
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload 
+          systemctl restart kubelet.service
+      - id: K.3.2.3
+        description: Ensure that the --client-ca-file argument is set as appropriate
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
-                  cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
-                  cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
-                  pass "$check"
-                  pass "      * client-ca-file: $cafile"
-              else
-                  warn "$check"
-              fi        
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
+              cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
+              cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * client-ca-file: $cafile"
+          else
+              warn "$check"
+          fi        
         remediation: |
-                    If using a Kubelet config file, edit the file to set authentication: x509: clientCAFile to the location of the client CA file.
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.
-                    --client-ca-file=<path/to/client-ca-file>
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload
-                    systemctl restart kubelet.service
-      - id: 3.2.4
+          If using a Kubelet config file, edit the file to set authentication: x509: clientCAFile to the location of the client CA file.
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.
+          --client-ca-file=<path/to/client-ca-file>
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload
+          systemctl restart kubelet.service
+      - id: K.3.2.4
         description: Ensure that the --read-only-port argument is set to 0 (Manual)
         type: worker
         category: kubernetes
@@ -209,32 +212,32 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--read-only-port' >/dev/null 2>&1; then
-                  port=$(get_argument_value "$CIS_KUBELET_CMD" '--read-only-port' | cut -d "=" -f 2)
-                  if [ $port = "0" ]; then
-                      pass "$check"
-                  else
-                      warn "$check"
-                      warn "      * read-only-port: $port"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--read-only-port' >/dev/null 2>&1; then
+              port=$(get_argument_value "$CIS_KUBELET_CMD" '--read-only-port' | cut -d "=" -f 2)
+              if [ $port = "0" ]; then
+                  pass "$check"
               else
                   warn "$check"
-              fi        
+                  warn "      * read-only-port: $port"
+              fi
+          else
+              warn "$check"
+          fi        
         remediation: |
-                    If using a Kubelet config file, edit the file to set readOnlyPort to 0.
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-                    --read-only-port=0
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload
-                    systemctl restart kubelet.service
-      - id: 3.2.5
-        description: Ensure that the --streaming-connection-idle-timeout argument is not set to 0 (Automated)
+          If using a Kubelet config file, edit the file to set readOnlyPort to 0.
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+          --read-only-port=0
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload
+          systemctl restart kubelet.service
+      - id: K.3.2.5
+        description: Ensure that the --streaming-connection-idle-timeout argument
+          is not set to 0 (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -242,23 +245,24 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--streaming-connection-idle-timeout=0' >/dev/null 2>&1; then
-                  timeout=$(get_argument_value "$CIS_KUBELET_CMD" '--streaming-connection-idle-timeout')
-                  warn "$check"
-                  warn "      * streaming-connection-idle-timeout: $timeout"
-              else
-                  pass "$check"
-              fi        
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--streaming-connection-idle-timeout=0' >/dev/null 2>&1; then
+              timeout=$(get_argument_value "$CIS_KUBELET_CMD" '--streaming-connection-idle-timeout')
+              warn "$check"
+              warn "      * streaming-connection-idle-timeout: $timeout"
+          else
+              pass "$check"
+          fi        
         remediation: |
-                    If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout to a value other than 0. 
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-                    --streaming-connection-idle-timeout=5m
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service
-      - id: 3.2.6
-        description: Ensure that the --make-iptables-util-chains argument is set to true (Automated)
+          If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout to a value other than 0. 
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+          --streaming-connection-idle-timeout=5m
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload 
+          systemctl restart kubelet.service
+      - id: K.3.2.6
+        description: Ensure that the --make-iptables-util-chains argument is set to
+          true (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -266,19 +270,19 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=true' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=true' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
         remediation: |
-                    If using a Kubelet config file, edit the file to set makeIPTablesUtilChains: true. 
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove the --mak-iptables-util-chains argument from the KUBELET_SYSTEM_PODS_ARGS variable. 
-                    Based on your system, restart the kubelet service. For example:        
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service
-      - id: 3.2.7
+          If using a Kubelet config file, edit the file to set makeIPTablesUtilChains: true. 
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove the --mak-iptables-util-chains argument from the KUBELET_SYSTEM_PODS_ARGS variable. 
+          Based on your system, restart the kubelet service. For example:        
+          systemctl daemon-reload 
+          systemctl restart kubelet.service
+      - id: K.3.2.7
         description: Ensure that the --hostname-override argument is not set (Manual)
         type: worker
         category: kubernetes
@@ -287,15 +291,19 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--hostname-override' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: 'Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove the --hostname-override argument from the KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service'
-      - id: 3.2.8
-        description: Ensure that the --eventrecordqps argument is set to 5 or higher or a level which ensures appropriate event capture (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--hostname-override' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: 'Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+          on each worker node and remove the --hostname-override argument from the
+          KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet
+          service. For example:  systemctl daemon-reload systemctl restart kubelet.service'
+      - id: K.3.2.8
+        description: Ensure that the --eventrecordqps argument is set to 5 or higher
+          or a level which ensures appropriate event capture (Automated)
         type: worker
         category: kubernetes
         scored: false
@@ -303,138 +311,143 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--event-qps' >/dev/null 2>&1; then
-                  qps=$(get_argument_value "$CIS_KUBELET_CMD" '--event-qps' | cut -d "=" -f 2)
-                  if [ $qps -ge 5 ]; then 
-                    pass "$check"
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--event-qps' >/dev/null 2>&1; then
+              qps=$(get_argument_value "$CIS_KUBELET_CMD" '--event-qps' | cut -d "=" -f 2)
+              if [ $qps -ge 5 ]; then 
+                pass "$check"
+              else
+                  warn "$check"
+                  warn "      * --event-qps should be set >= 5"
+              fi
+          else
+              if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
+                  file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'| cut -d " " -f 2)
+                  file=$(append_prefix "$CONFIG_PREFIX" "$file")
+                  if [ -f "$file" ]; then
+                      found=$(sed -rn '/--eventrecordqps=[^ ]+/p' $file)
+                      if [ -z "$found" ]; then
+                          warn "$check"
+                          warn "      * --eventrecordqps is not set in $file"
+                      else
+                          extracted_value=$(echo "$found" | sed 's/.*--eventrecordqps=\([^ ]*\).*/\1/')
+                          if [[ "$extracted_value" -ge 0 ]]; then
+                              pass "$check"
+                          else
+                              warn "$check"
+                              warn "      * --eventrecordqps should be set >= 5, but set $extracted_value"
+                          fi
+                      fi
                   else
                       warn "$check"
-                      warn "      * --event-qps should be set >= 5"
+                      warn "      * $file is not found!"
                   fi
-              else
-                  if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
-                      file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'| cut -d " " -f 2)
-                      file=$(append_prefix "$CONFIG_PREFIX" "$file")
-                      if [ -f "$file" ]; then
-                          found=$(sed -rn '/--eventrecordqps=[^ ]+/p' $file)
-                          if [ -z "$found" ]; then
-                              warn "$check"
-                              warn "      * --eventrecordqps is not set in $file"
-                          else
-                              extracted_value=$(echo "$found" | sed 's/.*--eventrecordqps=\([^ ]*\).*/\1/')
-                              if [[ "$extracted_value" -ge 0 ]]; then
-                                  pass "$check"
-                              else
-                                  warn "$check"
-                                  warn "      * --eventrecordqps should be set >= 5, but set $extracted_value"
-                              fi
-                          fi
-                      else
-                          warn "$check"
-                          warn "      * $file is not found!"
-                      fi
-                  else 
-                      warn "$check"
-                      warn "      * --event-qps should be set >= 5"
-                  fi
-              fi        
-        remediation: 'If using a Kubelet config file, edit the file to set --event-qps: to an appropriate level. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet service. For example:  systemctl daemon-reload systemctl restart kubelet.service'
-      - id: 3.2.9
-        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Automated)
+              else 
+                  warn "$check"
+                  warn "      * --event-qps should be set >= 5"
+              fi
+          fi        
+        remediation: 'If using a Kubelet config file, edit the file to set --event-qps:
+          to an appropriate level. If using command line arguments, edit the kubelet
+          service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each
+          worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+          Based on your system, restart the kubelet service. For example:  systemctl
+          daemon-reload systemctl restart kubelet.service'
+      - id: K.3.2.9
+        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
+          are set as appropriate (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
-                  if check_argument "$CIS_KUBELET_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
-                      cfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-cert-file')
-                      kfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-private-key-file')
-                      cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
-                      kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
-                      pass "$check"
-                      pass "      * tls-cert-file: $cfile"
-                      pass "      * tls-private-key-file: $kfile"
-                  else
-                    warn "$check"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
+              if check_argument "$CIS_KUBELET_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
+                  cfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-cert-file')
+                  kfile=$(get_argument_value "$CIS_KUBELET_CMD" '--tls-private-key-file')
+                  cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
+                  kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
+                  pass "$check"
+                  pass "      * tls-cert-file: $cfile"
+                  pass "      * tls-private-key-file: $kfile"
               else
-                  warn "$check"
-              fi        
+                warn "$check"
+              fi
+          else
+              warn "$check"
+          fi        
         remediation: |
-                    If using a Kubelet config file, edit the file to set tlsCertFile to the location of the certificate file to use to identify this Kubelet, and tlsPrivateKeyFile to the location of the corresponding private key file. 
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameters in KUBELET_CERTIFICATE_ARGS variable.  
-                    --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file> 
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service                    
-      - id: 3.2.10
-        description: Ensure that the --rotate-certificates argument is not set to false (Automated)
+          If using a Kubelet config file, edit the file to set tlsCertFile to the location of the certificate file to use to identify this Kubelet, and tlsPrivateKeyFile to the location of the corresponding private key file. 
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameters in KUBELET_CERTIFICATE_ARGS variable.  
+          --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file> 
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload 
+          systemctl restart kubelet.service                    
+      - id: K.3.2.10
+        description: Ensure that the --rotate-certificates argument is not set to
+          false (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_KUBELET_CMD" '--rotate-certificates=false' >/dev/null 2>&1; then
-                warn "$check"
-              else
-                pass "$check"
-              fi   
+          check="$id  - $description"
+          if check_argument "$CIS_KUBELET_CMD" '--rotate-certificates=false' >/dev/null 2>&1; then
+            warn "$check"
+          else
+            pass "$check"
+          fi   
         remediation: |
-                    If using a Kubelet config file, edit the file to add the line rotateCertificates: true or remove it altogether to use the default value.
-                    If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove --rotate-certificates=false argument from the KUBELET_CERTIFICATE_ARGS variable.
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload 
-                    systemctl restart kubelet.service 
-      - id: 3.2.11
-        description: Ensure that the RotateKubeletServerCertificate argument is set to true (Automated)
+          If using a Kubelet config file, edit the file to add the line rotateCertificates: true or remove it altogether to use the default value.
+          If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and remove --rotate-certificates=false argument from the KUBELET_CERTIFICATE_ARGS variable.
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload 
+          systemctl restart kubelet.service 
+      - id: K.3.2.11
+        description: Ensure that the RotateKubeletServerCertificate argument is set
+          to true (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file=""
-              if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
-                  file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'|cut -d " " -f 1)
-              fi
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
-                if [ -z "$found" ]; then
-                    warn "$check"
-                    warn "      * --feature-gates=RotateKubeletServerCertificate=true not found"
-                else
-                    pass "$check"
-                fi
-              else
+          check="$id  - $description"
+          file=""
+          if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
+              file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'|cut -d " " -f 1)
+          fi
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
+            if [ -z "$found" ]; then
                 warn "$check"
-                warn "      * The kubeconfig service file not found"
-              fi
-        remediation: |
-                    Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_CERTIFICATE_ARGS variable.
-                    --feature-gates=RotateKubeletServerCertificate=true
-                    Based on your system, restart the kubelet service. For example:
-                    systemctl daemon-reload
-                    systemctl restart kubelet.service
+                warn "      * --feature-gates=RotateKubeletServerCertificate=true not found"
+            else
+                pass "$check"
+            fi
+          else
+            warn "$check"
+            warn "      * The kubeconfig service file not found"
+          fi
+        remediation: |-
+          Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_CERTIFICATE_ARGS variable.
+          --feature-gates=RotateKubeletServerCertificate=true
+          Based on your system, restart the kubelet service. For example:
+          systemctl daemon-reload
+          systemctl restart kubelet.service

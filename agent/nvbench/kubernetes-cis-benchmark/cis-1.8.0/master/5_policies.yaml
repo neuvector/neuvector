@@ -17,7 +17,7 @@ groups:
         tags: []
         audit: |
           check="$id  - $description"
-          manual "$check"     
+          manual "$check"
           manual "      * Run kubectl get clusterrolebindings -o=custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].name, Review each principal listed and ensure that cluster-admin privilege is required for it."
         remediation: 'Identify all clusterrolebindings to the cluster-admin role.
           Check if they are used and if they need this role or if they could use a

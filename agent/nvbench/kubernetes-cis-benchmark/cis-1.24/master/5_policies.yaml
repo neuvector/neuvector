@@ -139,7 +139,8 @@ groups:
         audit: |
           check="$id  - $description"
           manual "$check"
-          manual "      * Review the namespaces in the cluster to see if the required labels have been applied kubectl get namespaces -o yaml To confirm if any external policy control system is in use, review the cluster for the presence of validatingadmissionwebhook and mutatingadmissionwebhook objects. kubectl get validatingwebhookconfigurations or kubectl get mutatingwebhookconfigurations"
+          manual "      * Run get pods -A -o=jsonpath={range .items[*]}{@.metadata.name}:{@..securityContext}\n{end}"
+          manual "      * It will produce an inventory of all the privileged use on the cluster, if any (please, refer to a sample below). Further grepping can be done to automate each specific violation detection.calico-kube-controllers-57b57c56f-jtmk4: {} << No Elevated Privileges calico-node-c4xv4: {} {privileged:true} {privileged:true} {privileged:true} {privileged:true} << Violates 5.2.2 dashboard-metrics-scraper-7bc864c59-2m2xw: {seccompProfile:{type:RuntimeDefault}} {allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,runAsGroup:2001,ru nAsUser:1001}"
         remediation: Ensure that either Pod Security Admission or an external policy
           control system is in place for every namespace which contains user workloads.
       - id: K.5.2.2
@@ -153,7 +154,8 @@ groups:
         audit: |
           check="$id  - $description"
           manual "$check"
-          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of privileged containers."
+          manual "      * Run get pods -A -o=jsonpath={range .items[*]}{@.metadata.name}:{@..securityContext}\n{end}"
+          manual "      * It will produce an inventory of all the privileged use on the cluster, if any (please, refer to a sample below). Further grepping can be done to automate each specific violation detection.calico-kube-controllers-57b57c56f-jtmk4: {} << No Elevated Privileges calico-node-c4xv4: {} {privileged:true} {privileged:true} {privileged:true} {privileged:true} << Violates 5.2.2 dashboard-metrics-scraper-7bc864c59-2m2xw: {seccompProfile:{type:RuntimeDefault}} {allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,runAsGroup:2001,ru nAsUser:1001}"
         remediation: Add policies to each namespace in the cluster which has user
           workloads to restrict the admission of privileged containers.
       - id: K.5.2.3
