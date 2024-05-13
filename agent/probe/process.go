@@ -764,19 +764,28 @@ func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcI
 	}
 
 	// normal process
-	info, ok := suspicProcMap[proc.name]
-	if !ok {
+	if info, ok := suspicProcMap[proc.name]; ok {
+		/// new finding
+		proc.riskType = proc.name                // updated
+		proc.action = share.PolicyActionCheckApp // tag it
+		return info, ok
+	} else {
 		// keep tracing on target suspicous tree
 		if proc.action == share.PolicyActionCheckApp { // parent is suspicious
+			proc.riskyChild = true
 			return suspicProcMap[proc.riskType], true
 		}
-		return nil, false
-	}
+		if info, ok = suspicProcMap[proc.pname]; !ok {
+			return nil, false
+		}
 
-	/// new finding
-	proc.riskType = proc.name                // updated
-	proc.action = share.PolicyActionCheckApp // tag it
-	return info, ok
+		// children
+		proc.riskType = proc.pname               // updated
+		proc.action = share.PolicyActionCheckApp // tag it
+		proc.riskyChild = true
+		return info, ok
+	}
+	return nil, false
 }
 
 
@@ -1806,6 +1815,32 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 		return false, false // a new executable
 	}
 
+	// Check whether its suspicious parent has been allowed by rules.
+	ppid := proc.ppid
+	for i := 0; i < 10; i++ {	// lookup 10 ancestries
+		if pproc, ok := p.pidProcMap[ppid]; !ok {
+			break	// no parent process for reference
+		} else {
+			if global.RT.IsRuntimeProcess(pproc.name, nil) {
+				mLog.WithFields(log.Fields{"name": pproc.name, "id": id}).Debug("PROC: not child")
+				break
+			}
+
+			if pproc.name == proc.riskType {
+				if action, ok := p.procProfileEval(id, pproc, true); ok && action == share.PolicyActionAllow {
+					// parent has been allowed
+					mLog.WithFields(log.Fields{"name": pproc.name, "id": id}).Debug("PROC: allowed")
+					return true, false	//
+				}
+				mLog.WithFields(log.Fields{"name": pproc.name, "id": id}).Debug("PROC: not allowed")
+				break
+			}
+			ppid = pproc.ppid
+			if ppid == 1 && id == ""{
+				break
+			}
+		}
+	}
 	return true, false
 }
 
@@ -2481,11 +2516,19 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		return share.PolicyActionAllow, false // assuming it is allowed so far
 	}
 
-	if !allowSuspicious { // user does not open the door
-		// suspicious children are suspicious. overwrite the action based on policy mode
-		if proc.riskyChild && pp.Action == share.PolicyActionAllow {
+	if proc.riskType != "" || proc.riskyChild {
+		if allowSuspicious {
+			if pp.Action != share.PolicyActionAllow {
+				// consider it as an intruder processes unless users whitelist it
+				mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: Risky session")
+				pp.Action = negativeResByMode(mode)
+				pp.Uuid = share.CLUSReservedUuidNotAlllowed
+			}
+		} else {
+			// user does not open the door
 			switch mode {
 			case share.PolicyModeLearn:
+				// suspicious children are still suspicious
 				pp.Action = share.PolicyActionCheckApp
 			case share.PolicyModeEvaluate:
 				pp.Action = share.PolicyActionViolate
@@ -2520,17 +2563,9 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 					}
 				}
 			} else {
-				// NVSHAS-7501 - I think we have to assume false on keep alive.
-				// If its in Monitor mode, the keep alive doesn't affect the rule and it won't kill the process.
-				// But when we transition to Protect mode and zero drift and the keep alive is set to true...
-				// existing processes that are running will be allowed to continue to run even tho they should not.
-				// By forcing to false, we are making sure existing processes that violate policies can be killed.
-				// Otherwise, the bug was that we would see
-				//"violation" incidents but the processes would continue to run
 				bKeepAlive = false
 			}
 		}
-
 		if (pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny) {
 		   if pp.Uuid != share.CLUSReservedUuidAnchorMode {
 				var bParentHostProc bool
@@ -3150,9 +3185,16 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "svcGroup": svcGroup}).Debug()
 			}
 		case share.PolicyActionAllow, share.PolicyActionViolate:
-			if ppe.Action == share.PolicyActionViolate && ppe.Uuid != share.CLUSReservedUuidNotAlllowed {
-				// a real deny rule
-				break
+			if ppe.Action == share.PolicyActionViolate {
+				if ppe.Uuid != share.CLUSReservedUuidNotAlllowed {
+					// a real deny rule
+					break
+				}
+
+				if proc.riskType != "" || proc.riskyChild {
+					mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("SHD: rissky session")
+					break
+				}
 			}
 
 			bPass = true
