@@ -15,8 +15,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 const (
@@ -26,7 +24,7 @@ const (
 	nodeModules2 = "/usr/local/lib/node_modules"
 	nodeModules  = "node_modules"
 	nodePackage  = "package.json"
-	nodeJs       = "node.js"
+	nodeJs       = "npm"
 
 	wpname           = "Wordpress"
 	WPVerFileSuffix  = "wp-includes/version.php"
@@ -119,13 +117,12 @@ type dotnetPackage struct {
 }
 
 type ScanApps struct {
-	dedup   utils.Set               // Used by some apps to remove duplicated modules
 	pkgs    map[string][]AppPackage // AppPackage set
 	replace bool
 }
 
 func NewScanApps(v2 bool) *ScanApps {
-	return &ScanApps{pkgs: make(map[string][]AppPackage), dedup: utils.NewSet(), replace: v2}
+	return &ScanApps{pkgs: make(map[string][]AppPackage), replace: v2}
 }
 
 func IsAppsPkgFile(filename, fullpath string) bool {
@@ -434,7 +431,7 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 	return &pkg, nil
 }
 
-func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath string, depth int) {
+func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath string, depth int) {
 	tempDir, err := ioutil.TempDir("", "")
 	if err == nil {
 		defer os.RemoveAll(tempDir)
@@ -445,7 +442,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 	// the real filepath
 	path := filename
 	if depth > 0 {
-		path = tfile + ":" + filename
+		path = origJar + ":" + filename
 	}
 
 	pkgs := make(map[string][]AppPackage)
@@ -462,7 +459,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 					if _, err := io.Copy(dstFile, jarFile); err == nil {
 						dstFile.Close()
 						if jarReader, err := zip.OpenReader(dstPath); err == nil {
-							s.parseJarPackage(jarReader.Reader, tfile, f.Name, dstPath, depth+1)
+							s.parseJarPackage(jarReader.Reader, origJar, f.Name, dstPath, depth+1)
 							jarReader.Close()
 						}
 					} else {
@@ -518,7 +515,12 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 				ModuleName: fmt.Sprintf("%s:%s", groupId, artifactId),
 				Version:    version,
 			}
-			pkgs[path] = []AppPackage{pkg}
+			if _, ok := pkgs[path]; !ok {
+				pkgs[path] = []AppPackage{pkg}
+			} else {
+				pkgs[path] = append(pkgs[path], pkg)
+			}
+
 			continue //higher priority
 		} else if strings.HasSuffix(f.Name, javaManifest) {
 			rc, err := f.Open()
@@ -528,7 +530,11 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, tfile, filename, fullpath strin
 			}
 
 			if pkg, err := parseJarManifestFile(path, rc); err == nil {
-				pkgs[path] = []AppPackage{*pkg}
+				if _, ok := pkgs[path]; !ok {
+					pkgs[path] = []AppPackage{*pkg}
+				} else {
+					pkgs[path] = append(pkgs[path], *pkg)
+				}
 			}
 
 			rc.Close()
@@ -594,7 +600,7 @@ func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
 		if _, ok := s.pkgs[filename]; !ok {
 			s.pkgs[filename] = []AppPackage{appPackage}
 		} else {
-			s.pkgs[filename] = append(s.pkgs[appPackage.ModuleName], appPackage)
+			s.pkgs[filename] = append(s.pkgs[filename], appPackage)
 		}
 	}
 }
@@ -746,13 +752,7 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 					Version:    v,
 					FileName:   filename,
 				}
-
-				// There can be several files that list the same dependency, such as .NET Core, so to dedup them
-				key := fmt.Sprintf("%s-%s-%s", pkg.AppName, pkg.ModuleName, pkg.Version)
-				if !s.dedup.Contains(key) {
-					s.dedup.Add(key)
-					pkgs = append(pkgs, pkg)
-				}
+				pkgs = append(pkgs, pkg)
 			}
 		}
 	}
@@ -764,13 +764,7 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 			Version:    coreVersion,
 			FileName:   filename,
 		}
-
-		// There can be several files that list the same dependency, such as .NET Core, so to dedup them
-		key := fmt.Sprintf("%s-%s-%s", pkg.AppName, pkg.ModuleName, pkg.Version)
-		if !s.dedup.Contains(key) {
-			s.dedup.Add(key)
-			pkgs = append(pkgs, pkg)
-		}
+		pkgs = append(pkgs, pkg)
 	}
 
 	if len(pkgs) > 0 {
