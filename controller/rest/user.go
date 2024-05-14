@@ -547,21 +547,10 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 		if user.Server == share.FlavorRancher {
 			if ruser.Role != nil || ruser.RoleDomains != nil {
-				e := "Cannot change Rancher SSO user's role/permissions in NeuVector"
-				log.WithFields(log.Fields{"user": fullname}).Error(e)
-				//->
+				//e := "Cannot change Rancher SSO user's role/permissions in NeuVector"
+				//log.WithFields(log.Fields{"user": fullname}).Error(e)
 				ruser.Role = nil
 				ruser.RoleDomains = nil
-				/*
-					if ruser.Role != nil {
-						log.WithFields(log.Fields{"ruser.Role": ruser.Role}).Error("=> test : 1")
-					}
-					if ruser.RoleDomains != nil {
-						log.WithFields(log.Fields{"ruser.RoleDomains": ruser.RoleDomains}).Error("=> test : 2")
-					}
-					restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, e)
-					return
-				*/
 			}
 		}
 

@@ -2193,6 +2193,7 @@ func CLUSEmptyFedRulesRevision() *CLUSFedRulesRevision {
 			FedProcessProfilesType:     0,
 			FedSystemConfigType:        0,
 		},
+		LastUpdateTime: time.Now().UTC(),
 	}
 
 	return fedRev
@@ -2224,6 +2225,13 @@ func CLUSFedKey2ClusterIdKey(key string) string {
 type CLUSRestServerInfo struct { // provided by admin
 	Server string `json:"server"`
 	Port   uint   `json:"port"`
+}
+
+func (restInfo CLUSRestServerInfo) IsValid() bool {
+	if restInfo.Server == "" || restInfo.Port == 0 {
+		return false
+	}
+	return true
 }
 
 type CLUSFedMasterClusterInfo struct {
@@ -2258,7 +2266,7 @@ type CLUSFedMembership struct { // stored on each cluster (master & joint cluste
 	JointCluster     CLUSFedJointClusterInfo  `json:"joint_cluster,omitempty"`  // meaningful when the role is "joint"
 	PendingDismiss   bool                     `json:"pending_dismiss"`          // set to true when the cluster is demoted/kicked & leaves fed. set to false when the fed rules cleanup is done
 	PendingDismissAt time.Time                `json:"pending_dismiss_at"`
-	UseProxy         string                   `json:"use_proxy"` // http / https
+	UseProxy         string                   `json:"use_proxy"` // "" / https
 }
 
 // fed registry scan data is always deployed
@@ -2294,7 +2302,8 @@ type CLUSClusterCspUsage struct {
 
 // fed ruleTypes' revision data. stored under object/config/federation/rules_revision
 type CLUSFedRulesRevision struct {
-	Revisions map[string]uint64 `json:"revisions"` // key is fed rules type, value is revision
+	Revisions      map[string]uint64 `json:"revisions"` // key is fed rules type, value is revision
+	LastUpdateTime time.Time         `json:"last_update_time"`
 }
 
 type CLUSFedDoPingPoll struct {

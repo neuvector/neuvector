@@ -1428,7 +1428,7 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer() {
+func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
 	licenseInit()
 	newRepoScanMgr()
@@ -1796,6 +1796,10 @@ func StartRESTServer() {
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
 
+	if isNewCluster && isLead {
+		go loadFedInitCfg()
+	}
+
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
 		MinVersion:               tls.VersionTLS11,
@@ -1875,6 +1879,7 @@ func startFedRestServer(fedPingInterval uint32) {
 		for i := 0; i < 5; i++ {
 			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 				if err == http.ErrServerClosed {
+					log.Info("REST Server closed")
 					break
 				}
 				log.WithFields(log.Fields{"error": err}).Error("Fail to start fed SSL rest")

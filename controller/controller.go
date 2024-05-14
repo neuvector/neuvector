@@ -856,7 +856,7 @@ func main() {
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
-	go rest.StartRESTServer()
+	go rest.StartRESTServer(isNewCluster, Ctrler.Leader)
 
 	// go rest.StartLocalDevHttpServer() // for local dev only
 

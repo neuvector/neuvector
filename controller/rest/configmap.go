@@ -28,6 +28,7 @@ const authconfigmap string = "/etc/config/userinitcfg.yaml"
 const roleconfigmap string = "/etc/config/roleinitcfg.yaml"
 const syscfgconfigmap string = "/etc/config/sysinitcfg.yaml"
 const pwdprofileconfigmap string = "/etc/config/passwordprofileinitcfg.yaml"
+const fedconfigmap string = "/etc/config/fedinitcfg.yaml"
 
 const maxNameLength = 1024
 
@@ -933,4 +934,219 @@ func LoadInitCfg(load bool, platform string) {
 	}
 	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried}).Info("done")
 
+}
+
+func waitForFedRoleChange(roleExpected string) {
+	for i := 0; i < 30; i++ {
+		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == roleExpected {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond)
+}
+
+func handlefedcfg(yaml_data []byte) (string, error) {
+	json_data, err1 := yaml.YAMLToJSON(yaml_data)
+	if err1 != nil {
+		log.WithFields(log.Fields{"error": err1}).Error("fed config to json convert error")
+		return "", err1
+	}
+
+	var rconf api.RESTFedDataCfgMap
+	var err error
+
+	if err := json.Unmarshal(json_data, &rconf); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return "", err
+	} else if !rconf.PrimaryRestInfo.IsValid() {
+		return "", fmt.Errorf("no primary rest server info")
+	}
+
+	var msg string
+	var fedOp string
+	acc := access.NewAdminAccessControl()
+	login := loginSession{
+		fullname:    common.ReservedNvSystemUser,
+		remote:      "configmap",
+		domainRoles: map[string]string{access.AccessDomainGlobal: api.UserRoleAdmin},
+	}
+
+	membership := clusHelper.GetFedMembership()
+	fedSettings := clusHelper.GetFedSettings()
+
+	var lock cluster.LockInterface
+	if lock, err = lockClusKey(nil, share.CLUSLockFedKey); err != nil {
+		return msg, err
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	// configmap has higher priority over backup settings.
+	if rconf.ManagedRestInfo == nil {
+		// to be a master cluster
+		fedOp = "promote"
+		promote := true
+		if membership.FedRole == api.FedRoleMaster {
+			if membership.UseProxy != rconf.UseProxy {
+				membership.UseProxy = rconf.UseProxy
+				clusHelper.PutFedMembership(membership)
+			}
+			if rconf.DeployRepoScanData != nil && fedSettings.DeployRepoScanData != *rconf.DeployRepoScanData {
+				var cfg share.CLUSFedSettings = share.CLUSFedSettings{DeployRepoScanData: *rconf.DeployRepoScanData}
+				clusHelper.PutFedSettings(nil, cfg)
+			}
+			// check whether any published fed server info is different
+			if membership.MasterCluster.RestInfo != rconf.PrimaryRestInfo {
+				// it's already a master cluster but with different fed rest host/port. restart fed rest server
+				StartStopFedPingPoll(share.StopFedRestServer, 0, nil)
+				membership.LocalRestInfo = rconf.PrimaryRestInfo
+				membership.MasterCluster.User = common.ReservedNvSystemUser
+				membership.MasterCluster.RestInfo = rconf.PrimaryRestInfo
+				clusHelper.PutFedMembership(membership)
+				clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{})
+				go StartStopFedPingPoll(share.StartFedRestServer, 0, nil)
+			}
+			promote = false
+			if rconf.ClusterName != "" {
+				oldName := cacher.GetSystemConfigClusterName(acc)
+				if rconf.ClusterName != oldName {
+					if list := clusHelper.GetFedJointClusterList(); list == nil || len(list.IDs) == 0 {
+						updateSystemClusterName(rconf.ClusterName, acc)
+					} else {
+						log.WithFields(log.Fields{"name": rconf.ClusterName}).Info("cluster name cannot be changed when there is managed cluster in fedetation")
+					}
+				}
+			}
+			_fixedJoinToken = rconf.JoinToken
+		} else if membership.FedRole == api.FedRoleJoint {
+			// change from joint role to master role. leave original fed and then promote as master cluster
+			reqData := api.RESTFedLeaveReq{Force: true}
+			masterCluster := api.RESTFedMasterClusterInfo{
+				Name:     membership.MasterCluster.Name,
+				ID:       membership.MasterCluster.ID,
+				Secret:   membership.MasterCluster.Secret,
+				RestInfo: membership.MasterCluster.RestInfo,
+			}
+			jointCluster := api.RESTFedJointClusterInfo{
+				ID:            membership.JointCluster.ID,
+				Secret:        membership.JointCluster.Secret,
+				RestInfo:      membership.JointCluster.RestInfo,
+				ProxyRequired: membership.JointCluster.ProxyRequired,
+			}
+			if _, _, _, err = leaveFed(nil, acc, &login, reqData, masterCluster, jointCluster); err == nil {
+				waitForFedRoleChange(api.FedRoleNone)
+			}
+		}
+		if promote {
+			if m := clusHelper.GetFedMembership(); m.FedRole != api.FedRoleNone {
+				err = fmt.Errorf("it's not a standalone cluster(current cluster role: %s) before promotion", m.FedRole)
+			} else {
+				_fixedJoinToken = rconf.JoinToken
+				reqData := api.RESTFedPromoteReqData{
+					Name:               rconf.ClusterName,
+					MasterRestInfo:     &rconf.PrimaryRestInfo,
+					UseProxy:           &rconf.UseProxy,
+					DeployRepoScanData: rconf.DeployRepoScanData,
+				}
+				if _, _, _, err = promoteToMaster(nil, acc, &login, reqData); err == nil {
+					if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleMaster {
+						msg = fmt.Sprintf("Successfully set up primary cluster for federation(%s:%d)",
+							rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
+					}
+				} else {
+					log.WithFields(log.Fields{"err": err}).Debug("promote")
+				}
+			}
+		}
+	} else {
+		// to be a managed cluster
+		fedOp = "join"
+		join := true
+		if membership.FedRole == api.FedRoleMaster {
+			// change from master role to joint role. demote from master cluster and then join another fed
+			login.domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
+			if _, _, _, err = demoteFromMaster(nil, access.NewFedAdminAccessControl(), &login); err == nil {
+				waitForFedRoleChange(api.FedRoleNone)
+			}
+		} else if membership.FedRole == api.FedRoleJoint {
+			if membership.MasterCluster.RestInfo != rconf.PrimaryRestInfo || membership.JointCluster.RestInfo != *rconf.ManagedRestInfo {
+				reqData := api.RESTFedLeaveReq{Force: true}
+				masterCluster := api.RESTFedMasterClusterInfo{
+					Name:     membership.MasterCluster.Name,
+					ID:       membership.MasterCluster.ID,
+					Secret:   membership.MasterCluster.Secret,
+					RestInfo: membership.MasterCluster.RestInfo,
+				}
+				jointCluster := api.RESTFedJointClusterInfo{
+					ID:            membership.JointCluster.ID,
+					Secret:        membership.JointCluster.Secret,
+					RestInfo:      membership.JointCluster.RestInfo,
+					ProxyRequired: membership.JointCluster.ProxyRequired,
+				}
+				if _, _, _, err = leaveFed(nil, acc, &login, reqData, masterCluster, jointCluster); err == nil {
+					waitForFedRoleChange(api.FedRoleNone)
+				}
+			}
+		}
+		if join {
+			if m := clusHelper.GetFedMembership(); m.FedRole != api.FedRoleNone {
+				err = fmt.Errorf("it's not a standalone cluster(current cluster role: %s) before joining federation", m.FedRole)
+			} else {
+				reqData := api.RESTFedJoinReq{
+					Name:      rconf.ClusterName,
+					Server:    rconf.PrimaryRestInfo.Server,
+					Port:      rconf.PrimaryRestInfo.Port,
+					JoinToken: rconf.JoinToken,
+					JointRestInfo: &share.CLUSRestServerInfo{
+						Server: rconf.ManagedRestInfo.Server,
+						Port:   rconf.ManagedRestInfo.Port,
+					},
+					UseProxy: &rconf.UseProxy,
+				}
+				for i := 0; i < 3; i++ {
+					if _, _, _, err = joinFed(nil, acc, &login, reqData); err == nil {
+						if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleJoint {
+							msg = fmt.Sprintf("Successfully set up managed cluster(%s:%d) to join federation(primary cluster: %s:%d)",
+								rconf.ManagedRestInfo.Server, rconf.ManagedRestInfo.Port, rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
+							break
+						}
+					} else {
+						log.WithFields(log.Fields{"err": err}).Debug("join")
+					}
+					time.Sleep(10 * time.Second)
+				}
+			}
+		}
+	}
+	log.WithFields(log.Fields{"msg": msg, "err": err}).Info()
+
+	if fedOp != "" && err != nil {
+		err = fmt.Errorf("Failed to %s for federation setup(%s)", fedOp, err.Error())
+	}
+
+	return msg, err
+}
+
+func loadFedInitCfg() {
+	log.Info()
+
+	var errMsg string
+	if _, err := os.Stat(fedconfigmap); err == nil {
+		configMapType := "fed"
+		if yaml_data, err := os.ReadFile(fedconfigmap); err == nil {
+			msg, err := handlefedcfg(yaml_data)
+			if err == nil {
+				k8sResourceLog(share.CLUSEvInitCfgMapDone, msg, nil)
+			} else {
+				errMsg = fmt.Sprintf("%s init configmap failed: %s ", configMapType, err.Error())
+			}
+		} else {
+			errMsg = fmt.Sprintf("%s init configmap read error: %s ", configMapType, err.Error())
+		}
+	}
+	if errMsg != "" {
+		log.Error(errMsg)
+		k8sResourceLog(share.CLUSEvInitCfgMapError, errMsg, nil)
+	}
+	log.Info("done")
 }
