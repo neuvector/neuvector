@@ -9241,7 +9241,10 @@ definitions:
     properties:
       name:
         type: string
-        example: scanner
+        example: openssl
+      file:
+        type: string
+        example: example.jar 
       version:
         type: string
         example: "1.011"

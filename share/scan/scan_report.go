@@ -157,6 +157,7 @@ func ScanModule2REST(m *share.ScanModule) *api.RESTScanModule {
 	}
 	return &api.RESTScanModule{
 		Name:    m.Name,
+		File:    m.File,
 		Version: m.Version,
 		Source:  m.Source,
 		CVEs:    mcve,
