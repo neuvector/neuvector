@@ -88,6 +88,7 @@ message ScanModule  {
     string Source = 3;
     repeated ScanModuleVul Vuls = 4;
     repeated string CPEs = 5;
+    string File = 6;
 }
 
 message ScanModuleVul  {
