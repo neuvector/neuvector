@@ -86,6 +86,7 @@ type tRancherUser struct {
 	valid             bool
 	id                string
 	name              string
+	provider          string // from Rancher's v3/principals?me=true
 	token             string // rancher token from R_SESS cookie
 	domainRoles       access.DomainRole
 	domainPermissions access.DomainPermissions // domain -> nv permissions
@@ -506,6 +507,9 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 							if principalIDs.Contains(p.ID) {
 								pid = rancherUsers.Data[idx].ID
 								rancherUser.name = p.LoginName
+								if p.Provider != "local" {
+									rancherUser.provider = p.Provider
+								}
 							} else {
 								pid = p.ID
 								subType = resource.SUBJECT_GROUP
@@ -864,7 +868,7 @@ func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[str
 }
 
 // parameters permits/permitsDomains are for Rancher SSO only
-func lookupShadowUser(server, username, userid, email, role string, roleDomains map[string][]string,
+func lookupShadowUser(server, provider, username, userid, email, role string, roleDomains map[string][]string,
 	permits share.NvPermissions, permitsDomains []share.CLUSPermitsAssigned) (*share.CLUSUser, bool) {
 
 	var newUser *share.CLUSUser
@@ -917,6 +921,9 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 			}
 
 			newUser = user
+		}
+		if server == share.FlavorRancher && provider != "" {
+			user.Server = fmt.Sprintf("%s(%s)", share.FlavorRancher, provider)
 		}
 
 		authz := (user.Role != api.UserRoleNone || !user.ExtraPermits.IsEmpty() || len(user.RoleDomains) != 0 || len(user.ExtraPermitsDomains) != 0)
@@ -1503,7 +1510,7 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 
 	hasPermFed := false
 	remoteDomainRoles = make(map[string]string, len(login.domainRoles))
-	if user.Server == share.FlavorRancher {
+	if strings.HasPrefix(user.Server, share.FlavorRancher) {
 		if len(login.extraDomainPermits) > 0 {
 			remoteDomainPermits = make(map[string]share.NvPermissions, len(login.extraDomainPermits))
 			for d, permits := range login.extraDomainPermits {
@@ -1768,7 +1775,7 @@ func remotePasswordAuth(cs *share.CLUSServer, pw *api.RESTAuthPassword) (*share.
 			log.WithFields(log.Fields{"server": cs.Name, "user": pw.Username, "role": role}).Debug("Authorized by group role mapping")
 		}
 
-		user, authz := lookupShadowUser(cs.Name, pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
+		user, authz := lookupShadowUser(cs.Name, "", pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
 		if authz {
 			return user, nil
 		}
@@ -1855,7 +1862,7 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 		}
 	}
 
-	user, authz := lookupShadowUser(cs.Name, username, "", email, role, roleDomains, share.NvPermissions{}, nil)
+	user, authz := lookupShadowUser(cs.Name, "", username, "", email, role, roleDomains, share.NvPermissions{}, nil)
 	if authz {
 		return user, nil
 	}
@@ -1917,7 +1924,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	role, roleDomains, _, _ = rbac2UserRole(allRoles, nil)
 	log.WithFields(log.Fields{"role": role, "roleDomains": roleDomains, "allRoles": allRoles}).Debug("combined roles")
 
-	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
+	user, authz := lookupShadowUser(server, "", pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
 	if authz {
 		return user, nil
 	}
@@ -2230,7 +2237,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			}
 		}
 		mainSessionID = fmt.Sprintf("%s%s", _rancherSessionPrefix, rancherUser.token)
-		user, authz = lookupShadowUser(share.FlavorRancher, rancherUser.name, rancherUser.id, "", role, roleDomains, permits, permitsDomains)
+		user, authz = lookupShadowUser(share.FlavorRancher, rancherUser.provider, rancherUser.name, rancherUser.id, "", role, roleDomains, permits, permitsDomains)
 		if !authz {
 			msg := fmt.Sprintf("Failed to map to a valid role: %s(%s)", rancherUser.name, rancherUser.id)
 			restRespErrorMessage(w, http.StatusUnauthorized, api.RESTErrUnauthorized, msg)

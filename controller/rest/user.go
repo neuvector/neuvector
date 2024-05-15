@@ -545,7 +545,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 		ruser := rconf.Config
 
-		if user.Server == share.FlavorRancher {
+		if strings.HasPrefix(user.Server, share.FlavorRancher) {
 			if ruser.Role != nil || ruser.RoleDomains != nil {
 				//e := "Cannot change Rancher SSO user's role/permissions in NeuVector"
 				//log.WithFields(log.Fields{"user": fullname}).Error(e)
@@ -613,7 +613,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 			}
 		}
 
-		if user.Server != share.FlavorRancher {
+		if !strings.HasPrefix(user.Server, share.FlavorRancher) {
 			// Check if global role & domain roles are valid
 			newRole := user.Role
 			newRoleDomains := user.RoleDomains
