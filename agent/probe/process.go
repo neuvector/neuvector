@@ -950,24 +950,39 @@ func (p *Probe) checkUserGroup_uidChange(escalProc *procInternal, c *procContain
 	return rUser, eUser, true
 }
 
-/////
-func isSudoCommand(cmds []string) bool {
-	for i, cmd := range cmds {
-		if i == 0 {
-			switch(filepath.Base(cmd)) {
-			case "sudo":
-				return true
-			case "su":	// check following su cmds
-			default:
-				return false
-			}
+func (p *Probe) isSudo(pid int) (*procInternal, bool) {
+	p.lockProcMux()
+	defer p.unlockProcMux()
+	if proc, ok := p.pidProcMap[pid]; ok {
+		return proc, proc.name == "sudo" || filepath.Base(proc.path) == "sudo"
+	}
+	return nil, false
+}
+
+func (p *Probe) isSudoChild(proc *procInternal) bool {
+	if _, ok := p.isSudo(proc.pgid); ok {
+		return true
+	}
+
+	if _, ok := p.isSudo(proc.sid); ok {
+		return true
+	}
+
+	ppid := proc.pid	// include itself
+	for i := 0; i < 10; i++ { // look up 10 ancesters
+		if pp, ok := p.isSudo(ppid); ok {
+			return true
 		} else {
-			if strings.HasPrefix(cmd, "-") { // skip option
-				continue
-			} else {	// it could be "su -c /bin/ps neuvector"
-				if cmd == "root" {
-					return true
-				}
+			if pp == nil { // no more upstream
+				break
+			}
+			if global.RT.IsRuntimeProcess(pp.name, nil) {
+				// end of search
+				break
+			}
+			ppid = pp.ppid	// next parent
+			if ppid == 1 {
+				break
 			}
 		}
 	}
@@ -1043,24 +1058,7 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
 			}
 
-			// skip if: userapp (user) -> (sudo)shell cmd -> children(established root)
-			if isSudoCommand(parent.cmds) {
-				return
-			}
-
-			// skip if: pgid is one of below processes (above and below "parent" checks might not be necessary)
-			var pgrp, psid *procInternal
-			var ok1, ok2 bool
-			p.lockProcMux() // minimum section lock
-			pgrp, ok1 = p.pidProcMap[proc.pgid]
-			psid, ok2 = p.pidProcMap[proc.sid]
-			p.unlockProcMux() // minimum section lock
-			if ok1 && isSudoCommand(pgrp.cmds) {
-				return
-			}
-
-			// skip if: sid is one of below processes
-			if ok2 && isSudoCommand(psid.cmds) {
+			if p.isSudoChild(proc) {
 				return
 			}
 
@@ -1081,11 +1079,6 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 				if ok {
 					if len(gp.cmds) == 0 {
 						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
-					}
-
-					// skip if: (sudo)userapp(user) -> shell cmd(*) -> children(established root)
-					if isSudoCommand(gp.cmds) {
-						return
 					}
 
 					// filter false-positive cases: grandparent is root
