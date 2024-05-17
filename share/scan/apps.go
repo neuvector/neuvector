@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 const (
@@ -701,7 +703,7 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 	}
 
 	var coreVersion string
-
+	dedup := utils.NewSet()
 	pkgs := make([]AppPackage, 0)
 	/*
 		// Not reliable
@@ -735,7 +737,10 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 	if targets, ok := dotnet.Targets[dotnet.Runtime.Name]; ok {
 		for target, dep := range targets {
 			// "Microsoft.NETCore.App/3.1.15-servicing.21214.3"
-			if strings.HasPrefix(target, "Microsoft.NETCore.App") || strings.HasPrefix(target, "Microsoft.AspNetCore.App") {
+			// it is possible that there are multiple core versions in different dependencies
+			//    Microsoft.NETCore.App/2.2.8   ==> 2.2.8
+			//    Microsoft.AspNetCore.ApplicationInsights.HostingStartup/2.2.0 ==> 2.2.0 (x)
+			if strings.HasPrefix(target, "Microsoft.NETCore.App/") || strings.HasPrefix(target, "Microsoft.AspNetCore.App/") {
 				if o := strings.Index(target, "/"); o != -1 {
 					version := target[o+1:]
 					if o = strings.Index(version, "-"); o != -1 {
@@ -746,25 +751,33 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 			}
 
 			for app, v := range dep.Deps {
-				pkg := AppPackage{
-					AppName:    ".NET",
-					ModuleName: ".NET:" + app,
-					Version:    v,
-					FileName:   filename,
+				key := fmt.Sprintf("%s-%s", ".NET:" + app, v)
+				if !dedup.Contains(key) {
+					dedup.Add(key)
+					pkg := AppPackage{
+						AppName:    ".NET",
+						ModuleName: ".NET:" + app,
+						Version:    v,
+						FileName:   filename,
+					}
+					pkgs = append(pkgs, pkg)
 				}
-				pkgs = append(pkgs, pkg)
 			}
 		}
 	}
 
 	if coreVersion != "" {
-		pkg := AppPackage{
-			AppName:    ".NET",
-			ModuleName: ".NET:Core",
-			Version:    coreVersion,
-			FileName:   filename,
+		key := fmt.Sprintf("%s-%s", ".NET:Core", coreVersion)
+		if !dedup.Contains(key) {
+			dedup.Add(key)
+			pkg := AppPackage{
+				AppName:    ".NET",
+				ModuleName: ".NET:Core",
+				Version:    coreVersion,
+				FileName:   filename,
+			}
+			pkgs = append(pkgs, pkg)
 		}
-		pkgs = append(pkgs, pkg)
 	}
 
 	if len(pkgs) > 0 {

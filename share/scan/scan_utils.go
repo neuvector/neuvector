@@ -226,7 +226,7 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 }
 
 func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
-	apps := NewScanApps(true)
+	apps := NewScanApps(false) // no need to scan the same file twice
 	exclDirs := utils.NewSet("bin", "boot", "dev", "proc", "run", "sys", "tmp")
 	rootPath := s.sys.ContainerFilePath(pid, "/")
 	rootLen := len(rootPath)
