@@ -1063,6 +1063,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			}
 			fedScanDataCacheMutexUnlock()
 		}
+
+		if err := db.DeleteAssetByID(db.AssetImage, id); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
