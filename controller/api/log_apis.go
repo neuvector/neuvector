@@ -416,8 +416,10 @@ type Audit struct {
 	ImageLayerDigest string `json:"image_layer_digest,omitempty"`
 	Cmds             string `json:"cmds,omitempty"`
 	// intermediate data
-	Vuls   map[string]*share.ScanVulnerability `json:"-"`
-	Layers []Audit                             `json:"-"`
+	Vuls                map[string]*share.ScanVulnerability `json:"-"`
+	Layers              []Audit                             `json:"-"`
+	PVCName             string                              `json:"pvc_name,omitempty"`
+	PVCStorageClassName string                              `json:"pvc_storageclass_name,omitempty"`
 }
 
 type IBMSAFinding struct {

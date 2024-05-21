@@ -119,6 +119,7 @@ const (
 	K8sKindClusterRole           = "ClusterRole"
 	K8sKindRoleBinding           = "RoleBinding"
 	K8sKindClusterRoleBinding    = "ClusterRoleBinding"
+	k8sKindPersistentVolumeClaim = "PersistentVolumeClaim"
 )
 
 var sidecarImages = []*ContainerImage{
@@ -963,6 +964,8 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult
 		alog.Props[nvsysadmission.AuditLogPropMessage] = result.Msg
 		alog.Props[nvsysadmission.AuditLogPropUser] = result.User
 		alog.Props[nvsysadmission.AuditLogPropFirstLogAt] = api.RESTTimeString(alog.ReportedAt)
+		alog.Props[nvsysadmission.AuditLogPropPVCName] = result.PVCName
+		alog.Props[nvsysadmission.AuditLogPVCStorageClassName] = result.PVCStorageClassName
 
 		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
 			_, alog = aggregateDenyLogs(result, admResObject.OwnerUIDs[0], alog)
@@ -1137,6 +1140,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			updateToOtherControllers(docKey, string(jsonData))
 		}
 		return composeResponse(nil), nil, reqIgnored
+	case k8sKindPersistentVolumeClaim:
+		return validatePVC(admission.NvAdmValidateType, ar, mode, forTesting)
 	default:
 		return composeResponse(nil), nil, reqIgnored
 	}
@@ -1726,4 +1731,82 @@ func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
 	b := opa.AddDocument(docKey, string(json_data))
 
 	log.WithFields(log.Fields{"docKey": info.DocKey, "AddDocument_Result": b}).Debug("ReportK8SResToOPA(grpc-server)")
+}
+
+func validatePVC(admType string, ar *admissionv1beta1.AdmissionReview, mode string, forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmAssessResult, bool) {
+	var reqIgnored bool
+	req := ar.Request
+
+	var pvc corev1.PersistentVolumeClaim
+	if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
+		return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
+	}
+
+	ns := pvc.ObjectMeta.Namespace
+	pvcName := pvc.ObjectMeta.Name
+	scName := pvc.Spec.StorageClassName
+
+	var statusResult = &metav1.Status{}
+
+	admResObject, _ := parseAdmRequest(req, &pvc.ObjectMeta, nil)
+
+	var allowed = true
+
+	admResult, matched := cacher.MatchK8sAdmissionRulesForPVC(admType, ns, pvcName, *scName, forTesting)
+	if matched {
+		opDisplay := "Creation" // we only handle create
+		var subMsg, ruleScope, msgHeader string
+		var modeStr string
+		var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
+
+		admResult.User = admResObject.UserName
+
+		if forTesting {
+			finalAction := "allowed"
+			if admResult.AssessMatchedRuleType == api.ValidatingDenyRuleType {
+				if admResult.RuleMode != "" {
+					// a deny rule's "rule mode"(if specified) takes precedence over global mode
+					mode = admResult.RuleMode
+				}
+				if mode == share.AdmCtrlModeProtect {
+					allowed = false
+					finalAction = "denied"
+				}
+			}
+
+			msgHeader = "<Assessment> "
+			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, finalAction, subMsg)
+		} else {
+			if mode == share.AdmCtrlModeMonitor {
+				modeStr = share.AdmCtrlModeMonitor
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
+					msgHeader, opDisplay, req.Kind.Kind,
+					pvcName,
+					ruleScope, admResult.RuleID, modeStr, subMsg)
+				eventID = share.CLUSAuditAdmCtrlK8sReqViolation
+			} else {
+				modeStr = share.AdmCtrlModeProtect
+				allowed = false
+				matchedSrcMsg := ""
+				if admResult.MatchedSource != "" {
+					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
+				}
+				statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
+					msgHeader, opDisplay, req.Kind.Kind,
+					pvcName,
+					modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
+				eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+			}
+		}
+
+		if !forTesting {
+			cacheAdmCtrlAudit(eventID, admResult, admResObject)
+		}
+	}
+
+	return &admissionv1beta1.AdmissionResponse{
+		Allowed: allowed,
+		Result:  statusResult,
+	}, admResult.AssessResults, false
 }
