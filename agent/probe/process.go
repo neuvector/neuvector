@@ -1924,12 +1924,9 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 	// (1) "checkApp" behaves the same reponding action as the "deny" among different policy modes
 	// (2) "checkApp" (including children) will not enter the "learned" process group.
 	// it lasts for its whole life until the calling updateCurrentRiskyAppRule() from upper layer
-	if risky && !proc.riskyChild {
-		if action == share.PolicyActionAllow { // default is checkApp
-			proc.action = action
-			proc.riskType = ""
-			risky = false
-		}
+	if risky && action == share.PolicyActionAllow {
+		proc.action = share.PolicyActionAllow	// updated with Allow
+		risky = false
 	}
 	mLog.WithFields(log.Fields{"name": proc.name, "pid": proc.pid, "path": proc.path, "action": action, "risky": risky}).Debug("PROC: Result")
 
@@ -2509,24 +2506,29 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		return share.PolicyActionAllow, false // assuming it is allowed so far
 	}
 
-	if proc.riskType != "" || proc.riskyChild {
-		if allowSuspicious {
-			if pp.Action != share.PolicyActionAllow {
-				// consider it as an intruder processes unless users whitelist it
-				mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: Risky session")
-				pp.Action = negativeResByMode(mode)
-				pp.Uuid = share.CLUSReservedUuidNotAlllowed
-			}
-		} else {
-			// user does not open the door
-			switch mode {
-			case share.PolicyModeLearn:
-				// suspicious children are still suspicious
-				pp.Action = share.PolicyActionCheckApp
-			case share.PolicyModeEvaluate:
-				pp.Action = share.PolicyActionViolate
-			case share.PolicyModeEnforce:
-				pp.Action = share.PolicyActionDeny
+
+	if id == "" && proc.riskType == "sshd" {
+
+	} else {
+		if proc.riskType != "" || proc.riskyChild {
+			if allowSuspicious {
+				if pp.Action != share.PolicyActionAllow {
+					// consider it as an intruder processes unless users whitelist it
+					mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: Risky session")
+					pp.Action = negativeResByMode(mode)
+					pp.Uuid = share.CLUSReservedUuidNotAlllowed
+				}
+			} else {
+				// user has not opened the door
+				switch mode {
+				case share.PolicyModeLearn:
+					// suspicious children are still suspicious
+					pp.Action = share.PolicyActionCheckApp
+				case share.PolicyModeEvaluate:
+					pp.Action = share.PolicyActionViolate
+				case share.PolicyModeEnforce:
+					pp.Action = share.PolicyActionDeny
+				}
 			}
 		}
 	}
