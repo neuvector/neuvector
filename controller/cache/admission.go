@@ -1325,18 +1325,21 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 	var mets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
 	var hasCustomCriteria bool
-
-	req := ar.Request
+	var kind string
 
 	statefuleSetVCT := make([]string, 0)
-	if req.Kind.Kind == "StatefulSet" {
-		var statefulSet appsv1.StatefulSet
-		if err := json.Unmarshal(req.Object.Raw, &statefulSet); err == nil {
-			for _, vct := range statefulSet.Spec.VolumeClaimTemplates {
-				if vct.Spec.StorageClassName != nil {
-					statefuleSetVCT = append(statefuleSetVCT, *vct.Spec.StorageClassName)
+	if ar != nil {
+		req := ar.Request
+		if req.Kind.Kind == "StatefulSet" {
+			var statefulSet appsv1.StatefulSet
+			if err := json.Unmarshal(req.Object.Raw, &statefulSet); err == nil {
+				for _, vct := range statefulSet.Spec.VolumeClaimTemplates {
+					if vct.Spec.StorageClassName != nil {
+						statefuleSetVCT = append(statefuleSetVCT, *vct.Spec.StorageClassName)
+					}
 				}
 			}
+			kind = "StatefulSet"
 		}
 	}
 
@@ -1474,7 +1477,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		case share.CriteriaKeyImageVerifiers:
 			met, positive = isSetCriterionMet(crt, utils.NewSetFromStringSlice(scannedImage.Verifiers))
 		case share.CriteriaKeyStorageClassName:
-			if req.Kind.Kind == "StatefulSet" {
+			if kind == "StatefulSet" {
 				for _, scName := range statefuleSetVCT {
 					met, positive = isStringCriterionMet(crt, scName)
 					if met {
