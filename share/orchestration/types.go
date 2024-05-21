@@ -54,7 +54,7 @@ type ResourceDriver interface {
 	Login(username, password string) (string, string, error)
 	Logout(username, token string) error
 	GetAuthServerAlias() string
-	GetUserRoles(username string, subjType uint8) (map[string]string, error)
+	GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvPermissions, error)
 	ListUsers() []UserRBAC
 	RegisterResource(rt string) error
 	ListResource(rt string) ([]interface{}, error)

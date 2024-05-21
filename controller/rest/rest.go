@@ -363,7 +363,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 		return
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
-	log.WithFields(log.Fields{"roles": login.domainRoles, "nvPage": login.nvPage}).Error("Object access denied")
+	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
 	if login.nvPage != api.RESTNvPageDashboard {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
@@ -1811,11 +1811,6 @@ func StartRESTServer() {
 	}
 	for {
 		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
-			if err == http.ErrServerClosed {
-				if cfgmapRetryTimer != nil {
-					cfgmapRetryTimer.Stop()
-				}
-			}
 			log.WithFields(log.Fields{"error": err}).Error("Fail to start SSL rest")
 			time.Sleep(time.Second * 5)
 		} else {

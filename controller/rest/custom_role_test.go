@@ -370,10 +370,10 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 
 		accRead := access.NewAccessControl(r, access.AccessOPRead, access.DomainRole{
 			"": data.Config.Name,
-		})
+		}, nil)
 		accWrite := access.NewAccessControl(r, access.AccessOPWrite, access.DomainRole{
 			"": data.Config.Name,
-		})
+		}, nil)
 		// CLUSAgent requires PERM_NV_RESOURCE permission and the custom role should not be able to access it
 		authz := accRead.Authorize(&obj, nil)
 		if idx == 0 {
@@ -430,13 +430,13 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 
 	accRead := access.NewAccessControl(r, access.AccessOPRead, access.DomainRole{
 		"": dataAllConfigurableWriteRole.Config.Name,
-	})
+	}, nil)
 	accWrite := access.NewAccessControl(r, access.AccessOPWrite, access.DomainRole{
 		"": dataAllConfigurableWriteRole.Config.Name,
-	})
+	}, nil)
 	// CLUSAgent requires PERM_NV_RESOURCE permission and no custom role can access it
 	authz := accRead.Authorize(&obj, nil)
-	if !authz { // custom role with all selectable write permissions is given nv_resource(r) intentionally since 5.3.3
+	if !authz { // custom role with all selectable read permissions is given nv_resource(r) intentionally since 5.3.3
 		t.Fatalf("Surprised to authorize failed for read")
 	}
 	authz = accWrite.Authorize(&obj, nil)

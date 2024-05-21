@@ -516,11 +516,17 @@ func (m CacheMethod) SetFedJoinedClusterToken(id, mainSessionID, token string) {
 	fedCacheMutexLock()
 	defer fedCacheMutexUnlock()
 
-	if c, ok := fedJoinedClustersCache[id]; ok && c != nil {
-		if token == "" {
+	if id != "" {
+		if c, ok := fedJoinedClustersCache[id]; ok && c != nil {
+			if token == "" {
+				delete(c.tokenCache, mainSessionID)
+			} else {
+				c.tokenCache[mainSessionID] = token
+			}
+		}
+	} else {
+		for _, c := range fedJoinedClustersCache {
 			delete(c.tokenCache, mainSessionID)
-		} else {
-			c.tokenCache[mainSessionID] = token
 		}
 	}
 }

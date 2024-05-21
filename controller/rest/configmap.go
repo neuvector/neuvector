@@ -37,11 +37,7 @@ type configMapHandlerContext struct {
 	platform          string
 	pwdProfile        *share.CLUSPwdProfile
 	subDetail         string
-	alwaysReload      bool // set by each HandlerFunc
 }
-
-var cfgmapRetryTimer *time.Timer
-var cfgmapTried map[string]int = make(map[string]int) // cfg type -> tried times(<0 means no need to retry)
 
 func handleeulacfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
 
@@ -86,7 +82,6 @@ func handleldapcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	name := "ldap1"
 	accAdmin := access.NewAdminAccessControl()
@@ -143,7 +138,6 @@ func handlesamlcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	name := "saml1"
 	accAdmin := access.NewAdminAccessControl()
@@ -199,7 +193,6 @@ func handleoidccfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	name := "openId1"
 	accAdmin := access.NewAdminAccessControl()
@@ -271,7 +264,6 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rc.AlwaysReload
 
 	rconf := api.RESTSystemConfigConfigData{
 		Config: &api.RESTSystemConfigConfig{
@@ -350,7 +342,6 @@ func handlecustomrolecfg(yaml_data []byte, load bool, skip *bool, context *confi
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	accAdmin := access.NewAdminAccessControl()
 	reservedRoleNames := access.GetReservedRoleNames()
@@ -552,7 +543,6 @@ func handlepwdprofilecfg(yaml_data []byte, load bool, skip *bool, context *confi
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	if rconf.ActiveProfileName == "" {
 		rconf.ActiveProfileName = share.CLUSDefPwdProfileName
@@ -650,7 +640,6 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		*skip = true
 		return nil
 	}
-	context.alwaysReload = rconf.AlwaysReload
 
 	accAdmin := access.NewAdminAccessControl()
 	if !context.gotAllCustomRoles {
@@ -711,7 +700,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 				continue
 			}
 		}
-		if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, false); e != nil {
+		if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, nil, nil, false); e != nil {
 			continue
 		}
 
@@ -845,7 +834,7 @@ func k8sResourceLog(ev share.TLogEvent, msg string, detail []string) {
 }
 
 func LoadInitCfg(load bool, platform string) {
-	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried}).Info()
+	log.WithFields(log.Fields{"load": load}).Info()
 	var loaded, failed []string
 	var skip bool
 	// After that if configmap have license it will overwrite the consol and eventually write back to .lc
@@ -874,25 +863,14 @@ func LoadInitCfg(load bool, platform string) {
 
 	context.platform = platform
 	for _, configMap := range configMaps {
-		// check whether we need to retry loading configmap when it failed in the last loading
-		if tried, _ := cfgmapTried[configMap.Type]; tried >= 6 {
-			cfgmapTried[configMap.Type] = -2 // no need to retry loading this config
-		}
-		tried, _ := cfgmapTried[configMap.Type]
-		if tried < 0 {
-			continue
-		}
-
 		var errMsg string
 		context.subDetail = ""
-		context.alwaysReload = false
 		if _, err := os.Stat(configMap.FileName); err == nil {
 			if yaml_data, err := ioutil.ReadFile(configMap.FileName); err == nil {
 				skip = false
 				err = configMap.HandlerFunc(yaml_data, load, &skip, &context)
 				log.WithFields(log.Fields{"cfg": configMap.Type, "skip": skip, "error": err}).Debug()
 				if err == nil {
-					cfgmapTried[configMap.Type] = -1 // no need to retry loading this config
 					msg := fmt.Sprintf("%s init configmap loaded", configMap.Type)
 					if context.subDetail != "" {
 						msg = fmt.Sprintf("%s partially:\n   %s", msg, context.subDetail)
@@ -906,13 +884,9 @@ func LoadInitCfg(load bool, platform string) {
 			}
 		}
 		if errMsg != "" {
-			if context.alwaysReload {
-				cfgmapTried[configMap.Type] = tried + 1
-			}
 			log.Error(errMsg)
 			failed = append(failed, errMsg)
 		}
-		context.alwaysReload = false
 	}
 
 	if len(loaded) > 0 {
@@ -923,15 +897,7 @@ func LoadInitCfg(load bool, platform string) {
 	if len(failed) > 0 {
 		e := "Following k8s configmap as neuvector init config failed to load "
 		k8sResourceLog(share.CLUSEvInitCfgMapError, e, failed)
-
-		cfgmapRetryTimer = time.AfterFunc(time.Duration(time.Minute), func() { LoadInitCfg(load, platform) })
-	} else {
-		if cfgmapRetryTimer != nil {
-			cfgmapRetryTimer.Stop()
-			cfgmapRetryTimer = nil
-		}
-		cfgmapTried = nil
 	}
-	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried}).Info("done")
+	log.WithFields(log.Fields{"load": load}).Info("done")
 
 }

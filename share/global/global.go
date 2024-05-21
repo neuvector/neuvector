@@ -220,6 +220,13 @@ func (d *orchHub) SetFlavor(flavor string) error {
 	return nil
 }
 
+func SetPseudoOrchHub_UnitTest(platform, flavor, k8sVer, ocVer string, regResource RegisterDriverFunc) {
+	ORCH = &orchHub{Driver: orchAPI.GetDriver(platform, flavor, "", k8sVer, ocVer, nil, nil)}
+	if regResource != nil {
+		ORCH.ResourceDriver = regResource(platform, flavor, "")
+	}
+}
+
 func getPlatformFromEnv() (string, string, string) {
 	network := share.NetworkDefault
 
