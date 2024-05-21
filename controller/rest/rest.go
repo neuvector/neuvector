@@ -1811,6 +1811,11 @@ func StartRESTServer() {
 	}
 	for {
 		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+			if err == http.ErrServerClosed {
+				if cfgmapRetryTimer != nil {
+					cfgmapRetryTimer.Stop()
+				}
+			}
 			log.WithFields(log.Fields{"error": err}).Error("Fail to start SSL rest")
 			time.Sleep(time.Second * 5)
 		} else {
@@ -2079,7 +2084,8 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 // api version is always the first path element
 // Ex: /v1/scan/registry
-//      ^^
+//
+//	^^
 func getRequestApiVersion(r *http.Request) ApiVersion {
 	if r.URL == nil || len(r.URL.Path) == 0 {
 		return ApiVersion1
