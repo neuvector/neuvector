@@ -20,7 +20,7 @@ func parseUserRolePermissions(r *share.CLUSUserRole) *share.CLUSUserRoleInternal
 	for _, option := range access.PermissionOptions {
 		permissionOptions[option.ID] = option
 	}
-	var readPermits, writePermits uint64
+	var readPermits, writePermits uint32
 	for _, permission := range r.Permissions {
 		if option, ok := permissionOptions[permission.ID]; ok {
 			if access.HiddenPermissions.Contains(permission.ID) {

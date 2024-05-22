@@ -700,7 +700,7 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 				continue
 			}
 		}
-		if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, false); e != nil {
+		if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, nil, nil, false); e != nil {
 			continue
 		}
 

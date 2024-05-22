@@ -2033,7 +2033,7 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 	var resp api.RESTUsersData
 	resp.Users = make([]*api.RESTUser, len(users))
 	for i, user := range users {
-		globalRole, roleDomains := rbac2UserRole(user.RBAC)
+		globalRole, roleDomains, _, _ := rbac2UserRole(user.RBAC, nil)
 
 		u := &api.RESTUser{
 			Fullname:    user.Name,
