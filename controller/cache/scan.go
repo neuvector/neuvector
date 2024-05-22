@@ -768,6 +768,7 @@ func scanWorkloadAdd(id string, param interface{}) {
 	cache := param.(*workloadCache)
 	workload := cache.workload
 	if !common.OEMIgnoreWorkload(workload) {
+		// Use DisplayName for image
 		idns := []api.RESTIDName{api.RESTIDName{Domains: []string{workload.Domain}, DisplayName: workload.Image}}
 		scanMapAdd(id, workload.AgentID, idns, share.ScanObjectType_CONTAINER)
 		// Read bench checks into cache in case its notification came earlier
