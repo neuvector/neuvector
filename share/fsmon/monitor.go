@@ -131,6 +131,7 @@ type groupInfo struct {
 	mode       string
 	applyRules map[string]utils.Set
 	learnRules map[string]utils.Set
+	startAt    time.Time
 }
 
 type FileWatch struct {
@@ -443,11 +444,10 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 	}
 	w.mux.Unlock()
 
-	if event == fileEventAttr {
-		// it depends on the init conditions by runtime engine
-		if isRunTimeAddedFile(filepath.Join("/root", path)) {
-			return
-		}
+
+	// it depends on the init conditions by runtime engine
+	if isRunTimeAddedFile(filepath.Join("/root", path)) && time.Since(grp.startAt) < time.Duration(time.Second * 60) {
+		return
 	}
 
 	if event != fileEventAccessed ||
@@ -714,6 +714,7 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 			bNeuvector: bNeuvectorSvc,
 			learnRules: make(map[string]utils.Set),
 			applyRules: make(map[string]utils.Set),
+			startAt: time.Now(),
 		}
 		w.groups[rootPid] = grp
 	}
