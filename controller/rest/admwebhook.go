@@ -1744,6 +1744,11 @@ func validatePVC(admType string, ar *admissionv1beta1.AdmissionReview, mode stri
 
 	ns := pvc.ObjectMeta.Namespace
 	pvcName := pvc.ObjectMeta.Name
+
+	if pvc.Spec.StorageClassName == nil {
+		return logUnmarshallError(&req.Kind.Kind, &req.UID, nil), nil, reqIgnored
+	}
+
 	scName := pvc.Spec.StorageClassName
 
 	var statusResult = &metav1.Status{}
