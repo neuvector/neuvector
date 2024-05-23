@@ -1522,8 +1522,9 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	if err = clusHelper.ConfigFedRole(common.DefaultAdminUser, api.UserRoleFedAdmin, acc); err != nil {
 		return membership, status, code, err
 	}
-	// any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
-	if login.fullname != common.DefaultAdminUser {
+	// Any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
+	// However, Rancher SSO user's role is defined in Rancher so we don't promote the shadow user created by Rancher SSO
+	if login.fullname != common.DefaultAdminUser && login.server != share.FlavorRancher {
 		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
 	}
 

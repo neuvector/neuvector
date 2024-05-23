@@ -584,6 +584,7 @@ func main() {
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
+	defAdminRestored := false
 
 	// Initialize installation ID.  Ignore if ID is already set.
 	clusHelper := kv.GetClusterHelper()
@@ -611,7 +612,7 @@ func main() {
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
 		// assuming the PV should have the latest config.
-		restoredFedRole, _ = kv.GetConfigHelper().Restore()
+		restoredFedRole, defAdminRestored, _ = kv.GetConfigHelper().Restore()
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
 			// 	we need to clean up fed rules & revisions in kv
@@ -852,11 +853,32 @@ func main() {
 
 	access.UpdateUserRoleForFedRoleChange(fedRole)
 
-	// start rest server
-	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
+	// Load config from ConfigMap
+	defAdminLoaded := rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform)
+	if !defAdminRestored && !defAdminLoaded {
+		// if platform == share.PlatformKubernetes && Ctrler.Leader && isNewCluster && !*noDefAdmin {
+		if platform == share.PlatformKubernetes && Ctrler.Leader && !*noDefAdmin {
+			if bootstrapPwd := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+				acc := access.NewFedAdminAccessControl()
+				user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+				if user != nil {
+					user.PasswordHash = utils.HashPassword(bootstrapPwd)
+					user.ResetPwdInNextLogin = true
+					user.UseBootstrapPwd = true
+					user.PwdResetTime = time.Now().UTC()
+					err = clusHelper.PutUserRev(user, rev)
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"err": err}).Error()
+				}
+			}
+		}
+	}
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
+
+	// start rest server
 	go rest.StartRESTServer(isNewCluster, Ctrler.Leader)
 
 	// go rest.StartLocalDevHttpServer() // for local dev only

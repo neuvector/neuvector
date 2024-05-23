@@ -655,6 +655,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 			},
 		},
 	},
+	RscTypeSecret: k8sResource{
+		apiGroup: "",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() metav1.Object { return new(corev1.Secret) },
+				func() metav1.ListInterface { return new(corev1.SecretList) },
+				nil, // xlateSecret,
+				nil,
+			},
+		},
+	},
 	/*RscTypeMutatingWebhookConfiguration: k8sResource{
 			apiGroup: k8sAdmApiGroup,
 			makers: []*resourceMaker{
@@ -1571,7 +1583,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -2056,4 +2068,26 @@ func getNeuvectorSvcAccount(resInfo map[string]string) {
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
 		continue
 	}
+}
+
+func RetrieveBootstrapPassword() string {
+	var bootstrapPwd string
+
+	obj, err := global.ORCH.GetResource(RscTypeSecret, NvAdmSvcNamespace, "neuvector-bootstrap-secret")
+	if obj != nil && err == nil {
+		if s, ok := obj.(*corev1.Secret); ok {
+			if s.Data != nil {
+				if v, ok := s.Data["bootstrapPassword"]; ok {
+					bootstrapPwd = string(v)
+				}
+			}
+		} else {
+			err = fmt.Errorf("type conversion failed")
+		}
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	}
+
+	return bootstrapPwd
 }

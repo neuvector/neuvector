@@ -871,6 +871,7 @@ type CLUSUser struct {
 	BlockLoginSince     time.Time             `json:"block_login_since"`  // reset to 0 after a successful login
 	AcceptedAlerts      []string              `json:"accepted_alerts,omitempty"`
 	ResetPwdInNextLogin bool                  `json:"reset_password_in_next_login"`
+	UseBootstrapPwd     bool                  `json:"use_bootstrap_password"`
 }
 
 type GroupRoleMapping struct {
