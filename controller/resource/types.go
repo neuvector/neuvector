@@ -27,6 +27,7 @@ const (
 	RscTypePod                            = "pod"
 	RscTypeRBAC                           = "rbac"
 	RscTypeImage                          = "image"
+	RscTypeSecret                         = "secret"
 	RscTypeCrd                            = "customresourcedefinition"
 	RscTypeConfigMap                      = "configmap"
 	RscTypeMutatingWebhookConfiguration   = "mutatingwebhookconfiguration"   // case sensitive!

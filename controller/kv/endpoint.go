@@ -13,6 +13,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -452,6 +453,9 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 				u.PwdResetTime = time.Now().UTC()
 				data, _ := json.Marshal(&u)
 				value = string(data)
+				if u.Fullname == common.DefaultAdminUser && u.Server == "" {
+					importInfo.defAdminRestored = true
+				}
 			}
 		}
 

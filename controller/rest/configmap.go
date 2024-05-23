@@ -38,6 +38,7 @@ type configMapHandlerContext struct {
 	pwdProfile        *share.CLUSPwdProfile
 	subDetail         string
 	alwaysReload      bool // set by each HandlerFunc
+	defAdminLoaded    bool // set only when default admin user is loaded from userinitcfg.yaml
 }
 
 var cfgmapRetryTimer *time.Timer
@@ -778,6 +779,10 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 
 		normalizeUserRoles(user)
 
+		if ruser.Fullname == common.DefaultAdminUser && ruser.Server == "" {
+			context.defAdminLoaded = true
+		}
+
 		if newuser {
 			if err := clusHelper.CreateUser(user); err != nil {
 				e := "Failed to write to the cluster"
@@ -844,9 +849,10 @@ func k8sResourceLog(ev share.TLogEvent, msg string, detail []string) {
 	evqueue.Append(&clog)
 }
 
-func LoadInitCfg(load bool, platform string) {
+func LoadInitCfg(load bool, platform string) bool {
 	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried}).Info()
 	var loaded, failed []string
+	var defAdminLoaded bool
 	var skip bool
 	// After that if configmap have license it will overwrite the consol and eventually write back to .lc
 	type configMap struct {
@@ -886,6 +892,7 @@ func LoadInitCfg(load bool, platform string) {
 		var errMsg string
 		context.subDetail = ""
 		context.alwaysReload = false
+		context.defAdminLoaded = false
 		if _, err := os.Stat(configMap.FileName); err == nil {
 			if yaml_data, err := os.ReadFile(configMap.FileName); err == nil {
 				skip = false
@@ -911,6 +918,8 @@ func LoadInitCfg(load bool, platform string) {
 			}
 			log.Error(errMsg)
 			failed = append(failed, errMsg)
+		} else if configMap.Type == "auth" {
+			defAdminLoaded = context.defAdminLoaded
 		}
 		context.alwaysReload = false
 	}
@@ -932,8 +941,9 @@ func LoadInitCfg(load bool, platform string) {
 		}
 		cfgmapTried = nil
 	}
-	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried}).Info("done")
+	log.WithFields(log.Fields{"load": load, "cfgmapTried": cfgmapTried, "defAdminLoaded": defAdminLoaded}).Info("done")
 
+	return defAdminLoaded
 }
 
 func waitForFedRoleChange(roleExpected string) {

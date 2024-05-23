@@ -2043,6 +2043,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 					user.PasswordHash = utils.HashPassword(*pw.NewPassword)
 					user.PwdResetTime = time.Now().UTC()
 					user.ResetPwdInNextLogin = false
+					user.UseBootstrapPwd = false
 				}
 			}
 		}

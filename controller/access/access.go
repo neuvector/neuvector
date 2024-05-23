@@ -428,55 +428,6 @@ func getPermitValues(permissions share.NvPermissions, domain string) (uint32, ui
 	}
 }
 
-func getRestRolePermitValuesOld(roleName, domain string) []*api.RESTRolePermission {
-	rolesMutex.RLock()
-	defer rolesMutex.RUnlock()
-
-	//rolePermits := map[string]*api.RESTRolePermission	// key is permission id
-	var pList []*api.RESTRolePermission
-	if role, ok := allRoles[roleName]; ok {
-		pList = make([]*api.RESTRolePermission, 0, len(PermissionOptions))
-		readPermits, writePermits := role.ReadPermits, role.WritePermits
-		if domain == AccessDomainGlobal {
-			readPermits &= share.PERMS_FED_READ
-			writePermits &= share.PERMS_FED_WRITE
-		} else {
-			readPermits &= share.PERMS_DOMAIN_READ
-			writePermits &= share.PERMS_DOMAIN_WRITE
-		}
-		for _, option := range PermissionOptions {
-			// need to check fed/nv_resource permissions as well
-			var read, write bool
-			optionReadValue, optionWriteValue := option.Value, option.Value
-			if domain == AccessDomainGlobal {
-				optionReadValue &= share.PERMS_FED_READ
-				optionWriteValue &= share.PERMS_FED_WRITE
-			} else {
-				optionReadValue &= share.PERMS_DOMAIN_READ
-				optionWriteValue &= share.PERMS_DOMAIN_WRITE
-			}
-			if optionReadValue != 0 && option.ReadSupported && ((readPermits & optionReadValue) == optionReadValue) {
-				read = true
-			}
-			if optionWriteValue != 0 && option.WriteSupported && ((writePermits & optionWriteValue) == optionWriteValue) {
-				write = true
-			}
-			if read || write {
-				p := &api.RESTRolePermission{
-					ID:    option.ID,
-					Read:  read,
-					Write: write,
-				}
-				pList = append(pList, p)
-			}
-		}
-	} else {
-		pList = make([]*api.RESTRolePermission, 0)
-	}
-
-	return pList
-}
-
 type rwPermit struct {
 	read  bool
 	write bool

@@ -511,7 +511,8 @@ type RESTEULA struct {
 }
 
 type RESTEULAData struct {
-	EULA *RESTEULA `json:"eula"`
+	EULA            *RESTEULA `json:"eula"`
+	BootstrapPwdCmd string    `json:"bootstrap_password_command"` // k8s command to retrieve the bootstrap password
 }
 
 type RESTList struct {

@@ -6833,6 +6833,9 @@ definitions:
     properties:
       eula:
         $ref: '#/definitions/RESTEULA'
+      bootstrap_password_command:
+        type: string
+        description: kubectl command for retrieving bootstrap password of default admin user
   RESTEventsData:
     type: object
     required:
