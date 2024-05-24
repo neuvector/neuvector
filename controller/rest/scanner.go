@@ -248,22 +248,19 @@ func handlerScanImageReport(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	brief, _ := cacher.GetWorkloadBrief(id, "", acc)
-	if brief.ScanSummary == nil || brief.ScanSummary.Status != api.ScanStatusFinished {
-		brief = nil
-	}
-
-	if brief == nil {
+	if brief == nil || brief.ScanSummary == nil || brief.ScanSummary.Status != api.ScanStatusFinished {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-	} else {
-		vuls, _, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
-		if vuls == nil {
-			restRespNotFoundLogAccessDenied(w, login, err)
-			return
-		}
-
-		resp := &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls}}
-		restRespSuccess(w, r, resp, acc, login, nil, "Get image scan report")
+		return
 	}
+
+	vuls, _, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
+	if vuls == nil {
+		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	resp := &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls}}
+	restRespSuccess(w, r, resp, acc, login, nil, "Get image scan report")
 }
 
 func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
