@@ -1765,6 +1765,8 @@ func validatePVC(admType string, ar *admissionv1beta1.AdmissionReview, mode stri
 		var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
 
 		admResult.User = admResObject.UserName
+		admResult.PVCName = pvcName
+		admResult.PVCStorageClassName = *scName
 
 		if forTesting {
 			finalAction := "allowed"
