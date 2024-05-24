@@ -349,7 +349,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 				ok = true
 			}
 		case _readerRequired:
-			ok = acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)
+			ok = acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) || acc.HasPermFed()
 		}
 		if !ok {
 			restRespAccessDenied(w, login)
@@ -1340,7 +1340,7 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	org, err := cacher.GetFedMember(_clusterStatusMap, acc) // org is type RESTFedMembereshipData
+	org, err := cacher.GetFedMember(_clusterStatusMap, access.NewReaderAccessControl()) // org is type RESTFedMembereshipData
 	if err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
