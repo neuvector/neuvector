@@ -923,6 +923,26 @@ func lookupShadowUser(server, provider, username, userid, email, role string, ro
 			newUser = user
 		}
 		if server == share.FlavorRancher && provider != "" {
+			mapping := map[string]string{
+				"activedirectory": "AD",
+				"azure":           "AzureAD",
+				"github":          "Github",
+				"googleoauth":     "Google",
+				"keycloakoidc":    "Keycloak/OIDC",
+				"ldap":            "LDAP",
+				"oidc":            "OpenID",
+				"saml":            "SAML",
+				"ping":            "Ping Identity",
+				"adfs":            "ADFS",
+				"keycloak":        "Keycloak/SAML",
+				"okta":            "Okta",
+				"shibboleth":      "Shibboleth",
+				"openldap":        "OpenLDAP",
+				"freeipa":         "FreeIPA",
+			}
+			if name, _ := mapping[provider]; name != "" {
+				provider = name
+			}
 			user.Server = fmt.Sprintf("%s(%s)", share.FlavorRancher, provider)
 		}
 
