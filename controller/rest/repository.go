@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -182,13 +181,6 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest,
 			"No repository name provided")
 		return
-	}
-	// Add "library" for dockerhub if not exist
-	if dockerRegistries.Contains(req.Registry) && strings.Index(req.Repository, "/") == -1 {
-		req.Repository = fmt.Sprintf("library/%s", req.Repository)
-	}
-	if req.Tag == "" {
-		req.Tag = repositoryDefaultTag
 	}
 
 	// If request is from a different login session, a new scan is triggered even for the same image.
