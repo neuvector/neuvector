@@ -910,7 +910,7 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 	return event
 }
 
-func (w *FileWatch) ContainerCleanup(rootPid int) {
+func (w *FileWatch) ContainerCleanup(rootPid int, bLeave bool) {
 	if !w.bEnable {
 		return
 	}
@@ -924,7 +924,16 @@ func (w *FileWatch) ContainerCleanup(rootPid int) {
 			delete( w.fileEvents, path)
 		}
 	}
-	delete(w.groups, rootPid)
+
+	if grp, ok := w.groups[rootPid]; ok {
+		if bLeave {
+			delete(w.groups, rootPid)
+		} else {
+			// reset lists
+			grp.learnRules = make(map[string]utils.Set)
+			grp.applyRules = make(map[string]utils.Set)
+		}
+	}
 }
 
 func (w *FileWatch) GetWatchFileList(rootPid int) []*share.CLUSFileMonitorFile {

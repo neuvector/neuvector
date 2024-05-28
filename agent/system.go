@@ -1201,7 +1201,7 @@ func systemConfigFileMonitor(nType cluster.ClusterNotifyType, key string, value 
 		name := share.CLUSProfileKey2Name(key)
 
 		if name == "nodes" { // reserved group: make it a trigger to file monitor on lost host
-			fileWatcher.ContainerCleanup(1)
+			fileWatcher.ContainerCleanup(1, false)
 			config := &fsmon.FsmonConfig{} // TODO:
 			config.Profile = &profile
 			if len(profile.Filters) > 0 {
