@@ -1693,7 +1693,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// applyProcessProfilePolicy(c, group)
 
 		// file monitors : protect mode, core-definitions, only modification alerts
-		fileWatcher.ContainerCleanup(info.Pid)
+		fileWatcher.ContainerCleanup(info.Pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
 		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
 			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true,
@@ -1762,7 +1762,7 @@ func stopNeuVectorMonitor(c *containerData) {
 	}
 
 	log.WithFields(log.Fields{"id": c.id, "pid": c.pid}).Debug("FMON:")
-	fileWatcher.ContainerCleanup(c.pid)
+	fileWatcher.ContainerCleanup(c.pid, true)
 
 	// Send event to controller
 	if !isChild {
@@ -2476,21 +2476,21 @@ func StartMonitorHostInterface(hid string, pid int, stopCh chan struct{}) {
 func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 	var err error
 	chLink := make(chan netlink.LinkUpdate)
-	doneLink := make(chan struct{})	
+	doneLink := make(chan struct{})
 	defer close(doneLink)
 
 	if err = netlink.LinkSubscribe(chLink, doneLink); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Link change subscription failed")
 	}
-	
+
 	chAddr := make(chan netlink.AddrUpdate)
-	doneAddr := make(chan struct{})	
+	doneAddr := make(chan struct{})
 	defer close(doneAddr)
 
 	if err = netlink.AddrSubscribe(chAddr, doneAddr); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Address change subscription failed")
 	}
- 
+
 	log.Debug("Start monitoring Host Interface changes...")
 
 	for {
