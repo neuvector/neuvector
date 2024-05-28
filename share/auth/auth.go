@@ -414,7 +414,7 @@ func (a *remoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAu
 		ctx, cancel := context.WithTimeout(context.Background(), oidcGroupInfoTimeout)
 		defer cancel()
 		if groups, err := oidc.GetAzureGroupInfo(ctx, claims, oauth2.StaticTokenSource(token)); err != nil {
-			log.WithError(err).Info("oidc: failed to fallback to distrubited group info")
+			log.WithError(err).Debug("oidc: failed to fallback to distrubited group info")
 		} else {
 			claims["groups"] = groups
 		}
