@@ -157,6 +157,7 @@ func ScanModule2REST(m *share.ScanModule) *api.RESTScanModule {
 	}
 	return &api.RESTScanModule{
 		Name:    m.Name,
+		File:    m.File,
 		Version: m.Version,
 		Source:  m.Source,
 		CVEs:    mcve,
@@ -907,6 +908,7 @@ func (vpf vpFilter) FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTI
 			skip = vpf.filterOneVul(v, nil, "")
 		} else {
 			for _, s := range idns {
+				// DisplayName is image name
 				if vpf.filterOneVul(v, s.Domains, s.DisplayName) {
 					skip = true
 					break

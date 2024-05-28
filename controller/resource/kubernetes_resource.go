@@ -68,6 +68,7 @@ const (
 	K8sResRbacClusterRoles        = "clusterroles.rbac.authorization.k8s.io"
 	K8sResRbacRolebindings        = "rolebindings.rbac.authorization.k8s.io"
 	K8sResRbacClusterRolebindings = "clusterrolebindings.rbac.authorization.k8s.io"
+	K8sResPersistentVolumeClaims  = "persistentvolumeclaims"
 )
 
 const (
@@ -242,7 +243,7 @@ var rbacApiGroups = utils.NewSet(k8sRbacApiGroup)
 
 var opCreateDelete = utils.NewSet(Create, Update)
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets)
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResPersistentVolumeClaims)
 var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets, K8sResPods)
 var admRbacResForCreateUpdate1 = utils.NewSet(K8sResRoles, K8sResRolebindings)
 var admRbacResForCreateUpdate2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
@@ -688,6 +689,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() k8s.Resource { return new(apiv1beta1.ValidatingWebhookConfiguration) },
 				func() k8s.ResourceList { return new(apiv1beta1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
+				nil,
+			},
+		},
+	},
+	RscTypePersistentVolumeClaim: k8sResource{
+		apiGroup: "",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() k8s.Resource { return new(corev1.PersistentVolumeClaim) },
+				func() k8s.ResourceList { return new(corev1.PersistentVolumeClaimList) },
+				xlatePersistentVolumeClaim,
 				nil,
 			},
 		},
@@ -1716,7 +1729,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypePersistentVolumeClaim:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -1887,7 +1900,8 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 }
 
 // revertCount: how many times the ValidatingWebhookConfiguration resource has been reverted by this controller.
-//              if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
+//
+//	if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool, revertCount *uint32,
 	unexpectedMatchKeys utils.Set) bool {
 
@@ -2185,4 +2199,8 @@ func getNeuvectorSvcAccount(resInfo map[string]string) {
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
 		continue
 	}
+}
+
+func xlatePersistentVolumeClaim(obj k8s.Resource) (string, interface{}) {
+	return "", nil
 }

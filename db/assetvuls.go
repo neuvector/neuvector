@@ -795,89 +795,6 @@ func buildWhereClauseForPlatform(allowedID []string, queryFilter *api.VulQueryFi
 	return goqu.And(part1_assetType, part2_allowed)
 }
 
-func buildWhereClauseForNode_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	return buildWhereClauseForNode([]string{}, queryFilter)
-}
-
-func buildWhereClauseForImage_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	return buildWhereClauseForImage([]string{}, queryFilter)
-}
-
-func buildWhereClauseForDomain_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// domains
-	part3_domain_equals := goqu.Ex{}
-	domain_contains := make([]exp.Expression, 0)
-	if queryFilter.MatchType4Ns != "" && len(queryFilter.SelectedDomains) > 0 {
-		if queryFilter.MatchType4Ns == "equals" {
-			part3_domain_equals = goqu.Ex{
-				"w_domain": queryFilter.SelectedDomains,
-			}
-		} else if queryFilter.MatchType4Ns == "contains" {
-			for _, d := range queryFilter.SelectedDomains {
-				domain_contains = append(domain_contains, goqu.C("w_domain").Like(fmt.Sprintf("%%%s%%", d)))
-			}
-		}
-	}
-
-	return goqu.And(part1_assetType, part3_domain_equals, goqu.Or(domain_contains...))
-}
-
-func buildWhereClauseForService_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// service
-	part_service_equal := goqu.Ex{}
-	part_service_contains := make([]exp.Expression, 0)
-	if queryFilter.ServiceNameMatchType != "" && queryFilter.ServiceName != "" {
-		if queryFilter.ServiceNameMatchType == "equals" {
-			part_service_equal = goqu.Ex{
-				"w_service_group": queryFilter.ServiceName,
-			}
-		} else if queryFilter.ServiceNameMatchType == "contains" {
-			// goqu.C("a").Like("%a%")
-			// goqu.Op{"like": "a%"},
-			part_service_contains = append(part_service_contains, goqu.C("w_service_group").Like(fmt.Sprintf("%%%s%%", queryFilter.ServiceName)))
-		}
-	}
-
-	return goqu.And(part1_assetType, part_service_equal, goqu.Or(part_service_contains...))
-}
-
-func buildWhereClauseForContainer_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "workload",
-	}
-
-	// container
-	part_container_equal := goqu.Ex{}
-	part_container_contains := make([]exp.Expression, 0)
-	if queryFilter.ContainerNameMatchType != "" && queryFilter.ContainerName != "" {
-		if queryFilter.ContainerNameMatchType == "equals" {
-			part_container_equal = goqu.Ex{
-				"name": queryFilter.ContainerName,
-			}
-		} else if queryFilter.ContainerNameMatchType == "contains" {
-			part_container_contains = append(part_container_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ContainerName)))
-		}
-	}
-
-	return goqu.And(part1_assetType, part_container_equal, goqu.Or(part_container_contains...))
-}
-
-func buildWhereClauseForPlatform_All(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
-	part1_assetType := goqu.Ex{
-		"type": "platform",
-	}
-
-	return goqu.And(part1_assetType)
-}
-
 func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 	var zipBytes []byte
 	if len(assetVul.Packages) > 0 {
@@ -957,4 +874,11 @@ func Perf_getAllWorkloadIDs(allowed map[string]utils.Set) error {
 	}
 
 	return nil
+}
+
+func hasNamespaceFilter(queryFilter *api.VulQueryFilterViewModel) bool {
+	if queryFilter.MatchType4Ns != "" && len(queryFilter.SelectedDomains) > 0 {
+		return true
+	}
+	return false
 }
