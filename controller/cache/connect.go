@@ -316,6 +316,13 @@ func getFqdnAddrGroupName(fqdn string) string {
 	return ""
 }
 
+func getIpAddrGroupName(ip string) string {
+	if grps, ok := ip2GrpMap[ip]; ok {
+		return grps.Any().(string)
+	}
+	return ""
+}
+
 func getAddrGroupNameFromPolicy(polid uint32, client bool) string {
 	if polid != 0 {
 		cacheMutexRLock()
@@ -889,6 +896,9 @@ func connectToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip) bo
 	} else {
 		// Unmanaged host
 		if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
+			conn.ServerWL = ep
+			sa.addrgrp = true
+		} else if ep = getIpAddrGroupName(net.IP(conn.ServerIP).String()); ep != "" {
 			conn.ServerWL = ep
 			sa.addrgrp = true
 		} else {

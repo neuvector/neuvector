@@ -79,17 +79,17 @@ var scanErrString = []string{
 }
 
 type CacheRecord struct {
-	Layer	string		`json:"layerID,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"ref_cnt,omitempty"`
-	RefLast	time.Time	`json:"ref_last,omitempty"`
+	Layer   string    `json:"layerID,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"ref_cnt,omitempty"`
+	RefLast time.Time `json:"ref_last,omitempty"`
 }
 
 type CacherData struct {
-	CacheRecords 	[]CacheRecord	`json:"cache_records,omitempty"`
-	MissCnt         uint64			`json:"cache_misses,omitempty"`
-	HitCnt          uint64			`json:"cache_hits,omitempty"`
-	CurRecordSize   uint64			`json:"current_record_size"`
+	CacheRecords  []CacheRecord `json:"cache_records,omitempty"`
+	MissCnt       uint64        `json:"cache_misses,omitempty"`
+	HitCnt        uint64        `json:"cache_hits,omitempty"`
+	CurRecordSize uint64        `json:"current_record_size"`
 }
 
 func ScanErrorToStr(e share.ScanErrorCode) string {
@@ -226,7 +226,7 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 }
 
 func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
-	apps := NewScanApps(true)
+	apps := NewScanApps(false) // no need to scan the same file twice
 	exclDirs := utils.NewSet("bin", "boot", "dev", "proc", "run", "sys", "tmp")
 	rootPath := s.sys.ContainerFilePath(pid, "/")
 	rootLen := len(rootPath)

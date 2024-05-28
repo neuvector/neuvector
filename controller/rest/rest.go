@@ -1665,8 +1665,8 @@ func StartRESTServer() {
 	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
-	r.GET("/v1/scan/image", handlerScanImageSummary)
-	r.GET("/v1/scan/image/:id", handlerScanImageReport)
+	r.GET("/v1/scan/image", handlerScanImageSummary)    // Returns all workload's scan result summary
+	r.GET("/v1/scan/image/:id", handlerScanImageReport) // Returns workload scan result by workload ID
 	r.POST("/v1/scan/host/:id", handlerScanHostReq)
 	r.GET("/v1/scan/host/:id", handlerScanHostReport)
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)

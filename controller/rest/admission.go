@@ -78,6 +78,8 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 	}
 
 	numOps := utils.NewSet(share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan, share.CriteriaOpBiggerThan)
+	hasStorageClassCriteria := false
+
 	for _, crt := range criteria {
 		var allowedOp, allowedValue bool
 
@@ -168,6 +170,18 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 			}
 		} else {
 			return fmt.Errorf("Unsupported criterion name: %s", crt.Name)
+		}
+
+		if crt.Name == share.CriteriaKeyStorageClassName {
+			hasStorageClassCriteria = true
+		}
+	}
+
+	if hasStorageClassCriteria {
+		for _, crt := range criteria {
+			if crt.Name != share.CriteriaKeyStorageClassName && crt.Name != share.CriteriaKeyNamespace {
+				return fmt.Errorf("The StorageClass Name criteria can only be used in conjunction with namespace criteria. Criterion name: %s", crt.Name)
+			}
 		}
 	}
 
