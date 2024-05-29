@@ -247,20 +247,28 @@ func handlerScanImageReport(w http.ResponseWriter, r *http.Request, ps httproute
 		showTag = api.QueryValueShowAccepted
 	}
 
-	brief, _ := cacher.GetWorkloadBrief(id, "", acc)
-	if brief == nil || brief.ScanSummary == nil || brief.ScanSummary.Status != api.ScanStatusFinished {
+	cached := cacher.GetAllWorkloadsBrief("", acc)
+
+	var brief *api.RESTWorkloadBrief
+	for _, wl := range cached {
+		if wl.ImageID == id && wl.ScanSummary != nil && wl.ScanSummary.Status == api.ScanStatusFinished {
+			brief = wl
+			break
+		}
+	}
+
+	if brief == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return
-	}
+	} else {
+		vuls, _, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
+		if vuls == nil {
+			restRespNotFoundLogAccessDenied(w, login, err)
+			return
+		}
 
-	vuls, _, err := cacher.GetVulnerabilityReport(brief.ID, showTag)
-	if vuls == nil {
-		restRespNotFoundLogAccessDenied(w, login, err)
-		return
+		resp := &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls}}
+		restRespSuccess(w, r, resp, acc, login, nil, "Get image scan report")
 	}
-
-	resp := &api.RESTScanReportData{Report: &api.RESTScanReport{Vuls: vuls}}
-	restRespSuccess(w, r, resp, acc, login, nil, "Get image scan report")
 }
 
 func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
