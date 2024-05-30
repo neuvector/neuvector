@@ -1567,8 +1567,12 @@ func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string
 }
 
 func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
-	list := make([]orchAPI.UserRBAC, len(d.rbacCache))
-	i := 0
+	size := len(d.rbacCache)
+	if len(d.permitsRbacCache) > size {
+		size = len(d.permitsRbacCache)
+	}
+
+	allUsers := make(map[k8sSubjectObjRef]*orchAPI.UserRBAC, size)
 
 	d.rbacLock.RLock()
 	defer d.rbacLock.RUnlock()
@@ -1584,9 +1588,32 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 		if len(domainRole) == 0 {
 			domainRole = nil
 		}
-		list[i] = orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC: domainRole}
+		allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC: domainRole}
+	}
+
+	for userRef, rbac := range d.permitsRbacCache {
+		domainPermits := make(map[string]share.NvPermissions)
+		for d, p := range rbac {
+			if !p.IsEmpty() {
+				domainPermits[d] = p
+			}
+		}
+		if len(domainPermits) > 0 {
+			if userRBAC, _ := allUsers[userRef]; rbac != nil {
+				userRBAC.RBAC2 = domainPermits
+			} else {
+				allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC2: domainPermits}
+			}
+		}
+	}
+
+	i := 0
+	list := make([]orchAPI.UserRBAC, len(allUsers))
+	for _, userRBAC := range allUsers {
+		list[i] = *userRBAC
 		i++
 	}
+
 	return list
 }
 

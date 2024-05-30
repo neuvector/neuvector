@@ -46,7 +46,8 @@ type StateCallback func(state string, err error)
 type UserRBAC struct {
 	Name   string
 	Domain string
-	RBAC   map[string]string // domain -> nv role
+	RBAC   map[string]string              // domain -> nv role
+	RBAC2  map[string]share.NvPermissions // domain -> nv permissions
 }
 
 type ResourceDriver interface {
