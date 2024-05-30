@@ -325,6 +325,10 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	// schedule a key deletion, as loong as one controller does it, it will be fine.
 	pruneHost()
 	SchedulePruneGroups()
+
+	if localDev.Host.Platform == share.PlatformKubernetes {
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+	}
 }
 
 func FillControllerCounter(c *share.CLUSControllerCounter) {
@@ -2080,7 +2084,8 @@ func startWorkerThread(ctx *Context) {
 
 // handler of K8s resource watcher calls cbResourceWatcher() which sends to orchObjChan/objChan
 // [2021-02-15] CRD-related resource changes do not call this function.
-//              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
+//
+//	If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
 	updateDetected := false
 	config := newConfig
@@ -2202,7 +2207,7 @@ func QueryK8sVersion() {
 	}
 }
 
-////// event handlers for enforcer's kv dispatcher
+// //// event handlers for enforcer's kv dispatcher
 // node: HostID
 func nodeLeaveDispatcher(node string, param interface{}) {
 	dispatchHelper.NodeLeave(node, isLeader())
