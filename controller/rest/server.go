@@ -2033,14 +2033,27 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 	var resp api.RESTUsersData
 	resp.Users = make([]*api.RESTUser, len(users))
 	for i, user := range users {
-		globalRole, roleDomains, _, _ := rbac2UserRole(user.RBAC, nil)
+		globalRole, roleDomains, permits, permitsDomains := rbac2UserRole(user.RBAC, user.RBAC2)
+
+		var extraPermitsDomains []api.RESTPermitsAssigned
+		if len(permitsDomains) > 0 {
+			extraPermitsDomains = make([]api.RESTPermitsAssigned, len(permitsDomains))
+			for i, permitsDomains := range permitsDomains {
+				extraPermitsDomains[i] = api.RESTPermitsAssigned{
+					Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
+					Domains: permitsDomains.Domains,
+				}
+			}
+		}
 
 		u := &api.RESTUser{
-			Fullname:    user.Name,
-			Server:      server,
-			Username:    user.Name,
-			Role:        globalRole,
-			RoleDomains: roleDomains,
+			Fullname:            user.Name,
+			Server:              server,
+			Username:            user.Name,
+			Role:                globalRole,
+			RoleDomains:         roleDomains,
+			ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, permits),
+			ExtraPermitsDomains: extraPermitsDomains,
 		}
 
 		resp.Users[i] = u
