@@ -57,7 +57,7 @@ const (
 	golang = "golang"
 
 	// R language
-	rlang = "r"
+	rlang           = "r"
 	rDefaultPath    = "usr/lib/R/library/"
 	rDefaultPath2   = "usr/local/lib/R/library/"
 	rRepositoryPath = "usr/local/lib/R/site-library/"
@@ -449,6 +449,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 		path = origJar + ":" + filename
 	}
 
+	doneWithFileParsing := false
 	pkgs := make(map[string][]AppPackage)
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
@@ -483,7 +484,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
 			}
-		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
+		} else if !doneWithFileParsing && strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
 			rc, err := f.Open()
 			if err != nil {
@@ -523,10 +524,10 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 			}
 
 			key := fmt.Sprintf("%s-%s-%s", pkg.FileName, pkg.ModuleName, pkg.Version)
-			dedup.Add(key)	// reference
-			pkgs[path] = []AppPackage{pkg}	//higher priority: replace others
-			break
-		} else if strings.HasSuffix(f.Name, javaManifest) {
+			dedup.Add(key)                 // reference
+			pkgs[path] = []AppPackage{pkg} // higher priority: replace others
+			doneWithFileParsing = true     // No need to parse other manifest files of the same jar file
+		} else if !doneWithFileParsing && strings.HasSuffix(f.Name, javaManifest) {
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
@@ -757,7 +758,7 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 			}
 
 			for app, v := range dep.Deps {
-				key := fmt.Sprintf("%s-%s", ".NET:" + app, v)
+				key := fmt.Sprintf("%s-%s", ".NET:"+app, v)
 				if !dedup.Contains(key) {
 					dedup.Add(key)
 					pkg := AppPackage{
@@ -825,11 +826,11 @@ func (s *ScanApps) parseRLangPackage(filename, fullpath string) {
 		} else {
 			rname = fmt.Sprintf("%s-%s", repository, name)
 		}
-		pkg := AppPackage {
+		pkg := AppPackage{
 			AppName:    rlang,
 			ModuleName: strings.ToLower(rname),
 			Version:    version,
-			FileName:   strings.TrimSuffix(filename, "/"+ rDescFileName),
+			FileName:   strings.TrimSuffix(filename, "/"+rDescFileName),
 		}
 		s.pkgs[filename] = []AppPackage{pkg}
 	}
