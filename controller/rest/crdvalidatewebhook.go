@@ -426,10 +426,17 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	} else {
+		var reqUpdateByK8sGC bool
+		var skipUpdateReqByK8sGC bool
 		var reqOp admissionv1beta1.Operation
+
 		if ar.Request != nil {
 			reqOp = ar.Request.Operation
+			if reqOp == admissionv1beta1.Update && ar.Request.UserInfo.Username == "system:serviceaccount:kube-system:generic-garbage-collector" {
+				reqUpdateByK8sGC = true
+			}
 		}
+
 		if (ar.Request == nil || len(ar.Request.Object.Raw) == 0) && (reqOp != admissionv1beta1.Delete) {
 			log.WithFields(log.Fields{"reqOp": reqOp}).Warn("disallow because of no request/raw data")
 			http.Error(w, "invalid request", http.StatusBadRequest)
@@ -467,7 +474,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 
-		if len(sizeErrMsg) == 0 && reqOp == admissionv1beta1.Create {
+		if len(sizeErrMsg) == 0 && (reqOp == admissionv1beta1.Create || reqUpdateByK8sGC) {
 			mdName := ""
 			allowedName := ""
 			var secRulePartial resource.NvSecurityRulePartial
@@ -475,16 +482,25 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil {
 				mdName = secRulePartial.GetName()
 			}
-			switch ar.Request.Kind.Kind {
-			case resource.NvAdmCtrlSecurityRuleKind:
-				allowedName = share.ScopeLocal
-			case resource.NvVulnProfileSecurityRuleKind:
-				allowedName = share.DefaultVulnerabilityProfileName
-			case resource.NvCompProfileSecurityRuleKind:
-				allowedName = share.DefaultComplianceProfileName
-			}
-			if allowedName != "" && mdName != allowedName {
-				sizeErrMsg = fmt.Sprintf("CRD resource metadata name(%s) is not allowed", mdName)
+			if reqOp == admissionv1beta1.Create {
+				switch req.Kind.Kind {
+				case resource.NvAdmCtrlSecurityRuleKind:
+					allowedName = share.ScopeLocal
+				case resource.NvVulnProfileSecurityRuleKind:
+					allowedName = share.DefaultVulnerabilityProfileName
+				case resource.NvCompProfileSecurityRuleKind:
+					allowedName = share.DefaultComplianceProfileName
+				}
+				if allowedName != "" && mdName != allowedName {
+					sizeErrMsg = fmt.Sprintf("CRD resource metadata name(%s) is not allowed", mdName)
+				}
+			} else if reqUpdateByK8sGC {
+				_, err := global.ORCH.GetResource(req.Resource.Resource, req.Namespace, secRulePartial.Name)
+				if err != nil && strings.Contains(err.Error(), " 404 ") {
+					// The NV CR to update is not found in k8s & it's requested by "system:serviceaccount:kube-system:generic-garbage-collector" !
+					log.WithFields(log.Fields{"err": err, "name": ar.Request.Name}).Debug()
+					skipUpdateReqByK8sGC = true
+				}
 			}
 		}
 
@@ -505,6 +521,9 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 					skip = true
 				} else {
 					resultMsg = fmt.Sprintf(" %s done", reqOp)
+				}
+				if skipUpdateReqByK8sGC {
+					skip = true
 				}
 			}
 		}

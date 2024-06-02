@@ -9,9 +9,11 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/mitchellh/pointerstructure"
 	"golang.org/x/oauth2"
 	jose "gopkg.in/square/go-jose.v2"
 )
@@ -29,6 +31,16 @@ const (
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess
 	ScopeOfflineAccess = "offline_access"
+
+	oidcClaimNames  = "_claim_names"
+	oidcGroups      = "groups"
+	oidcClaimSource = "_claim_sources"
+
+	oidcGraphWindowsNet   = "graph.windows.net"
+	oidcGraphMicrosoftCom = "graph.microsoft.com"
+
+	oidcGraphMicrosoftAzureUs = "graph.microsoftazure.us"
+	oidcGraphMicrosoftUs      = "graph.microsoft.us"
 )
 
 // ClientContext returns a new Context that carries the provided HTTP client.
@@ -200,6 +212,98 @@ func UserInfoReq(ctx context.Context, userInfoURL string, tokenSource oauth2.Tok
 	}
 	userInfo.claims = body
 	return &userInfo, nil
+}
+
+// GetAzureGroupInfo gets Azure's group information following _claim_sources.
+func GetAzureGroupInfo(ctx context.Context, allClaims map[string]interface{}, tokenSource oauth2.TokenSource) (interface{}, error) {
+
+	// Here we check if below conditions are met:
+	// 1. claims.iss contains "login.microsoftonline.com", which means it's coming from Azure AD.
+	// 2. No groups is provided.
+	// 3. _claim_sources is available.
+	// If they're all met at the same time, we try to get information from the endpoint specified in _claim_sources.
+	iss, err := pointerstructure.Get(allClaims, "/iss")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find issuer: %w", err)
+	}
+	issuer, ok := iss.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid issuer: %v", iss)
+	}
+
+	if !strings.Contains(issuer, "login.microsoftonline.com") {
+		return nil, fmt.Errorf("not recognized issuer: %s", issuer)
+	}
+
+	src, err := pointerstructure.Get(allClaims, fmt.Sprintf("/%s/%s", oidcClaimNames, oidcGroups))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find group claim name: %w", err)
+	}
+
+	srcname, ok := src.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid srcname: %v", src)
+	}
+
+	endpointPath := fmt.Sprintf("/%s/%s/endpoint", oidcClaimSource, srcname)
+	endpoint, err := pointerstructure.Get(allClaims, endpointPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find endpoint path: %w", err)
+	}
+
+	groupUrl, ok := endpoint.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid endpoint: %v", endpoint)
+	}
+
+	urlParsed, err := url.Parse(groupUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse group url: %w", err)
+	}
+
+	if urlParsed.Host == oidcGraphWindowsNet {
+		urlParsed.Host = oidcGraphMicrosoftCom
+		urlParsed.Path = "/v1.0" + urlParsed.Path
+	} else if urlParsed.Host == oidcGraphMicrosoftAzureUs {
+		urlParsed.Host = oidcGraphMicrosoftUs
+		urlParsed.Path = "/v1.0" + urlParsed.Path
+	}
+
+	payload := strings.NewReader("{\"securityEnabledOnly\": false}")
+	req, err := http.NewRequest("POST", urlParsed.String(), payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create POST request: %w", err)
+	}
+
+	req.Header.Add("content-type", "application/json")
+
+	token, err := tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create access token: %w", err)
+	}
+	token.SetAuthHeader(req)
+
+	resp, err := doRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read resp body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected HTTP code %s: %s", resp.Status, body)
+	}
+
+	target := struct {
+		Value []interface{} `json:"value"`
+	}{}
+
+	if err := json.Unmarshal(body, &target); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return target.Value, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation

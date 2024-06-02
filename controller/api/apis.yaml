@@ -2423,7 +2423,7 @@ paths:
     get:
       tags:
         - Scan
-      summary: Get scan image summary
+      summary: Get runtime scan summary by workload's images
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -2438,7 +2438,7 @@ paths:
     get:
       tags:
         - Scan
-      summary: Get image scan report
+      summary: Get runtime scan report by workload's image ID
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -9282,7 +9282,10 @@ definitions:
     properties:
       name:
         type: string
-        example: scanner
+        example: openssl
+      file:
+        type: string
+        example: example.jar 
       version:
         type: string
         example: "1.011"

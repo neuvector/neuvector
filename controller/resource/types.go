@@ -49,6 +49,7 @@ const (
 	RscTypeDaemonSet                      = "daemonset"
 	RscTypeReplicaSet                     = "replicaset"
 	RscTypeStatefulSet                    = "statefulset"
+	RscTypePersistentVolumeClaim          = "persistentvolumeclaims"
 )
 
 const (
@@ -123,20 +124,20 @@ type Container struct {
 }
 
 type Pod struct {
-	UID           string
-	Name          string
-	Domain        string
-	Node          string
-	IPNet         net.IPNet
-	HostNet       bool
-	Running       bool
-	OwnerUID      string
-	OwnerName     string
-	OwnerType     string
-	Containers    []Container
-	SA            string   // service account of this pod
-	ContainerIDs  []string // all workload id
-	Labels        map[string]string
+	UID          string
+	Name         string
+	Domain       string
+	Node         string
+	IPNet        net.IPNet
+	HostNet      bool
+	Running      bool
+	OwnerUID     string
+	OwnerName    string
+	OwnerType    string
+	Containers   []Container
+	SA           string   // service account of this pod
+	ContainerIDs []string // all workload id
+	Labels       map[string]string
 }
 
 type Deployment struct {

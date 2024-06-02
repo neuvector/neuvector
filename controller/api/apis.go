@@ -2203,6 +2203,7 @@ type RESTModuleCve struct {
 
 type RESTScanModule struct {
 	Name    string           `json:"name"`
+	File    string           `json:"file"`
 	Version string           `json:"version"`
 	Source  string           `json:"source"`
 	CVEs    []*RESTModuleCve `json:"cves,omitempty"`

@@ -69,6 +69,7 @@ const (
 	K8sResRbacClusterRoles        = "clusterroles.rbac.authorization.k8s.io"
 	K8sResRbacRolebindings        = "rolebindings.rbac.authorization.k8s.io"
 	K8sResRbacClusterRolebindings = "clusterrolebindings.rbac.authorization.k8s.io"
+	K8sResPersistentVolumeClaims  = "persistentvolumeclaims"
 )
 
 const (
@@ -243,7 +244,7 @@ var rbacApiGroups = utils.NewSet(k8sRbacApiGroup)
 
 var opCreateDelete = utils.NewSet(Create, Update)
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets)
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResPersistentVolumeClaims)
 var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets, K8sResPods)
 var admRbacResForCreateUpdate1 = utils.NewSet(K8sResRoles, K8sResRolebindings)
 var admRbacResForCreateUpdate2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
@@ -701,6 +702,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() metav1.Object { return new(admregv1b1.ValidatingWebhookConfiguration) },
 				func() metav1.ListInterface { return new(admregv1b1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
+				nil,
+			},
+		},
+	},
+	RscTypePersistentVolumeClaim: k8sResource{
+		apiGroup: "",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() metav1.Object { return new(corev1.PersistentVolumeClaim) },
+				func() metav1.ListInterface { return new(corev1.PersistentVolumeClaimList) },
+				xlatePersistentVolumeClaim,
 				nil,
 			},
 		},
@@ -1583,7 +1596,7 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret, RscTypePersistentVolumeClaim:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -2068,6 +2081,10 @@ func getNeuvectorSvcAccount(resInfo map[string]string) {
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
 		continue
 	}
+}
+
+func xlatePersistentVolumeClaim(obj metav1.Object) (string, interface{}) {
+	return "", nil
 }
 
 func RetrieveBootstrapPassword() string {

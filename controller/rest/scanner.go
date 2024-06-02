@@ -813,11 +813,11 @@ func handlerScanCacheStat(w http.ResponseWriter, r *http.Request, ps httprouter.
 	if res, err := rpc.ScanCacheGetStat(id); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
 	} else {
-		resp := &api.RESTScanCacheStat {
-			RecordCnt: 	res.RecordCnt,
+		resp := &api.RESTScanCacheStat{
+			RecordCnt:  res.RecordCnt,
 			RecordSize: res.RecordSize,
-			MissCnt: 	res.MissCnt,
-			HitCnt:  	res.HitCnt,
+			MissCnt:    res.MissCnt,
+			HitCnt:     res.HitCnt,
 		}
 		restRespSuccess(w, r, resp, acc, login, nil, "Get scan cache stat")
 	}
@@ -844,18 +844,18 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 		var data scanUtils.CacherData
 		uzb := utils.GunzipBytes(res.DataZb)
 		json.Unmarshal([]byte(uzb), &data)
-		resp := &api.RESTScanCacheData {
-			MissCnt: 	data.MissCnt,
-			HitCnt: 	data.HitCnt,
-			RecordSize:	data.CurRecordSize,
+		resp := &api.RESTScanCacheData{
+			MissCnt:    data.MissCnt,
+			HitCnt:     data.HitCnt,
+			RecordSize: data.CurRecordSize,
 		}
 
 		for _, rec := range data.CacheRecords {
-			r := api.RESTScanCacheRecord {
-				Layer: 	rec.Layer,
-				Size:	rec.Size,
-				RefCnt:	rec.RefCnt,
-				RefLast:rec.RefLast,
+			r := api.RESTScanCacheRecord{
+				Layer:   rec.Layer,
+				Size:    rec.Size,
+				RefCnt:  rec.RefCnt,
+				RefLast: rec.RefLast,
 			}
 			resp.CacheRecords = append(resp.CacheRecords, r)
 		}
