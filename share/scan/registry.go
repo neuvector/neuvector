@@ -142,6 +142,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	if manifestReqType == registry.ManifestRequest_CosignSignature {
 		log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("retrieving signature information")
 	}
+
 	var dg string
 	var body []byte
 	var err error
@@ -221,7 +222,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	// get schema v1
 	manV1, err := rc.Manifest(ctx, name, tag)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Get Manifest v1 fail")
+		log.WithFields(log.Fields{"error": err}).Debug("Get Manifest v1 fail")
 	} else {
 		log.WithFields(log.Fields{
 			"mediaType": manV1.SignedManifest.MediaType, "version": manV1.SignedManifest.SchemaVersion, "digest": manV1.Digest,

@@ -90,6 +90,7 @@ var DefaultIdleTimeout uint32 = DefIdleTimeoutInternal
 
 const defaultClusterName string = "cluster.local"
 
+const RegistryAllName string = "_all_registry"
 const RegistryRepoScanName string = "_repo_scan"
 const RegistryFedRepoScanName string = "fed._repo_scan"
 

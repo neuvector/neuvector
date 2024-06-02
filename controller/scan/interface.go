@@ -508,9 +508,35 @@ func (m *scanMethod) GetRegistryBenches(name string, tagMap map[string][]string,
 	return cmap, nmap, nil
 }
 
+func (m *scanMethod) getAllRegistryImageReport(id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
+	rpt, _ := m.GetRegistryImageReport(common.RegistryRepoScanName, id, vpf, showTag, tagMap, acc)
+	if rpt != nil {
+		return rpt, nil
+	}
+
+	rpt, _ = m.GetRegistryImageReport(common.RegistryFedRepoScanName, id, vpf, showTag, tagMap, acc)
+	if rpt != nil {
+		return rpt, nil
+	}
+
+	regs := regMapToArray(true, true)
+	for _, rs := range regs {
+		rpt, _ = m.GetRegistryImageReport(rs.config.Name, id, vpf, showTag, tagMap, acc)
+		if rpt != nil {
+			return rpt, nil
+		}
+	}
+
+	return nil, common.ErrObjectNotFound
+}
+
 func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
 	var rs *Registry
 	var ok bool
+
+	if name == common.RegistryAllName {
+		return m.getAllRegistryImageReport(id, vpf, showTag, tagMap, acc)
+	}
 
 	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry

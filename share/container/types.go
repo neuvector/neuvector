@@ -368,6 +368,67 @@ func tryConnectDefaultRt(rootPath string, sys *system.SystemTools) (Runtime, err
 	return nil, ErrUnknownRuntime
 }
 
+func isKubeletLikely(cmds []string) bool {
+	if strings.Contains(filepath.Base(cmds[0]), "kubelet") {
+		return true
+	}
+
+	matchedCnt := 0
+	for _, cmd := range cmds {
+		// log.WithFields(log.Fields{"cmd": cmd}).Debug()
+		if strings.HasPrefix(cmd, "--container-runtime-endpoint=") {
+			matchedCnt++
+		}
+
+		if strings.HasPrefix(cmd, "--pod-infra-container-image=") {
+			matchedCnt++
+		}
+
+		if strings.HasPrefix(cmd, "--kubeconfig=") {
+			matchedCnt++
+		}
+
+		if strings.HasPrefix(cmd, "--kubelet-registration-path=") {
+			matchedCnt++
+		}
+
+		if matchedCnt >= 2 {
+			log.WithFields(log.Fields{"cmds": cmds}).Debug()
+			return true
+		}
+	}
+	return false
+}
+
+func isK3sLikely(cmds []string) (string, bool) {
+	if strings.HasSuffix(filepath.Base(cmds[0]), "k3s") {
+		// https://docs.k3s.io/cli/server
+		pause_img := "docker.io/rancher/mirrored-pause:3.6" // default sandbox
+		matched := false
+		for i, cmd := range cmds {
+			// log.WithFields(log.Fields{"cmd": cmd}).Debug()
+			// node server
+			if strings.HasPrefix(cmd, "server") {
+				matched = true
+			}
+
+			// node agent
+			if strings.HasPrefix(cmd, "agent") {
+				matched = true
+			}
+
+			// only at agent
+			if strings.HasPrefix(cmd, "--pause-image") {
+				if (i+1) < len(cmds) {
+					pause_img = cmds[i+1]
+				}
+			}
+		}
+		return pause_img, matched
+	}
+	return "", false
+}
+
 func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool) {
 	// (1) iterating proc paths to find the "kubelet"
 	if d, err := os.Open("/proc"); err != nil {
@@ -383,7 +444,10 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 					// get all the process
 					pid, _ = strconv.Atoi(file.Name())
 					if cmds, err := sys.ReadCmdLine(pid); err == nil && len(cmds) > 0 {
-						if filepath.Base(cmds[0]) != "kubelet" {
+						if endpt, ok := isK3sLikely(cmds); ok {
+							return defaultK3sContainerdSock, endpt, true
+						}
+						if !isKubeletLikely(cmds) {
 							continue
 						}
 						// (2) cmdline: obtain token: "--container-runtime-endpoint="
@@ -391,7 +455,7 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 						//     --container-runtime-endpoint=unix:///var/run/crio/crio.sock
 						//     if not found, return "defaultDockerSocket"
 						//     --pod-infra-container-image=registry.k8s.io/pause:3.8
-						endpoint := defaultDockerSocket
+						endpoint := ""
 						pause_img := ""
 						for _, cmd := range cmds {
 							// log.WithFields(log.Fields{"cmd": cmd}).Debug()
@@ -405,6 +469,10 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 							if strings.HasPrefix(cmd, "--pod-infra-container-image=") {
 								pause_img = strings.TrimPrefix(cmd, "--pod-infra-container-image=")
 							}
+						}
+
+						if endpoint == "" {
+							continue   // find next process
 						}
 						// pre-k8s-1.24, docker is the default runtime
 						return endpoint, pause_img, true

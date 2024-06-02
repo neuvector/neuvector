@@ -192,7 +192,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	}
 
 	rscTypes := []string{resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC,
-		resource.RscTypeValidatingWebhookConfiguration}
+		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim}
 	for _, r := range rscTypes {
 		global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil)
 	}

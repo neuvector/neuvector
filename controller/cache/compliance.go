@@ -410,19 +410,23 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				continue
 			}
 			r := &api.RESTExposedEndpoint{
-				ID:           wl.ID,
-				Name:         wl.Name,
-				DisplayName:  cache.displayName,
-				PodName:      cache.podName,
-				Service:      cache.serviceName,
-				PolicyAction: cr.PolicyAction,
-				Severity:     cr.Severity,
-				Protos:       cr.Protos,
-				Apps:         cr.Apps,
-				Ports:        cr.Ports,
-				Entries:      cr.Entries,
+				ID:             wl.ID,
+				Name:           wl.Name,
+				DisplayName:    cache.displayName,
+				PodName:        cache.podName,
+				Service:        cache.serviceName,
+				PolicyAction:   cr.PolicyAction,
+				ThreatSeverity: cr.Severity,
+				Protos:         cr.Protos,
+				Apps:           cr.Apps,
+				Ports:          cr.Ports,
+				Entries:        cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
+			if cache.scanBrief != nil {
+				r.HighVuls = cache.scanBrief.HighVuls
+				r.MedVuls = cache.scanBrief.MedVuls
+			}
 			ins = append(ins, r)
 		}
 	}
@@ -433,19 +437,23 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				continue
 			}
 			r := &api.RESTExposedEndpoint{
-				ID:           wl.ID,
-				Name:         wl.Name,
-				DisplayName:  cache.displayName,
-				PodName:      cache.podName,
-				Service:      cache.serviceName,
-				PolicyAction: cr.PolicyAction,
-				Severity:     cr.Severity,
-				Protos:       cr.Protos,
-				Apps:         cr.Apps,
-				Ports:        cr.Ports,
-				Entries:      cr.Entries,
+				ID:             wl.ID,
+				Name:           wl.Name,
+				DisplayName:    cache.displayName,
+				PodName:        cache.podName,
+				Service:        cache.serviceName,
+				PolicyAction:   cr.PolicyAction,
+				ThreatSeverity: cr.Severity,
+				Protos:         cr.Protos,
+				Apps:           cr.Apps,
+				Ports:          cr.Ports,
+				Entries:        cr.Entries,
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
+			if cache.scanBrief != nil {
+				r.HighVuls = cache.scanBrief.HighVuls
+				r.MedVuls = cache.scanBrief.MedVuls
+			}
 			outs = append(outs, r)
 		}
 	}
