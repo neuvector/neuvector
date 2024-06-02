@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -260,7 +260,7 @@ func criGetContainerSocketPath(conn *grpc.ClientConn, ctx context.Context, id, e
 
 func criGetSelfID(conn *grpc.ClientConn, ctx context.Context, rid string) (string, error) {
 	var podname string
-	if dat, err := ioutil.ReadFile("/etc/hostname"); err == nil {
+	if dat, err := os.ReadFile("/etc/hostname"); err == nil {
 		podname = strings.TrimSpace(string(dat))
 	}
 
@@ -305,7 +305,7 @@ func criGetStorageDevice(conn *grpc.ClientConn, ctx context.Context) (string, er
 			if fsid := usage.GetFsId(); fsid != nil {
 					dev := strings.TrimSuffix(filepath.Base(fsid.GetMountpoint()), "-images")
 					if dev == "docker" { // find the driver
-						if entries, err := ioutil.ReadDir((filepath.Join("/proc/1/root", fsid.GetMountpoint(), "image"))); err == nil {
+						if entries, err := os.ReadDir((filepath.Join("/proc/1/root", fsid.GetMountpoint(), "image"))); err == nil {
 							dev = "overlay2"  // default
 							for _, dir := range entries {
 								dev = dir.Name()

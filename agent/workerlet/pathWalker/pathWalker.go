@@ -7,7 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -133,7 +133,7 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 	if err != nil {
 		return err
 	}
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 	jsonFile.Close()
 
 	// selector
@@ -275,7 +275,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 
 	// outputs
 	if data, err := json.Marshal(res); err == nil {
-		ioutil.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), data, 0644)
+		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), data, 0644)
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
@@ -291,7 +291,7 @@ func (tm *taskMain) WalkPackageTask(req workerlet.WalkGetPackageRequest) {
 	// outputs:
 	output, err := json.Marshal(data)
 	if err == nil {
-		ioutil.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
+		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
 	}
 	tm.done <- err
 }
@@ -306,7 +306,7 @@ func (tm *taskMain) ScanSecretTask(req workerlet.WalkSecretRequest) {
 	}
 
 	var envVars []byte
-	if content, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/environ", req.Pid)); err == nil {
+	if content, err := os.ReadFile(fmt.Sprintf("/proc/%d/environ", req.Pid)); err == nil {
 		envVars = bytes.Join(bytes.Split(content, []byte{0}), []byte{'\n'})
 	} else {
 		log.WithFields(log.Fields{"pid": req.Pid}).Error("failed to read environment variables")
@@ -317,14 +317,14 @@ func (tm *taskMain) ScanSecretTask(req workerlet.WalkSecretRequest) {
 
 	// outputs: perm
 	if output, err := json.Marshal(perms); err == nil {
-		ioutil.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
+		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
 
 	// outputs: secret
 	if output, err := json.Marshal(logs); err == nil {
-		ioutil.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson2), output, 0644)
+		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson2), output, 0644)
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}

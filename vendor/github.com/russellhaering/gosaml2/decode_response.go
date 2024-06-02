@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"encoding/xml"
 
@@ -362,7 +361,7 @@ func maybeDeflate(data []byte, maxSize int64, decoder func([]byte) error) error 
 
 	lr := io.LimitReader(flate.NewReader(bytes.NewReader(data)), maxSize+1)
 
-	deflated, err := ioutil.ReadAll(lr)
+	deflated, err := io.ReadAll(lr)
 	if err != nil {
 		return err
 	}

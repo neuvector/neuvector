@@ -7,4 +7,5 @@ type Entry struct {
 
 type RpmDBInterface interface {
 	Read() <-chan Entry
+	Close() error
 }

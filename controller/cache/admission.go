@@ -16,7 +16,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	k8sCorev1 "github.com/neuvector/k8s/apis/core/v1"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
@@ -32,6 +31,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
+	k8sCorev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -2761,9 +2761,7 @@ func getStorageClassNameFromK8s(ns, name string) (string, error) {
 
 	if obj, err := global.ORCH.GetResource(resource.RscTypePersistentVolumeClaim, ns, name); err == nil {
 		if pvcObj := obj.(*k8sCorev1.PersistentVolumeClaim); pvcObj != nil {
-			if pvcObj.Spec != nil {
-				return *pvcObj.Spec.StorageClassName, nil
-			}
+			return *pvcObj.Spec.StorageClassName, nil
 		}
 	}
 	return "", errors.New("PVC not found")

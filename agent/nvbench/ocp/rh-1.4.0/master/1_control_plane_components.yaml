@@ -1,739 +1,752 @@
-version: "rh-1.4"
+version: rh-1.4
 id: 1
-title: "1 - Control Plane Components"
-type: "master"
+title: 1 - Control Plane Components
+type: master
 groups:
   - id: 1.1
-    title: "1.1 - Master Node Configuration Files"
+    title: 1.1 - Master Node Configuration Files
     checks:
-      - id: 1.1.1
-        description: Ensure that the API server pod specification file permissions are set to 600 or more restrictive (Manual)
+      - id: K.1.1.1
+        description: Ensure that the API server pod specification file permissions
+          are set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f $file ]; then
-                if [ "$(stat -c %a $file)" -eq 600 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f $file ]; then
+            if [ "$(stat -c %a $file)" -eq 600 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of kube-apiserver-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.2
-        description: Ensure that the API server pod specification file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of kube-apiserver-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.2
+        description: Ensure that the API server pod specification file ownership is
+          set to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.3
-        description: Ensure that the controller manager pod specification file permissions are set to 600 or more restrictive (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.3
+        description: Ensure that the controller manager pod specification file permissions
+          are set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of kube-controller-manager-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.4
-        description: Ensure that the controller manager pod specification file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of kube-controller-manager-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.4
+        description: Ensure that the controller manager pod specification file ownership
+          is set to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.5
-        description: Ensure that the scheduler pod specification file permissions are set to 600 or more restrictive (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.5
+        description: Ensure that the scheduler pod specification file permissions
+          are set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of kube-scheduler-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.6
-        description: Ensure that the scheduler pod specification file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of kube-scheduler-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.6
+        description: Ensure that the scheduler pod specification file ownership is
+          set to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.7
-        description: Ensure that the etcd pod specification file permissions are set to 600 or more restrictive (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.7
+        description: Ensure that the etcd pod specification file permissions are set
+          to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/etcd-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/etcd-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of etcd-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.8
-        description: Ensure that the etcd pod specification file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of etcd-pod.yaml. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.8
+        description: Ensure that the etcd pod specification file ownership is set
+          to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/manifests/etcd-pod.yaml"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.9
-        description: Ensure that the Container Network Interface file permissions are set to 600 or more restrictive (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/manifests/etcd-pod.yaml"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.9
+        description: Ensure that the Container Network Interface file permissions
+          are set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              valid_permission=true
-              path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
-              path_cni_multus=$(append_prefix "$CONFIG_PREFIX" "/var/run/multus/cni/net.d")
+          check="$id  - $description"
+          valid_permission=true
+          path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          path_cni_multus=$(append_prefix "$CONFIG_PREFIX" "/var/run/multus/cni/net.d")
 
-              path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
-              path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
+          path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
+          path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
 
-              path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
-              path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
-              path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
+          path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
+          path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
+          path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
 
-              invalid_file_list=""
+          invalid_file_list=""
 
-              for p in "$path_cni_netd" "$path_cni_multus" "$path_sdn_lib_ocpsdn" "$path_sdn_run_ocpsdn" "$path_ovs_etc_openv" "$path_ovs_run_openv" "$path_ovs_var_openv"
+          for p in "$path_cni_netd" "$path_cni_multus" "$path_sdn_lib_ocpsdn" "$path_sdn_run_ocpsdn" "$path_ovs_etc_openv" "$path_ovs_run_openv" "$path_ovs_var_openv"
+          do
+            if [ -d "$p" ]; then
+              files=$(find $p -type f)
+              for i in $files
               do
-                if [ -d "$p" ]; then
-                  files=$(find $p -type f)
-                  for i in $files
-                  do
-                    if [ $(stat -c %a "$i") -gt 600 ]; then
-                      valid_permission=false
-                      invalid_file_list+=" $i"
-                    fi
-                  done
+                if [ $(stat -c %a "$i") -gt 600 ]; then
+                  valid_permission=false
+                  invalid_file_list+=" $i"
                 fi
               done
+            fi
+          done
 
-              if [ "$valid_permission" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-                for p in $invalid_file_list
-                do
-                  warn "     * Wrong ownership for $p "
-                done
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.10
-        description: Ensure that the Container Network Interface file ownership is set to root:root (Manual)
+          if [ "$valid_permission" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            for p in $invalid_file_list
+            do
+              warn "     * Wrong ownership for $p "
+            done
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.10
+        description: Ensure that the Container Network Interface file ownership is
+          set to root:root (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              valid_ownership=true
-              path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
-              path_cni_multus=$(append_prefix "$CONFIG_PREFIX" "/var/run/multus/cni/net.d")
+          check="$id  - $description"
+          valid_ownership=true
+          path_cni_netd=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          path_cni_multus=$(append_prefix "$CONFIG_PREFIX" "/var/run/multus/cni/net.d")
 
-              path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
-              path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
+          path_sdn_lib_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/lib/cni/networks/openshift-sdn")
+          path_sdn_run_ocpsdn=$(append_prefix "$CONFIG_PREFIX" "/var/run/openshift-sdn")
 
-              path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
-              path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
-              path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
+          path_ovs_etc_openv=$(append_prefix "$CONFIG_PREFIX" "/etc/openvswitch")
+          path_ovs_run_openv=$(append_prefix "$CONFIG_PREFIX" "/run/openvswitch")
+          path_ovs_var_openv=$(append_prefix "$CONFIG_PREFIX" "/var/run/openvswitch")
 
-              invalid_file_list=""
+          invalid_file_list=""
 
-              for p in "$path_cni_netd" "$path_cni_multus" "$path_sdn_lib_ocpsdn" "$path_sdn_run_ocpsdn"
+          for p in "$path_cni_netd" "$path_cni_multus" "$path_sdn_lib_ocpsdn" "$path_sdn_run_ocpsdn"
+          do
+            if [ -d "$p" ]; then
+              files=$(find $p -type f)
+              for i in $files
               do
-                if [ -d "$p" ]; then
-                  files=$(find $p -type f)
-                  for i in $files
-                  do
-                    if [ $(stat -c %U:%G "$i") != "root:root" ]; then
-                      valid_ownership=false
-                      invalid_file_list+=" $i"
-                    fi
-                  done
+                if [ $(stat -c %U:%G "$i") != "root:root" ]; then
+                  valid_ownership=false
+                  invalid_file_list+=" $i"
                 fi
               done
+            fi
+          done
 
-              for p in "$path_ovs_etc_openv" "$path_ovs_run_openv" "$path_ovs_var_openv"
+          for p in "$path_ovs_etc_openv" "$path_ovs_run_openv" "$path_ovs_var_openv"
+          do
+            if [ -d "$p" ]; then
+              files=$(find $p -type f)
+              for i in $files
               do
-                if [ -d "$p" ]; then
-                  files=$(find $p -type f)
-                  for i in $files
-                  do
-                    if [ $(stat -c %U:%G "$i") != "openvswitch:openvswitch" ]; then
-                      valid_ownership=false
-                      invalid_file_list+=" $i"
-                    fi
-                  done
+                if [ $(stat -c %U:%G "$i") != "openvswitch:openvswitch" ]; then
+                  valid_ownership=false
+                  invalid_file_list+=" $i"
                 fi
               done
+            fi
+          done
 
-              if [ "$valid_ownership" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-                for p in $invalid_file_list
-                do
-                  warn "     * Wrong ownership for $p "
-                done
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.11
-        description: Ensure that the etcd data directory permissions are set to 700 or more restrictive (Manual)
+          if [ "$valid_ownership" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            for p in $invalid_file_list
+            do
+              warn "     * Wrong ownership for $p "
+            done
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.11
+        description: Ensure that the etcd data directory permissions are set to 700
+          or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/var/lib/etcd"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -d "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 700 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permission for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required. File permissions are managed by the etcd operator.
-      - id: 1.1.12
-        description: Ensure that the etcd data directory ownership is set to etcd:etcd (Manual)
+          check="$id  - $description"
+          file="/var/lib/etcd"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -d "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 700 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permission for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required. File permissions are managed by the
+          etcd operator.
+      - id: K.1.1.12
+        description: Ensure that the etcd data directory ownership is set to etcd:etcd
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %U:%G $file)" = "etcd:etcd" ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * etcd data directory not found."
-              fi
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %U:%G $file)" = "etcd:etcd" ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * etcd data directory not found."
+          fi
         remediation: No remediation required; file ownership is managed by the operator.
-      - id: 1.1.13
-        description: Ensure that the kubeconfig file permissions are set to 600 or more restrictive (Manual)
+      - id: K.1.1.13
+        description: Ensure that the kubeconfig file permissions are set to 600 or
+          more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubeconfig"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          check="$id  - $description"
+          file="/etc/kubernetes/kubeconfig"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                warn "$check"
-                warn "      * File not found"
-              fi
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            warn "$check"
+            warn "      * File not found"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of kubeconfig. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.14
-        description: Ensure that the kubeconfig file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of kubeconfig. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.14
+        description: Ensure that the kubeconfig file ownership is set to root:root
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubeconfig"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.15
-        description: Ensure that the Scheduler kubeconfig file permissions are set to 600 or more restrictive (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/kubeconfig"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.15
+        description: Ensure that the Scheduler kubeconfig file permissions are set
+          to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
+          check="$id  - $description"
+          files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
 
+          valid_permission=false
+          for i in $files
+          do
+            if [ $(stat -c %a "$i") -eq 600 -o $(stat -c %a "$i") -eq 400 ]; then
+              valid_permission=true
+            else
               valid_permission=false
-              for i in $files
-              do
-                if [ $(stat -c %a "$i") -eq 600 -o $(stat -c %a "$i") -eq 400 ]; then
-                  valid_permission=true
-                else
-                  valid_permission=false
-                  break
-                fi
-              done
+              break
+            fi
+          done
 
-              if [ "$valid_permission" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          if [ "$valid_permission" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: |
-                    There is no remediation for updating the permissions of the kubeconfig file. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.16
-        description: Ensure that the Scheduler kubeconfig file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of the kubeconfig file. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.16
+        description: Ensure that the Scheduler kubeconfig file ownership is set to
+          root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
+          check="$id  - $description"
+          files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
 
+          valid_permission=false
+          for i in $files
+          do
+            if [ $(stat -c %u%g "$i") -eq 00 ]; then
+              valid_permission=true
+            else
               valid_permission=false
-              for i in $files
-              do
-                if [ $(stat -c %u%g "$i") -eq 00 ]; then
-                  valid_permission=true
-                else
-                  valid_permission=false
-                  break
-                fi
-              done
+              break
+            fi
+          done
 
-              if [ "$valid_permission" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.17
-        description: Ensure that the Controller Manager kubeconfig file permissions are set to 600 or more restrictive (Manual)
+          if [ "$valid_permission" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.17
+        description: Ensure that the Controller Manager kubeconfig file permissions
+          are set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
+          check="$id  - $description"
+          files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
 
+          valid_permission=false
+          for i in $files
+          do
+            if [ $(stat -c %a "$i") -eq 600 -o $(stat -c %a "$i") -eq 400 ]; then
+              valid_permission=true
+            else
               valid_permission=false
-              for i in $files
-              do
-                if [ $(stat -c %a "$i") -eq 600 -o $(stat -c %a "$i") -eq 400 ]; then
-                  valid_permission=true
-                else
-                  valid_permission=false
-                  break
-                fi
-              done
+              break
+            fi
+          done
 
-              if [ "$valid_permission" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi   
+          if [ "$valid_permission" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi   
         remediation: |
-                    There is no remediation for updating the permissions of the kubeconfig file. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
-                    Please do not attempt to remediate the permissions of this file.
-      - id: 1.1.18
-        description: Ensure that the Controller Manager kubeconfig file ownership is set to root:root (Manual)
+          There is no remediation for updating the permissions of the kubeconfig file. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
+          Please do not attempt to remediate the permissions of this file.
+      - id: K.1.1.18
+        description: Ensure that the Controller Manager kubeconfig file ownership
+          is set to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
+          check="$id  - $description"
+          files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
 
+          valid_permission=false
+          for i in $files
+          do
+            if [ $(stat -c %u%g "$i") -eq 00 ]; then
+              valid_permission=true
+            else
               valid_permission=false
-              for i in $files
-              do
-                if [ $(stat -c %u%g "$i") -eq 00 ]; then
-                  valid_permission=true
-                else
-                  valid_permission=false
-                  break
-                fi
-              done
+              break
+            fi
+          done
 
-              if [ "$valid_permission" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi      
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.19
-        description: Ensure that the OpenShift PKI directory and file ownership is set to root:root (Manual)
+          if [ "$valid_permission" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi      
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.19
+        description: Ensure that the OpenShift PKI directory and file ownership is
+          set to root:root (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              cert_path="/etc/kubernetes/static-pod-certs"
-              cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
-              valid_perm_dir=false
-              valid_perm_file=false
+          check="$id  - $description"
+          cert_path="/etc/kubernetes/static-pod-certs"
+          cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
+          valid_perm_dir=false
+          valid_perm_file=false
 
-              if [ -f "$cert_path" ]; then
+          if [ -f "$cert_path" ]; then
 
-                directories=$(find $cert_path -type d -wholename '*/secrets*')
-                files=$(find $cert_path -type f -wholename '*/secrets*')
+            directories=$(find $cert_path -type d -wholename '*/secrets*')
+            files=$(find $cert_path -type f -wholename '*/secrets*')
 
-                for i in $directories
-                do
-                  if [ $(stat -c %u%g "$i") -eq 00 ]; then
-                    valid_perm_dir=true
-                  else
-                    valid_perm_dir=false
-                    break
-                  fi
-                done
-
-                for i in $files
-                do
-                  if [ $(stat -c %u%g "$i") -eq 00 ]; then
-                    valid_perm_file=true
-                  else
-                    valid_perm_file=false
-                    break
-                  fi
-                done
-
-                if [ "$valid_perm_file" = "true" ] && [ "$valid_perm_dir" = "true" ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                fi
+            for i in $directories
+            do
+              if [ $(stat -c %u%g "$i") -eq 00 ]; then
+                valid_perm_dir=true
               else
-                warn "$check"
-                warn "     * $cert_path doesn't exist."
+                valid_perm_dir=false
+                break
               fi
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.20
-        description: Ensure that the OpenShift PKI certificate file permissions are set to 600 or more restrictive (Manual)
+            done
+
+            for i in $files
+            do
+              if [ $(stat -c %u%g "$i") -eq 00 ]; then
+                valid_perm_file=true
+              else
+                valid_perm_file=false
+                break
+              fi
+            done
+
+            if [ "$valid_perm_file" = "true" ] && [ "$valid_perm_dir" = "true" ]; then
+              pass "$check"
+            else
+              warn "$check"
+            fi
+          else
+            warn "$check"
+            warn "     * $cert_path doesn't exist."
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.20
+        description: Ensure that the OpenShift PKI certificate file permissions are
+          set to 600 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              cert_path="/etc/kubernetes/static-pod-certs"
-              cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
-              if [ -f "$cert_path" ]; then
-                files=$(find $cert_path -type f -wholename '*/secrets/*.crt')
-                valid_perm_file=false
-                for i in $files
-                do
-                  if [ $(stat -c %a "$i") -eq 600 ]; then
-                    valid_perm_file=true
-                  else
-                    valid_perm_file=false
-                    break
-                  fi
-                done
-
-                if [ "$valid_perm_file" = "true" ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                fi
+          check="$id  - $description"
+          cert_path="/etc/kubernetes/static-pod-certs"
+          cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
+          if [ -f "$cert_path" ]; then
+            files=$(find $cert_path -type f -wholename '*/secrets/*.crt')
+            valid_perm_file=false
+            for i in $files
+            do
+              if [ $(stat -c %a "$i") -eq 600 ]; then
+                valid_perm_file=true
               else
-                warn "$check"
-                warn "     * $cert_path doesn't exist."
-              fi   
-        remediation: No remediation required; file permissions are managed by the operator.
-      - id: 1.1.21
-        description: Ensure that the OpenShift PKI key file permissions are set to 600 (Manual)
+                valid_perm_file=false
+                break
+              fi
+            done
+
+            if [ "$valid_perm_file" = "true" ]; then
+              pass "$check"
+            else
+              warn "$check"
+            fi
+          else
+            warn "$check"
+            warn "     * $cert_path doesn't exist."
+          fi   
+        remediation: No remediation required; file permissions are managed by the
+          operator.
+      - id: K.1.1.21
+        description: Ensure that the OpenShift PKI key file permissions are set to
+          600 (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              cert_path="/etc/kubernetes/static-pod-certs"
-              cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
+          check="$id  - $description"
+          cert_path="/etc/kubernetes/static-pod-certs"
+          cert_path=$(append_prefix "$CONFIG_PREFIX" "$cert_path")
 
-              if [ -f "$cert_path" ]; then
-                files=$(find $cert_path -type f -wholename '*/secrets/*.key')
-                valid_perm_file=false
-                for i in $files
-                do
-                  if [ $(stat -c %a "$i") -eq 600 ]; then
-                    valid_perm_file=true
-                  else
-                    valid_perm_file=false
-                    break
-                  fi
-                done
-
-                if [ "$valid_perm_file" = "true" ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                fi
+          if [ -f "$cert_path" ]; then
+            files=$(find $cert_path -type f -wholename '*/secrets/*.key')
+            valid_perm_file=false
+            for i in $files
+            do
+              if [ $(stat -c %a "$i") -eq 600 ]; then
+                valid_perm_file=true
               else
-                warn "$check"
-                warn "     * $cert_path doesn't exist."
+                valid_perm_file=false
+                break
               fi
-        remediation: No remediation required; file permissions are managed by the operator.
+            done
+
+            if [ "$valid_perm_file" = "true" ]; then
+              pass "$check"
+            else
+              warn "$check"
+            fi
+          else
+            warn "$check"
+            warn "     * $cert_path doesn't exist."
+          fi
+        remediation: No remediation required; file permissions are managed by the
+          operator.
   - id: 1.2
-    title: "1.2 - API Server"
+    title: 1.2 - API Server
     checks:
-      - id: 1.2.1
+      - id: K.1.2.1
         description: Ensure that anonymous requests are authorized (Manual)
         type: master
         category: kubernetes
@@ -741,28 +754,27 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output_kube=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | \
-                jq -r '.data["config.yaml"]' | \
-                jq '.auditConfig.policyConfiguration.rules' | \
-                grep 'system:unauthenticated' )
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | \
-                jq -r '.data["config.yaml"]' | \
-                jq '.auditConfig.policyConfiguration.rules' | \
-                grep 'system:unauthenticated' )
+          check="$id  - $description"
+          output_kube=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | \
+            jq -r '.data["config.yaml"]' | \
+            jq '.auditConfig.policyConfiguration.rules' | \
+            grep 'system:unauthenticated' )
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | \
+            jq -r '.data["config.yaml"]' | \
+            jq '.auditConfig.policyConfiguration.rules' | \
+            grep 'system:unauthenticated' )
 
-              if [ -z "$output_kube" ] || [ -z "$output" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi       
+          if [ -z "$output_kube" ] || [ -z "$output" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi       
         remediation: None. The default configuration should not be modified.
-      - id: 1.2.2
+      - id: K.1.2.2
         description: Ensure that the --basic-auth-file argument is not set (Manual)
         type: master
         category: kubernetes
@@ -770,22 +782,21 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output_ocp=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | grep --color "basic-auth")
-              output_api=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | grep --color "basic-auth" )
-              running=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication )
-              if [ -z "$output_ocp" ] && [ -z "$output_api" ] && [ -n "$running" ] ; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          check="$id  - $description"
+          output_ocp=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | grep --color "basic-auth")
+          output_api=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | grep --color "basic-auth" )
+          running=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication )
+          if [ -z "$output_ocp" ] && [ -z "$output_api" ] && [ -n "$running" ] ; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None required. --basic-auth-file cannot be configured on OpenShift.
-      - id: 1.2.3
+      - id: K.1.2.3
         description: Ensure that the --token-auth-file parameter is not set (Manual)
         type: master
         category: kubernetes
@@ -793,28 +804,26 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty')
-              output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty')
-              output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty')
-              output_4=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication)
+          check="$id  - $description"
+          output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty')
+          output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty')
+          output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty')
+          output_4=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication)
 
-              token_auth_file_present=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq 'select(.apiServerArguments["token-auth-file"] != null)')
-              auth_operator_status=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication | jq '.status.conditions[] | select(.type == "Available" and .status == "True")')
+          token_auth_file_present=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq 'select(.apiServerArguments["token-auth-file"] != null)')
+          auth_operator_status=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/config.openshift.io/v1/clusteroperators/authentication | jq '.status.conditions[] | select(.type == "Available" and .status == "True")')
 
-              if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ] || [ -z "$output_4" ] || [ -n "$token_auth_file_present" ] || [ -z "$auth_operator_status" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi
-
+          if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ] || [ -z "$output_4" ] || [ -n "$token_auth_file_present" ] || [ -z "$auth_operator_status" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
         remediation: None is required.
-      - id: 1.2.4
+      - id: K.1.2.4
         description: Use https for kubelet connections (Manual)
         type: master
         category: kubernetes
@@ -822,35 +831,36 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
+          check="$id  - $description"
 
-              kubelet_https_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-https"] // empty')
-              client_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-certificate"] // empty')
-              client_key_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-key"] // empty')
-              serving_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/secrets/serving-cert)
+          kubelet_https_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-https"] // empty')
+          client_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-certificate"] // empty')
+          client_key_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-key"] // empty')
+          serving_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/secrets/serving-cert)
 
-              # Check for the absence of --kubelet-https argument
-              if [ -n "$kubelet_https_output" ]; then
-                warn "$check"
-                warn "     * --kubelet-https argument should not be used"
-              elif [ -z "$client_cert_output" ] || [ -z "$client_key_output" ]; then
-                warn "$check"
-                warn "     * kubelet client certificate and/or key is missing"
-              elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
-                ! echo "$serving_cert_output" | grep -q "tls.crt" || \
-                ! echo "$serving_cert_output" | grep -q "tls.key"; then
-                  warn "$check"
-                  warn "     * serving-cert for openshift-apiserver is not correctly configured"
-              else
-                  pass "$check"
-              fi
-        remediation: No remediation is required. OpenShift platform components use X.509 certificates for authentication. OpenShift manages the CAs and certificates for platform components. This is not configurable.
-      - id: 1.2.5
+          # Check for the absence of --kubelet-https argument
+          if [ -n "$kubelet_https_output" ]; then
+            warn "$check"
+            warn "     * --kubelet-https argument should not be used"
+          elif [ -z "$client_cert_output" ] || [ -z "$client_key_output" ]; then
+            warn "$check"
+            warn "     * kubelet client certificate and/or key is missing"
+          elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
+            ! echo "$serving_cert_output" | grep -q "tls.crt" || \
+            ! echo "$serving_cert_output" | grep -q "tls.key"; then
+              warn "$check"
+              warn "     * serving-cert for openshift-apiserver is not correctly configured"
+          else
+              pass "$check"
+          fi
+        remediation: No remediation is required. OpenShift platform components use
+          X.509 certificates for authentication. OpenShift manages the CAs and certificates
+          for platform components. This is not configurable.
+      - id: K.1.2.5
         description: Ensure that the kubelet uses certificates to authenticate (Manual)
         type: master
         category: kubernetes
@@ -858,79 +868,84 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.kubeletClientInfo //empty' )
-              client_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-certificate"] // empty')
-              client_key_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-key"] // empty')
-              serving_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/secrets/serving-cert)
-              if [ -z "$output" ]; then
-                warn "$check"
-              elif [ -n "$client_cert_output" ] || [ -n "$client_key_output" ]; then
-                warn "$check"
-                warn "     * kubelet client certificate and/or key should not be set"
-              elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
-                ! echo "$serving_cert_output" | grep -q "tls.crt" || \
-                ! echo "$serving_cert_output" | grep -q "tls.key"; then
-                  warn "$check"
-                  warn "     * serving-cert for openshift-apiserver is not correctly configured"
-              else
-                  pass "$check"
-              fi
-              
-        remediation: Follow the Kubernetes documentation and setup the TLS connection between the apiserver and kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the -- kubelet-certificate-authority parameter to the path to the cert file for the certificate authority. --kubelet-certificate-authority=<ca-string>
-      - id: 1.2.6
-        description: Verify that the kubelet certificate authority is set as appropriate (Manual)
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.kubeletClientInfo //empty' )
+          client_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-certificate"] // empty')
+          client_key_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments["kubelet-client-key"] // empty')
+          serving_cert_output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/secrets/serving-cert)
+          if [ -z "$output" ]; then
+            warn "$check"
+          elif [ -n "$client_cert_output" ] || [ -n "$client_key_output" ]; then
+            warn "$check"
+            warn "     * kubelet client certificate and/or key should not be set"
+          elif ! echo "$serving_cert_output" | grep -q "kubernetes.io/tls" || \
+            ! echo "$serving_cert_output" | grep -q "tls.crt" || \
+            ! echo "$serving_cert_output" | grep -q "tls.key"; then
+              warn "$check"
+              warn "     * serving-cert for openshift-apiserver is not correctly configured"
+          else
+              pass "$check"
+          fi
+        remediation: Follow the Kubernetes documentation and setup the TLS connection
+          between the apiserver and kubelets. Then, edit the API server pod specification
+          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
+          set the -- kubelet-certificate-authority parameter to the path to the cert
+          file for the certificate authority. --kubelet-certificate-authority=<ca-string>
+      - id: K.1.2.6
+        description: Verify that the kubelet certificate authority is set as appropriate
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              kubelet_cert_authority=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["kubelet-certificate-authority"] // empty')
-              # Check for the existence of the ca-bundle.crt file
-              ca_bundle_path="/etc/kubernetes/static-pod-resources/configmaps/kubelet-serving-ca/ca-bundle.crt"
-              if [ "$kubelet_cert_authority" == "$ca_bundle_path" ] && [ -f "$ca_bundle_path" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi   
-        remediation: No remediation is required. OpenShift platform components use X.509 certificates for authentication. OpenShift manages the CAs and certificates for platform components. This is not configurable.
-      - id: 1.2.7
-        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow (Manual)
+          check="$id  - $description"
+          kubelet_cert_authority=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["kubelet-certificate-authority"] // empty')
+          # Check for the existence of the ca-bundle.crt file
+          ca_bundle_path="/etc/kubernetes/static-pod-resources/configmaps/kubelet-serving-ca/ca-bundle.crt"
+          if [ "$kubelet_cert_authority" == "$ca_bundle_path" ] && [ -f "$ca_bundle_path" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi   
+        remediation: No remediation is required. OpenShift platform components use
+          X.509 certificates for authentication. OpenShift manages the CAs and certificates
+          for platform components. This is not configurable.
+      - id: K.1.2.7
+        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # TODO
-              output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config  | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty' )
-              output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config  | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty' )
-              output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty' )
-              if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi     
-        remediation: None. RBAC is always on and the OpenShift API server does not use the values assigned to the flag authorization-mode.
-      - id: 1.2.8
+          check="$id  - $description"
+          # TODO
+          output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config  | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty' )
+          output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config  | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty' )
+          output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty' )
+          if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi     
+        remediation: None. RBAC is always on and the OpenShift API server does not
+          use the values assigned to the flag authorization-mode.
+      - id: K.1.2.8
         description: Verify that RBAC is enabled (Manual)
         type: master
         category: kubernetes
@@ -938,178 +953,179 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."authorization-mode"' // empty)
-              if echo "$output" | grep -q "RBAC"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."authorization-mode"' // empty)
+          if echo "$output" | grep -q "RBAC"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: None.
-      - id: 1.2.9
-        description: Ensure that the APIPriorityAndFairness feature gate is enabled (Manual)
+      - id: K.1.2.9
+        description: Ensure that the APIPriorityAndFairness feature gate is enabled
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              # Verify the APIPriorityAndFairness feature-gate
-              feature_gates=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.apiServerArguments["feature-gates"] // empty')
+          check="$id  - $description"
+          # Verify the APIPriorityAndFairness feature-gate
+          feature_gates=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.apiServerArguments["feature-gates"] // empty')
 
-              # Verify the set of admission-plugins for OCP 4.6 and higher
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          # Verify the set of admission-plugins for OCP 4.6 and higher
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
 
-              # Check that no overrides are configured
-              unsupported_overrides=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.unsupportedConfigOverrides // empty')
+          # Check that no overrides are configured
+          unsupported_overrides=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.unsupportedConfigOverrides // empty')
 
-              # Check conditions
-              if echo "$feature_gates" | grep -q "APIPriorityAndFairness=true" && \
-                ! echo "$admission_plugins" | grep -q "EventRateLimit" && \
-                [ -z "$unsupported_overrides" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          # Check conditions
+          if echo "$feature_gates" | grep -q "APIPriorityAndFairness=true" && \
+            ! echo "$admission_plugins" | grep -q "EventRateLimit" && \
+            [ -z "$unsupported_overrides" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: No remediation is required.
-      - id: 1.2.10
-        description: Ensure that the admission control plugin AlwaysAdmit is not set (Manual)
+      - id: K.1.2.10
+        description: Ensure that the admission control plugin AlwaysAdmit is not set
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
-              if echo "$output" | grep -qv "AlwaysAdmit"; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
+          if echo "$output" | grep -qv "AlwaysAdmit"; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None
-      - id: 1.2.11
-        description: Ensure that the admission control plugin AlwaysPullImages is not set (Manual)
+      - id: K.1.2.11
+        description: Ensure that the admission control plugin AlwaysPullImages is
+          not set (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
-              if echo "$output" | grep -qv "AlwaysPullImages"; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
+          if echo "$output" | grep -qv "AlwaysPullImages"; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None
-      - id: 1.2.12
-        description: Ensure that the admission control plugin ServiceAccount is set (Manual)
+      - id: K.1.2.12
+        description: Ensure that the admission control plugin ServiceAccount is set
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          check="$id  - $description"
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
 
-              # Check if ServiceAccount is in the list of enabled admission plugins
-              if echo "$admission_plugins" | grep -q "ServiceAccount"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi     
+          # Check if ServiceAccount is in the list of enabled admission plugins
+          if echo "$admission_plugins" | grep -q "ServiceAccount"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi     
         remediation: None
-      - id: 1.2.13
-        description: Ensure that the admission control plugin NamespaceLifecycle is set (Manual)
+      - id: K.1.2.13
+        description: Ensure that the admission control plugin NamespaceLifecycle is
+          set (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          check="$id  - $description"
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
 
-              # Check if NamespaceLifecycle is in the list of enabled admission plugins
-              if echo "$admission_plugins" | grep -q "NamespaceLifecycle"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi 
+          # Check if NamespaceLifecycle is in the list of enabled admission plugins
+          if echo "$admission_plugins" | grep -q "NamespaceLifecycle"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi 
         remediation: None
-      - id: 1.2.14
-        description: Ensure that the admission control plugin SecurityContextConstraint is set (Manual)
+      - id: K.1.2.14
+        description: Ensure that the admission control plugin SecurityContextConstraint
+          is set (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
-              securityContext="security.openshift.io/SecurityContextConstraint"
-              if echo "$admission_plugins" | grep -q "$securityContext"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --disable-admission-plugins parameter to ensure it does not include NamespaceLifecycle.
-      - id: 1.2.15
-        description: Ensure that the admission control plugin NodeRestriction is set (Manual)
+          check="$id  - $description"
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          securityContext="security.openshift.io/SecurityContextConstraint"
+          if echo "$admission_plugins" | grep -q "$securityContext"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --disable-admission-plugins parameter to
+          ensure it does not include NamespaceLifecycle.
+      - id: K.1.2.15
+        description: Ensure that the admission control plugin NodeRestriction is set
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          check="$id  - $description"
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
 
-              # Check if NodeRestriction is in the list of enabled admission plugins
-              if echo "$admission_plugins" | grep -q "NodeRestriction"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          # Check if NodeRestriction is in the list of enabled admission plugins
+          if echo "$admission_plugins" | grep -q "NodeRestriction"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: None
-      - id: 1.2.16
+      - id: K.1.2.16
         description: Ensure that the --insecure-bind-address argument is not set (Manual)
         type: master
         category: kubernetes
@@ -1117,43 +1133,45 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments."feature-gates" //empty')
-              output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
-              output_openshift=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/endpoints | jq -r '.subsets[].ports[].port')
+          check="$id  - $description"
+          admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments."feature-gates" //empty')
+          output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
+          output_openshift=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/endpoints | jq -r '.subsets[].ports[].port')
 
-              if ! echo "$output_k8s" | grep -qv "^6443$" || \
-                ! echo "$output_openshift" | grep -qv "^8443$" || \
-                echo "$admission_plugins" | grep -q "InsecureBindAddress=true"; then
-                warn "$check"
-              else
-                pass "$check"
-              fi
+          if ! echo "$output_k8s" | grep -qv "^6443$" || \
+            ! echo "$output_openshift" | grep -qv "^8443$" || \
+            echo "$admission_plugins" | grep -q "InsecureBindAddress=true"; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
         remediation: None
-      - id: 1.2.17
+      - id: K.1.2.17
         description: Ensure that the --insecure-port argument is set to 0 (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
-        tags: []
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
-              if echo "$output_k8s" | grep -qv "^6443$"; then
-                pass "$check"
-              else
-                warn "$check"
-              fi      
+          check="$id  - $description"
+          output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
+          if echo "$output_k8s" | grep -qv "^6443$"; then
+            pass "$check"
+          else
+            warn "$check"
+          fi      
         remediation: None
-      - id: 1.2.18
+      - id: K.1.2.18
         description: Ensure that the --secure-port argument is not set to 0 (Manual)
         type: master
         category: kubernetes
@@ -1161,26 +1179,26 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
+          check="$id  - $description"
 
-              # Get the bind address
-              bindAddress=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.servingInfo.bindAddress')
+          # Get the bind address
+          bindAddress=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.servingInfo.bindAddress')
 
-              # Get the port
-              port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
+          # Get the port
+          port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
 
-              # Check the bind address and port
-              if [ "$bindAddress" = "0.0.0.0:6443" ] && [ "$port" = "6443" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi     
+          # Check the bind address and port
+          if [ "$bindAddress" = "0.0.0.0:6443" ] && [ "$port" = "6443" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi     
         remediation: None
-      - id: 1.2.19
+      - id: K.1.2.19
         description: Ensure that the healthz endpoint is protected by RBAC (Manual)
         type: master
         category: kubernetes
@@ -1188,22 +1206,21 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # TODO
-              output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty')
-              output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/kube-apiserver-pod | grep --color healthz)
-              output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/endpoints/api)
-              if [ -n "$output_1" ] && [ -n "$output_2" ] && [ -n "$output_3" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          check="$id  - $description"
+          # TODO
+          output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments //empty')
+          output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/kube-apiserver-pod | grep --color healthz)
+          output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/endpoints/api)
+          if [ -n "$output_1" ] && [ -n "$output_2" ] && [ -n "$output_3" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None
-      - id: 1.2.20
+      - id: K.1.2.20
         description: Ensure that the --audit-log-path argument is set (Manual)
         type: master
         category: kubernetes
@@ -1211,46 +1228,46 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # TODO
-              output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments')
-              output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.auditConfig.auditFilePath //empty')
-              output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.auditConfig.auditFilePath //empty')
-              if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ]; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
+          check="$id  - $description"
+          # TODO
+          output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.apiServerArguments')
+          output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.auditConfig.auditFilePath //empty')
+          output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.auditConfig.auditFilePath //empty')
+          if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ]; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
         remediation: None required. This is managed by the cluster apiserver operator.
-      - id: 1.2.21
-        description: Ensure that the audit logs are forwarded off the cluster for retention (Manual)
+      - id: K.1.2.21
+        description: Ensure that the audit logs are forwarded off the cluster for
+          retention (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.apiServerArguments."audit-log-path" // empty')
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.apiServerArguments."audit-log-path" // empty')
 
-              # Check if audit log forwarding is configured
-              if [ -n "$output" ] && echo "$output" | grep -q "/var/log/kube-apiserver/audit.log"; then
-                # Further checks can be added here to verify the forwarding configuration
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          # Check if audit log forwarding is configured
+          if [ -n "$output" ] && echo "$output" | grep -q "/var/log/kube-apiserver/audit.log"; then
+            # Further checks can be added here to verify the forwarding configuration
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: Follow the documentation for log forwarding.
-      - id: 1.2.22
-        description: Ensure that the maximumRetainedFiles argument is set to 10 or as appropriate (Manual)
+      - id: K.1.2.22
+        description: Ensure that the maximumRetainedFiles argument is set to 10 or
+          as appropriate (Manual)
         type: master
         category: kubernetes
         scored: true
@@ -1258,38 +1275,39 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' |  jq -r '.apiServerArguments["audit-log-maxbackup"][]? //empty')
-              if [ "$output" -ge 10] > /dev/null 2>&1; then
-                pass "$check"
-              else
-                warn "$check"
-              fi   
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' |  jq -r '.apiServerArguments["audit-log-maxbackup"][]? //empty')
+          if [ "$output" -ge 10] > /dev/null 2>&1; then
+            pass "$check"
+          else
+            warn "$check"
+          fi   
         remediation: None
-      - id: 1.2.23
-        description: Ensure that the maximumFileSizeMegabytes argument is set to 100 (Manual)
+      - id: K.1.2.23
+        description: Ensure that the maximumFileSizeMegabytes argument is set to 100
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              audit_log_maxsize=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["audit-log-maxsize"][]?')
+          check="$id  - $description"
+          audit_log_maxsize=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["audit-log-maxsize"][]?')
 
-              # Check if the audit-log-maxsize is set to 100
-              if [ "$audit_log_maxsize" = "100" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: None. The audit-log-maxsize parameter is by default set to 100 and not supported to change.
-      - id: 1.2.24
+          # Check if the audit-log-maxsize is set to 100
+          if [ "$audit_log_maxsize" = "100" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: None. The audit-log-maxsize parameter is by default set to 100
+          and not supported to change.
+      - id: K.1.2.24
         description: Ensure that the --request-timeout argument is set (Manual)
         type: master
         category: kubernetes
@@ -1297,202 +1315,209 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              min_request_timeout=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["min-request-timeout"][]?')
+          check="$id  - $description"
+          min_request_timeout=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["min-request-timeout"][]?')
 
-              # Check if the min-request-timeout is set to 3600
-              if [ "$min_request_timeout" = "3600" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: By default, min-request-timeout is set to 3600 seconds in OpenShift 4
-      - id: 1.2.25
-        description: Ensure that the --service-account-lookup argument is set to true (Manual)
+          # Check if the min-request-timeout is set to 3600
+          if [ "$min_request_timeout" = "3600" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: By default, min-request-timeout is set to 3600 seconds in OpenShift
+          4
+      - id: K.1.2.25
+        description: Ensure that the --service-account-lookup argument is set to true
+          (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              manual "$check"
-              manual "     * OpenShift denies access for any OAuth Access token that does not exist in its etcd data store."
-              manual "     * OpenShift does not use the service-account-lookup flag."
+          check="$id  - $description"
+          manual "$check"
+          manual "     * OpenShift denies access for any OAuth Access token that does not exist in its etcd data store."
+          manual "     * OpenShift does not use the service-account-lookup flag."
         remediation: Service account lookup is enabled by default.
-      - id: 1.2.26
-        description: Ensure that the --service-account-key-file argument is set as appropriate (Manual)
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: true
-        tags: []
-        audit: |
-              check="$id  - $description"
-              config_data=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.serviceAccountPublicKeyFiles //empty')
-              if echo "$config_data" | grep -q "/etc/kubernetes/static-pod-resources/configmaps/sa-token-signing-certs" && \
-                echo "$config_data" | grep -q "/etc/kubernetes/static-pod-resources/configmaps/bound-sa-token-signing-certs"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
-        remediation: The OpenShift API server does not use the service-account-key-file argument. The ServiceAccount token authenticator is configured with serviceAccountConfig.publicKeyFiles. OpenShift does not reuse the apiserver TLS key. This is not configurable.
-      - id: 1.2.27
-        description: Ensure that the --etcd-certfile and --etcd-keyfile arguments are set as appropriate (Manual)
+      - id: K.1.2.26
+        description: Ensure that the --service-account-key-file argument is set as
+          appropriate (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              etcd_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-certfile"]?')
-              etcd_keyfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-keyfile"]?')
-              expect_certfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.crt"
-              expect_keyfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.key"
-              # Check if the etcd-certfile is set to the expected path
-              if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: OpenShift automatically manages TLS and client certificate authentication for etcd. This is not configurable.
-      - id: 1.2.28
-        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Manual)
+          check="$id  - $description"
+          config_data=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.serviceAccountPublicKeyFiles //empty')
+          if echo "$config_data" | grep -q "/etc/kubernetes/static-pod-resources/configmaps/sa-token-signing-certs" && \
+            echo "$config_data" | grep -q "/etc/kubernetes/static-pod-resources/configmaps/bound-sa-token-signing-certs"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
+        remediation: The OpenShift API server does not use the service-account-key-file
+          argument. The ServiceAccount token authenticator is configured with serviceAccountConfig.publicKeyFiles.
+          OpenShift does not reuse the apiserver TLS key. This is not configurable.
+      - id: K.1.2.27
+        description: Ensure that the --etcd-certfile and --etcd-keyfile arguments
+          are set as appropriate (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              tls_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."tls-cert-file"[]?')
-              tls_keyfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."tls-private-key-file"[]?')
-              expect_certfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.crt"
-              expect_keyfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.key"
-              # Check if the etcd-certfile is set to the expected path
-              if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi 
+          check="$id  - $description"
+          etcd_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-certfile"]?')
+          etcd_keyfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-keyfile"]?')
+          expect_certfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.crt"
+          expect_keyfile="/etc/kubernetes/static-pod-resources/secrets/etcd-client/tls.key"
+          # Check if the etcd-certfile is set to the expected path
+          if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: OpenShift automatically manages TLS and client certificate authentication
+          for etcd. This is not configurable.
+      - id: K.1.2.28
+        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
+          are set as appropriate (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          tls_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."tls-cert-file"[]?')
+          tls_keyfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."tls-private-key-file"[]?')
+          expect_certfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.crt"
+          expect_keyfile="/etc/kubernetes/static-pod-certs/secrets/service-network- serving-certkey/tls.key"
+          # Check if the etcd-certfile is set to the expected path
+          if [ "$etcd_certfile" = "$expect_certfile" -a "$etcd_keyfile" = "$expect_keyfile"]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi 
         remediation: None
-      - id: 1.2.29
-        description:  Ensure that the --client-ca-file argument is set as appropriate (Manual)
+      - id: K.1.2.29
+        description: Ensure that the --client-ca-file argument is set as appropriate
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.servingInfo.clientCA //empty')
-              ca_bundle_path="/etc/kubernetes/static-pod-certs/configmaps/client-ca/ca-bundle.crt"
-              if [ echo "$output" | grep -q "$ca_bundle_path" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.servingInfo.clientCA //empty')
+          ca_bundle_path="/etc/kubernetes/static-pod-certs/configmaps/client-ca/ca-bundle.crt"
+          if [ echo "$output" | grep -q "$ca_bundle_path" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
         remediation: None
-      - id: 1.2.30
-        description:  Ensure that the --etcd-cafile argument is set as appropriate (Manual)
+      - id: K.1.2.30
+        description: Ensure that the --etcd-cafile argument is set as appropriate
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-cafile"] //empty')
-              ca_bundle_path="/etc/kubernetes/static-pod-resources/configmaps/etcd-serving-ca/ca-bundle.crt"
-              if [ echo "$output" | grep -q "$ca_bundle_path" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi     
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-cafile"] //empty')
+          ca_bundle_path="/etc/kubernetes/static-pod-resources/configmaps/etcd-serving-ca/ca-bundle.crt"
+          if [ echo "$output" | grep -q "$ca_bundle_path" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi     
         remediation: None
-      - id: 1.2.31
-        description: Ensure that encryption providers are appropriately configured (Manual)
+      - id: K.1.2.31
+        description: Ensure that encryption providers are appropriately configured
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/openshiftapiservers/cluster -o=jsonpath='{range .items[0].status.conditions[?(@.type=="Encrypted")]}{.reason}{"\n"}{.message}{"\n"}')
-              encrypt_complete="EncryptionCompleted"
-              if echo "$output" | grep -q "$encrypt_complete"; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/openshiftapiservers/cluster -o=jsonpath='{range .items[0].status.conditions[?(@.type=="Encrypted")]}{.reason}{"\n"}{.message}{"\n"}')
+          encrypt_complete="EncryptionCompleted"
+          if echo "$output" | grep -q "$encrypt_complete"; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: Follow the OpenShift documentation for encrypting etcd data.
-      - id: 1.2.32
-        description: Ensure that the API Server only makes use of Strong Cryptographic Ciphers (Manual)
+      - id: K.1.2.32
+        description: Ensure that the API Server only makes use of Strong Cryptographic
+          Ciphers (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # TODO
-              # Fetch TLS security profile information
-              output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-authentication/configmaps/v4-0-config-system-cliconfig | jq '.data."v4-0-config-system-cliconfig" | fromjson?.servingInfo // empty')
-              output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.servingInfo // empty')
-              output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/openshiftapiservers/cluster | jq '.spec.observedConfig.servingInfo // empty')
-              output_4=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/namespaces/openshift-ingress-operator/ingresscontrollers/default | jq '.spec.default.spec.tlsSecurityProfile // empty')
+          check="$id  - $description"
+          # TODO
+          # Fetch TLS security profile information
+          output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-authentication/configmaps/v4-0-config-system-cliconfig | jq '.data."v4-0-config-system-cliconfig" | fromjson?.servingInfo // empty')
+          output_2=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.observedConfig.servingInfo // empty')
+          output_3=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/openshiftapiservers/cluster | jq '.spec.observedConfig.servingInfo // empty')
+          output_4=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/namespaces/openshift-ingress-operator/ingresscontrollers/default | jq '.spec.default.spec.tlsSecurityProfile // empty')
 
-              # Check if any of the outputs are empty
-              if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ] || [ -z "$output_4" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi
+          # Check if any of the outputs are empty
+          if [ -z "$output_1" ] || [ -z "$output_2" ] || [ -z "$output_3" ] || [ -z "$output_4" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
         remediation: None
-      - id: 1.2.33
+      - id: K.1.2.33
         description: Ensure unsupported configuration overrides are not used (Manual)
         type: master
         category: kubernetes
@@ -1501,19 +1526,20 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.unsupportedConfigOverrides //empty')
-              if [ -n "$output" ]; then
-                warn "$check"
-              else
-                pass "$check"
-              fi
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.unsupportedConfigOverrides //empty')
+          if [ -n "$output" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
         remediation: None
   - id: 1.3
-    title: "1.3 - Controller Manager"
+    title: 1.3 - Controller Manager
     checks:
-      - id: 1.3.1
-        description: Ensure that controller manager healthz endpoints are protected by RBAC (Manual)
+      - id: K.1.3.1
+        description: Ensure that controller manager healthz endpoints are protected
+          by RBAC (Manual)
         type: master
         category: kubernetes
         scored: false
@@ -1521,81 +1547,85 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
+          check="$id  - $description"
 
-              # Check LivenessProbe
-              liveness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/kube-controller-manager-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].livenessProbe.httpGet.path')
-              # Check ReadinessProbe
-              readiness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/kube-controller-manager-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].readinessProbe.httpGet.path')
+          # Check LivenessProbe
+          liveness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/kube-controller-manager-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].livenessProbe.httpGet.path')
+          # Check ReadinessProbe
+          readiness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/kube-controller-manager-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].readinessProbe.httpGet.path')
 
-              if [ "$liveness_probe" = "/healthz" -a "$readiness_probe" = "/healthz" ]; then
-                pass "$check_liveness"
-              else
-                warn "$check_liveness"
-              fi
+          if [ "$liveness_probe" = "/healthz" -a "$readiness_probe" = "/healthz" ]; then
+            pass "$check_liveness"
+          else
+            warn "$check_liveness"
+          fi
         remediation: None
-      - id: 1.3.2
-        description: Ensure that the --use-service-account-credentials argument is set to true (Manual)
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: true
-        tags: []
-        audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["use-service-account-credentials"][]')
-              if [ "$output" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: None
-      - id: 1.3.3
-        description: Ensure that the --use-service-account-credentials argument is set to true (Automated)
+      - id: K.1.3.2
+        description: Ensure that the --use-service-account-credentials argument is
+          set to true (Manual)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["service-account-private-key-file"][]')
-              key_file="/etc/kubernetes/static-pod-resources/secrets/service-account-private-key/service-account.key"
-              if [ "$output" = "$key_file" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi    
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["use-service-account-credentials"][]')
+          if [ "$output" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None
-      - id: 1.3.4
-        description: Ensure that the --root-ca-file argument is set as appropriate (Manual)
+      - id: K.1.3.3
+        description: Ensure that the --service-account-private-key-file argument is
+          set to true (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["root-ca-file"][]')
-              ca_bundle="/etc/kubernetes/static-pod-resources/configmaps/serviceaccount-ca/ca-bundle.crt."
-              if [ "$output" = "$ca_bundle" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi      
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["service-account-private-key-file"][]')
+          key_file="/etc/kubernetes/static-pod-resources/secrets/service-account-private-key/service-account.key"
+          if [ "$output" = "$key_file" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi    
         remediation: None
-      - id: 1.3.5
+      - id: K.1.3.4
+        description: Ensure that the --root-ca-file argument is set as appropriate
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["root-ca-file"][]')
+          ca_bundle="/etc/kubernetes/static-pod-resources/configmaps/serviceaccount-ca/ca-bundle.crt."
+          if [ "$output" = "$ca_bundle" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi      
+        remediation: None
+      - id: K.1.3.5
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Manual)
         type: master
         category: kubernetes
@@ -1603,29 +1633,29 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              secure_port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["secure-port"][] // empty')
+          check="$id  - $description"
+          secure_port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["secure-port"][] // empty')
 
-              # Fetch the insecure port configuration
-              insecure_port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["port"][] // empty')
+          # Fetch the insecure port configuration
+          insecure_port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["port"][] // empty')
 
-              # Check if the secure port is 10257 and the insecure port is 0
-              if [ "$secure_port" = "10257" ] && [ "$insecure_port" = "0" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi 
+          # Check if the secure port is 10257 and the insecure port is 0
+          if [ "$secure_port" = "10257" ] && [ "$insecure_port" = "0" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi 
         remediation: None
   - id: 1.4
-    title: "1.4 - Scheduler"
+    title: 1.4 - Scheduler
     checks:
-      - id: 1.4.1
-        description: Ensure that the healthz endpoints for the scheduler are protected by RBAC (Manual)
+      - id: K.1.4.1
+        description: Ensure that the healthz endpoints for the scheduler are protected
+          by RBAC (Manual)
         type: master
         category: kubernetes
         scored: true
@@ -1633,17 +1663,17 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              liveness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].livenessProbe.httpGet.path')
-              readiness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].readinessProbe.httpGet.path')
+          check="$id  - $description"
+          liveness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].livenessProbe.httpGet.path')
+          readiness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].readinessProbe.httpGet.path')
 
-              if [ "$liveness_probe" = "/healthz" -a "$readiness_probe" = "/healthz" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
+          if [ "$liveness_probe" = "/healthz" -a "$readiness_probe" = "/healthz" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
         remediation: None
-      - id: 1.4.2
+      - id: K.1.4.2
         description: Verify that the scheduler API service is protected by RBAC (Manual)
         type: master
         category: kubernetes
@@ -1652,33 +1682,33 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              manual "$check"
-              manual "     * Run the following command to verify the schedule endpoints:"
-              manual "     * oc -n openshift-kube-scheduler describe endpoints"
-              manual "     * Verify the bind-address and port arguments are not used:"
-              manual "     * Verify the metrics endpoint is protected by RBAC. First, find the schedule pod information:"
-              manual "     * oc -n openshift-kube-scheduler get cm kube-scheduler-pod -o json | jq -r '.data.'pod.yaml'' | jq '.spec.containers[]|select(.name=='kube-scheduler')|.args'"
-              manual "     * oc project openshift-kube-scheduler"
-              manual "     * export POD=$(oc get pods -l app=openshift-kube-scheduler -o"
-              manual "     * jsonpath='{.items[0].metadata.name}')"
-              manual "     * export POD_IP=$(oc get pods -l app=openshift-kube-scheduler -o"
-              manual "     * jsonpath='{.items[0].status.podIP}')"
-              manual "     * export PORT=$(oc get pod $POD -o"
-              manual "     * jsonpath='{.spec.containers[0].livenessProbe.httpGet.port}'),"
-              manual "     * Attempt to make an insecure GET request to the metrics endpoint: oc rsh $POD curl https://$POD_IP:$PORT/metrics -k"
-              manual "     * Ensure an HTTP 403 is returned. Create a test service account:"
-              manual "     * oc create sa permission-test-sa"
-              manual "     * Generate a service account token and attempt to access the metrics endpoint:"
-              manual "     * export SA_TOKEN=$(oc create token permission-test-sa)"
-              manual "     * oc rsh $POD curl https://$POD_IP:$PORT/metrics -H 'Authorization: Bearer"
-              manual "     * Login$SA_TOKEN' -k"
-              manual "     * Verify that an HTTP 403 is returned."
-              manual "     * Login as a cluster administrator and attempt to access the metrics endpoint:"
-              manual "     * Loginexport CLUSTER_ADMIN_TOKEN=$(oc whoami -t)"
-              manual "     * Loginoc rsh $POD curl https://$POD_IP:$PORT/metrics -H 'Authorization: Bearer"
-              manual "     * Login$CLUSTER_ADMIN_TOKEN' -k"
-              manual "     * Verify metrics output is returned. Unset environment variables used in the test and delete the test service account:"
-              manual "     * unset CLUSTER_ADMIN_TOKEN POD PORT SA_TOKEN POD_IP"
-              manual "     * oc delete sa permission-test-sa"   
+          check="$id  - $description"
+          manual "$check"
+          manual "     * Run the following command to verify the schedule endpoints:"
+          manual "     * oc -n openshift-kube-scheduler describe endpoints"
+          manual "     * Verify the bind-address and port arguments are not used:"
+          manual "     * Verify the metrics endpoint is protected by RBAC. First, find the schedule pod information:"
+          manual "     * oc -n openshift-kube-scheduler get cm kube-scheduler-pod -o json | jq -r '.data.'pod.yaml'' | jq '.spec.containers[]|select(.name=='kube-scheduler')|.args'"
+          manual "     * oc project openshift-kube-scheduler"
+          manual "     * export POD=$(oc get pods -l app=openshift-kube-scheduler -o"
+          manual "     * jsonpath='{.items[0].metadata.name}')"
+          manual "     * export POD_IP=$(oc get pods -l app=openshift-kube-scheduler -o"
+          manual "     * jsonpath='{.items[0].status.podIP}')"
+          manual "     * export PORT=$(oc get pod $POD -o"
+          manual "     * jsonpath='{.spec.containers[0].livenessProbe.httpGet.port}'),"
+          manual "     * Attempt to make an insecure GET request to the metrics endpoint: oc rsh $POD curl https://$POD_IP:$PORT/metrics -k"
+          manual "     * Ensure an HTTP 403 is returned. Create a test service account:"
+          manual "     * oc create sa permission-test-sa"
+          manual "     * Generate a service account token and attempt to access the metrics endpoint:"
+          manual "     * export SA_TOKEN=$(oc create token permission-test-sa)"
+          manual "     * oc rsh $POD curl https://$POD_IP:$PORT/metrics -H 'Authorization: Bearer"
+          manual "     * Login$SA_TOKEN' -k"
+          manual "     * Verify that an HTTP 403 is returned."
+          manual "     * Login as a cluster administrator and attempt to access the metrics endpoint:"
+          manual "     * Loginexport CLUSTER_ADMIN_TOKEN=$(oc whoami -t)"
+          manual "     * Loginoc rsh $POD curl https://$POD_IP:$PORT/metrics -H 'Authorization: Bearer"
+          manual "     * Login$CLUSTER_ADMIN_TOKEN' -k"
+          manual "     * Verify metrics output is returned. Unset environment variables used in the test and delete the test service account:"
+          manual "     * unset CLUSTER_ADMIN_TOKEN POD PORT SA_TOKEN POD_IP"
+          manual "     * oc delete sa permission-test-sa"   
         remediation: None

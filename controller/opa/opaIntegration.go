@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -82,7 +82,7 @@ func IsOpaRestarted() bool {
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"error": readErr}).Error("OPA error on ReadAll")
 		return false
@@ -159,7 +159,7 @@ func addObject(key string, contentType string, data string) bool {
 	}
 	defer resp.Body.Close()
 
-	_, readErr := ioutil.ReadAll(resp.Body)
+	_, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"key": key, "contentType": contentType, "error": err}).Error("OPA addObject NewRequest")
 		return false
@@ -221,7 +221,7 @@ func DeleteDocument(key string) {
 	}
 	defer resp.Body.Close()
 
-	_, readErr := ioutil.ReadAll(resp.Body)
+	_, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"key": key, "error": readErr}).Error("OPA delDocument NewRequest")
 		return
@@ -237,7 +237,7 @@ func DeleteDocument(key string) {
 }
 
 func OpaEval(policyPath string, inputFile string) (int, string, error) {
-	bytes, err := ioutil.ReadFile(inputFile)
+	bytes, err := os.ReadFile(inputFile)
 	if err != nil {
 		return -1, "", err
 	}
@@ -266,7 +266,7 @@ func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		return resp.StatusCode, "", err
 	}
@@ -332,7 +332,7 @@ func GetRiskyRoleRuleIDByName(ruleName string) int {
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("GetRiskyRoleRuleIDByName error on ReadAll")
 		return 0

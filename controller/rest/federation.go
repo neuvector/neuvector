@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"net/http/cookiejar"
@@ -143,6 +143,7 @@ var _fedPingInterval uint32 = 1                                                 
 var _fedPingTimer *time.Timer = time.NewTimer(time.Minute * time.Duration(_fedPingInterval))    // for master cluster to ping master clusters
 var _lastFedMemberPingTime time.Time = time.Now()
 var _masterClusterIP string
+var _fixedJoinToken string
 
 var _sysHttpsProxy share.CLUSProxy
 var _sysHttpProxy share.CLUSProxy
@@ -341,7 +342,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 		case _fedAdminRequired:
 			ok = acc.IsFedAdmin()
 		case _fedReaderRequired:
-			ok = acc.IsFedReader() || acc.IsFedAdmin()
+			ok = acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed()
 		case _adminRequired:
 			ok = acc.CanWriteCluster()
 		case _localAdminRequired:
@@ -359,8 +360,8 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 
 	var fedRole string
 	var err error
-	if acc.IsFedReader() {
-		fedRole, err = cacher.GetFedMembershipRole(access.NewFedAdminAccessControl())
+	if acc.HasPermFed() {
+		fedRole, err = cacher.GetFedMembershipRole(access.NewReaderAccessControl())
 	} else {
 		fedRole, err = cacher.GetFedMembershipRole(acc)
 	}
@@ -632,7 +633,7 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cnt
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"url": urlStr, "status": resp.Status, "proxyOption": proxyOption}).Error("Read data fail")
 		return nil, 0, err
@@ -819,7 +820,7 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		if logError {
 			log.WithFields(log.Fields{"url": urlStr, "tag": tag, "error": err, "proxyOption": proxyOption, "timeout": httpClient.Timeout}).Error("Read data fail")
@@ -850,30 +851,23 @@ func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, 
 // called by master cluster only
 func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, user *share.CLUSUser, refreshToken bool,
 	acc *access.AccessControl, login *loginSession) (string, error) {
-	if user == nil || (user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader) {
+
+	if user == nil || (user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader && !user.ExtraPermits.HasPermFed()) {
 		return "", common.ErrObjectAccessDenied
 	}
+
 	reqTokenLock.Lock()
 	defer reqTokenLock.Unlock()
 
 	if !refreshToken {
 		return cacher.GetFedJoinedClusterToken(clusterID, login.id, acc)
 	} else {
-		var remoteRole string
-		switch user.Role {
-		case api.UserRoleFedAdmin:
-			remoteRole = api.UserRoleAdmin
-		case api.UserRoleFedReader:
-			remoteRole = api.UserRoleReader
-		default:
-			return "", common.ErrObjectAccessDenied
-		}
 		reqTo := &api.RESTFedAuthData{
 			ClientIP:       _masterClusterIP,
 			MasterUsername: login.fullname,
 			JointUsername:  common.DefaultAdminUser,
-			// master token is for requesting regular token from joint cluster. It can be validated by joint cluster based on shared secret/key/cert between master & joint clusters
-			MasterToken: jwtGenFedMasterToken(user, login, remoteRole, rc.ID, rc.Secret),
+			// master token is for requesting regular jwt token from joint cluster. It can be validated by joint cluster based on shared secret/key/cert between master & joint clusters
+			MasterToken: jwtGenFedMasterToken(user, login, rc.ID, rc.Secret),
 		}
 		if reqTo.MasterToken == "" {
 			return "", common.ErrObjectAccessDenied
@@ -909,14 +903,17 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 }
 
 func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, tag string, body []byte, ch chan<- cmdResponse,
-	acc *access.AccessControl, login *loginSession) int {
+	acc *access.AccessControl, login *loginSession, talkRounds []bool) int {
 	log.WithFields(log.Fields{"method": method, "id": id}).Debug()
 	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
 	var status int
 
+	if len(talkRounds) == 0 {
+		talkRounds = []bool{false, true}
+	}
 	// we cache the token for forwarded requests(to joint clusters). so we try the cached token first and ask for a new token if necessary.
-	for _, refreshToken := range []bool{false, true} {
+	for _, refreshToken := range talkRounds {
 		status = http.StatusBadRequest
 		if token, err := getJointClusterToken(rc, id, user, refreshToken, acc, login); token != "" { // get a regular token for accessing joint cluster
 			if _, statusCode, data, proxyUsed, err := sendReqToJointCluster(rc.RestInfo, id, token, method,
@@ -934,6 +931,7 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 					break
 				} else {
 					status = statusCode
+					cacher.SetFedJoinedClusterToken(id, login.id, "")
 					log.WithFields(log.Fields{"cluster": rc.RestInfo.Server, "status": status, "proxyUsed": proxyUsed}).Error("failed to send")
 				}
 			}
@@ -952,13 +950,15 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 
 // share.CLUSLockFedKey lock is owned by caller
 func informFedDismissed(joinedCluster share.CLUSFedJointClusterInfo, bodyTo []byte, ch chan<- bool, acc *access.AccessControl, login *loginSession) {
-	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", joinedCluster.ID, _tagDismissFed, bodyTo, nil, acc, login)
+	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", joinedCluster.ID, _tagDismissFed, bodyTo, nil, acc, login, nil)
 	_, jointKeyPath, jointCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
 	os.Remove(jointKeyPath)
 	os.Remove(jointCertPath)
 	_setFedJointPrivateKey(joinedCluster.ID, nil)
 	clusHelper.DeleteFedJointCluster(joinedCluster.ID)
-	ch <- true
+	if ch != nil {
+		ch <- true
+	}
 }
 
 func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
@@ -1048,13 +1048,15 @@ func cleanFedRules() {
 
 }
 
-func leaveFedCleanup(masterID, jointID string) {
+func leaveFedCleanup(masterID, jointID string, lockAcquired bool) {
 	var err error
 	var lock cluster.LockInterface
-	if lock, err = lockClusKey(nil, share.CLUSLockFedKey); err != nil {
-		return
+	if !lockAcquired {
+		if lock, err = lockClusKey(nil, share.CLUSLockFedKey); err != nil {
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
 	}
-	defer clusHelper.ReleaseLock(lock)
 
 	masterCaCertPath, jointKeyPath, jointCertPath := kv.GetFedTlsKeyCertPath(masterID, jointID)
 	os.Remove(masterCaCertPath)
@@ -1165,7 +1167,7 @@ func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
 				if jointCluster.ID == id {
 					notify++
 					bodyTo, _ := json.Marshal(&reqTo)
-					go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagDeployFedPolicy, bodyTo, ch, acc, login)
+					go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagDeployFedPolicy, bodyTo, ch, acc, login, nil)
 				}
 			}
 		}
@@ -1378,10 +1380,9 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var reqData api.RESTFedConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &reqData); err != nil || (reqData.Name != nil && *reqData.Name == "") ||
-		(reqData.RestInfo != nil && (reqData.RestInfo.Server == "" || reqData.RestInfo.Port == 0)) ||
-		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
+		!reqData.RestInfo.IsValid() || (reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -1483,6 +1484,117 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	restRespSuccess(w, r, nil, acc, login, nil, "Patch local cluster info")
 }
 
+// caller must own share.CLUSLockFedKey
+func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, reqData api.RESTFedPromoteReqData) (
+	share.CLUSFedMembership, int, int, error) {
+
+	var err error
+	var restInfo share.CLUSRestServerInfo
+	var useProxy string
+	var msg string
+	var membership share.CLUSFedMembership
+	var status int = http.StatusInternalServerError
+	var code int = api.RESTErrFedOperationFailed
+
+	cacheRestInfo, cacheUseProxy := cacher.GetFedLocalRestInfo(acc)
+	if reqData.MasterRestInfo != nil {
+		restInfo = *reqData.MasterRestInfo
+	} else {
+		restInfo = cacheRestInfo
+	}
+	if reqData.UseProxy != nil {
+		useProxy = *reqData.UseProxy
+	} else if cacheUseProxy == const_https_proxy {
+		useProxy = "https"
+	}
+	var msgProxy string
+	if useProxy != "" {
+		msgProxy = "(use proxy)"
+	}
+	msg = fmt.Sprintf("Promote to primary cluster%s", msgProxy)
+
+	if reqData.UseProxy != nil && *reqData.UseProxy != "" && *reqData.UseProxy != "https" || !restInfo.IsValid() {
+		log.WithFields(log.Fields{"useProxy": useProxy, "restInfo": restInfo}).Error("Request error")
+		return membership, http.StatusBadRequest, api.RESTErrInvalidRequest, nil
+	}
+
+	updateSystemClusterName(reqData.Name, acc)
+	if err = clusHelper.ConfigFedRole(common.DefaultAdminUser, api.UserRoleFedAdmin, acc); err != nil {
+		return membership, status, code, err
+	}
+	// Any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
+	// However, Rancher SSO user's role is defined in Rancher so we don't promote the shadow user created by Rancher SSO
+	if login.fullname != common.DefaultAdminUser && login.server != share.FlavorRancher {
+		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
+	}
+
+	var masterID string
+	for ok := true; ok; ok = false {
+		if masterID, err = utils.GetGuid(); err == nil {
+			_, err = kv.GetFedCaCertPath(masterID)
+			if err == nil {
+				break
+			}
+		}
+		revertFedRoles(acc)
+		return membership, status, code, err
+	}
+
+	if reqData.PingInterval > 0 {
+		atomic.StoreUint32(&_fedPingInterval, reqData.PingInterval)
+	}
+	if reqData.PollInterval > 0 {
+		atomic.StoreUint32(&_fedPollInterval, reqData.PollInterval)
+	}
+	secret, _ := utils.GetGuid()
+	membership = share.CLUSFedMembership{
+		FedRole:       api.FedRoleMaster,
+		PingInterval:  reqData.PingInterval,
+		PollInterval:  reqData.PollInterval,
+		LocalRestInfo: restInfo,
+		MasterCluster: share.CLUSFedMasterClusterInfo{
+			ID:       masterID,
+			Secret:   secret,
+			User:     login.fullname,
+			RestInfo: restInfo,
+		},
+		UseProxy: useProxy,
+	}
+
+	if err = clusHelper.PutFedMembership(&membership); err != nil {
+		revertFedRoles(acc)
+		return membership, status, code, err
+	}
+	kv.CreateDefaultFedGroups()
+
+	var cfg share.CLUSFedSettings
+	if reqData.DeployRepoScanData != nil {
+		cfg.DeployRepoScanData = *reqData.DeployRepoScanData
+	}
+	clusHelper.PutFedSettings(nil, cfg)
+
+	revisions := share.CLUSEmptyFedRulesRevision()
+	clusHelper.PutFedRulesRevision(nil, revisions)
+	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
+
+	accFedAdmin := access.NewFedAdminAccessControl()
+	cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles)
+	user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
+	if user != nil {
+		kickLoginSessions(user)
+	}
+	// if current user is local non-default admin user or rancher user, kick all related sessions
+	if w != nil && (login.fullname != common.DefaultAdminUser || login.server != "") {
+		if user, _, _ := clusHelper.GetUserRev(login.fullname, accFedAdmin); user != nil {
+			kickLoginSessions(user)
+		}
+	}
+
+	cache.ConfigCspUsages(false, false, api.FedRoleMaster, masterID)
+
+	return membership, http.StatusOK, 0, nil
+}
+
 func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -1510,127 +1622,97 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedPromoteReqData
-	var restInfo share.CLUSRestServerInfo
-	var useProxy string
-	var msg string
-	body, _ := ioutil.ReadAll(r.Body)
-	if err = json.Unmarshal(body, &reqData); err != nil || (reqData.UseProxy != nil && *reqData.UseProxy != "" && *reqData.UseProxy != "https") {
+	body, _ := io.ReadAll(r.Body)
+	if err = json.Unmarshal(body, &reqData); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
+	}
+
+	if membership, httpStatus, code, err := promoteToMaster(w, acc, login, reqData); httpStatus == http.StatusOK {
+		resp := api.RESTFedPromoteRespData{
+			FedRole: api.FedRoleMaster,
+			MasterCluster: api.RESTFedMasterClusterInfo{
+				ID:       membership.MasterCluster.ID,
+				RestInfo: membership.MasterCluster.RestInfo,
+			},
+			UseProxy: membership.UseProxy,
+		}
+		if reqData.DeployRepoScanData != nil {
+			resp.DeployRepoScanData = *reqData.DeployRepoScanData
+		}
+		restRespSuccess(w, r, &resp, acc, login, nil, "Promote to primary cluster")
 	} else {
-		cacheRestInfo, cacheUseProxy := cacher.GetFedLocalRestInfo(acc)
-		if reqData.MasterRestInfo != nil {
-			restInfo = *reqData.MasterRestInfo
-		} else {
-			restInfo = cacheRestInfo
+		var msg string
+		if err != nil {
+			msg = err.Error()
 		}
-		if reqData.UseProxy != nil {
-			useProxy = *reqData.UseProxy
-		} else if cacheUseProxy == const_https_proxy {
-			useProxy = "https"
+		restRespErrorMessage(w, httpStatus, code, msg)
+	}
+}
+
+// caller must own share.CLUSLockFedKey
+func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *loginSession) (
+	share.CLUSFedMembership, int, int, error) {
+
+	var membership share.CLUSFedMembership
+
+	// inform all joined clusters that the federation is dismissing
+	list := clusHelper.GetFedJointClusterList()
+	if list != nil && len(list.IDs) > 0 {
+		reqTo := api.RESTFedRemovedReqInternal{
+			User: login.fullname, // user on master cluster who issues demote request
 		}
-		var msgProxy string
-		if useProxy != "" {
-			msgProxy = "(use proxy)"
-		}
-		msg = fmt.Sprintf("Promote to primary cluster%s", msgProxy)
-	}
-
-	if restInfo.Server == "" || restInfo.Port == 0 {
-		log.WithFields(log.Fields{"server": restInfo.Server, "port": restInfo.Port}).Error("Request error")
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-
-	updateSystemClusterName(reqData.Name, acc)
-	if err = clusHelper.ConfigFedRole(common.DefaultAdminUser, api.UserRoleFedAdmin, acc); err != nil {
-		restRespError(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed)
-		return
-	}
-	// any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
-	if login.fullname != common.DefaultAdminUser {
-		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
-	}
-
-	var masterID string
-	for ok := true; ok; ok = false {
-		if masterID, err = utils.GetGuid(); err == nil {
-			_, err = kv.GetFedCaCertPath(masterID)
-			if err == nil {
-				break
+		bodyTo, _ := json.Marshal(&reqTo)
+		dismiss := 0
+		ch := make(chan bool)
+		for _, id := range list.IDs {
+			if joinedCluster := clusHelper.GetFedJointCluster(id); joinedCluster != nil {
+				if joinedCluster.ID == id {
+					dismiss++
+					if w == nil {
+						// called by configmap
+						informFedDismissed(*joinedCluster, bodyTo, nil, acc, login)
+					} else {
+						go informFedDismissed(*joinedCluster, bodyTo, ch, acc, login)
+					}
+				}
 			}
 		}
-		revertFedRoles(acc)
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
-		return
-	}
-
-	if reqData.PingInterval > 0 {
-		atomic.StoreUint32(&_fedPingInterval, reqData.PingInterval)
-	}
-	if reqData.PollInterval > 0 {
-		atomic.StoreUint32(&_fedPollInterval, reqData.PollInterval)
-	}
-	secret, _ := utils.GetGuid()
-	m := share.CLUSFedMembership{
-		FedRole:       api.FedRoleMaster,
-		PingInterval:  reqData.PingInterval,
-		PollInterval:  reqData.PollInterval,
-		LocalRestInfo: restInfo,
-		MasterCluster: share.CLUSFedMasterClusterInfo{
-			ID:       masterID,
-			Secret:   secret,
-			User:     login.fullname,
-			RestInfo: restInfo,
-		},
-		UseProxy: useProxy,
-	}
-
-	if clusHelper.PutFedMembership(&m) != nil {
-		revertFedRoles(acc)
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
-		return
-	}
-	kv.CreateDefaultFedGroups()
-
-	var cfg share.CLUSFedSettings
-	if reqData.DeployRepoScanData != nil {
-		cfg.DeployRepoScanData = *reqData.DeployRepoScanData
-	}
-	clusHelper.PutFedSettings(nil, cfg)
-
-	resp := api.RESTFedPromoteRespData{
-		FedRole: api.FedRoleMaster,
-		//NewToken: login.token,
-		MasterCluster: api.RESTFedMasterClusterInfo{
-			ID:       masterID,
-			RestInfo: m.MasterCluster.RestInfo,
-		},
-		UseProxy:           useProxy,
-		DeployRepoScanData: cfg.DeployRepoScanData,
-	}
-
-	revisions := share.CLUSEmptyFedRulesRevision()
-	clusHelper.PutFedRulesRevision(nil, revisions)
-	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
-
-	accFedAdmin := access.NewFedAdminAccessControl()
-	cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles)
-	user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
-	if user != nil {
-		kickLoginSessions(user)
-	}
-	// if current user is local non-default admin user or rancher user, kick all related sessions
-	if login.fullname != common.DefaultAdminUser || login.server != "" {
-		if user, _, _ := clusHelper.GetUserRev(login.fullname, accFedAdmin); user != nil {
-			kickLoginSessions(user)
+		if w != nil {
+			for j := 0; j < dismiss; j++ {
+				<-ch
+			}
 		}
 	}
+	clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{})
 
-	cache.ConfigCspUsages(false, false, api.FedRoleMaster, masterID)
+	masterCluster := cacher.GetFedMasterCluster(acc)
+	if masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
+		os.Remove(masterCaCertPath)
+	}
+	membership = share.CLUSFedMembership{
+		FedRole:          api.FedRoleNone,
+		LocalRestInfo:    masterCluster.RestInfo,
+		PendingDismiss:   true,
+		PendingDismissAt: time.Now().UTC(),
+	}
+	if err := clusHelper.PutFedMembership(&membership); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to demote")
+		return membership, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err
+	}
 
-	restRespSuccess(w, r, &resp, acc, login, nil, "Promote to primary cluster")
+	cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles)
+	evqueue.Flush()
+	revertFedRoles(acc)
+	cleanFedRules()
+
+	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+	membership.PendingDismiss = false
+	membership.PendingDismissAt = time.Time{}
+	clusHelper.PutFedMembership(&membership)
+
+	return membership, http.StatusOK, 0, nil
 }
 
 func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1649,52 +1731,15 @@ func handlerDemoteFromMaster(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	// inform all joined clusters that the federation is dismissing
-	list := clusHelper.GetFedJointClusterList()
-	if list != nil && len(list.IDs) > 0 {
-		reqTo := api.RESTFedRemovedReqInternal{
-			User: login.fullname, // user on master cluster who issues demote request
+	if _, httpStatus, code, err := demoteFromMaster(w, acc, login); httpStatus == http.StatusOK {
+		restRespSuccess(w, r, nil, acc, login, nil, "Demote from primary cluster")
+	} else {
+		var msg string
+		if err != nil {
+			msg = err.Error()
 		}
-		bodyTo, _ := json.Marshal(&reqTo)
-		dismiss := 0
-		ch := make(chan bool)
-		for _, id := range list.IDs {
-			joinedCluster := cacher.GetFedJoinedCluster(id, acc)
-			if joinedCluster.ID == id {
-				dismiss++
-				go informFedDismissed(joinedCluster, bodyTo, ch, acc, login)
-			}
-		}
-		for j := 0; j < dismiss; j++ {
-			<-ch
-		}
+		restRespErrorMessage(w, httpStatus, code, msg)
 	}
-	clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{})
-
-	masterCluster := cacher.GetFedMasterCluster(acc)
-	if masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
-		os.Remove(masterCaCertPath)
-	}
-	m := &share.CLUSFedMembership{
-		FedRole:          api.FedRoleNone,
-		LocalRestInfo:    masterCluster.RestInfo,
-		PendingDismiss:   true,
-		PendingDismissAt: time.Now().UTC(),
-	}
-	if err := clusHelper.PutFedMembership(m); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Failed to demote")
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
-		return
-	}
-
-	cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles)
-	evqueue.Flush()
-	revertFedRoles(acc)
-	cleanFedRules()
-
-	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
-
-	restRespSuccess(w, r, nil, acc, login, nil, "Demote from primary cluster")
 }
 
 func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1728,6 +1773,183 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get federation join_token")
 }
 
+// caller must own share.CLUSLockFedKey
+func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedJoinReq) (
+	share.CLUSFedMembership, int, int, error) {
+
+	var err error
+	var localRestInfo share.CLUSRestServerInfo
+	var masterRestInfo share.CLUSRestServerInfo
+	var useProxy string
+	var specificProxy int8
+	var joinToken joinToken
+	var msgProxy string
+	var membership share.CLUSFedMembership
+	var status int = http.StatusInternalServerError
+	var code int = api.RESTErrFedOperationFailed
+
+	fedRestInfo, fedUseProxy := cacher.GetFedLocalRestInfo(acc)
+	if req.JointRestInfo != nil {
+		localRestInfo = *req.JointRestInfo
+	} else {
+		localRestInfo = fedRestInfo
+	}
+
+	if req.UseProxy != nil {
+		useProxy = *req.UseProxy
+	} else if fedUseProxy == const_https_proxy {
+		useProxy = "https"
+	}
+	if useProxy != "" {
+		msgProxy = "(use proxy)"
+		specificProxy = const_https_proxy
+	}
+
+	if w != nil {
+		// called by REST API
+		if tokenBytes, err := base64.StdEncoding.DecodeString(req.JoinToken); err == nil {
+			if err := json.Unmarshal(tokenBytes, &joinToken); err == nil {
+				if req.Server == "" {
+					req.Server = joinToken.MasterServer
+				}
+				if req.Port == 0 {
+					req.Port = joinToken.MasterPort
+				}
+			}
+		}
+	} else {
+		// called by configmap
+		joinToken.JoinTicket = req.JoinToken
+	}
+	masterRestInfo = share.CLUSRestServerInfo{
+		Server: req.Server,
+		Port:   req.Port,
+	}
+
+	var name string
+	if req.Name == "" {
+		name = cacher.GetSystemConfigClusterName(acc)
+	} else {
+		name = req.Name
+	}
+	if name == "" || !masterRestInfo.IsValid() || (w != nil && joinToken.JoinTicket == "") || !localRestInfo.IsValid() ||
+		(req.UseProxy != nil && *req.UseProxy != "" && *req.UseProxy != "https") {
+		log.WithFields(log.Fields{"name": name, "localServer": localRestInfo, "masterServer": masterRestInfo}).Error("Request error")
+		return membership, http.StatusBadRequest, api.RESTErrInvalidRequest, nil
+	}
+	updateSystemClusterName(name, acc)
+
+	var jointID, jointSecret string
+	if jointID, err = utils.GetGuid(); err == nil {
+		jointSecret, err = utils.GetGuid()
+	}
+	if jointID == "" || jointSecret == "" {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		return membership, status, code, err
+	}
+	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
+
+	reqTo := api.RESTFedJoinReqInternal{
+		User:         login.fullname, // user on joint cluster who triggered join-federation request
+		Remote:       login.remote,
+		UserRoles:    login.domainRoles,
+		FedKvVersion: kv.GetFedKvVer(),
+		RestVersion:  kv.GetRestVer(),
+		JoinTicket:   joinToken.JoinTicket,
+		JointCluster: api.RESTFedJointClusterInfo{
+			Name:     name,
+			ID:       jointID,
+			Secret:   jointSecret,
+			User:     login.fullname, // user on joint cluster who issued join-federation request
+			RestInfo: localRestInfo,
+		},
+		CspType: nvUsage.LocalClusterUsage.CspType, // joint cluster's billing csp type
+		Nodes:   nvUsage.LocalClusterUsage.Nodes,
+	}
+
+	bodyTo, _ := json.Marshal(&reqTo)
+	var data []byte
+	var statusCode int
+	var proxyUsed bool
+	// call master cluster for joining federation
+	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/join_internal", masterRestInfo.Server, masterRestInfo.Port)
+	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, &specificProxy, acc)
+	if err == nil {
+		respTo := api.RESTFedJoinRespInternal{}
+		if err = json.Unmarshal(data, &respTo); err == nil {
+			mtlsAvailable := false
+			caCertPath, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
+			if respTo.CACert != "" && respTo.ClientCert != "" && respTo.ClientKey != "" {
+				if caCert, err := base64.StdEncoding.DecodeString(respTo.CACert); err == nil {
+					if err = os.WriteFile(caCertPath, caCert, 0600); err == nil {
+						mtlsAvailable = true
+					}
+				}
+			}
+			if !mtlsAvailable {
+				caCertPath = ""
+			}
+
+			if respTo.PollInterval > 0 {
+				atomic.StoreUint32(&_fedPollInterval, respTo.PollInterval)
+			}
+			// cert/key files store []byte. But the corresponding cert/key are string in CLUSxyz so that they are encrypted when marshalled
+			membership := share.CLUSFedMembership{
+				FedRole:       api.FedRoleJoint,
+				PollInterval:  respTo.PollInterval,
+				LocalRestInfo: localRestInfo,
+				MasterCluster: share.CLUSFedMasterClusterInfo{
+					Name:   respTo.MasterCluster.Name,
+					ID:     respTo.MasterCluster.ID,
+					CACert: respTo.CACert,
+					User:   "", // respTo.MasterCluster.User, do not let joint cluster know who promoted the master cluster
+					RestInfo: share.CLUSRestServerInfo{
+						Server: masterRestInfo.Server,
+						Port:   masterRestInfo.Port,
+					},
+				},
+				JointCluster: share.CLUSFedJointClusterInfo{
+					ID:         jointID,
+					Secret:     jointSecret,
+					ClientKey:  respTo.ClientKey,
+					ClientCert: respTo.ClientCert,
+					RestInfo:   localRestInfo,
+					User:       login.fullname,
+				},
+				UseProxy: useProxy,
+			}
+			if err = clusHelper.PutFedMembership(&membership); err == nil {
+				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
+				updateClusterState(respTo.MasterCluster.ID, respTo.MasterCluster.ID, _fedClusterConnected, nil, acc)
+				updateClusterState(jointID, "", _fedClusterJoined, nil, acc)
+				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, masterRestInfo.Server)
+				cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles)
+				atomic.StoreUint32(&_fedFullPolling, 1)
+				cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID)
+				return membership, http.StatusOK, 0, nil
+			}
+			if mtlsAvailable { // error happened if it reaches here
+				os.Remove(caCertPath)
+			}
+		}
+	} else if statusCode != 0 {
+		log.WithFields(log.Fields{"statusCode": statusCode, "data": string(data), "localServer": localRestInfo, "masterServer": masterRestInfo,
+			"proxyUsed": proxyUsed, "kv_version": reqTo.FedKvVersion}).Error()
+		var restErr api.RESTError
+		if json.Unmarshal(data, &restErr) == nil {
+			code := restErr.Code
+			if restErr.Code == _fedMasterUpgradeRequired {
+				code = api.RESTErrMasterUpgradeRequired
+			} else if restErr.Code == _fedJointUpgradeRequired {
+				code = api.RESTErrJointUpgradeRequired
+			}
+			return membership, statusCode, code, fmt.Errorf(restErrMessage[code])
+		}
+	}
+
+	return membership, status, code, err
+}
+
 func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -1753,171 +1975,79 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 		return
 	}
 
-	var req api.RESTFedJoinReq
-	var restInfo share.CLUSRestServerInfo
-	var useProxy string
-	var specificProxy int8
-	var joinToken joinToken
-	var msgProxy string
-	body, _ := ioutil.ReadAll(r.Body)
-	if err := json.Unmarshal(body, &req); err != nil || (req.UseProxy != nil && *req.UseProxy != "" && *req.UseProxy != "https") {
+	var reqData api.RESTFedJoinReq
+	body, _ := io.ReadAll(r.Body)
+	if err := json.Unmarshal(body, &reqData); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
+	}
+
+	if _, httpStatus, code, err := joinFed(w, acc, login, reqData); httpStatus == http.StatusOK {
+		restRespSuccess(w, r, nil, acc, login, nil, "Join federation")
 	} else {
-		fedRestInfo, fedUseProxy := cacher.GetFedLocalRestInfo(acc)
-		if req.JointRestInfo != nil {
-			restInfo = *req.JointRestInfo
-		} else {
-			restInfo = fedRestInfo
+		var msg string
+		if err != nil {
+			msg = err.Error()
 		}
-
-		if req.UseProxy != nil {
-			useProxy = *req.UseProxy
-		} else if fedUseProxy == const_https_proxy {
-			useProxy = "https"
-		}
-		if useProxy != "" {
-			msgProxy = "(use proxy)"
-			specificProxy = const_https_proxy
-		}
+		restRespErrorMessage(w, httpStatus, code, msg)
 	}
-	//log.WithFields(log.Fields{"useProxy": useProxy}).Debug()
+}
 
-	if tokenBytes, err := base64.StdEncoding.DecodeString(req.JoinToken); err == nil {
-		if err := json.Unmarshal(tokenBytes, &joinToken); err == nil {
-			if req.Server == "" {
-				req.Server = joinToken.MasterServer
+// caller must own share.CLUSLockFedKey
+func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedLeaveReq,
+	masterCluster api.RESTFedMasterClusterInfo, jointCluster api.RESTFedJointClusterInfo) (share.CLUSFedMembership, int, int, error) {
+
+	var membership share.CLUSFedMembership
+
+	if masterCluster.ID == "" || jointCluster.ID == "" {
+		log.WithFields(log.Fields{"master": masterCluster.ID, "joint": jointCluster.ID}).Error("Request error")
+		return membership, http.StatusInternalServerError, api.RESTErrObjectNotFound, common.ErrObjectNotFound
+	}
+
+	reqTo := api.RESTFedLeaveReqInternal{
+		ID:          jointCluster.ID,
+		JointTicket: jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife),
+		User:        login.fullname, // user on joint cluster who triggered leave-federation request
+		Remote:      login.remote,
+		UserRoles:   login.domainRoles,
+	}
+	var err99 error
+	if bodyTo, err := json.Marshal(&reqTo); err == nil {
+		// call master cluster for leaving federation
+		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/leave_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
+		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, acc)
+		if err == nil || req.Force {
+			membership = share.CLUSFedMembership{
+				FedRole:          api.FedRoleNone,
+				LocalRestInfo:    jointCluster.RestInfo,
+				PendingDismiss:   true,
+				PendingDismissAt: time.Now().UTC(),
 			}
-			if req.Port == 0 {
-				req.Port = joinToken.MasterPort
-			}
-		}
-	}
 
-	var name string
-	if req.Name == "" {
-		name = cacher.GetSystemConfigClusterName(acc)
-	} else {
-		name = req.Name
-	}
-	if name == "" || req.Server == "" || req.Port == 0 || joinToken.JoinTicket == "" || restInfo.Server == "" || restInfo.Port == 0 {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
-	updateSystemClusterName(name, acc)
-
-	var jointID, jointSecret string
-	if jointID, err = utils.GetGuid(); err == nil {
-		jointSecret, err = utils.GetGuid()
-	}
-	if jointID == "" || jointSecret == "" {
-		log.WithFields(log.Fields{"error": err}).Error("Request error")
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
-		return
-	}
-	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
-
-	reqTo := api.RESTFedJoinReqInternal{
-		User:         login.fullname, // user on joint cluster who triggered join-federation request
-		Remote:       login.remote,
-		UserRoles:    login.domainRoles,
-		FedKvVersion: kv.GetFedKvVer(),
-		RestVersion:  kv.GetRestVer(),
-		JoinTicket:   joinToken.JoinTicket,
-		JointCluster: api.RESTFedJointClusterInfo{
-			Name:     name,
-			ID:       jointID,
-			Secret:   jointSecret,
-			User:     login.fullname, // user on joint cluster who issued join-federation request
-			RestInfo: restInfo,
-		},
-		CspType: nvUsage.LocalClusterUsage.CspType, // joint cluster's billing csp type
-		Nodes:   nvUsage.LocalClusterUsage.Nodes,
-	}
-
-	bodyTo, _ := json.Marshal(&reqTo)
-	var data []byte
-	var statusCode int
-	var proxyUsed bool
-	// call master cluster for joining federation
-	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/join_internal", req.Server, req.Port)
-	data, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, &specificProxy, acc)
-	if err == nil {
-		respTo := api.RESTFedJoinRespInternal{}
-		if err = json.Unmarshal(data, &respTo); err == nil {
-			mtlsAvailable := false
-			caCertPath, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
-			if respTo.CACert != "" && respTo.ClientCert != "" && respTo.ClientKey != "" {
-				if caCert, err := base64.StdEncoding.DecodeString(respTo.CACert); err == nil {
-					if err = ioutil.WriteFile(caCertPath, caCert, 0600); err == nil {
-						mtlsAvailable = true
-					}
+			if err := clusHelper.PutFedMembership(&membership); err == nil {
+				cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles)
+				evqueue.Flush()
+				if w == nil {
+					// called by configmap
+					leaveFedCleanup(masterCluster.ID, jointCluster.ID, true)
+				} else {
+					go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 				}
-			}
-			if !mtlsAvailable {
-				caCertPath = ""
-			}
-
-			if respTo.PollInterval > 0 {
-				atomic.StoreUint32(&_fedPollInterval, respTo.PollInterval)
-			}
-			// cert/key files store []byte. But the corresponding cert/key are string in CLUSxyz so that they are encrypted when marshalled
-			m := share.CLUSFedMembership{
-				FedRole:       api.FedRoleJoint,
-				PollInterval:  respTo.PollInterval,
-				LocalRestInfo: restInfo,
-				MasterCluster: share.CLUSFedMasterClusterInfo{
-					Name:   respTo.MasterCluster.Name,
-					ID:     respTo.MasterCluster.ID,
-					CACert: respTo.CACert,
-					User:   "", // respTo.MasterCluster.User, do not let joint cluster know who promoted the master cluster
-					RestInfo: share.CLUSRestServerInfo{
-						Server: req.Server,
-						Port:   req.Port,
-					},
-				},
-				JointCluster: share.CLUSFedJointClusterInfo{
-					ID:         jointID,
-					Secret:     jointSecret,
-					ClientKey:  respTo.ClientKey,
-					ClientCert: respTo.ClientCert,
-					RestInfo:   restInfo,
-					User:       login.fullname,
-				},
-				UseProxy: useProxy,
-			}
-			if err = clusHelper.PutFedMembership(&m); err == nil {
-				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
-				updateClusterState(respTo.MasterCluster.ID, respTo.MasterCluster.ID, _fedClusterConnected, nil, acc)
-				updateClusterState(jointID, "", _fedClusterJoined, nil, acc)
-				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, req.Server)
-				cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles)
-				atomic.StoreUint32(&_fedFullPolling, 1)
-				cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID)
-				restRespSuccess(w, r, nil, acc, login, nil, "Join federation")
-				return
-			}
-			if mtlsAvailable { // error happened if it reaches here
-				os.Remove(caCertPath)
-			}
-		}
-	} else if statusCode != 0 {
-		log.WithFields(log.Fields{"statusCode": statusCode, "data": string(data), "localServer": req.Server, "localPort": req.Port,
-			"proxyUsed": proxyUsed, "kv_version": reqTo.FedKvVersion}).Error()
-		var restErr api.RESTError
-		if json.Unmarshal(data, &restErr) == nil {
-			if restErr.Code == _fedMasterUpgradeRequired {
-				restRespError(w, statusCode, api.RESTErrMasterUpgradeRequired)
-			} else if restErr.Code == _fedJointUpgradeRequired {
-				restRespError(w, statusCode, api.RESTErrJointUpgradeRequired)
 			} else {
-				restRespError(w, statusCode, restErr.Code)
+				err99 = err
 			}
-			return
+		} else {
+			err99 = err
 		}
+	} else {
+		err99 = err
 	}
-	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
+
+	// after leaving federation, standalone NV reports its usage to CSP
+	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+
+	return membership, http.StatusOK, 0, err99
 }
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1936,61 +2066,24 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
-	var req api.RESTFedLeaveReq
-	body, _ := ioutil.ReadAll(r.Body)
-	if err := json.Unmarshal(body, &req); err != nil {
+	var reqData api.RESTFedLeaveReq
+	body, _ := io.ReadAll(r.Body)
+	if err := json.Unmarshal(body, &reqData); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
 
 	masterCluster := cacher.GetFedMasterCluster(acc)
 	jointCluster := cacher.GetFedLocalJointCluster(acc)
-	if masterCluster.ID == "" || jointCluster.ID == "" {
-		log.WithFields(log.Fields{"master": masterCluster.ID, "joint": jointCluster.ID}).Error("Request error")
-		restRespError(w, http.StatusInternalServerError, api.RESTErrObjectNotFound)
-		return
-	}
-
-	reqTo := api.RESTFedLeaveReqInternal{
-		ID:          jointCluster.ID,
-		JointTicket: jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife),
-		User:        login.fullname, // user on joint cluster who triggered leave-federation request
-		Remote:      login.remote,
-		UserRoles:   login.domainRoles,
-	}
-	var err99 error
-	if bodyTo, err := json.Marshal(&reqTo); err == nil {
-		// call master cluster for leaving federation
-		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/leave_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
-		_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, acc)
-		if err == nil || req.Force {
-			m := &share.CLUSFedMembership{
-				FedRole:          api.FedRoleNone,
-				LocalRestInfo:    jointCluster.RestInfo,
-				PendingDismiss:   true,
-				PendingDismissAt: time.Now().UTC(),
-			}
-
-			if err := clusHelper.PutFedMembership(m); err == nil {
-				cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles)
-				evqueue.Flush()
-				go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
-				restRespSuccess(w, r, nil, acc, login, nil, "Leave federation")
-				return
-			} else {
-				err99 = err
-			}
-		} else {
-			err99 = err
-		}
+	if _, httpStatus, code, err := leaveFed(w, acc, login, reqData, masterCluster, jointCluster); httpStatus == http.StatusOK {
+		restRespSuccess(w, r, nil, acc, login, nil, "Leave federation")
 	} else {
-		err99 = err
+		var msg string
+		if err != nil {
+			msg = err.Error()
+		}
+		restRespErrorMessage(w, httpStatus, code, msg)
 	}
-
-	// after leaving federation, standalone NV reports its usage to CSP
-	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
-
-	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err99.Error())
 }
 
 func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -2021,7 +2114,7 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		User: login.fullname, // user on master cluster who issues remove-from-federation request
 	}
 	bodyTo, _ := json.Marshal(&reqTo)
-	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login)
+	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login, nil)
 
 	status, code := removeFromFederation(&joinedCluster, acc) // remove the joint cluster's entry from master cluster
 	if status != http.StatusOK {
@@ -2050,7 +2143,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedJoinReqInternal
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	for ok := true; ok; ok = false {
 		if err := json.Unmarshal(body, &reqData); err == nil {
 			masterName := cacher.GetSystemConfigClusterName(accReadAll)
@@ -2096,7 +2189,13 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Validate token
-	if err := jwtValidateFedJoinTicket(reqData.JoinTicket, masterCluster.Secret); err != nil {
+	err = nil
+	if _fixedJoinToken != "" && reqData.JoinTicket == _fixedJoinToken {
+		// fixed join token is enabled thru configmap/secret. always trust it
+	} else {
+		err = jwtValidateFedJoinTicket(reqData.JoinTicket, masterCluster.Secret)
+	}
+	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespErrorMessage(w, http.StatusExpectationFailed, api.RESTErrFedOperationFailed, err.Error())
 		return
@@ -2117,11 +2216,11 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	_, privKeyPath, certPath := kv.GetFedTlsKeyCertPath("", reqData.JointCluster.ID)
 	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath, kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
 		masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
-		caCertData, err = ioutil.ReadFile(masterCaCertPath)
+		caCertData, err = os.ReadFile(masterCaCertPath)
 		if err == nil {
-			privKeyData, err = ioutil.ReadFile(privKeyPath)
+			privKeyData, err = os.ReadFile(privKeyPath)
 			if err == nil {
-				certData, err = ioutil.ReadFile(certPath)
+				certData, err = os.ReadFile(certPath)
 				if err != nil {
 					log.WithFields(log.Fields{"err": err}).Error("read certData failed")
 				}
@@ -2211,7 +2310,7 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var req api.RESTFedLeaveReqInternal
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil || req.ID == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2248,7 +2347,7 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		if err := json.Unmarshal(body, &req); err == nil {
 			accReadAll := access.NewReaderAccessControl()
 			if jointCluster := cacher.GetFedLocalJointCluster(accReadAll); jointCluster.ID != "" {
@@ -2315,7 +2414,7 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
 	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles)
 	evqueue.Flush()
-	go leaveFedCleanup(masterCluster.ID, jointCluster.ID)
+	go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 
 	// after being kicked out of federation, standalone NV reports its usage to CSP
 	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
@@ -2330,27 +2429,32 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *acc
 	}
 
 	// update kv
+	found := false
+	deleted := false
 	if list := clusHelper.GetFedJointClusterList(); list != nil {
 		clusterIDs := list.IDs
 		for i, id := range clusterIDs {
 			if id == joinedCluster.ID {
+				found = true
 				clusterIDs[i] = clusterIDs[len(clusterIDs)-1]
 				list.IDs = clusterIDs[:len(clusterIDs)-1]
 				if err := clusHelper.PutFedJointClusterList(list); err == nil {
-					clusHelper.DeleteFedJointCluster(id)
-					_, clientKeyPath, clientCertPath := kv.GetFedTlsKeyCertPath("", id)
-					os.Remove(clientKeyPath)
-					os.Remove(clientCertPath)
-					_setFedJointPrivateKey(joinedCluster.ID, nil)
-					for j := 0; j < 3; j++ {
-						if c := cacher.GetFedJoinedCluster(joinedCluster.ID, acc); c.ID == joinedCluster.ID {
-							time.Sleep(time.Second)
-						} else {
-							break
-						}
-					}
-					return http.StatusOK, 0
+					deleted = true
 				}
+			}
+		}
+	}
+	if deleted || !found {
+		clusHelper.DeleteFedJointCluster(joinedCluster.ID)
+		_, clientKeyPath, clientCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
+		os.Remove(clientKeyPath)
+		os.Remove(clientCertPath)
+		_setFedJointPrivateKey(joinedCluster.ID, nil)
+		for j := 0; j < 3; j++ {
+			if c := cacher.GetFedJoinedCluster(joinedCluster.ID, acc); c.ID == joinedCluster.ID {
+				time.Sleep(time.Second)
+			} else {
+				return http.StatusOK, 0
 			}
 		}
 	}
@@ -2371,7 +2475,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var req api.RESTDeployFedRulesReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2412,7 +2516,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 				deploy++
 				bodyTo, _ := json.Marshal(&reqTo)
 				// make sure share.CLUSLockFedKey is not locked because talkToJointCluster may lock it !
-				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login)
+				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login, nil)
 			} else if jointCluster.Disabled && len(ids) == 1 {
 				restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 				return
@@ -2493,7 +2597,7 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 	}
 	if updated {
 		cacheFedEvent(share.CLUSEvFedPolicySync, "Sync up policy with primary cluster", "", "", "", nil)
-		data := share.CLUSFedRulesRevision{Revisions: localRevs}
+		data := share.CLUSFedRulesRevision{Revisions: localRevs, LastUpdateTime: time.Now().UTC()}
 		clusHelper.PutFedRulesRevision(nil, &data)
 		log.WithFields(log.Fields{"revs": localRevs}).Info("applied fed rules")
 	}
@@ -2913,7 +3017,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 	var err error
 	var req api.RESTPollFedRulesReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3033,7 +3137,7 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	ce := r.Header.Get("Content-Encoding")
 
 	var req api.RESTPollFedScanDataReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if ce == "gzip" {
 		body = utils.GunzipBytes(body)
 	}
@@ -3083,7 +3187,7 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var req api.RESTFedInternalCommandReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -3155,7 +3259,7 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var err error
 	var req api.RESTFedCspSupportReq
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3231,7 +3335,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 		return
 	}
-	accCaller, login := isFedOpAllowed(api.FedRoleMaster, _fedReaderRequired, w, r) // reject non-FedAdmin/FedReader login
+	accCaller, login := isFedOpAllowed(api.FedRoleMaster, _fedReaderRequired, w, r) // reject non-FedAdmin/FedReader & non-PERM_FED login
 	if accCaller == nil || login == nil {
 		return
 	}
@@ -3243,7 +3347,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	forbidden := false
 	regScanTest := false
 	txnID := ""
-	if accCaller.IsFedReader() {
+	if accCaller.IsFedReader() || accCaller.HasPermFed() {
 		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") {
 			// forward is allowed
 			// In fedReader user sessions, controller needs to update cluster state as well. So the acc needs to have write permissions for that purpose.
@@ -3325,7 +3429,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 		return
 	}
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
 	remoteExport := false
 

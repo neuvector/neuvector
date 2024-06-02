@@ -218,7 +218,7 @@ func TestAzureCniCmd(t *testing.T) {
 	}
 
 	global.RT = &dummyRTDriver{cmd: "runc"}
-	p := &Probe{bKubePlatform: true}
+	p := &Probe{bKubePlatform: true, agentPid: 100, }
 	for k, v := range apps {
 		res := p.isProcessException(v, share.GroupNVProtect, "1234567890", true, false)
 		if k < 10 {

@@ -17,9 +17,16 @@
 WHALE = "+"
 ONI = "-"
 
-BINARY_SUFFIX=".exe"
-
 # amd64 supports go test -race
 ifeq ($(GOARCH),amd64)
 	TESTFLAGS_RACE= -race
 endif
+
+WINDOWS_SHIM=bin/containerd-shim-runhcs-v1.exe
+BINARIES := $(addsuffix .exe,$(BINARIES)) $(WINDOWS_SHIM)
+
+$(WINDOWS_SHIM): script/setup/install-runhcs-shim go.mod
+	DESTDIR=$(CURDIR)/bin $<
+
+bin/%.exe: cmd/% FORCE
+	$(BUILD_BINARY)

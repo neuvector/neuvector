@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	mathRand "math/rand"
 	"net/http"
@@ -31,41 +31,43 @@ import (
 )
 
 type loginSession struct {
-	id              string // For event log to correlate login and logout events. It's from token claim's id
-	mainSessionID   string // (1) From master token claim, i.e. master cluster login's id. (2) "rancher:{R_SESS}" (3) Empty otherwise
-	mainSessionUser string // From master token claim, i.e. master cluster login's fullname. Empty otherwise
-	token           string
-	fullname        string
-	nameid          string // Used by SAML Single Logout
-	sessionIndex    string // Used by SAML Single Logout
-	domain          string
-	server          string
-	timeout         uint32
-	remote          string
-	loginAt         time.Time
-	lastAt          time.Time
-	lastSyncTimerAt time.Time // last time calling other controllers for syncing the timer for the token with this login session
-	eolAt           time.Time // end of life
-	timer           *time.Timer
-	domainRoles     access.DomainRole // map: domain -> role
-	loginType       int               // 0=user (default), 1=apikey
+	id                 string // For event log to correlate login and logout events. It's from token claim's id
+	mainSessionID      string // (1) From master token claim, i.e. master cluster login's id. (2) "rancher:{R_SESS}" (3) Empty otherwise
+	mainSessionUser    string // From master token claim, i.e. master cluster login's fullname. Empty otherwise
+	token              string
+	fullname           string
+	nameid             string // Used by SAML Single Logout
+	sessionIndex       string // Used by SAML Single Logout
+	domain             string
+	server             string
+	timeout            uint32
+	remote             string
+	loginAt            time.Time
+	lastAt             time.Time
+	lastSyncTimerAt    time.Time // last time calling other controllers for syncing the timer for the token with this login session
+	eolAt              time.Time // end of life
+	timer              *time.Timer
+	domainRoles        access.DomainRole        // map: domain -> role
+	extraDomainPermits access.DomainPermissions // map: extra domain -> permissions(other than in 'domainRoles'), only for Rancher SSO
+	loginType          int                      // 0=user (default), 1=apikey
 
 	nvPage string // could change in every request even in the same login session
 }
 
 type tokenClaim struct {
-	Remote          string            `json:"remote"`
-	Fullname        string            `json:"fullname"`
-	Username        string            `json:"username"`
-	Server          string            `json:"server"`
-	EMail           string            `json:"email"`
-	Locale          string            `json:"locale"`
-	MainSessionID   string            `json:"main_session_id"`   // from id in master login token's claim. empty when the token is generated for local cluster login
-	MainSessionUser string            `json:"main_session_user"` // from fullname in master login token's claim. empty when the token is generated for local cluster login
-	Timeout         uint32            `json:"timeout"`
-	Roles           access.DomainRole `json:"roles"`
-	NameID          string            `json:"nameId,omitempty"`       // Used by SAML Single Logout
-	SessionIndex    string            `json:"sessionIndex,omitempty"` // Used by SAML Single Logout
+	Remote          string                   `json:"remote"`
+	Fullname        string                   `json:"fullname"`
+	Username        string                   `json:"username"`
+	Server          string                   `json:"server"`
+	EMail           string                   `json:"email"`
+	Locale          string                   `json:"locale"`
+	MainSessionID   string                   `json:"main_session_id"`   // from id in master login token's claim. empty when the token is generated for local cluster login
+	MainSessionUser string                   `json:"main_session_user"` // from fullname in master login token's claim. empty when the token is generated for local cluster login
+	Timeout         uint32                   `json:"timeout"`
+	Roles           access.DomainRole        `json:"roles"`                  // domain -> role
+	ExtraPermits    access.DomainPermissions `json:"extra_permissions"`      // extra domain -> permissions(other than in 'Roles'). only for Rancher SSO
+	NameID          string                   `json:"nameId,omitempty"`       // Used by SAML Single Logout
+	SessionIndex    string                   `json:"sessionIndex,omitempty"` // Used by SAML Single Logout
 	jwt.StandardClaims
 }
 
@@ -81,11 +83,13 @@ type joinTicket struct {
 }
 
 type tRancherUser struct {
-	valid       bool
-	id          string
-	name        string
-	token       string // rancher token from R_SESS cookie
-	domainRoles access.DomainRole
+	valid             bool
+	id                string
+	name              string
+	provider          string // from Rancher's v3/principals?me=true
+	token             string // rancher token from R_SESS cookie
+	domainRoles       access.DomainRole
+	domainPermissions access.DomainPermissions // domain -> nv permissions
 }
 
 // Extra information of Single Sign-On session
@@ -171,20 +175,21 @@ func GetJWTSigningKey() JWTCertificateState {
 // With userMutex locked when calling this because it does loginSession lookup first
 func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (*loginSession, int) {
 	s := &loginSession{
-		id:              claims.Id,
-		mainSessionID:   claims.MainSessionID,
-		mainSessionUser: claims.MainSessionUser,
-		token:           token,
-		fullname:        claims.Fullname,
-		server:          claims.Server,
-		timeout:         claims.Timeout,
-		remote:          claims.Remote,
-		loginAt:         now,
-		lastAt:          now,
-		eolAt:           time.Unix(claims.ExpiresAt, 0),
-		domainRoles:     claims.Roles,
-		nameid:          claims.NameID,
-		sessionIndex:    claims.SessionIndex,
+		id:                 claims.Id,
+		mainSessionID:      claims.MainSessionID,
+		mainSessionUser:    claims.MainSessionUser,
+		token:              token,
+		fullname:           claims.Fullname,
+		server:             claims.Server,
+		timeout:            claims.Timeout,
+		remote:             claims.Remote,
+		loginAt:            now,
+		lastAt:             now,
+		eolAt:              time.Unix(claims.ExpiresAt, 0),
+		domainRoles:        claims.Roles,
+		extraDomainPermits: claims.ExtraPermits,
+		nameid:             claims.NameID,
+		sessionIndex:       claims.SessionIndex,
 	}
 	if rc := _registerLoginSession(s); rc != userOK {
 		updateFedLoginSession(s)
@@ -194,24 +199,26 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 	}
 }
 
-func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string, sso *SsoSession) (*loginSession, int) {
-	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
+func newLoginSessionFromUser(user *share.CLUSUser, domainRoles access.DomainRole, extraDomainPermits access.DomainPermissions,
+	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (*loginSession, int) {
 
-	id, token, claims := jwtGenerateToken(user, roles, remote, mainSessionID, mainSessionUser, sso)
+	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
+	id, token, claims := jwtGenerateToken(user, domainRoles, extraDomainPermits, remote, mainSessionID, mainSessionUser, sso)
 	now := user.LastLoginAt // Already updated
 	s := &loginSession{
-		id:              id,
-		mainSessionID:   mainSessionID,
-		mainSessionUser: mainSessionUser,
-		token:           token,
-		fullname:        user.Fullname,
-		server:          user.Server,
-		timeout:         user.Timeout,
-		remote:          remote,
-		loginAt:         now,
-		lastAt:          now,
-		eolAt:           time.Unix(claims.ExpiresAt, 0),
-		domainRoles:     roles,
+		id:                 id,
+		mainSessionID:      mainSessionID,
+		mainSessionUser:    mainSessionUser,
+		token:              token,
+		fullname:           user.Fullname,
+		server:             user.Server,
+		timeout:            user.Timeout,
+		remote:             remote,
+		loginAt:            now,
+		lastAt:             now,
+		eolAt:              time.Unix(claims.ExpiresAt, 0),
+		domainRoles:        domainRoles,
+		extraDomainPermits: extraDomainPermits,
 	}
 	// for federal login, give it longer timeout so it doesn't time out as easily as interactive login
 	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) {
@@ -234,7 +241,7 @@ func newLoginSessionFromUser(user *share.CLUSUser, roles access.DomainRole, remo
 	}
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func _registerLoginSession(login *loginSession) int {
 	if _, ok := loginUserAccounting[login.fullname]; ok {
 		if loginUserAccounting[login.fullname] == MaxPerDomainLoginUsers {
@@ -287,7 +294,7 @@ func (s *loginSession) getToken() string {
 	return s.token
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func _deleteSessionToken(s *loginSession) {
 	if s.timer != nil {
 		s.timer.Stop()
@@ -322,13 +329,14 @@ func _deleteSessionToken(s *loginSession) {
 	}
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func (s *loginSession) _delete() {
 	_deleteSessionToken(s)
 }
 
-// delete the calling fed login session/token from loginFedSessions cache, with userMutex locked when called
-func (s *loginSession) _delFedSessionToken() {
+// delete the calling fed login session/token from loginFedSessions cache
+// caller must own userMutex before calling this function
+func (s *loginSession) _testDelFedSessionToken() {
 	if !recordFedAuthSessions {
 		return
 	}
@@ -343,9 +351,10 @@ func (s *loginSession) _delFedSessionToken() {
 	}
 }
 
-// delete all fed login sessions/tokens that have the same mainSessionID as the calling login session, with userMutex locked when called
-func (s *loginSession) _delFedSessionTokens() {
-	// this function is called when when a fed user logout from master cluster
+// delete all fed login sessions/tokens(on joint cluster) that have the same mainSessionID as the caller's(i.e. master cluster) login session
+// caller must own userMutex before calling this function
+func (s *loginSession) _delJointFedSessions() {
+	// this function is called on joint clusters by serving request from master cluster that is triggered by fed user logout on master cluster
 	if s.mainSessionID != _interactiveSessionID && !strings.HasPrefix(s.mainSessionID, _rancherSessionPrefix) {
 		if recordFedAuthSessions {
 			if tokenSet, exist := loginFedSessions[s.mainSessionID]; exist && tokenSet.Cardinality() > 0 {
@@ -366,7 +375,7 @@ func (s *loginSession) _delFedSessionTokens() {
 	}
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func (s *loginSession) _logout() {
 	log.WithFields(log.Fields{"id": s.id, "user": s.fullname}).Debug()
 	var msg string
@@ -385,13 +394,7 @@ func (s *loginSession) _logout() {
 	s._delete()
 }
 
-// with userMutex locked when calling this
-func (s *loginSession) _logoutFedSession() {
-	s._delFedSessionTokens()
-	s._logout()
-}
-
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func (s *loginSession) _expire() {
 	log.WithFields(log.Fields{"id": s.id, "user": s.fullname}).Debug()
 	if r, ok := s.domainRoles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(s.domainRoles) == 1 {
@@ -405,17 +408,21 @@ func (s *loginSession) _expire() {
 		}
 		authLog(share.CLUSEvAuthTimeout, userName, s.remote, s.id, s.domainRoles, "")
 	}
-	s._delFedSessionToken()
+	s._testDelFedSessionToken()
 	s._delete()
 }
 
 func (s *loginSession) expire() {
+	if s.hasFedPermission() {
+		clearTokensFromJointClusters(access.NewFedAdminAccessControl(), s)
+	}
+
 	userMutex.Lock()
-	defer userMutex.Unlock()
 	s._expire()
+	userMutex.Unlock()
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func (s *loginSession) _updateTimeout(tmo uint32) {
 	s.timeout = tmo
 	elapsed := time.Since(s.lastAt)
@@ -458,7 +465,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	var err error
 	var statusCode int
 	var proxyUsed bool
-	var rancherUser tRancherUser = tRancherUser{domainRoles: make(map[string]string)}
+	var rancherUser tRancherUser = tRancherUser{domainRoles: make(map[string]string), domainPermissions: make(map[string]share.NvPermissions)}
 
 	cookie := &http.Cookie{
 		Name:  "R_SESS",
@@ -468,6 +475,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", "", "", cookie, []byte{}, true, nil, acc)
 	if err == nil {
 		var domainRoles map[string]string
+		var domainPermissions map[string]share.NvPermissions
 		var rancherUsers api.UserCollection
 		if err = json.Unmarshal(data, &rancherUsers); err == nil {
 			idx := -1
@@ -499,50 +507,77 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 							if principalIDs.Contains(p.ID) {
 								pid = rancherUsers.Data[idx].ID
 								rancherUser.name = p.LoginName
+								if p.Provider != "local" {
+									rancherUser.provider = p.Provider
+								}
 							} else {
 								pid = p.ID
 								subType = resource.SUBJECT_GROUP
 							}
-							if thisDomainRoles, _ := global.ORCH.GetUserRoles(pid, subType); len(thisDomainRoles) > 0 {
-								if domainRoles == nil {
-									domainRoles = thisDomainRoles
-								} else {
-									for d, rNew := range thisDomainRoles {
-										if rNew != "" {
-											if rOld, ok := domainRoles[d]; ok && rOld != rNew {
-												if (rOld == api.UserRoleReader && rNew != api.UserRoleNone) || (rOld == api.UserRoleNone) || (rNew == api.UserRoleFedAdmin) {
+							thisDomainRoles, thisDomainPermits, _ := global.ORCH.GetUserRoles(pid, subType)
+							if len(thisDomainRoles) == 0 && len(thisDomainPermits) == 0 {
+								log.WithFields(log.Fields{"id": pid, "subType": subType}).Debug("no deduced role/permission")
+							} else {
+								if len(thisDomainRoles) > 0 {
+									if domainRoles == nil {
+										domainRoles = thisDomainRoles
+									} else {
+										for d, rNew := range thisDomainRoles {
+											if rNew != "" {
+												if rOld, ok := domainRoles[d]; ok && rOld != rNew {
+													if (rOld == api.UserRoleReader && rNew != api.UserRoleNone) || (rOld == api.UserRoleNone) || (rNew == api.UserRoleFedAdmin) {
+														domainRoles[d] = rNew
+													}
+												} else if !ok {
 													domainRoles[d] = rNew
 												}
-											} else if !ok {
-												domainRoles[d] = rNew
+											}
+										}
+									}
+									if rancherUser.name == common.DefaultAdminUser {
+										if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
+											if role, ok := domainRoles[access.AccessDomainGlobal]; ok && role == api.UserRoleAdmin {
+												domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
 											}
 										}
 									}
 								}
-								if rancherUser.name == common.DefaultAdminUser {
-									if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-										if role, ok := domainRoles[access.AccessDomainGlobal]; ok && role == api.UserRoleAdmin {
-											domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
+								if len(thisDomainPermits) > 0 {
+									if domainPermissions == nil {
+										domainPermissions = thisDomainPermits
+									} else {
+										for d, permits := range thisDomainPermits {
+											if !permits.IsEmpty() {
+												domainPermissions[d] = permits
+											}
 										}
 									}
 								}
-							} else {
-								log.WithFields(log.Fields{"id": pid, "subType": subType}).Debug("no deduced role")
 							}
 						}
 						if domainRoles != nil {
-							if role, ok := domainRoles[""]; ok {
+							if role, ok := domainRoles[access.AccessDomainGlobal]; ok {
 								if role == api.UserRoleFedAdmin || role == api.UserRoleAdmin {
-									domainRoles = map[string]string{"": role}
+									domainRoles = map[string]string{access.AccessDomainGlobal: role}
 								} else if role == api.UserRoleFedReader || role == api.UserRoleReader {
 									for d, r := range domainRoles {
-										if d != "" && (r == api.UserRoleReader || r == api.UserRoleNone) {
+										if d != access.AccessDomainGlobal && (r == api.UserRoleReader || r == api.UserRoleNone) {
 											delete(domainRoles, d)
 										}
 									}
 								}
 							}
 							rancherUser.domainRoles = domainRoles
+						}
+						if domainPermissions != nil {
+							if gPermits, ok := domainPermissions[access.AccessDomainGlobal]; ok {
+								for d, dPermits := range domainPermissions {
+									if d != access.AccessDomainGlobal && (gPermits == dPermits) {
+										delete(domainPermissions, d)
+									}
+								}
+							}
+							rancherUser.domainPermissions = domainPermissions
 						}
 					}
 				}
@@ -555,15 +590,15 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		log.WithFields(log.Fields{"data": string(data), "url": urlStr, "err": err}).Error()
 	}
 
-	if !rancherUser.valid || len(rancherUser.domainRoles) == 0 {
-		err = fmt.Errorf("cannot find a mapped role")
+	if !rancherUser.valid || (len(rancherUser.domainRoles) == 0 && len(rancherUser.domainPermissions) == 0) {
+		err = fmt.Errorf("cannot find any role/permission")
 		log.WithFields(log.Fields{"statusCode": statusCode, "user": rancherUser.name, "proxyUsed": proxyUsed}).Error()
 	}
 
 	return rancherUser, err
 }
 
-// with userMutex locked when calling this
+// caller must own userMutex before calling this function
 func restReq2User(r *http.Request) (*loginSession, int, string) {
 	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
 
@@ -609,7 +644,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 				}
 				roles[access.AccessDomainGlobal] = apikeyAccount.Role
 
-				_, _, err := access.GetDomainPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains)
+				_, _, err := access.GetUserPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains, share.NvPermissions{}, nil)
 				if err != nil {
 					return nil, userInvalidRequest, rsessToken
 				}
@@ -789,16 +824,16 @@ func getAccessControl(w http.ResponseWriter, r *http.Request, op access.AccessOP
 		return nil, nil
 	}
 
-	if login.domainRoles == nil || len(login.domainRoles) == 0 {
+	if len(login.domainRoles) == 0 && len(login.extraDomainPermits) == 0 {
 		restRespAccessDenied(w, login)
 		return nil, login
 	}
 
-	acc := access.NewAccessControl(r, op, login.domainRoles)
+	acc := access.NewAccessControl(r, op, login.domainRoles, login.extraDomainPermits)
 	return acc, login
 }
 
-func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[string]string, msg string) {
+func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[string]string, msg string) { //->
 	clog := share.CLUSEventLog{
 		Event:          ev,
 		HostID:         localDev.Host.ID,
@@ -832,7 +867,10 @@ func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[str
 	evqueue.Append(&clog)
 }
 
-func lookupShadowUser(server, username, userid, email, role string, roleDomains map[string][]string) (*share.CLUSUser, bool) {
+// parameters permits/permitsDomains are for Rancher SSO only
+func lookupShadowUser(server, provider, username, userid, email, role string, roleDomains map[string][]string,
+	permits share.NvPermissions, permitsDomains []share.CLUSPermitsAssigned) (*share.CLUSUser, bool) {
+
 	var newUser *share.CLUSUser
 
 	now := time.Now()
@@ -846,16 +884,18 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 		user, rev, _ := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl())
 		if user == nil {
 			newUser = &share.CLUSUser{
-				Fullname:    fullname,
-				Server:      server,
-				Username:    username,
-				EMail:       email,
-				Role:        role,
-				RoleDomains: roleDomains,
-				Timeout:     common.DefaultIdleTimeout,
-				Locale:      common.OEMDefaultUserLocale,
-				LoginCount:  1,
-				LastLoginAt: now,
+				Fullname:            fullname,
+				Server:              server,
+				Username:            username,
+				EMail:               email,
+				Role:                role,
+				RoleDomains:         roleDomains,
+				ExtraPermits:        permits,        // nv permissions for global domain. only for Rancher SSO
+				ExtraPermitsDomains: permitsDomains, // nv permissions for namespaces. only for Rancher SSO
+				Timeout:             common.DefaultIdleTimeout,
+				Locale:              common.OEMDefaultUserLocale,
+				LoginCount:          1,
+				LastLoginAt:         now,
 			}
 			user = newUser
 		} else {
@@ -868,21 +908,45 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 				user.EMail = email
 			}
 
-			if !user.RoleOverride {
-				if server == share.FlavorRancher && username != common.DefaultAdminUser &&
-					user.Role == api.UserRoleFedAdmin && role == api.UserRoleAdmin {
-					// in Rancher SSO, a Rancher cluster admin who promotes the nv cluster to fed master is prmoted to fedAdmin role in nv kv.
-					// however, Rancher cluster admin is mapped to nv admon role(as the role parameter) by k8s rbac
-				} else {
-					user.Role = role
-					user.RoleDomains = roleDomains
-				}
+			if server == share.FlavorRancher {
+				// We do not allow changing role/permissions of shadow users from Rancher SSO.
+				// So always over-write this shadow user's role/permissions
+				user.Role = role
+				user.RoleDomains = roleDomains
+				user.ExtraPermits = permits               // nv permissions for global domain. only for Rancher SSO
+				user.ExtraPermitsDomains = permitsDomains // nv permissions for namespaces. only for Rancher SSO
+			} else if !user.RoleOverride {
+				user.Role = role
+				user.RoleDomains = roleDomains
 			}
 
 			newUser = user
 		}
+		if server == share.FlavorRancher && provider != "" {
+			mapping := map[string]string{
+				"activedirectory": "AD",
+				"azure":           "AzureAD",
+				"github":          "Github",
+				"googleoauth":     "Google",
+				"keycloakoidc":    "Keycloak/OIDC",
+				"ldap":            "LDAP",
+				"oidc":            "OpenID",
+				"saml":            "SAML",
+				"ping":            "Ping Identity",
+				"adfs":            "ADFS",
+				"keycloak":        "Keycloak/SAML",
+				"okta":            "Okta",
+				"shibboleth":      "Shibboleth",
+				"openldap":        "OpenLDAP",
+				"freeipa":         "FreeIPA",
+			}
+			if name, _ := mapping[provider]; name != "" {
+				provider = name
+			}
+			user.Server = fmt.Sprintf("%s(%s)", share.FlavorRancher, provider)
+		}
 
-		authz := (user.Role != api.UserRoleNone || len(user.RoleDomains) != 0)
+		authz := (user.Role != api.UserRoleNone || !user.ExtraPermits.IsEmpty() || len(user.RoleDomains) != 0 || len(user.ExtraPermitsDomains) != 0)
 		if !authz {
 			return nil, false
 		}
@@ -891,7 +955,7 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 		user.BlockLoginSince = time.Time{}
 
 		if err := clusHelper.PutUserRev(user, rev); err != nil {
-			log.WithFields(log.Fields{"user": user.Fullname, "error": err, "rev": rev}).Error("")
+			log.WithFields(log.Fields{"user": user.Fullname, "error": err, "rev": rev}).Error()
 			retry++
 		} else {
 			log.WithFields(log.Fields{"user": user.Fullname}).Debug("Created/updated shadow user in cluster")
@@ -908,7 +972,9 @@ func lookupShadowUser(server, username, userid, email, role string, roleDomains 
 	return newUser, true
 }
 
-func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, mainSessionID, mainSessionUser, fedRole string, sso *SsoSession) (*loginSession, int) {
+func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, masterDomainsPermits access.DomainPermissions,
+	remote, mainSessionID, mainSessionUser, fedRole string, sso *SsoSession) (*loginSession, int) {
+
 	// 1. When a cluster is promoted to master cluster, the default admin user is automatically assigned fedAdmin role
 	// 2. When a master cluster is demoted, users with fed role(fedAdmin) are downgraded to with admin/reader role
 	// 3. On master cluster, only users with fedAdmin role can assign fed roles to other users
@@ -918,13 +984,23 @@ func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, main
 	// 7. Only interactive login with fedAdmin role on master cluster can access joint clusters
 	// 8. when an interactive fedAdmin login on master cluster access joint clusters, the remote token on joint cluster has admin role
 	// 9. when federal rules are deployed to joint clusters, there is no access control checking on joint clusters
-	roles := make(map[string]string)                                                                        // access.DomainRole
-	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) { // meaning it's a remote federal login from master cluster
+	roles := make(map[string]string)                // access.DomainRole
+	permits := make(map[string]share.NvPermissions) // access.DomainPermissions
+	if mainSessionID != _interactiveSessionID && !strings.HasPrefix(mainSessionID, _rancherSessionPrefix) {
+		// meaning it's a remote federal login from master cluster
 		for d, r := range masterRoles {
 			roles[d] = r
 		}
 		roles[access.AccessDomainGlobal] = masterRoles[access.AccessDomainGlobal]
-	} else { // meaning it's an interactive local cluster login, or redirected from rancher console
+
+		// for Rancher SSO only
+		for d, p := range masterDomainsPermits {
+			if !p.IsEmpty() {
+				permits[d] = p
+			}
+		}
+	} else {
+		// meaning it's an interactive local cluster login, or redirected from Rancher console where SSO happens
 		// Convert role->domains to domain->role
 		for role, domains := range user.RoleDomains {
 			for _, d := range domains {
@@ -932,9 +1008,17 @@ func loginUser(user *share.CLUSUser, masterRoles access.DomainRole, remote, main
 			}
 		}
 		roles[access.AccessDomainGlobal] = user.Role
+
+		// Convert permissions->domains to domain->permissions. for Rancher SSO only
+		for _, permitsDomains := range user.ExtraPermitsDomains {
+			for _, domain := range permitsDomains.Domains {
+				permits[domain] = permitsDomains.Permits
+			}
+		}
+		permits[access.AccessDomainGlobal] = user.ExtraPermits
 	}
 
-	return newLoginSessionFromUser(user, roles, remote, mainSessionID, mainSessionUser, sso)
+	return newLoginSessionFromUser(user, roles, permits, remote, mainSessionID, mainSessionUser, sso)
 }
 
 func compareUserWithLogin(user *share.CLUSUser, login *loginSession) bool {
@@ -976,9 +1060,10 @@ func _kickFedLoginSessions() {
 	userMutex.Lock()
 	defer userMutex.Unlock()
 
-	fedRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
+	acc := access.NewFedAdminAccessControl()
 	for _, login := range loginSessions {
-		if role, ok := login.domainRoles[access.AccessDomainGlobal]; ok && fedRoles.Contains(role) {
+		if login.hasFedPermission() {
+			clearTokensFromJointClusters(acc, login)
 			login._logout()
 		}
 	}
@@ -990,6 +1075,9 @@ func _kickLoginSessions(user *share.CLUSUser) { // `user == nil` means kick all 
 
 	for _, login := range loginSessions {
 		if user == nil || compareUserWithLogin(user, login) {
+			if login.hasFedPermission() {
+				clearTokensFromJointClusters(access.NewFedAdminAccessControl(), login)
+			}
 			login._logout()
 		}
 	}
@@ -1190,7 +1278,7 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 	var err error
 	var data []byte
 
-	log.WithFields(log.Fields{"clusterID": clusterID, "callerFedRole": callerFedRole}).Info("")
+	log.WithFields(log.Fields{"clusterID": clusterID, "callerFedRole": callerFedRole}).Info()
 	if callerFedRole == api.FedRoleJoint {
 		// meaning joint cluster wants to reload its public key
 		m := clusHelper.GetFedMembership()
@@ -1328,7 +1416,10 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 	return validateEncryptedData(encryptedTicket, secret, true)
 }
 
-func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim) {
+// permits is for Rancher SSO only
+func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extraDomainPermits access.DomainPermissions,
+	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim) {
+
 	id := utils.GetRandomID(idLength, "")
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
@@ -1346,7 +1437,8 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 		MainSessionID:   mainSessionID,
 		MainSessionUser: mainSessionUser,
 		Timeout:         user.Timeout,
-		Roles:           roles,
+		Roles:           domainRoles,
+		ExtraPermits:    extraDomainPermits,
 		StandardClaims: jwt.StandardClaims{
 			Id:        id,
 			Subject:   installID,
@@ -1358,7 +1450,7 @@ func jwtGenerateToken(user *share.CLUSUser, roles access.DomainRole, remote, mai
 		c.NameID = sso.SAMLNameID
 		c.SessionIndex = sso.SAMLSessionIndex
 	}
-	if r, ok := roles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(roles) == 1 {
+	if r, ok := domainRoles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(domainRoles) == 1 {
 		if r == api.UserRoleIBMSA {
 			c.Timeout = uint32(30 * 60) // jwtIbmSaTokenLife, 30 minutes
 			c.StandardClaims.ExpiresAt = now.Add(jwtIbmSaTokenLife).Unix()
@@ -1425,26 +1517,65 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 	return ""
 }
 
-func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, remoteRole, clusterID, secret string) string {
-	var ok bool
-	var origRole string
-	allowedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
-	if origRole, ok = login.domainRoles[access.AccessDomainGlobal]; !ok || !allowedUserRoles.Contains(origRole) {
-		// global role must not be None nor CIOps nor IBMSA for this function
+func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, secret string) string {
+
+	if !login.hasFedPermission() {
+		// caller needs to have fed role or fed permission
 		return ""
 	}
+
+	var remoteGlobalRole string
+	var remoteDomainRoles map[string]string                // contains global domain's role
+	var remoteDomainPermits map[string]share.NvPermissions // contains global domain's extra permissions
+
+	hasPermFed := false
+	remoteDomainRoles = make(map[string]string, len(login.domainRoles))
+	if strings.HasPrefix(user.Server, share.FlavorRancher) {
+		if len(login.extraDomainPermits) > 0 {
+			remoteDomainPermits = make(map[string]share.NvPermissions, len(login.extraDomainPermits))
+			for d, permits := range login.extraDomainPermits {
+				// custom fed role for namespace is not supported yet
+				if d == access.AccessDomainGlobal {
+					if permits.HasPermFed() {
+						var reset uint32 = share.PERM_FED
+						permits.ReadValue &= ^reset
+						permits.WriteValue &= ^reset
+						hasPermFed = true
+					}
+					if !permits.IsEmpty() {
+						remoteDomainPermits[d] = permits
+					}
+				}
+			}
+		}
+	}
+
+	for d, role := range login.domainRoles {
+		if d == access.AccessDomainGlobal {
+			// master token must not have fedAdmin/fedReader roles because joint clusters do not recognize fedAdmin/fedReader roles.
+			if role == api.UserRoleFedAdmin {
+				remoteGlobalRole = api.UserRoleAdmin
+			} else if role == api.UserRoleFedReader {
+				remoteGlobalRole = api.UserRoleReader
+			} else if hasPermFed && (role == api.UserRoleAdmin || role == api.UserRoleReader) {
+				remoteGlobalRole = role
+			}
+		} else {
+			// custom fed role for namespace is not supported yet
+			if role == api.UserRoleAdmin || role == api.UserRoleReader {
+				remoteDomainRoles[d] = role
+			}
+		}
+	}
+	if remoteGlobalRole == "" && len(remoteDomainPermits) == 0 {
+		return ""
+	}
+	remoteDomainRoles[access.AccessDomainGlobal] = remoteGlobalRole
 
 	id := utils.GetRandomID(idLength, "")
 
 	//installID, _ := clusHelper.GetInstallationID()	// no need because it's not verified for master token(multi-clusters)
-	domainRoles := login.domainRoles
 	now := time.Now()
-	// master token must not have fedAdmin/fedReader roles because joint clusters do not recognize fedAdmin/fedReader roles.
-	domainRoles = make(map[string]string, len(login.domainRoles))
-	for k, v := range login.domainRoles {
-		domainRoles[k] = v
-	}
-	domainRoles[access.AccessDomainGlobal] = remoteRole
 
 	c := tokenClaim{
 		Fullname:        user.Fullname,
@@ -1455,7 +1586,8 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, remoteRole,
 		MainSessionID:   login.id,
 		MainSessionUser: login.fullname,
 		Timeout:         user.Timeout,
-		Roles:           domainRoles,
+		Roles:           remoteDomainRoles,
+		ExtraPermits:    remoteDomainPermits,
 		StandardClaims: jwt.StandardClaims{
 			Id: id,
 			//Subject: installID,	    // no need because it's not verified for master token(multi-clusters)
@@ -1663,7 +1795,7 @@ func remotePasswordAuth(cs *share.CLUSServer, pw *api.RESTAuthPassword) (*share.
 			log.WithFields(log.Fields{"server": cs.Name, "user": pw.Username, "role": role}).Debug("Authorized by group role mapping")
 		}
 
-		user, authz := lookupShadowUser(cs.Name, pw.Username, "", "", role, roleDomains)
+		user, authz := lookupShadowUser(cs.Name, "", pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
 		if authz {
 			return user, nil
 		}
@@ -1674,20 +1806,45 @@ func remotePasswordAuth(cs *share.CLUSServer, pw *api.RESTAuthPassword) (*share.
 	return nil, errors.New("Unknown server type")
 }
 
-func rbac2UserRole(rbac map[string]string) (string, map[string][]string) {
-	globalRole := ""
+func rbac2UserRole(rbacDomainRole map[string]string, rbacDomainPermits map[string]share.NvPermissions) (
+	string, map[string][]string, share.NvPermissions, []share.CLUSPermitsAssigned) {
+
+	globalRole := api.UserRoleNone
+	globalPermits := share.NvPermissions{}
 	roleDomains := make(map[string][]string)
-	for domain, role := range rbac {
-		if domain == "" {
+	rbacPermitsDomains := make(map[share.NvPermissions][]string)
+	for domain, role := range rbacDomainRole {
+		if domain == access.AccessDomainGlobal {
 			globalRole = role
-		} else if _, ok := roleDomains[role]; ok {
-			roleDomains[role] = append(roleDomains[role], domain)
-		} else {
-			roleDomains[role] = []string{domain}
+		} else if role != api.UserRoleNone {
+			// for namespace
+			domains, _ := roleDomains[role]
+			roleDomains[role] = append(domains, domain)
 		}
 	}
 
-	return globalRole, roleDomains
+	for domain, permits := range rbacDomainPermits {
+		if permits.IsEmpty() {
+			continue
+		}
+		if domain == access.AccessDomainGlobal {
+			globalPermits = permits
+		} else {
+			// for namespace
+			domains, _ := rbacPermitsDomains[permits]
+			rbacPermitsDomains[permits] = append(domains, domain)
+		}
+	}
+
+	var permitsDomains []share.CLUSPermitsAssigned
+	if len(rbacPermitsDomains) > 0 {
+		permitsDomains = make([]share.CLUSPermitsAssigned, 0, len(rbacPermitsDomains))
+		for permits, domains := range rbacPermitsDomains {
+			permitsDomains = append(permitsDomains, share.CLUSPermitsAssigned{Permits: permits, Domains: domains})
+		}
+	}
+
+	return globalRole, roleDomains, globalPermits, permitsDomains
 }
 
 func platformTokenRoleMapping(username string) map[string]string {
@@ -1697,82 +1854,12 @@ func platformTokenRoleMapping(username string) map[string]string {
 		return nil
 	}
 
-	roles, err := global.ORCH.GetUserRoles(username, resource.SUBJECT_USER)
+	roles, _, err := global.ORCH.GetUserRoles(username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		return nil
 	}
 
 	log.WithFields(log.Fields{"user": username}).Debug("Authorized by platform")
-	return roles
-}
-
-func consolidateCookieRoleMapping(fedRole string, ugRoles, roles map[string]string) bool {
-	if len(ugRoles) > 0 {
-		if r, ok := ugRoles[""]; ok {
-			if fedRole != api.FedRoleMaster {
-				if r == api.UserRoleFedAdmin {
-					r = api.UserRoleAdmin
-				} else if r == api.UserRoleFedReader {
-					r = api.UserRoleReader
-				}
-				ugRoles[""] = r
-			}
-			if r == api.UserRoleFedAdmin || r == api.UserRoleAdmin {
-				return true
-			}
-		} else {
-			var globalRole string
-			globalRole, _ = roles[""]
-			for d, r := range ugRoles {
-				if r == api.UserRoleFedAdmin {
-					r = api.UserRoleAdmin
-				} else if r == api.UserRoleFedReader {
-					r = api.UserRoleReader
-				}
-				if role, ok := roles[d]; ok {
-					if role != r {
-						if r == api.UserRoleAdmin && role != api.UserRoleAdmin {
-							roles[d] = r
-						} else if r == api.UserRoleReader && role == api.UserRoleNone {
-							roles[d] = r
-						}
-					}
-				} else {
-					roles[d] = r
-				}
-				if role, ok := roles[d]; ok && role == globalRole {
-					delete(roles, d)
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-func platformCookieRoleMapping(username string, groups []string) map[string]string {
-	accReadAll := access.NewReaderAccessControl()
-	cfg := cacher.GetSystemConfig(accReadAll)
-	if !cfg.AuthByPlatform {
-		return nil
-	}
-
-	fedRole := cacher.GetFedMembershipRoleNoAuth()
-	roles := make(map[string]string)
-	uRoles, _ := global.ORCH.GetUserRoles(username, resource.SUBJECT_USER)
-	if finalResult := consolidateCookieRoleMapping(fedRole, uRoles, roles); !finalResult {
-		for _, g := range groups {
-			gRoles, _ := global.ORCH.GetUserRoles(g, resource.SUBJECT_GROUP)
-			if finalResult := consolidateCookieRoleMapping(fedRole, gRoles, roles); finalResult {
-				break
-			}
-		}
-	}
-	log.WithFields(log.Fields{"user": username, "groups": groups}).Debug("Authorized by platform")
-	if r, ok := roles[""]; ok && (r == api.UserRoleFedAdmin || r == api.UserRoleAdmin) {
-		return map[string]string{"": r}
-	}
-
 	return roles
 }
 
@@ -1782,7 +1869,7 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 	roleDomains := make(map[string][]string)
 	// If platform authz enabled, try to get user role from there; if failed, fallback to group role mapping
 	if roles := platformTokenRoleMapping(username); roles != nil {
-		role, roleDomains = rbac2UserRole(roles)
+		role, roleDomains, _, _ = rbac2UserRole(roles, nil)
 	} else {
 		if cs.SAML != nil {
 			role, roleDomains = getRoleFromGroupMapping(groups, cs.SAML.GroupMappedRoles, cs.SAML.DefaultRole, true)
@@ -1795,7 +1882,7 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 		}
 	}
 
-	user, authz := lookupShadowUser(cs.Name, username, "", email, role, roleDomains)
+	user, authz := lookupShadowUser(cs.Name, "", username, "", email, role, roleDomains, share.NvPermissions{}, nil)
 	if authz {
 		return user, nil
 	}
@@ -1823,7 +1910,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	groups, err := global.ORCH.GetPlatformUserGroups(token)
 	if err == nil {
 		for _, group := range groups {
-			roles, err := global.ORCH.GetUserRoles(group, resource.SUBJECT_GROUP)
+			roles, _, err := global.ORCH.GetUserRoles(group, resource.SUBJECT_GROUP)
 			if err == nil {
 				for k, v := range roles {
 					// not to override admin role
@@ -1840,7 +1927,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 		log.WithFields(log.Fields{"groups": groups, "allRoles": allRoles}).Debug("combined group roles ")
 	}
 
-	roles, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
+	roles, _, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		log.WithFields(log.Fields{"user": pw.Username}).Debug("No role available for this user.")
 		roleDomains = make(map[string][]string)
@@ -1854,10 +1941,10 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 		}
 	}
 
-	role, roleDomains = rbac2UserRole(allRoles)
+	role, roleDomains, _, _ = rbac2UserRole(allRoles, nil)
 	log.WithFields(log.Fields{"role": role, "roleDomains": roleDomains, "allRoles": allRoles}).Debug("combined roles")
 
-	user, authz := lookupShadowUser(server, pw.Username, "", "", role, roleDomains)
+	user, authz := lookupShadowUser(server, "", pw.Username, "", "", role, roleDomains, share.NvPermissions{}, nil)
 	if authz {
 		return user, nil
 	}
@@ -1976,6 +2063,7 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 					user.PasswordHash = utils.HashPassword(*pw.NewPassword)
 					user.PwdResetTime = time.Now().UTC()
 					user.ResetPwdInNextLogin = false
+					user.UseBootstrapPwd = false
 				}
 			}
 		}
@@ -2041,14 +2129,46 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 	if user == nil || user.Server != "" {
 		return nil, nil, errors.New("User not found")
 	}
-	if role, ok := claims.Roles[access.AccessDomainGlobal]; ok {
-		user.Role = role
-	} else {
-		return nil, nil, errors.New("Access denied")
+	user.Username = claims.Username
+	user.Server = claims.Server
+	user.Timeout = claims.Timeout
+
+	roleDomains := make(map[string][]string)
+	for d, role := range claims.Roles {
+		if d == access.AccessDomainGlobal {
+			user.Role = role
+		} else {
+			if domains, ok := roleDomains[role]; ok {
+				roleDomains[role] = append(domains, d)
+			} else {
+				domains = make([]string, 1)
+				domains[0] = d
+				roleDomains[role] = domains
+			}
+
+		}
 	}
-	if d, ok := user.RoleDomains[api.UserRoleAdmin]; ok {
-		delete(user.RoleDomains, api.UserRoleAdmin)
-		user.RoleDomains[api.UserRoleReader] = d
+	user.RoleDomains = roleDomains
+
+	permitsDomains := make(map[share.NvPermissions][]string)
+	for domain, permits := range claims.ExtraPermits {
+		if !permits.IsEmpty() {
+			if domain == access.AccessDomainGlobal {
+				user.ExtraPermits = permits
+			} else {
+				domains, _ := permitsDomains[permits]
+				permitsDomains[permits] = append(domains, domain)
+			}
+		}
+	}
+	extraPermitsDomains := make([]share.CLUSPermitsAssigned, 0, len(permitsDomains))
+	for permits, domains := range permitsDomains {
+		extraPermitsDomains = append(extraPermitsDomains, share.CLUSPermitsAssigned{Permits: permits, Domains: domains})
+	}
+	user.ExtraPermitsDomains = extraPermitsDomains
+
+	if user.Role == api.UserRoleNone && user.ExtraPermits.IsEmpty() {
+		return nil, nil, errors.New("Access denied")
 	}
 	// do not increase user's LoginCount because this master login requests a real user login in the caller later
 
@@ -2088,6 +2208,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	var localAuthed bool
 	var remote string
 	var mainSessionID string
+	var mainSessionUser string
 	var auth api.RESTAuthData
 	var user *share.CLUSUser
 	var rancherUser tRancherUser
@@ -2119,15 +2240,25 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	if rancherUser.valid {
 		var authz bool
-		role, roleDomains := rbac2UserRole(rancherUser.domainRoles)
+		role, roleDomains, permits, permitsDomains := rbac2UserRole(rancherUser.domainRoles, rancherUser.domainPermissions)
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole != api.FedRoleMaster {
 			fedAdjusted := map[string]string{api.UserRoleFedAdmin: api.UserRoleAdmin, api.UserRoleFedReader: api.UserRoleReader}
 			if adjusted, ok := fedAdjusted[role]; ok {
 				role = adjusted
 			}
+			if !permits.IsEmpty() {
+				// remove PERM_FED from global permissions when it's not master cluster
+				permits.ReadValue &= share.PERMS_CLUSTER_READ
+				permits.WriteValue &= share.PERMS_CLUSTER_WRITE
+			}
+			for i, _ := range permitsDomains {
+				permitsDomains[i].Permits.ReadValue &= share.PERMS_DOMAIN_READ
+				permitsDomains[i].Permits.WriteValue &= share.PERMS_DOMAIN_WRITE
+
+			}
 		}
 		mainSessionID = fmt.Sprintf("%s%s", _rancherSessionPrefix, rancherUser.token)
-		user, authz = lookupShadowUser(share.FlavorRancher, rancherUser.name, rancherUser.id, "", role, roleDomains)
+		user, authz = lookupShadowUser(share.FlavorRancher, rancherUser.provider, rancherUser.name, rancherUser.id, "", role, roleDomains, permits, permitsDomains)
 		if !authz {
 			msg := fmt.Sprintf("Failed to map to a valid role: %s(%s)", rancherUser.name, rancherUser.id)
 			restRespErrorMessage(w, http.StatusUnauthorized, api.RESTErrUnauthorized, msg)
@@ -2146,9 +2277,10 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			},
 		}
 		remote = r.RemoteAddr
+		mainSessionUser = user.Fullname
 	} else {
 		// Read body
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 
 		err := json.Unmarshal(body, &auth)
 		if err != nil || auth.Password == nil {
@@ -2292,7 +2424,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		rc = userInvalidRequest
 	} else {
 		// Login user accounting
-		login, rc = loginUser(user, nil, remote, mainSessionID, "", fedRole, nil)
+		login, rc = loginUser(user, nil, nil, remote, mainSessionID, mainSessionUser, fedRole, nil)
 	}
 	if rc != userOK {
 		if rc == userTimeout {
@@ -2307,23 +2439,13 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		return
 	}
 
-	// Respond
 	resp := api.RESTTokenData{
 		Token: &api.RESTToken{
-			Token: login.token,
-			RESTUser: api.RESTUser{
-				Fullname:    user.Fullname,
-				Server:      user.Server,
-				Username:    user.Username,
-				EMail:       user.EMail,
-				Role:        user.Role,
-				Timeout:     user.Timeout,
-				Locale:      user.Locale,
-				DefaultPWD:  defaultPW,
-				RoleDomains: user.RoleDomains,
-			},
+			Token:    login.token,
+			RESTUser: *user2REST(user, nil),
 		},
 	}
+	resp.Token.DefaultPWD = defaultPW
 
 	if cacheRancherCookie {
 		rancherCookieMutex.Lock()
@@ -2338,14 +2460,14 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 		resp.PwdDaysUntilExpire = pwdDaysUntilExpire
 		resp.PwdHoursUntilExpire = pwdHoursUntilExpire
-		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains)
+		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetUserPermissions(user.Role, user.RoleDomains, share.NvPermissions{}, nil)
 	} else {
 		resp.PwdDaysUntilExpire = -1
 		resp.PwdHoursUntilExpire = -1
-		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains) //->
+		resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetUserPermissions(user.Role, user.RoleDomains, user.ExtraPermits, user.ExtraPermitsDomains)
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"user": user.Fullname, "err": err}).Warn("")
+		log.WithFields(log.Fields{"user": user.Fullname, "err": err}).Warn()
 		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 	} else {
 		restRespSuccess(w, r, &resp, nil, login, nil, "")
@@ -2371,7 +2493,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err = json.Unmarshal(body, &auth)
 	if err != nil || auth.MasterToken == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -2397,15 +2519,16 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		if err == errTokenExpired {
 			status = http.StatusRequestTimeout
 		} else {
-			authLog(share.CLUSEvAuthLoginFailed, auth.JointUsername, remote, "", nil, "")
-			log.WithFields(log.Fields{"user": auth.JointUsername, "error": err}).Error("Fed auth failed")
+			fullname := fmt.Sprintf("%s(from %s)", auth.JointUsername, auth.MasterUsername)
+			authLog(share.CLUSEvAuthLoginFailed, fullname, remote, "", nil, "")
+			log.WithFields(log.Fields{"user": fullname, "error": err}).Error("Fed auth failed")
 		}
 		restRespError(w, status, api.RESTErrUnauthorized)
 		return
 	}
 
 	// Login user accounting
-	login, rc := loginUser(user, claims.Roles, remote, claims.MainSessionID, claims.MainSessionUser, api.FedRoleJoint, nil)
+	login, rc := loginUser(user, claims.Roles, claims.ExtraPermits, remote, claims.MainSessionID, claims.MainSessionUser, api.FedRoleJoint, nil)
 	if rc != userOK {
 		log.WithFields(log.Fields{"user": auth.JointUsername, "rc": rc}).Error("Fed master login failed")
 		authLog(share.CLUSEvAuthLoginFailed, auth.JointUsername, remote, "", nil, "")
@@ -2420,17 +2543,6 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	resp := api.RESTTokenData{
 		Token: &api.RESTToken{
 			Token: login.token,
-			RESTUser: api.RESTUser{
-				Fullname:    user.Fullname,
-				Server:      user.Server,
-				Username:    user.Username,
-				EMail:       user.EMail,
-				Role:        user.Role,
-				Timeout:     user.Timeout,
-				Locale:      user.Locale,
-				DefaultPWD:  false,
-				RoleDomains: user.RoleDomains,
-			},
 		},
 	}
 
@@ -2442,7 +2554,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTAuthData
 	err := json.Unmarshal(body, &data)
@@ -2607,7 +2719,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 
 	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
 	// Login user accounting
-	login, rc := loginUser(user, nil, remote, _interactiveSessionID, "", fedRole, &sso)
+	login, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", fedRole, &sso)
 	if rc != userOK {
 		if rc == userTimeout {
 			log.WithFields(log.Fields{"user": user.Fullname}).Error("User login timeout")
@@ -2646,12 +2758,27 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		PwdDaysUntilExpire:  pwdDaysUntilExpire,
 		PwdHoursUntilExpire: pwdHoursUntilExpire,
 	}
-	resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetDomainPermissions(user.Role, user.RoleDomains)
+	resp.Token.GlobalPermits, resp.Token.DomainPermits, err = access.GetUserPermissions(user.Role, user.RoleDomains, share.NvPermissions{}, nil)
 	if err != nil {
-		log.WithFields(log.Fields{"user": user.Fullname, "err": err}).Warn("")
+		log.WithFields(log.Fields{"user": user.Fullname, "err": err}).Warn()
 		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 	} else {
 		restRespSuccess(w, r, &resp, nil, login, nil, "")
+	}
+}
+
+func clearTokensFromJointClusters(acc *access.AccessControl, login *loginSession) {
+	fedRole, err := cacher.GetFedMembershipRole(acc)
+	if err == nil && fedRole == api.FedRoleMaster {
+		ids := cacher.GetFedJoinedClusterIdMap(acc)
+		for id := range ids {
+			joinedCluster := cacher.GetFedJoinedCluster(id, acc)
+			if joinedCluster.ID != "" {
+				talkToJointCluster(&joinedCluster, http.MethodDelete, "v1/fed_auth", id, "logout", []byte("{}"), nil, acc, login, []bool{false})
+				cacher.SetFedJoinedClusterToken(id, login.id, "")
+			}
+		}
+		cacher.SetFedJoinedClusterToken("", login.id, "")
 	}
 }
 
@@ -2664,34 +2791,33 @@ func handlerAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
+	if login.hasFedPermission() {
+		clearTokensFromJointClusters(acc, login)
+	}
+
 	userMutex.Lock()
 	login._logout()
 	userMutex.Unlock()
 
-	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
-	if role, ok := login.domainRoles[access.AccessDomainGlobal]; ok && fedUserRoles.Contains(role) {
-		fedRole, err := cacher.GetFedMembershipRole(acc)
-		if err == nil && fedRole == api.FedRoleMaster {
-			ids := cacher.GetFedJoinedClusterIdMap(acc)
-			for id := range ids {
-				joinedCluster := cacher.GetFedJoinedCluster(id, acc)
-				if joinedCluster.ID != "" {
-					var token string
-					reqTokenLock.Lock()
-					token, _ = cacher.GetFedJoinedClusterToken(joinedCluster.ID, login.id, acc)
-					reqTokenLock.Unlock()
-					if token != "" {
-						talkToJointCluster(&joinedCluster, http.MethodDelete, "v1/fed_auth", id, "logout", []byte("{}"), nil, acc, login)
-						cacher.SetFedJoinedClusterToken(id, login.id, "")
-					}
-				}
-			}
-		}
-	}
-
 	restRespSuccess(w, r, nil, acc, login, nil, "")
 }
 
+func (s *loginSession) hasFedPermission() bool {
+	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
+	if role, ok := s.domainRoles[access.AccessDomainGlobal]; ok && fedUserRoles.Contains(role) {
+		return true
+	}
+	for _, permits := range s.extraDomainPermits {
+		if (permits.ReadValue&share.PERM_FED != 0) || (permits.WriteValue&share.PERM_FED != 0) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// The request is from master cluster.
+// It's for asking joint clusters to logout the sessions for the jwt tokens generated by serving POST(v1/fed_auth) requests from master cluster
 func handlerFedAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -2702,7 +2828,8 @@ func handlerFedAuthLogout(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	userMutex.Lock()
-	login._logoutFedSession()
+	login._delJointFedSessions()
+	login._logout()
 	userMutex.Unlock()
 
 	restRespSuccess(w, r, nil, acc, login, nil, "")

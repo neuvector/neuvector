@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -19,7 +18,7 @@ import (
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/system"
@@ -161,7 +160,7 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 		return "", fmt.Errorf("New Request fail - error=%s", err)
 	}
 	if useToken {
-		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
+		if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
 			return "", fmt.Errorf("Read File fail - tag=%s, error=%s", tag, err)
 		} else {
 			req.Header.Set("Authorization", "Bearer "+string(data))
@@ -178,7 +177,7 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 	}
 
 	var data []byte
-	data, err = ioutil.ReadAll(resp.Body)
+	data, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("Read data fail - error=%s", err)
 	}
@@ -629,7 +628,7 @@ func (d *kubernetes) createCleanupScript(wr io.Writer, hostPorts map[string][]sh
 
 func (d *kubernetes) CleanupHostPorts(hostPorts map[string][]share.CLUSIPAddr) error {
 	if d.flavor == share.FlavorOpenShift {
-		if f, err := ioutil.TempFile("", "ovs"); err != nil {
+		if f, err := os.CreateTemp("", "ovs"); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to create file")
 			return err
 		} else {

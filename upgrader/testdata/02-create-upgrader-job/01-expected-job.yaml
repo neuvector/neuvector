@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    cronjob.kubernetes.io/instantiate: manual
+    cert-upgrader-uid: uid
+  creationTimestamp: "2024-02-14T22:07:03Z"
+  name: neuvector-cert-upgrader-job
+  namespace: neuvector
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: CronJob
+    name: neuvector-cert-upgrader-pod
+    uid: 2ef4dd7f-f39b-442b-acc2-8edccdbd381c
+spec:
+  activeDeadlineSeconds: 3601
+  backoffLimit: 6
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: neuvector-cert-upgrader-pod
+        release: release-name
+    spec:
+      containers:
+      - command:
+        - /usr/local/bin/upgrader
+        - upgrader-job
+        - --fresh-install
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: EXPIRY_CERT_THRESHOLD
+          value: 87600h
+        image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.1-dev
+        imagePullPolicy: Always
+        name: neuvector-cert-upgrader-pod
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: my-docker-secret
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: cert-upgrader
+      serviceAccountName: cert-upgrader
+      terminationGracePeriodSeconds: 30

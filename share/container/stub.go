@@ -3,7 +3,6 @@ package container
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -59,9 +58,9 @@ func InitStubRtDriver(sys *system.SystemTools) (Runtime, error) {
 	ppid := os.Getppid()
 
 	id, _, _, _ = sys.GetContainerIDByPID(ppid)
-	if dat, err := ioutil.ReadFile("/etc/hostname"); err == nil {
+	if dat, err := os.ReadFile("/etc/hostname"); err == nil {
 		podname = strings.TrimSpace(string(dat))
-		if dat, err = ioutil.ReadFile("/etc/hosts"); err == nil {
+		if dat, err = os.ReadFile("/etc/hosts"); err == nil {
 			for _, line := range strings.Split(strings.Trim(string(dat), " \t\r\n"), "\n") {
 				line = strings.Replace(strings.Trim(line, " \t"), "\t", " ", -1)
 				if len(line) == 0 || line[0] == ';' || line[0] == '#' {

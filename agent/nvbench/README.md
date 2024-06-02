@@ -8,7 +8,7 @@ This set of scripts can be used to check the Kubernetes installation against the
 ## How it trigger
 When the enforcer pod start, it read the environment then deicde which benchmark it run then generated report.
 
-## Supported CIS Kubernetes versions
+## Supported CIS Kubernetes Benchmark versions
 | CIS Kubernetes Benchmark Version | Kubernetes versions |
 |---|---|
 | 1.0.0 | 1.6 |
@@ -18,6 +18,13 @@ When the enforcer pod start, it read the environment then deicde which benchmark
 | 1.23 | 1.19 - 1.23 |
 | 1.24 | 1.24 |
 | 1.8.0 | 1.27+ |
+
+| CIS Kubernetes Benchmark Version on Cloud| Kubernetes versions |
+|---|---|
+| EKS-1.4.0 | Any |
+| AKS-1.4.0 | Any |
+| GKE-1.4.0 | 1.24+ |
+| GKE-1.4.0 | 1.23 |
 
 | CIS OpenShift Benchmark Version | OpenShift versions |
 |---|---|

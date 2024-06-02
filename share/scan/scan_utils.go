@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,7 +129,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			}
 			hasPackage = true
 		} else if lib == DpkgStatusDir {
-			dpkgfiles, err := ioutil.ReadDir(path)
+			dpkgfiles, err := os.ReadDir(path)
 			if err != nil {
 				continue
 			}
@@ -294,6 +293,7 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
@@ -306,12 +306,17 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	list := make([]RPMPackage, 0, len(pkgs))
 	for _, p := range pkgs {
 		if p.Name != "gpg-pubkey" {
+			var epoch int
+			if p.Epoch != nil {
+				epoch = *p.Epoch
+			}
+
 			if kernel == "" {
-				list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+				list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 			} else {
 				// filter kernels that are not running
 				if k := isRpmKernelPackage(p); k == "" || strings.HasPrefix(kernel, k) {
-					list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+					list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 				}
 			}
 		}
@@ -547,7 +552,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	defer os.Remove(fileName) // clean up
 
 	apps := NewScanApps(true)
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "scan_lambda")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "scan_lambda")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Create temp directory fail")
 		return nil, err
@@ -563,7 +568,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 			}
 			defer zFile.Close()
 
-			tmpfile, err := ioutil.TempFile(tmpDir, "extract")
+			tmpfile, err := os.CreateTemp(tmpDir, "extract")
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "filename": file.Name}).Error("write to temp file fail")
 				continue

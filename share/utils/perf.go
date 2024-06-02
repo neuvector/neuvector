@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -139,7 +138,7 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 		PerfProfile(req, workFolder, prefix)
 
 		// deferred action because PerfProfile will create the tmp_folder
-		ioutil.WriteFile(filepath.Join(workFolder, "data.json"), file, 0644)
+		os.WriteFile(filepath.Join(workFolder, "data.json"), file, 0644)
 
 		//  write the .tar.gzip
 		targetZipFile := filepath.Join(folder, fmt.Sprintf("%ssnapshot.%s.%s.zip", prefix, cid, label))

@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
-	//	metav1 "github.com/neuvector/k8s/apis/meta/v1"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -43,6 +43,7 @@ type nvCrdHandler struct {
 	lockKey    string
 	crUid      string // metadata.uid in the CR object
 	mdName     string // metadata.name in the CR object
+	rscType    string
 	lock       cluster.LockInterface
 	acc        *access.AccessControl
 }
@@ -193,7 +194,7 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 			updateKV := false
 			cg, _, err := clusHelper.GetGroup(group.Name, h.acc)
 			if cg == nil {
-				log.WithFields(log.Fields{"error": err}).Error()
+				log.WithFields(log.Fields{"error": err, "name": group.Name}).Error()
 				cg = &share.CLUSGroup{
 					Name:     group.Name,
 					CfgType:  share.GroundCfg,
@@ -2081,21 +2082,21 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, r
 	ruleSet := utils.NewSet()
 	errCount := 0
 
-	if gfwrule == nil || gfwrule.Metadata == nil || gfwrule.Metadata.Name == nil {
+	if gfwrule == nil || gfwrule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = gfwrule.Metadata.GetName()
+	h.mdName = gfwrule.GetName()
 
 	if reviewType == share.ReviewTypeCRD {
-		if *gfwrule.Kind == resource.NvClusterSecurityRuleKind {
+		if gfwrule.Kind == resource.NvClusterSecurityRuleKind {
 			ruleNs = "default"
 		} else {
-			ruleNs = *gfwrule.Metadata.Namespace
+			ruleNs = gfwrule.GetNamespace()
 		}
-		recordName = fmt.Sprintf("%s-%s-%s", *gfwrule.Kind, ruleNs, *gfwrule.Metadata.Name)
+		recordName = fmt.Sprintf("%s-%s-%s", gfwrule.Kind, ruleNs, gfwrule.GetName())
 	} else {
-		ruleNs = *gfwrule.Metadata.Namespace
+		ruleNs = gfwrule.GetNamespace()
 		recordName = gfwrule.Spec.Target.Selector.Name
 	}
 
@@ -2130,7 +2131,7 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, r
 
 	//    if the rule was for certain namespace, then the target must belong to same namespace.
 	//    neuvector namespace was used for general in/export
-	if *gfwrule.Kind == resource.NvSecurityRuleKind {
+	if gfwrule.Kind == resource.NvSecurityRuleKind {
 		for _, ct := range *gfwrule.Spec.Target.Selector.Criteria {
 			if ct.Key == share.CriteriaKeyDomain {
 				if ct.Op == share.CriteriaOpEqual && ct.Value == ruleNs {
@@ -2384,11 +2385,11 @@ func admCtrlRuleHashFromCriteria(rCriteria []*api.RESTAdmRuleCriterion) uint32 {
 func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmCtrlSecurityRule, reviewType share.TReviewType,
 	reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 
-	if admCtrlSecRule == nil || admCtrlSecRule.Metadata == nil || admCtrlSecRule.Metadata.Name == nil {
+	if admCtrlSecRule == nil || admCtrlSecRule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = admCtrlSecRule.Metadata.GetName()
+	h.mdName = admCtrlSecRule.GetName()
 
 	name := h.mdName
 	if reviewType == share.ReviewTypeCRD {
@@ -2406,7 +2407,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 
 	errCount := 0
 	crdCfgRet := &resource.NvSecurityParse{}
-	recordName := fmt.Sprintf("%s-default-%s", *admCtrlSecRule.Kind, name)
+	recordName := fmt.Sprintf("%s-default-%s", admCtrlSecRule.Kind, name)
 	if admCtrlSecRule.Spec.Config != nil {
 		// Get the admission control config
 		cfg := admCtrlSecRule.Spec.Config
@@ -2535,11 +2536,11 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityRule, reviewType share.TReviewType,
 	reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 
-	if dlpSecRule == nil || dlpSecRule.Metadata == nil || dlpSecRule.Metadata.Name == nil {
+	if dlpSecRule == nil || dlpSecRule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = dlpSecRule.Metadata.GetName()
+	h.mdName = dlpSecRule.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2550,7 +2551,7 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 	errCount := 0
 	crdCfgRet := &resource.NvSecurityParse{}
 	name := h.mdName
-	recordName := fmt.Sprintf("%s-default-%s", *dlpSecRule.Kind, name)
+	recordName := fmt.Sprintf("%s-default-%s", dlpSecRule.Kind, name)
 	if dlpSecRule.Spec.Sensor != nil {
 		sensor := dlpSecRule.Spec.Sensor
 		if sensor.Name != name {
@@ -2593,7 +2594,7 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 		}
 	} else {
 		crdCfgRet.DlpSensorCfg = &api.RESTDlpSensorConfig{
-			Name: *dlpSecRule.Metadata.Name,
+			Name: dlpSecRule.GetName(),
 		}
 	}
 
@@ -2604,11 +2605,11 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityRule, reviewType share.TReviewType,
 	reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 
-	if wafSecRule == nil || wafSecRule.Metadata == nil || wafSecRule.Metadata.Name == nil {
+	if wafSecRule == nil || wafSecRule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = wafSecRule.Metadata.GetName()
+	h.mdName = wafSecRule.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2619,7 +2620,7 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 	errCount := 0
 	crdCfgRet := &resource.NvSecurityParse{}
 	name := h.mdName
-	recordName := fmt.Sprintf("%s-default-%s", *wafSecRule.Kind, name)
+	recordName := fmt.Sprintf("%s-default-%s", wafSecRule.Kind, name)
 	if wafSecRule.Spec.Sensor != nil {
 		sensor := wafSecRule.Spec.Sensor
 		if sensor.Name != name {
@@ -2662,7 +2663,7 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 		}
 	} else {
 		crdCfgRet.WafSensorCfg = &api.RESTWafSensorConfig{
-			Name: *wafSecRule.Metadata.Name,
+			Name: wafSecRule.GetName(),
 		}
 	}
 
@@ -2673,11 +2674,11 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resource.NvVulnProfileSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 
-	if vulnProfileSecRule == nil || vulnProfileSecRule.Metadata == nil || vulnProfileSecRule.Metadata.Name == nil {
+	if vulnProfileSecRule == nil || vulnProfileSecRule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = vulnProfileSecRule.Metadata.GetName()
+	h.mdName = vulnProfileSecRule.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2686,8 +2687,8 @@ func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resourc
 
 	var errMsg string
 	crdCfgRet := &resource.NvSecurityParse{}
-	mdName := *vulnProfileSecRule.Metadata.Name
-	recordName := fmt.Sprintf("%s-default-%s", *vulnProfileSecRule.Kind, mdName)
+	mdName := vulnProfileSecRule.GetName()
+	recordName := fmt.Sprintf("%s-default-%s", vulnProfileSecRule.Kind, mdName)
 	if mdName != share.DefaultVulnerabilityProfileName {
 		errMsg = fmt.Sprintf("%s file format error:  unsupported metadata name %s", reviewTypeDisplay, mdName)
 		return nil, 1, errMsg, recordName
@@ -2738,12 +2739,11 @@ func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resourc
 func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resource.NvCompProfileSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 
-	if compProfileSecRule == nil || compProfileSecRule.Metadata == nil ||
-		compProfileSecRule.Metadata.Name == nil || *compProfileSecRule.Metadata.Name == "" {
+	if compProfileSecRule == nil || compProfileSecRule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s file format error:  validation error", reviewTypeDisplay)
 		return nil, 1, errMsg, ""
 	}
-	h.mdName = compProfileSecRule.Metadata.GetName()
+	h.mdName = compProfileSecRule.GetName()
 
 	var cfgType string = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
@@ -2752,8 +2752,8 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 
 	var errMsg string
 	crdCfgRet := &resource.NvSecurityParse{}
-	mdName := *compProfileSecRule.Metadata.Name
-	recordName := fmt.Sprintf("%s-default-%s", *compProfileSecRule.Kind, mdName)
+	mdName := compProfileSecRule.GetName()
+	recordName := fmt.Sprintf("%s-default-%s", compProfileSecRule.Kind, mdName)
 	if mdName != share.DefaultComplianceProfileName {
 		errMsg = fmt.Sprintf("%s file format error:  unsupported metadata name %s", reviewTypeDisplay, mdName)
 		return nil, 1, errMsg, recordName
@@ -2982,6 +2982,7 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 
 	var crdCfgRet *resource.NvSecurityParse
 	var gfwrule *resource.NvSecurityRule
+	var gfwruleObj resource.NvSecurityRule
 	var admCtrlSecRule *resource.NvAdmCtrlSecurityRule
 	var dlpSecRule *resource.NvDlpSecurityRule
 	var wafSecRule *resource.NvWafSecurityRule
@@ -2991,8 +2992,14 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 	var ok bool
 
 	switch kind {
-	case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
+	case resource.NvSecurityRuleKind:
 		gfwrule, ok = crdSecRule.(*resource.NvSecurityRule)
+	case resource.NvClusterSecurityRuleKind:
+		var gfwruleTemp *resource.NvClusterSecurityRule
+		if gfwruleTemp, ok = crdSecRule.(*resource.NvClusterSecurityRule); ok {
+			gfwruleObj = resource.NvSecurityRule(*gfwruleTemp)
+			gfwrule = &gfwruleObj
+		}
 	case resource.NvAdmCtrlSecurityRuleKind:
 		admCtrlSecRule, ok = crdSecRule.(*resource.NvAdmCtrlSecurityRule)
 	case resource.NvDlpSecurityRuleKind:
@@ -3179,7 +3186,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTGroupExport
 
 	err := json.Unmarshal(body, &rconf)
@@ -3191,8 +3198,10 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	apiVersion := resource.NvSecurityRuleVersion
 	resp := resource.NvSecurityRuleList{
-		Kind:       &resource.NvListKind,
-		ApiVersion: &apiVersion,
+		TypeMeta: metav1.TypeMeta{
+			Kind:       resource.NvListKind,
+			APIVersion: apiVersion,
+		},
 	}
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
@@ -3229,13 +3238,14 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		resptmp := resource.NvSecurityRule{
-			//Kind: &resource.NvSecurityRuleKind,
-			Kind: &targetKind,
-			Metadata: &cmetav1.ObjectMeta{
-				Name:      &kindName,
-				Namespace: &targetNs,
+			TypeMeta: metav1.TypeMeta{
+				Kind:       targetKind,
+				APIVersion: apiversion,
 			},
-			ApiVersion: &apiversion,
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      kindName,
+				Namespace: targetNs,
+			},
 			Spec: resource.NvSecurityRuleSpec{
 				Target: resource.NvSecurityTarget{
 					Selector: *tgroup,
@@ -3291,7 +3301,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 
-		resp.Items = append(resp.Items, &resptmp)
+		resp.Items = append(resp.Items, resptmp)
 	}
 	// for all the group in the From/To , if learned group we also need export it's policymode
 	// We don't know the default policy mode in other system so in current system just export
@@ -3640,77 +3650,55 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[
 	return profileMode, baseline
 }
 
-// for calculating md5, we need to set those variant fields in metadata.
-// that's why we need to backup those fields
-func (h *nvCrdHandler) prepareForMd5(metaData *cmetav1.ObjectMeta) cmetav1.ObjectMeta {
-	mdBackup := cmetav1.ObjectMeta{
-		CreationTimestamp: metaData.CreationTimestamp,
-		ResourceVersion:   metaData.ResourceVersion,
-		Generation:        metaData.Generation,
-		Uid:               metaData.Uid,
-		Labels:            metaData.Labels,
-		Annotations:       metaData.Annotations,
-		OwnerReferences:   metaData.OwnerReferences,
-	}
-	metaData.CreationTimestamp = nil
-	metaData.ResourceVersion = nil
-	metaData.Generation = nil
-	metaData.Uid = nil
-	metaData.Labels = nil
-	metaData.Annotations = nil
-	metaData.OwnerReferences = nil
-
-	return mdBackup
-}
-
-func (h *nvCrdHandler) getCrInfo(kind string, crdSecRule interface{}, metaData *cmetav1.ObjectMeta) (
-	string, string, interface{}, bool, error) {
+func (h *nvCrdHandler) getCrInfo(crdSecRule interface{}) (string, bool, error) {
 
 	var crdMD5 string
-	var rscType string
 	var skip bool
 
-	h.crUid = metaData.GetUid() // must be before prepareForMd5()
-	mdBackup := h.prepareForMd5(metaData)
-	h.mdName = metaData.GetName()
-	ruleJsonValue, _ := json.Marshal(crdSecRule)
-	crdMD5, skip = h.calcCrdSecRuleMD5(metaData, mdBackup, ruleJsonValue, nil, "")
-	switch kind {
-	case resource.NvSecurityRuleKind:
-		rscType = resource.RscTypeCrdSecurityRule
-	case resource.NvClusterSecurityRuleKind:
-		rscType = resource.RscTypeCrdClusterSecurityRule
-	case resource.NvAdmCtrlSecurityRuleKind:
-		rscType = resource.RscTypeCrdAdmCtrlSecurityRule
-	case resource.NvDlpSecurityRuleKind:
-		rscType = resource.RscTypeCrdDlpSecurityRule
-	case resource.NvWafSecurityRuleKind:
-		rscType = resource.RscTypeCrdWafSecurityRule
-	case resource.NvVulnProfileSecurityRuleKind:
-		rscType = resource.RscTypeCrdVulnProfile
-	case resource.NvCompProfileSecurityRuleKind:
-		rscType = resource.RscTypeCrdCompProfile
-	default:
-		return "", "", nil, true, fmt.Errorf("unsupported Kubernetese resource kind")
-	}
+	if objectMeta, ok := crdSecRule.(metav1.Object); !ok {
+		return "", true, fmt.Errorf("type casting error")
+	} else {
+		h.crUid = string(objectMeta.GetUID())
+		mdBackup := metav1.ObjectMeta{
+			CreationTimestamp: objectMeta.GetCreationTimestamp(),
+			ResourceVersion:   objectMeta.GetResourceVersion(),
+			Generation:        objectMeta.GetGeneration(),
+			UID:               objectMeta.GetUID(),
+			Labels:            objectMeta.GetLabels(),
+			Annotations:       objectMeta.GetAnnotations(),
+			OwnerReferences:   objectMeta.GetOwnerReferences(),
+		}
+		// clear those variant fields in input metadata for calculating md5 of the cr.
+		objectMeta.SetCreationTimestamp(metav1.Time{})
+		objectMeta.SetResourceVersion("")
+		objectMeta.SetGeneration(0)
+		objectMeta.SetUID(types.UID(""))
+		objectMeta.SetLabels(nil)
+		objectMeta.SetAnnotations(nil)
+		objectMeta.SetOwnerReferences(nil)
 
-	return crdMD5, rscType, crdSecRule, skip, nil
+		h.mdName = objectMeta.GetName()
+		ruleJsonValue, _ := json.Marshal(crdSecRule)
+		crdMD5, skip = h.calcCrdSecRuleMD5(ruleJsonValue, nil, "")
+
+		// revert those variant fields in input metadata to their original values.
+		objectMeta.SetCreationTimestamp(mdBackup.CreationTimestamp)
+		objectMeta.SetResourceVersion(mdBackup.ResourceVersion)
+		objectMeta.SetGeneration(mdBackup.Generation)
+		objectMeta.SetUID(mdBackup.UID)
+		objectMeta.SetLabels(mdBackup.Labels)
+		objectMeta.SetAnnotations(mdBackup.Annotations)
+		objectMeta.SetOwnerReferences(mdBackup.OwnerReferences)
+
+		return crdMD5, skip, nil
+	}
 }
 
 // calculate md5 of the crd security rule(cr resource)
-// ater md5 is calculated, we need to revert those variant fields in metadata to their original values.
+// after md5 is calculated, we need to revert those variant fields in metadata to their original values.
 // parameter recordList: non-nil means it's for CrossCheckCrd()
 // returns (crdMd5, skip)
-func (h *nvCrdHandler) calcCrdSecRuleMD5(metaData *cmetav1.ObjectMeta, mdBackup cmetav1.ObjectMeta, ruleJsonValue []byte,
-	recordList map[string]*share.CLUSCrdSecurityRule, recordName string) (string, bool) {
-
-	metaData.CreationTimestamp = mdBackup.CreationTimestamp
-	metaData.ResourceVersion = mdBackup.ResourceVersion
-	metaData.Generation = mdBackup.Generation
-	metaData.Uid = mdBackup.Uid
-	metaData.Labels = mdBackup.Labels
-	metaData.Annotations = mdBackup.Annotations
-	metaData.OwnerReferences = mdBackup.OwnerReferences
+func (h *nvCrdHandler) calcCrdSecRuleMD5(ruleJsonValue []byte, recordList map[string]*share.CLUSCrdSecurityRule, recordName string) (string, bool) {
 
 	crdMd5Temp := md5.Sum(ruleJsonValue)
 	crdMd5 := hex.EncodeToString(crdMd5Temp[:])
@@ -3797,44 +3785,21 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		var crdMd5 string
 		var mdNameDisplay string
 		var recordName string
-		var metaData *cmetav1.ObjectMeta
 		var gfwRule resource.NvSecurityRule
 		var objOrig interface{}
 
-		switch kind {
-		case resource.NvSecurityRuleKind:
-			r := obj.(*resource.NvSecurityRule)
-			metaData = r.Metadata
-		case resource.NvClusterSecurityRuleKind:
-			r := obj.(*resource.NvClusterSecurityRule)
-			rObj := resource.NvSecurityRule(*r)
-			metaData = rObj.Metadata
-		case resource.NvAdmCtrlSecurityRuleKind:
-			r := obj.(*resource.NvAdmCtrlSecurityRule)
-			metaData = r.Metadata
-		case resource.NvDlpSecurityRuleKind:
-			r := obj.(*resource.NvDlpSecurityRule)
-			metaData = r.Metadata
-		case resource.NvWafSecurityRuleKind:
-			r := obj.(*resource.NvWafSecurityRule)
-			metaData = r.Metadata
-		case resource.NvVulnProfileSecurityRuleKind:
-			r := obj.(*resource.NvVulnProfileSecurityRule)
-			metaData = r.Metadata
-		case resource.NvCompProfileSecurityRuleKind:
-			r := obj.(*resource.NvCompProfileSecurityRule)
-			metaData = r.Metadata
-		default:
+		metaData, ok := obj.(metav1.Object)
+		if !ok {
 			continue
 		}
 		if kind == resource.NvSecurityRuleKind {
-			mdNameDisplay = fmt.Sprintf("%s in namespace %s", *metaData.Name, *metaData.Namespace)
-			recordName = fmt.Sprintf("%s-%s-%s", kind, *metaData.Namespace, *metaData.Name)
+			mdNameDisplay = fmt.Sprintf("%s in namespace %s", metaData.GetName(), metaData.GetNamespace())
+			recordName = fmt.Sprintf("%s-%s-%s", kind, metaData.GetNamespace(), metaData.GetName())
 		} else {
-			mdNameDisplay = *metaData.Name
+			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
-		if crdMd5, _, _, skip, _ = crdHandler.getCrInfo(kind, obj, metaData); skip {
+		if crdMd5, skip, _ = crdHandler.getCrInfo(obj); skip {
 			continue
 		}
 		if kind == resource.NvClusterSecurityRuleKind {
@@ -3856,7 +3821,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 					obj = objOrig
 				}
 				if err := global.ORCH.DeleteResource(rscType, obj); err != nil {
-					log.WithFields(log.Fields{"rscType": rscType, "name": gfwRule.Metadata.GetName(), "err": err}).Error()
+					log.WithFields(log.Fields{"rscType": rscType, "name": mdNameDisplay, "err": err}).Error()
 				}
 			}
 		} else {
