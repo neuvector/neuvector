@@ -322,6 +322,7 @@ type Violation struct {
 	ServerIP      string   `json:"server_ip"`
 	FQDN          string   `json:"fqdn"`
 	Xff           bool     `json:"xff"`
+	Nbe           bool     `json:"nbe"`
 }
 
 const (

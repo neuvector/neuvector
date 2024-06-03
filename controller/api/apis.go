@@ -846,6 +846,7 @@ type RESTDomain struct {
 	Services         int               `json:"services"`
 	Tags             []string          `json:"tags"`
 	Labels           map[string]string `json:"labels"`
+	Nbe              bool              `json:"nbe"`
 }
 
 type RESTDomainsData struct {
@@ -1098,6 +1099,7 @@ type RESTConversationReport struct {
 	EventType    []string                       `json:"event_type,omitempty"`
 	XffEntry     bool                           `json:"xff_entry,omitempty"` //has xff entry
 	Entries      []*RESTConversationReportEntry `json:"entries"`
+	Nbe          bool                           `json:"nbe,omitempty"` //cross namespace entry
 }
 
 type RESTConversation struct {
@@ -1129,6 +1131,7 @@ type RESTConversationEntry struct {
 	FQDN         string `json:"fqdn"`
 	Xff          bool   `json:"xff"`
 	ToSidecar    bool   `json:"to_sidecar"`
+	Nbe          bool   `json:"nbe"`
 }
 
 type RESTConversationDetail struct {

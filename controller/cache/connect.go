@@ -65,6 +65,7 @@ type graphEntry struct {
 	xff          uint8
 	toSidecar    uint8
 	fqdn         string // server fqdn if it is egress direction. otherwise, the fqdn is empty
+	nbe          uint8
 }
 
 type graphKey struct {
@@ -191,6 +192,7 @@ func conn2Violation(conn *share.CLUSConnection, server uint32) *api.Violation {
 		ServerImage:   swln.image,
 		ServerService: swln.service,
 		Xff:           conn.Xff,
+		Nbe:           conn.Nbe,
 	}
 	if conn.PolicyAction == C.DP_POLICY_ACTION_DENY {
 		c.Level = api.LogLevelCRIT
@@ -560,6 +562,7 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"meshToSvr":      conn.MeshToSvr,
 			"linkLocal":      conn.LinkLocal,
 			"fqdn":           conn.FQDN,
+			"nbe":            conn.Nbe,
 		}).Debug()
 
 		addConnectToGraph(conn, ca, sa, stip)
@@ -700,6 +703,14 @@ func connectFromGlobal(conn *share.CLUSConnection, ca *nodeAttr, stip *serverTip
 			stip.wlPort = uint16(conn.ServerPort)
 			ca.workload = true
 			return true
+		} else if conn.Nbe {
+			if alive {
+				conn.ClientWL = wl
+				stip.wlPort = uint16(conn.ServerPort)
+				ca.workload = true
+				ca.managed = true
+				return true
+			}
 		}
 		cctx.ConnLog.WithFields(log.Fields{
 			"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
@@ -901,6 +912,10 @@ func connectToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip) bo
 		} else if ep = getIpAddrGroupName(net.IP(conn.ServerIP).String()); ep != "" {
 			conn.ServerWL = ep
 			sa.addrgrp = true
+			tep := specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
+			if wlGraph.DeleteNode(tep) != "" {
+				log.WithFields(log.Fields{"endpoint": tep}).Debug("Delete unknown host ip endpoint")
+			}
 		} else {
 			ep = specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
 			if wlGraph.Node(ep) == "" &&
@@ -1133,8 +1148,7 @@ func preProcessConnect(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *serve
 						if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
 							conn.ServerWL = ep
 							sa.addrgrp = true
-						} else if conn.FQDN != "" && conn.PolicyId == 0 &&
-							conn.PolicyAction <= C.DP_POLICY_ACTION_LEARN {
+						} else if conn.FQDN != "" && conn.PolicyId == 0 {
 							//learn to predefined address group
 							if fqdngrp := getFqdnAddrGroupName(conn.FQDN); fqdngrp != "" {
 								conn.ServerWL = fqdngrp
@@ -1455,6 +1469,9 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 		if ge.xff > 0 {
 			conver.XffEntry = true
 		}
+		if ge.nbe > 0 {
+			conver.Nbe = true
+		}
 		entries = append(entries, entry)
 	}
 	conver.EventType = make([]string, 0)
@@ -1718,6 +1735,9 @@ func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessCon
 			}
 			if entry.toSidecar > 0 {
 				c.ToSidecar = true
+			}
+			if entry.nbe > 0 {
+				c.Nbe = true
 			}
 			conver.Entries[i] = c
 			i++

@@ -324,6 +324,19 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 	dpSendMsg(msg)
 }
 
+func DPCtrlConfigNBE(MACs []string, nbe *bool) {
+	data := DPConfigNbeReq {
+		Cfg: &DPNbeConfig{
+			MACs: MACs,
+		},
+	}
+	if nbe != nil {
+		data.Cfg.Nbe = nbe
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
 func DPCtrlAddPortPair(vex_iface, vin_iface string, epmac net.HardwareAddr, quar *bool) {
 	data := DPAddPortPairReq{
 		AddPortPair: &DPPortPair{

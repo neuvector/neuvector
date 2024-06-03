@@ -606,6 +606,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		TmpOpen:      c.TmpOpen,
 		UwlIp:        c.UwlIp,
 		FQDN:         fqdn,
+		Nbe:          c.Nbe,
 	}
 }
 

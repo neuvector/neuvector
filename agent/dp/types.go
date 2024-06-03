@@ -51,6 +51,7 @@ type Connection struct {
 	LinkLocal    bool
 	TmpOpen      bool
 	UwlIp        bool
+	Nbe          bool
 }
 
 type ConnectionData struct {

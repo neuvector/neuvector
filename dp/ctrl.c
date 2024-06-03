@@ -615,6 +615,46 @@ static int dp_ctrl_del_mac(json_t *msg)
     return 0;
 }
 
+static int dp_ctrl_cfg_nbe(json_t *msg)
+{
+    json_t *obj, *nbe_obj;
+    bool nbe = false;
+    int len, i;
+
+    obj = json_object_get(msg, "macs");
+    nbe_obj = json_object_get(msg, "nbe");
+    if (nbe_obj != NULL) {
+        nbe = json_boolean_value(nbe_obj);
+    }
+
+    len = json_array_size(obj);
+    if (len == 0) {
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in mac cfg!!\n");
+        return -1;
+    }
+
+    rcu_read_lock();
+    for (i = 0; i < len; i ++) {
+        struct ether_addr mac_addr;
+        const char *mac_str = json_string_value(json_array_get(obj, i));
+        ether_aton_r(mac_str, &mac_addr);
+
+        io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
+        if (mac == NULL) {
+            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.\n", mac_str);
+            continue;
+        }
+
+        io_ep_t *ep = mac->ep;
+        if (nbe_obj != NULL) {
+            ep->nbe = nbe;
+        }
+        DEBUG_CTRL("mac=%s, ep->nbe=%d\n", mac_str, nbe);
+    }
+    rcu_read_unlock();
+    return 0;
+}
+
 static int dp_ctrl_cfg_mac(json_t *msg)
 {
     json_t *obj, *tap_obj, *app_obj;
@@ -2361,6 +2401,8 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_del_mac(msg);
         } else if (strcmp(key, "ctrl_cfg_mac") == 0) {
             ret = dp_ctrl_cfg_mac(msg);
+        } else if (strcmp(key, "ctrl_cfg_nbe") == 0) {
+            ret = dp_ctrl_cfg_nbe(msg);
         } else if (strcmp(key, "ctrl_refresh_app") == 0) {
             ret = dp_ctrl_refresh_app(msg);
         } else if (strcmp(key, "ctrl_stats_macs") == 0) {
@@ -2670,6 +2712,9 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_UWLIP)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_UWLIP);
             }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_CHK_NBE)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_CHK_NBE);
+            }
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;
             conn->Sessions = count_session;
@@ -2715,6 +2760,7 @@ static void netify_connects(DPMsgConnect *conn)
     conn->ServerPort = htons(conn->ServerPort);
     conn->ClientPort = htons(conn->ClientPort);
     conn->EtherType = htons(conn->EtherType);
+    conn->Flags = htons(conn->Flags);
     conn->Bytes = htonl(conn->Bytes);
     conn->Sessions = htonl(conn->Sessions);
     conn->Violates = htonl(conn->Violates);
