@@ -21,6 +21,7 @@ It has these top-level messages:
 	GetScannersResponse
 	ScannerRegisterData
 	ScannerDeregisterData
+	ControllerCaps
 	CLUSFilePacket
 	CLUSAdmissionRequest
 	CLUSAdmissionResponse
