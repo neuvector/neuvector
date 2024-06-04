@@ -3348,7 +3348,8 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	regScanTest := false
 	txnID := ""
 	if accCaller.IsFedReader() || accCaller.HasPermFed() {
-		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") {
+		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") ||
+			(method == http.MethodPost && (request == "/v1/vulasset" || request == "/v1/assetvul")) {
 			// forward is allowed
 			// In fedReader user sessions, controller needs to update cluster state as well. So the acc needs to have write permissions for that purpose.
 			acc = access.NewFedAdminAccessControl()
