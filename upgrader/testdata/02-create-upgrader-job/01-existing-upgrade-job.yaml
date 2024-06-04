@@ -1,0 +1,75 @@
+apiVersion: v1
+items:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+        cert-upgrader-uid: b8ec570e-444b-4866-b2f3-76fb4fe8c70ae04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+      creationTimestamp: '2024-01-25T23:00:08Z'
+      generation: 1
+      labels:
+        batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        batch.kubernetes.io/job-name: neuvector-cert-upgrader-job
+        controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        job-name: neuvector-cert-upgrader-job
+      name: neuvector-cert-upgrader-job
+      namespace: neuvector
+      resourceVersion: '1316968'
+      uid: 26921c92-cfef-4056-97c0-e0a03a633308
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+            batch.kubernetes.io/job-name: neuvector-cert-upgrader-job
+            controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+            job-name: neuvector-cert-upgrader-job
+          name: neuvector-cert-upgrader-job
+          namespace: neuvector
+        spec:
+          containers:
+            - command:
+                - /usr/local/bin/upgrader
+                - upgrader-job
+              env:
+                - name: OVERRIDE_CHECKSUM
+                  value: e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+                - name: EXPIRY_CERT_THRESHOLD
+                  value: 87600h
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+              imagePullPolicy: Always
+              name: cert-upgrader
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+    status:
+      completionTime: '2024-01-25T23:04:38Z'
+      conditions:
+        - lastProbeTime: '2024-01-25T23:04:38Z'
+          lastTransitionTime: '2024-01-25T23:04:38Z'
+          status: 'True'
+          type: Complete
+      ready: 0
+      startTime: '2024-01-25T23:00:08Z'
+      succeeded: 1
+      uncountedTerminatedPods: {}
+kind: List
+metadata:
+  resourceVersion: ''

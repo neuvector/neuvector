@@ -288,6 +288,10 @@ func hdrblobVerifyRegion(blob *hdrblob, data []byte) error {
 	// ref. https://github.com/rpm-software-management/rpm/blob/rpm-4.14.3-release/lib/header.c#L1842
 	var trailer entryInfo
 	regionEnd := blob.dataStart + einfo.Offset
+	if regionEnd > int32(len(data)) || regionEnd+REGION_TAG_COUNT > int32(len(data)) {
+		return xerrors.New("invalid region offset")
+	}
+
 	if err := binary.Read(bytes.NewReader(data[regionEnd:regionEnd+REGION_TAG_COUNT]), binary.LittleEndian, &trailer); err != nil {
 		return xerrors.Errorf("failed to parse trailer: %w", err)
 	}
@@ -350,6 +354,9 @@ func regionSwab(data []byte, peList []entryInfo, dl, dataStart, dataEnd int32) (
 		}
 
 		end := int(start) + indexEntry.Length
+		if start > int32(len(data)) || end > len(data) {
+			return nil, 0, xerrors.New("invalid data length")
+		}
 		indexEntry.Data = data[start:end]
 		indexEntries[i] = indexEntry
 
@@ -397,7 +404,7 @@ func alignDiff(t, alignSize uint32) int {
 // ref. https://github.com/rpm-software-management/rpm/blob/rpm-4.14.3-release/lib/header.c#L408
 func strtaglen(data []byte, count uint32, start, dataEnd int32) int {
 	var length int
-	if start >= dataEnd {
+	if start >= dataEnd || dataEnd > int32(len(data)) {
 		return -1
 	}
 

@@ -2,11 +2,15 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	log "github.com/sirupsen/logrus"
@@ -28,6 +32,14 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	} else {
 		resp.EULA = &api.RESTEULA{Accepted: false}
 	}
+	if k8sPlatform && !resp.EULA.Accepted {
+		accReadAll := access.NewReaderAccessControl()
+		user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll)
+		if user != nil && user.ResetPwdInNextLogin && user.UseBootstrapPwd {
+			strK8sCmdFormat := `kubectl get secret --namespace %s neuvector-bootstrap-secret -o go-template='{{ .data.bootstrapPassword|base64decode}}{{ "\n" }}'`
+			resp.BootstrapPwdCmd = fmt.Sprintf(strK8sCmdFormat, resource.NvAdmSvcNamespace)
+		}
+	}
 
 	restRespSuccess(w, r, &resp, nil, nil, nil, "Get EULA")
 }
@@ -41,7 +53,7 @@ func handlerEULAConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTEULAData
 	err := json.Unmarshal(body, &rconf)

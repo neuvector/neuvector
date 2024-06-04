@@ -1,648 +1,673 @@
-version: "cis-1.6"
+version: cis-1.6
 id: 1
-title: "1 - Control Plane Components"
-type: "master"
+title: 1 - Control Plane Components
+type: master
 groups:
   - id: 1.1
-    title: "1.1 - Master Node Configuration Files"
+    title: 1.1 - Master Node Configuration Files
     checks:
-      - id: 1.1.1
-        description: Ensure that the API server pod specification file permissions are set to 644 or more restrictive (Automated)
+      - id: K.1.1.1
+        description: Ensure that the API server pod specification file permissions
+          are set to 644 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
-              if [ -f $config_manifest ]; then
-                  # kops
-                  file=$config_manifest
-              else
-                  file=$config_yaml
-              fi
+          check="$id  - $description"
+          config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.manifest")
+          config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
+          if [ -f $config_manifest ]; then
+              # kops
+              file=$config_manifest
+          else
+              file=$config_yaml
+          fi
 
-              if [ -f $file ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-apiserver.yaml
-      - id: 1.1.2
-        description: Ensure that the API server pod specification file ownership is set to root:root (Automated)
+          if [ -f $file ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 640 -o "$(stat -c %a $file)" -eq 600 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-apiserver.yaml
+      - id: K.1.1.2
+        description: Ensure that the API server pod specification file ownership is
+          set to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
-      - id: 1.1.3
-        description: Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
+      - id: K.1.1.3
+        description: Ensure that the controller manager pod specification file permissions
+          are set to 644 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
-              if [ -f $config_manifest ]; then
-                  # kops
-                  file=$config_manifest
-              else
-                  file=$config_yaml
-              fi
+          check="$id  - $description"
+          config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
+          config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
+          if [ -f $config_manifest ]; then
+              # kops
+              file=$config_manifest
+          else
+              file=$config_yaml
+          fi
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-controller-manager.yaml
-      - id: 1.1.4
-        description: Ensure that the controller manager pod specification file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: K.1.1.4
+        description: Ensure that the controller manager pod specification file ownership
+          is set to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"    
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
-      - id: 1.1.5
-        description: Ensure that the scheduler pod specification file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"    
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: K.1.1.5
+        description: Ensure that the scheduler pod specification file permissions
+          are set to 644 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
-              if [ -f $config_yaml ]; then
-                  # kops
-                  file=$config_yaml
-              else
-                  file=$config_manifest
-              fi
+          check="$id  - $description"
+          config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.manifest")
+          config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
+          if [ -f $config_yaml ]; then
+              # kops
+              file=$config_yaml
+          else
+              file=$config_manifest
+          fi
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-scheduler.yaml
-      - id: 1.1.6
-        description: Ensure that the scheduler pod specification file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-scheduler.yaml
+      - id: K.1.1.6
+        description: Ensure that the scheduler pod specification file ownership is
+          set to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-scheduler.yaml
-      - id: 1.1.7
-        description: Ensure that the etcd pod specification file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-scheduler.yaml
+      - id: K.1.1.7
+        description: Ensure that the etcd pod specification file permissions are set
+          to 644 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
-              if [ -f $config_yaml ]; then
-                  # kops
-                  file=$config_yaml
-              else
-                  file=$config_manifest
-              fi
+          check="$id  - $description"
+          config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
+          config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+          if [ -f $config_yaml ]; then
+              # kops
+              file=$config_yaml
+          else
+              file=$config_manifest
+          fi
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/etcd.yaml
-      - id: 1.1.8
-        description: Ensure that the etcd pod specification file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/manifests/etcd.yaml
+      - id: K.1.1.8
+        description: Ensure that the etcd pod specification file ownership is set
+          to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/etcd.yaml
-      - id: 1.1.9
-        description: Ensure that the Container Network Interface file permissions are set to 644 or more restrictive (Manual)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/etcd.yaml
+      - id: K.1.1.9
+        description: Ensure that the Container Network Interface file permissions
+          are set to 644 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # Initialize counters and non-compliant files list
-              count_files=0
-              non_compliant_files=""
-              cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
-              for file in $(find "$cni_folder" -name "*kube*" -type f); do
-                count_files=$((count_files + 1))
-                permissions=$(stat -c %a "$file")
+          check="$id  - $description"
+          # Initialize counters and non-compliant files list
+          count_files=0
+          non_compliant_files=""
+          cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          for file in $(find "$cni_folder" -name "*kube*" -type f); do
+            count_files=$((count_files + 1))
+            permissions=$(stat -c %a "$file")
 
-                # Check if the permissions are more permissive than 644
-                if [ "$permissions" -gt 644 ]; then
-                  non_compliant_files="$non_compliant_files$file ($permissions), "
-                fi
-              done
+            # Check if the permissions are more permissive than 644
+            if [ "$permissions" -gt 644 ]; then
+              non_compliant_files="$non_compliant_files$file ($permissions), "
+            fi
+          done
 
-              # Remove trailing comma and space
-              non_compliant_files=${non_compliant_files%, }
+          # Remove trailing comma and space
+          non_compliant_files=${non_compliant_files%, }
 
-              # Check and output results
-              if [ "$count_files" -eq 0 ]; then
-                warn "$check"
-                warn "      * No matching files found in $cni_folder"
-              elif [ -z "$non_compliant_files" ]; then
-                pass "$check"
-              else
-                warn "$check"
-                warn "$check - Non-compliant file(s): $non_compliant_files"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 the related files in etc/cni/net.d
-      - id: 1.1.10
-        description: Ensure that the Container Network Interface file ownership is set to root:root (Manual)
+          # Check and output results
+          if [ "$count_files" -eq 0 ]; then
+            warn "$check"
+            warn "      * No matching files found in $cni_folder"
+          elif [ -z "$non_compliant_files" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            warn "$check - Non-compliant file(s): $non_compliant_files"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 the related files in etc/cni/net.d
+      - id: K.1.1.10
+        description: Ensure that the Container Network Interface file ownership is
+          set to root:root (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # Initialize counters and non-compliant files list
-              count_files=0
-              non_compliant_files=""
-              cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
-              for file in $(find "$cni_folder" -name "*kube*" -type f); do
-                count_files=$((count_files + 1))
-                permissions=$(stat -c %u%g $file)
+          check="$id  - $description"
+          # Initialize counters and non-compliant files list
+          count_files=0
+          non_compliant_files=""
+          cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          for file in $(find "$cni_folder" -name "*kube*" -type f); do
+            count_files=$((count_files + 1))
+            permissions=$(stat -c %u%g $file)
 
-                # Check if the ownership is set to root:root 
-                if [ "$permissions" != "00" ]; then
-                  non_compliant_files="$non_compliant_files$file ($permissions), "
-                fi
-              done
+            # Check if the ownership is set to root:root 
+            if [ "$permissions" != "00" ]; then
+              non_compliant_files="$non_compliant_files$file ($permissions), "
+            fi
+          done
 
-              # Remove trailing comma and space
-              non_compliant_files=${non_compliant_files%, }
+          # Remove trailing comma and space
+          non_compliant_files=${non_compliant_files%, }
 
-              # Check and output results
-              if [ "$count_files" -eq 0 ]; then
-                warn "$check"
-                warn "      * No matching files found in $cni_folder"
-              elif [ -z "$non_compliant_files" ]; then
-                pass "$check"
-              else
-                warn "$check"
-                warn "$check - Non-compliant file(s): $non_compliant_files"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root the related files in etc/cni/net.d
-      - id: 1.1.11
-        description: Ensure that the etcd data directory permissions are set to 700 or more restrictive (Automated)
+          # Check and output results
+          if [ "$count_files" -eq 0 ]; then
+            warn "$check"
+            warn "      * No matching files found in $cni_folder"
+          elif [ -z "$non_compliant_files" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            warn "$check - Non-compliant file(s): $non_compliant_files"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root the related files in etc/cni/net.d
+      - id: K.1.1.11
+        description: Ensure that the etcd data directory permissions are set to 700
+          or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file=""
-              if check_argument "$CIS_ETCD_CMD" '--data-dir' >/dev/null 2>&1; then
-                  file=$(get_argument_value "$CIS_ETCD_CMD" '--data-dir'|cut -d " " -f 1)
-              fi
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          check="$id  - $description"
+          file=""
+          if check_argument "$CIS_ETCD_CMD" '--data-dir' >/dev/null 2>&1; then
+              file=$(get_argument_value "$CIS_ETCD_CMD" '--data-dir'|cut -d " " -f 1)
+          fi
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 700 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * etcd data directory not found."
-              fi
-        remediation: 'On the etcd server node, get the etcd data directory, passed as an argument --data-dir, from the below command: ps -ef | grep etcd Run the below command (based on the etcd data directory found above). For example, chmod 700 /var/lib/etcd'
-      - id: 1.1.12
-        description: Ensure that the etcd data directory ownership is set to etcd:etcd (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 700 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * etcd data directory not found."
+          fi
+        remediation: 'On the etcd server node, get the etcd data directory, passed
+          as an argument --data-dir, from the below command: ps -ef | grep etcd Run
+          the below command (based on the etcd data directory found above). For example,
+          chmod 700 /var/lib/etcd'
+      - id: K.1.1.12
+        description: Ensure that the etcd data directory ownership is set to etcd:etcd
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %U:%G $file)" = "etcd:etcd" ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * etcd data directory not found."
-              fi
-        remediation: 'On the etcd server node, get the etcd data directory, passed as an argument --data-dir, from the below command: ps -ef | grep etcd Run the below command (based on the etcd data directory found above). For example, chown etcd:etcd /var/lib/etcd'
-      - id: 1.1.13
-        description: Ensure that the admin.conf file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %U:%G $file)" = "etcd:etcd" ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * etcd data directory not found."
+          fi
+        remediation: 'On the etcd server node, get the etcd data directory, passed
+          as an argument --data-dir, from the below command: ps -ef | grep etcd Run
+          the below command (based on the etcd data directory found above). For example,
+          chown etcd:etcd /var/lib/etcd'
+      - id: K.1.1.13
+        description: Ensure that the admin.conf file permissions are set to 644 or
+          more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/admin.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          check="$id  - $description"
+          file="/etc/kubernetes/admin.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/admin.conf
-      - id: 1.1.14
-        description: Ensure that the admin.conf file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/admin.conf
+      - id: K.1.1.14
+        description: Ensure that the admin.conf file ownership is set to root:root
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/admin.conf
-      - id: 1.1.15
-        description: Ensure that the scheduler.conf file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/admin.conf
+      - id: K.1.1.15
+        description: Ensure that the scheduler.conf file permissions are set to 644
+          or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/scheduler.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          check="$id  - $description"
+          file="/etc/kubernetes/scheduler.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/scheduler.conf
-      - id: 1.1.16
-        description: Ensure that the scheduler.conf file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/scheduler.conf
+      - id: K.1.1.16
+        description: Ensure that the scheduler.conf file ownership is set to root:root
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/scheduler.conf
-      - id: 1.1.17
-        description: Ensure that the controller-manager.conf file permissions are set to 644 or more restrictive (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/scheduler.conf
+      - id: K.1.1.17
+        description: Ensure that the controller-manager.conf file permissions are
+          set to 644 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/controller-manager.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          check="$id  - $description"
+          file="/etc/kubernetes/controller-manager.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi        
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/controller-manager.conf
-      - id: 1.1.18
-        description: Ensure that the controller-manager.conf file ownership is set to root:root (Automated)
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi        
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 644 /etc/kubernetes/controller-manager.conf
+      - id: K.1.1.18
+        description: Ensure that the controller-manager.conf file ownership is set
+          to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi        
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/controller-manager.conf
-      - id: 1.1.19
-        description: Ensure that the Kubernetes PKI directory and file ownership is set to root:root (Automated)
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi        
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/controller-manager.conf
+      - id: K.1.1.19
+        description: Ensure that the Kubernetes PKI directory and file ownership is
+          set to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/pki/"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              files=$(find $file)
-              pass=true
-              for f in ${files}; do
-                if [ "$(stat -c %u%g $f)" != 00 ]; then
-                  pass=false;
-                  break;
-                fi
-              done
+          check="$id  - $description"
+          file="/etc/kubernetes/pki/"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          files=$(find $file)
+          pass=true
+          for f in ${files}; do
+            if [ "$(stat -c %u%g $f)" != 00 ]; then
+              pass=false;
+              break;
+            fi
+          done
 
-              if [ "$pass" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown -R root:root /etc/kubernetes/pki/
-      - id: 1.1.20
-        description: Ensure that the Kubernetes PKI certificate file permissions are set to 644 or more restrictive (Manual)
+          if [ "$pass" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown -R root:root /etc/kubernetes/pki/
+      - id: K.1.1.20
+        description: Ensure that the Kubernetes PKI certificate file permissions are
+          set to 644 or more restrictive (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $file -name "*.crt")
-              pass=true
-              for f in ${files}; do
-                if ! [ "$(stat -c %a $f)" -eq 644 -o "$(stat -c %a $f)" -eq 600 -o "$(stat -c %a $f)" -eq 400 ]; then
-                  pass=false;
-                  break;
-                fi
-              done
+          check="$id  - $description"
+          files=$(find $file -name "*.crt")
+          pass=true
+          for f in ${files}; do
+            if ! [ "$(stat -c %a $f)" -eq 644 -o "$(stat -c %a $f)" -eq 600 -o "$(stat -c %a $f)" -eq 400 ]; then
+              pass=false;
+              break;
+            fi
+          done
 
-              if [ "$pass" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi        
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod -R 644 /etc/kubernetes/pki/*.crt
-      - id: 1.1.21
-        description: Ensure that the Kubernetes PKI key file permissions are set to 600 (Manual)
+          if [ "$pass" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi        
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod -R 644 /etc/kubernetes/pki/*.crt
+      - id: K.1.1.21
+        description: Ensure that the Kubernetes PKI key file permissions are set to
+          600 (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              files=$(find $file -name "*.key")
-              pass=true
-              for f in ${files}; do
-                if ! [ "$(stat -c %a $f)" -eq 600 ]; then
-                  pass=false;
-                  break;
-                fi
-              done
+          check="$id  - $description"
+          files=$(find $file -name "*.key")
+          pass=true
+          for f in ${files}; do
+            if ! [ "$(stat -c %a $f)" -eq 600 ]; then
+              pass=false;
+              break;
+            fi
+          done
 
-              if [ "$pass" = "true" ]; then
-                pass "$check"
-              else
-                warn "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod -R 600 /etc/kubernetes/pki/*.key
+          if [ "$pass" = "true" ]; then
+            pass "$check"
+          else
+            warn "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod -R 600 /etc/kubernetes/pki/*.key
   - id: 1.2
-    title: "1.2 - API Server"
+    title: 1.2 - API Server
     checks:
-      - id: 1.2.1
+      - id: K.1.2.1
         description: Ensure that the --anonymous-auth argument is set to false (Manual)
         type: master
         category: kubernetes
@@ -650,19 +675,19 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the below parameter. --anonymous-auth=false
-      - id: 1.2.2
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the below parameter. --anonymous-auth=false
+      - id: K.1.2.2
         description: Ensure that the --basic-auth-file argument is not set (Automated)
         type: master
         category: kubernetes
@@ -670,19 +695,20 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--basic-auth-file' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
-        remediation: Follow the documentation and configure alternate mechanisms for authentication. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and remove the --basic-auth-file=<filename> parameter.
-      - id: 1.2.3
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--basic-auth-file' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
+        remediation: Follow the documentation and configure alternate mechanisms for
+          authentication. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and remove the --basic-auth-file=<filename> parameter.
+      - id: K.1.2.3
         description: Ensure that the --token-auth-file parameter is not set (Automated)
         type: master
         category: kubernetes
@@ -690,19 +716,20 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--token-auth-file' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
-        remediation: Follow the documentation and configure alternate mechanisms for authentication. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and remove the --token-auth-file=<filename> parameter.
-      - id: 1.2.4
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--token-auth-file' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
+        remediation: Follow the documentation and configure alternate mechanisms for
+          authentication. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and remove the --token-auth-file=<filename> parameter.
+      - id: K.1.2.4
         description: Ensure that the --kubelet-https argument is set to true (Automated)
         type: master
         category: kubernetes
@@ -710,87 +737,97 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--kubelet-https=false' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and remove the --kubelet-https parameter.
-      - id: 1.2.5
-        description: Ensure that the --kubelet-client-certificate and --kubelet-client-key arguments are set as appropriate (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--kubelet-https=false' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and remove the --kubelet-https parameter.
+      - id: K.1.2.5
+        description: Ensure that the --kubelet-client-certificate and --kubelet-client-key
+          arguments are set as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--kubelet-client-certificate' >/dev/null 2>&1; then
-                  if check_argument "$CIS_APISERVER_CMD" '--kubelet-client-key' >/dev/null 2>&1; then
-                      certificate=$(get_argument_value "$CIS_APISERVER_CMD" '--kubelet-client-certificate')
-                      key=$(get_argument_value "$CIS_APISERVER_CMD" '--kubelet-client-key')
-                      pass "$check"
-                      pass "      * kubelet-client-certificate: $certificate"
-                      pass "      * kubelet-client-key: $key"
-                  else
-                      warn "$check"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--kubelet-client-certificate' >/dev/null 2>&1; then
+              if check_argument "$CIS_APISERVER_CMD" '--kubelet-client-key' >/dev/null 2>&1; then
+                  certificate=$(get_argument_value "$CIS_APISERVER_CMD" '--kubelet-client-certificate')
+                  key=$(get_argument_value "$CIS_APISERVER_CMD" '--kubelet-client-key')
+                  pass "$check"
+                  pass "      * kubelet-client-certificate: $certificate"
+                  pass "      * kubelet-client-key: $key"
               else
                   warn "$check"
-              fi  
-        remediation: Follow the Kubernetes documentation and set up the TLS connection between the apiserver and kubelets. Then, edit API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the kubelet client certificate and key parameters as below. --kubelet-client-certificate=<path/to/client-certificate-file> --kubelet-client-key=<path/to/client-key-file>
-      - id: 1.2.6
-        description: Ensure that the --kubelet-certificate-authority argument is set as appropriate (Automated)
+              fi
+          else
+              warn "$check"
+          fi  
+        remediation: Follow the Kubernetes documentation and set up the TLS connection
+          between the apiserver and kubelets. Then, edit API server pod specification
+          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
+          set the kubelet client certificate and key parameters as below. --kubelet-client-certificate=<path/to/client-certificate-file>
+          --kubelet-client-key=<path/to/client-key-file>
+      - id: K.1.2.6
+        description: Ensure that the --kubelet-certificate-authority argument is set
+          as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--kubelet-certificate-authority' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Follow the Kubernetes documentation and setup the TLS connection between the apiserver and kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the -- kubelet-certificate-authority parameter to the path to the cert file for the certificate authority. --kubelet-certificate-authority=<ca-string>
-      - id: 1.2.7
-        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--kubelet-certificate-authority' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Follow the Kubernetes documentation and setup the TLS connection
+          between the apiserver and kubelets. Then, edit the API server pod specification
+          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
+          set the -- kubelet-certificate-authority parameter to the path to the cert
+          file for the certificate authority. --kubelet-certificate-authority=<ca-string>
+      - id: K.1.2.7
+        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'AlwaysAllow' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --authorization-mode parameter to values other than AlwaysAllow . One such example could be as below. --authorization-mode=RBAC
-      - id: 1.2.8
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'AlwaysAllow' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --authorization-mode parameter to values
+          other than AlwaysAllow . One such example could be as below. --authorization-mode=RBAC
+      - id: K.1.2.8
         description: Ensure that the --authorization-mode argument includes Node (Automated)
         type: master
         category: kubernetes
@@ -798,19 +835,20 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'Node' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --authorization-mode parameter to a value that includes Node . --authorization-mode=Node,RBAC
-      - id: 1.2.9
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'Node' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --authorization-mode parameter to a value
+          that includes Node . --authorization-mode=Node,RBAC
+      - id: K.1.2.9
         description: Ensure that the --authorization-mode argument includes RBAC (Automated)
         type: master
         category: kubernetes
@@ -818,175 +856,198 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'RBAC' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --authorization-mode parameter to a value that includes RBAC, for example:--authorization-mode=Node,RBAC
-      - id: 1.2.10
-        description: Ensure that the admission control plugin EventRateLimit is set (Manual)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'RBAC' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --authorization-mode parameter to a value
+          that includes RBAC, for example:--authorization-mode=Node,RBAC
+      - id: K.1.2.10
+        description: Ensure that the admission control plugin EventRateLimit is set
+          (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'EventRateLimit' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Follow the Kubernetes documentation and set the desired limits in a configuration file. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml and set the below parameters.  --enable-admission-plugins=...,EventRateLimit,... --admission-control-config-file=<path/to/configuration/file>
-      - id: 1.2.11
-        description: Ensure that the admission control plugin AlwaysAdmit is not set (Automated)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'EventRateLimit' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Follow the Kubernetes documentation and set the desired limits
+          in a configuration file. Then, edit the API server pod specification file
+          /etc/kubernetes/manifests/kube-apiserver.yaml and set the below parameters.  --enable-admission-plugins=...,EventRateLimit,...
+          --admission-control-config-file=<path/to/configuration/file>
+      - id: K.1.2.11
+        description: Ensure that the admission control plugin AlwaysAdmit is not set
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysAdmit' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and either remove the --enable-admission-plugins parameter, or set it to a value that does not include AlwaysAdmit.
-      - id: 1.2.12
-        description: Ensure that the admission control plugin AlwaysPullImages is set (Manual)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysAdmit' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and either remove the --enable-admission-plugins parameter,
+          or set it to a value that does not include AlwaysAdmit.
+      - id: K.1.2.12
+        description: Ensure that the admission control plugin AlwaysPullImages is
+          set (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysPullImages' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --enable-admission-plugins parameter to include AlwaysPullImages.  --enable-admission-plugins=...,AlwaysPullImages,...
-      - id: 1.2.13
-        description: Ensure that the admission control plugin SecurityContextDeny is set if PodSecurityPolicy is not used (Manual)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysPullImages' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --enable-admission-plugins parameter to include
+          AlwaysPullImages.  --enable-admission-plugins=...,AlwaysPullImages,...
+      - id: K.1.2.13
+        description: Ensure that the admission control plugin SecurityContextDeny
+          is set if PodSecurityPolicy is not used (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'SecurityContextDeny' >/dev/null 2>&1; then
-                  pass "$check"
-                else
-                  warn "$check"
-                fi
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --enable-admission-plugins parameter to include SecurityContextDeny, unless PodSecurityPolicy is already in place.  --enable-admission-plugins=...,SecurityContextDeny,...
-      - id: 1.2.14
-        description: Ensure that the admission control plugin ServiceAccount is set (Automated)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
+              pass "$check"
+          else
+            if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'SecurityContextDeny' >/dev/null 2>&1; then
+              pass "$check"
+            else
+              warn "$check"
+            fi
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --enable-admission-plugins parameter to include
+          SecurityContextDeny, unless PodSecurityPolicy is already in place.  --enable-admission-plugins=...,SecurityContextDeny,...
+      - id: K.1.2.14
+        description: Ensure that the admission control plugin ServiceAccount is set
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'ServiceAccount' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Follow the documentation and create ServiceAccount objects as per your environment. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and ensure that the --disable-admission-plugins parameter is set to a value that does not include ServiceAccount.
-      - id: 1.2.15
-        description: Ensure that the admission control plugin NamespaceLifecycle is set (Automated)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'ServiceAccount' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Follow the documentation and create ServiceAccount objects as
+          per your environment. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and ensure that the --disable-admission-plugins parameter
+          is set to a value that does not include ServiceAccount.
+      - id: K.1.2.15
+        description: Ensure that the admission control plugin NamespaceLifecycle is
+          set (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'NamespaceLifecycle' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --disable-admission-plugins parameter to ensure it does not include NamespaceLifecycle.
-      - id: 1.2.16
-        description: Ensure that the admission control plugin PodSecurityPolicy is set (Automated)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'NamespaceLifecycle' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --disable-admission-plugins parameter to
+          ensure it does not include NamespaceLifecycle.
+      - id: K.1.2.16
+        description: Ensure that the admission control plugin PodSecurityPolicy is
+          set (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: 'Follow the documentation and create Pod Security Policy objects as per your environment. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --enable-admission-plugins parameter to a value that includes PodSecurityPolicy: --enable-admission-plugins=...,PodSecurityPolicy,... Then restart the API Server.'
-      - id: 1.2.17
-        description: Ensure that the admission control plugin NodeRestriction is set (Automated)
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: 'Follow the documentation and create Pod Security Policy objects
+          as per your environment. Then, edit the API server pod specification file
+          /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set
+          the --enable-admission-plugins parameter to a value that includes PodSecurityPolicy:
+          --enable-admission-plugins=...,PodSecurityPolicy,... Then restart the API
+          Server.'
+      - id: K.1.2.17
+        description: Ensure that the admission control plugin NodeRestriction is set
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
+          - HIPAA: []
+          - PCI: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'NodeRestriction' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
-        remediation: Follow the Kubernetes documentation and configure NodeRestriction plug-in on kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --enable-admission-plugins parameter to a value that includes NodeRestriction. --enable-admission-plugins=...,NodeRestriction,...
-      - id: 1.2.18
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'NodeRestriction' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
+        remediation: Follow the Kubernetes documentation and configure NodeRestriction
+          plug-in on kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --enable-admission-plugins parameter to a
+          value that includes NodeRestriction. --enable-admission-plugins=...,NodeRestriction,...
+      - id: K.1.2.18
         description: Ensure that the --insecure-bind-address argument is not set (Automated)
         type: master
         category: kubernetes
@@ -994,19 +1055,19 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--insecure-bind-address' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and remove the --insecure-bind-address parameter.
-      - id: 1.2.19
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--insecure-bind-address' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and remove the --insecure-bind-address parameter.
+      - id: K.1.2.19
         description: Ensure that the --insecure-port argument is set to 0 (Automated)
         type: master
         category: kubernetes
@@ -1014,25 +1075,25 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--insecure-port' >/dev/null 2>&1; then
-                  port=$(get_argument_value "$CIS_APISERVER_CMD" '--insecure-port'|cut -d " " -f 1)
-                  if [ "$port" = "0" ]; then
-                      pass "$check"
-                  else
-                      warn "$check"
-                      warn "      * insecure-port: $port"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--insecure-port' >/dev/null 2>&1; then
+              port=$(get_argument_value "$CIS_APISERVER_CMD" '--insecure-port'|cut -d " " -f 1)
+              if [ "$port" = "0" ]; then
+                  pass "$check"
               else
                   warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the below parameter. --insecure-port=0
-      - id: 1.2.20
+                  warn "      * insecure-port: $port"
+              fi
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the below parameter. --insecure-port=0
+      - id: K.1.2.20
         description: Ensure that the --secure-port argument is not set to 0 (Automated)
         type: master
         category: kubernetes
@@ -1040,25 +1101,26 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--secure-port' >/dev/null 2>&1; then
-                  port=$(get_argument_value "$CIS_APISERVER_CMD" '--secure-port'|cut -d " " -f 1)
-                  if [ "$port" = "0" ]; then
-                      warn "$check"
-                      warn "      * secure-port: $port"
-                  else
-                      pass "$check"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--secure-port' >/dev/null 2>&1; then
+              port=$(get_argument_value "$CIS_APISERVER_CMD" '--secure-port'|cut -d " " -f 1)
+              if [ "$port" = "0" ]; then
+                  warn "$check"
+                  warn "      * secure-port: $port"
               else
                   pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and either remove the --secure-port parameter or set it to a different (non-zero) desired port.
-      - id: 1.2.21
+              fi
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and either remove the --secure-port parameter or set
+          it to a different (non-zero) desired port.
+      - id: K.1.2.21
         description: Ensure that the --profiling argument is set to false (Automated)
         type: master
         category: kubernetes
@@ -1067,14 +1129,15 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--profiling=false' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the below parameter. --profiling=false
-      - id: 1.2.22
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--profiling=false' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the below parameter. --profiling=false
+      - id: K.1.2.22
         description: Ensure that the --audit-log-path argument is set (Automated)
         type: master
         category: kubernetes
@@ -1082,97 +1145,106 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--audit-log-path' >/dev/null 2>&1; then
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--audit-log-path' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --audit-log-path parameter to a suitable
+          path and file where you would like audit logs to be written, for example:
+          --audit-log-path=/var/log/apiserver/audit.log'
+      - id: K.1.2.23
+        description: Ensure that the --audit-log-maxage argument is set to 30 or as
+          appropriate (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxage' >/dev/null 2>&1; then
+              maxage=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxage'|cut -d " " -f 1)
+              if [ "$maxage" -ge "30" ]; then
                   pass "$check"
+                  pass "      * audit-log-maxage: $maxage"
               else
                   warn "$check"
-              fi        
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --audit-log-path parameter to a suitable path and file where you would like audit logs to be written, for example: --audit-log-path=/var/log/apiserver/audit.log'
-      - id: 1.2.23
-        description: Ensure that the --audit-log-maxage argument is set to 30 or as appropriate (Automated)
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxage' >/dev/null 2>&1; then
-                  maxage=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxage'|cut -d " " -f 1)
-                  if [ "$maxage" -ge "30" ]; then
-                      pass "$check"
-                      pass "      * audit-log-maxage: $maxage"
-                  else
-                      warn "$check"
-                      warn "      * audit-log-maxage: $maxage"
-                  fi
-              else
-                  warn "$check"
-              fi 
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --audit-log-maxage parameter to 30 or as an appropriate number of days: --audit-log-maxage=30'
-      - id: 1.2.24
-        description: Ensure that the --audit-log-maxbackup argument is set to 10 or as appropriate (Automated)
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxbackup' >/dev/null 2>&1; then
-                  maxbackup=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxbackup'|cut -d " " -f 1)
-                  if [ "$maxbackup" -ge "10" ]; then
-                      pass "$check"
-                      pass "      * audit-log-maxbackup: $maxbackup"
-                  else
-                      warn "$check"
-                      warn "      * audit-log-maxbackup: $maxbackup"
-                  fi
-              else
-                  warn "$check"
+                  warn "      * audit-log-maxage: $maxage"
               fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --audit-log-maxbackup parameter to 10 or to an appropriate value. --audit-log-maxbackup=10
-      - id: 1.2.25
-        description: Ensure that the --audit-log-maxsize argument is set to 100 or as appropriate (Automated)
+          else
+              warn "$check"
+          fi 
+        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --audit-log-maxage parameter to 30 or as
+          an appropriate number of days: --audit-log-maxage=30'
+      - id: K.1.2.24
+        description: Ensure that the --audit-log-maxbackup argument is set to 10 or
+          as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - GDPR
+          - HIPAA: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxsize' >/dev/null 2>&1; then
-                  maxsize=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxsize'|cut -d " " -f 1)
-                  if [ "$maxsize" -ge "100" ]; then
-                      pass "$check"
-                      pass "      * audit-log-maxsize: $maxsize"
-                  else
-                      warn "$check"
-                      warn "      * audit-log-maxsize: $maxsize"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxbackup' >/dev/null 2>&1; then
+              maxbackup=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxbackup'|cut -d " " -f 1)
+              if [ "$maxbackup" -ge "10" ]; then
+                  pass "$check"
+                  pass "      * audit-log-maxbackup: $maxbackup"
               else
                   warn "$check"
+                  warn "      * audit-log-maxbackup: $maxbackup"
               fi
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --audit-log-maxsize parameter to an appropriate size in MB. For example, to set it as 100 MB: --audit-log-maxsize=100'
-      - id: 1.2.26
-        description: Ensure that the --request-timeout argument is set as appropriate (Automated)
+          else
+              warn "$check"
+          fi
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --audit-log-maxbackup parameter to 10 or
+          to an appropriate value. --audit-log-maxbackup=10
+      - id: K.1.2.25
+        description: Ensure that the --audit-log-maxsize argument is set to 100 or
+          as appropriate (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxsize' >/dev/null 2>&1; then
+              maxsize=$(get_argument_value "$CIS_APISERVER_CMD" '--audit-log-maxsize'|cut -d " " -f 1)
+              if [ "$maxsize" -ge "100" ]; then
+                  pass "$check"
+                  pass "      * audit-log-maxsize: $maxsize"
+              else
+                  warn "$check"
+                  warn "      * audit-log-maxsize: $maxsize"
+              fi
+          else
+              warn "$check"
+          fi
+        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --audit-log-maxsize parameter to an appropriate
+          size in MB. For example, to set it as 100 MB: --audit-log-maxsize=100'
+      - id: K.1.2.26
+        description: Ensure that the --request-timeout argument is set as appropriate
+          (Automated)
         type: master
         category: kubernetes
         scored: true
@@ -1180,244 +1252,268 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--request-timeout' >/dev/null 2>&1; then
-                  requestTimeout=$(get_argument_value "$CIS_APISERVER_CMD" '--request-timeout')
-                  warn "$check"
-                  warn "      * request-timeout: $requestTimeout"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml and set the below parameter as appropriate and if needed. For example, --request-timeout=300s
-      - id: 1.2.27
-        description: Ensure that the --service-account-lookup argument is set to true (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--request-timeout' >/dev/null 2>&1; then
+              requestTimeout=$(get_argument_value "$CIS_APISERVER_CMD" '--request-timeout')
+              warn "$check"
+              warn "      * request-timeout: $requestTimeout"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          and set the below parameter as appropriate and if needed. For example, --request-timeout=300s
+      - id: K.1.2.27
+        description: Ensure that the --service-account-lookup argument is set to true
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--service-account-lookup=false' >/dev/null 2>&1; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the below parameter. --service-account-lookup=true
-      - id: 1.2.28
-        description: Ensure that the --service-account-key-file argument is set as appropriate (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--service-account-lookup=false' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the below parameter. --service-account-lookup=true
+      - id: K.1.2.28
+        description: Ensure that the --service-account-key-file argument is set as
+          appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--service-account-key-file' >/dev/null 2>&1; then
-                  file=$(get_argument_value "$CIS_APISERVER_CMD" '--service-account-key-file')
-                  file=$(append_prefix "$CONFIG_PREFIX" "$file")
-                  pass "$check"
-                  pass "      * service-account-key-file: $file"
-              else
-                  warn "$check"
-              fi        
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --service-account-key-file parameter to the public key file for service accounts: --service-account-key-file=<filename>'
-      - id: 1.2.29
-        description: Ensure that the --etcd-certfile and --etcd-keyfile arguments are set as appropriate (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--service-account-key-file' >/dev/null 2>&1; then
+              file=$(get_argument_value "$CIS_APISERVER_CMD" '--service-account-key-file')
+              file=$(append_prefix "$CONFIG_PREFIX" "$file")
+              pass "$check"
+              pass "      * service-account-key-file: $file"
+          else
+              warn "$check"
+          fi        
+        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --service-account-key-file parameter to the
+          public key file for service accounts: --service-account-key-file=<filename>'
+      - id: K.1.2.29
+        description: Ensure that the --etcd-certfile and --etcd-keyfile arguments
+          are set as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--etcd-certfile' >/dev/null 2>&1; then
-                  if check_argument "$CIS_APISERVER_CMD" '--etcd-keyfile' >/dev/null 2>&1; then
-                      certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-certfile')
-                      keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-keyfile')
-                      certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
-                      keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
-                      pass "$check"
-                      pass "      * etcd-certfile: $certfile"
-                      pass "      * etcd-keyfile: $keyfile"
-                  else
-                      warn "$check"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--etcd-certfile' >/dev/null 2>&1; then
+              if check_argument "$CIS_APISERVER_CMD" '--etcd-keyfile' >/dev/null 2>&1; then
+                  certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-certfile')
+                  keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-keyfile')
+                  certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+                  keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
+                  pass "$check"
+                  pass "      * etcd-certfile: $certfile"
+                  pass "      * etcd-keyfile: $keyfile"
               else
                   warn "$check"
               fi
-        remediation: Follow the Kubernetes documentation and set up the TLS connection between the apiserver and etcd. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the etcd certificate and key file parameters.  --etcd-certfile=<path/to/client-certificate-file> --etcd-keyfile=<path/to/client-key-file>
-      - id: 1.2.30
-        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Automated)
+          else
+              warn "$check"
+          fi
+        remediation: Follow the Kubernetes documentation and set up the TLS connection
+          between the apiserver and etcd. Then, edit the API server pod specification
+          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
+          set the etcd certificate and key file parameters.  --etcd-certfile=<path/to/client-certificate-file>
+          --etcd-keyfile=<path/to/client-key-file>
+      - id: K.1.2.30
+        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
+          are set as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--tls-cert-file' >/dev/null 2>&1; then
-                  if check_argument "$CIS_APISERVER_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
-                      certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cert-file')
-                      keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-private-key-file')
-                      certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
-                      keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
-                      pass "$check"
-                      pass "      * tls-cert-file: $certfile"
-                      pass "      * tls-private-key-file: $keyfile"
-                  else
-                      warn "$check"
-                  fi
-              else
-                  warn "$check"
-              fi        
-        remediation: Follow the Kubernetes documentation and set up the TLS connection on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the TLS certificate and private key file parameters. --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file>
-      - id: 1.2.31
-        description: Ensure that the --client-ca-file argument is set as appropriate (Automated)
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
-                  cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
-                  cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--tls-cert-file' >/dev/null 2>&1; then
+              if check_argument "$CIS_APISERVER_CMD" '--tls-private-key-file' >/dev/null 2>&1; then
+                  certfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cert-file')
+                  keyfile=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-private-key-file')
+                  certfile=$(append_prefix "$CONFIG_PREFIX" "$certfile")
+                  keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
                   pass "$check"
-                  pass "      * client-ca-file: $cafile"
+                  pass "      * tls-cert-file: $certfile"
+                  pass "      * tls-private-key-file: $keyfile"
               else
                   warn "$check"
               fi
-        remediation: Follow the Kubernetes documentation and set up the TLS connection on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the client certificate authority file. --client-ca-file=<path/to/client-ca-file>
-      - id: 1.2.32
-        description: Ensure that the --etcd-cafile argument is set as appropriate (Automated)
+          else
+              warn "$check"
+          fi        
+        remediation: Follow the Kubernetes documentation and set up the TLS connection
+          on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the TLS certificate and private key file parameters.
+          --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file>
+      - id: K.1.2.31
+        description: Ensure that the --client-ca-file argument is set as appropriate
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--etcd-cafile' >/dev/null 2>&1; then
-                  cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-cafile')
-                  cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
+              cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
+              cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * client-ca-file: $cafile"
+          else
+              warn "$check"
+          fi
+        remediation: Follow the Kubernetes documentation and set up the TLS connection
+          on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the client certificate authority file. --client-ca-file=<path/to/client-ca-file>
+      - id: K.1.2.32
+        description: Ensure that the --etcd-cafile argument is set as appropriate
+          (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--etcd-cafile' >/dev/null 2>&1; then
+              cafile=$(get_argument_value "$CIS_APISERVER_CMD" '--etcd-cafile')
+              cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * etcd-cafile: $cafile"
+          else
+              warn "$check"
+          fi        
+        remediation: Follow the Kubernetes documentation and set up the TLS connection
+          between the apiserver and etcd. Then, edit the API server pod specification
+          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
+          set the etcd certificate authority file parameter. --etcd-cafile=<path/to/ca-file>
+      - id: K.1.2.33
+        description: Ensure that the --encryption-provider-config argument is set
+          as appropriate (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config'| grep 'EncryptionConfig' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi     
+        remediation: 'Follow the Kubernetes documentation and configure a EncryptionConfig
+          file. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the --encryption-provider-config parameter to
+          the path of that file: --encryption-provider-config=</path/to/EncryptionConfig/File>'
+      - id: K.1.2.34
+        description: Ensure that encryption providers are appropriately configured
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--encryption-provider-config' >/dev/null 2>&1; then
+              encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config')
+              if [ -f "$encryptionConfig" ]; then
+                if [ $(grep -c "\- aescbc:\|\- kms:\|\- secretbox:" $encryptionConfig) -ne 0 ]; then
                   pass "$check"
-                  pass "      * etcd-cafile: $cafile"
-              else
+                else
                   warn "$check"
-              fi        
-        remediation: Follow the Kubernetes documentation and set up the TLS connection between the apiserver and etcd. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the etcd certificate authority file parameter. --etcd-cafile=<path/to/ca-file>
-      - id: 1.2.33
-        description: Ensure that the --encryption-provider-config argument is set as appropriate (Manual)
+                fi
+              else
+                warn "$check"
+              fi
+          else
+              warn "$check"
+          fi        
+        remediation: Follow the Kubernetes documentation and configure a EncryptionConfig
+          file. In this file, choose aescbc, kms or secretbox as the encryption provider.
+      - id: K.1.2.35
+        description: Ensure that the API Server only makes use of Strong Cryptographic
+          Ciphers (Manual)
         type: master
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config'| grep 'EncryptionConfig' >/dev/null 2>&1; then
-                  pass "$check"
+          check="$id  - $description"
+          if check_argument "$CIS_APISERVER_CMD" '--tls-cipher-suites' >/dev/null 2>&1; then
+              ciphers=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cipher-suites'|cut -d " " -f 1)
+              found=$(echo $ciphers| sed -rn '/(TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305|TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305|TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)/p')
+              if [ ! -z "$found" ]; then
+                pass "$check"
               else
-                  warn "$check"
-              fi     
-        remediation: 'Follow the Kubernetes documentation and configure a EncryptionConfig file. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the --encryption-provider-config parameter to the path of that file: --encryption-provider-config=</path/to/EncryptionConfig/File>'
-      - id: 1.2.34
-        description: Ensure that encryption providers are appropriately configured (Manual)
-        type: master
-        category: kubernetes
-        scored: false
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--encryption-provider-config' >/dev/null 2>&1; then
-                  encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config')
-                  if [ -f "$encryptionConfig" ]; then
-                    if [ $(grep -c "\- aescbc:\|\- kms:\|\- secretbox:" $encryptionConfig) -ne 0 ]; then
-                      pass "$check"
-                    else
-                      warn "$check"
-                    fi
-                  else
-                    warn "$check"
-                  fi
-              else
-                  warn "$check"
-              fi        
-        remediation: Follow the Kubernetes documentation and configure a EncryptionConfig file. In this file, choose aescbc, kms or secretbox as the encryption provider.
-      - id: 1.2.35
-        description: Ensure that the API Server only makes use of Strong Cryptographic Ciphers (Manual)
-        type: master
-        category: kubernetes
-        scored: false
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_APISERVER_CMD" '--tls-cipher-suites' >/dev/null 2>&1; then
-                  ciphers=$(get_argument_value "$CIS_APISERVER_CMD" '--tls-cipher-suites'|cut -d " " -f 1)
-                  found=$(echo $ciphers| sed -rn '/(TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305|TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305|TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)/p')
-                  if [ ! -z "$found" ]; then
-                    pass "$check"
-                  else
-                    warn "$check"
-                  fi
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and set the below parameter as follows, or to a subset of these values. --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+                warn "$check"
+              fi
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the master node and set the below parameter as follows, or to a subset
+          of these values. 
+          --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
   - id: 1.3
-    title: "1.3 - Controller Manager"
+    title: 1.3 - Controller Manager
     checks:
-      - id: 1.3.1
-        description: Ensure that the --terminated-pod-gc-threshold argument is set as appropriate (Manual)
+      - id: K.1.3.1
+        description: Ensure that the --terminated-pod-gc-threshold argument is set
+          as appropriate (Manual)
         type: master
         category: kubernetes
         scored: false
@@ -1425,18 +1521,20 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              # Filter out processes like "/bin/tee -a /var/log/kube-controller-manager.log"
-              # which exist on kops-managed clusters.
-              if check_argument "$CIS_MANAGER_CMD" '--terminated-pod-gc-threshold' >/dev/null 2>&1; then
-                  threshold=$(get_argument_value "$CIS_MANAGER_CMD" '--terminated-pod-gc-threshold')
-                  pass "$check"
-                  pass "      * terminated-pod-gc-threshold: $threshold"
-              else
-                  warn "$check"
-              fi        
-        remediation: 'Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and set the --terminated-pod-gc-threshold to an appropriate threshold, for example: --terminated-pod-gc-threshold=10'
-      - id: 1.3.2
+          check="$id  - $description"
+          # Filter out processes like "/bin/tee -a /var/log/kube-controller-manager.log"
+          # which exist on kops-managed clusters.
+          if check_argument "$CIS_MANAGER_CMD" '--terminated-pod-gc-threshold' >/dev/null 2>&1; then
+              threshold=$(get_argument_value "$CIS_MANAGER_CMD" '--terminated-pod-gc-threshold')
+              pass "$check"
+              pass "      * terminated-pod-gc-threshold: $threshold"
+          else
+              warn "$check"
+          fi        
+        remediation: 'Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and set the --terminated-pod-gc-threshold to an appropriate
+          threshold, for example: --terminated-pod-gc-threshold=10'
+      - id: K.1.3.2
         description: Ensure that the --profiling argument is set to false (Automated)
         type: master
         category: kubernetes
@@ -1445,106 +1543,114 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_MANAGER_CMD" '--profiling=false' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and set the below parameter. --profiling=false
-      - id: 1.3.3
-        description: Ensure that the --use-service-account-credentials argument is set to true (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_MANAGER_CMD" '--profiling=false' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and set the below parameter. --profiling=false
+      - id: K.1.3.3
+        description: Ensure that the --use-service-account-credentials argument is
+          set to true (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_MANAGER_CMD" '--use-service-account-credentials=true' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node to set the below parameter. --use-service-account-credentials=true
-      - id: 1.3.4
-        description: Ensure that the --service-account-private-key-file argument is set as appropriate (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_MANAGER_CMD" '--use-service-account-credentials=true' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node to set the below parameter. --use-service-account-credentials=true
+      - id: K.1.3.4
+        description: Ensure that the --service-account-private-key-file argument is
+          set as appropriate (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_MANAGER_CMD" '--service-account-private-key-file' >/dev/null 2>&1; then
-                  keyfile=$(get_argument_value "$CIS_MANAGER_CMD" '--service-account-private-key-file')
-                  keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
-                  pass "$check"
-                  pass "      * service-account-private-key-file: $keyfile"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and set the --service-account-privae-key-file parameter to the private key file for service accounts. --service-account-private-key-file=<filename>
-      - id: 1.3.5
-        description: Ensure that the --root-ca-file argument is set as appropriate (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_MANAGER_CMD" '--service-account-private-key-file' >/dev/null 2>&1; then
+              keyfile=$(get_argument_value "$CIS_MANAGER_CMD" '--service-account-private-key-file')
+              keyfile=$(append_prefix "$CONFIG_PREFIX" "$keyfile")
+              pass "$check"
+              pass "      * service-account-private-key-file: $keyfile"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and set the --service-account-privae-key-file parameter
+          to the private key file for service accounts. --service-account-private-key-file=<filename>
+      - id: K.1.3.5
+        description: Ensure that the --root-ca-file argument is set as appropriate
+          (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_MANAGER_CMD" '--root-ca-file' >/dev/null 2>&1; then
-                  cafile=$(get_argument_value "$CIS_MANAGER_CMD" '--root-ca-file')
-                  cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
-                  pass "$check"
-                  pass "      * root-ca-file: $cafile"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and set the --root-ca-file parameter to the certificate bundle file`. --root-ca-file=<path/to/file>
-      - id: 1.3.6
-        description: Ensure that the RotateKubeletServerCertificate argument is set to true (Automated)
+          check="$id  - $description"
+          if check_argument "$CIS_MANAGER_CMD" '--root-ca-file' >/dev/null 2>&1; then
+              cafile=$(get_argument_value "$CIS_MANAGER_CMD" '--root-ca-file')
+              cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * root-ca-file: $cafile"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and set the --root-ca-file parameter to the certificate
+          bundle file`. --root-ca-file=<path/to/file>
+      - id: K.1.3.6
+        description: Ensure that the RotateKubeletServerCertificate argument is set
+          to true (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 2
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_MANAGER_CMD" '--feature-gates' >/dev/null 2>&1; then
-                  serverCert=$(get_argument_value "$CIS_MANAGER_CMD" '--feature-gates')
-                  found=$(echo $serverCert| grep 'RotateKubeletServerCertificate=true')
-                  if [ ! -z $found ]; then
-                    pass "$check"
-                  else
-                    warn "$check"
-                  fi
+          check="$id  - $description"
+          if check_argument "$CIS_MANAGER_CMD" '--feature-gates' >/dev/null 2>&1; then
+              serverCert=$(get_argument_value "$CIS_MANAGER_CMD" '--feature-gates')
+              found=$(echo $serverCert| grep 'RotateKubeletServerCertificate=true')
+              if [ ! -z $found ]; then
+                pass "$check"
               else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and set the --feature-gates parameter to include RotateKubeletServerCertificate=true. --feature-gates=RotateKubeletServerCertificate=true
-      - id: 1.3.7
+                warn "$check"
+              fi
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and set the --feature-gates parameter to include RotateKubeletServerCertificate=true.
+          --feature-gates=RotateKubeletServerCertificate=true
+      - id: K.1.3.7
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Automated)
         type: master
         category: kubernetes
@@ -1553,17 +1659,18 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_MANAGER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml on the master node and ensure the correct value for the --bind-address parameter.
+          check="$id  - $description"
+          if get_argument_value "$CIS_MANAGER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the master node and ensure the correct value for the --bind-address parameter.
   - id: 1.4
-    title: "1.4 - Scheduler"
+    title: 1.4 - Scheduler
     checks:
-      - id: 1.4.1
+      - id: K.1.4.1
         description: Ensure that the --profiling argument is set to false (Automated)
         type: master
         category: kubernetes
@@ -1572,14 +1679,15 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if check_argument "$CIS_SCHEDULER_CMD" '--profiling=false' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml file on the master node and set the below parameter. --profiling=false
-      - id: 1.4.2
+          check="$id  - $description"
+          if check_argument "$CIS_SCHEDULER_CMD" '--profiling=false' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
+          file on the master node and set the below parameter. --profiling=false
+      - id: K.1.4.2
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Automated)
         type: master
         category: kubernetes
@@ -1588,10 +1696,11 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              if get_argument_value "$CIS_SCHEDULER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi        
-        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml on the master node and ensure the correct value for the --bind-address parameter
+          check="$id  - $description"
+          if get_argument_value "$CIS_SCHEDULER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
+          on the master node and ensure the correct value for the --bind-address parameter

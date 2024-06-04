@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	cmetav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -452,7 +451,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTAdmissionConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -970,7 +969,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &confData)
 	if err != nil || confData.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1131,7 +1130,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 	code := 0
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &confData)
 	ruleCfg := confData.Config
 	if err != nil || confData.Config == nil {
@@ -1370,7 +1369,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var rconf api.RESTAdmCtrlRulesExport
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1382,10 +1381,12 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	metadatadName := share.ScopeLocal
 	kind := resource.NvAdmCtrlSecurityRuleKind
 	resp := resource.NvAdmCtrlSecurityRule{
-		ApiVersion: &apiversion,
-		Kind:       &kind,
-		Metadata: &cmetav1.ObjectMeta{
-			Name: &metadatadName,
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiversion,
+			Kind:       kind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: metadatadName,
 		},
 		Spec: resource.NvSecurityAdmCtrlSpec{},
 	}
@@ -1487,9 +1488,9 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRule resource.NvAdmCtrlSecurityRule
-	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.Kind == nil || *secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
+	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
@@ -1577,7 +1578,7 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	var promoteData api.RESTAdmCtrlPromoteRequestData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &promoteData)
 	if err != nil || promoteData.Request == nil || len(promoteData.Request.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

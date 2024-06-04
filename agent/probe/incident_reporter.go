@@ -159,6 +159,7 @@ var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk", "zypper
 const (
 	fsPackageUpdate = "Software packages were updated."
 	fsComboAction   = "Files were modified or deleted."
+	fsNvProtectAlert= "NV.Protect: Files were modified."
 )
 
 /////
@@ -365,6 +366,21 @@ func (p *Probe) sendFsnJavaPkgReport(id string, files []string, bAdd bool) {
 		fsMsg.Path += " (added)"
 	} else {
 		fsMsg.Path += " (removed)"
+	}
+
+	p.notifyFsTaskChan <- &fsMsg
+	log.WithFields(log.Fields{"report": fsMsg}).Debug("PROC:")
+}
+
+func (p *Probe) sendFsnNvProtectReport(id string, files []string) {
+	fsMsg := fsmon.MonitorMessage {
+		ID:      id,
+		Path:    strings.Join(files, ", "),
+		Group:   share.GroupNVProtect,
+		Package: false,
+		Msg:     fsNvProtectAlert,
+		Action:  share.PolicyActionViolate,
+		StartAt: time.Now().UTC(),
 	}
 
 	p.notifyFsTaskChan <- &fsMsg

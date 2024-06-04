@@ -42,6 +42,10 @@ func Open(path string) (*RpmDB, error) {
 
 }
 
+func (d *RpmDB) Close() error {
+	return d.db.Close()
+}
+
 func (d *RpmDB) Package(name string) (*PackageInfo, error) {
 	pkgs, err := d.ListPackages()
 	if err != nil {

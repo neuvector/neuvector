@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -136,7 +136,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 
 	group := ps.ByName("name")
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTFileMonitorConfigData
 	err := json.Unmarshal(body, &rconf)

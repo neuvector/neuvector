@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -103,7 +103,7 @@ func handlerLicenseUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var req api.RESTLicenseKey
 	err := json.Unmarshal(body, &req)

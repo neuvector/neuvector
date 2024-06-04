@@ -3,9 +3,10 @@ package bdb
 import (
 	"bytes"
 	"encoding/binary"
-	"golang.org/x/xerrors"
 	"io"
 	"os"
+
+	"golang.org/x/xerrors"
 )
 
 // source: https://github.com/berkeleydb/libdb/blob/5b7b02ae052442626af54c176335b67ecc613a30/src/dbinc/db_page.h#L259
@@ -20,10 +21,9 @@ type HashPage struct {
 	PageType       uint8   `struct:"uint8"`   /*    25: Page type. */
 }
 
-func ParseHashPage(data []byte) (*HashPage, error) {
+func ParseHashPage(data []byte, swapped bool) (*HashPage, error) {
 	var hashPage HashPage
-
-	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &hashPage)
+	err := binary.Read(bytes.NewReader(data), byteOrder(swapped), &hashPage)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to unpack: %w", err)
 	}
@@ -31,7 +31,7 @@ func ParseHashPage(data []byte) (*HashPage, error) {
 	return &hashPage, nil
 }
 
-func HashPageValueContent(db *os.File, pageData []byte, hashPageIndex uint16, pageSize uint32) ([]byte, error) {
+func HashPageValueContent(db *os.File, pageData []byte, hashPageIndex uint16, pageSize uint32, swapped bool) ([]byte, error) {
 	// the first byte is the page type, so we can peek at it first before parsing further...
 	valuePageType := pageData[hashPageIndex]
 
@@ -42,7 +42,7 @@ func HashPageValueContent(db *os.File, pageData []byte, hashPageIndex uint16, pa
 
 	hashOffPageEntryBuff := pageData[hashPageIndex : hashPageIndex+HashOffPageSize]
 
-	entry, err := ParseHashOffPageEntry(hashOffPageEntryBuff)
+	entry, err := ParseHashOffPageEntry(hashOffPageEntryBuff, swapped)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func HashPageValueContent(db *os.File, pageData []byte, hashPageIndex uint16, pa
 			return nil, xerrors.Errorf("failed to read page=%d: %w", currentPageNo, err)
 		}
 
-		currentPage, err := ParseHashPage(currentPageBuff)
+		currentPage, err := ParseHashPage(currentPageBuff, swapped)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to parse page=%d: %w", currentPageNo, err)
 		}
@@ -86,8 +86,9 @@ func HashPageValueContent(db *os.File, pageData []byte, hashPageIndex uint16, pa
 	return hashValue, nil
 }
 
-func HashPageValueIndexes(data []byte, entries uint16) ([]uint16, error) {
-	var hashIndexValues = make([]uint16, 0)
+func HashPageValueIndexes(data []byte, entries uint16, swapped bool) ([]uint16, error) {
+	order := byteOrder(swapped)
+	hashIndexValues := make([]uint16, 0)
 	if entries%2 != 0 {
 		return nil, xerrors.Errorf("invalid hash index: entries should only come in pairs (%+v)", entries)
 	}
@@ -101,7 +102,7 @@ func HashPageValueIndexes(data []byte, entries uint16) ([]uint16, error) {
 	const keyValuePairSize = 2 * HashIndexEntrySize
 	for idx := range hashIndexData {
 		if (idx-HashIndexEntrySize)%keyValuePairSize == 0 {
-			value := binary.LittleEndian.Uint16(hashIndexData[idx : idx+2])
+			value := order.Uint16(hashIndexData[idx : idx+2])
 			hashIndexValues = append(hashIndexValues, value)
 		}
 	}

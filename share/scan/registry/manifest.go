@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -110,7 +110,7 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", nil, err
 	}
@@ -286,7 +286,7 @@ func (r *Registry) ImageConfigSpecV1(ctx context.Context, repository string, ref
 	rd, _, err := r.DownloadLayer(ctx, repository, reference)
 	if err == nil {
 		defer rd.Close()
-		if body, err := ioutil.ReadAll(rd); err == nil {
+		if body, err := io.ReadAll(rd); err == nil {
 			// log.WithFields(log.Fields{"body": string(body[:])}).Debug()
 
 			var ics imageConfigSpec

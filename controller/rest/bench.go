@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -88,10 +88,10 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 	}
 
 	// add tags
-	if tags, ok := cpf.filter[r.TestNum]; ok {
-		r.Tags = tags
+	if _, ok := cpf.filter[r.TestNum]; ok {
+		r.Tags = metaMap[r.TestNum].Tags
 	} else {
-		r.Tags = make([]string, 0)
+		r.Tags = make([]map[string][]api.TagDetail, 0)
 	}
 
 	return r
@@ -296,7 +296,7 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTCustomCheckConfigData
 	err := json.Unmarshal(body, &rconf)

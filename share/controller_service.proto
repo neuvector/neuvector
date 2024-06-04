@@ -137,6 +137,9 @@ message CLUSConnection {
 	bool TmpOpen = 31;
 	bool UwlIp = 32;
 	string FQDN = 33;
+	uint32 EpSessCurIn = 34;
+	uint32 EpSessIn60 = 35;
+	uint64 EpByteIn60 = 36;
 }
 
 message CLUSConnectionArray {
