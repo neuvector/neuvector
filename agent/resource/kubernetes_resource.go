@@ -7,13 +7,14 @@ import (
 	"sync"
 
 	"github.com/neuvector/k8s"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type resourceMaker struct {
 	apiVersion string
-	newObject  func() k8s.Resource
-	newList    func() k8s.ResourceList
-	xlate      func(obj k8s.Resource) (string, interface{})
+	newObject  func() metav1.Object
+	newList    func() metav1.ListInterface
+	xlate      func(obj metav1.Object) (string, interface{})
 }
 
 type k8sResource struct {
@@ -28,8 +29,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(ocImageStream) },
-				func() k8s.ResourceList { return new(ocImageStreamList) },
+				func() metav1.Object { return new(ocImageStream) },
+				func() metav1.ListInterface { return new(ocImageStreamList) },
 				nil,
 			},
 		},
@@ -75,7 +76,7 @@ func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 	}
 
 	// First, try preferred version
-	v := g.GetPreferredVersion().GetVersion()
+	v := g.PreferredVersion.Version
 	for _, maker := range r.makers {
 		if v == maker.apiVersion {
 			return maker, nil
@@ -83,11 +84,11 @@ func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 	}
 
 	// Second, going through versions by our order
-	vers := g.GetVersions()
+	vers := g.Versions
 	supported := make([]string, len(vers))
 	for _, maker := range r.makers {
 		for i, ver := range vers {
-			supported[i] = ver.GetVersion()
+			supported[i] = ver.Version
 			if supported[i] == maker.apiVersion {
 				return maker, nil
 			}

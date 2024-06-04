@@ -5,14 +5,14 @@ import (
 	"sync"
 
 	"github.com/neuvector/k8s"
-	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
-	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
 	log "github.com/sirupsen/logrus"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 type orchConnInterface interface {
@@ -123,20 +123,28 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvWafSecurityRuleKind,
 				},
+				resource.NvVulnProfileSecurityRuleName: &resource.NvCrdInfo{
+					LockKey:   share.CLUSLockVulnKey,
+					KvCrdKind: resource.NvVulnProfileSecurityRuleKind,
+				},
+				resource.NvCompProfileSecurityRuleName: &resource.NvCrdInfo{
+					LockKey:   share.CLUSLockCompKey,
+					KvCrdKind: resource.NvCompProfileSecurityRuleKind,
+				},
 			}
-			if crd, ok := res.(*apiextv1b1.CustomResourceDefinition); ok {
-				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
-					if event == resource.WatchEventDelete {
-						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
-						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey)
-					}
+			var name string
+			var kind string
+			if event == resource.WatchEventDelete {
+				if crd, ok := res.(*apiextv1b1.CustomResourceDefinition); ok {
+					name = crd.Name
+					kind = crd.Spec.Names.Kind
+				} else if crd, ok := res.(*apiextv1.CustomResourceDefinition); ok {
+					name = crd.Name
+					kind = crd.Spec.Names.Kind
 				}
-			} else if crd, ok := res.(*apiextv1.CustomResourceDefinition); ok {
-				if crdInfo, ok := nvCrdInfo[*crd.Metadata.Name]; ok {
-					if event == resource.WatchEventDelete {
-						k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": crd.Metadata.Name}).Debug("Event done")
-						rest.CrdDelAll(*crd.Spec.Names.Kind, crdInfo.KvCrdKind, crdInfo.LockKey)
-					}
+				if crdInfo, ok := nvCrdInfo[name]; ok {
+					k8sResLog.WithFields(log.Fields{"crd event": event, "type": rt, "name": name}).Debug("Event done")
+					rest.CrdDelAll(kind, crdInfo.KvCrdKind, crdInfo.LockKey)
 				}
 			}
 		}
@@ -184,7 +192,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	}
 
 	rscTypes := []string{resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC,
-		resource.RscTypeValidatingWebhookConfiguration}
+		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim}
 	for _, r := range rscTypes {
 		global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil)
 	}

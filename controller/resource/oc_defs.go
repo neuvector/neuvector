@@ -1,7 +1,7 @@
 package resource
 
 import (
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -45,27 +45,15 @@ type ocImageStreamStatus struct {
 }
 
 type ocImageStream struct {
-	Metadata         *metav1.ObjectMeta   `json:"metadata"`
-	Spec             *ocImageStreamSpec   `json:"spec"`
-	Status           *ocImageStreamStatus `json:"status"`
-	XXX_unrecognized []byte               `json:"-"`
-}
-
-func (m *ocImageStream) GetMetadata() *metav1.ObjectMeta {
-	if m != nil {
-		return m.Metadata
-	}
-	return nil
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              *ocImageStreamSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Status            *ocImageStreamStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	XXX_unrecognized  []byte               `json:"-"`
 }
 
 type ocImageStreamList struct {
-	Metadata *metav1.ListMeta `json:"metadata"`
-	Items    []*ocImageStream `json:"items"`
-}
-
-func (m *ocImageStreamList) GetMetadata() *metav1.ListMeta {
-	if m != nil {
-		return m.Metadata
-	}
-	return nil
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []ocImageStream `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

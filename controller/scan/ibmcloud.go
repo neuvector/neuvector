@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -77,11 +77,12 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 		return err
 	}
 
+	defer response.Body.Close()
+
 	if response.StatusCode != http.StatusOK {
 		smd.scanLog.WithFields(log.Fields{"StatusCode": response.StatusCode}).Debug("aquire token fail")
 		return fmt.Errorf("fail to get the IBM Cloud IAM access token")
 	}
-	defer response.Body.Close()
 
 	var authToken authToken
 	decoder := json.NewDecoder(response.Body)
@@ -120,7 +121,7 @@ func (r *ibmcloud) getImages() ([]ibmImage, error) {
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

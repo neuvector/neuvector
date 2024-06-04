@@ -90,6 +90,7 @@ var DefaultIdleTimeout uint32 = DefIdleTimeoutInternal
 
 const defaultClusterName string = "cluster.local"
 
+const RegistryAllName string = "_all_registry"
 const RegistryRepoScanName string = "_repo_scan"
 const RegistryFedRepoScanName string = "fed._repo_scan"
 
@@ -328,6 +329,7 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvAuthDefAdminPwdUnchanged:    {api.EventNameAuthDefAdminPwdUnchanged, api.EventCatAuth, api.LogLevelWARNING},
 	share.CLUSEvScannerAutoScaleDisabled:    {api.EventNameScannerAutoScaleDisabled, api.EventCatConfig, api.LogLevelNOTICE},
 	share.CLUSEvK8sAdmissionWebhookCChange:  {api.EventNameK8sAdmissionWebhookChange, api.EventCatAdmCtrl, api.LogLevelNOTICE},
+	share.CLUSEvGroupMetricViolation:        {api.EventNameGroupMetricViolation, api.EventCatGroup, api.LogLevelWARNING},
 }
 
 type LogIncidentInfo struct {

@@ -3,8 +3,8 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"mime/multipart"
+	"io"
 	"net/http"
 	"net/textproto"
 	"sort"
@@ -183,7 +183,7 @@ func handlerSnifferStart(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var proc api.RESTSnifferArgsData
 	err := json.Unmarshal(body, &proc)

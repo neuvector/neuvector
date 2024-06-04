@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,7 +60,7 @@ func getPauseImageRepoDigests(sys *system.SystemTools) (string, error) {
 	}
 
 	for _, filename := range config_files {
-		dat, err := ioutil.ReadFile(filename)
+		dat, err := os.ReadFile(filename)
 		if err != nil {
 			continue
 		}
@@ -611,7 +610,7 @@ func (d *crioDriver) IsDaemonProcess(proc string, cmds []string) bool {
 }
 
 func (d *crioDriver) IsRuntimeProcess(proc string, cmds []string) bool {
-	return proc == "runc" || proc == "crio" || proc == "conmon" // an OCI container runtime monitor
+	return proc == "runc" || proc == "crio" || proc == "conmon" || proc == "crio-conmon" // an OCI container runtime monitor
 }
 
 func (d *crioDriver) GetParent(info *ContainerMetaExtra, pidMap map[int]string) (bool, string) {

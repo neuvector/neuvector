@@ -1,280 +1,281 @@
-version: "rh-1.4"
+version: rh-1.4
 id: 4
-title: "4 - Worker Nodes"
-type: "node"
+title: 4 - Worker Nodes
+type: node
 groups:
   - id: 4.1
-    title: "4.1 - Worker Node Configuration Files"
+    title: 4.1 - Worker Node Configuration Files
     checks:
-      - id: 4.1.1
-        description: Ensure that the kubelet service file permissions are set to 644 or more restrictive (Automated)
+      - id: K.4.1.1
+        description: Ensure that the kubelet service file permissions are set to 644
+          or more restrictive (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/systemd/system/kubelet.service"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * The kubelet service file not found"
-              fi
+          check="$id  - $description"
+          file="/etc/systemd/system/kubelet.service"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * The kubelet service file not found"
+          fi
         remediation: None
-      - id: 4.1.2
-        description: Ensure that the kubelet service file ownership is set to root:root (Automated)
+      - id: K.4.1.2
+        description: Ensure that the kubelet service file ownership is set to root:root
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/systemd/system/kubelet.service"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
+          check="$id  - $description"
+          file="/etc/systemd/system/kubelet.service"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
         remediation: None
-      - id: 4.1.3
-        description: If proxy kube proxy configuration file exists ensure permissions are set to 644 or more restrictive (Manual)
+      - id: K.4.1.3
+        description: If proxy kube proxy configuration file exists ensure permissions
+          are set to 644 or more restrictive (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              manual "$check"
-              manual "     * Run the following command:"
-              manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
-              manual "     * do"
-              manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %a /config/kube-proxy-config.yaml"
-              manual "     * done"
-              manual "     * Verify that the kube-proxy-config.yaml file has permissions of 644."    
+          check="$id  - $description"
+          manual "$check"
+          manual "     * Run the following command:"
+          manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
+          manual "     * do"
+          manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %a /config/kube-proxy-config.yaml"
+          manual "     * done"
+          manual "     * Verify that the kube-proxy-config.yaml file has permissions of 644."    
         remediation: None
-      - id: 4.1.4
-        description: If proxy kubeconfig file exists ensure ownership is set to root:root (Manual)
+      - id: K.4.1.4
+        description: If proxy kubeconfig file exists ensure ownership is set to root:root
+          (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"           
-              manual "$check"
-              manual "     * Run the following command:"
-              manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
-              manual "     * do"
-              manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %U:%G /config/kube-proxy-config.yaml
-              manual "     * done"
-              manual "     * Verify that the kube-proxy-config.yaml file has ownership root:root.
+          check="$id  - $description"           
+          manual "$check"
+          manual "     * Run the following command:"
+          manual "     * for i in \$(oc get pods -n openshift-sdn -l app=sdn -oname)"
+          manual "     * do"
+          manual "     *     oc exec -n openshift-sdn $i -- stat -Lc %U:%G /config/kube-proxy-config.yaml
+          manual "     * done"
+          manual "     * Verify that the kube-proxy-config.yaml file has ownership root:root.
         remediation: None required. The configuration is managed by OpenShift operators.
-      - id: 4.1.5
-        description: Ensure that the --kubeconfig kubelet.conf file permissions are set to 644 or more restrictive (Manual)
+      - id: K.4.1.5
+        description: Ensure that the --kubeconfig kubelet.conf file permissions are
+          set to 644 or more restrictive (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi   
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi   
         remediation: None
-      - id: 4.1.6
-        description: Ensure that the --kubeconfig kubelet.conf file ownership is set to root:root (Manual)
+      - id: K.4.1.6
+        description: Ensure that the --kubeconfig kubelet.conf file ownership is set
+          to root:root (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
         remediation: None
-      - id: 4.1.7
-        description: Ensure that the certificate authorities file permissions are set to 644 or more restrictive (Automated)
+      - id: K.4.1.7
+        description: Ensure that the certificate authorities file permissions are
+          set to 644 or more restrictive (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet-ca.crt"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet-ca.crt"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: None
-      - id: 4.1.8
-        description: Ensure that the client certificate authorities file ownership is set to root:root (Automated)
+      - id: K.4.1.8
+        description: Ensure that the client certificate authorities file ownership
+          is set to root:root (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet-ca.crt"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet-ca.crt"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
         remediation: None
-      - id: 4.1.9
-        description: Ensure that the kubelet --config configuration file has permissions set to 600 or more restrictive (Automated)
+      - id: K.4.1.9
+        description: Ensure that the kubelet --config configuration file has permissions
+          set to 600 or more restrictive (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/var/lib/kubelet/config.json"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 600 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "     * File not found"
-              fi
+          check="$id  - $description"
+          file="/var/lib/kubelet/config.json"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "     * File not found"
+          fi
         remediation: None
-      - id: 4.1.10
-        description: Ensure that the kubelet configuration file ownership is set to root:root (Automated)
+      - id: K.4.1.10
+        description: Ensure that the kubelet configuration file ownership is set to
+          root:root (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/var/lib/kubelet/config.json"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "     * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
+          check="$id  - $description"
+          file="/var/lib/kubelet/config.json"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "     * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
         remediation: None
   - id: 4.2
-    title: "4.2 - Kubelet"
+    title: 4.2 - Kubelet
     checks:
-      - id: 4.2.1
-        description: Activate Garbage collection in OpenShift Container Platform 4, as appropriate (Manual)
+      - id: K.4.2.1
+        description: Activate Garbage collection in OpenShift Container Platform 4,
+          as appropriate (Manual)
         type: worker
         category: kubernetes
         scored: true
@@ -282,23 +283,23 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              manual "$check"
-              manual "     * To verify settings, run the following command for each updated configpool To verify, you can inspect the configuration of each node individually:"
-              manual "     * for node in $(oc get nodes -ojsonpath='{.items[*].metadata.name}')"
-              manual "     * do"
-              manual "     *   oc get --raw /api/v1/nodes/$node/proxy/configz | jq '.kubeletconfig'"
-              manual "     * done"
-              manual "     * You can verify the values of the evictionHard settings Verify the values for the following are set as appropriate."
-              manual "     * evictionHard"
-              manual "     * evictionPressureTransitionPeriod"
-              manual "     * imageMinimumGCAge"
-              manual "     * imageGCHighThresholdPercent"
-              manual "     * imageGCLowThresholdPercent"
-              manual "     * evictionSoft (if configured) "
-              manual "     * evictionSoftGracePeriod (if configured)"
+          check="$id  - $description"
+          manual "$check"
+          manual "     * To verify settings, run the following command for each updated configpool To verify, you can inspect the configuration of each node individually:"
+          manual "     * for node in $(oc get nodes -ojsonpath='{.items[*].metadata.name}')"
+          manual "     * do"
+          manual "     *   oc get --raw /api/v1/nodes/$node/proxy/configz | jq '.kubeletconfig'"
+          manual "     * done"
+          manual "     * You can verify the values of the evictionHard settings Verify the values for the following are set as appropriate."
+          manual "     * evictionHard"
+          manual "     * evictionPressureTransitionPeriod"
+          manual "     * imageMinimumGCAge"
+          manual "     * imageGCHighThresholdPercent"
+          manual "     * imageGCLowThresholdPercent"
+          manual "     * evictionSoft (if configured) "
+          manual "     * evictionSoftGracePeriod (if configured)"
         remediation: To configure, follow the directions in Garbage Collection Remediation
-      - id: 4.2.2
+      - id: K.4.2.2
         description: Ensure that the --anonymous-auth argument is set to false (Automated)
         type: worker
         category: kubernetes
@@ -306,72 +307,72 @@ groups:
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              ca_cert=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet-ca.crt")
-              output_ca=$(grep "clientCAFile: $ca_cert" $file)
-              output_auth=$(grep '\(enabled: false\)' $file)
-              if [ -z "$output_ca" ] || [ -z "$output_auth" ] ; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
-        remediation: Create a kubeletconfig to explicitly disable anonymous authentication. Examples of how to do this can be found in the OpenShift documentation.                   
-      - id: 4.2.3
-        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          ca_cert=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet-ca.crt")
+          output_ca=$(grep "clientCAFile: $ca_cert" $file)
+          output_auth=$(grep '\(enabled: false\)' $file)
+          if [ -z "$output_ca" ] || [ -z "$output_auth" ] ; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
+        remediation: Create a kubeletconfig to explicitly disable anonymous authentication.
+          Examples of how to do this can be found in the OpenShift documentation.
+      - id: K.4.2.3
+        description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              # TODO
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output=$(grep '\(authorization-mode\)' $file)
-              if [ -z "$output" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          check="$id  - $description"
+          # TODO
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output=$(grep '\(authorization-mode\)' $file)
+          if [ -z "$output" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: None
-      - id: 4.2.4
-        description: Ensure that the --client-ca-file argument is set as appropriate (Automated)
+      - id: K.4.2.4
+        description: Ensure that the --client-ca-file argument is set as appropriate
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              ca_cert=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet-ca.crt")
-              output_ca=$(grep "clientCAFile: $ca_cert" $file)
-              if [ -z "$output_ca" ]; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi     
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          ca_cert=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/kubelet-ca.crt")
+          output_ca=$(grep "clientCAFile: $ca_cert" $file)
+          if [ -z "$output_ca" ]; then
+              warn "$check"
+          else
+              pass "$check"
+          fi     
         remediation: None. Changing the clientCAFile value is unsupported.
-      - id: 4.2.5
+      - id: K.4.2.5
         description: Verify that the read only port is not used or is set to 0 (Automated)
         type: worker
         category: kubernetes
@@ -379,25 +380,25 @@ groups:
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output=$(grep '\(read-only-port\)' $file)
-              if [ -z "$output" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi       
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output=$(grep '\(read-only-port\)' $file)
+          if [ -z "$output" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi       
         remediation: |
-                    In earlier versions of OpenShift 4, the read-only-port argument is not used.
-                    Follow the instructions in the documentation to create a kubeletconfig CRD and set the kubelet-read-only-port is set to 0.
-      - id: 4.2.6
-        description: Ensure that the --streaming-connection-idle-timeout argument is not set to 0 (Automated)
+          In earlier versions of OpenShift 4, the read-only-port argument is not used.
+          Follow the instructions in the documentation to create a kubeletconfig CRD and set the kubelet-read-only-port is set to 0.
+      - id: K.4.2.6
+        description: Ensure that the --streaming-connection-idle-timeout argument
+          is not set to 0 (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -405,48 +406,51 @@ groups:
         automated: false
         tags: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output=$(grep 'streaming-connection-idle-timeout' $file | cut -d'=' -f2 | tr -d '[:space:]')
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output=$(grep 'streaming-connection-idle-timeout' $file | cut -d'=' -f2 | tr -d '[:space:]')
 
-              if [ -z "$output" ]; then
-                  # The setting is not found, handle as needed
-                  pass "$check"
-              elif [ "$output" != "0" ]; then
-                  # The setting is found and its value is not 0
-                  pass "$check"
-              else
-                  # The setting is found but its value is 0
-                  warn "$check"
-              fi
-        remediation: Follow the instructions in the documentation to create a kubeletconfig CRD and set the streamingConnectionIdleTimeout to the desired value. Do not set the value to 0.
-      - id: 4.2.7
-        description: Ensure that the --make-iptables-util-chains argument is set to true (Manual)
+          if [ -z "$output" ]; then
+              # The setting is not found, handle as needed
+              pass "$check"
+          elif [ "$output" != "0" ]; then
+              # The setting is found and its value is not 0
+              pass "$check"
+          else
+              # The setting is found but its value is 0
+              warn "$check"
+          fi
+        remediation: Follow the instructions in the documentation to create a kubeletconfig
+          CRD and set the streamingConnectionIdleTimeout to the desired value. Do
+          not set the value to 0.
+      - id: K.4.2.7
+        description: Ensure that the --make-iptables-util-chains argument is set to
+          true (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output=$(grep 'hostname-override' $file | cut -d'=' -f2 | tr -d '[:space:]')
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output=$(grep 'hostname-override' $file | cut -d'=' -f2 | tr -d '[:space:]')
 
-              if [ "$output" = "true" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          if [ "$output" = "true" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: None
-      - id: 4.2.8
-        description: Ensure that the kubeAPIQPS [--event-qps] argument is set to 0 or a level which ensures appropriate event capture (Manual)
+      - id: K.4.2.8
+        description: Ensure that the kubeAPIQPS [--event-qps] argument is set to 0
+          or a level which ensures appropriate event capture (Manual)
         type: worker
         category: kubernetes
         scored: true
@@ -454,114 +458,126 @@ groups:
         automated: true
         tags: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output=$(grep '\(kubeAPIQPS: 50\)' $file)
-              if [ -z "$output" ]; then
-                  warn "$check"
-              else
-                  pass "$check"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output=$(grep '\(kubeAPIQPS: 50\)' $file)
+          if [ -z "$output" ]; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
         remediation: |
-                    None by default.
-                    Follow the documentation to edit kubeletconfig parameters.
-      - id: 4.2.9
-        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Manual)
+          None by default.
+          Follow the documentation to edit kubeletconfig parameters.
+      - id: K.4.2.9
+        description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
+          are set as appropriate (Manual)
         type: worker
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output_cert=$(grep '\(tls-cert-file\)' $file)
-              output_key=$(grep '\(tls-private-key-file\)' $file)
-              if [ -z "$output_cert" ] && [ -z "$output_key" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi  
-        remediation: OpenShift automatically manages TLS authentication for the API server communication with the node/kublet. This is not configurable.
-      - id: 4.2.10
-        description: Ensure that the --rotate-certificates argument is not set to false (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output_cert=$(grep '\(tls-cert-file\)' $file)
+          output_key=$(grep '\(tls-private-key-file\)' $file)
+          if [ -z "$output_cert" ] && [ -z "$output_key" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi  
+        remediation: OpenShift automatically manages TLS authentication for the API
+          server communication with the node/kublet. This is not configurable.
+      - id: K.4.2.10
+        description: Ensure that the --rotate-certificates argument is not set to
+          false (Manual)
         type: worker
         category: kubernetes
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output1=$(grep '\(rotateKubeletClientCertificates: false\)' $file)
-              output2=$(grep '\(rotateCertificates: true\)' $file)
-              if [ -z "$output1"] && [ -n "$output2" ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output1=$(grep '\(rotateKubeletClientCertificates: false\)' $file)
+          output2=$(grep '\(rotateCertificates: true\)' $file)
+          if [ -z "$output1"] && [ -n "$output2" ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi
         remediation: None
-      - id: 4.2.11
-        description: Verify that the RotateKubeletServerCertificate argument is set to true (Manual)
+      - id: K.4.2.11
+        description: Verify that the RotateKubeletServerCertificate argument is set
+          to true (Manual)
         type: worker
         category: kubernetes
         scored: true
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              file="/etc/kubernetes/kubelet.conf"
-              file=$(append_prefix "$CONFIG_PREFIX" "$file")
-              output1=$(grep '\(RotateKubeletServerCertificate: true\)' $file)
-              output2=$(grep '\(rotateCertificates: true\)' $file)
-              if [ -n "$output1" ] && [ -n "$output2" ] ; then
-                  pass "$check"
-              else
-                  warn "$check"
-              fi     
-        remediation: None              
-      - id: 4.2.12
-        description: Ensure that the Kubelet only makes use of Strong Cryptographic Ciphers (Manual)
+          check="$id  - $description"
+          file="/etc/kubernetes/kubelet.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          output1=$(grep '\(RotateKubeletServerCertificate: true\)' $file)
+          output2=$(grep '\(rotateCertificates: true\)' $file)
+          if [ -n "$output1" ] && [ -n "$output2" ] ; then
+              pass "$check"
+          else
+              warn "$check"
+          fi     
+        remediation: None
+      - id: K.4.2.12
+        description: Ensure that the Kubelet only makes use of Strong Cryptographic
+          Ciphers (Manual)
         type: worker
         category: kubernetes
         scored: false
         profile: Level 1
         automated: false
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              manual "$check"
-              manual "     * The set of cryptographic ciphers currently considered secure is the following:"
-              manual "     * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-              manual "     * TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-              manual "     * TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"
-              manual "     * TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-              manual "     * TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
-              manual "     * TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-              manual "     * TLS_RSA_WITH_AES_256_GCM_SHA384"
-              manual "     * TLS_RSA_WITH_AES_128_GCM_SHA256"
-              manual "     * Verify the ciphers used by the Kubernetes API server:"
-              manual "     * oc get --namespace=openshift-ingress-operator ingresscontroller/default -ojson | jq .status.tlsProfile.ciphers"
-              manual "     * Verify the ciphers used by the OpenShift API server:"
-              manual "     * oc get kubeapiservers.operator.openshift.io cluster -ojson | jq .spec.observedConfig.servingInfo.cipherSuites"
-              manual "     * Verify the ciphers used by OpenShift authentication:"
-              manual "     * oc get cm -n openshift-authentication v4-0-config-system-cliconfig -o jsonpath='{.data.v4\-0\-config\-system\-cliconfig}' | jq .servingInfo.cipherSuites"
-              manual "     * Verify tlsSecurityProfile is using the default value:"
-              manual "     * oc get cm -n openshift-authentication v4-0-config-system-cliconfig -o jsonpath='{.data.v4\-0\-config\-system\-cliconfig}' | jq .servingInfo.cipherSuites"
-              manual "     * Verify that the cipher suites are appropriate."
-              manual "     * oc get kubeapiservers.operator.openshift.io cluster -ojson | jq .spec.tlsSecurityProfile"
-        remediation: Follow the directions above and in the OpenShift documentation to configure the tlsSecurityProfile. Configuring Ingress. Please reference the OpenShift TLS security profile documentation for more detail on each profile.
+          check="$id  - $description"
+          manual "$check"
+          manual "     * The set of cryptographic ciphers currently considered secure is the following:"
+          manual "     * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+          manual "     * TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+          manual "     * TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"
+          manual "     * TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+          manual "     * TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+          manual "     * TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+          manual "     * TLS_RSA_WITH_AES_256_GCM_SHA384"
+          manual "     * TLS_RSA_WITH_AES_128_GCM_SHA256"
+          manual "     * Verify the ciphers used by the Kubernetes API server:"
+          manual "     * oc get --namespace=openshift-ingress-operator ingresscontroller/default -ojson | jq .status.tlsProfile.ciphers"
+          manual "     * Verify the ciphers used by the OpenShift API server:"
+          manual "     * oc get kubeapiservers.operator.openshift.io cluster -ojson | jq .spec.observedConfig.servingInfo.cipherSuites"
+          manual "     * Verify the ciphers used by OpenShift authentication:"
+          manual "     * oc get cm -n openshift-authentication v4-0-config-system-cliconfig -o jsonpath='{.data.v4\-0\-config\-system\-cliconfig}' | jq .servingInfo.cipherSuites"
+          manual "     * Verify tlsSecurityProfile is using the default value:"
+          manual "     * oc get cm -n openshift-authentication v4-0-config-system-cliconfig -o jsonpath='{.data.v4\-0\-config\-system\-cliconfig}' | jq .servingInfo.cipherSuites"
+          manual "     * Verify that the cipher suites are appropriate."
+          manual "     * oc get kubeapiservers.operator.openshift.io cluster -ojson | jq .spec.tlsSecurityProfile"
+        remediation: Follow the directions above and in the OpenShift documentation
+          to configure the tlsSecurityProfile. Configuring Ingress. Please reference
+          the OpenShift TLS security profile documentation for more detail on each
+          profile.

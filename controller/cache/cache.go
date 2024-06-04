@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"fmt"
 	"net"
@@ -328,6 +325,10 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	// schedule a key deletion, as loong as one controller does it, it will be fine.
 	pruneHost()
 	SchedulePruneGroups()
+
+	if localDev.Host.Platform == share.PlatformKubernetes {
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+	}
 }
 
 func FillControllerCounter(c *share.CLUSControllerCounter) {
@@ -1666,6 +1667,7 @@ const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
+const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 
@@ -1679,6 +1681,7 @@ func startWorkerThread(ctx *Context) {
 	if !cacher.rmNsGrps {
 		pruneTicker.Stop()
 	}
+	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
 
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1704,6 +1707,10 @@ func startWorkerThread(ctx *Context) {
 			case <-usageReportTicker.C:
 				if isLeader() {
 					writeUsageReport()
+				}
+			case <-groupMetricCheckTicker.C:
+				if isLeader() {
+					CheckGroupMetric()
 				}
 			case <-teleReportTicker.C:
 				if isLeader() {
@@ -2077,7 +2084,8 @@ func startWorkerThread(ctx *Context) {
 
 // handler of K8s resource watcher calls cbResourceWatcher() which sends to orchObjChan/objChan
 // [2021-02-15] CRD-related resource changes do not call this function.
-//              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
+//
+//	If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
 	updateDetected := false
 	config := newConfig
@@ -2199,7 +2207,7 @@ func QueryK8sVersion() {
 	}
 }
 
-////// event handlers for enforcer's kv dispatcher
+// //// event handlers for enforcer's kv dispatcher
 // node: HostID
 func nodeLeaveDispatcher(node string, param interface{}) {
 	dispatchHelper.NodeLeave(node, isLeader())

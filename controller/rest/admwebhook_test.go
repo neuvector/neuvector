@@ -1,19 +1,9 @@
 package rest
 
 import (
-	//	"github.com/neuvector/neuvector/controller/api"
-	//	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share/utils"
 
-	//	"encoding/json"
-	//	"io/ioutil"
-	//	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	//	appsv1 "k8s.io/api/apps/v1"
-	//	corev1 "k8s.io/api/core/v1"
-	//	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//	"path/filepath"
-	//	"runtime"
 	"testing"
 )
 
@@ -103,7 +93,7 @@ func TestWalkThruContainersForSkipUpdateLog(t *testing.T) {
 
 	for i := 0; i < 1; i++ {
 		dataFileName := filepath.Join(filepath.Dir(testFileName), "data", "request_update_deployment.json")
-		data, err := ioutil.ReadFile(dataFileName)
+		data, err := os.ReadFile(dataFileName)
 		if err != nil {
 			t.Errorf("Read test data error: %s (%s)\n", dataFileName, err)
 		}

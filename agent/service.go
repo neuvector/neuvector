@@ -4,13 +4,13 @@ package main
 import "C"
 
 import (
-	"encoding/json"
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -661,6 +661,7 @@ func (rs *RPCService) GetGroupStats(ctx context.Context, f *share.CLUSWlIDArray)
 
 	return &stats, nil
 }
+
 // --
 
 func (rs *RPCService) cbSessionCount(buf []byte, param interface{}) bool {
@@ -895,7 +896,7 @@ func (rs *RPCService) GetSnifferPcap(req *share.CLUSSnifferDownload, stream shar
 	fileList := getFileList(proc.fileNumber, proc.fileName)
 	if len(fileList) > 0 {
 		for _, fpath := range fileList {
-			if dat, err := ioutil.ReadFile(fpath); err == nil {
+			if dat, err := os.ReadFile(fpath); err == nil {
 				packet := &share.CLUSSnifferPcap{
 					Pcap: dat,
 				}

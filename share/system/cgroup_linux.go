@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -442,7 +441,7 @@ func getCgroupParamKeyValue(t string) (string, uint64, error) {
 // Gets a single uint64 value from the specified cgroup file.
 func getCgroupParamUint(cgroupPath, cgroupFile string) (uint64, error) {
 	fileName := filepath.Join(cgroupPath, cgroupFile)
-	contents, err := ioutil.ReadFile(fileName)
+	contents, err := os.ReadFile(fileName)
 	if err != nil {
 		return 0, err
 	}
@@ -1031,14 +1030,14 @@ func readAufsContainerLayerPaths(rootPid int, id string) (string, string, error)
 		d.Close()
 	}
 
-	if content, err := ioutil.ReadFile(filepath.Join(siPath, "br0")); err == nil {
+	if content, err := os.ReadFile(filepath.Join(siPath, "br0")); err == nil {
 		cPath = string(content)
 		if pos := strings.LastIndex(cPath, "="); pos != -1 {
 			cPath = cPath[:pos]
 		}
 	}
 
-	if content, err := ioutil.ReadFile(filepath.Join(siPath, fmt.Sprintf("br%d", baseIndex))); err == nil {
+	if content, err := os.ReadFile(filepath.Join(siPath, fmt.Sprintf("br%d", baseIndex))); err == nil {
 		iPath = string(content)
 		if pos := strings.LastIndex(iPath, "="); pos != -1 {
 			iPath = iPath[:pos]

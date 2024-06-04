@@ -948,6 +948,11 @@ func fillCvePackages(cvePackages map[string]map[string]utils.Set, packagesBytes 
 }
 
 func buildAssetFilterWhereClause(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList {
+
+	if hasNamespaceFilter(queryFilter) {
+		return buildWhereClauseForWorkload(nil, queryFilter)
+	}
+
 	exp1 := buildWhereClauseForImage(nil, queryFilter)
 	exp2 := buildWhereClauseForWorkload(nil, queryFilter)
 	exp3 := buildWhereClauseForNode(nil, queryFilter)

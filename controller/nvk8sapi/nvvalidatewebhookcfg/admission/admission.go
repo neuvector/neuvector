@@ -2,7 +2,7 @@ package nvsysadmission
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -19,19 +19,21 @@ const (
 )
 
 const (
-	AuditLogPropMessage     = "Message"
-	AuditLogPropUser        = "User"
-	AuditLogPropImage       = "Image"
-	AuditLogPropImageID     = "ImageID"
-	AuditLogPropRegistry    = "Registry"
-	AuditLogPropRepository  = "Repository"
-	AuditLogPropTag         = "Tag"
-	AuditLogPropBaseOS      = "BaseOS"
-	AuditLogPropHighVulsCnt = "HighVulsCnt"
-	AuditLogPropMedVulsCnt  = "MedVulsCnt"
-	AuditLogPropNamespace   = "Namespace"
-	AuditLogPropFirstLogAt  = "FirstLogAt"
-	AuditLogPropLastLogAt   = "LastLogAt"
+	AuditLogPropMessage         = "Message"
+	AuditLogPropUser            = "User"
+	AuditLogPropImage           = "Image"
+	AuditLogPropImageID         = "ImageID"
+	AuditLogPropRegistry        = "Registry"
+	AuditLogPropRepository      = "Repository"
+	AuditLogPropTag             = "Tag"
+	AuditLogPropBaseOS          = "BaseOS"
+	AuditLogPropHighVulsCnt     = "HighVulsCnt"
+	AuditLogPropMedVulsCnt      = "MedVulsCnt"
+	AuditLogPropNamespace       = "Namespace"
+	AuditLogPropFirstLogAt      = "FirstLogAt"
+	AuditLogPropLastLogAt       = "LastLogAt"
+	AuditLogPropPVCName         = "PVCName"
+	AuditLogPVCStorageClassName = "PVCNameStorageClassName"
 )
 
 type ScannedImageSummary struct {
@@ -170,6 +172,8 @@ type AdmResult struct { // AdmResult is per-container-image
 	MedVulsCnt            int
 	AssessResults         []*AdmAssessResult // for assessment only, including all matched rules (disabled or not)
 	AssessMatchedRuleType string             // for assessment only, the 1st matched non-disabled rule's type(""/"allow"/"deny")
+	PVCName               string
+	PVCStorageClassName   string
 }
 
 type AdmResObject struct {
@@ -463,6 +467,11 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      verifierOps,
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyStorageClassName: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyStorageClassName,
+				Ops:      setOps1,
+				MatchSrc: api.MatchSrcYaml,
+			},
 		}
 	}
 	return admK8sDenyRuleOptions
@@ -656,7 +665,7 @@ func GetCustomCriteriaTemplates() []*api.RESTAdminCriteriaTemplate {
 	}
 
 	for k, v := range sources {
-		bytesData, err := ioutil.ReadFile(v)
+		bytesData, err := os.ReadFile(v)
 		if err != nil {
 			return templates
 		}

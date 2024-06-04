@@ -6,7 +6,6 @@ package sysinfo
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -60,7 +59,7 @@ scan:
 
 func (si *SysInfo) getStorageInfo() {
 	sysBlock := "/sys/block"
-	devices, err := ioutil.ReadDir(sysBlock)
+	devices, err := os.ReadDir(sysBlock)
 	if err != nil {
 		return
 	}

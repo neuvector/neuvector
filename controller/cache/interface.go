@@ -170,6 +170,7 @@ type CacheInterface interface {
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
 		containerType string, forTesting bool) (*nvsysadmission.AdmResult, bool)
+	MatchK8sAdmissionRulesForPVC(admType string, ns, name, scName string, forTesting bool) (*nvsysadmission.AdmResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()

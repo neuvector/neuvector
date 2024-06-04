@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -272,7 +272,7 @@ func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
 		}
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		smd.scanLog.WithFields(log.Fields{"error": err}).Error("Failed to read aql query result")
 		return nil, err
@@ -381,7 +381,7 @@ func (r *jfrog) getJFrogDirUrl() ([]jfrogDir, error) {
 	defer resp.Body.Close()
 
 	var jfrogDirs []jfrogDir
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		smd.scanLog.WithFields(log.Fields{"error": err}).Error("Failed to read repo dir")
 		return nil, err

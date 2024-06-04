@@ -157,6 +157,7 @@ func ScanModule2REST(m *share.ScanModule) *api.RESTScanModule {
 	}
 	return &api.RESTScanModule{
 		Name:    m.Name,
+		File:    m.File,
 		Version: m.Version,
 		Source:  m.Source,
 		CVEs:    mcve,
@@ -257,13 +258,21 @@ func ImageBench2REST(cmds []string, secrets []*share.ScanSecretLog, setids []*sh
 	}
 
 	// add tags to every checks
-	for _, item := range checks {
+	for i := range checks {
+		item := checks[i]
+
 		if tagMap == nil {
-			item.Tags = make([]string, 0)
-		} else if tags, ok := tagMap[item.TestNum]; !ok {
-			item.Tags = make([]string, 0)
+			item.Tags = make([]map[string][]api.TagDetail, 0)
+		} else if tags, ok := tagMap[item.TestNum]; ok {
+			item.Tags = make([]map[string][]api.TagDetail, 0, len(tags))
+
+			for _, tag := range tags {
+				tagMap := map[string][]api.TagDetail{tag: []api.TagDetail{}}
+				item.Tags = append(item.Tags, tagMap)
+			}
+
 		} else {
-			item.Tags = tags
+			item.Tags = make([]map[string][]api.TagDetail, 0)
 		}
 	}
 
@@ -907,6 +916,7 @@ func (vpf vpFilter) FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTI
 			skip = vpf.filterOneVul(v, nil, "")
 		} else {
 			for _, s := range idns {
+				// DisplayName is image name
 				if vpf.filterOneVul(v, s.Domains, s.DisplayName) {
 					skip = true
 					break

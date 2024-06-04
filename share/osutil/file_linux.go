@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -67,7 +66,7 @@ func fileExists(path string) bool {
 
 func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 	if inTest {
-		// Since we use ioutil.TempDir("", "proc") to mock proc file system
+		// Since we use os.MkdirTemp("", "proc") to mock proc file system
 		// Regular expression to match the pattern /proc/[number]/root/
 		re := regexp.MustCompile(`.*/proc/\d+/root/`)
 		matches := re.FindStringSubmatch(input)
@@ -348,7 +347,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 
-	entries, err := ioutil.ReadDir(src)
+	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
@@ -363,7 +362,7 @@ func CopyDir(src string, dst string) error {
 			}
 		} else {
 			// Skip symlinks
-			if entry.Mode()&os.ModeSymlink != 0 {
+			if entry.Type()&os.ModeSymlink != 0 {
 				continue
 			}
 

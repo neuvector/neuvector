@@ -51,6 +51,7 @@ const (
 	CriteriaKeySaBindRiskyRole     string = "saBindRiskyRole"
 	CriteriaKeyImageVerifiers      string = "imageVerifiers"
 	CriteriaKeyAnnotations         string = "annotations"
+	CriteriaKeyStorageClassName    string = "storageClassName"
 )
 
 const (

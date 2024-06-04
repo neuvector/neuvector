@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"reflect"
@@ -1441,7 +1441,7 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTPolicyRuleActionData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil {
@@ -1528,7 +1528,7 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTPolicyRuleConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -2086,7 +2086,7 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var promoteData api.RESTPolicyPromoteRequestData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &promoteData)
 	if err != nil || promoteData.Request == nil || len(promoteData.Request.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

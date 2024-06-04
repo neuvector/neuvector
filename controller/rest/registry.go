@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"sort"
@@ -214,7 +214,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var data api.RESTRegistryConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2
@@ -553,7 +553,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var data api.RESTRegistryConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2

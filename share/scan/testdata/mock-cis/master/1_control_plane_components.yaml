@@ -1,128 +1,314 @@
-version: "cis-1.6"
+version: cis-1.8
 id: 1
-title: "1 - Control Plane Components"
-type: "master"
+title: 1 - Control Plane Components
+type: master
 groups:
   - id: 1.1
-    title: "1.1 - Master Node Configuration Files"
+    title: 1.1 - Control Plane Node Configuration Files
     checks:
-      - id: 1.1.2
-        description: mock Ensure that the API server pod specification file ownership is set to root:root
+      - id: K.1.1.1
+        description: Ensure that the API server pod specification file permissions
+          are set to 600 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
-        automated: false
+        automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
-      - id: 1.1.3
-        description: mock Ensure that the controller manager pod specification file permissions are set to 644 or more restrictive
-        type: master
-        category: kubernetes
-        scored: true
-        profile: Level 1
-        automated: false
-        tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
-        audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
-              if [ -f $config_manifest ]; then
-                  # kops
-                  file=$config_manifest
-              else
-                  file=$config_yaml
-              fi
+          check="$id  - $description"
+          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/kube-controller-manager.yaml
-      - id: 1.1.4
-        description: mock Ensure that the controller manager pod specification file ownership is set to root:root
+          if [ -f $file ]; then
+            if [ "$(stat -c %a $file)" -eq 600 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-apiserver.yaml
+      - id: K.1.1.2
+        description: Ensure that the API server pod specification file ownership is
+          set to root:root (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
-        automated: false
+        automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"    
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %u%g $file)" -eq 00 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong ownership for $file"
-                fi
-              else
-                info "$check"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
-      - id: 1.1.7
-        description: mock Ensure that the etcd pod specification file permissions are set to 644 or more restrictive
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
+      - id: K.1.1.3
+        description: Ensure that the controller manager pod specification file permissions
+          are set to 600 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
         profile: Level 1
-        automated: false
+        automated: true
         tags:
-        - HIPAA
-        - NIST
-        - PCI
-        - GDPR
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
         audit: |
-              check="$id  - $description"
-              config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
-              config_yaml=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
-              if [ -f $config_yaml ]; then
-                  # kops
-                  file=$config_yaml
-              else
-                  file=$config_manifest
-              fi
+          check="$id  - $description"
+          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
 
-              if [ -f "$file" ]; then
-                if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
-                  pass "$check"
-                else
-                  warn "$check"
-                  warn "      * Wrong permissions for $file"
-                fi
-              else
-                info "$check"
-                info "      * File not found"
-              fi
-        remediation: Run the below command (based on the file location on your system) on the master node. For example, chmod 644 /etc/kubernetes/manifests/etcd.yaml
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: K.1.1.4
+        description: Ensure that the controller manager pod specification file ownership
+          is set to root:root (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
+      - id: K.1.1.5
+        description: Ensure that the scheduler pod specification file permissions
+          are set to 600 or more restrictive (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
+
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-scheduler.yaml
+      - id: K.1.1.6
+        description: Ensure that the scheduler pod specification file ownership is
+          set to root:root (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-scheduler.yaml
+      - id: K.1.1.7
+        description: Ensure that the etcd pod specification file permissions are set
+          to 600 or more restrictive (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong permissions for $file"
+            fi
+          else
+            info "$check"
+            info "      * File not found"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 600 /etc/kubernetes/manifests/etcd.yaml
+      - id: K.1.1.8
+        description: Ensure that the etcd pod specification file ownership is set
+          to root:root (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          if [ -f "$file" ]; then
+            if [ "$(stat -c %u%g $file)" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file"
+            fi
+          else
+            info "$check"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root /etc/kubernetes/manifests/etcd.yaml
+      - id: K.1.1.9
+        description: Ensure that the Container Network Interface file permissions
+          are set to 600 or more restrictive (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          # Initialize counters and non-compliant files list
+          count_files=0
+          non_compliant_files=""
+          cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          for file in $(find "$cni_folder" -name "*kube*" -type f); do
+            count_files=$((count_files + 1))
+            permissions=$(stat -c %a "$file")
+
+            # Check if the permissions are more permissive than 600
+            if [ "$permissions" -gt 600 ]; then
+              non_compliant_files="$non_compliant_files$file ($permissions), "
+            fi
+          done
+
+          # Remove trailing comma and space
+          non_compliant_files=${non_compliant_files%, }
+
+          # Check and output results
+          if [ "$count_files" -eq 0 ]; then
+            warn "$check"
+            warn "      * No matching files found in $cni_folder"
+          elif [ -z "$non_compliant_files" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            warn "$check - Non-compliant file(s): $non_compliant_files"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chmod 600 the related files in etc/cni/net.d
+      - id: K.1.1.10
+        description: Ensure that the Container Network Interface file ownership is
+          set to root:root (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags:
+          - HIPAA: []
+          - PCI: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          # Initialize counters and non-compliant files list
+          count_files=0
+          non_compliant_files=""
+          cni_folder=$(append_prefix "$CONFIG_PREFIX" "/etc/cni/net.d")
+          for file in $(find "$cni_folder" -name "*kube*" -type f); do
+            count_files=$((count_files + 1))
+            permissions=$(stat -c %u%g $file)
+
+            # Check if the ownership is set to root:root 
+            if [ "$permissions" != "00" ]; then
+              non_compliant_files="$non_compliant_files$file ($permissions), "
+            fi
+          done
+
+          # Remove trailing comma and space
+          non_compliant_files=${non_compliant_files%, }
+
+          # Check and output results
+          if [ "$count_files" -eq 0 ]; then
+            warn "$check"
+            warn "      * No matching files found in $cni_folder"
+          elif [ -z "$non_compliant_files" ]; then
+            pass "$check"
+          else
+            warn "$check"
+            warn "$check - Non-compliant file(s): $non_compliant_files"
+          fi
+        remediation: Run the below command (based on the file location on your system)
+          on the master node. For example, chown root:root the related files in etc/cni/net.d

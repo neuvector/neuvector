@@ -8,8 +8,6 @@ import (
 
 	dbi "github.com/knqyf263/go-rpmdb/pkg/db"
 	"golang.org/x/xerrors"
-
-	_ "modernc.org/sqlite"
 )
 
 type SQLite3 struct {
@@ -62,6 +60,13 @@ func (db *SQLite3) Read() <-chan dbi.Entry {
 			entries <- dbi.Entry{
 				Err: xerrors.Errorf("failed to close DB: %w", err),
 			}
+		}
+
+		if rows == nil {
+			entries <- dbi.Entry{
+				Err: xerrors.Errorf("query failed to return rows: %w", err),
+			}
+			return
 		}
 
 		for rows.Next() {

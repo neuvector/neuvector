@@ -1,0 +1,452 @@
+apiVersion: v1
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        deployment.kubernetes.io/revision: '2'
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"chart":"core-2.6.6","heritage":"Helm","release":"release-name"},"name":"neuvector-controller-pod","namespace":"neuvector"},"spec":{"minReadySeconds":60,"replicas":3,"selector":{"matchLabels":{"app":"neuvector-controller-pod"}},"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"},"template":{"metadata":{"annotations":{"checksum/controller-secret":"e24f2c528e3c724e35e3e3cd115272668e387a978f4bad66c4eb14b7bbe69bbc"},"labels":{"app":"neuvector-controller-pod","release":"release-name"}},"spec":{"affinity":{"podAntiAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"podAffinityTerm":{"labelSelector":{"matchExpressions":[{"key":"app","operator":"In","values":["neuvector-controller-pod"]}]},"topologyKey":"kubernetes.io/hostname"},"weight":100}]}},"containers":[{"env":[{"name":"CLUSTER_JOIN_ADDR","value":"neuvector-svc-controller.neuvector"},{"name":"CLUSTER_ADVERTISED_ADDR","valueFrom":{"fieldRef":{"fieldPath":"status.podIP"}}},{"name":"CLUSTER_BIND_ADDR","valueFrom":{"fieldRef":{"fieldPath":"status.podIP"}}},{"name":"AUTO_INTERNAL_CERT","value":"1"}],"image":"396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev","imagePullPolicy":"Always","name":"neuvector-controller-pod","readinessProbe":{"exec":{"command":["cat","/tmp/ready"]},"initialDelaySeconds":5,"periodSeconds":5},"resources":{},"securityContext":{"runAsUser":0},"volumeMounts":[{"mountPath":"/etc/config","name":"config-volume","readOnly":true},{"mountPath":"/etc/neuvector/certs/ssl-cert.key","name":"cert","readOnly":true,"subPath":"ssl-cert.key"},{"mountPath":"/etc/neuvector/certs/ssl-cert.pem","name":"cert","readOnly":true,"subPath":"ssl-cert.pem"},{"mountPath":"/etc/neuvector/certs/internal/","name":"internal-cert-dir"}]}],"imagePullSecrets":[{"name":"my-docker-secret"}],"initContainers":[{"command":["/usr/local/bin/upgrader","pre-sync-hook","--image","396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev"],"env":[{"name":"POD_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"OVERRIDE_CHECKSUM","value":"e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3"},{"name":"IMAGE_PULL_SECRET","value":"my-docker-secret"},{"name":"IMAGE_PULL_POLICY","value":"Always"},{"name":"EXPIRY_CERT_THRESHOLD","value":"87600h"}],"image":"396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev","imagePullPolicy":"Always","name":"init"}],"restartPolicy":"Always","serviceAccount":"default","serviceAccountName":"default","terminationGracePeriodSeconds":300,"volumes":[{"name":"config-volume","projected":{"sources":[{"configMap":{"name":"neuvector-init","optional":true}},{"secret":{"name":"neuvector-init","optional":true}},{"secret":{"name":"neuvector-secret","optional":true}}]}},{"name":"cert","secret":{"secretName":"neuvector-controller-secret"}},{"emptyDir":{"sizeLimit":"50Mi"},"name":"internal-cert-dir"}]}}}}
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generation: 2
+      labels:
+        chart: core-2.6.6
+        heritage: Helm
+        release: release-name
+      name: neuvector-controller-pod
+      namespace: neuvector
+      resourceVersion: '1316864'
+      uid: a9faf4e3-6aaf-4036-b220-b59cd2eb38c4
+    spec:
+      minReadySeconds: 60
+      progressDeadlineSeconds: 600
+      replicas: 3
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: neuvector-controller-pod
+      strategy:
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+        type: RollingUpdate
+      template:
+        metadata:
+          annotations:
+            checksum/controller-secret: e24f2c528e3c724e35e3e3cd115272668e387a978f4bad66c4eb14b7bbe69bbc
+          creationTimestamp: null
+          labels:
+            app: neuvector-controller-pod
+            release: release-name
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                            - neuvector-controller-pod
+                    topologyKey: kubernetes.io/hostname
+                  weight: 100
+          containers:
+            - env:
+                - name: CLUSTER_JOIN_ADDR
+                  value: neuvector-svc-controller.neuvector
+                - name: CLUSTER_ADVERTISED_ADDR
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: status.podIP
+                - name: CLUSTER_BIND_ADDR
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: status.podIP
+                - name: AUTO_INTERNAL_CERT
+                  value: '1'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+              imagePullPolicy: Always
+              name: neuvector-controller-pod
+              readinessProbe:
+                exec:
+                  command:
+                    - cat
+                    - /tmp/ready
+                failureThreshold: 3
+                initialDelaySeconds: 5
+                periodSeconds: 5
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources: {}
+              securityContext:
+                runAsUser: 0
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /etc/config
+                  name: config-volume
+                  readOnly: true
+                - mountPath: /etc/neuvector/certs/ssl-cert.key
+                  name: cert
+                  readOnly: true
+                  subPath: ssl-cert.key
+                - mountPath: /etc/neuvector/certs/ssl-cert.pem
+                  name: cert
+                  readOnly: true
+                  subPath: ssl-cert.pem
+                - mountPath: /etc/neuvector/certs/internal/
+                  name: internal-cert-dir
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          initContainers:
+            - command:
+                - /usr/local/bin/upgrader
+                - pre-sync-hook
+                - --image
+                - 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+              env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+                - name: OVERRIDE_CHECKSUM
+                  value: e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+                - name: IMAGE_PULL_SECRET
+                  value: my-docker-secret
+                - name: IMAGE_PULL_POLICY
+                  value: Always
+                - name: EXPIRY_CERT_THRESHOLD
+                  value: 87600h
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+              imagePullPolicy: Always
+              name: init
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: config-volume
+              projected:
+                defaultMode: 420
+                sources:
+                  - configMap:
+                      name: neuvector-init
+                      optional: true
+                  - secret:
+                      name: neuvector-init
+                      optional: true
+                  - secret:
+                      name: neuvector-secret
+                      optional: true
+            - name: cert
+              secret:
+                defaultMode: 420
+                secretName: neuvector-controller-secret
+            - emptyDir:
+                sizeLimit: 50Mi
+              name: internal-cert-dir
+    status:
+      availableReplicas: 3
+      conditions:
+        - lastTransitionTime: '2024-01-25T23:00:12Z'
+          lastUpdateTime: '2024-01-25T23:00:12Z'
+          message: Deployment has minimum availability.
+          reason: MinimumReplicasAvailable
+          status: 'True'
+          type: Available
+        - lastTransitionTime: '2024-01-25T22:59:01Z'
+          lastUpdateTime: '2024-01-25T23:04:02Z'
+          message: ReplicaSet "neuvector-controller-pod-7b5c578f7c" has successfully progressed.
+          reason: NewReplicaSetAvailable
+          status: 'True'
+          type: Progressing
+      observedGeneration: 2
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        deployment.kubernetes.io/revision: '2'
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"chart":"core-2.6.6","heritage":"Helm","release":"release-name"},"name":"neuvector-manager-pod","namespace":"neuvector"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"neuvector-manager-pod"}},"template":{"metadata":{"annotations":{"checksum/manager-secret":"d8397b2817280a0d838fafb8d530adcd4e6c957cdd7bb736ece01889ffa697eb"},"labels":{"app":"neuvector-manager-pod","release":"release-name"}},"spec":{"containers":[{"env":[{"name":"CTRL_SERVER_IP","value":"neuvector-svc-controller.neuvector"}],"image":"396800944890.dkr.ecr.us-east-1.amazonaws.com/manager:5.3.0-dev","name":"neuvector-manager-pod","ports":[{"containerPort":8443,"name":"http","protocol":"TCP"}],"resources":{},"volumeMounts":[{"mountPath":"/etc/neuvector/certs/ssl-cert.key","name":"cert","readOnly":true,"subPath":"ssl-cert.key"},{"mountPath":"/etc/neuvector/certs/ssl-cert.pem","name":"cert","readOnly":true,"subPath":"ssl-cert.pem"}]}],"imagePullSecrets":[{"name":"my-docker-secret"}],"restartPolicy":"Always","serviceAccount":"default","serviceAccountName":"default","volumes":[{"name":"cert","secret":{"secretName":"neuvector-manager-secret"}}]}}}}
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generation: 2
+      labels:
+        chart: core-2.6.6
+        heritage: Helm
+        release: release-name
+      name: neuvector-manager-pod
+      namespace: neuvector
+      resourceVersion: '1315990'
+      uid: 056f6174-c045-4fd0-bf4b-00d45d328e30
+    spec:
+      progressDeadlineSeconds: 600
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: neuvector-manager-pod
+      strategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+      template:
+        metadata:
+          annotations:
+            checksum/manager-secret: d8397b2817280a0d838fafb8d530adcd4e6c957cdd7bb736ece01889ffa697eb
+          creationTimestamp: null
+          labels:
+            app: neuvector-manager-pod
+            release: release-name
+        spec:
+          containers:
+            - env:
+                - name: CTRL_SERVER_IP
+                  value: neuvector-svc-controller.neuvector
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/manager:5.3.0-dev
+              imagePullPolicy: IfNotPresent
+              name: neuvector-manager-pod
+              ports:
+                - containerPort: 8443
+                  name: http
+                  protocol: TCP
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /etc/neuvector/certs/ssl-cert.key
+                  name: cert
+                  readOnly: true
+                  subPath: ssl-cert.key
+                - mountPath: /etc/neuvector/certs/ssl-cert.pem
+                  name: cert
+                  readOnly: true
+                  subPath: ssl-cert.pem
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - name: cert
+              secret:
+                defaultMode: 420
+                secretName: neuvector-manager-secret
+    status:
+      availableReplicas: 1
+      conditions:
+        - lastTransitionTime: '2024-01-25T22:59:04Z'
+          lastUpdateTime: '2024-01-25T22:59:04Z'
+          message: Deployment has minimum availability.
+          reason: MinimumReplicasAvailable
+          status: 'True'
+          type: Available
+        - lastTransitionTime: '2024-01-25T22:59:01Z'
+          lastUpdateTime: '2024-01-25T23:00:08Z'
+          message: ReplicaSet "neuvector-manager-pod-fccbd7678" has successfully progressed.
+          reason: NewReplicaSetAvailable
+          status: 'True'
+          type: Progressing
+      observedGeneration: 2
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        deployment.kubernetes.io/revision: '1'
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"chart":"core-2.6.6","heritage":"Helm","release":"release-name"},"name":"neuvector-registry-adapter-pod","namespace":"neuvector"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"neuvector-registry-adapter-pod"}},"template":{"metadata":{"annotations":{"checksum/registry-adapter-secret":"675f56a38411ca20002d46f475fbb13072503cea2b94f437f30f0be994ddd474"},"labels":{"app":"neuvector-registry-adapter-pod","release":"release-name"}},"spec":{"containers":[{"env":[{"name":"CLUSTER_JOIN_ADDR","value":"neuvector-svc-controller.neuvector"},{"name":"HARBOR_SERVER_PROTO","value":"https"},{"name":"AUTO_INTERNAL_CERT","value":"1"}],"image":"396800944890.dkr.ecr.us-east-1.amazonaws.com/registry-adapter:latest","name":"neuvector-registry-adapter-pod","resources":{"limits":{"cpu":"400m"},"requests":{"cpu":"100m"}},"volumeMounts":[{"mountPath":"/etc/neuvector/certs/internal/","name":"internal-cert-dir"}]}],"imagePullSecrets":[{"name":"my-docker-secret"}],"restartPolicy":"Always","serviceAccount":"default","serviceAccountName":"default","volumes":[{"name":"cert","secret":{"secretName":"neuvector-registry-adapter-secret"}},{"emptyDir":{"sizeLimit":"50Mi"},"name":"internal-cert-dir"}]}}}}
+      creationTimestamp: '2024-01-25T23:00:05Z'
+      generation: 1
+      labels:
+        chart: core-2.6.6
+        heritage: Helm
+        release: release-name
+      name: neuvector-registry-adapter-pod
+      namespace: neuvector
+      resourceVersion: '1315960'
+      uid: e83b52ac-49cc-4f05-b879-0ae575874945
+    spec:
+      progressDeadlineSeconds: 600
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: neuvector-registry-adapter-pod
+      strategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+      template:
+        metadata:
+          annotations:
+            checksum/registry-adapter-secret: 675f56a38411ca20002d46f475fbb13072503cea2b94f437f30f0be994ddd474
+          creationTimestamp: null
+          labels:
+            app: neuvector-registry-adapter-pod
+            release: release-name
+        spec:
+          containers:
+            - env:
+                - name: CLUSTER_JOIN_ADDR
+                  value: neuvector-svc-controller.neuvector
+                - name: HARBOR_SERVER_PROTO
+                  value: https
+                - name: AUTO_INTERNAL_CERT
+                  value: '1'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/registry-adapter:latest
+              imagePullPolicy: Always
+              name: neuvector-registry-adapter-pod
+              resources:
+                limits:
+                  cpu: 400m
+                requests:
+                  cpu: 100m
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /etc/neuvector/certs/internal/
+                  name: internal-cert-dir
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - name: cert
+              secret:
+                defaultMode: 420
+                secretName: neuvector-registry-adapter-secret
+            - emptyDir:
+                sizeLimit: 50Mi
+              name: internal-cert-dir
+    status:
+      availableReplicas: 1
+      conditions:
+        - lastTransitionTime: '2024-01-25T23:00:07Z'
+          lastUpdateTime: '2024-01-25T23:00:07Z'
+          message: Deployment has minimum availability.
+          reason: MinimumReplicasAvailable
+          status: 'True'
+          type: Available
+        - lastTransitionTime: '2024-01-25T23:00:05Z'
+          lastUpdateTime: '2024-01-25T23:00:07Z'
+          message:
+            ReplicaSet "neuvector-registry-adapter-pod-5985cdc6c7" has successfully
+            progressed.
+          reason: NewReplicaSetAvailable
+          status: 'True'
+          type: Progressing
+      observedGeneration: 1
+      readyReplicas: 1
+      replicas: 1
+      updatedReplicas: 1
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        deployment.kubernetes.io/revision: '2'
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"chart":"core-2.6.6","heritage":"Helm","release":"release-name"},"name":"neuvector-scanner-pod","namespace":"neuvector"},"spec":{"replicas":3,"selector":{"matchLabels":{"app":"neuvector-scanner-pod"}},"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"},"template":{"metadata":{"labels":{"app":"neuvector-scanner-pod"}},"spec":{"containers":[{"env":[{"name":"CLUSTER_JOIN_ADDR","value":"neuvector-svc-controller.neuvector"},{"name":"AUTO_INTERNAL_CERT","value":"1"}],"image":"396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest","imagePullPolicy":"Always","name":"neuvector-scanner-pod","resources":{},"volumeMounts":[{"mountPath":"/etc/neuvector/certs/internal/","name":"internal-cert-dir"}]}],"imagePullSecrets":[{"name":"my-docker-secret"}],"restartPolicy":"Always","serviceAccount":"default","serviceAccountName":"default","volumes":[{"emptyDir":{"sizeLimit":"50Mi"},"name":"internal-cert-dir"}]}}}}
+      creationTimestamp: '2024-01-25T22:59:01Z'
+      generation: 2
+      labels:
+        chart: core-2.6.6
+        heritage: Helm
+        release: release-name
+      name: neuvector-scanner-pod
+      namespace: neuvector
+      resourceVersion: '1316086'
+      uid: c9633f17-59a4-46dd-a94c-d85bf3636338
+    spec:
+      progressDeadlineSeconds: 600
+      replicas: 3
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app: neuvector-scanner-pod
+      strategy:
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+        type: RollingUpdate
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: neuvector-scanner-pod
+        spec:
+          containers:
+            - env:
+                - name: CLUSTER_JOIN_ADDR
+                  value: neuvector-svc-controller.neuvector
+                - name: AUTO_INTERNAL_CERT
+                  value: '1'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/scanner:latest
+              imagePullPolicy: Always
+              name: neuvector-scanner-pod
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /etc/neuvector/certs/internal/
+                  name: internal-cert-dir
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - emptyDir:
+                sizeLimit: 50Mi
+              name: internal-cert-dir
+    status:
+      availableReplicas: 3
+      conditions:
+        - lastTransitionTime: '2024-01-25T22:59:04Z'
+          lastUpdateTime: '2024-01-25T22:59:04Z'
+          message: Deployment has minimum availability.
+          reason: MinimumReplicasAvailable
+          status: 'True'
+          type: Available
+        - lastTransitionTime: '2024-01-25T22:59:01Z'
+          lastUpdateTime: '2024-01-25T23:00:11Z'
+          message: ReplicaSet "neuvector-scanner-pod-7cdcb54779" has successfully progressed.
+          reason: NewReplicaSetAvailable
+          status: 'True'
+          type: Progressing
+      observedGeneration: 2
+      readyReplicas: 3
+      replicas: 3
+      updatedReplicas: 3
+kind: List
+metadata:
+  resourceVersion: ''

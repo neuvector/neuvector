@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -17,8 +17,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/api"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -63,7 +63,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	var whsvr WebhookServer
 	var stamps api.AdmCtlTimeStamps
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	body = _preprocessImportBody(body)
 	yamlParts := strings.Split(string(body), "\n---\n")
 
@@ -167,7 +167,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 				oneResult.Name = tempObj.ObjectMeta.Name
 				switch tempObj.Kind {
 				case k8sKindCronJob, k8sKindDaemonSet, k8sKindDeployment, k8sKindDeploymentConfig, k8sKindJob,
-					K8sKindReplicationController, k8sKindReplicaSet, K8sKindStatefulSet, k8sKindPod:
+					K8sKindReplicationController, k8sKindReplicaSet, K8sKindStatefulSet, k8sKindPod, k8sKindPersistentVolumeClaim:
 					ar := admissionv1beta1.AdmissionReview{
 						Request: &admissionv1beta1.AdmissionRequest{
 							Operation: admissionv1beta1.Create,

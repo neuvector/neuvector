@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -109,6 +109,7 @@ func (exp GitHubExport) Do() error {
 	if err != nil {
 		return fmt.Errorf("could not do request: %s", err.Error())
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusCreated {
 		if response.Header.Get("x-ratelimit-remaining") == "0" {
@@ -137,7 +138,7 @@ func getRateLimitResetDate(rateLimitResetHeader string) *time.Time {
 	return &rateLimitResetDate
 }
 
-func (exp GitHubExport) getExistingFileSha() (string, string, error) {
+func (exp GitHubExport) getExistingFileSha() (sha string, ver string, reterr error) {
 	client := http.DefaultClient
 
 	req := exp.getBaseRequest(http.MethodGet)
@@ -147,6 +148,12 @@ func (exp GitHubExport) getExistingFileSha() (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("could not do request: %s", err.Error())
 	}
+	defer func() {
+		err = resp.Body.Close()
+		if reterr == nil && err != nil {
+			reterr = fmt.Errorf("error closing response body: %s", err.Error())
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
@@ -156,14 +163,9 @@ func (exp GitHubExport) getExistingFileSha() (string, string, error) {
 	}
 
 	var body []byte
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading response body: %s", err.Error())
-	}
-
-	err = resp.Body.Close()
-	if err != nil {
-		return "", "", fmt.Errorf("error closing response body: %s", err.Error())
 	}
 
 	var githubVer string

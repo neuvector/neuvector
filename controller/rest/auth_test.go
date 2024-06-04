@@ -273,7 +273,7 @@ func TestLDAPLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, wrong password: status=%v.", w.status)
 	}
-	if _, authz := lookupShadowUser(ldap.Name, "user", ""); authz {
+	if _, authz := lookupShadowUser(ldap.Name, "", "user", ""); authz {
 		t.Errorf("No shadow user should be created.")
 	}
 
@@ -282,7 +282,7 @@ func TestLDAPLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, no matched role: status=%v.", w.status)
 	}
-	if user, authz := lookupShadowUser(ldap.Name, "user", ""); user == nil {
+	if user, authz := lookupShadowUser(ldap.Name, "", "user", ""); user == nil {
 		t.Errorf("Shadow user should be created.")
 	} else if authz {
 		t.Errorf("Shadow user should not be authorized.")
@@ -581,7 +581,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, server not enable: status=%v.", w.status)
 	}
-	if _, authz := lookupShadowUser(saml.Name, username, "", "", "", make(map[string][]string)); authz {
+	if _, authz := lookupShadowUser(saml.Name, "", username, "", "", "", make(map[string][]string), share.NvPermissions{}, nil); authz {
 		t.Errorf("No shadow user should be created.")
 	}
 
@@ -919,7 +919,7 @@ func TestOIDCLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, server not enable: status=%v.", w.status)
 	}
-	if _, authz := lookupShadowUser(oidc.Name, username, ""); authz {
+	if _, authz := lookupShadowUser(oidc.Name, "", username, ""); authz {
 		t.Errorf("No shadow user should be created.")
 	}
 
@@ -929,7 +929,7 @@ func TestOIDCLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, no role or username: status=%v.", w.status)
 	}
-	if user, authz := lookupShadowUser(oidc.Name, username, ""); user == nil {
+	if user, authz := lookupShadowUser(oidc.Name, "", username, ""); user == nil {
 		t.Errorf("Shadow user should be created.")
 	} else if authz {
 		t.Errorf("Shadow user should not be authorized.")
@@ -1017,7 +1017,7 @@ func TestJWTSignValidate(t *testing.T) {
 	}
 	remote := "10.1.2.3"
 
-	_, tokenString, _ := jwtGenerateToken(user, roles, remote, "", "", nil)
+	_, tokenString, _ := jwtGenerateToken(user, roles, nil, remote, "", "", nil)
 
 	token, _ := jwtValidateToken(tokenString, "", nil)
 	if token.Fullname != user.Fullname {

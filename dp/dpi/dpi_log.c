@@ -15,6 +15,7 @@
 #include "dpi/dpi_log.h"
 
 extern bool cmp_mac_prefix(void *m1, void *prefix);
+extern int g_stats_slot;
 
 #define LOG_CACHE_TIMEOUT 5
 
@@ -763,6 +764,27 @@ int dpi_session_log_xff(dpi_session_t *s, DPMsgSession *dps)
     return 0;
 }
 
+static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
+{
+    uint32_t cur = g_stats_slot;
+    uint32_t last = s->cur_slot;
+    if (last + 59 >= cur) {
+        uint32_t from = (cur >= 59) ? cur - 59 : 0;
+        uint32_t i, n, sess;
+        uint64_t byte;
+        sess = 0;
+        byte = 0;
+        for (n = from; n < last; n ++) {
+            i = n % STATS_SLOTS;
+            sess += s->in.sess_ring[i];
+            byte += s->in.byte_ring[i];
+        }
+        dps->EpSessIn60 = sess;
+        dps->EpByteIn60 = byte;
+    }
+    dps->EpSessCurIn = s->in.cur_session;
+}
+
 void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
 {
     memset(dps, 0, sizeof(DPMsgSession));
@@ -855,6 +877,13 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
     dps->Severity = sess->severity;
     dps->PolicyAction = sess->policy_desc.action;
     dps->PolicyId = sess->policy_desc.id;
+
+    io_mac_t *mac = rcu_map_lookup(&g_ep_map, dps->EPMAC);
+    if (mac != NULL) {
+        get_ingress_stats(dps, &mac->ep->stats);
+        /*DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn=%lu EpSessIn60=%lu EpByteIn60=%llu\n",
+            dps->EpSessCurIn, dps->EpSessIn60, dps->EpByteIn60);*/
+    }
 }
 
 static void dpi_session_log_from_pkt(dpi_packet_t *p, int to_server, dpi_policy_desc_t *desc,

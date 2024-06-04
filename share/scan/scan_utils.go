@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -79,17 +78,17 @@ var scanErrString = []string{
 }
 
 type CacheRecord struct {
-	Layer	string		`json:"layerID,omitempty"`
-	Size	uint64		`json:"size,omitempty"`
-	RefCnt	uint32		`json:"ref_cnt,omitempty"`
-	RefLast	time.Time	`json:"ref_last,omitempty"`
+	Layer   string    `json:"layerID,omitempty"`
+	Size    uint64    `json:"size,omitempty"`
+	RefCnt  uint32    `json:"ref_cnt,omitempty"`
+	RefLast time.Time `json:"ref_last,omitempty"`
 }
 
 type CacherData struct {
-	CacheRecords 	[]CacheRecord	`json:"cache_records,omitempty"`
-	MissCnt         uint64			`json:"cache_misses,omitempty"`
-	HitCnt          uint64			`json:"cache_hits,omitempty"`
-	CurRecordSize   uint64			`json:"current_record_size"`
+	CacheRecords  []CacheRecord `json:"cache_records,omitempty"`
+	MissCnt       uint64        `json:"cache_misses,omitempty"`
+	HitCnt        uint64        `json:"cache_hits,omitempty"`
+	CurRecordSize uint64        `json:"current_record_size"`
 }
 
 func ScanErrorToStr(e share.ScanErrorCode) string {
@@ -130,7 +129,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			}
 			hasPackage = true
 		} else if lib == DpkgStatusDir {
-			dpkgfiles, err := ioutil.ReadDir(path)
+			dpkgfiles, err := os.ReadDir(path)
 			if err != nil {
 				continue
 			}
@@ -226,8 +225,8 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 }
 
 func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
-	apps := NewScanApps(true)
-	exclDirs := utils.NewSet("bin", "boot", "dev", "proc", "run", "sys", "tmp")
+	apps := NewScanApps(false) // no need to scan the same file twice
+	exclDirs := utils.NewSet("boot", "dev", "proc", "run", "sys")
 	rootPath := s.sys.ContainerFilePath(pid, "/")
 	rootLen := len(rootPath)
 
@@ -294,6 +293,7 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
@@ -306,12 +306,17 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 	list := make([]RPMPackage, 0, len(pkgs))
 	for _, p := range pkgs {
 		if p.Name != "gpg-pubkey" {
+			var epoch int
+			if p.Epoch != nil {
+				epoch = *p.Epoch
+			}
+
 			if kernel == "" {
-				list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+				list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 			} else {
 				// filter kernels that are not running
 				if k := isRpmKernelPackage(p); k == "" || strings.HasPrefix(kernel, k) {
-					list = append(list, RPMPackage{Name: p.Name, Epoch: p.Epoch, Version: p.Version, Release: p.Release})
+					list = append(list, RPMPackage{Name: p.Name, Epoch: epoch, Version: p.Version, Release: p.Release})
 				}
 			}
 		}
@@ -547,7 +552,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	defer os.Remove(fileName) // clean up
 
 	apps := NewScanApps(true)
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "scan_lambda")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "scan_lambda")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Create temp directory fail")
 		return nil, err
@@ -563,7 +568,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 			}
 			defer zFile.Close()
 
-			tmpfile, err := ioutil.TempFile(tmpDir, "extract")
+			tmpfile, err := os.CreateTemp(tmpDir, "extract")
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "filename": file.Name}).Error("write to temp file fail")
 				continue

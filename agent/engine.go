@@ -84,6 +84,7 @@ type containerData struct {
 	pushPHistory   bool
 	examIntface    bool
 	scanCache      []byte
+	nvRole         string
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -177,6 +178,13 @@ func gInfoRUnlock() {
 func gInfoReadActiveContainer(id string) (*containerData, bool) {
 	gInfoRLock()
 	c, ok := gInfo.activeContainers[id]
+	gInfoRUnlock()
+	return c, ok
+}
+
+func gInfoReadNeuvectorContainer(id string) (*containerData, bool) {
+	gInfoRLock()
+	c, ok := gInfo.neuContainers[id]
 	gInfoRUnlock()
 	return c, ok
 }
@@ -1008,7 +1016,7 @@ func programUpdatePairs(c *containerData, restore bool) (bool, bool, bool, map[s
 }
 
 func taskReexamIntfContainer(id string, info *container.ContainerMetaExtra, restartMonitor bool) {
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		if info != nil && c.pid != info.Pid {
 			return
 		}
@@ -1288,6 +1296,20 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 	}
 }
 
+func isMultiNetworkContainer(c *containerData) bool {
+	if c.intcpPairs != nil {
+		if len(c.intcpPairs) < 2 {
+			return false
+		}
+		for _, pair := range c.intcpPairs {
+			if pair.Peer == "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
 	if c.hostMode {
 		return nil, errHostModeUnsupported
@@ -1319,7 +1341,7 @@ func programNfqPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, err
 }
 
 func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error) {
-	if driver == pipe.PIPE_CLM {
+	if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 		return programNfqPorts(c, restore)
 	}
 	// Platform containers' interfaces should be inspected, so instead of check against hasDatapath,
@@ -1371,7 +1393,7 @@ func programBridge(c *containerData) {
 		for _, pair := range c.intcpPairs {
 			pipe.ResetPortPair(c.pid, pair)
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, true)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to create quarantine iptable rules")
@@ -1381,14 +1403,14 @@ func programBridge(c *containerData) {
 		for _, pair := range c.intcpPairs {
 			pipe.FwdPortPair(c.pid, pair)
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, false)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
 			}
 		}
 	} else {
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			err := pipe.CreateNfqQuarRules(c.pid, false)
 			if err != nil {
 				log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to delete quarantine iptable rules")
@@ -1482,7 +1504,7 @@ func programBridgeNoTc(c *containerData) {
 }
 
 func programDP(c *containerData, cfgApp bool, macChangePairs map[string]*pipe.InterceptPair) {
-	if driver == pipe.PIPE_CLM {
+	if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 		programNfqDP(c, cfgApp, macChangePairs)
 		return
 	}
@@ -1608,11 +1630,11 @@ func examNeuVectorInterface(c *containerData, change int) {
 	}
 }
 
-func isNeuvectorContainerById(id string) bool {
-	gInfoRLock()
-	defer gInfoRUnlock()
-	_, ok := gInfo.neuContainers[id]
-	return ok
+func isNeuvectorContainerById(id string) (string, bool) {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
+		return c.nvRole, true
+	}
+	return "", false
 }
 
 // oc49 and above: pod process is none on the cri-o
@@ -1628,7 +1650,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	log.WithFields(log.Fields{"id": id, "name": info.Name, "role": role, "pid": info.Pid}).Info()
 
 	// log.WithFields(log.Fields{"container": info}).Debug("PROC:")
-	if isNeuvectorContainerById(id) { // existed and ignore it
+	if _, ok := isNeuvectorContainerById(id); ok { // existed and ignore it
 		return
 	}
 
@@ -1644,6 +1666,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		pods:           utils.NewSet(),
 		ownListenPorts: utils.NewSet(),
 		capBlock:       true, // intentional for process monitor
+		nvRole:         role,
 	}
 
 	// Because activePid2ID doesn't have neuvector container in it, we cannot always get
@@ -1691,17 +1714,37 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
-
+		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+		prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, c.pid)
 		// file monitors : protect mode, core-definitions, only modification alerts
-		fileWatcher.ContainerCleanup(info.Pid)
+		fileWatcher.ContainerCleanup(info.Pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
 		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
-			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true,
+			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
 		})
+
+		var filters []share.CLUSFileMonitorFilter
+		if role ==  "enforcer" || role == "controller+enforcer+manager" || role == "controller+enforcer" || role == "allinone" {
+			for _, fltr := range conf.Profile.Filters {
+				switch fltr.Path {
+				case "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin" : // skipped
+				default:
+					filters = append(filters, fltr)
+				}
+			}
+			filters = append(filters, share.CLUSFileMonitorFilter{
+				Behavior: share.FileAccessBehaviorBlock, Path: "/usr/local/bin/scripts", Regex: ".*", Recursive: true, CustomerAdd: true,
+			})
+			filters = append(filters, share.CLUSFileMonitorFilter{
+				Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
+			})
+			conf.Profile.Filters = filters // customized
+		}
+
 		conf.Profile.Mode = share.PolicyModeEnforce
 		conf.Profile.Group = group
 		if info.Pid != 0 {
-			go fileWatcher.StartWatch(id, info.Pid, conf, false, true)
+			go fileWatcher.StartWatch(id, info.Pid, conf, true, true)
 		}
 	}
 
@@ -1761,8 +1804,9 @@ func stopNeuVectorMonitor(c *containerData) {
 		pe.DeleteProcessPolicy(group)
 	}
 
+	prober.HandleAnchorNvProtectChange(false, c.id, c.upperDir, c.pid)
 	log.WithFields(log.Fields{"id": c.id, "pid": c.pid}).Debug("FMON:")
-	fileWatcher.ContainerCleanup(c.pid)
+	fileWatcher.ContainerCleanup(c.pid, true)
 
 	// Send event to controller
 	if !isChild {
@@ -1773,7 +1817,6 @@ func stopNeuVectorMonitor(c *containerData) {
 		ev = ClusterEvent{event: EV_DEL_CONTAINER, id: c.id}
 		ClusterEventChan <- &ev
 	}
-
 	return
 }
 
@@ -2050,7 +2093,7 @@ func delProgramNfqDP(c *containerData, ns string) {
 }
 
 func taskStopContainer(id string, pid int) {
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		stopNeuVectorMonitor(c)
 		return
 	}
@@ -2101,7 +2144,7 @@ func taskStopContainer(id string, pid int) {
 		prober.StopMonitorInterface(id)
 
 		if c.inline || c.quar {
-			if driver != pipe.PIPE_CLM {
+			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				pipe.CleanupContainer(c.pid, c.intcpPairs)
 			}
 			for _, pair := range c.intcpPairs {
@@ -2116,7 +2159,7 @@ func taskStopContainer(id string, pid int) {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
@@ -2156,7 +2199,7 @@ func taskStopContainer(id string, pid int) {
 
 func taskDelContainer(id string) {
 	// If the container stop event is missed, call stop first.
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		stopNeuVectorMonitor(c)
 		return
 	}
@@ -2364,7 +2407,7 @@ func containerTaskExit() {
 
 		prober.StopMonitorInterface(c.id)
 		if c.inline || c.quar {
-			if driver != pipe.PIPE_CLM {
+			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
 				pipe.RestoreContainer(c.pid, c.intcpPairs)
 			}
@@ -2389,7 +2432,7 @@ func containerTaskExit() {
 				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
 			}
 		}
-		if driver == pipe.PIPE_CLM {
+		if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
 			delProgramNfqDP(c, netns)
 		}
 		//POD with proxy injection
@@ -2441,7 +2484,7 @@ func getContainerService(id string) (string, bool, bool) {
 		return c.service, c.capBlock, false
 	}
 
-	if c, ok := gInfo.neuContainers[id]; ok {
+	if c, ok := gInfoReadNeuvectorContainer(id); ok {
 		return c.service, c.capBlock, true
 	}
 	return "", false, false
@@ -2476,21 +2519,21 @@ func StartMonitorHostInterface(hid string, pid int, stopCh chan struct{}) {
 func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 	var err error
 	chLink := make(chan netlink.LinkUpdate)
-	doneLink := make(chan struct{})	
+	doneLink := make(chan struct{})
 	defer close(doneLink)
 
 	if err = netlink.LinkSubscribe(chLink, doneLink); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Link change subscription failed")
 	}
-	
+
 	chAddr := make(chan netlink.AddrUpdate)
-	doneAddr := make(chan struct{})	
+	doneAddr := make(chan struct{})
 	defer close(doneAddr)
 
 	if err = netlink.AddrSubscribe(chAddr, doneAddr); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Address change subscription failed")
 	}
- 
+
 	log.Debug("Start monitoring Host Interface changes...")
 
 	for {
