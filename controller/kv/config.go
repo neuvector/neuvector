@@ -16,7 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -30,7 +30,7 @@ type PauseResumeStoreWatcherFunc func(ip string, port uint16, req share.CLUSStor
 type ConfigHelper interface {
 	NotifyConfigChange(endpoint string)
 	BackupAll()
-	Restore() (string, error)
+	Restore() (string, bool, error)
 	Export(w *bufio.Writer, sections utils.Set) error
 	Import(eps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
 		tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc,
@@ -56,6 +56,7 @@ type configHelper struct {
 type fedRulesRevInfo struct {
 	fedRulesRevValue string
 	fedRole          string
+	defAdminRestored bool
 }
 
 const clusterLockWait = time.Duration(time.Second * 20)
@@ -336,7 +337,7 @@ func restoreEPs(eps utils.Set, ch chan error, importInfo *fedRulesRevInfo) error
 	return err
 }
 
-func (c *configHelper) Restore() (string, error) {
+func (c *configHelper) Restore() (string, bool, error) {
 	log.Info()
 
 	if !c.persist {
@@ -353,7 +354,7 @@ func (c *configHelper) Restore() (string, error) {
 			clusHelper.PutFedScanRevisions(&scanRevs, &rev)
 		}
 
-		return "", nil
+		return "", false, nil
 	}
 
 	importInfo := fedRulesRevInfo{}
@@ -401,7 +402,7 @@ func (c *configHelper) Restore() (string, error) {
 		}
 	}
 
-	return importInfo.fedRole, err
+	return importInfo.fedRole, importInfo.defAdminRestored, err
 }
 
 type configHeader struct {
@@ -485,11 +486,11 @@ func (c *configHelper) sections2Endpoints(sections []string) []*cfgEndpoint {
 	return eps
 }
 
-// 1. When import, cluster name is always replaced with the cluster name(if available) specified in the backup file
-// 2. When import, fed rules are always replaced with the fed rules specified in the backup file.
-// 3. For clusters in fed, Import() doesn't change the existing clusters membership.
-// 4. For stand-alone cluster, we allow it to promote to master cluster by importing a master cluster's backup file.
-//	  However, joined clusters list is not imported. Customer needs to manually trigger join-fed operation.
+//  1. When import, cluster name is always replaced with the cluster name(if available) specified in the backup file
+//  2. When import, fed rules are always replaced with the fed rules specified in the backup file.
+//  3. For clusters in fed, Import() doesn't change the existing clusters membership.
+//  4. For stand-alone cluster, we allow it to promote to master cluster by importing a master cluster's backup file.
+//     However, joined clusters list is not imported. Customer needs to manually trigger join-fed operation.
 func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
 	tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc, ignoreFed bool) error {
 	log.Debug()

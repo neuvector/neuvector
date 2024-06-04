@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ type SocketInfo struct {
 func GetProcessPIDs(pid int) (ppid, gid, sid int, status, cmd string) {
 	ppid = -1
 	filename := global.SYS.ContainerProcFilePath(pid, "/stat")
-	dat, err := ioutil.ReadFile(filename)
+	dat, err := os.ReadFile(filename)
 	if err != nil {
 		// log.WithFields(log.Fields{"error": err, "file": filename}).Error("")
 		return
@@ -395,7 +394,7 @@ func GetProcessConnection(pid int, clientPort *share.CLUSProtoPort, inodes utils
 func GetProcessUIDs(pid int) (name string, ppid, ruid, euid int) {
 	ppid = -1
 	filename := global.SYS.ContainerProcFilePath(pid, "/status")
-	dat, err := ioutil.ReadFile(filename)
+	dat, err := os.ReadFile(filename)
 	if err != nil {
 		// No log here, too many error when called by escalation eval.
 		// log.WithFields(log.Fields{"error": err, "file": filename}).Error("")

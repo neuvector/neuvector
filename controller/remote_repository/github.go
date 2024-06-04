@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -163,7 +163,7 @@ func (exp GitHubExport) getExistingFileSha() (sha string, ver string, reterr err
 	}
 
 	var body []byte
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading response body: %s", err.Error())
 	}

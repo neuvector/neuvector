@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -98,7 +98,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserData
 	err := json.Unmarshal(body, &rconf)
@@ -125,7 +125,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, true); e != nil {
+	if e := isValidRoleDomains(ruser.Fullname, ruser.Role, ruser.RoleDomains, nil, nil, true); e != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
 		return
 	}
@@ -218,22 +218,36 @@ func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 	if user.Fullname == common.DefaultAdminUser && user.PasswordHash == utils.HashPassword(common.DefaultAdminPass) {
 		defaultPW = true
 	}
-	userRest := &api.RESTUser{
-		Fullname:           user.Fullname,
-		Server:             user.Server,
-		Username:           user.Username,
-		Role:               user.Role,
-		EMail:              user.EMail,
-		Timeout:            user.Timeout,
-		Locale:             user.Locale,
-		DefaultPWD:         defaultPW,
-		RoleDomains:        user.RoleDomains,
-		LastLoginTimeStamp: user.LastLoginAt.Unix(),
-		LastLoginAt:        api.RESTTimeString(user.LastLoginAt),
-		LoginCount:         user.LoginCount,
+
+	var extraPermitsDomains []api.RESTPermitsAssigned
+	if len(user.ExtraPermitsDomains) > 0 {
+		extraPermitsDomains = make([]api.RESTPermitsAssigned, len(user.ExtraPermitsDomains))
+		for i, permitsDomains := range user.ExtraPermitsDomains {
+			extraPermitsDomains[i] = api.RESTPermitsAssigned{
+				Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
+				Domains: permitsDomains.Domains,
+			}
+		}
 	}
 
-	if acc.HasGlobalPermissions(0, share.PERM_AUTHORIZATION) && userRest.Server == "" {
+	userRest := &api.RESTUser{
+		Fullname:            user.Fullname,
+		Server:              user.Server,
+		Username:            user.Username,
+		Role:                user.Role,
+		ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, user.ExtraPermits),
+		EMail:               user.EMail,
+		Timeout:             user.Timeout,
+		Locale:              user.Locale,
+		DefaultPWD:          defaultPW,
+		RoleDomains:         user.RoleDomains,
+		ExtraPermitsDomains: extraPermitsDomains,
+		LastLoginTimeStamp:  user.LastLoginAt.Unix(),
+		LastLoginAt:         api.RESTTimeString(user.LastLoginAt),
+		LoginCount:          user.LoginCount,
+	}
+
+	if acc != nil && acc.HasGlobalPermissions(0, share.PERM_AUTHORIZATION) && userRest.Server == "" {
 		if acc.IsFedAdmin() || (acc.CanWriteCluster() && user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader) {
 			userRest.PwdResettable = true
 		}
@@ -322,7 +336,7 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		resp.PwdDaysUntilExpire = -1
 		resp.PwdHoursUntilExpire = 0
 	}
-	resp.GlobalPermits, resp.DomainPermits, _ = access.GetDomainPermissions(user.Role, user.RoleDomains)
+	resp.GlobalPermits, resp.DomainPermits, _ = access.GetUserPermissions(user.Role, user.RoleDomains, user.ExtraPermits, user.ExtraPermitsDomains)
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
 }
@@ -463,7 +477,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	fullname, _ = url.PathUnescape(fullname)
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -531,6 +545,15 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 		ruser := rconf.Config
 
+		if strings.HasPrefix(user.Server, share.FlavorRancher) {
+			if ruser.Role != nil || ruser.RoleDomains != nil {
+				//e := "Cannot change Rancher SSO user's role/permissions in NeuVector"
+				//log.WithFields(log.Fields{"user": fullname}).Error(e)
+				ruser.Role = nil
+				ruser.RoleDomains = nil
+			}
+		}
+
 		// To modify password, existing password must be given
 		if ruser.NewPassword != nil {
 			if !myself {
@@ -584,69 +607,71 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		if fullname == common.DefaultAdminUser && ruser.Role != nil {
 			if (fedRole == api.FedRoleMaster && *ruser.Role != api.UserRoleFedAdmin) || (fedRole != api.FedRoleMaster && *ruser.Role != api.UserRoleAdmin) {
 				e := "Default admin user's role cannot be changed"
-				log.WithFields(log.Fields{"user": fullname, "role": *ruser.Role}).Error(e)
+				log.WithFields(log.Fields{"user": fullname, "role": *ruser.Role, "fedRole": fedRole}).Error(e)
 				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, e)
 				return
 			}
 		}
 
-		// Check if global role & domain roles are valid
-		newRole := user.Role
-		newRoleDomains := user.RoleDomains
-		if ruser.Role != nil {
-			newRole = *ruser.Role
-		}
-		if ruser.RoleDomains != nil {
-			newRoleDomains = *ruser.RoleDomains
-		}
-		if e := isValidRoleDomains(ruser.Fullname, newRole, newRoleDomains, false); e != nil {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
-			return
-		}
-
-		err = nil
-		if (user.Role == api.UserRoleIBMSA) || (user.Role == api.UserRoleImportStatus) {
-			err = common.ErrObjectAccessDenied
-		} else {
-			fedRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
-			if fedRole == api.FedRoleMaster {
-				if newRole != user.Role {
-					// On master cluster, only users with fedAdmin role can:
-					// 1. assign/remove fedAdmin/fedReader role to/from users
-					// 2. delete users who have fedAdmin/fedReader role
-					if (login.domainRoles[access.AccessDomainGlobal] != api.UserRoleFedAdmin) && (fedRoles.Contains(newRole) || fedRoles.Contains(user.Role)) {
-						err = common.ErrObjectAccessDenied
-					}
-				}
-			} else if fedRoles.Contains(newRole) {
-				// On non-master cluster, fedAdmin/fedReader roles cannot be be assigned to user
-				err = common.ErrObjectAccessDenied
+		if !strings.HasPrefix(user.Server, share.FlavorRancher) {
+			// Check if global role & domain roles are valid
+			newRole := user.Role
+			newRoleDomains := user.RoleDomains
+			if ruser.Role != nil {
+				newRole = *ruser.Role
 			}
-		}
-		if err == common.ErrObjectAccessDenied {
-			restRespAccessDenied(w, login)
-			return
-		}
+			if ruser.RoleDomains != nil {
+				newRoleDomains = *ruser.RoleDomains
+			}
+			if e := isValidRoleDomains(ruser.Fullname, newRole, newRoleDomains, nil, nil, false); e != nil {
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
+				return
+			}
 
-		// With a user's global role, it doesn't need to have the same role in its RoleDomains
-		delete(newRoleDomains, newRole)
-
-		// If configuring myself, no authz needed if role not changed; if not myself, authz has been done.
-		// For every domain that a user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
-		if roleModUser, roleModified := applyRoleChange(user, ruser); roleModified {
-			log.WithFields(log.Fields{
-				"acc":        acc,
-				"mod-role":   roleModUser.Role == roleModDummyRole,
-				"mod-domain": roleModUser.RoleDomains[roleModDummyRole],
-			}).Debug("Role modified")
-
-			if !acc.AuthorizeOwn(roleModUser, nil) {
+			err = nil
+			if (user.Role == api.UserRoleIBMSA) || (user.Role == api.UserRoleImportStatus) {
+				err = common.ErrObjectAccessDenied
+			} else {
+				fedRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
+				if fedRole == api.FedRoleMaster {
+					if newRole != user.Role {
+						// On master cluster, only users with fedAdmin role can:
+						// 1. assign/remove fedAdmin/fedReader role to/from users
+						// 2. delete users who have fedAdmin/fedReader role
+						if (login.domainRoles[access.AccessDomainGlobal] != api.UserRoleFedAdmin) && (fedRoles.Contains(newRole) || fedRoles.Contains(user.Role)) {
+							err = common.ErrObjectAccessDenied
+						}
+					}
+				} else if fedRoles.Contains(newRole) {
+					// On non-master cluster, fedAdmin/fedReader roles cannot be be assigned to user
+					err = common.ErrObjectAccessDenied
+				}
+			}
+			if err == common.ErrObjectAccessDenied {
 				restRespAccessDenied(w, login)
 				return
 			}
 
-			user.RoleOverride = true
-			kick = true
+			// With a user's global role, it doesn't need to have the same role in its RoleDomains
+			delete(newRoleDomains, newRole)
+
+			// If configuring myself, no authz needed if role not changed; if not myself, authz has been done.
+			// For every domain that a user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
+			if roleModUser, roleModified := applyRoleChange(user, ruser); roleModified {
+				log.WithFields(log.Fields{
+					"acc":        acc,
+					"mod-role":   roleModUser.Role == roleModDummyRole,
+					"mod-domain": roleModUser.RoleDomains[roleModDummyRole],
+				}).Debug("Role modified")
+
+				if !acc.AuthorizeOwn(roleModUser, nil) {
+					restRespAccessDenied(w, login)
+					return
+				}
+
+				user.RoleOverride = true
+				kick = true
+			}
 		}
 
 		if ruser.EMail != nil {
@@ -720,7 +745,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var errMsg string
 	var rconf api.RESTUserPwdConfigData
@@ -867,7 +892,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserRoleDomainsConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -948,7 +973,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 			kick = true
 		}
 
-		if e := isValidRoleDomains(user.Fullname, user.Role, user.RoleDomains, false); e != nil {
+		if e := isValidRoleDomains(user.Fullname, user.Role, user.RoleDomains, nil, nil, false); e != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
 			return
 		}
@@ -1036,7 +1061,9 @@ func handlerUserDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete user")
 }
 
-func isValidRoleDomains(user, globalRole string, roleDomains map[string][]string, allowNoPermission bool) error {
+func isValidRoleDomains(user, globalRole string, roleDomains map[string][]string,
+	globalPermits *share.NvPermissions, extraPermitsDomains []share.CLUSPermitsAssigned, allowNoPermission bool) error {
+
 	var err error
 	if !access.IsValidRole(globalRole, access.CONST_VISIBLE_USER_ROLE) {
 		err = fmt.Errorf("User %s  Unknown global role %s ", user, globalRole)
@@ -1084,7 +1111,20 @@ out:
 		}
 	}
 	if globalRole == api.UserRoleNone && len(roleDomains) == 0 && !allowNoPermission {
-		err = fmt.Errorf("User %s  Not assigned any role for any domain", user)
+		foundPermits := false
+		if globalPermits != nil && globalPermits.IsEmpty() {
+			for _, permitsDomains := range extraPermitsDomains {
+				if !permitsDomains.Permits.IsEmpty() && len(permitsDomains.Domains) > 0 {
+					foundPermits = true
+					break
+				}
+			}
+		} else {
+			foundPermits = true
+		}
+		if !foundPermits {
+			err = fmt.Errorf("User %s  Not assigned any role/permission for any domain", user)
+		}
 	}
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
@@ -1188,7 +1228,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTApikeyCreationData
 	err := json.Unmarshal(body, &rconf)
@@ -1221,7 +1261,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if e := isValidRoleDomains(rapikey.Name, rapikey.Role, rapikey.RoleDomains, true); e != nil {
+	if e := isValidRoleDomains(rapikey.Name, rapikey.Role, rapikey.RoleDomains, nil, nil, true); e != nil {
 		msg := e.Error()
 		if strings.HasPrefix(msg, "User") {
 			msg = fmt.Sprintf("API key %s", msg[5:])
@@ -1392,7 +1432,7 @@ func handlerSelfApikeyShow(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	resp := api.RESTSelfApikeyData{Apikey: apikey2REST(apikey)}
 
-	resp.GlobalPermits, resp.DomainPermits, _ = access.GetDomainPermissions(apikey.Role, apikey.RoleDomains)
+	resp.GlobalPermits, resp.DomainPermits, _ = access.GetUserPermissions(apikey.Role, apikey.RoleDomains, share.NvPermissions{}, nil)
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self apikey detail")
 }

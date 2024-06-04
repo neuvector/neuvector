@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -63,7 +63,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	var whsvr WebhookServer
 	var stamps api.AdmCtlTimeStamps
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	body = _preprocessImportBody(body)
 	yamlParts := strings.Split(string(body), "\n---\n")
 

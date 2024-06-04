@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -138,10 +138,12 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 			kind := resource.NvCspUsageKind
 			apiVersion := "susecloud.net/v1"
 			crCspUsage := &resource.NvCspUsage{
-				Kind:       &kind,
-				ApiVersion: &apiVersion,
-				Metadata: &metav1.ObjectMeta{
-					Name: &rscName,
+				TypeMeta: metav1.TypeMeta{
+					Kind:       kind,
+					APIVersion: apiVersion,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: rscName,
 				},
 				ManagedNodeCount: totalNodes,
 				ReportingTime:    t,

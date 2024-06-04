@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -221,7 +221,7 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 	group := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTProcessProfileConfigData
 	err := json.Unmarshal(body, &rconf)

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -25,7 +25,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var remoteRepository api.RESTRemoteRepository
 	err := json.Unmarshal(body, &remoteRepository)
 	if err != nil {
@@ -164,7 +164,7 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTRemoteRepositoryConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {

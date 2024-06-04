@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.3.1'
+  version: '5.4'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -6833,6 +6833,9 @@ definitions:
     properties:
       eula:
         $ref: '#/definitions/RESTEULA'
+      bootstrap_password_command:
+        type: string
+        description: kubectl command for retrieving bootstrap password of default admin user
   RESTEventsData:
     type: object
     required:
@@ -7033,6 +7036,10 @@ definitions:
       - platform_role
       - cfg_type
       - baseline_profile
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
     properties:
       name:
         type: string
@@ -7076,6 +7083,21 @@ definitions:
       baseline_profile:
         type: string
         example: ""
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       cap_change_mode:
         type: boolean
         example: false
@@ -7101,6 +7123,10 @@ definitions:
       - platform_role
       - cap_change_mode
       - cfg_type
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
       - criteria
       - members
       - policy_rules
@@ -7138,6 +7164,21 @@ definitions:
       cfg_type:
         type: string
         enum: [learned, user_created, ground, federal]
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       criteria:
         type: array
         items:
@@ -11367,6 +11408,11 @@ definitions:
       role:
         type: string
         example: admin
+      global_permissions:
+        description: permissions on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
       timeout:
         type: integer
         format: uint32
@@ -11387,6 +11433,21 @@ definitions:
           items:
             type: string
           example: ["domain1", "domain2"]
+      domain_permissions:
+        type: array
+        description: permissions on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      extra_permissions:
+        description: extra permissions(other than 'role') on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      extra_permissions_domains:
+        type: array
+        description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTPermitsAssigned'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11465,7 +11526,13 @@ definitions:
         example: user@mail.com
       role:
         type: string
+        description: role on global domain
         example: admin
+      extra_permissions:
+        description: extra permissions(other than 'role') on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
       timeout:
         type: integer
         format: uint32
@@ -11482,12 +11549,24 @@ definitions:
         description: If the password should be modified
       role_domains:
         type: object
-        description: Object key is role and value is array of domains
-        additionalProperties:
-          type: array
-          items:
+        description: map of roles on namespaces
+        properties:
+          key:
+            description: role
             type: string
-          example: ["domain1", "domain2"]
+          value:
+            type: object
+            description: array of domains
+            additionalProperties:
+              type: array
+              items:
+                type: string
+              example: ["domain1", "domain2"]
+      extra_permissions_domains:
+        type: array
+        description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTPermitsAssigned'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11509,6 +11588,20 @@ definitions:
         type: boolean
         description: whether the user's password can be reset by the current login user
         example: false
+  RESTPermitsAssigned:
+    type: object
+    properties:
+      permissions:
+        type: array
+        description: array of permissions
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      domains:
+        type: array
+        description: array of domains that have the same permissions
+        items:
+          type: string
+        example: ["domain1", "domain2"]
   RESTUserData:
     type: object
     required:
@@ -13868,3 +13961,12 @@ definitions:
       remote_repository_nickname:
         type: string
         example: default
+  NvPermissions:
+    type: object
+    properties:
+      read_value:
+        type: integer
+        format: uint32
+      write_value:
+        type: integer
+        format: uint32

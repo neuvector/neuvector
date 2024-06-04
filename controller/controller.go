@@ -30,10 +30,13 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/healthz"
+	"github.com/neuvector/neuvector/share/migration"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 var Host share.CLUSHost = share.CLUSHost{
@@ -460,6 +463,54 @@ func main() {
 		Ctrler: &Ctrler,
 	}
 
+	var grpcServer *cluster.GRPCServer
+	var internalCertControllerCancel context.CancelFunc
+	var ctx context.Context
+
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+
+		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
+
+		go func() {
+			if err := healthz.StartHealthzServer(); err != nil {
+				log.WithError(err).Warn("failed to start healthz server")
+			}
+		}()
+
+		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
+		defer internalCertControllerCancel()
+		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
+		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
+			// Reload consul
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading consul config")
+				if err := cluster.Reload(nil); err != nil {
+					return fmt.Errorf("failed to reload consul: %w", err)
+				}
+
+				return nil
+			},
+			// Reload grpc servers/clients
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading gRPC servers/clients")
+				if err := cluster.ReloadInternalCert(); err != nil {
+					return fmt.Errorf("failed to reload gRPC's certificate: %w", err)
+				}
+				return nil
+			},
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to initialize internal secret controller")
+			os.Exit(-2)
+		}
+		log.Info("internal certificate is initialized")
+	}
+
+	err = cluster.ReloadInternalCert()
+	if err != nil {
+		log.WithError(err).Fatal("failed to reload internal certificate")
+	}
+
 	eventLogKey := share.CLUSControllerEventLogKey(Host.ID, Ctrler.ID)
 	evqueue = cluster.NewObjectQueue(eventLogKey, cluster.DefaultMaxQLen)
 	auditLogKey := share.CLUSAuditLogKey(Host.ID, Ctrler.ID)
@@ -498,7 +549,6 @@ func main() {
 	}
 
 	// get grpc port before put controller info to cluster
-	var grpcServer *cluster.GRPCServer
 	if *grpcPort == 0 {
 		*grpcPort = cluster.DefaultControllerGRPCPort
 	}
@@ -534,6 +584,7 @@ func main() {
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
+	defAdminRestored := false
 
 	// Initialize installation ID.  Ignore if ID is already set.
 	clusHelper := kv.GetClusterHelper()
@@ -561,7 +612,7 @@ func main() {
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
 		// assuming the PV should have the latest config.
-		restoredFedRole, _ = kv.GetConfigHelper().Restore()
+		restoredFedRole, defAdminRestored, _ = kv.GetConfigHelper().Restore()
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
 			// 	we need to clean up fed rules & revisions in kv
@@ -654,6 +705,7 @@ func main() {
 
 	// pre-build compliance map
 	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor)
+	go scanUtils.UpdateComplianceConfigs()
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.
@@ -801,12 +853,33 @@ func main() {
 
 	access.UpdateUserRoleForFedRoleChange(fedRole)
 
-	// start rest server
-	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
+	// Load config from ConfigMap
+	defAdminLoaded := rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform)
+	if !defAdminRestored && !defAdminLoaded {
+		// if platform == share.PlatformKubernetes && Ctrler.Leader && isNewCluster && !*noDefAdmin {
+		if platform == share.PlatformKubernetes && Ctrler.Leader && !*noDefAdmin {
+			if bootstrapPwd := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+				acc := access.NewFedAdminAccessControl()
+				user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+				if user != nil {
+					user.PasswordHash = utils.HashPassword(bootstrapPwd)
+					user.ResetPwdInNextLogin = true
+					user.UseBootstrapPwd = true
+					user.PwdResetTime = time.Now().UTC()
+					err = clusHelper.PutUserRev(user, rev)
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"err": err}).Error()
+				}
+			}
+		}
+	}
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
-	go rest.StartRESTServer()
+
+	// start rest server
+	go rest.StartRESTServer(isNewCluster, Ctrler.Leader)
 
 	// go rest.StartLocalDevHttpServer() // for local dev only
 

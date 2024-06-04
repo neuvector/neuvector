@@ -363,7 +363,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 		return
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
-	log.WithFields(log.Fields{"roles": login.domainRoles, "nvPage": login.nvPage}).Error("Object access denied")
+	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
 	if login.nvPage != api.RESTNvPageDashboard {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
@@ -968,6 +968,7 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		if login.mainSessionID == _interactiveSessionID || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
 			clog.User = login.fullname
 			clog.UserRoles = login.domainRoles
+			clog.UserPermits = login.extraDomainPermits
 		} else {
 			userRole := api.UserRoleFedAdmin
 			if r, ok := login.domainRoles[access.AccessDomainGlobal]; ok && r == api.UserRoleReader {
@@ -1427,7 +1428,7 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer() {
+func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
 	licenseInit()
 	newRepoScanMgr()
@@ -1446,7 +1447,7 @@ func StartRESTServer() {
 	r.POST("/v1/auth/:server", handlerAuthLoginServer)
 	r.PATCH("/v1/auth", handlerAuthRefresh)
 	r.DELETE("/v1/auth", handlerAuthLogout)
-	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document
+	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document. Called by master cluster
 	r.GET("/v1/eula", handlerEULAShow)
 	r.POST("/v1/eula", handlerEULAConfig)
 	r.GET("/v1/user", handlerUserList)
@@ -1795,6 +1796,10 @@ func StartRESTServer() {
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
 
+	if isNewCluster && isLead {
+		go loadFedInitCfg()
+	}
+
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
 		MinVersion:               tls.VersionTLS11,
@@ -1874,6 +1879,7 @@ func startFedRestServer(fedPingInterval uint32) {
 		for i := 0; i < 5; i++ {
 			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 				if err == http.ErrServerClosed {
+					log.Info("REST Server closed")
 					break
 				}
 				log.WithFields(log.Fields{"error": err}).Error("Fail to start fed SSL rest")

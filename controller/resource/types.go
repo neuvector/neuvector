@@ -3,6 +3,8 @@ package resource
 import (
 	"errors"
 	"net"
+
+	"github.com/neuvector/neuvector/share"
 )
 
 var ErrMethodNotSupported = errors.New("Method not supported")
@@ -25,6 +27,7 @@ const (
 	RscTypePod                            = "pod"
 	RscTypeRBAC                           = "rbac"
 	RscTypeImage                          = "image"
+	RscTypeSecret                         = "secret"
 	RscTypeCrd                            = "customresourcedefinition"
 	RscTypeConfigMap                      = "configmap"
 	RscTypeMutatingWebhookConfiguration   = "mutatingwebhookconfiguration"   // case sensitive!
@@ -184,16 +187,10 @@ type Image struct {
 }
 
 type RBAC struct {
-	Name   string
-	Domain string
-	Roles  map[string]string // domain -> role
-}
-
-type CRD struct {
-	UID     string
-	Name    string
-	Domain  string
-	Version string
+	Name          string
+	Domain        string
+	DomainRoles   map[string]string              // domain -> nv reserved role
+	DomainPermits map[string]share.NvPermissions // domain -> nv permissions. for Rancher SSO custom roles only
 }
 
 type ConfigMap struct {

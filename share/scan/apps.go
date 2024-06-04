@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -436,7 +435,7 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 
 func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath string, depth int, dedup utils.Set) {
 	// in-memory unzip the jar file then walk through.
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	if err == nil {
 		defer os.RemoveAll(tempDir)
 	} else {
@@ -585,7 +584,7 @@ func IsRlangPackage(filename string) bool {
 func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
 	data := ComposerLock{}
 	//extract json data
-	bytes, err := ioutil.ReadFile(filepath)
+	bytes, err := os.ReadFile(filepath)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err, "file": filename}).Error("failed to read composer.lock file")
 		return
@@ -701,7 +700,7 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 
 	var dotnet dotnetPackage
 
-	if data, err := ioutil.ReadFile(fullpath); err != nil {
+	if data, err := os.ReadFile(fullpath); err != nil {
 		log.WithFields(log.Fields{"err": err, "fullpath": fullpath, "filename": filename}).Error("Failed to read file")
 		return
 	} else if err = json.Unmarshal(data, &dotnet); err != nil {

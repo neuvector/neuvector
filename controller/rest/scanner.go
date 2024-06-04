@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 
@@ -51,7 +51,7 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var sconf api.RESTScanConfigData
 	err := json.Unmarshal(body, &sconf)

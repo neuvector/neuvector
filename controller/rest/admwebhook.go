@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
-	k8sAppsv1 "github.com/neuvector/k8s/apis/apps/v1"
-	k8sMetav1 "github.com/neuvector/k8s/apis/meta/v1"
-
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -47,6 +44,7 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
+	//"github.com/neuvector/neuvector/vendor/github.com/neuvector/k8s"
 )
 
 const (
@@ -580,47 +578,42 @@ func mergeMaps(labels1, labels2 map[string]string) map[string]string {
 // kind, name, ns are owner's attributes
 func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, bool) {
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
-		var objectMeta *k8sMetav1.ObjectMeta
+		var ownerReferences []metav1.OwnerReference
 		switch kind {
 		case resource.RscTypeStatefulSet:
 			// support pod -> statefulset
-			if ssObj := obj.(*k8sAppsv1.StatefulSet); ssObj != nil {
-				if len(ssObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), mergeMaps(ssObj.Metadata.Annotations, ssObj.Spec.Template.Metadata.Annotations), true
+			if ssObj, ok := obj.(*appsv1.StatefulSet); ok {
+				if len(ssObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(ssObj.Labels, ssObj.Spec.Template.Labels), mergeMaps(ssObj.Annotations, ssObj.Spec.Template.Annotations), true
 				}
 			}
 		case resource.RscTypeReplicaSet:
 			// support pod -> replicaset -> deployment for now
-			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
-				objectMeta = rsObj.Metadata
+			if rsObj, ok := obj.(*appsv1.ReplicaSet); ok {
+				ownerReferences = rsObj.OwnerReferences
 			}
 		case resource.RscTypeDeployment:
-			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
-				if len(deployObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), mergeMaps(deployObj.Metadata.Annotations, deployObj.Spec.Template.Metadata.Annotations), true
+			if deployObj, ok := obj.(*appsv1.Deployment); ok {
+				if len(deployObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(deployObj.Labels, deployObj.Spec.Template.Labels), mergeMaps(deployObj.Annotations, deployObj.Spec.Template.Annotations), true
 				}
 			}
 		}
-		if objectMeta != nil {
-			for _, ownerRef := range objectMeta.OwnerReferences {
-				if ownerRef == nil {
-					continue
-				}
-				admResCacheMutex.RLock()
-				ownerObject, exist := admResCache[ownerRef.GetUid()]
-				admResCacheMutex.RUnlock()
-				if exist {
-					if len(ownerObject.OwnerUIDs) == 0 {
-						// owner is root resource (most likely deployment)
-						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
-					} else {
-						log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
-					}
+		for _, ownerRef := range ownerReferences {
+			admResCacheMutex.RLock()
+			ownerObject, exist := admResCache[string(ownerRef.UID)]
+			admResCacheMutex.RUnlock()
+			if exist {
+				if len(ownerObject.OwnerUIDs) == 0 {
+					// owner is root resource (most likely deployment)
+					return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
 				} else {
-					// trace up one layer in the owner chain
-					if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
-						return userName, groups, labels, annotations, true
-					}
+					log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
+				}
+			} else {
+				// trace up one layer in the owner chain
+				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.Kind), ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations, true
 				}
 			}
 		}
@@ -1404,7 +1397,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -1567,7 +1560,7 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 
 	if clientAuth {
 		clientCACert := tlsClientCA
-		caCert, err := ioutil.ReadFile(clientCACert)
+		caCert, err := os.ReadFile(clientCACert)
 		if err != nil {
 			log.WithFields(log.Fields{"svcName": svcName}).Info("Cannot load CA cert for client authentication")
 			log.Fatal(err)

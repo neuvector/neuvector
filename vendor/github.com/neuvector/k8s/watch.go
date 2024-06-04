@@ -10,9 +10,9 @@ import (
 	"io"
 	"io/ioutil"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
-	"github.com/neuvector/k8s/runtime"
 	"github.com/golang/protobuf/proto"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Decode events from a watch stream.
@@ -26,14 +26,14 @@ import (
 // be initialized.
 type Watcher struct {
 	watcher interface {
-		Next(Resource) (string, error)
+		Next(metav1.Object) (string, error)
 		Close() error
 	}
 }
 
 // Next decodes the next event from the watch stream. Errors are fatal, and
 // indicate that the watcher should no longer be used, and must be recreated.
-func (w *Watcher) Next(r Resource) (string, error) {
+func (w *Watcher) Next(r metav1.Object) (string, error) {
 	return w.watcher.Next(r)
 }
 
@@ -52,7 +52,7 @@ func (w *watcherJSON) Close() error {
 	return w.c.Close()
 }
 
-func (w *watcherJSON) Next(r Resource) (string, error) {
+func (w *watcherJSON) Next(r metav1.Object) (string, error) {
 	var event struct {
 		Type   string          `json:"type"`
 		Object json.RawMessage `json:"object"`
@@ -70,7 +70,7 @@ func (w *watcherJSON) Next(r Resource) (string, error) {
 		}
 		return event.Type, &APIError{
 			Status: status,
-			Code:   int(*status.Code),
+			Code:   int(status.Code),
 		}
 	}
 	if err := json.Unmarshal([]byte(event.Object), r); err != nil {
@@ -83,7 +83,7 @@ type watcherPB struct {
 	r io.ReadCloser
 }
 
-func (w *watcherPB) Next(r Resource) (string, error) {
+func (w *watcherPB) Next(r metav1.Object) (string, error) {
 	msg, ok := r.(proto.Message)
 	if !ok {
 		return "", errors.New("object was not a protobuf message")
@@ -92,23 +92,23 @@ func (w *watcherPB) Next(r Resource) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if event.Type == nil || *event.Type == "" {
+	if event.Type == "" {
 		return "", errors.New("watch event had no type field")
 	}
-	if *event.Type == EventError {
+	if event.Type == EventError {
 		status := &metav1.Status{}
 		if err := proto.Unmarshal(unknown.Raw, status); err != nil {
 			return "", fmt.Errorf("decoding event error: %v", err)
 		}
-		return *event.Type, &APIError{
+		return event.Type, &APIError{
 			Status: status,
-			Code:   int(*status.Code),
+			Code:   int(status.Code),
 		}
 	}
 	if err := proto.Unmarshal(unknown.Raw, msg); err != nil {
 		return "", err
 	}
-	return *event.Type, nil
+	return event.Type, nil
 }
 
 func (w *watcherPB) Close() error {
@@ -131,7 +131,7 @@ func (w *watcherPB) next() (*metav1.WatchEvent, *runtime.Unknown, error) {
 		return nil, nil, err
 	}
 
-	if event.Object == nil {
+	if len(event.Object.Raw) == 0 {
 		return nil, nil, fmt.Errorf("event had no underlying object")
 	}
 
@@ -157,7 +157,7 @@ func parseUnknown(b []byte) (*runtime.Unknown, error) {
 	return &u, nil
 }
 
-// Watch creates a watch on a resource. It takes an example Resource to
+// Watch creates a watch on a resource. It takes an example metav1.Object to
 // determine what endpoint to watch.
 //
 // Watch does not automatically reconnect. If a watch fails, a new watch must
@@ -180,7 +180,7 @@ func parseUnknown(b []byte) (*runtime.Unknown, error) {
 //			fmt.Println(eventType, *cm.Metadata.Name)
 //		}
 //
-func (c *Client) Watch(ctx context.Context, namespace string, r Resource, options ...Option) (*Watcher, error) {
+func (c *Client) Watch(ctx context.Context, namespace string, r metav1.Object, options ...Option) (*Watcher, error) {
 	url, err := resourceWatchURL(c.Endpoint, namespace, r, options...)
 	if err != nil {
 		return nil, err

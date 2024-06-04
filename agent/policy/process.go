@@ -391,7 +391,6 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// tools
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	// arm64
 		{"dash", "*"},
@@ -430,7 +429,6 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// tools
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	         // arm64
 
@@ -454,7 +452,6 @@ func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// tools
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},
 
@@ -475,7 +472,6 @@ func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProf
 
 		// tools
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	          // arm64
 		{"ls", "*"},
@@ -514,8 +510,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"cat", "*"},                     // k8s readiness and openshift operations
-		{"grep", "*"},                    // monitor
-
+		{"kill", "*"},
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
 		{"mv", "/bin/busybox"},
@@ -528,8 +523,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"top", "/usr/bin/top"}, // new procps package
 		{"kill", "/bin/kill"},   // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"}, // replaced
-		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 
 		// k8s or openshift environment
@@ -571,7 +564,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"dash", "*"},
-		{"cat", "*"},                     // k8s readiness and openshift operations
+		{"kill", "*"},
 
 		// busybox
 		{"busybox", "/bin/busybox"},      // below busybox and its symbolic links
@@ -586,33 +579,13 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ip", "/sbin/ip"},
 		{"iptables", "/sbin/xtables-legacy-multi"},      // dp
 		{"iptables-save", "/sbin/xtables-legacy-multi"}, // dp
-		{"top", "/usr/bin/top"},                         // new procps package
-		{"kill", "/bin/kill"},                           // new procps package
 		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"}, // replaced
-		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"which", "*"},
-
-		// bench scripts
-		{"awk", "*"},
-		{"cut", "*"},
-		{"echo", "*"},
-		{"find", "*"},
-		{"grep", "*"},
-		{"pgrep", "*"},
-		{"sed", "*"},
-		{"sort", "*"},
-		{"stat", "*"},
-		{"tail", "*"},
-		{"tee", "*"},
-		{"tr", "*"},
-		{"yq", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
@@ -631,10 +604,8 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// manager cores :  wildcard
 		{"*", "/usr/lib/jvm/*"}, // JVM
-		// {"java", "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"}
 
 		// /usr/local/bin
-		//  {"*", "/usr/local/bin/*"}, // wildcard for below commented execs
 		{"agent", "/usr/local/bin/agent"},
 		{"consul", "*"}, // monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
@@ -661,6 +632,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"dash", "*"},
+		{"kill", "*"},
 		{"cat", "*"},                     // k8s readiness and openshift operations
 
 		// busybox
@@ -679,34 +651,12 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"ip", "/sbin/ip"},
 		{"iptables", "/sbin/xtables-legacy-multi"},      // dp
 		{"iptables-save", "/sbin/xtables-legacy-multi"}, // dp
-		{"top", "/usr/bin/top"},                         // new procps package
-		{"kill", "/bin/kill"},                           // new procps package
-		{"ls", "/bin/busybox"},
-		{"kill", "/bin/busybox"}, // replaced
-		{"top", "/bin/busybox"},  // replaced
 		{"nslookup", "/bin/busybox"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
 		{"pod", "/usr/bin/pod"}, // openshift, pod
 		{"mount", "*"},          // k8s volume plug-in
-		{"grep", "*"},           // monitor, CIS bench tests
-		{"which", "*"},
-
-		// bench scripts
-		{"awk", "*"},
-		{"cut", "*"},
-		{"echo", "*"},
-		{"find", "*"},
-		{"grep", "*"},
-		{"pgrep", "*"},
-		{"sed", "*"},
-		{"sort", "*"},
-		{"stat", "*"},
-		{"tail", "*"},
-		{"tee", "*"},
-		{"tr", "*"},
-		{"yq", "*"},
 	}
 
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)

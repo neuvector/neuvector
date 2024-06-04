@@ -1,8 +1,5 @@
 package rest
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"net/http"
 	"sync"
