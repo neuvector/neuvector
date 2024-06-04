@@ -244,7 +244,7 @@ github.com/docker/distribution/manifest/manifestlist
 github.com/docker/distribution/manifest/schema1
 github.com/docker/distribution/manifest/schema2
 github.com/docker/distribution/reference
-# github.com/docker/docker v24.0.7+incompatible => github.com/docker/docker v1.13.1
+# github.com/docker/docker v24.0.9+incompatible => github.com/docker/docker v1.13.1
 ## explicit
 github.com/docker/docker/api/types/registry
 # github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
