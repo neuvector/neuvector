@@ -4,18 +4,19 @@ package policy
 import "C"
 
 import (
-	"encoding/json"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
 	"strings"
+	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type fqdnInfo struct {
@@ -96,7 +97,7 @@ func fqdnInfoPostPolicyCalc(hid string) {
 	}
 	if len(del) > 0 && dp.DPCtrlDeleteFqdn(del) == 0 {
 		for _, name := range del {
-			if strings.HasPrefix(name, "*") {//wildcard
+			if strings.HasPrefix(name, "*") { //wildcard
 				rule_key := share.CLUSFqdnIpKey(hid, name)
 				if cluster.Exist(rule_key) {
 					cluster.Delete(rule_key)
@@ -138,7 +139,7 @@ type ruleContext struct {
 	ingress bool
 	id      uint32
 	fqdn    string
-	vhost	bool
+	vhost   bool
 }
 
 func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, action uint8,
@@ -224,7 +225,7 @@ func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, act
 				Action:  action,
 				Ingress: ctx.ingress,
 				Fqdn:    ctx.fqdn,
-				Vhost:	 ctx.vhost,
+				Vhost:   ctx.vhost,
 			}
 
 			// For host mode container, only check ports, not applications.
@@ -404,7 +405,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 			//mode workload we do not check application but only
 			//check ports, only add LocalPortApp when there is
 			//service port(NatPortApp) open
-			if (to.NatPortApp != nil && len(to.NatPortApp) > 0)	&&
+			if (to.NatPortApp != nil && len(to.NatPortApp) > 0) &&
 				(to.LocalPortApp != nil && len(to.LocalPortApp) > 0) {
 				toPortApp = append(toPortApp, to.LocalPortApp...)
 			}
@@ -422,7 +423,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 					}
 				}
 
-				if from.WlID == share.CLUSWLAddressGroup  || from.WlID == share.CLUSHostAddrGroup {
+				if from.WlID == share.CLUSWLAddressGroup || from.WlID == share.CLUSHostAddrGroup {
 					for i := 0; i < len(from.NatIP); i += 2 {
 						createIPRule(from.NatIP[i], ipTo, from.NatIP[i+1], nil, toPortApp, action, pInfo, ctx)
 						if pInfo.HostMode && from.NatIP[i].Equal(utils.IPv4Loopback) {
@@ -519,7 +520,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 		}
 	}
 
-	if from.WlID == share.CLUSWLAddressGroup  || from.WlID == share.CLUSHostAddrGroup {
+	if from.WlID == share.CLUSWLAddressGroup || from.WlID == share.CLUSHostAddrGroup {
 		for _, ipTo := range to.GlobalIP {
 			for i := 0; i < len(from.NatIP); i += 2 {
 				createIPRule(from.NatIP[i], ipTo, from.NatIP[i+1], nil, to.LocalPortApp, action, pInfo, ctx)
@@ -670,7 +671,7 @@ func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
 					continue
 				}
 				wlAddr := share.CLUSWorkloadAddr{
-					WlID: id,
+					WlID:       id,
 					PolicyMode: pInfo.Policy.Mode,
 				}
 				if isto {
@@ -699,12 +700,12 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
 				for id, wl := range wlMap {
 					if strings.Contains(addr.PolicyMode, wl.PolicyMode) {
-						if addr.NatPortApp == nil  || len(addr.NatPortApp) <= 0 {//PAI
+						if addr.NatPortApp == nil || len(addr.NatPortApp) <= 0 { //PAI
 							wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
-									LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
+								LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
 						} else {
 							wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
-									LocalPortApp: addr.LocalPortApp, NatPortApp: wl.NatPortApp})
+								LocalPortApp: addr.LocalPortApp, NatPortApp: wl.NatPortApp})
 						}
 					}
 				}
@@ -714,7 +715,7 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
 				for id, wl := range wlMap {
 					wlAddr := share.CLUSWorkloadAddr{
-						WlID: id,
+						WlID:       id,
 						PolicyMode: wl.PolicyMode,
 					}
 					wlList = append(wlList, &wlAddr)
@@ -761,8 +762,16 @@ func addWlGlobalAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newPolicyAddrM
 	}
 }
 
+func addWlHostModeAddrToPolicyAddrMap(from *share.CLUSWorkloadAddr, newHostPolicyAddrMap map[string]share.CLUSSubnet) {
+	for _, nip := range from.NatIP {
+		nipnet := &net.IPNet{IP: nip, Mask: net.CIDRMask(32, 32)}
+		//log.WithFields(log.Fields{"ip": nipnet.IP.String(), "mask": nipnet.Mask.String()}).Debug("add hostmode nat ip")
+		addPolicyAddrIPNet(newHostPolicyAddrMap, nipnet, share.CLUSIPAddrScopeNAT)
+	}
+}
+
 func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyMap map[string]*WorkloadIPPolicyInfo,
-	newPolicyAddrMap map[string]share.CLUSSubnet) {
+	newPolicyAddrMap, newHostPolicyAddrMap map[string]share.CLUSSubnet) {
 	addrMap := make(map[string]*share.CLUSWorkloadAddr)
 	for i, pp := range p {
 		// The first rule is the default rule that contains all container
@@ -774,6 +783,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 				if from.PolicyMode == share.PolicyModeEvaluate ||
 					from.PolicyMode == share.PolicyModeEnforce {
 					addWlGlobalAddrToPolicyAddrMap(from, newPolicyAddrMap)
+					//add IP of host-mode workload in monitor/protect mode
+					if (from.GlobalIP == nil || len(from.GlobalIP) == 0) && (from.LocalIP == nil || len(from.LocalIP) == 0) {
+						addWlHostModeAddrToPolicyAddrMap(from, newHostPolicyAddrMap)
+					}
 				}
 				if pInfo, ok := workloadPolicyMap[from.WlID]; ok {
 					pInfo.Configured = true
@@ -867,6 +880,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 	return
 }
 
+var SpecialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
+
 func policyModeToDefaultAction(mode string, capIntcp bool) uint8 {
 	switch mode {
 	case share.PolicyModeLearn:
@@ -933,6 +948,134 @@ func hostPolicyMatch(r *dp.DPPolicyIPRule, conn *dp.Connection) (bool, uint32, u
 	return true, r.ID, r.Action
 }
 
+func ip4_iptype(ip net.IP) string {
+	ipnet := &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	if spec_snet, ok := SpecialSubnets[ipnet.String()]; ok {
+		return spec_snet.IpType
+	}
+	return ""
+}
+
+func is_policy_addr(ip net.IP, policyAddrMap map[string]share.CLUSSubnet) bool {
+	ipnet := &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	if _, ok := policyAddrMap[ipnet.String()]; ok {
+		return true
+	}
+	return false
+}
+
+type unknown_ip_desc struct {
+	sip string
+	dip string
+}
+
+type unknown_ip_cache struct {
+	timerTask string
+	desc      unknown_ip_desc
+	polver    uint16
+	start_hit time.Time
+	last_hit  time.Time
+	try_cnt   uint8
+}
+
+var unknown_ip_map map[unknown_ip_desc]*unknown_ip_cache = make(map[unknown_ip_desc]*unknown_ip_cache)
+
+const UNKN_IP_CACHE_TIMEOUT = time.Duration(time.Second * 600)
+const POL_VER_CHG_MAX = time.Duration(time.Second * 60)
+const UNKN_IP_TRY_COUNT uint8 = 10
+const HOST_IP_TRY_COUNT uint8 = 3
+const EXT_IP_TRY_COUNT uint8 = 2
+
+type unknownIPEvent struct {
+	desc unknown_ip_desc
+}
+
+func (p *unknownIPEvent) Expire() {
+	if _, ok := unknown_ip_map[p.desc]; ok {
+		delete(unknown_ip_map, p.desc)
+	}
+}
+
+func add_unkn_ip_cache(uip_desc *unknown_ip_desc, polver uint16, iptype string, ext bool, aTimerWheel *utils.TimerWheel) {
+	cache := &unknown_ip_cache{
+		polver:    polver,
+		start_hit: time.Now().UTC(),
+		last_hit:  time.Now().UTC(),
+	}
+	cache.desc.sip = uip_desc.sip
+	cache.desc.dip = uip_desc.dip
+
+	if iptype == share.SpecInternalHostIP || iptype == share.SpecInternalTunnelIP {
+		cache.try_cnt = HOST_IP_TRY_COUNT
+	} else {
+		cache.try_cnt = UNKN_IP_TRY_COUNT
+		if ext {
+			cache.try_cnt = EXT_IP_TRY_COUNT
+		}
+	}
+	task := &unknownIPEvent{}
+	task.desc.sip = uip_desc.sip
+	task.desc.dip = uip_desc.dip
+
+	cache.timerTask, _ = aTimerWheel.AddTask(task, UNKN_IP_CACHE_TIMEOUT)
+	if cache.timerTask == "" {
+		log.Error("Fail to insert unknown IP cache timer")
+	}
+	unknown_ip_map[*uip_desc] = cache
+}
+
+func refresh_unkn_ip_cache(cache *unknown_ip_cache, pver uint16, try_cnt uint8) {
+	//refresh timer task
+	cache.try_cnt = try_cnt
+	cache.polver = pver
+	//restart timestamp
+	cache.start_hit = time.Now().UTC()
+	cache.last_hit = time.Now().UTC()
+}
+
+func update_unkn_ip_cache(cache *unknown_ip_cache) {
+	//update timestamp
+	cache.last_hit = time.Now().UTC()
+}
+
+func policy_chk_unknown_ip(pInfo *WorkloadIPPolicyInfo, srcip, dstip net.IP, iptype string, ext bool, action *uint8, aTimerWheel *utils.TimerWheel) {
+	if pInfo == nil {
+		return
+	}
+	//unknown ip desc
+	uip_desc := unknown_ip_desc{
+		sip: srcip.String(),
+		dip: dstip.String(),
+	}
+
+	if iptype == "" ||
+		iptype == share.SpecInternalHostIP ||
+		iptype == share.SpecInternalTunnelIP {
+		pver := pInfo.PolVer
+		if uip_cache, exist := unknown_ip_map[uip_desc]; exist {
+			since := time.Since(uip_cache.start_hit)
+			if pver == uip_cache.polver && since < POL_VER_CHG_MAX {
+				*action = C.DP_POLICY_ACTION_OPEN
+				update_unkn_ip_cache(uip_cache)
+			} else {
+				//try above condition UNKN_IP_TRY_COUNT time
+				try_cnt := uip_cache.try_cnt
+				if try_cnt > 0 {
+					try_cnt--
+					*action = C.DP_POLICY_ACTION_OPEN
+					refresh_unkn_ip_cache(uip_cache, pver, try_cnt)
+				}
+			}
+		} else {
+			*action = C.DP_POLICY_ACTION_OPEN
+			add_unkn_ip_cache(&uip_desc, pInfo.PolVer, iptype, ext, aTimerWheel)
+		}
+	} else if iptype == share.SpecInternalDevIP {
+		//connection from nv device is open
+		*action = C.DP_POLICY_ACTION_OPEN
+	}
+}
+
 func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32, uint8, bool) {
 	e.Mutex.Lock()
 	pInfo := e.NetworkPolicy[wl]
@@ -973,6 +1116,61 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 		}
 	}
 	action := policyModeToDefaultAction(pInfo.Policy.Mode, pInfo.CapIntcp)
+	if action != C.DP_POLICY_ACTION_VIOLATE && action != C.DP_POLICY_ACTION_DENY {
+		return 0, action, action > C.DP_POLICY_ACTION_CHECK_APP
+	}
+	policyAddrMap := e.GetPolicyAddrMap()
+	hostPolicyAddrMap := e.GetHostPolicyAddrMap()
+	iptype := ""
+	inPolicyAddr := false
+	if !conn.ExternalPeer {
+		if conn.Ingress {
+			iptype = ip4_iptype(conn.ClientIP)
+		} else {
+			iptype = ip4_iptype(conn.ServerIP)
+		}
+		if action == C.DP_POLICY_ACTION_VIOLATE || action == C.DP_POLICY_ACTION_DENY {
+			if conn.Ingress {
+				if iptype == share.SpecInternalHostIP || iptype == share.SpecInternalTunnelIP {
+					inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+					//we still need to consider newly added node
+					if inPolicyAddr {
+						inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+					}
+				} else {
+					inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+				}
+			} else {
+				if iptype == share.SpecInternalHostIP || iptype == share.SpecInternalTunnelIP {
+					inPolicyAddr = is_policy_addr(conn.ClientIP, policyAddrMap)
+					//we still need to consider newly added node
+					if inPolicyAddr {
+						inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+					}
+				} else {
+					inPolicyAddr = is_policy_addr(conn.ServerIP, policyAddrMap)
+				}
+			}
+			if !inPolicyAddr {
+				policy_chk_unknown_ip(pInfo, conn.ClientIP, conn.ServerIP, iptype, false, &action, e.PolTimerWheel)
+			}
+		}
+	} else {
+		if action == C.DP_POLICY_ACTION_VIOLATE || action == C.DP_POLICY_ACTION_DENY {
+			if conn.Ingress {
+				inPolicyAddr = is_policy_addr(conn.ServerIP, hostPolicyAddrMap)
+			} else {
+				inPolicyAddr = is_policy_addr(conn.ClientIP, hostPolicyAddrMap)
+			}
+			if !inPolicyAddr {
+				if conn.Ingress {
+					policy_chk_unknown_ip(pInfo, net.ParseIP("0.0.0.0"), conn.ServerIP, "", true, &action, e.PolTimerWheel)
+				} else {
+					policy_chk_unknown_ip(pInfo, conn.ClientIP, net.ParseIP("0.0.0.0"), "", true, &action, e.PolTimerWheel)
+				}
+			}
+		}
+	}
 	return 0, action, action > C.DP_POLICY_ACTION_CHECK_APP
 }
 
@@ -984,7 +1182,8 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	fqdnInfoPrePolicyCalc()
 
 	newPolicyAddrMap := make(map[string]share.CLUSSubnet)
-	e.parseGroupIPPolicy(ps, newPolicy, newPolicyAddrMap)
+	newHostPolicyAddrMap := make(map[string]share.CLUSSubnet)
+	e.parseGroupIPPolicy(ps, newPolicy, newPolicyAddrMap, newHostPolicyAddrMap)
 
 	dpConnected := dp.Connected()
 
@@ -1038,6 +1237,7 @@ func (e *Engine) UpdateNetworkPolicy(ps []share.CLUSGroupIPPolicy,
 	e.Mutex.Lock()
 	e.NetworkPolicy = newPolicy
 	e.PolicyAddrMap = newPolicyAddrMap
+	e.HostPolicyAddrMap = newHostPolicyAddrMap
 	e.Mutex.Unlock()
 
 	return hostPolicyChangeSet
@@ -1055,6 +1255,13 @@ func (e *Engine) GetPolicyAddrMap() map[string]share.CLUSSubnet {
 	defer e.Mutex.Unlock()
 
 	return e.PolicyAddrMap
+}
+
+func (e *Engine) GetHostPolicyAddrMap() map[string]share.CLUSSubnet {
+	e.Mutex.Lock()
+	defer e.Mutex.Unlock()
+
+	return e.HostPolicyAddrMap
 }
 
 func (e *Engine) DeleteNetworkPolicy(id string) {
@@ -1095,7 +1302,7 @@ func (e *Engine) PushFqdnInfoToDP() {
 	}
 }
 
-//dlp
+// dlp
 func (e *Engine) GetNetworkDlpWorkloadRulesInfo() map[string]*dp.DPWorkloadDlpRule {
 	e.Mutex.Lock()
 	defer e.Mutex.Unlock()

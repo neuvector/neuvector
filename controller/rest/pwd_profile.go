@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -33,7 +33,7 @@ func handlerPwdProfileCreate(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTPwdProfileData
 	err := json.Unmarshal(body, &rconf)
@@ -215,7 +215,7 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var errMsg string
 	var rconf api.RESTPwdProfileConfigData

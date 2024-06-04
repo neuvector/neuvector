@@ -103,6 +103,8 @@ func (m *netlinkIntfMonitor) WaitAddrChange(intval *syscall.Timeval) (bool, erro
 	}
 }
 
+// obsolete
+// use netlink.LinkUpdate and netlink.AddrUpdate
 func (m *netlinkIntfMonitor) WaitHostAddrChange(intval *syscall.Timeval) (bool, error) {
 	for {
 		// select() changes timer value, so reinitiate every time.

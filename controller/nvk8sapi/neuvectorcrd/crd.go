@@ -2,10 +2,10 @@ package nvcrd
 
 import (
 	"github.com/neuvector/k8s"
-	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
-	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1" // apiextensions.k8s.io/v1beta1 API version of CustomResourceDefinition is no longer served as of k8s v1.22
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
 	log "github.com/sirupsen/logrus"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1" // apiextensions.k8s.io/v1beta1 API version of CustomResourceDefinition is no longer served as of k8s v1.22
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"encoding/json"
 	"fmt"
@@ -56,12 +56,12 @@ func (b *nvCrdSchmaBuilder) Init() {
 	}
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeArray,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1B1Schema() apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
 		Items: &apiextv1b1.JSONSchemaPropsOrArray{
 			Schema: &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+				Type: b.schemaTypeString,
 			},
 		},
 	}
@@ -69,12 +69,12 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1B1Schema() *apiextv1b1.JSONSch
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeArray,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
 		Items: &apiextv1.JSONSchemaPropsOrArray{
 			Schema: &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+				Type: b.schemaTypeString,
 			},
 		},
 	}
@@ -82,35 +82,35 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() *apiextv1.JSONSchemaP
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"name": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"name": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"original_name": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"original_name": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"comment": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"comment": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"criteria": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"criteria": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+						Type:     b.schemaTypeObject,
 						Required: []string{"key", "op", "value"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"key": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"key": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"op": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"op": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"value": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"value": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
 						},
 					},
@@ -122,35 +122,35 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() *apiextv1.JSONSc
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"name": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"name": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"original_name": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"original_name": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"comment": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"comment": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"criteria": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"criteria": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1b1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+						Type:     b.schemaTypeObject,
 						Required: []string{"key", "op", "value"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"key": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"key": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"op": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"op": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"value": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"value": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
 						},
 					},
@@ -162,29 +162,29 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() *apiextv1b1.JS
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeArray,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
 		Items: &apiextv1.JSONSchemaPropsOrArray{
 			Schema: &apiextv1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+				Type:     b.schemaTypeObject,
 				Required: []string{"action", "name", "selector"},
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"ports": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"ports": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeString,
 					},
-					"priority": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeInteger,
+					"priority": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeInteger,
 					},
-					"action": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
-						Enum: []*apiextv1.JSON{
-							&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-							&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+					"action": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+						Enum: []apiextv1.JSON{
+							apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+							apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 						},
 					},
-					"name": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+					"name": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeString,
 					},
 					"selector":     b.buildNvSeurityCrdSelectorV1Schema(),
 					"applications": b.buildNvSeurityCrdAppV1Schema(),
@@ -196,29 +196,29 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() *apiextv1.JSONSche
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeArray,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
 		Items: &apiextv1b1.JSONSchemaPropsOrArray{
 			Schema: &apiextv1b1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+				Type:     b.schemaTypeObject,
 				Required: []string{"action", "name", "selector"},
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"ports": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"ports": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeString,
 					},
-					"priority": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeInteger,
+					"priority": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeInteger,
 					},
-					"action": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
-						Enum: []*apiextv1b1.JSON{
-							&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-							&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+					"action": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+						Enum: []apiextv1b1.JSON{
+							apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+							apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 						},
 					},
-					"name": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+					"name": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeString,
 					},
 					"selector":     b.buildNvSeurityCrdSelectorV1B1Schema(),
 					"applications": b.buildNvSeurityCrdAppV1B1Schema(),
@@ -230,28 +230,28 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() *apiextv1b1.JSON
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"status": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1B1Schema() apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"status": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"settings": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"settings": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1b1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+						Type:     b.schemaTypeObject,
 						Required: []string{"name", "action"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"name": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"name": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"action": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+							"action": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 								},
 							},
 						},
@@ -264,28 +264,28 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1B1Schema() *apiextv1b1.JSON
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"status": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1Schema() apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"status": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"settings": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"settings": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+						Type:     b.schemaTypeObject,
 						Required: []string{"name", "action"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"name": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"name": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"action": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+							"action": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 								},
 							},
 						},
@@ -299,24 +299,24 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1Schema() *apiextv1.JSONSche
 }
 
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"spec": &apiextv1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": apiextv1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"target"},
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"target": &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"target": apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"selector"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"policymode": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
-									&apiextv1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"policymode": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
 								},
 							},
 							"selector": b.buildNvSeurityCrdSelectorV1Schema(),
@@ -324,66 +324,66 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 					},
 					"ingress": b.buildNvSeurityCrdPolicyV1Schema(),
 					"egress":  b.buildNvSeurityCrdPolicyV1Schema(),
-					"process": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"process": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"action"},
-								Properties: map[string]*apiextv1.JSONSchemaProps{
-									"path": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"path": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"action": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1.JSON{
-											&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-											&apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+									"action": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1.JSON{
+											apiextv1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+											apiextv1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 										},
 									},
-									"name": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"name": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"allow_update": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"allow_update": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
 								},
 							},
 						},
 					},
-					"process_profile": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeObject,
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"baseline": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileBasic]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
-									&apiextv1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
+					"process_profile": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeObject,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"baseline": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.ProfileBasic]},
+									apiextv1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
+									apiextv1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
+									apiextv1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
 						},
 					},
-					"file": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"file": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"behavior", "filter"},
-								Properties: map[string]*apiextv1.JSONSchemaProps{
-									"behavior": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1.JSON{
-											&apiextv1.JSON{Raw: b.enumMap[share.FileAccessBehaviorMonitor]},
-											&apiextv1.JSON{Raw: b.enumMap[share.FileAccessBehaviorBlock]},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"behavior": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1.JSON{
+											apiextv1.JSON{Raw: b.enumMap[share.FileAccessBehaviorMonitor]},
+											apiextv1.JSON{Raw: b.enumMap[share.FileAccessBehaviorBlock]},
 										},
 									},
-									"filter": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"filter": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"recursive": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"recursive": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
 									"app": b.buildNvSeurityCrdAppV1Schema(),
 								},
@@ -397,28 +397,28 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 		},
 	}
 
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"spec": &apiextv1b1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": apiextv1b1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"target"},
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"target": &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"target": apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"selector"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"policymode": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"policymode": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
 								},
 							},
 							"selector": b.buildNvSeurityCrdSelectorV1B1Schema(),
@@ -426,66 +426,66 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 					},
 					"ingress": b.buildNvSeurityCrdPolicyV1B1Schema(),
 					"egress":  b.buildNvSeurityCrdPolicyV1B1Schema(),
-					"process": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"process": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1b1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1b1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"action"},
-								Properties: map[string]*apiextv1b1.JSONSchemaProps{
-									"path": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+								Properties: map[string]apiextv1b1.JSONSchemaProps{
+									"path": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"action": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1b1.JSON{
-											&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
-											&apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
+									"action": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1b1.JSON{
+											apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionAllow]},
+											apiextv1b1.JSON{Raw: b.enumMap[share.PolicyActionDeny]},
 										},
 									},
-									"name": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"name": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"allow_update": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"allow_update": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
 								},
 							},
 						},
 					},
-					"process_profile": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeObject,
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"baseline": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileBasic]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
+					"process_profile": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeObject,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"baseline": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileBasic]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
 						},
 					},
-					"file": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"file": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1b1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1b1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"behavior", "filter"},
-								Properties: map[string]*apiextv1b1.JSONSchemaProps{
-									"behavior": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1b1.JSON{
-											&apiextv1b1.JSON{Raw: b.enumMap[share.FileAccessBehaviorMonitor]},
-											&apiextv1b1.JSON{Raw: b.enumMap[share.FileAccessBehaviorBlock]},
+								Properties: map[string]apiextv1b1.JSONSchemaProps{
+									"behavior": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1b1.JSON{
+											apiextv1b1.JSON{Raw: b.enumMap[share.FileAccessBehaviorMonitor]},
+											apiextv1b1.JSON{Raw: b.enumMap[share.FileAccessBehaviorBlock]},
 										},
 									},
-									"filter": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"filter": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"recursive": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"recursive": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
 									"app": b.buildNvSeurityCrdAppV1B1Schema(),
 								},
@@ -499,128 +499,128 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 		},
 	}
 
-	return schema
+	return &schema
 }
 
 // for k8a 1.19(+)
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"spec": &apiextv1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": apiextv1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{},
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"config": &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"config": apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"enable", "mode", "client_mode"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"enable": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"enable": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeBoolean,
 							},
-							"mode": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
-									&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+							"mode": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+									apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
 								},
 							},
-							"client_mode": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1.JSON{
-									&apiextv1.JSON{Raw: b.enumMap[share.AdmClientModeSvc]},
-									&apiextv1.JSON{Raw: b.enumMap[share.AdmClientModeUrl]},
+							"client_mode": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.AdmClientModeSvc]},
+									apiextv1.JSON{Raw: b.enumMap[share.AdmClientModeUrl]},
 								},
 							},
 						},
 					},
-					"rules": &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"rules": apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"action", "criteria"},
-								Properties: map[string]*apiextv1.JSONSchemaProps{
-									"id": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeInteger,
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"id": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeInteger,
 									},
-									"action": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1.JSON{
-											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlActionAllow]},
-											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlActionDeny]},
+									"action": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1.JSON{
+											apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlActionAllow]},
+											apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlActionDeny]},
 										},
 									},
-									"comment": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"comment": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"disabled": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"disabled": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
-									"rule_mode": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1.JSON{
-											&apiextv1.JSON{Raw: b.enumMap[""]},
-											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
-											&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+									"rule_mode": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1.JSON{
+											apiextv1.JSON{Raw: b.enumMap[""]},
+											apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+											apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
 										},
 									},
-									"containers": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeArray,
+									"containers": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeArray,
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-												Enum: []*apiextv1.JSON{
-													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
-													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
-													&apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
+												Type: b.schemaTypeString,
+												Enum: []apiextv1.JSON{
+													apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
+													apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
+													apiextv1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
 												},
 											},
 										},
 									},
-									"criteria": &apiextv1.JSONSchemaProps{
-										Type: &b.schemaTypeArray,
+									"criteria": apiextv1.JSONSchemaProps{
+										Type: b.schemaTypeArray,
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type:     &b.schemaTypeObject,
+												Type:     b.schemaTypeObject,
 												Required: []string{"name", "op", "value"},
-												Properties: map[string]*apiextv1.JSONSchemaProps{
-													"name": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"name": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"op": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"op": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"value": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"value": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"type": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"type": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"template_kind": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"template_kind": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"path": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"path": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"value_type": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"value_type": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"sub_criteria": &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeArray,
+													"sub_criteria": apiextv1.JSONSchemaProps{
+														Type: b.schemaTypeArray,
 														Items: &apiextv1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1.JSONSchemaProps{
-																Type:     &b.schemaTypeObject,
+																Type:     b.schemaTypeObject,
 																Required: []string{"name", "op", "value"},
-																Properties: map[string]*apiextv1.JSONSchemaProps{
-																	"name": &apiextv1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																Properties: map[string]apiextv1.JSONSchemaProps{
+																	"name": apiextv1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
-																	"op": &apiextv1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																	"op": apiextv1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
-																	"value": &apiextv1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																	"value": apiextv1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
 																},
 															},
@@ -638,128 +638,128 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSc
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 // for k8a 1.18(-)
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"spec": &apiextv1b1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": apiextv1b1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{},
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"config": &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"config": apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"enable", "mode", "client_mode"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"enable": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"enable": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeBoolean,
 							},
-							"mode": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+							"mode": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
 								},
 							},
-							"client_mode": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
-								Enum: []*apiextv1b1.JSON{
-									&apiextv1b1.JSON{Raw: b.enumMap[share.AdmClientModeSvc]},
-									&apiextv1b1.JSON{Raw: b.enumMap[share.AdmClientModeUrl]},
+							"client_mode": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.AdmClientModeSvc]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.AdmClientModeUrl]},
 								},
 							},
 						},
 					},
-					"rules": &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeArray,
+					"rules": apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeArray,
 						Items: &apiextv1b1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1b1.JSONSchemaProps{
-								Type:     &b.schemaTypeObject,
+								Type:     b.schemaTypeObject,
 								Required: []string{"action", "criteria"},
-								Properties: map[string]*apiextv1b1.JSONSchemaProps{
-									"id": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeInteger,
+								Properties: map[string]apiextv1b1.JSONSchemaProps{
+									"id": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeInteger,
 									},
-									"action": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1b1.JSON{
-											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlActionAllow]},
-											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlActionDeny]},
+									"action": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1b1.JSON{
+											apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlActionAllow]},
+											apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlActionDeny]},
 										},
 									},
-									"comment": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
+									"comment": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
 									},
-									"disabled": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeBoolean,
+									"disabled": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeBoolean,
 									},
-									"rule_mode": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeString,
-										Enum: []*apiextv1b1.JSON{
-											&apiextv1b1.JSON{Raw: b.enumMap[""]},
-											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
-											&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
+									"rule_mode": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeString,
+										Enum: []apiextv1b1.JSON{
+											apiextv1b1.JSON{Raw: b.enumMap[""]},
+											apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeMonitor]},
+											apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlModeProtect]},
 										},
 									},
-									"containers": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeArray,
+									"containers": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeArray,
 										Items: &apiextv1b1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
-												Enum: []*apiextv1b1.JSON{
-													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
-													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
-													&apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
+												Type: b.schemaTypeString,
+												Enum: []apiextv1b1.JSON{
+													apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleInitContainers]},
+													apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleContainers]},
+													apiextv1b1.JSON{Raw: b.enumMap[share.AdmCtrlRuleEphemeralContainers]},
 												},
 											},
 										},
 									},
-									"criteria": &apiextv1b1.JSONSchemaProps{
-										Type: &b.schemaTypeArray,
+									"criteria": apiextv1b1.JSONSchemaProps{
+										Type: b.schemaTypeArray,
 										Items: &apiextv1b1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1b1.JSONSchemaProps{
-												Type:     &b.schemaTypeObject,
+												Type:     b.schemaTypeObject,
 												Required: []string{"name", "op", "value"},
-												Properties: map[string]*apiextv1b1.JSONSchemaProps{
-													"name": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+												Properties: map[string]apiextv1b1.JSONSchemaProps{
+													"name": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"op": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"op": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"value": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"value": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"type": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"type": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"template_kind": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"template_kind": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"path": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"path": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"value_type": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+													"value_type": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeString,
 													},
-													"sub_criteria": &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeArray,
+													"sub_criteria": apiextv1b1.JSONSchemaProps{
+														Type: b.schemaTypeArray,
 														Items: &apiextv1b1.JSONSchemaPropsOrArray{
 															Schema: &apiextv1b1.JSONSchemaProps{
-																Type:     &b.schemaTypeObject,
+																Type:     b.schemaTypeObject,
 																Required: []string{"name", "op", "value"},
-																Properties: map[string]*apiextv1b1.JSONSchemaProps{
-																	"name": &apiextv1b1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																Properties: map[string]apiextv1b1.JSONSchemaProps{
+																	"name": apiextv1b1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
-																	"op": &apiextv1b1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																	"op": apiextv1b1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
-																	"value": &apiextv1b1.JSONSchemaProps{
-																		Type: &b.schemaTypeString,
+																	"value": apiextv1b1.JSONSchemaProps{
+																		Type: b.schemaTypeString,
 																	},
 																},
 															},
@@ -777,67 +777,67 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"spec": &apiextv1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": apiextv1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"sensor"},
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"sensor": &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"sensor": apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"name"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"name": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"name": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"comment": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"comment": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"rules": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+							"rules": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"name", "patterns"},
-										Properties: map[string]*apiextv1.JSONSchemaProps{
-											"name": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"name": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"patterns": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"patterns": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1.JSONSchemaProps{
-														Type:     &b.schemaTypeObject,
+														Type:     b.schemaTypeObject,
 														Required: []string{"key", "op", "value", "context"},
-														Properties: map[string]*apiextv1.JSONSchemaProps{
-															"key": &apiextv1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1.JSON{
-																	&apiextv1.JSON{Raw: b.enumMap[share.DlpRuleKeyPattern]},
+														Properties: map[string]apiextv1.JSONSchemaProps{
+															"key": apiextv1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1.JSON{
+																	apiextv1.JSON{Raw: b.enumMap[share.DlpRuleKeyPattern]},
 																},
 															},
-															"op": &apiextv1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1.JSON{
-																	&apiextv1.JSON{Raw: b.enumMap[share.CriteriaOpRegex]},
-																	&apiextv1.JSON{Raw: b.enumMap[share.CriteriaOpNotRegex]},
+															"op": apiextv1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1.JSON{
+																	apiextv1.JSON{Raw: b.enumMap[share.CriteriaOpRegex]},
+																	apiextv1.JSON{Raw: b.enumMap[share.CriteriaOpNotRegex]},
 																},
 															},
-															"value": &apiextv1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
+															"value": apiextv1.JSONSchemaProps{
+																Type: b.schemaTypeString,
 															},
-															"context": &apiextv1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1.JSON{
-																	&apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextURI]},
-																	&apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextHEAD]},
-																	&apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextBODY]},
-																	&apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextPACKET]},
+															"context": apiextv1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1.JSON{
+																	apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextURI]},
+																	apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextHEAD]},
+																	apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextBODY]},
+																	apiextv1.JSON{Raw: b.enumMap[share.DlpPatternContextPACKET]},
 																},
 															},
 														},
@@ -854,50 +854,50 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1Schema() *apiextv1.JSONSch
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"spec": &apiextv1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": apiextv1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"profile"},
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"profile": &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"profile": apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"entries"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"entries": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"entries": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"name"},
-										Properties: map[string]*apiextv1.JSONSchemaProps{
-											"name": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"name": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"comment": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+											"comment": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"days": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeInteger,
+											"days": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeInteger,
 											},
-											"domains": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"domains": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
-											"images": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"images": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
@@ -911,75 +911,75 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1Schema() *apiextv1.JS
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 /*
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"name": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"name": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"disable": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+			"disable": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"dummy": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+			"dummy": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"labels": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeObject,
+			"labels": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeObject,
 				AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 					Schema: &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+						Type: b.schemaTypeString,
 					},
 				},
 			},
-			"tags": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"tags": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+						Type: b.schemaTypeString,
 					},
 				},
 			},
 		},
 	}
 
-	return schema
+	return &schema
 }
 */
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"spec": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeObject,
-				Properties: map[string]*apiextv1.JSONSchemaProps{
-					"templates": &apiextv1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeObject,
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"templates": apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"entries"},
-						Properties: map[string]*apiextv1.JSONSchemaProps{
-							"disable_system": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"disable_system": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeBoolean,
 							},
-							"entries": &apiextv1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+							"entries": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"test_number"},
-										Properties: map[string]*apiextv1.JSONSchemaProps{
-											"test_number": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"test_number": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"tags": &apiextv1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"tags": apiextv1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
@@ -990,9 +990,9 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1Schema() *apiextv1.JS
 						},
 					},
 					/*
-						"assets": &apiextv1.JSONSchemaProps{
-							Type: &b.schemaTypeObject,
-							Properties: map[string]*apiextv1.JSONSchemaProps{
+						"assets": apiextv1.JSONSchemaProps{
+							Type: b.schemaTypeObject,
+							Properties: map[string]apiextv1.JSONSchemaProps{
 								"built-in":   b.buildNvSeurityCrdCompAssetV1Schema(),
 								"namespaces": b.buildNvSeurityCrdCompAssetV1Schema(),
 							},
@@ -1002,87 +1002,87 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1Schema() *apiextv1.JS
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1Schema() *apiextv1.JSONSchemaProps {
-	schema := &apiextv1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+	schema := apiextv1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"managed_node_count", "reporting_time", "base_product"},
-		Properties: map[string]*apiextv1.JSONSchemaProps{
-			"reporting_time": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"reporting_time": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"managed_node_count": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeInteger,
+			"managed_node_count": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeInteger,
 			},
-			"base_product": &apiextv1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"base_product": apiextv1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 // for k8a 1.18(-)
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"spec": &apiextv1b1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": apiextv1b1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"sensor"},
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"sensor": &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"sensor": apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"name"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"name": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"name": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"comment": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeString,
+							"comment": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
 							},
-							"rules": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+							"rules": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1b1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1b1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"name", "patterns"},
-										Properties: map[string]*apiextv1b1.JSONSchemaProps{
-											"name": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1b1.JSONSchemaProps{
+											"name": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"patterns": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"patterns": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1b1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1b1.JSONSchemaProps{
-														Type:     &b.schemaTypeObject,
+														Type:     b.schemaTypeObject,
 														Required: []string{"key", "op", "value", "context"},
-														Properties: map[string]*apiextv1b1.JSONSchemaProps{
-															"key": &apiextv1b1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1b1.JSON{
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.DlpRuleKeyPattern]},
+														Properties: map[string]apiextv1b1.JSONSchemaProps{
+															"key": apiextv1b1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1b1.JSON{
+																	apiextv1b1.JSON{Raw: b.enumMap[share.DlpRuleKeyPattern]},
 																},
 															},
-															"op": &apiextv1b1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1b1.JSON{
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.CriteriaOpRegex]},
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.CriteriaOpNotRegex]},
+															"op": apiextv1b1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1b1.JSON{
+																	apiextv1b1.JSON{Raw: b.enumMap[share.CriteriaOpRegex]},
+																	apiextv1b1.JSON{Raw: b.enumMap[share.CriteriaOpNotRegex]},
 																},
 															},
-															"value": &apiextv1b1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
+															"value": apiextv1b1.JSONSchemaProps{
+																Type: b.schemaTypeString,
 															},
-															"context": &apiextv1b1.JSONSchemaProps{
-																Type: &b.schemaTypeString,
-																Enum: []*apiextv1b1.JSON{
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextURI]},
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextHEAD]},
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextBODY]},
-																	&apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextPACKET]},
+															"context": apiextv1b1.JSONSchemaProps{
+																Type: b.schemaTypeString,
+																Enum: []apiextv1b1.JSON{
+																	apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextURI]},
+																	apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextHEAD]},
+																	apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextBODY]},
+																	apiextv1b1.JSON{Raw: b.enumMap[share.DlpPatternContextPACKET]},
 																},
 															},
 														},
@@ -1099,50 +1099,50 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdDlpWafV1B1Schema() *apiextv1b1.JSO
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"spec": &apiextv1b1.JSONSchemaProps{
-				Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": apiextv1b1.JSONSchemaProps{
+				Type:     b.schemaTypeObject,
 				Required: []string{"profile"},
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"profile": &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"profile": apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"entries"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"entries": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"entries": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1b1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1b1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"name"},
-										Properties: map[string]*apiextv1b1.JSONSchemaProps{
-											"name": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1b1.JSONSchemaProps{
+											"name": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"comment": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+											"comment": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"days": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeInteger,
+											"days": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeInteger,
 											},
-											"domains": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"domains": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1b1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
-											"images": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"images": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1b1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
@@ -1156,75 +1156,75 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1B1Schema() *apiextv1b
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 /*
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1B1Schema() apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
 		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"name": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"name": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"disable": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+			"disable": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"dummy": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeBoolean,
+			"dummy": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeBoolean,
 			},
-			"labels": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeObject,
-				AdditionalProperties: &apiextv1b1.JSONSchemaPropsOrBool{
+			"labels": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeObject,
+				AdditionalProperties: apiextv1b1.JSONSchemaPropsOrBool{
 					Schema: &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+						Type: b.schemaTypeString,
 					},
 				},
 			},
-			"tags": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeArray,
+			"tags": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeArray,
 				Items: &apiextv1b1.JSONSchemaPropsOrArray{
 					Schema: &apiextv1b1.JSONSchemaProps{
-						Type: &b.schemaTypeString,
+						Type: b.schemaTypeString,
 					},
 				},
 			},
 		},
 	}
 
-	return schema
+	return &schema
 }
 */
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type: &b.schemaTypeObject,
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"spec": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeObject,
-				Properties: map[string]*apiextv1b1.JSONSchemaProps{
-					"templates": &apiextv1b1.JSONSchemaProps{
-						Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeObject,
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"templates": apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
 						Required: []string{"entries"},
-						Properties: map[string]*apiextv1b1.JSONSchemaProps{
-							"disable_system": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeBoolean,
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"disable_system": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeBoolean,
 							},
-							"entries": &apiextv1b1.JSONSchemaProps{
-								Type: &b.schemaTypeArray,
+							"entries": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeArray,
 								Items: &apiextv1b1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1b1.JSONSchemaProps{
-										Type:     &b.schemaTypeObject,
+										Type:     b.schemaTypeObject,
 										Required: []string{"test_number"},
-										Properties: map[string]*apiextv1b1.JSONSchemaProps{
-											"test_number": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeString,
+										Properties: map[string]apiextv1b1.JSONSchemaProps{
+											"test_number": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeString,
 											},
-											"tags": &apiextv1b1.JSONSchemaProps{
-												Type: &b.schemaTypeArray,
+											"tags": apiextv1b1.JSONSchemaProps{
+												Type: b.schemaTypeArray,
 												Items: &apiextv1b1.JSONSchemaPropsOrArray{
 													Schema: &apiextv1b1.JSONSchemaProps{
-														Type: &b.schemaTypeString,
+														Type: b.schemaTypeString,
 													},
 												},
 											},
@@ -1235,8 +1235,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1B1Schema() *apiextv1b
 						},
 					},
 					/*
-						"assets": &apiextv1b1.JSONSchemaProps{
-							Type: &b.schemaTypeObject,
+						"assets": apiextv1b1.JSONSchemaProps{
+							Type: b.schemaTypeObject,
 							Properties: map[string]*apiextv1b1.JSONSchemaProps{
 								"built-in":   b.buildNvSeurityCrdCompAssetV1B1Schema(),
 								"namespaces": b.buildNvSeurityCrdCompAssetV1B1Schema(),
@@ -1247,34 +1247,34 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1B1Schema() *apiextv1b
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
 func (b *nvCrdSchmaBuilder) buildNvCspUsageV1B1Schema() *apiextv1b1.JSONSchemaProps {
-	schema := &apiextv1b1.JSONSchemaProps{
-		Type:     &b.schemaTypeObject,
+	schema := apiextv1b1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
 		Required: []string{"managed_node_count", "reporting_time", "base_product"},
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"reporting_time": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"reporting_time": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
-			"managed_node_count": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeInteger,
+			"managed_node_count": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeInteger,
 			},
-			"base_product": &apiextv1b1.JSONSchemaProps{
-				Type: &b.schemaTypeString,
+			"base_product": apiextv1b1.JSONSchemaProps{
+				Type: b.schemaTypeString,
 			},
 		},
 	}
-	return schema
+	return &schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, version *string) *apiextv1.CustomResourceDefinitionVersion {
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, version string) apiextv1.CustomResourceDefinitionVersion {
 
-	v1 := &apiextv1.CustomResourceDefinitionVersion{
+	v1 := apiextv1.CustomResourceDefinitionVersion{
 		Name:    version,
-		Served:  func() *bool { b := true; return &b }(),
-		Storage: func() *bool { b := true; return &b }(),
+		Served:  true,
+		Storage: true,
 		Schema:  &apiextv1.CustomResourceValidation{},
 	}
 	switch nvCrdMetaName {
@@ -1294,12 +1294,12 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 	return v1
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string, version *string) *apiextv1b1.CustomResourceDefinitionVersion {
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string, version string) apiextv1b1.CustomResourceDefinitionVersion {
 
-	v1 := &apiextv1b1.CustomResourceDefinitionVersion{
+	v1 := apiextv1b1.CustomResourceDefinitionVersion{
 		Name:    version,
-		Served:  func() *bool { b := true; return &b }(),
-		Storage: func() *bool { b := true; return &b }(),
+		Served:  true,
+		Storage: true,
 		Schema:  &apiextv1b1.CustomResourceValidation{},
 	}
 	switch nvCrdMetaName {
@@ -1329,46 +1329,46 @@ func createK8sCrdSchema(crdInfo *resource.NvCrdInfo) error {
 	builder.Init()
 	if k8sVersionMajor == 1 && k8sVersionMinor < 19 {
 		res := &apiextv1b1.CustomResourceDefinition{
-			Metadata: &metav1.ObjectMeta{
-				Name:            &crdInfo.MetaName,
-				ResourceVersion: &verRead,
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            crdInfo.MetaName,
+				ResourceVersion: verRead,
 			},
-			Spec: &apiextv1b1.CustomResourceDefinitionSpec{
-				Group:   &crdInfo.SpecGroup,
-				Version: &crdInfo.SpecVersion,
-				Names: &apiextv1b1.CustomResourceDefinitionNames{
-					Plural:   &crdInfo.SpecNamesPlural,
-					Kind:     &crdInfo.SpecNamesKind,
-					Singular: &crdInfo.SpecNamesSingular,
-					ListKind: &crdInfo.SpecNamesListKind,
+			Spec: apiextv1b1.CustomResourceDefinitionSpec{
+				Group:   crdInfo.SpecGroup,
+				Version: crdInfo.SpecVersion,
+				Names: apiextv1b1.CustomResourceDefinitionNames{
+					Plural:   crdInfo.SpecNamesPlural,
+					Kind:     crdInfo.SpecNamesKind,
+					Singular: crdInfo.SpecNamesSingular,
+					ListKind: crdInfo.SpecNamesListKind,
 				},
-				Scope: &crdInfo.SpecScope,
+				Scope: apiextv1b1.ResourceScope(crdInfo.SpecScope),
 			},
 		}
-		v := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion)
+		v := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, crdInfo.SpecVersion)
 		res.Spec.Validation = v.Schema
 		err = global.ORCH.AddResource(resource.RscTypeCrd, res)
 	} else {
 		res := &apiextv1.CustomResourceDefinition{
-			Metadata: &metav1.ObjectMeta{
-				Name:            &crdInfo.MetaName,
-				ResourceVersion: &verRead,
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            crdInfo.MetaName,
+				ResourceVersion: verRead,
 			},
-			Spec: &apiextv1.CustomResourceDefinitionSpec{
-				Group: &crdInfo.SpecGroup,
-				Names: &apiextv1.CustomResourceDefinitionNames{
-					Plural:   &crdInfo.SpecNamesPlural,
-					Kind:     &crdInfo.SpecNamesKind,
-					Singular: &crdInfo.SpecNamesSingular,
-					ListKind: &crdInfo.SpecNamesListKind,
+			Spec: apiextv1.CustomResourceDefinitionSpec{
+				Group: crdInfo.SpecGroup,
+				Names: apiextv1.CustomResourceDefinitionNames{
+					Plural:   crdInfo.SpecNamesPlural,
+					Kind:     crdInfo.SpecNamesKind,
+					Singular: crdInfo.SpecNamesSingular,
+					ListKind: crdInfo.SpecNamesListKind,
 				},
-				Scope: &crdInfo.SpecScope,
+				Scope: apiextv1.ResourceScope(crdInfo.SpecScope),
 			},
 		}
 		if len(crdInfo.ShortNames) > 0 {
 			res.Spec.Names.ShortNames = crdInfo.ShortNames
 		}
-		v := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion)
+		v := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, crdInfo.SpecVersion)
 		res.Spec.Versions = append(res.Spec.Versions, v)
 		err = global.ORCH.AddResource(resource.RscTypeCrd, res)
 	}
@@ -1380,23 +1380,23 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1(srcSchema, destSchema *apiextv1.JSO
 	if srcSchema == nil && destSchema == nil {
 		return true
 	}
-	if srcSchema == nil || destSchema == nil || srcSchema.GetType() != destSchema.GetType() ||
-		len(srcSchema.GetRequired()) != len(destSchema.GetRequired()) ||
-		len(srcSchema.GetEnum()) != len(destSchema.GetEnum()) ||
-		len(srcSchema.GetProperties()) != len(destSchema.GetProperties()) {
+	if srcSchema == nil || destSchema == nil || srcSchema.Type != destSchema.Type ||
+		len(srcSchema.Required) != len(destSchema.Required) ||
+		len(srcSchema.Enum) != len(destSchema.Enum) ||
+		len(srcSchema.Properties) != len(destSchema.Properties) {
 		return false
 	}
 
-	if srcSchema.GetType() == b.schemaTypeArray {
-		srcItems := srcSchema.GetItems()
-		destItems := destSchema.GetItems()
+	if srcSchema.Type == b.schemaTypeArray {
+		srcItems := srcSchema.Items
+		destItems := destSchema.Items
 		if !b.compJSONSchemaV1(srcItems.Schema, destItems.Schema) || len(srcItems.JSONSchemas) != len(destItems.JSONSchemas) {
 			return false
 		}
 		for _, srcItem := range srcItems.JSONSchemas {
 			found := false
 			for _, destItem := range destItems.JSONSchemas {
-				if b.compJSONSchemaV1(srcItem, destItem) {
+				if b.compJSONSchemaV1(&srcItem, &destItem) {
 					found = true
 					break
 				}
@@ -1409,8 +1409,8 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1(srcSchema, destSchema *apiextv1.JSO
 		return true
 	}
 
-	srcRequired := srcSchema.GetRequired()
-	destRequired := destSchema.GetRequired()
+	srcRequired := srcSchema.Required
+	destRequired := destSchema.Required
 	sort.Strings(srcRequired)
 	sort.Strings(destRequired)
 	for i, r := range srcRequired {
@@ -1419,15 +1419,10 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1(srcSchema, destSchema *apiextv1.JSO
 		}
 	}
 
-	for _, srcEnum := range srcSchema.GetEnum() {
+	for _, srcEnum := range srcSchema.Enum {
 		found := false
-		for _, destEnum := range destSchema.GetEnum() {
-			if srcEnum == nil && destEnum == nil {
-				found = true
-				break
-			} else if srcEnum == nil || destEnum == nil {
-				continue
-			} else if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
+		for _, destEnum := range destSchema.Enum {
+			if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
 				found = true
 				break
 			}
@@ -1437,13 +1432,13 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1(srcSchema, destSchema *apiextv1.JSO
 		}
 	}
 
-	srcProps := srcSchema.GetProperties()
-	destProps := destSchema.GetProperties()
+	srcProps := srcSchema.Properties
+	destProps := destSchema.Properties
 	for srcName, srcProp := range srcProps {
-		if destProp, ok := destProps[srcName]; !ok || destProp == nil {
+		if destProp, ok := destProps[srcName]; !ok {
 			return false
 		} else {
-			if same := b.compJSONSchemaV1(srcProp, destProp); !same {
+			if same := b.compJSONSchemaV1(&srcProp, &destProp); !same {
 				return false
 			}
 		}
@@ -1456,23 +1451,23 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1B1(srcSchema, destSchema *apiextv1b1
 	if srcSchema == nil && destSchema == nil {
 		return true
 	}
-	if srcSchema == nil || destSchema == nil || srcSchema.GetType() != destSchema.GetType() ||
-		len(srcSchema.GetRequired()) != len(destSchema.GetRequired()) ||
-		len(srcSchema.GetEnum()) != len(destSchema.GetEnum()) ||
-		len(srcSchema.GetProperties()) != len(destSchema.GetProperties()) {
+	if srcSchema == nil || destSchema == nil || srcSchema.Type != destSchema.Type ||
+		len(srcSchema.Required) != len(destSchema.Required) ||
+		len(srcSchema.Enum) != len(destSchema.Enum) ||
+		len(srcSchema.Properties) != len(destSchema.Properties) {
 		return false
 	}
 
-	if srcSchema.GetType() == b.schemaTypeArray {
-		srcItems := srcSchema.GetItems()
-		destItems := destSchema.GetItems()
+	if srcSchema.Type == b.schemaTypeArray {
+		srcItems := srcSchema.Items
+		destItems := destSchema.Items
 		if !b.compJSONSchemaV1B1(srcItems.Schema, destItems.Schema) || len(srcItems.JSONSchemas) != len(destItems.JSONSchemas) {
 			return false
 		}
 		for _, srcItem := range srcItems.JSONSchemas {
 			found := false
 			for _, destItem := range destItems.JSONSchemas {
-				if b.compJSONSchemaV1B1(srcItem, destItem) {
+				if b.compJSONSchemaV1B1(&srcItem, &destItem) {
 					found = true
 					break
 				}
@@ -1485,8 +1480,8 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1B1(srcSchema, destSchema *apiextv1b1
 		return true
 	}
 
-	srcRequired := srcSchema.GetRequired()
-	destRequired := destSchema.GetRequired()
+	srcRequired := srcSchema.Required
+	destRequired := destSchema.Required
 	sort.Strings(srcRequired)
 	sort.Strings(destRequired)
 	for i, r := range srcRequired {
@@ -1495,15 +1490,10 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1B1(srcSchema, destSchema *apiextv1b1
 		}
 	}
 
-	for _, srcEnum := range srcSchema.GetEnum() {
+	for _, srcEnum := range srcSchema.Enum {
 		found := false
-		for _, destEnum := range destSchema.GetEnum() {
-			if srcEnum == nil && destEnum == nil {
-				found = true
-				break
-			} else if srcEnum == nil || destEnum == nil {
-				continue
-			} else if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
+		for _, destEnum := range destSchema.Enum {
+			if len(srcEnum.Raw) == len(destEnum.Raw) && string(srcEnum.Raw) == string(destEnum.Raw) {
 				found = true
 				break
 			}
@@ -1513,13 +1503,13 @@ func (b *nvCrdSchmaBuilder) compJSONSchemaV1B1(srcSchema, destSchema *apiextv1b1
 		}
 	}
 
-	srcProps := srcSchema.GetProperties()
-	destProps := destSchema.GetProperties()
+	srcProps := srcSchema.Properties
+	destProps := destSchema.Properties
 	for srcName, srcProp := range srcProps {
-		if destProp, ok := destProps[srcName]; !ok || destProp == nil {
+		if destProp, ok := destProps[srcName]; !ok {
 			return false
 		} else {
-			if same := b.compJSONSchemaV1B1(srcProp, destProp); !same {
+			if same := b.compJSONSchemaV1B1(&srcProp, &destProp); !same {
 				return false
 			}
 		}
@@ -1535,24 +1525,24 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 	obj, err := global.ORCH.GetResource(resource.RscTypeCrd, k8s.AllNamespaces, crdInfo.MetaName)
 	if err == nil {
 		crdConfigured = true
-		if crdRes, ok := obj.(*apiextv1.CustomResourceDefinition); ok && crdRes.Metadata != nil && crdRes.Spec != nil {
+		if crdRes, ok := obj.(*apiextv1.CustomResourceDefinition); ok {
 			crdSpec := crdRes.Spec
-			if crdRes.Metadata.GetName() == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
-				if crdSpec.GetGroup() == crdInfo.SpecGroup && crdSpec.GetScope() == crdInfo.SpecScope && crdSpec.Names != nil {
-					shortNames := crdSpec.Names.GetShortNames()
+			if crdRes.Name == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
+				if crdSpec.Group == crdInfo.SpecGroup && string(crdSpec.Scope) == crdInfo.SpecScope {
+					shortNames := crdSpec.Names.ShortNames
 					if utils.CompareSliceWithoutOrder(shortNames, crdInfo.ShortNames) &&
-						crdSpec.Names.GetPlural() == crdInfo.SpecNamesPlural &&
-						crdSpec.Names.GetSingular() == crdInfo.SpecNamesSingular &&
-						crdSpec.Names.GetKind() == crdInfo.SpecNamesKind &&
-						crdSpec.Names.GetListKind() == crdInfo.SpecNamesListKind {
+						crdSpec.Names.Plural == crdInfo.SpecNamesPlural &&
+						crdSpec.Names.Singular == crdInfo.SpecNamesSingular &&
+						crdSpec.Names.Kind == crdInfo.SpecNamesKind &&
+						crdSpec.Names.ListKind == crdInfo.SpecNamesListKind {
 						v0 := crdSpec.Versions[0]
 						schema := v0.Schema
 						if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-							if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || (ok && spec != nil) {
+							if _, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || ok {
 								var builder nvCrdSchmaBuilder
 								builder.Init()
-								if expected := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
-									if v0.GetServed() == expected.GetServed() && v0.GetStorage() == expected.GetStorage() && v0.GetName() == expected.GetName() {
+								if expected := builder.buildNvSecurityCrdByApiExtV1(crdInfo.MetaName, crdInfo.SpecVersion); expected.Schema != nil {
+									if v0.Served == expected.Served && v0.Storage == expected.Storage && v0.Name == expected.Name {
 										crdUpToDate = builder.compJSONSchemaV1(expected.Schema.OpenAPIV3Schema, schema.OpenAPIV3Schema)
 									}
 								}
@@ -1561,22 +1551,22 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 					}
 				}
 			}
-		} else if crdRes, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && crdRes.Metadata != nil && crdRes.Spec != nil && len(crdRes.Spec.Versions) > 0 {
+		} else if crdRes, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok && len(crdRes.Spec.Versions) > 0 {
 			crdSpec := crdRes.Spec
-			if crdRes.Metadata.GetName() == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
-				if crdSpec.GetGroup() == crdInfo.SpecGroup && crdSpec.GetScope() == crdInfo.SpecScope && crdSpec.Names != nil {
-					if crdSpec.Names.GetPlural() == crdInfo.SpecNamesPlural &&
-						crdSpec.Names.GetSingular() == crdInfo.SpecNamesSingular &&
-						crdSpec.Names.GetKind() == crdInfo.SpecNamesKind &&
-						crdSpec.Names.GetListKind() == crdInfo.SpecNamesListKind {
+			if crdRes.Name == crdInfo.MetaName && len(crdSpec.Versions) > 0 {
+				if crdSpec.Group == crdInfo.SpecGroup && string(crdSpec.Scope) == crdInfo.SpecScope {
+					if crdSpec.Names.Plural == crdInfo.SpecNamesPlural &&
+						crdSpec.Names.Singular == crdInfo.SpecNamesSingular &&
+						crdSpec.Names.Kind == crdInfo.SpecNamesKind &&
+						crdSpec.Names.ListKind == crdInfo.SpecNamesListKind {
 						v0 := crdSpec.Versions[0]
-						if v0.Served != nil && *v0.Served && v0.Storage != nil && *v0.Storage {
+						if v0.Served && v0.Storage {
 							schema := crdRes.Spec.Versions[0].Schema
 							if schema != nil && schema.OpenAPIV3Schema != nil && schema.OpenAPIV3Schema.Properties != nil {
-								if spec, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || (ok && spec != nil) {
+								if _, ok := schema.OpenAPIV3Schema.Properties["spec"]; crdInfo.RscType == resource.RscTypeCrdNvCspUsage || ok {
 									var builder nvCrdSchmaBuilder
 									builder.Init()
-									if expected := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, &crdInfo.SpecVersion); expected != nil && expected.Schema != nil {
+									if expected := builder.buildNvSecurityCrdByApiExtV1B1(crdInfo.MetaName, crdInfo.SpecVersion); expected.Schema != nil {
 										crdUpToDate = builder.compJSONSchemaV1B1(expected.Schema.OpenAPIV3Schema, schema.OpenAPIV3Schema)
 									}
 								}
@@ -1592,8 +1582,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 }
 
 // do not update CustomResourceDefinition resource(schema) anymore
-func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
-
+func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []string {
 	nvCrdInfo := []*resource.NvCrdInfo{}
 	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		&resource.NvCrdInfo{
@@ -1716,17 +1705,15 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		// [2023/04] no more crd schema upgrade.
 		crdConfigured, crdUpToDate, err := isCrdUpToDate(leader, crdInfo)
 		if crdConfigured {
-			if leader && create {
-				if crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
-					rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
-				}
+			if crossCheck && crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
+				rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
 			}
 
 			if !crdUpToDate {
 				crdOutOfDate = append(crdOutOfDate, crdInfo.MetaName)
 				continue
 			}
-		} else if create {
+		} else if init {
 			for retry := 0; retry < 3; retry++ {
 				if err = createK8sCrdSchema(crdInfo); err == nil {
 					log.WithFields(log.Fields{"crd": crdInfo.MetaName}).Info("configured crd schema in k8s")
@@ -1747,7 +1734,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 		}
 
 		if err != nil {
-			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "create": create, "err": err}).Error("crd schema")
+			log.WithFields(log.Fields{"crd": crdInfo.MetaName, "init": init, "err": err}).Error("crd schema")
 			errors = append(errors, err.Error())
 		}
 	}
@@ -1760,7 +1747,7 @@ func CheckCrdSchema(leader, create bool, cspType share.TCspType) []string {
 	return errors
 }
 
-func Init(leader bool, cspType share.TCspType) {
+func Init(leader, crossCheck bool, cspType share.TCspType) {
 	var crdconf *share.CLUSAdmissionState
 	clusHelper := kv.GetClusterHelper()
 	crdconf, _ = clusHelper.GetAdmissionStateRev(resource.NvCrdSvcName)
@@ -1769,7 +1756,7 @@ func Init(leader bool, cspType share.TCspType) {
 	}
 	crdconf.CtrlStates[admission.NvAdmValidateType].Enable = true // always enable NV CRD feature
 
-	CheckCrdSchema(leader, true, cspType)
+	CheckCrdSchema(leader, true, crossCheck, cspType)
 
 	// register crd admission control(ValidatingWebhookConfiguration neuvector-validating-crd-webhook) to k8s
 	k8sResInfo := admission.ValidatingWebhookConfigInfo{

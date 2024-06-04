@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -97,7 +97,10 @@ func newHttpClient(proxy string, insecure bool) (*http.Client, error) {
 
 func (r *gitlab) newGitlabClient() error {
 	var err error
-	proxy := GetProxy(r.apiUrl)
+	var proxy string
+	if !r.ignoreProxy {
+		proxy = GetProxy(r.apiUrl)
+	}
 	r.gitlabClient, err = newHttpClient(proxy, true)
 	return err
 }
@@ -126,7 +129,7 @@ func (r *gitlab) getData(ur string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

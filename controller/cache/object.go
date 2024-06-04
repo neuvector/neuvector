@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"encoding/json"
 	"fmt"
@@ -22,6 +19,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -705,6 +703,11 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if cache != nil {
 			evhdls.Trigger(EV_HOST_DELETE, hostID, cache)
 		}
+
+		// cleanup records in database
+		if err := db.DeleteAssetByID(db.AssetNode, hostID); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": hostID}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
@@ -1045,7 +1048,7 @@ func addrWorkloadAdd(id string, param interface{}) {
 				}
 
 				//NVSHAS-8155, previous host ip reused by POD, remove it from iphost cache
-				if !host_mode {//NVSHAS-8249, only for non-hostmode wl
+				if !host_mode { //NVSHAS-8249, only for non-hostmode wl
 					if _, ok1 := ipHostMap[key]; ok1 {
 						delete(ipHostMap, key)
 						hostip_reused = true
@@ -1254,8 +1257,8 @@ func mergeProbeCommands(cmds [][]string) []k8sProbeCmd {
 	return probes
 }
 
-func addK8sPodEvent(pod resource.Pod) {
-	probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
+func addK8sPodEvent(pod resource.Pod, probeCmds [][]string) {
+	probes := mergeProbeCommands(probeCmds)
 	groupName := fmt.Sprintf("nv.%s.%s", pod.Name, pod.Domain)
 	if svc := global.ORCH.GetServiceFromPodLabels(pod.Domain, pod.Name, pod.Node, pod.Labels); svc != nil {
 		groupName = api.LearnedGroupPrefix + utils.NormalizeForURL(utils.MakeServiceName(svc.Domain, svc.Name))
@@ -1294,37 +1297,59 @@ func addK8sPodEvent(pod resource.Pod) {
 }
 
 // The cacheMutex is locked by callers
-func updateK8sPodEvent(group, podname, domain string) {
-	var bFound bool
+func updateK8sPodEvent(group, podname, domain, id string) bool {
+	var bFound, bPrivileged bool
 	now := time.Now().Unix()
 	for name, p := range cacher.k8sPodEvents {
 		if group == p.group || group == p.groupAlt {
 			addK8sProbeApps(group, p.probes)
-			// delete(cacher.k8sPodEvents, name)
-			bFound = true
-			break
+			for _, c := range p.pod.Containers {
+				if c.Id == id {
+					bFound = true
+					bPrivileged = c.Privileged
+					break
+				}
+			}
 		}
 		if now > p.cleanAt {
 			log.WithFields(log.Fields{"name": name}).Debug("Clean-up")
 			delete(cacher.k8sPodEvents, name)
+		}
+
+		if bFound {
+			break
 		}
 	}
 
 	if !bFound {
 		if obj, err := global.ORCH.GetResource(resource.RscTypePod, domain, podname); err != nil {
 			log.WithFields(log.Fields{"error": err, "group": group, "pod": podname, "domain": domain}).Error("get ressource")
-			return
+			return bPrivileged
 		} else {
+			var probeCmds [][]string
 			pod := obj.(*resource.Pod)
-			probes := mergeProbeCommands(append(pod.LivenessCmds, pod.ReadinessCmds...))
-			if len(probes) == 0 {
-				return
+			for _, c := range pod.Containers {
+				if len(c.LivenessCmds) > 0 {
+					probeCmds = append(probeCmds, c.LivenessCmds)
+				}
+				if len(c.ReadinessCmds) > 0 {
+					probeCmds = append(probeCmds, c.ReadinessCmds)
+				}
+				if c.Id == id {
+					bPrivileged = c.Privileged
+				}
 			}
 
-			// log.WithFields(log.Fields{"probes": probes, "group": group, "pod": podname, "domain": domain}).Debug()
-			addK8sProbeApps(group, probes)
+			if len(probeCmds) > 0 {
+				probes := mergeProbeCommands(probeCmds)
+				if len(probes) > 0 {
+					// log.WithFields(log.Fields{"probes": probes, "group": group, "pod": podname, "domain": domain}).Debug()
+					addK8sProbeApps(group, probes)
+				}
+			}
 		}
 	}
+	return bPrivileged
 }
 
 func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -1386,7 +1411,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			}
 
 			setServiceAccount(wl.HostName, wl.ID, wl.Name, wlCache)
-
+			wl.Privileged = wlCache.workload.Privileged // pre-existing
 			wlCache.workload = &wl
 			wlCache.state = ""
 
@@ -1547,6 +1572,11 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		if wlCache != nil {
 			evhdls.Trigger(EV_WORKLOAD_DELETE, id, wlCache)
 		}
+
+		// cleanup records in database
+		if err := db.DeleteAssetByID(db.AssetWorkload, id); err != nil {
+			log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
+		}
 	}
 }
 
@@ -1666,6 +1696,8 @@ func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mod
 		userRoleConfigUpdate(nType, key, value)
 	case share.CFGEndpointPwdProfile:
 		pwdProfileConfigUpdate(nType, key, value)
+	case share.CFGEndpointQuerySession:
+		querySessionRequest(nType, key, value)
 	}
 
 	// Only the lead run backup, because the typical use case for backup is to save config
@@ -2231,4 +2263,30 @@ func (kvs *kvConfigStore) GetBackupKvStore(key string) ([]byte, bool) {
 		return value, ok
 	}
 	return nil, false
+}
+
+func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []byte) {
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
+
+	switch nType {
+	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
+		var qsr api.QuerySessionRequest
+		json.Unmarshal(value, &qsr)
+
+		log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr}).Debug("[multi-cluster] consul kv watcher added event. Will call rest.CreateQuerySession()")
+
+		err := cctx.CreateQuerySessionFunc(&qsr)
+		if err != nil {
+			log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr, "err": err}).Debug("[multi-cluster] consul kv watcher added event. call rest.CreateQuerySession() error")
+		}
+	case cluster.ClusterNotifyDelete:
+		queryToken := share.CLUSKeyLastToken(key)
+
+		err := cctx.DeleteQuerySessionFunc(queryToken)
+		if err != nil {
+			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event, call cctx.DeleteQuerySessionFunc() error")
+		} else {
+			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event")
+		}
+	}
 }

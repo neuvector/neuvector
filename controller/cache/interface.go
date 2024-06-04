@@ -54,6 +54,9 @@ type CacheInterface interface {
 	GetAllWorkloadsRisk(acc *access.AccessControl) []*common.WorkloadRisk
 	GetWorkloadRisk(id string, acc *access.AccessControl) (*common.WorkloadRisk, error)
 	CanAccessWorkload(id string, acc *access.AccessControl) error
+	GetAllWorkloadsID(acc *access.AccessControl, filteredMap map[string]bool) []string
+	GetAllHostsID(acc *access.AccessControl, filteredMap map[string]bool) []string
+	GetPlatformID(acc *access.AccessControl, filteredMap map[string]bool) string
 
 	GetAllGroups(scope, view string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroup
 	GetAllGroupsBrief(scope string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroupBrief
@@ -167,6 +170,7 @@ type CacheInterface interface {
 	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
 		containerType string, forTesting bool) (*nvsysadmission.AdmResult, bool)
+	MatchK8sAdmissionRulesForPVC(admType string, ns, name, scName string, forTesting bool) (*nvsysadmission.AdmResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()

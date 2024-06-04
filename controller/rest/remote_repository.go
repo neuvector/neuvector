@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -25,7 +25,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var remoteRepository api.RESTRemoteRepository
 	err := json.Unmarshal(body, &remoteRepository)
 	if err != nil {
@@ -41,7 +41,12 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 
 	// in 5.3, only an alias of "default" is allowed
 	if remoteRepository.Nickname != "default" {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "only \"default\" alias for github is allowed")
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "the only supported name is default")
+		return
+	}
+
+	if remoteRepository.Provider != share.RemoteRepositoryProvider_GitHub {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "the only supported provider is github")
 		return
 	}
 
@@ -49,6 +54,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		Nickname: remoteRepository.Nickname,
 		Provider: remoteRepository.Provider,
 		Comment:  remoteRepository.Comment,
+		Enable:   remoteRepository.Enable,
 	}
 	if remoteRepository.GitHubConfiguration != nil {
 		githubCfg := *remoteRepository.GitHubConfiguration
@@ -158,7 +164,7 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTRemoteRepositoryConfigData
 	err := json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
@@ -222,6 +228,10 @@ func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RE
 		return s != nil
 	}
 
+	if updates.Enable != nil {
+		base.Enable = *updates.Enable
+	}
+
 	if base.Provider == share.RemoteRepositoryProvider_GitHub {
 		if isSet(updates.Comment) {
 			base.Comment = *updates.Comment
@@ -244,6 +254,10 @@ func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RE
 		if isSet(updates.GitHubConfiguration.PersonalAccessTokenEmail) {
 			base.GitHubConfiguration.PersonalAccessTokenEmail = *updates.GitHubConfiguration.PersonalAccessTokenEmail
 		}
+	}
+
+	if base.Provider != "github" {
+		return share.CLUSRemoteRepository{}, errors.New(`only "github" provider is allowed`)
 	}
 
 	if !base.IsValid() {

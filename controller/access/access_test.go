@@ -3,6 +3,7 @@ package access
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,8 @@ import (
 )
 
 func preTest() {
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
 	log.SetLevel(log.FatalLevel)
 
 	CompileUriPermitsMapping()
@@ -62,7 +65,7 @@ func TestGlobalAccess(t *testing.T) {
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz := acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -70,13 +73,13 @@ func TestGlobalAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
 	}
 
-	acc = NewAccessControl(r, AccessOPWrite, DomainRole{})
+	acc = NewAccessControl(r, AccessOPWrite, DomainRole{}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -84,13 +87,13 @@ func TestGlobalAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
 	}
 
-	acc = NewAccessControl(r, AccessOPRead, DomainRole{})
+	acc = NewAccessControl(r, AccessOPRead, DomainRole{}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -107,7 +110,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz := acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -115,13 +118,13 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
 	}
 
-	acc = NewAccessControl(r, AccessOPWrite, DomainRole{})
+	acc = NewAccessControl(r, AccessOPWrite, DomainRole{}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -129,7 +132,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -138,7 +141,7 @@ func TestDomainAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"":    api.UserRoleReader,
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -146,7 +149,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -155,7 +158,7 @@ func TestDomainAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"":    api.UserRoleReader,
 		"ns2": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -163,7 +166,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -171,7 +174,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -179,7 +182,7 @@ func TestDomainAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -206,7 +209,7 @@ func TestWildcardDomainAccess(t *testing.T) {
 		for _, domain := range domains {
 			acc := NewAccessControl(req, op, DomainRole{
 				domain: userRole1.Name,
-			})
+			}, nil)
 			authz := acc.Authorize(&obj1, nil)
 			if op == AccessOPRead {
 				if !authz {
@@ -222,7 +225,7 @@ func TestWildcardDomainAccess(t *testing.T) {
 			acc := NewAccessControl(req, op, DomainRole{
 				domain:      userRole1.Name,
 				"default-2": userRole1.Name,
-			})
+			}, nil)
 			authz := acc.Authorize(&obj1, nil)
 			if op == AccessOPRead {
 				if !authz {
@@ -239,7 +242,7 @@ func TestWildcardDomainAccess(t *testing.T) {
 		for _, domain := range domains {
 			acc := NewAccessControl(req, op, DomainRole{
 				domain: userRole1.Name,
-			})
+			}, nil)
 			authz := acc.Authorize(&obj1, nil)
 			if authz {
 				t.Errorf("Authz succeed: op=%v, roles=%+v", acc.op, acc.roles)
@@ -249,7 +252,7 @@ func TestWildcardDomainAccess(t *testing.T) {
 			acc := NewAccessControl(req, op, DomainRole{
 				domain:      userRole1.Name,
 				"default-2": userRole1.Name,
-			})
+			}, nil)
 			authz := acc.Authorize(&obj1, nil)
 			if authz {
 				t.Errorf("Authz succeed: op=%v, roles=%+v", acc.op, acc.roles)
@@ -259,7 +262,7 @@ func TestWildcardDomainAccess(t *testing.T) {
 			acc := NewAccessControl(req, op, DomainRole{
 				domain: userRole1.Name,
 				"":     userRole1.Name,
-			})
+			}, nil)
 			authz := acc.Authorize(&obj1, nil)
 			if op == AccessOPRead {
 				if !authz {
@@ -289,7 +292,7 @@ func testWildcardDomainAccess(caller string, t *testing.T, obj *domainObjectTest
 		for _, domain := range userDomainsResult.UserDomains {
 			domainRole[domain] = userRole1.Name
 		}
-		acc := NewAccessControl(req, op, domainRole)
+		acc := NewAccessControl(req, op, domainRole, nil)
 		authz := acc.Authorize(obj, nil)
 		if op == AccessOPRead {
 			if userDomainsResult.ExpectedResult && !authz {
@@ -309,7 +312,7 @@ func testWildcardDomainAccess(caller string, t *testing.T, obj *domainObjectTest
 		for _, domain := range userDomainsResult.UserDomains {
 			domainRole[domain] = userRole2.Name
 		}
-		acc := NewAccessControl(req, op, domainRole)
+		acc := NewAccessControl(req, op, domainRole, nil)
 		authz := acc.Authorize(obj, nil)
 		if op == AccessOPRead {
 			if userDomainsResult.ExpectedResult && !authz {
@@ -328,18 +331,19 @@ func testWildcardDomainAccess(caller string, t *testing.T, obj *domainObjectTest
 }
 
 // Example 1: user A1 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*" only and creates a group G1 ( i.e. group G1's CreaterDomains is ["app-US-*"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-2" cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-JP-*"       cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*", "qa" can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*", "qa"    can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "", "qa"         can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""               can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"              can access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev-*"   cannot access group G1
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-US-dev" ,"*b" cannot access group G1
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-2" cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-JP-*"       cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*", "qa" can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*", "qa"    can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "", "qa"         can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""               can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"              can access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev-*"   cannot access group G1
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-US-dev" ,"*b" cannot access group G1
 func TestWildcardDomainAccess1(t *testing.T) {
 	preTest()
 
@@ -381,19 +385,20 @@ func TestWildcardDomainAccess1(t *testing.T) {
 }
 
 // Example 2: user A2 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" and creates a group G2 ( i.e. group G2's CreaterDomains is ["app-1", "app-US-dev"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev"     		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "qa"    		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" 	can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "","app-JP"       		can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""       				can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"       				can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev"       			can access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US"       			cannot access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-2","app-JP-*"       cannot access group G2
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev-US"       		cannot access group G2
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-dev"     		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "qa"    		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-dev" 	can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-*"          		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "","app-JP"       		can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain ""       				can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*"       				can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev"       			can access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US"       			cannot access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-2","app-JP-*"       cannot access group G2
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "*-dev-US"       		cannot access group G2
 func TestWildcardDomainAccess2(t *testing.T) {
 	preTest()
 
@@ -436,17 +441,18 @@ func TestWildcardDomainAccess2(t *testing.T) {
 }
 
 // Example 3: user A3 has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1", "app-US-*" and creates a group G3 ( i.e. group G3's CreaterDomains is ["app-1", "app-US-*"]	)
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app*"          			can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1","qa"     		can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*","app-JP-*" 	can access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1" 				cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1","app-JP-2" 	cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "bpp-*"          		cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa" 					cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa","app-JP-*" 			cannot access group G3
-// 	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-UK-1","app-JP-2" 	cannot access group G3
+//
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1"          		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*"       		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app*"          			can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-1","qa"     		can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-*","app-JP-*" 	can access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1" 				cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-US-1","app-JP-2" 	cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "bpp-*"          		cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa" 					cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "qa","app-JP-*" 			cannot access group G3
+//	user has PERMS_RUNTIME_POLICIES(r/w) on domain "app-UK-1","app-JP-2" 	cannot access group G3
 func TestWildcardDomainAccess3(t *testing.T) {
 	preTest()
 
@@ -534,7 +540,7 @@ func TestDualAccess(t *testing.T) {
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz := acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -542,7 +548,7 @@ func TestDualAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -550,7 +556,7 @@ func TestDualAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -558,7 +564,7 @@ func TestDualAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -567,7 +573,7 @@ func TestDualAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
 		"ns2": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -576,7 +582,7 @@ func TestDualAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -585,7 +591,7 @@ func TestDualAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleAdmin,
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -594,7 +600,7 @@ func TestDualAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleReader,
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -603,7 +609,7 @@ func TestDualAccess(t *testing.T) {
 	// For read access, readable to one side of domain list is enough
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -648,7 +654,7 @@ func TestOwnAccess(t *testing.T) {
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz := acc.AuthorizeOwn(obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -656,7 +662,7 @@ func TestOwnAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -666,7 +672,7 @@ func TestOwnAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -674,7 +680,7 @@ func TestOwnAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -682,7 +688,7 @@ func TestOwnAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -691,7 +697,7 @@ func TestOwnAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
 		"ns2": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -700,7 +706,7 @@ func TestOwnAccess(t *testing.T) {
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
 		"ns2": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.AuthorizeOwn(obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -729,7 +735,7 @@ func TestWildcardOwnAccess(t *testing.T) {
 			for _, domain := range domains {
 				domainRole[domain] = userRole1.Name
 			}
-			acc := NewAccessControl(req, op, domainRole)
+			acc := NewAccessControl(req, op, domainRole, nil)
 			authz := acc.AuthorizeOwn(&obj1, nil)
 			if !authz {
 				t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -744,7 +750,7 @@ func TestWildcardOwnAccess(t *testing.T) {
 			for _, domain := range domains {
 				domainRole[domain] = userRole1.Name
 			}
-			acc := NewAccessControl(req, op, domainRole)
+			acc := NewAccessControl(req, op, domainRole, nil)
 			authz := acc.AuthorizeOwn(&obj1, nil)
 			if authz {
 				t.Errorf("Authz success: op=%v, roles=%+v", acc.op, acc.roles)
@@ -763,7 +769,7 @@ func testWildcardOwnAccess(caller string, t *testing.T, obj *domainObjectTest, r
 		for _, domain := range userDomainsResult.UserDomains {
 			domainRole[domain] = userRole1.Name
 		}
-		acc := NewAccessControl(req, op, domainRole)
+		acc := NewAccessControl(req, op, domainRole, nil)
 		// Authorize if the access has rights on all domains which obj1 is member of.
 		authz := acc.AuthorizeOwn(obj, nil)
 		if op == AccessOPRead {
@@ -784,7 +790,7 @@ func testWildcardOwnAccess(caller string, t *testing.T, obj *domainObjectTest, r
 		for _, domain := range userDomainsResult.UserDomains {
 			domainRole[domain] = userRole2.Name
 		}
-		acc := NewAccessControl(req, op, domainRole)
+		acc := NewAccessControl(req, op, domainRole, nil)
 		// Authorize if the access has rights on all domains which obj1 is member of.
 		authz := acc.AuthorizeOwn(obj, nil)
 		if op == AccessOPRead {
@@ -962,7 +968,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz := acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -970,7 +976,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -978,7 +984,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -986,7 +992,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"": api.UserRoleCIOps,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -994,7 +1000,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -1002,7 +1008,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPWrite, DomainRole{
 		"ns1": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -1010,7 +1016,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleAdmin,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -1018,7 +1024,7 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleReader,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != true {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -1026,13 +1032,13 @@ func TestAllReaderAccess(t *testing.T) {
 
 	acc = NewAccessControl(r, AccessOPRead, DomainRole{
 		"ns1": api.UserRoleCIOps,
-	})
+	}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
 	}
 
-	acc = NewAccessControl(r, AccessOPRead, DomainRole{})
+	acc = NewAccessControl(r, AccessOPRead, DomainRole{}, nil)
 	authz = acc.Authorize(&obj, nil)
 	if authz != false {
 		t.Errorf("Authz fail: op=%v, roles=%+v", acc.op, acc.roles)
@@ -1041,9 +1047,9 @@ func TestAllReaderAccess(t *testing.T) {
 	postTest()
 }
 
-func checkPermissionValue(id string, pValue uint64, t *testing.T) {
+func checkPermissionValue(id string, pValue uint32, t *testing.T) {
 	original := pValue
-	var bit uint64 = 0x8000000000000000
+	var bit uint32 = 0x80000000
 	found := false
 	for ; bit > 0; bit >>= 1 {
 		if bit&pValue > 0 {
@@ -1073,15 +1079,15 @@ func TestSimplePermission(t *testing.T) {
 	readOnlyPermissions := utils.NewSet(share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS)
 	writeOnlyPermissions := utils.NewSet(share.PERM_CICD_SCAN)
 	globalOnlyPermissions := utils.NewSet(share.PERM_CICD_SCAN, share.PERM_NV_RESOURCE, share.PERM_ADM_CONTROL, share.PERM_AUTHENTICATION, share.PERM_SYSTEM_CONFIG,
-		share.PERM_CLOUD, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY)
+		/*share.PERM_CLOUD,*/ share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY)
 
 	globalReadPermissions := []uint64{share.PERM_NV_RESOURCE, share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC,
 		share.PERM_GROUP_BASIC, share.PERM_ADM_CONTROL, share.PERM_COMPLIANCE_BASIC, share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS, share.PERM_AUTHENTICATION,
-		share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG, share.PERM_CLOUD, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY}
+		share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG /*share.PERM_CLOUD,*/, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_VULNERABILITY}
 
 	globalWritePermissions := []uint64{share.PERM_NV_RESOURCE, share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC,
 		share.PERM_GROUP_BASIC, share.PERM_ADM_CONTROL, share.PERM_COMPLIANCE_BASIC, share.PERM_AUTHENTICATION, share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG,
-		share.PERM_CLOUD, share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_CICD_SCAN, share.PERM_VULNERABILITY}
+		/*share.PERM_CLOUD,*/ share.PERM_WORKLOAD_BASIC, share.PERM_INFRA_BASIC, share.PERM_CICD_SCAN, share.PERM_VULNERABILITY}
 
 	domainReadPermissions := []uint64{share.PERM_RUNTIME_SCAN_BASIC, share.PERM_REG_SCAN, share.PERM_NETWORK_POLICY_BASIC, share.PERM_SYSTEM_POLICY_BASIC, share.PERM_GROUP_BASIC,
 		share.PERM_COMPLIANCE_BASIC, share.PERM_AUTHORIZATION, share.PERM_SYSTEM_CONFIG, share.PERM_WORKLOAD_BASIC, share.PERM_AUDIT_EVENTS, share.PERM_SECURITY_EVENTS_BASIC, share.PERM_EVENTS}
@@ -1179,6 +1185,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/config",
 			"v1/scan/status",
+			"v1/scan/cache_stat/*",
+			"v1/scan/cache_data/*",
 			"v1/scan/workload/*",
 			"v1/scan/image",
 			"v1/scan/image/*",
@@ -1186,6 +1194,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/platform",
 			"v1/scan/platform/platform",
 			"v1/scan/asset",
+			"v1/vulasset",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry",
@@ -1335,7 +1344,6 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/license",
 			"v1/system/summary",
 			"v1/internal/system",
-			"v1/system/config/remote_repository/*",
 		},
 		CONST_API_FED: []string{
 			"v1/fed/join_token",
@@ -1375,11 +1383,15 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/workload/*",
 			"v1/scan/host/*",
 			"v1/scan/platform/platform",
+			"v1/vulasset",
+			"v1/assetvul",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*/scan",
 			"v1/scan/registry",
+			"v2/scan/registry",
 			"v1/scan/registry/*/test",
+			"v2/scan/registry/*/test",
 			"v1/scan/sigstore/root_of_trust",
 			"v1/scan/sigstore/root_of_trust/*/verifier",
 		},
@@ -1464,6 +1476,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*",
+			"v2/scan/registry/*",
 			"v1/scan/sigstore/root_of_trust/*",
 			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
@@ -1620,6 +1633,416 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 				}
 			}
 		}
+	}
+
+	postTest()
+}
+
+type tCaseInfo struct {
+	t        *testing.T
+	caseName string
+	caseID   int
+}
+
+func (r *tCaseInfo) dumpGlobalPermitsList(gPermitsList []*api.RESTRolePermission) {
+	for _, gPerm := range gPermitsList {
+		r.t.Logf("[%d]   permission %s, read(%v), write(%v)\n", r.caseID, gPerm.ID, gPerm.Read, gPerm.Write)
+	}
+}
+
+func (r *tCaseInfo) dumpDomainPermitsList(dPermitsList map[string][]*api.RESTRolePermission) {
+	for domain, dPermits := range dPermitsList {
+		for _, dPerm := range dPermits {
+			r.t.Logf("[%d] domain %s: permission %s, read(%v), write(%v)\n", r.caseID, domain, dPerm.ID, dPerm.Read, dPerm.Write)
+		}
+	}
+}
+
+func (r *tCaseInfo) checkPermissionsResult(gPermitsList, expectedGPermitsList []*api.RESTRolePermission,
+	dPermitsList, expectedDPermitsList map[string][]*api.RESTRolePermission) {
+
+	if len(gPermitsList) != len(expectedGPermitsList) {
+		r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+		r.t.Logf("[%d]   Expect gPermitsList len: %d\n", r.caseID, len(expectedGPermitsList))
+		r.t.Logf("[%d]   Actual gPermitsList len: %d\n", r.caseID, len(gPermitsList))
+		r.dumpGlobalPermitsList(gPermitsList)
+
+	} else {
+		for _, gPerm1 := range gPermitsList {
+			found := false
+			for _, gPerm2 := range expectedGPermitsList {
+				if gPerm1.ID == gPerm2.ID {
+					found = true
+					if gPerm1.Read != gPerm2.Read || gPerm1.Write != gPerm2.Write {
+						r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+						r.t.Logf("[%d]   Expect: gPerm %s, read(%v), write(%v)\n", r.caseID, gPerm1.ID, gPerm1.Read, gPerm1.Write)
+						r.t.Logf("[%d]   Actual: gPerm %s, read(%v), write(%v)\n", r.caseID, gPerm2.ID, gPerm2.Read, gPerm2.Write)
+					}
+					break
+				}
+			}
+			if !found {
+				r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+				r.t.Logf("[%d]   Expect: gPerm %s, read(%v), write(%v)\n", r.caseID, gPerm1.ID, gPerm1.Read, gPerm1.Write)
+				r.t.Logf("[%d]   Actual: gPerm %s not found\n", r.caseID, gPerm1.ID)
+			}
+		}
+	}
+
+	if len(dPermitsList) != len(expectedDPermitsList) {
+		r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+		r.t.Logf("[%d]   Expect dPermitsList len: %d\n", r.caseID, len(expectedDPermitsList))
+		r.t.Logf("[%d]   Actual dPermitsList len: %d\n", r.caseID, len(dPermitsList))
+		r.dumpDomainPermitsList(dPermitsList)
+	} else {
+		for domain, dPermsList := range dPermitsList {
+			if expectedDPermsList, ok := expectedDPermitsList[domain]; ok {
+				for _, dPerm1 := range dPermsList {
+					found := false
+					for _, dPerm2 := range expectedDPermsList {
+						if dPerm1.ID == dPerm2.ID {
+							found = true
+							if dPerm1.Read != dPerm2.Read || dPerm1.Write != dPerm2.Write {
+								r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+								r.t.Logf("[%d]   Expect: domain %s, dPerm %s, read(%v), write(%v)\n", r.caseID, domain, dPerm1.ID, dPerm1.Read, dPerm1.Write)
+								r.t.Logf("[%d]   Actual: domain %s, dPerm %s, read(%v), write(%v)\n", r.caseID, domain, dPerm2.ID, dPerm2.Read, dPerm2.Write)
+							}
+							break
+						}
+					}
+					if !found {
+						r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+						r.t.Logf("[%d]   Expect: domain %s, dPerm %s, read(%v), write(%v)\n", r.caseID, domain, dPerm1.ID, dPerm1.Read, dPerm1.Write)
+						r.t.Logf("[%d]   Actual: domain %s, dPerm %s not found\n", r.caseID, domain, dPerm1.ID)
+					}
+				}
+			} else {
+				r.t.Errorf("[ %s : case %d ] unexpected test result\n", r.caseName, r.caseID)
+				r.t.Logf("[%d]   Expect: dPermsList for domain %s\n", r.caseID, domain)
+				r.t.Logf("[%d]   Actual: dPermsList for domain %s not found\n", r.caseID, domain)
+			}
+		}
+	}
+
+	r.caseID += 1
+	log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+func TestGetUserPermissions(t *testing.T) {
+	preTest()
+
+	var testObj tCaseInfo = tCaseInfo{
+		t:        t,
+		caseName: "TestGetUserPermissions",
+		caseID:   1,
+	}
+
+	{
+		var roleDomains map[string][]string
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions("admin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		gPermitsList, dPermitsList, _ = GetUserPermissions("fedAdmin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true, Write: true})
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+	}
+
+	{
+		testObj.caseID = 11
+
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions("reader", nil, share.NvPermissions{}, extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		gPermitsList, dPermitsList, _ = GetUserPermissions("fedReader", nil, share.NvPermissions{}, extraPermitsDomains)
+		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true})
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+	}
+
+	{
+		testObj.caseID = 21
+
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions(
+			"admin",
+			nil,
+			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
+			extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		gPermitsList, dPermitsList, _ = GetUserPermissions(
+			"fedAdmin",
+			nil,
+			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
+			extraPermitsDomains)
+		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true, Write: true})
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+	}
+
+	{
+		testObj.caseID = 31
+
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions(
+			"reader",
+			nil,
+			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
+			extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		gPermitsList, dPermitsList, _ = GetUserPermissions(
+			"fedReader",
+			nil,
+			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
+			extraPermitsDomains)
+		expectedGPermitsList = []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+	}
+
+	{
+		testObj.caseID = 41
+
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions(
+			"reader",
+			map[string][]string{"admin": []string{"nv-1"}},
+			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
+			extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		expectedDPermitsList = map[string][]*api.RESTRolePermission{
+			"nv-1": []*api.RESTRolePermission{
+				&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+				&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+				&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		//log.SetLevel(log.DebugLevel)
+		gPermitsList, dPermitsList, _ = GetUserPermissions(
+			"reader",
+			nil,
+			share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN},
+			[]share.CLUSPermitsAssigned{
+				share.CLUSPermitsAssigned{
+					Permits: share.NvPermissions{
+						ReadValue:  share.PERMS_RUNTIME_POLICIES,
+						WriteValue: share.PERMS_RUNTIME_POLICIES,
+					},
+					Domains: []string{"nv-1", "nv-2"},
+				},
+				share.CLUSPermitsAssigned{
+					Permits: share.NvPermissions{
+						ReadValue:  share.PERMS_RUNTIME_SCAN,
+						WriteValue: share.PERMS_RUNTIME_SCAN,
+					},
+					Domains: []string{"nv-2", "nv-3"},
+				},
+				share.CLUSPermitsAssigned{
+					Permits: share.NvPermissions{
+						ReadValue: share.PERMS_SECURITY_EVENTS,
+					},
+					Domains: []string{"nv-4"},
+				},
+				share.CLUSPermitsAssigned{
+					Permits: share.NvPermissions{
+						WriteValue: share.PERMS_SECURITY_EVENTS, // ignored because PERMS_SECURITY_EVENTS doesn't support write !
+					},
+					Domains: []string{"nv-4", "nv-5"},
+				},
+			})
+		expectedGPermitsList = []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		expectedDPermitsList = map[string][]*api.RESTRolePermission{
+			"nv-1": []*api.RESTRolePermission{
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			},
+			"nv-2": []*api.RESTRolePermission{
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			},
+			"nv-3": []*api.RESTRolePermission{
+				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			},
+			"nv-4": []*api.RESTRolePermission{
+				&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			},
+		}
+		//log.SetLevel(log.FatalLevel)
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+	}
+
+	{
+		testObj.caseID = 51
+
+		var extraPermitsDomains []share.CLUSPermitsAssigned
+		var expectedDPermitsList map[string][]*api.RESTRolePermission
+		gPermitsList, dPermitsList, _ := GetUserPermissions(
+			"admin",
+			nil,
+			share.NvPermissions{ReadValue: share.PERM_FED},
+			extraPermitsDomains)
+		expectedGPermitsList := []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
+
+		gPermitsList, dPermitsList, _ = GetUserPermissions(
+			"fedReader",
+			nil,
+			share.NvPermissions{
+				WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_ADM_CONTROL,
+			},
+			extraPermitsDomains,
+		)
+		expectedGPermitsList = []*api.RESTRolePermission{
+			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+		}
+		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 	}
 
 	postTest()

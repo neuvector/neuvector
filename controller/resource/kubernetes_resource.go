@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"reflect"
@@ -18,18 +17,21 @@ import (
 	"time"
 
 	"github.com/neuvector/k8s"
-	apiv1 "github.com/neuvector/k8s/apis/admissionregistration/v1"
-	apiv1beta1 "github.com/neuvector/k8s/apis/admissionregistration/v1beta1"
-	apiextv1 "github.com/neuvector/k8s/apis/apiextensions/v1"
-	apiextv1b1 "github.com/neuvector/k8s/apis/apiextensions/v1beta1"
-	appsv1 "github.com/neuvector/k8s/apis/apps/v1"
-	batchv1b1 "github.com/neuvector/k8s/apis/batch/v1beta1"
-	corev1 "github.com/neuvector/k8s/apis/core/v1"
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
-	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
-	rbacv1b1 "github.com/neuvector/k8s/apis/rbac/v1beta1"
 	log "github.com/sirupsen/logrus"
+	admregv1 "k8s.io/api/admissionregistration/v1"
+	admregv1b1 "k8s.io/api/admissionregistration/v1beta1"
+	apiv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1b1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1b1 "k8s.io/api/rbac/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
@@ -67,6 +69,7 @@ const (
 	K8sResRbacClusterRoles        = "clusterroles.rbac.authorization.k8s.io"
 	K8sResRbacRolebindings        = "rolebindings.rbac.authorization.k8s.io"
 	K8sResRbacClusterRolebindings = "clusterrolebindings.rbac.authorization.k8s.io"
+	K8sResPersistentVolumeClaims  = "persistentvolumeclaims"
 )
 
 const (
@@ -142,10 +145,10 @@ type resourceWatcher struct {
 
 type resourceMaker struct {
 	apiVersion string
-	newObject  func() k8s.Resource
-	newList    func() k8s.ResourceList
-	xlate      func(obj k8s.Resource) (string, interface{})
-	xlate2     func(obj k8s.Resource, action string)
+	newObject  func() metav1.Object
+	newList    func() metav1.ListInterface
+	xlate      func(obj metav1.Object) (string, interface{})
+	xlate2     func(obj metav1.Object, action string)
 }
 
 type k8sResource struct {
@@ -170,9 +173,10 @@ type NvCrdInfo struct {
 
 // --- for generic types in admissionregistration v1/vebeta1
 type K8sAdmRegServiceReference struct {
-	Namespace *string
-	Name      *string
+	Namespace string
+	Name      string
 	Path      *string
+	Port      *int32
 }
 
 type K8sAdmRegWebhookClientConfig struct {
@@ -194,7 +198,7 @@ type K8sAdmRegRuleWithOperations struct {
 }
 
 type K8sAdmRegWebhook struct {
-	Name                    *string
+	Name                    string
 	AdmissionReviewVersions []string
 	ClientConfig            *K8sAdmRegWebhookClientConfig
 	Rules                   []*K8sAdmRegRuleWithOperations
@@ -204,7 +208,6 @@ type K8sAdmRegWebhook struct {
 }
 
 type K8sAdmRegValidatingWebhookConfiguration struct {
-	Metadata *metav1.ObjectMeta
 	Webhooks []*K8sAdmRegWebhook
 }
 
@@ -214,8 +217,6 @@ type NvAdmRegRuleSetting struct {
 	Resources  utils.Set
 	Scope      string
 }
-
-type NvCrdInitFunc func(leader bool, cspType share.TCspType)
 
 type NvQueryK8sVerFunc func()
 
@@ -243,8 +244,8 @@ var rbacApiGroups = utils.NewSet(k8sRbacApiGroup)
 
 var opCreateDelete = utils.NewSet(Create, Update)
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets)
-var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets)
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResPersistentVolumeClaims)
+var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets, K8sResPods)
 var admRbacResForCreateUpdate1 = utils.NewSet(K8sResRoles, K8sResRolebindings)
 var admRbacResForCreateUpdate2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
 var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
@@ -253,25 +254,25 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create),
 		Resources:  admResForCreateSet,
-		Scope:      apiv1beta1.NamespacedScope,
+		Scope:      string(apiv1beta1.NamespacedScope),
 	},
 	&NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Update),
 		Resources:  admResForUpdateSet,
-		Scope:      apiv1beta1.NamespacedScope,
+		Scope:      string(apiv1beta1.NamespacedScope),
 	},
 	&NvAdmRegRuleSetting{
 		ApiGroups:  rbacApiGroups,
 		Operations: opCreateDelete,
 		Resources:  admRbacResForCreateUpdate1,
-		Scope:      apiv1beta1.NamespacedScope,
+		Scope:      string(apiv1beta1.NamespacedScope),
 	},
 	&NvAdmRegRuleSetting{
 		ApiGroups:  rbacApiGroups,
 		Operations: opCreateDelete,
 		Resources:  admRbacResForCreateUpdate2,
-		Scope:      apiv1beta1.AllScopes,
+		Scope:      string(apiv1beta1.AllScopes),
 	},
 }
 
@@ -282,7 +283,7 @@ var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create, Update, Delete),
 		Resources:  crdResForAllOpSet,
-		Scope:      apiv1beta1.AllScopes,
+		Scope:      string(apiv1beta1.AllScopes),
 	},
 }
 
@@ -293,13 +294,13 @@ var StatusResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: opCreateDelete,
 		Resources:  statusResForCreateUpdateSet,
-		Scope:      apiv1beta1.NamespacedScope,
+		Scope:      string(apiv1beta1.NamespacedScope),
 	},
 	&NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Delete),
 		Resources:  statusResForDeleteSet,
-		Scope:      apiv1beta1.NamespacedScope,
+		Scope:      string(apiv1beta1.NamespacedScope),
 	},
 }
 
@@ -309,7 +310,6 @@ var ocVersionMajor int
 
 var cacheEventFunc common.CacheEventFunc
 
-var nvCrdInitFunc NvCrdInitFunc
 var nvQueryK8sVerFunc NvQueryK8sVerFunc
 var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
 var isLeader bool
@@ -330,8 +330,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(corev1.Node) },
-				func() k8s.ResourceList { return new(corev1.NodeList) },
+				func() metav1.Object { return new(corev1.Node) },
+				func() metav1.ListInterface { return new(corev1.NodeList) },
 				xlateNode,
 				nil,
 			},
@@ -342,8 +342,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(corev1.Namespace) },
-				func() k8s.ResourceList { return new(corev1.NamespaceList) },
+				func() metav1.Object { return new(corev1.Namespace) },
+				func() metav1.ListInterface { return new(corev1.NamespaceList) },
 				xlateNamespace,
 				nil,
 			},
@@ -354,8 +354,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(corev1.Service) },
-				func() k8s.ResourceList { return new(corev1.ServiceList) },
+				func() metav1.Object { return new(corev1.Service) },
+				func() metav1.ListInterface { return new(corev1.ServiceList) },
 				xlateService,
 				nil,
 			},
@@ -366,8 +366,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(corev1.Pod) },
-				func() k8s.ResourceList { return new(corev1.PodList) },
+				func() metav1.Object { return new(corev1.Pod) },
+				func() metav1.ListInterface { return new(corev1.PodList) },
 				xlatePod,
 				nil,
 			},
@@ -378,8 +378,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(appsv1.Deployment) },
-				func() k8s.ResourceList { return new(appsv1.DeploymentList) },
+				func() metav1.Object { return new(appsv1.Deployment) },
+				func() metav1.ListInterface { return new(appsv1.DeploymentList) },
 				xlateDeployment,
 				nil,
 			},
@@ -390,8 +390,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(appsv1.DaemonSet) },
-				func() k8s.ResourceList { return new(appsv1.DaemonSetList) },
+				func() metav1.Object { return new(appsv1.DaemonSet) },
+				func() metav1.ListInterface { return new(appsv1.DaemonSetList) },
 				xlateDaemonSet,
 				nil,
 			},
@@ -402,8 +402,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(appsv1.ReplicaSet) },
-				func() k8s.ResourceList { return new(appsv1.ReplicaSetList) },
+				func() metav1.Object { return new(appsv1.ReplicaSet) },
+				func() metav1.ListInterface { return new(appsv1.ReplicaSetList) },
 				xlateReplicaSet,
 				nil,
 			},
@@ -414,8 +414,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(appsv1.StatefulSet) },
-				func() k8s.ResourceList { return new(appsv1.StatefulSetList) },
+				func() metav1.Object { return new(appsv1.StatefulSet) },
+				func() metav1.ListInterface { return new(appsv1.StatefulSetList) },
 				xlateStatefulSet,
 				nil,
 			},
@@ -426,15 +426,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(batchv1b1.CronJob) },
-				func() k8s.ResourceList { return new(batchv1b1.CronJobList) },
+				func() metav1.Object { return new(batchv1b1.CronJob) },
+				func() metav1.ListInterface { return new(batchv1b1.CronJobList) },
 				xlateCronJob,
 				nil,
 			},
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(CronJobV1) },
-				func() k8s.ResourceList { return new(CronJobListV1) },
+				func() metav1.Object { return new(batchv1.CronJob) },
+				func() metav1.ListInterface { return new(batchv1.CronJobList) },
 				xlateCronJob,
 				nil,
 			},
@@ -445,8 +445,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(ocImageStream) },
-				func() k8s.ResourceList { return new(ocImageStreamList) },
+				func() metav1.Object { return new(ocImageStream) },
+				func() metav1.ListInterface { return new(ocImageStreamList) },
 				xlateImage,
 				nil,
 			},
@@ -457,15 +457,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(rbacv1.Role) },
-				func() k8s.ResourceList { return new(rbacv1.RoleList) },
+				func() metav1.Object { return new(rbacv1.Role) },
+				func() metav1.ListInterface { return new(rbacv1.RoleList) },
 				xlateRole,
 				xlateRole2,
 			},
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(rbacv1b1.Role) },
-				func() k8s.ResourceList { return new(rbacv1b1.RoleList) },
+				func() metav1.Object { return new(rbacv1b1.Role) },
+				func() metav1.ListInterface { return new(rbacv1b1.RoleList) },
 				xlateRole,
 				xlateRole2,
 			},
@@ -476,15 +476,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(rbacv1.ClusterRole) },
-				func() k8s.ResourceList { return new(rbacv1.ClusterRoleList) },
+				func() metav1.Object { return new(rbacv1.ClusterRole) },
+				func() metav1.ListInterface { return new(rbacv1.ClusterRoleList) },
 				xlateClusRole,
 				xlateClusRole2,
 			},
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(rbacv1b1.ClusterRole) },
-				func() k8s.ResourceList { return new(rbacv1b1.ClusterRoleList) },
+				func() metav1.Object { return new(rbacv1b1.ClusterRole) },
+				func() metav1.ListInterface { return new(rbacv1b1.ClusterRoleList) },
 				xlateClusRole,
 				xlateClusRole2,
 			},
@@ -495,15 +495,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(rbacv1.RoleBinding) },
-				func() k8s.ResourceList { return new(rbacv1.RoleBindingList) },
+				func() metav1.Object { return new(rbacv1.RoleBinding) },
+				func() metav1.ListInterface { return new(rbacv1.RoleBindingList) },
 				xlateRoleBinding,
 				xlateRoleBinding2,
 			},
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(rbacv1b1.RoleBinding) },
-				func() k8s.ResourceList { return new(rbacv1b1.RoleBindingList) },
+				func() metav1.Object { return new(rbacv1b1.RoleBinding) },
+				func() metav1.ListInterface { return new(rbacv1b1.RoleBindingList) },
 				xlateRoleBinding,
 				xlateRoleBinding2,
 			},
@@ -514,15 +514,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(rbacv1.ClusterRoleBinding) },
-				func() k8s.ResourceList { return new(rbacv1.ClusterRoleBindingList) },
+				func() metav1.Object { return new(rbacv1.ClusterRoleBinding) },
+				func() metav1.ListInterface { return new(rbacv1.ClusterRoleBindingList) },
 				xlateClusRoleBinding,
 				xlateClusRoleBinding2,
 			},
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(rbacv1b1.ClusterRoleBinding) },
-				func() k8s.ResourceList { return new(rbacv1b1.ClusterRoleBindingList) },
+				func() metav1.Object { return new(rbacv1b1.ClusterRoleBinding) },
+				func() metav1.ListInterface { return new(rbacv1b1.ClusterRoleBindingList) },
 				xlateClusRoleBinding,
 				xlateClusRoleBinding2,
 			},
@@ -533,15 +533,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(apiextv1b1.CustomResourceDefinition) },
-				func() k8s.ResourceList { return new(apiextv1b1.CustomResourceDefinitionList) },
+				func() metav1.Object { return new(apiextv1b1.CustomResourceDefinition) },
+				func() metav1.ListInterface { return new(apiextv1b1.CustomResourceDefinitionList) },
 				xlateCrd,
 				nil,
 			},
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(apiextv1.CustomResourceDefinition) },
-				func() k8s.ResourceList { return new(apiextv1.CustomResourceDefinitionList) },
+				func() metav1.Object { return new(apiextv1.CustomResourceDefinition) },
+				func() metav1.ListInterface { return new(apiextv1.CustomResourceDefinitionList) },
 				xlateCrd,
 				nil,
 			},
@@ -552,8 +552,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvSecurityRule) },
-				func() k8s.ResourceList { return new(NvSecurityRuleList) },
+				func() metav1.Object { return new(NvSecurityRule) },
+				func() metav1.ListInterface { return new(NvSecurityRuleList) },
 				xlateCrdNvSecurityRule,
 				nil,
 			},
@@ -565,8 +565,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvClusterSecurityRule) },
-				func() k8s.ResourceList { return new(NvClusterSecurityRuleList) },
+				func() metav1.Object { return new(NvClusterSecurityRule) },
+				func() metav1.ListInterface { return new(NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
 				nil,
 			},
@@ -577,8 +577,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvAdmCtrlSecurityRule) },
-				func() k8s.ResourceList { return new(NvAdmCtrlSecurityRuleList) },
+				func() metav1.Object { return new(NvAdmCtrlSecurityRule) },
+				func() metav1.ListInterface { return new(NvAdmCtrlSecurityRuleList) },
 				xlateCrdAdmCtrlRule,
 				nil,
 			},
@@ -589,8 +589,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvDlpSecurityRule) },
-				func() k8s.ResourceList { return new(NvDlpSecurityRuleList) },
+				func() metav1.Object { return new(NvDlpSecurityRule) },
+				func() metav1.ListInterface { return new(NvDlpSecurityRuleList) },
 				xlateCrdDlpSecurityRule,
 				nil,
 			},
@@ -601,8 +601,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvWafSecurityRule) },
-				func() k8s.ResourceList { return new(NvWafSecurityRuleList) },
+				func() metav1.Object { return new(NvWafSecurityRule) },
+				func() metav1.ListInterface { return new(NvWafSecurityRuleList) },
 				xlateCrdWafSecurityRule,
 				nil,
 			},
@@ -613,8 +613,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvVulnProfileSecurityRule) },
-				func() k8s.ResourceList { return new(NvVulnProfileSecurityRuleList) },
+				func() metav1.Object { return new(NvVulnProfileSecurityRule) },
+				func() metav1.ListInterface { return new(NvVulnProfileSecurityRuleList) },
 				xlateCrdVulnProfile,
 				nil,
 			},
@@ -625,8 +625,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvCompProfileSecurityRule) },
-				func() k8s.ResourceList { return new(NvCompProfileSecurityRuleList) },
+				func() metav1.Object { return new(NvCompProfileSecurityRule) },
+				func() metav1.ListInterface { return new(NvCompProfileSecurityRuleList) },
 				xlateCrdCompProfile,
 				nil,
 			},
@@ -637,8 +637,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(NvCspUsage) },
-				func() k8s.ResourceList { return new(NvCspUsageList) },
+				func() metav1.Object { return new(NvCspUsage) },
+				func() metav1.ListInterface { return new(NvCspUsageList) },
 				xlateCrdCspUsage,
 				nil,
 			},
@@ -649,9 +649,21 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(corev1.ConfigMap) },
-				func() k8s.ResourceList { return new(corev1.ConfigMapList) },
+				func() metav1.Object { return new(corev1.ConfigMap) },
+				func() metav1.ListInterface { return new(corev1.ConfigMapList) },
 				xlateConfigMap,
+				nil,
+			},
+		},
+	},
+	RscTypeSecret: k8sResource{
+		apiGroup: "",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() metav1.Object { return new(corev1.Secret) },
+				func() metav1.ListInterface { return new(corev1.SecretList) },
+				nil, // xlateSecret,
 				nil,
 			},
 		},
@@ -661,15 +673,15 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 			makers: []*resourceMaker{
 				&resourceMaker{
 					"v1",
-					func() k8s.Resource { return new(apiv1.MutatingWebhookConfiguration) },
-					func() k8s.ResourceList { return new(apiv1.MutatingWebhookConfigurationList) },
+					func() metav1.Object { return new(admregv1.MutatingWebhookConfiguration) },
+					func() metav1.ListInterface { return new(admregv1.MutatingWebhookConfigurationList) },
 					xlateMutatingWebhookConfiguration,
 					nil,
 				},
 	            &resourceMaker{
 					"v1beta1",
-					func() k8s.Resource { return new(apiv1beta1.MutatingWebhookConfiguration) },
-					func() k8s.ResourceList { return new(apiv1beta1.MutatingWebhookConfigurationList) },
+					func() metav1.Object { return new(admregv1b1.MutatingWebhookConfiguration) },
+					func() metav1.ListInterface { return new(admregv1b1.MutatingWebhookConfigurationList) },
 					xlateMutatingWebhookConfiguration,
 					nil,
 				},
@@ -680,16 +692,28 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			&resourceMaker{
 				"v1",
-				func() k8s.Resource { return new(apiv1.ValidatingWebhookConfiguration) },
-				func() k8s.ResourceList { return new(apiv1.ValidatingWebhookConfigurationList) },
+				func() metav1.Object { return new(admregv1.ValidatingWebhookConfiguration) },
+				func() metav1.ListInterface { return new(admregv1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
 				nil,
 			},
 			&resourceMaker{
 				"v1beta1",
-				func() k8s.Resource { return new(apiv1beta1.ValidatingWebhookConfiguration) },
-				func() k8s.ResourceList { return new(apiv1beta1.ValidatingWebhookConfigurationList) },
+				func() metav1.Object { return new(admregv1b1.ValidatingWebhookConfiguration) },
+				func() metav1.ListInterface { return new(admregv1b1.ValidatingWebhookConfigurationList) },
 				xlateValidatingWebhookConfiguration,
+				nil,
+			},
+		},
+	},
+	RscTypePersistentVolumeClaim: k8sResource{
+		apiGroup: "",
+		makers: []*resourceMaker{
+			&resourceMaker{
+				"v1",
+				func() metav1.Object { return new(corev1.PersistentVolumeClaim) },
+				func() metav1.ListInterface { return new(corev1.PersistentVolumeClaimList) },
+				xlatePersistentVolumeClaim,
 				nil,
 			},
 		},
@@ -711,18 +735,24 @@ type kubernetes struct {
 	version   *k8s.Version
 	watchers  map[string]*resourceWatcher
 
-	roleCache map[k8sObjectRef]string                // role -> nv role
-	userCache map[k8sSubjectObjRef]utils.Set         // user -> set of k8sRoleRef
-	rbacCache map[k8sSubjectObjRef]map[string]string // user -> (domain -> nv role); it's updated after rbacEvaluateUser() call
+	userCache map[k8sSubjectObjRef]utils.Set         // k8s user -> set of k8sRoleRef
+	roleCache map[k8sObjectRef]string                // k8s (cluster)role -> nv reserved role
+	rbacCache map[k8sSubjectObjRef]map[string]string // k8s user -> (domain -> nv reserved role). it's updated after rbacEvaluateUser() call
+
+	// for Rancher SSO only.
+	permitsCache     map[k8sObjectRef]share.NvPermissions                // k8s (cluster)role -> nv permissions.
+	permitsRbacCache map[k8sSubjectObjRef]map[string]share.NvPermissions // k8s user -> (domain -> nv permissions). it's updated after rbacEvaluateUser() call
 }
 
 func newKubernetesDriver(platform, flavor, network string) *kubernetes {
 	d := &kubernetes{
-		noop:      newNoopDriver(platform, flavor, network),
-		watchers:  make(map[string]*resourceWatcher),
-		roleCache: make(map[k8sObjectRef]string),
-		userCache: make(map[k8sSubjectObjRef]utils.Set),
-		rbacCache: make(map[k8sSubjectObjRef]map[string]string),
+		noop:             newNoopDriver(platform, flavor, network),
+		watchers:         make(map[string]*resourceWatcher),
+		roleCache:        make(map[k8sObjectRef]string),
+		userCache:        make(map[k8sSubjectObjRef]utils.Set),
+		rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
+		permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
+		permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvPermissions),
 	}
 	return d
 }
@@ -733,35 +763,29 @@ event=Add node=&{UID:2d39e6bb-267f-11e8-8d3e-0800273d5dc6 Name:host3 IPNets:[{IP
 event=Delete node=&{UID:2d39e6bb-267f-11e8-8d3e-0800273d5dc6 Name:host3 IPNets:[{IP:10.254.101.103 Mask:ffffffff}]}
 */
 
-func xlateNode(obj k8s.Resource) (string, interface{}) {
+func xlateNode(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*corev1.Node); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
 		r := &Node{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
 			IPNets: make([]net.IPNet, 0),
 		}
-		if o.Status != nil {
-			addrs := o.Status.GetAddresses()
-			for _, addr := range addrs {
-				if addr.GetType() == k8sNodeTypeInternalIP {
-					if ip := net.ParseIP(addr.GetAddress()); ip != nil {
-						if utils.IsIPv4(ip) {
-							r.IPNets = append(r.IPNets, net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)})
-						} else {
-							r.IPNets = append(r.IPNets, net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)})
-						}
+		addrs := o.Status.Addresses
+		for _, addr := range addrs {
+			if addr.Type == k8sNodeTypeInternalIP {
+				if ip := net.ParseIP(addr.Address); ip != nil {
+					if utils.IsIPv4(ip) {
+						r.IPNets = append(r.IPNets, net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)})
+					} else {
+						r.IPNets = append(r.IPNets, net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)})
 					}
 				}
 			}
 		}
-		r.Labels = meta.GetLabels()
-		r.Annotations = meta.GetAnnotations()
+		r.Labels = o.GetLabels()
+		r.Annotations = o.GetAnnotations()
 		// special handling for IBM cloud because it customizes the k8s node name to using IP, but not the system hostname
-		if o.Spec != nil && o.Spec.ProviderID != nil && strings.HasPrefix(*o.Spec.ProviderID, "ibm://") {
+		if strings.HasPrefix(o.Spec.ProviderID, "ibm://") {
 			// [ex] ibm-cloud.kubernetes.io/worker-id: kube-c40msj4d0tb4oeriggqg-atibmcluste-default-000001f1
 			if hostname, ok := r.Labels["ibm-cloud.kubernetes.io/worker-id"]; ok {
 				r.IBMCloudWorkerID = hostname
@@ -773,16 +797,12 @@ func xlateNode(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-func xlateNamespace(obj k8s.Resource) (string, interface{}) {
-	if o, ok := obj.(*corev1.Namespace); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
+func xlateNamespace(obj metav1.Object) (string, interface{}) {
+	if _, ok := obj.(*corev1.Namespace); ok {
 		r := &Namespace{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Labels: meta.GetLabels(),
+			UID:    string(obj.GetUID()),
+			Name:   obj.GetName(),
+			Labels: obj.GetLabels(),
 		}
 		return r.UID, r
 	}
@@ -799,29 +819,23 @@ event=Delete service=&{UID:5de2fe39-2659-11e8-aa34-0800273d5dc6 Name:nginx Domai
 event=Add service=&{UID:35dcd76f-267d-11e8-8d3e-0800273d5dc6 Name:nginx-webui Domain: IP:10.97.170.48 Selector:map[app:nginx-pod]}
 event=Delete service=&{UID:35dcd76f-267d-11e8-8d3e-0800273d5dc6 Name:nginx-webui Domain: IP:10.97.170.48 Selector:map[app:nginx-pod]}
 */
-func xlateService(obj k8s.Resource) (string, interface{}) {
+func xlateService(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*corev1.Service); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
 		r := &Service{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
+			Domain: o.GetNamespace(),
 			Labels: make(map[string]string),
 		}
-		if o.Spec != nil {
-			r.IPs = make([]net.IP, 0)
-			if tip := net.ParseIP(o.Spec.GetClusterIP()); tip != nil {
-				r.IPs = append(r.IPs, tip)
-			}
-			r.Selector = o.Spec.GetSelector()
-			r.Type = o.Spec.GetType()
-			r.ExternalIPs = make([]net.IP, len(o.Spec.GetExternalIPs()))
-			for i, e := range o.Spec.GetExternalIPs() {
-				r.ExternalIPs[i] = net.ParseIP(e)
-			}
+		r.IPs = make([]net.IP, 0)
+		if tip := net.ParseIP(o.Spec.ClusterIP); tip != nil {
+			r.IPs = append(r.IPs, tip)
+		}
+		r.Selector = o.Spec.Selector
+		r.Type = string(o.Spec.Type)
+		r.ExternalIPs = make([]net.IP, len(o.Spec.ExternalIPs))
+		for i, e := range o.Spec.ExternalIPs {
+			r.ExternalIPs[i] = net.ParseIP(e)
 		}
 		return r.UID, r
 	}
@@ -837,74 +851,69 @@ event=Add pod=&{UID:5dff5793-2659-11e8-aa34-0800273d5dc6 Name:web-0 Domain:defau
 event=Modify pod=&{UID:5dff5793-2659-11e8-aa34-0800273d5dc6 Name:web-0 Domain:default IPNet:{IP:<nil> Mask:ffffffff} Running:false OwnerUID: OwnerName: OwnerType:}
 event=Delete pod=&{UID:5dff5793-2659-11e8-aa34-0800273d5dc6 Name:web-0 Domain:default IPNet:{IP:<nil> Mask:ffffffff} Running:false OwnerUID: OwnerName: OwnerType:}
 */
-func xlatePod(obj k8s.Resource) (string, interface{}) {
+func xlatePod(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*corev1.Pod); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
 		r := &Pod{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-			Labels: meta.GetLabels(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
+			Domain: o.GetNamespace(),
+			Labels: o.GetLabels(),
 		}
-		if len(meta.OwnerReferences) >= 1 {
-			if owner := meta.OwnerReferences[0]; owner != nil {
-				r.OwnerUID = owner.GetUid()
-				r.OwnerName = owner.GetName()
-				r.OwnerType = owner.GetKind()
-			}
+		if len(o.OwnerReferences) >= 1 {
+			owner := o.OwnerReferences[0]
+			r.OwnerUID = string(owner.UID)
+			r.OwnerName = owner.Name
+			r.OwnerType = owner.Kind
 		}
 
-		if o.Spec != nil {
-			r.Node = o.Spec.GetNodeName()
-			r.HostNet = o.Spec.GetHostNetwork()
-			for _, c := range o.Spec.GetContainers() {
-				liveness := c.GetLivenessProbe()
-				readiness := c.GetReadinessProbe()
-				if liveness != nil || readiness != nil {
-					if handler := liveness.GetHandler(); handler != nil {
-						if exec := handler.GetExec(); exec != nil {
-							r.LivenessCmds = append(r.LivenessCmds, exec.GetCommand())
-						}
-					}
-					if handler := readiness.GetHandler(); handler != nil {
-						if exec := handler.GetExec(); exec != nil {
-							r.ReadinessCmds = append(r.ReadinessCmds, exec.GetCommand())
-						}
-					}
-				}
+		r.Node = o.Spec.NodeName
+		r.HostNet = o.Spec.HostNetwork
+		for _, c := range o.Spec.Containers {
+			var ctr Container
+			ctr.Name = c.Name
+			if c.LivenessProbe != nil && c.LivenessProbe.Exec != nil {
+				ctr.LivenessCmds = c.LivenessProbe.Exec.Command
 			}
-			if r.SA = o.Spec.GetServiceAccountName(); r.SA == "" {
-				r.SA = o.Spec.GetServiceAccount()
+			if c.ReadinessProbe != nil && c.ReadinessProbe.Exec != nil {
+				ctr.ReadinessCmds = c.ReadinessProbe.Exec.Command
 			}
-			if r.SA == "" {
-				r.SA = "default" // see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+			if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
+				ctr.Privileged = *c.SecurityContext.Privileged
+			}
+			r.Containers = append(r.Containers, ctr)
+		}
+		if r.SA = o.Spec.ServiceAccountName; r.SA == "" {
+			r.SA = o.Spec.DeprecatedServiceAccount
+		}
+		if r.SA == "" {
+			r.SA = "default" // see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+		}
+
+		if ip := net.ParseIP(o.Status.PodIP); ip != nil {
+			if utils.IsIPv4(ip) {
+				r.IPNet = net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+			} else {
+				r.IPNet = net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}
 			}
 		}
-		if o.Status != nil {
-			if ip := net.ParseIP(o.Status.GetPodIP()); ip != nil {
-				if utils.IsIPv4(ip) {
-					r.IPNet = net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+		if o.Status.Phase == "Running" {
+			r.Running = true
+		}
+
+		if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
+			for i, cs := range o.Status.ContainerStatuses {
+				var id string
+				containerID := cs.ContainerID
+				for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
+					if strings.HasPrefix(containerID, prefix) {
+						id = containerID[len(prefix):]
+						r.ContainerIDs = append(r.ContainerIDs, id)
+					}
+				}
+				if i < len(r.Containers) {
+					r.Containers[i].Id = id
 				} else {
-					r.IPNet = net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}
-				}
-			}
-			if o.Status.GetPhase() == "Running" {
-				r.Running = true
-			}
-
-			if r.Domain != NvAdmSvcNamespace && len(o.Status.ContainerStatuses) > 0 {
-				for _, cs := range o.Status.GetContainerStatuses() {
-					if cs != nil {
-						containerID := cs.GetContainerID()
-						for _, prefix := range []string{"docker://", "containerd://", "cri-o://"} {
-							if strings.HasPrefix(containerID, prefix) {
-								r.ContainerIDs = append(r.ContainerIDs, containerID[len(prefix):])
-							}
-						}
-					}
+					log.WithFields(log.Fields{"id": id, "containers": r.Containers}).Error("Not matched")
 				}
 			}
 		}
@@ -914,17 +923,18 @@ func xlatePod(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-func xlateDeployment(obj k8s.Resource) (string, interface{}) {
+func xlateDeployment(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
-		meta := o.Metadata
-		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-scanner-pod" {
+		if o.GetNamespace() != NvAdmSvcNamespace || o.GetName() != "neuvector-scanner-pod" {
 			return "", nil
 		}
 		r := &Deployment{
-			UID:      meta.GetUid(),
-			Name:     meta.GetName(),
-			Domain:   meta.GetNamespace(),
-			Replicas: o.Spec.GetReplicas(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
+			Domain: o.GetNamespace(),
+		}
+		if o.Spec.Replicas != nil {
+			r.Replicas = *o.Spec.Replicas
 		}
 		return r.UID, r
 	}
@@ -932,102 +942,75 @@ func xlateDeployment(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-func xlateDaemonSet(obj k8s.Resource) (string, interface{}) {
+func xlateDaemonSet(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*appsv1.DaemonSet); ok && o != nil {
-		meta := o.Metadata
-		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-enforcer-pod" {
+		if o.GetNamespace() != NvAdmSvcNamespace || o.GetName() != "neuvector-enforcer-pod" {
 			return "", nil
 		}
 		r := &DaemonSet{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
+			UID:    string(obj.GetUID()),
+			Name:   obj.GetName(),
+			Domain: obj.GetNamespace(),
 			SA:     "default",
 		}
-		if o.Spec != nil && o.Spec.Template != nil && o.Spec.Template.Spec != nil {
-			spec := o.Spec.Template.Spec
-			if spec.ServiceAccountName != nil && *spec.ServiceAccountName != "" {
-				r.SA = *spec.ServiceAccountName
-			} else if spec.ServiceAccount != nil && *spec.ServiceAccount != "" {
-				r.SA = *spec.ServiceAccount
-			}
-		}
-		return r.UID, r
-	}
-
-	return "", nil
-}
-
-func xlateReplicaSet(obj k8s.Resource) (string, interface{}) {
-	if o, ok := obj.(*appsv1.ReplicaSet); ok && o != nil {
-		meta := o.Metadata
-		if meta == nil {
-			return "", nil
-		}
-		r := &ReplicaSet{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, r
-	}
-
-	return "", nil
-}
-
-func xlateStatefulSet(obj k8s.Resource) (string, interface{}) {
-	if o, ok := obj.(*appsv1.StatefulSet); ok && o != nil {
-		meta := o.Metadata
-		if meta == nil {
-			return "", nil
-		}
-		r := &StatefulSet{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, r
-	}
-
-	return "", nil
-}
-
-func xlateCronJob(obj k8s.Resource) (string, interface{}) {
-	if o, ok := obj.(*batchv1b1.CronJob); ok && o != nil {
-		meta := o.Metadata
-		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-updater-pod" {
-			return "", nil
-		}
-		r := &CronJob{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-			SA:     "default",
-		}
-		if o != nil && o.Spec != nil && o.Spec.JobTemplate != nil && o.Spec.JobTemplate.Spec != nil &&
-			o.Spec.JobTemplate.Spec.Template != nil && o.Spec.JobTemplate.Spec.Template.Spec != nil {
-			spec := o.Spec.JobTemplate.Spec.Template.Spec
-			if spec.ServiceAccountName != nil && *spec.ServiceAccountName != "" {
-				r.SA = *spec.ServiceAccountName
-			} else if spec.ServiceAccount != nil && *spec.ServiceAccount != "" {
-				r.SA = *spec.ServiceAccount
-			}
-		}
-		return r.UID, r
-	} else if o, ok := obj.(*CronJobV1); ok && o != nil {
-		meta := o.GetMetadata()
-		if meta == nil || meta.GetNamespace() != NvAdmSvcNamespace || meta.GetName() != "neuvector-updater-pod" {
-			return "", nil
-		}
-		r := &CronJob{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-			SA:     "default",
-		}
-		spec := &o.Spec.JobTemplate.Spec.Template.Spec
+		spec := o.Spec.Template.Spec
 		if spec.ServiceAccountName != "" {
 			r.SA = spec.ServiceAccountName
+		} else if spec.DeprecatedServiceAccount != "" {
+			r.SA = spec.DeprecatedServiceAccount
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
+func xlateReplicaSet(obj metav1.Object) (string, interface{}) {
+	if o, ok := obj.(*appsv1.ReplicaSet); ok && o != nil {
+		r := &ReplicaSet{
+			UID:    string(obj.GetUID()),
+			Name:   obj.GetName(),
+			Domain: obj.GetNamespace(),
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
+func xlateStatefulSet(obj metav1.Object) (string, interface{}) {
+	if o, ok := obj.(*appsv1.StatefulSet); ok && o != nil {
+		r := &StatefulSet{
+			UID:    string(obj.GetUID()),
+			Name:   obj.GetName(),
+			Domain: obj.GetNamespace(),
+		}
+		return r.UID, r
+	}
+
+	return "", nil
+}
+
+func xlateCronJob(obj metav1.Object) (string, interface{}) {
+	var r CronJob = CronJob{
+		UID:    string(obj.GetUID()),
+		Name:   obj.GetName(),
+		Domain: obj.GetNamespace(),
+		SA:     "default",
+	}
+	var spec *corev1.PodSpec
+
+	if o, ok := obj.(*batchv1b1.CronJob); ok && o != nil {
+		spec = &o.Spec.JobTemplate.Spec.Template.Spec
+	} else if o, ok := obj.(*batchv1.CronJob); ok && o != nil {
+		spec = &o.Spec.JobTemplate.Spec.Template.Spec
+	}
+
+	if spec != nil {
+		if spec.ServiceAccountName != "" {
+			r.SA = spec.ServiceAccountName
+		} else if spec.DeprecatedServiceAccount != "" {
+			r.SA = spec.DeprecatedServiceAccount
 		}
 		return r.UID, r
 	}
@@ -1045,16 +1028,12 @@ func xlateImageRemoveURL(repo string) string {
 	return repo[slash+1:]
 }
 
-func xlateImage(obj k8s.Resource) (string, interface{}) {
+func xlateImage(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*ocImageStream); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
 		r := &Image{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
+			Domain: o.GetNamespace(),
 			Tags:   make([]ImageTag, 0),
 		}
 		if o.Status != nil {
@@ -1071,174 +1050,86 @@ func xlateImage(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-func xlateCrd(obj k8s.Resource) (string, interface{}) {
+func xlateCrd(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*apiextv1b1.CustomResourceDefinition); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	} else if o, ok := obj.(*apiextv1.CustomResourceDefinition); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdNvSecurityRule(obj k8s.Resource) (string, interface{}) {
+func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdNvClusterSecurityRule(obj k8s.Resource) (string, interface{}) {
+func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvClusterSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdAdmCtrlRule(obj k8s.Resource) (string, interface{}) {
+func xlateCrdAdmCtrlRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvAdmCtrlSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdDlpSecurityRule(obj k8s.Resource) (string, interface{}) {
+func xlateCrdDlpSecurityRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvDlpSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdWafSecurityRule(obj k8s.Resource) (string, interface{}) {
+func xlateCrdWafSecurityRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvWafSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdVulnProfile(obj k8s.Resource) (string, interface{}) {
+func xlateCrdVulnProfile(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvVulnProfileSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdCompProfile(obj k8s.Resource) (string, interface{}) {
+func xlateCrdCompProfile(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvCompProfileSecurityRule); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateCrdCspUsage(obj k8s.Resource) (string, interface{}) {
+func xlateCrdCspUsage(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvCspUsage); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
-		r := &CRD{
-			UID:  meta.GetUid(),
-			Name: meta.GetName(),
-		}
-		return r.UID, o
+		return string(obj.GetUID()), o
 	}
 
 	return "", nil
 }
 
-func xlateConfigMap(obj k8s.Resource) (string, interface{}) {
+func xlateConfigMap(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*corev1.ConfigMap); ok {
-		if o.Metadata == nil {
-			return "", nil
-		}
-		meta := o.Metadata
 		r := &ConfigMap{
-			UID:    meta.GetUid(),
-			Name:   meta.GetName(),
-			Domain: meta.GetNamespace(),
+			UID:    string(o.GetUID()),
+			Name:   o.GetName(),
+			Domain: o.GetNamespace(),
 			Data:   o.Data,
 		}
 		return r.UID, r
@@ -1247,38 +1138,43 @@ func xlateConfigMap(obj k8s.Resource) (string, interface{}) {
 	return "", nil
 }
 
-func xlateMutatingWebhookConfiguration(obj k8s.Resource) (string, interface{}) {
-	var meta *metav1.ObjectMeta
-	if o, ok := obj.(*apiv1.MutatingWebhookConfiguration); ok {
-		meta = o.Metadata
-	} else if o, ok := obj.(*apiv1beta1.MutatingWebhookConfiguration); ok {
-		meta = o.Metadata
+func xlateMutatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
+	var name string
+	var guid string
+	if o, ok := obj.(*admregv1.MutatingWebhookConfiguration); ok {
+		name = o.GetName()
+		guid = string(o.GetUID())
+	} else if o, ok := obj.(*admregv1b1.MutatingWebhookConfiguration); ok {
+		name = o.GetName()
+		guid = string(o.GetUID())
 	}
-	if meta != nil {
+	if name != "" {
 		r := &AdmissionWebhookConfiguration{
 			AdmType: nvAdmMutateType,
-			Name:    meta.GetName(),
+			Name:    name,
 		}
-		return meta.GetUid(), r
+		return guid, r
 	}
 	return "", nil
 }
 
-func xlateValidatingWebhookConfiguration(obj k8s.Resource) (string, interface{}) {
-	var meta *metav1.ObjectMeta
-	if o, ok := obj.(*apiv1.ValidatingWebhookConfiguration); ok {
-		meta = o.Metadata
-	} else if o, ok := obj.(*apiv1beta1.ValidatingWebhookConfiguration); ok {
-		meta = o.Metadata
+func xlateValidatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
+	var name string
+	var guid string
+	if o, ok := obj.(*admregv1.ValidatingWebhookConfiguration); ok {
+		name = o.GetName()
+		guid = string(o.GetUID())
+	} else if o, ok := obj.(*admregv1b1.ValidatingWebhookConfiguration); ok {
+		name = o.GetName()
+		guid = string(o.GetUID())
 	}
-	if meta != nil {
-		name := meta.GetName()
+	if name != "" {
 		if name == NvAdmValidatingName || name == NvPruneValidatingName {
 			r := &AdmissionWebhookConfiguration{
 				AdmType: nvAdmValidateType,
 				Name:    name,
 			}
-			return meta.GetUid(), r
+			return guid, r
 		}
 	}
 	return "", nil
@@ -1307,7 +1203,7 @@ func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 	}
 
 	// First, try preferred version
-	v := g.GetPreferredVersion().GetVersion()
+	v := g.PreferredVersion.Version
 	for _, maker := range r.makers {
 		if v == maker.apiVersion {
 			return maker, nil
@@ -1315,11 +1211,11 @@ func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 	}
 
 	// Second, going through versions by our order
-	vers := g.GetVersions()
+	vers := g.Versions
 	supported := make([]string, len(vers))
 	for _, maker := range r.makers {
 		for i, ver := range vers {
-			supported[i] = ver.GetVersion()
+			supported[i] = ver.Version
 			if supported[i] == maker.apiVersion {
 				return maker, nil
 			}
@@ -1453,10 +1349,12 @@ func (d *kubernetes) listResource(rt string) ([]interface{}, error) {
 		return nil, err
 	}
 
-	list := make([]interface{}, items.Len())
-	for i := 0; i < len(list); i++ {
-		if item, ok := items.Index(i).Interface().(k8s.Resource); ok {
-			_, list[i] = maker.xlate(item)
+	list := make([]interface{}, 0, items.Len())
+	for i := 0; i < items.Len(); i++ {
+		item := items.Index(i).Addr().Interface()
+		if o, ok := item.(metav1.Object); ok {
+			_, obj := maker.xlate(o)
+			list = append(list, obj)
 		}
 	}
 
@@ -1679,7 +1577,7 @@ func getVersion(url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("Read data fail")
 		return "", err
@@ -1698,12 +1596,12 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret, RscTypePersistentVolumeClaim:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
 			if maker, err := d.discoverResource(rt); err == nil {
-				if _, o := maker.xlate(r.(k8s.Resource)); o != nil {
+				if _, o := maker.xlate(r.(metav1.Object)); o != nil {
 					return o, nil
 				}
 			}
@@ -1761,7 +1659,7 @@ func (d *kubernetes) addResource(rt string, res interface{}) error {
 	}
 
 	// Note: Currently(Jan./2019) we only support creating neuvector-validating-admission-webhook resource
-	obj, ok := res.(k8s.Resource)
+	obj, ok := res.(metav1.Object)
 	if !ok {
 		return ErrResourceNotSupported
 	}
@@ -1776,17 +1674,17 @@ func (d *kubernetes) UpdateResource(rt string, res interface{}) error {
 	switch rt {
 	case RscTypeService:
 		svc := res.(*corev1.Service)
-		if svc != nil && svc.Metadata != nil && svc.Metadata.Name != nil && *svc.Metadata.Name == NvAdmSvcName {
+		if svc != nil && svc.Name == NvAdmSvcName {
 			return d.updateResource(rt, res)
 		}
 	case RscTypeNamespace:
 		ns := res.(*corev1.Namespace)
-		if ns != nil && ns.Metadata != nil {
+		if ns != nil {
 			return d.updateResource(rt, res)
 		}
 	case RscTypeDeployment:
 		deploy := res.(*appsv1.Deployment)
-		if deploy != nil && deploy.Metadata != nil && deploy.Metadata.GetNamespace() == NvAdmSvcNamespace {
+		if deploy != nil && deploy.Namespace == NvAdmSvcNamespace {
 			return d.updateResource(rt, res)
 		}
 	//case RscTypeMutatingWebhookConfiguration:
@@ -1811,7 +1709,7 @@ func (d *kubernetes) updateResource(rt string, res interface{}) error {
 		}
 	}
 
-	obj, ok := res.(k8s.Resource)
+	obj, ok := res.(metav1.Object)
 	if !ok {
 		return ErrResourceNotSupported
 	}
@@ -1849,7 +1747,7 @@ func (d *kubernetes) deleteResource(rt string, res interface{}) error {
 	}
 
 	// Note: Currently(Jan./2019) we only support deleting neuvector-validating-admission-webhook resource
-	obj, ok := res.(k8s.Resource)
+	obj, ok := res.(metav1.Object)
 	if !ok {
 		return ErrResourceNotSupported
 	}
@@ -1869,7 +1767,8 @@ func (d *kubernetes) SetFlavor(flavor string) error {
 }
 
 // revertCount: how many times the ValidatingWebhookConfiguration resource has been reverted by this controller.
-//              if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
+//
+//	if it's >= 1, do not revert the ValidatingWebhookConfiguration resource just becuase of unknown matchExpressions keys
 func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook, checkNsSelector bool, revertCount *uint32,
 	unexpectedMatchKeys utils.Set) bool {
 
@@ -1922,8 +1821,8 @@ func IsK8sNvWebhookConfigured(whName, failurePolicy string, wh *K8sAdmRegWebhook
 	}
 	if checkNsSelector {
 		for _, expr := range wh.NamespaceSelector.MatchExpressions {
-			key := expr.GetKey()
-			op := expr.GetOperator()
+			key := expr.Key
+			op := string(expr.Operator)
 			if expectedOp, ok := selKeyOps[key]; !ok || expectedOp != op {
 				// an unexpected label(key/op) is found in webhook NamespaceSelector's MatchExpressions
 				if revertCount != nil && *revertCount <= 1 {
@@ -1972,10 +1871,9 @@ func AdjustAdmResForOC() {
 	}
 }
 
-func AdjustAdmWebhookName(f1 NvCrdInitFunc, f2 NvQueryK8sVerFunc, f3 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
-	nvCrdInitFunc = f1
-	nvQueryK8sVerFunc = f2
-	nvVerifyK8sNsFunc = f3
+func AdjustAdmWebhookName(f1 NvQueryK8sVerFunc, f2 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
+	nvQueryK8sVerFunc = f1
+	nvVerifyK8sNsFunc = f2
 	cspType = cspType_
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
@@ -2046,28 +1944,66 @@ func IsRancherFlavor() bool {
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 	} else {
-		svcnames := []string{"cattle-cluster-agent", "rancher"}
-		for _, svcname := range svcnames {
-			if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
-				log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
-				nvPermissions := []string{"*"}
-				/* Rancher SSO:
-				nvPermissions := []string{"*", "admctrl", "audit_events", "authentication", "authorization", "ci_scan",
-					"compliance", "config", "events", "reg_scan", "rt_policy", "rt_scan", "vulnerability", "security_events"}
-				nvPermissionIndex = make(map[string]int, len(nvPermissions)+1) // permission -> index in the pseudo role's [pseudo name]
-				nvIndexPermission = make(map[int]string, len(nvPermissions)+1) // index -> permission in the pseudo role's [pseudo name]
-				// reserve [0] in pseudo role's pseudo name
-				for i, p := range nvPermissions {
-					nvPermissionIndex[p] = i + 1
-					nvIndexPermission[i+1] = p
-				}*/
-				nvPermissionRscs = utils.NewSetFromSliceKind(nvPermissions)
-				nvRscsMap = map[string]utils.Set{ // apiGroup to resources
-					"read-only.neuvector.api.io": nvPermissionRscs,
-					"*":                          nvPermissionRscs,
+		if len(nvRscMapSSO) == 0 {
+			svcnames := []string{"cattle-cluster-agent", "rancher"}
+			nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
+				share.PERM_REG_SCAN_ID,
+				share.PERM_CICD_SCAN_ID,
+				share.PERM_ADM_CONTROL_ID,
+				share.PERM_AUDIT_EVENTS_ID,
+				share.PERM_EVENTS_ID,
+				share.PERM_AUTHENTICATION_ID,
+				share.PERM_AUTHORIZATION_ID,
+				share.PERM_SYSTEM_CONFIG_ID,
+				share.PERM_VULNERABILITY_ID,
+				share.PERMS_RUNTIME_SCAN_ID,
+				share.PERMS_RUNTIME_POLICIES_ID,
+				share.PERMS_COMPLIANCE_ID,
+				share.PERMS_SECURITY_EVENTS_ID,
+				share.PERM_FED_ID,
+			})
+			for _, svcname := range svcnames {
+				if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
+					log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
+					// For Rancher SSO only: nv permission string -> nv permission uint32 value
+					nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality())
+					for _, option := range access.PermissionOptions {
+						if nvPermitsRscSSO.Contains(option.ID) {
+							var readPermits uint32
+							var writePermits uint32
+							if len(option.ComplexPermits) > 0 {
+								for _, option2 := range option.ComplexPermits {
+									if option.ReadSupported && option2.ReadSupported {
+										readPermits |= option2.Value
+									}
+									if option.WriteSupported && option2.WriteSupported {
+										writePermits |= option2.Value
+									}
+								}
+							} else {
+								if option.ReadSupported {
+									readPermits |= option.Value
+								}
+								if option.WriteSupported {
+									writePermits |= option.Value
+								}
+							}
+							optionID := strings.ReplaceAll(option.ID, "_", "-")
+							nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+						}
+					}
+
+					nvRscMapSSO = map[string]utils.Set{ // apiGroup -> nv-perm resources
+						"read-only.neuvector.api.io": nvPermitsRscSSO,
+						"api.neuvector.com":          nvPermitsRscSSO,
+						"*":                          nvPermitsRscSSO,
+					}
+
+					return true
 				}
-				return true
 			}
+		} else {
+			return true
 		}
 	}
 
@@ -2084,18 +2020,33 @@ func UpdateDeploymentReplicates(name string, replicas int32) error {
 		log.WithFields(log.Fields{"name": name, "err": err}).Error("resource no found")
 		return err
 	} else {
-		deployObj := obj.(*appsv1.Deployment)
-		if deployObj != nil && deployObj.Spec != nil && deployObj.Spec.GetReplicas() != replicas {
-			deployObj.Spec.Replicas = &replicas
-			err = global.ORCH.UpdateResource(RscTypeDeployment, deployObj)
-			if err != nil {
-				log.WithFields(log.Fields{"name": name, "err": err}).Error("update resource failed")
-				return err
+		if deployObj, ok := obj.(*appsv1.Deployment); ok {
+			var old int32
+			if deployObj.Spec.Replicas != nil {
+				old = *deployObj.Spec.Replicas
+			}
+			if old != replicas {
+				deployObj.Spec.Replicas = &replicas
+				err = global.ORCH.UpdateResource(RscTypeDeployment, deployObj)
+				if err != nil {
+					log.WithFields(log.Fields{"name": name, "err": err}).Error("update resource failed")
+					return err
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+func CreateNvCrdObject(rt string) (interface{}, error) {
+	r, ok := resourceMakers[rt]
+	if !ok {
+		return nil, fmt.Errorf("Unknown resource name: %s", rt)
+	}
+	maker := r.makers[0]
+
+	return maker.newObject(), nil
 }
 
 func getNeuvectorSvcAccount(resInfo map[string]string) {
@@ -2130,4 +2081,30 @@ func getNeuvectorSvcAccount(resInfo map[string]string) {
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
 		continue
 	}
+}
+
+func xlatePersistentVolumeClaim(obj metav1.Object) (string, interface{}) {
+	return "", nil
+}
+
+func RetrieveBootstrapPassword() string {
+	var bootstrapPwd string
+
+	obj, err := global.ORCH.GetResource(RscTypeSecret, NvAdmSvcNamespace, "neuvector-bootstrap-secret")
+	if obj != nil && err == nil {
+		if s, ok := obj.(*corev1.Secret); ok {
+			if s.Data != nil {
+				if v, ok := s.Data["bootstrapPassword"]; ok {
+					bootstrapPwd = string(v)
+				}
+			}
+		} else {
+			err = fmt.Errorf("type conversion failed")
+		}
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	}
+
+	return bootstrapPwd
 }

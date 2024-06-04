@@ -32,6 +32,8 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
 #define UNKNOWN_IP_CACHE_TIMEOUT 600 //sec
 #define POLICY_DESC_VER_CHG_MAX 60 //sec
 #define UNKNOWN_IP_TRY_COUNT 10 //10 times
+#define HOST_IP_TRY_COUNT 3 //3 times
+#define EXT_IP_TRY_COUNT 2 //2 times
 typedef struct dpi_unknown_ip_desc_ {
     uint32_t sip;
     uint32_t dip;
@@ -75,7 +77,7 @@ void dpi_unknown_ip_init(void)
     rcu_map_init(&th_unknown_ip_map, 64, offsetof(dpi_unknown_ip_cache_t, node), unknown_ip_match, unknown_ip_hash);
 }
 
-static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key, uint8_t iptype)
+static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_desc_t *key, uint8_t iptype, bool ext)
 {
     dpi_unknown_ip_cache_t *cache = calloc(1, sizeof(*cache));
     if (cache != NULL) {
@@ -83,9 +85,12 @@ static void add_unknown_ip_cache(dpi_unknown_ip_desc_t *desc, dpi_unknown_ip_des
         cache->start_hit = th_snap.tick;
         cache->last_hit = th_snap.tick;
         if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
-            cache->try_cnt = 0;
+            cache->try_cnt = HOST_IP_TRY_COUNT;
         } else {
             cache->try_cnt = UNKNOWN_IP_TRY_COUNT;
+            if (ext) {
+                cache->try_cnt = EXT_IP_TRY_COUNT;
+            }
         }
         rcu_map_add(&th_unknown_ip_map, cache, key);
 
@@ -656,12 +661,20 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
             if (is_ingress) {
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(dip);
+                    //we still need to consider newly added node
+                    if (inPolicyAddr) {
+                        inPolicyAddr = dpi_is_policy_addr(sip);
+                    }
                 } else {
                     inPolicyAddr = dpi_is_policy_addr(sip);
                 }
             } else {
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(sip);
+                    //we still need to consider newly added node
+                    if (inPolicyAddr) {
+                        inPolicyAddr = dpi_is_policy_addr(dip);
+                    }
                 } else {
                     inPolicyAddr = dpi_is_policy_addr(dip);
                 }
@@ -672,6 +685,21 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
         }
         if (iptype == DP_IPTYPE_UWLIP) {
             desc->flags |= POLICY_DESC_UWLIP;
+        }
+    } else {
+        if (_dpi_policy_implicit_default(hdl, desc)) {
+            if (is_ingress) {
+                inPolicyAddr = dpi_is_policy_addr(dip);
+            } else {
+                inPolicyAddr = dpi_is_policy_addr(sip);
+            }
+            if (!inPolicyAddr) {
+                if (is_ingress) {
+                    _dpi_policy_chk_unknown_ip(hdl, 0, dip, DP_IPTYPE_NONE, &desc);
+                } else {
+                    _dpi_policy_chk_unknown_ip(hdl, sip, 0, DP_IPTYPE_NONE, &desc);
+                }
+            }
         }
     }
 
@@ -710,6 +738,11 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
 
     dpi_policy_desc_t *desc = *pol_desc;
     dpi_unknown_ip_desc_t uip_desc;
+    bool is_external = false;
+    if (desc->flags & POLICY_DESC_EXTERNAL) {
+        is_external = true;
+    }
+
     //unknown ip desc
     memset(&uip_desc, 0, sizeof(uip_desc));
     uip_desc.sip = sip;
@@ -742,7 +775,7 @@ static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint
             }
         } else {
             uip_desc.hdl_ver = thdl_ver;
-            add_unknown_ip_cache(&uip_desc, &uip_desc, iptype);
+            add_unknown_ip_cache(&uip_desc, &uip_desc, iptype, is_external);
             desc->flags &= ~(POLICY_DESC_CHECK_VER);
             desc->flags |= POLICY_DESC_UNKNOWN_IP;
             desc->flags |= POLICY_DESC_TMP_OPEN;
@@ -912,7 +945,20 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         uint8_t iptype = dpi_ip4_iptype(key.dip);
         fqdn_ipv4_entry_t *ipv4_ent = NULL;
         ipv4_ent = rcu_map_lookup(&g_fqdn_hdl->fqdn_ipv4_map, &(key.dip));
+        bool is_src_internal = dpi_is_ip4_internal(key.sip);
 
+        //NVSHAS-8989, we see only partial packets from long session
+        //which could cause session direction be mistaken in openshift,
+        //then this can cause false alert, we need to let such special
+        //passthrough packet from external to bypass policy match in the
+        //intermediate container, the policy match need to be done at the
+        //source/destination container
+        if (is_internal && !is_src_internal && (hdl->apply_dir & DP_POLICY_APPLY_EGRESS)) {
+            desc->id = 0;
+            desc->action = DP_POLICY_ACTION_OPEN;
+            desc->flags = POLICY_DESC_INTERNAL;
+            goto exit;
+        }
         //client inside cluster connect to server service
         //with type externalIP has MITM (man in the middle)
         //risk, implicitly warn/block it

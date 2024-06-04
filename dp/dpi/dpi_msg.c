@@ -141,6 +141,9 @@ static void netify_session_log(DPMsgSession *dps)
     dps->ThreatID = htonl(dps->ThreatID);
     dps->XffApp = htons(dps->XffApp);
     dps->XffPort = htons(dps->XffPort);
+    dps->EpSessCurIn = htonl(dps->EpSessCurIn);
+    dps->EpSessIn60 = htonl(dps->EpSessIn60);
+    dps->EpByteIn60 = htonll(dps->EpByteIn60);
 }
 
 static void dpi_list_session()
@@ -404,6 +407,17 @@ static void dpi_dump_policy()
             cds_list_for_each_entry_safe(ipv4_itr, ipv4_next, &(name_entry->r->iplist), node) {
                 fprintf(logfp, "    FQDN match ip:"DBG_IPV4_FORMAT"\n", DBG_IPV4_TUPLE(ipv4_itr->ip));
             }
+            fflush(logfp);
+        }
+    }
+
+    if (th_ip_fqdn_storage_map.map != NULL) {
+        struct cds_lfht_node *ip_fqdn_storage_node;
+        // Iterate through ip fqdn storage map
+        RCU_MAP_FOR_EACH(&th_ip_fqdn_storage_map, ip_fqdn_storage_node) {
+            dpi_ip_fqdn_storage_entry_t *entry = STRUCT_OF(ip_fqdn_storage_node, dpi_ip_fqdn_storage_entry_t, node);
+            fprintf(logfp, "IP-FQDN storage map, IP:"DBG_IPV4_FORMAT" FQDN name:%s\n", DBG_IPV4_TUPLE(entry->r->ip), entry->r->name);
+
             fflush(logfp);
         }
     }

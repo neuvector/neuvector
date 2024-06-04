@@ -173,6 +173,7 @@ type registryDriver interface {
 	GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode)
 	ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult
 	SetConfig(cfg *share.CLUSRegistryConfig)
+	SetProxy()
 	SetTracer(tracer httptrace.HTTPTrace)
 	GetTracer() httptrace.HTTPTrace
 }
@@ -186,6 +187,7 @@ type base struct {
 	scanLayers  bool
 	scanSecrets bool
 	tracer      httptrace.HTTPTrace
+	ignoreProxy bool
 }
 
 func (r *base) url(pathTemplate string, args ...interface{}) string {
@@ -206,7 +208,16 @@ func (r *base) SetConfig(cfg *share.CLUSRegistryConfig) {
 	r.regURL = cfg.Registry
 	r.scanLayers = cfg.ScanLayers
 	r.scanSecrets = !cfg.DisableFiles
-	r.proxy = GetProxy(cfg.Registry)
+	r.ignoreProxy = cfg.IgnoreProxy
+	r.SetProxy()
+}
+
+func (r *base) SetProxy() {
+	if r.ignoreProxy {
+		r.proxy = ""
+	} else {
+		r.proxy = GetProxy(r.regURL)
+	}
 }
 
 func (r *base) GetTracer() httptrace.HTTPTrace {
@@ -277,10 +288,11 @@ func makeSigstoreScanRequestObj() ([]*share.SigstoreRootOfTrust, error) {
 	reqRootsOfTrust := []*share.SigstoreRootOfTrust{}
 	for _, clusRootOfTrust := range clusRootsOfTrust {
 		reqRootOfTrust := &share.SigstoreRootOfTrust{
-			Name:           clusRootOfTrust.Name,
-			RekorPublicKey: clusRootOfTrust.RekorPublicKey,
-			RootCert:       clusRootOfTrust.RootCert,
-			SCTPublicKey:   clusRootOfTrust.SCTPublicKey,
+			Name:                 clusRootOfTrust.Name,
+			RekorPublicKey:       clusRootOfTrust.RekorPublicKey,
+			RootCert:             clusRootOfTrust.RootCert,
+			SCTPublicKey:         clusRootOfTrust.SCTPublicKey,
+			RootlessKeypairsOnly: clusRootOfTrust.RootlessKeypairsOnly,
 		}
 
 		clusVerifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRootOfTrust.Name)

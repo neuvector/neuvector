@@ -13,7 +13,8 @@ import (
 type LDAPClient struct {
 	Conn               *ldap.Conn
 	Attributes         []string
-	Base               string
+	BaseDN             string
+	GroupDN            string
 	BindDN             string
 	BindPassword       string
 	GroupFilter        string
@@ -88,7 +89,7 @@ func (lc *LDAPClient) Authenticate(password string) (string, map[string]string, 
 	attributes := append(lc.Attributes, "dn")
 	// Search for the given username
 	searchRequest := ldap.NewSearchRequest(
-		lc.Base,
+		lc.BaseDN,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		lc.UserFilter,
 		attributes,
@@ -141,7 +142,7 @@ func (lc *LDAPClient) GetGroupsOfUser() ([]string, error) {
 
 	log.WithFields(log.Fields{"filter": lc.GroupFilter}).Debug()
 	searchRequest := ldap.NewSearchRequest(
-		lc.Base,
+		lc.GroupDN,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		lc.GroupFilter,
 		[]string{"cn"}, // can it be something else than "cn"?

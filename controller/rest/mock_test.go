@@ -403,17 +403,22 @@ func (m *mockCache) GetProcessProfile(group string, acc *access.AccessControl) (
 func (m *mockCache) GetComplianceProfile(name string, acc *access.AccessControl) (*api.RESTComplianceProfile, map[string][]string, error) {
 	if cp, ok := m.cps[name]; ok {
 		filter := make(map[string][]string)
-
 		// First create user override entries
 		for _, e := range cp.Entries {
 			filter[e.TestNum] = e.Tags
 		}
 
 		// Add checks that are not in the override list
-		_, metaMap := scanUtils.GetComplianceMeta()
+		_, metaMap := scanUtils.InitComplianceMeta("", "")
 		for _, m := range metaMap {
 			if _, ok := filter[m.TestNum]; !ok {
-				filter[m.TestNum] = m.Tags
+				var tags []string
+				for _, tagMap := range m.Tags {
+					for complianceTag, _ := range tagMap {
+						tags = append(tags, complianceTag)
+					}
+				}
+				filter[m.TestNum] = tags
 			}
 		}
 
@@ -486,7 +491,7 @@ func mockLoginUser(name, role, fedRole string, roleDomains map[string][]string) 
 		RoleDomains: roleDomains,
 	}
 
-	login, _ := loginUser(user, nil, "", _interactiveSessionID, "", fedRole, nil)
+	login, _ := loginUser(user, nil, nil, "", _interactiveSessionID, "", fedRole, nil)
 	return login
 }
 

@@ -3,7 +3,6 @@ package probe
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -293,7 +292,7 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 
 	// reporting events
 	// log.WithFields(log.Fields{"id": root.id, "file": file, "finfo": finfo}).Debug("FSN:")
-	fsn.prober.ProcessFsnEvent(root.id, []string {file}, *finfo)
+	go fsn.prober.ProcessFsnEvent(root.id, []string {file}, *finfo)
 }
 
 // already locked
@@ -314,16 +313,16 @@ func (fsn *FileNotificationCtr) handleRemoveEvent(op string, root *fsnRootFd, pa
 		}
 		mLog.WithFields(log.Fields{"dir": file, "execs": execs, "jars": jars}).Debug("FSN: remove dir")
 		if len(execs) > 0 {
-			fsn.prober.ProcessFsnEvent(root.id, execs, fileInfo{bExec: true, fileType: file_deleted})
+			go fsn.prober.ProcessFsnEvent(root.id, execs, fileInfo{bExec: true, fileType: file_deleted})
 		}
 		if len(jars) > 0 {
-			fsn.prober.ProcessFsnEvent(root.id, jars, fileInfo{bJavaPkg: true, fileType: file_deleted})
+			go fsn.prober.ProcessFsnEvent(root.id, jars, fileInfo{bJavaPkg: true, fileType: file_deleted})
 		}
 		root.dirs.Remove(path)
 	} else {
 		// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: remove file")
 		if fi, ok := root.files[file]; ok && fi.bJavaPkg {
-			fsn.prober.ProcessFsnEvent(root.id, []string {file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+			go fsn.prober.ProcessFsnEvent(root.id, []string {file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
 		}
 		delete(root.files, file)
 	}
@@ -388,7 +387,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 				file = filepath.Join(filepath.Dir(file), name)
 				// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: deleted file")
 				if scan.IsJava(path) {
-					fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+					go fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
 				}
 			} else {
 				go fsn.updateFileInfo(index, file, path)
@@ -396,7 +395,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 		case fi.Mode() == (os.ModeDevice | os.ModeCharDevice):
 			// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: deleted file")
 			if scan.IsJava(path) {
-				fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+				go fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
 			}
 		}
 	} else if (event.Op & (fsnotify.Chmod | fsnotify.Write)) != 0 {
@@ -761,7 +760,7 @@ type BtrfsLayerData struct {
 func (fsn *FileNotificationCtr) lookupBtrfsLayerFile(rootPath, sublayer string) (string, error) {
 	// go up 2 layers, then find the "layers.json"
 	file := filepath.Join("/proc/1/root", filepath.Dir(filepath.Dir(rootPath)), "btrfs-layers", "layers.json")
-	value, err := ioutil.ReadFile(file)
+	value, err := os.ReadFile(file)
 	if err == nil {
 		var layers []BtrfsLayerData
 		if err = json.Unmarshal(value, &layers); err == nil {

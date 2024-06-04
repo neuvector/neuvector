@@ -1,0 +1,89 @@
+version: rh-1.4
+id: 3
+title: 3 - Control Plane Configuration
+type: master
+groups:
+  - id: 3.1
+    title: 3.1 - Authentication and Authorization
+    checks:
+      - id: K.3.1.1
+        description: Client certificate authentication should not be used for users
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: []
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Verify user authentication is enabled:"
+          manual "      * oc describe authentication"
+          manual "      * Next, verify an identity provider is configured:"
+          manual "      * oc get oauth -o json  | jq '.items[].spec.identityProviders'"
+          manual "      * Verify at least one identity provider is configured, and verify that the kubeadmin user does not exist."
+          manual "      * Next, verify a cluster-admin user exists:"
+          manual "      * oc get clusterrolebindings -o='custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].kind' | grep cluster-admin | grep User"
+          manual "      * Verify at least one user has the cluster-admin role. Finally, verify that the kubeadmin secret is removed."
+          manual "      * oc get secrets kubeadmin -n kube-system"
+          manual "      * No result is expected"
+        remediation: |
+          Configure an identity provider for the OpenShift cluster following the OpenShift documentation. Once an identity provider has been defined, you can use RBAC to define and apply permissions.
+          After you define an identity provider and create a new cluster-admin user you can reduce the attack surface by removing the default kubeadmin user.
+  - id: 3.2
+    title: 3.2 - Logging
+    checks:
+      - id: K.3.2.1
+        description: Ensure that a minimal audit policy is created (Manual)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: false
+        tags:
+          - HIPAA: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "     * Use the following command to view the audit log profile:"
+          manual "     * oc get apiserver cluster -o json | jq .spec.audit.profile"
+          manual "     * Verify the result is not None, which means audit logging is disabled."
+          manual "     * Review the audit log configuration for the OpenShift and Kubernetes API servers using the following commands:"
+          manual "     * oc get cm -n openshift-apiserver config -o json | jq -r '.data.config.yaml'"
+          manual "     * | jq .apiServerArguments"
+          manual "     * oc get cm -n openshift-kube-apiserver  config -o json | jq -r"
+          manual "     * '.data.config.yaml' | jq .apiServerArguments"
+          manual "     * Review the audit policies for the OpenShift and Kubernetes API servers using the following commands:"
+          manual "     *  oc get cm -n openshift-apiserver audit -o json | jq -r '.data.policy.yaml'"
+          manual "     * oc get cm -n openshift-kube-apiserver kube-apiserver-audit-policies -o json |"
+          manual "     * jq -r '.data.policy.yaml'"
+          manual "     * Verify the returned configuration and ensure it aligns with data retention and storage requirements for the deployment."
+          manual "     * Use the following command to view Kubernetes API server audit logs:"
+          manual "     * oc adm node-logs --role=master --path=kube-apiserver/"
+          manual "     * Verify logs are returned."
+          manual "     * Use the following command to view OpenShift API server audit logs."
+          manual "     * oc adm node-logs --role=master --path=openshift-apiserver/"
+          manual "     * Verify logs are returned."      
+        remediation: None
+      - id: K.3.2.2
+        description: Ensure that the audit policy covers key security concerns (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags:
+          - HIPAA: []
+          - GDPR: []
+        audit: |
+          check="$id  - $description"
+          # TODO
+          output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.auditConfig.auditFilePath','.auditConfig.enabled','.auditConfig.logFormat','.auditConfig.maximumFileSizeMegabytes','.auditConfig.maximumRetainedFiles','.auditConfig.policyConfiguration')
+          if [ -z "$output" ]; then
+            warn "$check"
+          else
+            pass "$check"
+          fi
+        remediation: Update the audit log policy profile to use WriteRequestBodies.

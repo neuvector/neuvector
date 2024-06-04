@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
-	k8sAppsv1 "github.com/neuvector/k8s/apis/apps/v1"
-	k8sMetav1 "github.com/neuvector/k8s/apis/meta/v1"
-
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -47,6 +44,7 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
+	//"github.com/neuvector/neuvector/vendor/github.com/neuvector/k8s"
 )
 
 const (
@@ -119,6 +117,7 @@ const (
 	K8sKindClusterRole           = "ClusterRole"
 	K8sKindRoleBinding           = "RoleBinding"
 	K8sKindClusterRoleBinding    = "ClusterRoleBinding"
+	k8sKindPersistentVolumeClaim = "PersistentVolumeClaim"
 )
 
 var sidecarImages = []*ContainerImage{
@@ -579,47 +578,42 @@ func mergeMaps(labels1, labels2 map[string]string) map[string]string {
 // kind, name, ns are owner's attributes
 func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, bool) {
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
-		var objectMeta *k8sMetav1.ObjectMeta
+		var ownerReferences []metav1.OwnerReference
 		switch kind {
 		case resource.RscTypeStatefulSet:
 			// support pod -> statefulset
-			if ssObj := obj.(*k8sAppsv1.StatefulSet); ssObj != nil {
-				if len(ssObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), mergeMaps(ssObj.Metadata.Annotations, ssObj.Spec.Template.Metadata.Annotations), true
+			if ssObj, ok := obj.(*appsv1.StatefulSet); ok {
+				if len(ssObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(ssObj.Labels, ssObj.Spec.Template.Labels), mergeMaps(ssObj.Annotations, ssObj.Spec.Template.Annotations), true
 				}
 			}
 		case resource.RscTypeReplicaSet:
 			// support pod -> replicaset -> deployment for now
-			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
-				objectMeta = rsObj.Metadata
+			if rsObj, ok := obj.(*appsv1.ReplicaSet); ok {
+				ownerReferences = rsObj.OwnerReferences
 			}
 		case resource.RscTypeDeployment:
-			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
-				if len(deployObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), mergeMaps(deployObj.Metadata.Annotations, deployObj.Spec.Template.Metadata.Annotations), true
+			if deployObj, ok := obj.(*appsv1.Deployment); ok {
+				if len(deployObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(deployObj.Labels, deployObj.Spec.Template.Labels), mergeMaps(deployObj.Annotations, deployObj.Spec.Template.Annotations), true
 				}
 			}
 		}
-		if objectMeta != nil {
-			for _, ownerRef := range objectMeta.OwnerReferences {
-				if ownerRef == nil {
-					continue
-				}
-				admResCacheMutex.RLock()
-				ownerObject, exist := admResCache[ownerRef.GetUid()]
-				admResCacheMutex.RUnlock()
-				if exist {
-					if len(ownerObject.OwnerUIDs) == 0 {
-						// owner is root resource (most likely deployment)
-						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
-					} else {
-						log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
-					}
+		for _, ownerRef := range ownerReferences {
+			admResCacheMutex.RLock()
+			ownerObject, exist := admResCache[string(ownerRef.UID)]
+			admResCacheMutex.RUnlock()
+			if exist {
+				if len(ownerObject.OwnerUIDs) == 0 {
+					// owner is root resource (most likely deployment)
+					return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
 				} else {
-					// trace up one layer in the owner chain
-					if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
-						return userName, groups, labels, annotations, true
-					}
+					log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
+				}
+			} else {
+				// trace up one layer in the owner chain
+				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.Kind), ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations, true
 				}
 			}
 		}
@@ -963,6 +957,8 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult
 		alog.Props[nvsysadmission.AuditLogPropMessage] = result.Msg
 		alog.Props[nvsysadmission.AuditLogPropUser] = result.User
 		alog.Props[nvsysadmission.AuditLogPropFirstLogAt] = api.RESTTimeString(alog.ReportedAt)
+		alog.Props[nvsysadmission.AuditLogPropPVCName] = result.PVCName
+		alog.Props[nvsysadmission.AuditLogPVCStorageClassName] = result.PVCStorageClassName
 
 		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
 			_, alog = aggregateDenyLogs(result, admResObject.OwnerUIDs[0], alog)
@@ -1121,7 +1117,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
 			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
-		if pod.Status.Phase == "Running" {
+		// if pod is middle resource(i.e. has owner) & it's already at running phase(i.e. this is an UPDATE pod request), skip handling this request
+		if len(pod.ObjectMeta.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
 			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
@@ -1136,6 +1133,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			updateToOtherControllers(docKey, string(jsonData))
 		}
 		return composeResponse(nil), nil, reqIgnored
+	case k8sKindPersistentVolumeClaim:
+		return validatePVC(admission.NvAdmValidateType, ar, mode, defaultAction, forTesting)
 	default:
 		return composeResponse(nil), nil, reqIgnored
 	}
@@ -1309,7 +1308,7 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 		}
 		return
 	} else {
-		if whsvr.dumpRequestObj && ar.Request.Operation != admissionv1beta1.Delete {
+		if ar.Request.Operation != admissionv1beta1.Delete {
 			if b, err := json.Marshal(ar); err == nil {
 				log.WithFields(log.Fields{"AdmissionReview": string(b)}).Debug()
 			}
@@ -1398,7 +1397,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -1561,7 +1560,7 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 
 	if clientAuth {
 		clientCACert := tlsClientCA
-		caCert, err := ioutil.ReadFile(clientCACert)
+		caCert, err := os.ReadFile(clientCACert)
 		if err != nil {
 			log.WithFields(log.Fields{"svcName": svcName}).Info("Cannot load CA cert for client authentication")
 			log.Fatal(err)
@@ -1725,4 +1724,125 @@ func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
 	b := opa.AddDocument(docKey, string(json_data))
 
 	log.WithFields(log.Fields{"docKey": info.DocKey, "AddDocument_Result": b}).Debug("ReportK8SResToOPA(grpc-server)")
+}
+
+func validatePVC(admType string, ar *admissionv1beta1.AdmissionReview, mode string, defaultAction int, forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmAssessResult, bool) {
+	var reqIgnored bool
+	req := ar.Request
+
+	var pvc corev1.PersistentVolumeClaim
+	if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
+		return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
+	}
+
+	var ruleScope, msgHeader string
+	var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
+	var allowed = true
+	var statusResult = &metav1.Status{}
+	opDisplay := "Creation" // we only handle create
+
+	if req.DryRun != nil && *req.DryRun {
+		msgHeader = "<Server Dry Run> "
+	} else if forTesting {
+		msgHeader = "<Assessment> "
+	}
+
+	ns := pvc.ObjectMeta.Namespace
+	pvcName := pvc.ObjectMeta.Name
+
+	// not all pvc has StorageClassName
+	if pvc.Spec.StorageClassName == nil {
+		if forTesting {
+			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s.", msgHeader, opDisplay, req.Kind.Kind, "allowed")
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+				Result:  statusResult,
+			}, nil, false
+		}
+		return logUnmarshallError(&req.Kind.Kind, &req.UID, nil), nil, reqIgnored
+	}
+
+	scName := pvc.Spec.StorageClassName
+	admResObject, _ := parseAdmRequest(req, &pvc.ObjectMeta, nil)
+
+	admResult, matched := cacher.MatchK8sAdmissionRulesForPVC(admType, ns, pvcName, *scName, forTesting)
+	if admResult.MatchFedRule {
+		ruleScope = "federal "
+	}
+
+	if forTesting {
+		finalAction := "allowed"
+		if admResult.AssessMatchedRuleType == api.ValidatingDenyRuleType {
+			if admResult.RuleMode != "" {
+				// a deny rule's "rule mode"(if specified) takes precedence over global mode
+				mode = admResult.RuleMode
+			}
+			if mode == share.AdmCtrlModeProtect {
+				allowed = false
+				finalAction = "denied"
+			}
+		}
+		statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s.", msgHeader, opDisplay, req.Kind.Kind, finalAction)
+	} else if matched {
+		// equal to [else if admResult.MatchDeny]
+		msg := admResult.Msg
+		var modeStr string
+		// matches deny rule
+		if admResult.RuleMode != "" {
+			// a deny rule's "rule mode"(if specified) takes precedence over global mode
+			mode = admResult.RuleMode
+			modeStr = "per-rule " + mode
+		} else {
+			modeStr = mode
+		}
+		if mode == share.AdmCtrlModeMonitor {
+			admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode",
+				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr)
+			eventID = share.CLUSAuditAdmCtrlK8sReqViolation
+		} else {
+			allowed = false
+			matchedSrcMsg := ""
+			if admResult.MatchedSource != "" {
+				matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
+			}
+			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+			admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s",
+				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg)
+			eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+		}
+
+		// append the causes
+		if len(msg) > 0 {
+			admResult.Msg += ", " + msg
+		}
+
+		admResult.User = admResObject.UserName
+		admResult.PVCName = pvcName
+		admResult.PVCStorageClassName = *scName
+	} else {
+		// doesn't match any rule
+		var actionMsg string
+		switch defaultAction {
+		case nvsysadmission.AdmCtrlActionAllow:
+			actionMsg = "allowed"
+		case nvsysadmission.AdmCtrlActionDeny:
+			actionMsg = "denied"
+			allowed = false
+			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+			eventID = share.CLUSAuditAdmCtrlK8sReqDenied
+		default:
+			actionMsg = "allowed"
+		}
+		admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is %s because it doesn't match any rule",
+			msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, actionMsg)
+	}
+
+	if !forTesting {
+		cacheAdmCtrlAudit(eventID, admResult, admResObject)
+	}
+
+	return &admissionv1beta1.AdmissionResponse{
+		Allowed: allowed,
+		Result:  statusResult,
+	}, admResult.AssessResults, false
 }

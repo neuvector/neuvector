@@ -10,13 +10,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/resource"
@@ -118,13 +118,13 @@ cleanup:
 // If data is not consistent, the data in kv will be used and files in keyPath and certPath will be modified.
 func StoreKeyCertFilesInKV(kvkey string, certPath string, keyPath string) error {
 	log.Info("store key/cert in new kv")
-	certData, err := ioutil.ReadFile(certPath)
+	certData, err := os.ReadFile(certPath)
 	if err != nil {
-		return errors.Wrap(err, "failed to read ca cert")
+		return fmt.Errorf("failed to read ca cert: %w", err)
 	}
-	keyData, err := ioutil.ReadFile(keyPath)
+	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
-		return errors.Wrap(err, "failed to read ca key")
+		return fmt.Errorf("failed to read ca key: %w", err)
 	}
 
 	if len(certData) <= 0 {
@@ -193,18 +193,18 @@ func CreateCAFilesAndStoreInKv(certpath, keypath string) error {
 		}).Debug("found existing CA files")
 	} else {
 		// Only RSA is supported for now.
-		cert, key, err := generateCAWithRSAKey(nil, RSAKeySize)
+		cert, key, err := GenerateCAWithRSAKey(nil, RSAKeySize)
 		if err != nil {
-			return errors.Wrap(err, "Failed to create ca certificate")
+			return fmt.Errorf("failed to create ca certificate: %w", err)
 		}
 		if err := savePrivKeyCert(cert, key, certpath, keypath); err != nil {
-			return errors.Wrap(err, "Failed to save key/cert")
+			return fmt.Errorf("failed to save key/cert: %w", err)
 		}
 	}
 
 	// cert.IsEmpty() is checked in if condition above.
 	if err := StoreKeyCertFilesInKV(share.CLUSRootCAKey, certpath, keypath); err != nil {
-		return errors.Wrap(err, "failed to store key into KV")
+		return fmt.Errorf("failed to store key into KV: %w", err)
 	}
 	return nil
 }
@@ -253,7 +253,7 @@ func GetDefaultTLSCertTemplate() *x509.Certificate {
 
 // Generate CA cert/key
 // When succeeds, it returns cert (der) and key.
-func generateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []byte, error) {
+func GenerateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []byte, error) {
 	// If user specifies one, use template provided.
 	var certTemplate *x509.Certificate
 	if template != nil {
@@ -268,7 +268,7 @@ func generateCAWithRSAKey(template *x509.Certificate, keysize int) ([]byte, []by
 // Generate TLS cert/key
 // When parent == nil, it will be self-signed.
 // When succeeds, it returns cert (der) and key.
-func generateTLSCertWithRSAKey(template *x509.Certificate, keysize int, parent *x509.Certificate, parentPrivateKey interface{}) ([]byte, []byte, error) {
+func GenerateTLSCertWithRSAKey(template *x509.Certificate, keysize int, parent *x509.Certificate, parentPrivateKey interface{}) ([]byte, []byte, error) {
 	// If user specifies one, use template provided.
 	var certTemplate *x509.Certificate
 	if template != nil {
@@ -291,7 +291,7 @@ func generateCertWithRSAKeyInternal(template *x509.Certificate, keysize int, par
 
 	// Generate private key
 	if privKey, err = rsa.GenerateKey(rand.Reader, keysize); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to generate private key")
+		return nil, nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
 	if parent == nil {
@@ -304,7 +304,7 @@ func generateCertWithRSAKeyInternal(template *x509.Certificate, keysize int, par
 	}
 
 	if cert, err = x509.CreateCertificate(rand.Reader, template, parentCert, &privKey.PublicKey, parentKey); err != nil {
-		return nil, nil, errors.Wrap(err, "Failed to create ca certificate")
+		return nil, nil, fmt.Errorf("failed to create ca certificate: %w", err)
 	}
 
 	var certbuf bytes.Buffer
@@ -315,11 +315,11 @@ func generateCertWithRSAKeyInternal(template *x509.Certificate, keysize int, par
 		return nil, nil, errors.New("failed to decode private key block")
 	}
 	if err = pem.Encode(&keybuf, pemBlock); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to encode pem file")
+		return nil, nil, fmt.Errorf("failed to encode pem file: %w", err)
 	}
 
 	if err = pem.Encode(&certbuf, &pem.Block{Type: "CERTIFICATE", Bytes: cert}); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to encode pem file")
+		return nil, nil, fmt.Errorf("failed to encode pem file: %w", err)
 	}
 
 	return certbuf.Bytes(), keybuf.Bytes(), nil
@@ -415,11 +415,11 @@ func GenTlsCertWithCaAndStoreInFiles(cn string, certPath string, privKeyPath str
 	} else {
 		cert, key, err := GenTlsKeyCert(cn, caCertPath, caKeyPath, validityPeriod, usage)
 		if err != nil {
-			return errors.Wrap(err, "failed to generate tls key/cert")
+			return fmt.Errorf("failed to generate tls key/cert: %w", err)
 		}
 
 		if err := savePrivKeyCert(cert, key, certPath, privKeyPath); err != nil {
-			return errors.Wrap(err, "failed to save key/cert")
+			return fmt.Errorf("failed to save key/cert: %w", err)
 		}
 	}
 
@@ -446,27 +446,27 @@ func GenTlsKeyCert(cn string, caCertPath string, caKeyPath string, validityPerio
 		catls, err := tls.LoadX509KeyPair(caCertPath, caKeyPath)
 		if err != nil {
 			log.WithError(err).Error("failed to load ca key pair")
-			return nil, nil, errors.Wrap(err, "failed to load ca key pair")
+			return nil, nil, fmt.Errorf("failed to load ca key pair: %w", err)
 		}
 
 		ca, err := x509.ParseCertificate(catls.Certificate[0])
 		if err != nil {
 			log.WithError(err).Error("failed to parse ca cert")
-			return nil, nil, errors.Wrap(err, "failed to parse ca cert")
+			return nil, nil, fmt.Errorf("failed to parse ca cert: %w", err)
 		}
 		// Only RSA is supported for now.
-		cert, key, err = generateTLSCertWithRSAKey(template, RSAKeySize, ca, catls.PrivateKey)
+		cert, key, err = GenerateTLSCertWithRSAKey(template, RSAKeySize, ca, catls.PrivateKey)
 		if err != nil {
 			log.WithError(err).Error("Failed to create TLS certificate")
-			return nil, nil, errors.Wrap(err, "Failed to create TLS certificate")
+			return nil, nil, fmt.Errorf("failed to create TLS certificate: %w", err)
 		}
 	} else {
 		// Only RSA is supported for now.
 		// Self sign
-		cert, key, err = generateTLSCertWithRSAKey(template, RSAKeySize, nil, nil)
+		cert, key, err = GenerateTLSCertWithRSAKey(template, RSAKeySize, nil, nil)
 		if err != nil {
 			log.WithError(err).Error("Failed to create TLS certificate")
-			return nil, nil, errors.Wrap(err, "Failed to create TLS certificate")
+			return nil, nil, fmt.Errorf("failed to create TLS certificate: %w", err)
 		}
 	}
 
@@ -489,8 +489,8 @@ func GetFedCaCertPath(masterID string) (string, error) { // returns caCertPath
 	var caCertData []byte
 	var err error
 	caCertPath := fmt.Sprintf("/etc/neuvector/certs/fed.master.%s.cert.pem", masterID)
-	if caCertData, err = ioutil.ReadFile(AdmCACertPath); err == nil {
-		if err = ioutil.WriteFile(caCertPath, caCertData, 0600); err == nil {
+	if caCertData, err = os.ReadFile(AdmCACertPath); err == nil {
+		if err = os.WriteFile(caCertPath, caCertData, 0600); err == nil {
 			return caCertPath, nil
 		} else {
 			log.WithFields(log.Fields{"error": err, "cert": caCertPath}).Error("failed to write")

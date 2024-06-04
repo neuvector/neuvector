@@ -21,6 +21,7 @@ type ProbeConfig struct {
 	ProcPolicyLookupFunc func(id, riskType, pname, ppath string, pid, pgid, shellCmd int, proc *share.CLUSProcessProfileEntry) (string, string, string, string, bool, error)
 	IsK8sGroupWithProbe  func(svcGroup string) bool
 	ReportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
+	IsNeuvectorContainer func(id string) (string, bool)
 	ContainerInContainer bool
 	GetContainerPid      func(id string) int
 	GetAllContainerList  func() utils.Set
@@ -47,7 +48,7 @@ const (
 	PROBE_REPORT_FILE_MODIFIED
 	PROBE_REPORT_PROCESS_VIOLATION
 	PROBE_REPORT_PROCESS_DENIED
-	PROBE_HOST_NEW_IP
+	PROBE_HOST_NEW_IP              // obsolete
 )
 
 var ProbeMsgName = []string{
@@ -61,7 +62,7 @@ var ProbeMsgName = []string{
 	PROBE_REPORT_FILE_MODIFIED:     "file_modified",
 	PROBE_REPORT_PROCESS_VIOLATION: "process_profile_violation",
 	PROBE_REPORT_PROCESS_DENIED:    "process_profile_denied",
-	PROBE_HOST_NEW_IP:         		"host_new_ip",
+	PROBE_HOST_NEW_IP:         		"host_new_ip",               // obsolete
 }
 
 type ProbeMessage struct {

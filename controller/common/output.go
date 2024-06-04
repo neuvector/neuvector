@@ -228,6 +228,8 @@ func (s *Syslogger) makeDial(prio syslog.Priority, timeout time.Duration) (*sysl
 
 const webhookInfo = "Neuvector webhook is configured."
 const requestTimeout = time.Duration(5 * time.Second)
+const ctypeText = "text/plain; charset=us-ascii"
+const ctypeJSON = "application/json"
 
 type Webhook struct {
 	url    string
@@ -247,8 +249,10 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title strin
 
 	if logText := struct2Text(elog); logText != "" {
 		var data []byte
+		var ctype string
 		switch w.target {
 		case api.WebhookTypeSlack:
+			ctype = ctypeJSON
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
@@ -258,25 +262,28 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title strin
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
 			data, _ = json.Marshal(fields)
 		case api.WebhookTypeTeams:
+			ctype = ctypeJSON
 			fields := make(map[string]string)
 			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
 			data, _ = json.Marshal(fields)
 		case api.WebhookTypeJSON:
+			ctype = ctypeJSON
 			extra := fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster)
 			data, _ = json.Marshal(elog)
 			data = append([]byte(extra), data[1:]...)
 		default:
+			ctype = ctypeText
 			msg := fmt.Sprintf("level=%s,cluster=%s,%s", strings.ToUpper(LevelToString(level)), cluster, logText)
 			data = []byte(msg)
 		}
 
-		w.httpRequest(data, proxy)
+		w.httpRequest(data, ctype, proxy)
 	}
 }
 
-func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
+func (w *Webhook) httpRequest(data []byte, ctype string, proxy *share.CLUSProxy) error {
 	client := &http.Client{
 		Timeout: requestTimeout,
 	}
@@ -305,6 +312,15 @@ func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
 		}
 
 		client.Transport = transport
+	} else if strings.HasPrefix(w.url, "http://") {
+		if proxy != nil {
+			transport := &http.Transport{
+				Proxy: func(r *http.Request) (*url.URL, error) {
+					return url.Parse(proxy.URL)
+				},
+			}
+			client.Transport = transport
+		}
 	}
 
 	var err error
@@ -316,6 +332,7 @@ func (w *Webhook) httpRequest(data []byte, proxy *share.CLUSProxy) error {
 		if strings.HasPrefix(w.url, "http://") && authHdr != "" {
 			req.Header.Add("Proxy-Authorization", authHdr)
 		}
+		req.Header.Set("Content-Type", ctype)
 
 		resp, err = client.Do(req)
 		if err != nil {

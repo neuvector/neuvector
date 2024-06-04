@@ -310,12 +310,13 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		}
 	}
 
-    rconf.RemoteRepositories = make([]api.RESTRemoteRepository, len(systemConfigCache.RemoteRepositories))
+	rconf.RemoteRepositories = make([]api.RESTRemoteRepository, len(systemConfigCache.RemoteRepositories))
 	for i, rr := range systemConfigCache.RemoteRepositories {
 		repo := api.RESTRemoteRepository{
 			Nickname: rr.Nickname,
 			Comment:  rr.Comment,
 			Provider: rr.Provider,
+			Enable:   rr.Enable,
 		}
 		if rr.Provider == share.RemoteRepositoryProvider_GitHub && rr.GitHubConfiguration != nil {
 			repo.GitHubConfiguration = &api.RESTRemoteRepo_GitHubConfig{

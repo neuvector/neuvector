@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"encoding/json"
 	"fmt"
@@ -11,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -20,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -102,8 +101,11 @@ var grpSvcIpByDomainMap map[string]utils.Set = make(map[string]utils.Set) //key 
 var addr2ExtIpMap map[string][]net.IP = make(map[string][]net.IP)         //key svc cluster ip, value is externalIPs
 var extIp2addrMap map[string]net.IP = make(map[string]net.IP)             //key externalIP, value is svc cluster ip
 var addr2ExtIpRefreshMap map[string]bool = make(map[string]bool)          //key svc cluster ip
-var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)          //fqdn->group name(s)
-var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)          //group->fqdn name(s)
+var fqdn2GrpMap map[string]utils.Set = make(map[string]utils.Set)         //fqdn->group name(s)
+var grp2FqdnMap map[string]utils.Set = make(map[string]utils.Set)         //group->fqdn name(s)
+var ip2GrpMap map[string]utils.Set = make(map[string]utils.Set)           //ip->group name(s)
+var grp2IpMap map[string]utils.Set = make(map[string]utils.Set)           //group->ip(s)
+var groupMetricMap map[string]*share.CLUSGroupMetric = make(map[string]*share.CLUSGroupMetric)
 
 func getSvcAddrGroupNameByExtIP(ip net.IP, port uint16) string {
 	if addrip, ok := extIp2addrMap[ip.String()]; ok {
@@ -180,6 +182,10 @@ func group2BriefREST(cache *groupCache, withCap bool) *api.RESTGroupBrief {
 		Kind:            cache.group.Kind,
 		PlatformRole:    cache.group.PlatformRole,
 		BaselineProfile: cache.group.BaselineProfile,
+		MonMetric:       cache.group.MonMetric,
+		GrpSessCur:      cache.group.GrpSessCur,
+		GrpSessRate:     cache.group.GrpSessRate,
+		GrpBandWidth:    cache.group.GrpBandWidth,
 	}
 	if withCap {
 		g.CapChgMode = &cache.capChgMode
@@ -492,6 +498,10 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		} else {
 			refreshGroupMember(cache)
 			groupCacheMap[group.Name] = cache
+			//for imported empty group
+			if cache.members.Cardinality() == 0 && cacher.GetUnusedGroupAging() != 0 {
+				scheduleGroupRemoval(cache)
+			}
 		}
 		if ok := isCreateDlpGroup(&group); ok {
 			createDlpGroup(group.Name, group.CfgType)
@@ -547,11 +557,13 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			}
 
 			delete(groupCacheMap, name)
+			refreshGroupMetricMap(name, "", true)
 		}
 		cacheMutexUnlock()
 
 		if cache != nil && cache.group.Kind == share.GroupKindAddress {
 			deleteFqdn2Group(cache)
+			deleteIp2Group(cache)
 		}
 		if cache != nil && !isIPSvcGrpHidden(cache) {
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
@@ -1000,6 +1012,9 @@ type groupRemovalEvent struct {
 	groupname string
 }
 
+var emptyGroups []string
+var emptyGroupsMutex sync.Mutex
+
 func (p *groupRemovalEvent) Expire() {
 	cacheMutexLock()
 	if cache, ok := groupCacheMap[p.groupname]; ok {
@@ -1016,13 +1031,60 @@ func (p *groupRemovalEvent) Expire() {
 		//is really deleted or not
 		cache.timerTask = ""
 		cacheMutexUnlock()
-		deleted := deleteGroupFromCluster(p.groupname)
 
-		if deleted {
-			groupRemoveEvent(share.CLUSEvGroupAutoRemove, p.groupname)
-		}
+		//log.WithFields(log.Fields{"group": p.groupname}).Info("To be deleted")
+		emptyGroupsMutex.Lock()
+		emptyGroups = append(emptyGroups, p.groupname)
+		emptyGroupsMutex.Unlock()
 	} else {
 		cacheMutexUnlock()
+	}
+}
+
+func rmEmptyGroupsFromCluster() {
+	if isLeader() == false {
+		return
+	}
+	emptyGroupsMutex.Lock()
+	groups := emptyGroups
+	emptyGroups = nil
+	emptyGroupsMutex.Unlock()
+
+	if len(groups) <= 0 {
+		return
+	}
+
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	//log.WithFields(log.Fields{"groups": groups}).Debug("")
+	kv.DeletePolicyByGroups(groups)
+	kv.DeleteResponseRuleByGroups(groups)
+
+	accAll := access.NewAdminAccessControl()
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	for _, name := range groups {
+		cg, _, _ := clusHelper.GetGroup(name, accAll)
+		if cg == nil {
+			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
+			if _, ok := groupCacheMap[name]; ok {
+				delete(groupCacheMap, name)
+			}
+		} else {
+			clusHelper.DeleteGroupTxn(txn, name)
+		}
+	}
+	if ok, err1 := txn.Apply(); err1 != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
+	}
+	for _, name := range groups {
+		groupRemoveEvent(share.CLUSEvGroupAutoRemove, name)
 	}
 }
 
@@ -1142,6 +1204,38 @@ func SchedulePruneGroups() {
 	}
 }
 
+// caller hold cacheMutexLock
+func refreshGroupMetricMap(groupname string, wlid string, deletegrp bool) {
+	if deletegrp {
+		if grpmet, ok := groupMetricMap[groupname]; ok {
+			grpmet.WlMetric = nil
+			delete(groupMetricMap, groupname)
+		}
+	} else {
+		if grpMet, ok := groupMetricMap[groupname]; ok {
+			if grpMet.WlMetric == nil {
+				grpMet.WlMetric = make(map[string]*share.CLUSWlMetric)
+			}
+			if _, exst := grpMet.WlMetric[wlid]; exst {
+				delete(grpMet.WlMetric, wlid)
+			}
+			if len(grpMet.WlMetric) == 0 {
+				delete(groupMetricMap, groupname)
+			} else {
+				//reset group metric
+				grpMet.GroupSessCurIn = 0
+				grpMet.GroupSessIn60 = 0
+				grpMet.GroupByteIn60 = 0
+				for _, cwlmet := range grpMet.WlMetric {
+					grpMet.GroupSessCurIn += cwlmet.WlSessCurIn
+					grpMet.GroupSessIn60 += cwlmet.WlSessIn60
+					grpMet.GroupByteIn60 += cwlmet.WlByteIn60
+				}
+			}
+		}
+	}
+}
+
 func groupWorkloadLeave(id string, param interface{}) {
 	wlc := param.(*workloadCache)
 	wl := wlc.workload
@@ -1172,6 +1266,7 @@ func groupWorkloadLeave(id string, param interface{}) {
 		//it needs to inform dp that a fqdn
 		//is no longer needed
 		scheduleIPPolicyCalculation(false)
+		refreshGroupMetricMap(wlc.learnedGroupName, id, false)
 	}
 	cacheMutexUnlock()
 
@@ -1198,6 +1293,7 @@ func hostWorkloadStart(id string, param interface{}) {
 		}
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
+		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1225,6 +1321,7 @@ func hostWorkloadDelete(id string, param interface{}) {
 		host.runningPods.Remove(wl.ID)
 		host.runningCntrs.Remove(wl.ID)
 		host.workloads.Remove(wl.ID)
+		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1294,7 +1391,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 			if bHasGroupProfile {
 				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
-					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}
 			}
 			// Members is calculated when group change is handled
@@ -1341,9 +1438,10 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// warning: avoid cacheMutexLock() before calling below function
 	if bHasGroupProfile {
 		if localDev.Host.Platform == share.PlatformKubernetes {
-			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") { // ignore POD
+			if !strings.HasPrefix(wlc.workload.Name, "k8s_POD") {
+				// app containers
 				cacheMutexLock()
-				updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain)
+				wl.Privileged = updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				cacheMutexUnlock()
 			}
 		}
@@ -1376,7 +1474,7 @@ func svcipGroupJoin(svcipcache *groupCache) {
 	}
 }
 
-func updateFqdn2Group (cache *groupCache) {
+func updateFqdn2Group(cache *groupCache) {
 	deleteFqdn2Group(cache)
 	for _, ct := range cache.group.Criteria {
 		if ct.Key == share.CriteriaKeyAddress {
@@ -1399,7 +1497,7 @@ func updateFqdn2Group (cache *groupCache) {
 	}
 }
 
-func deleteFqdn2Group (cache *groupCache) {
+func deleteFqdn2Group(cache *groupCache) {
 	if gfqs, ok := grp2FqdnMap[cache.group.Name]; ok {
 		for fq := range gfqs.Iter() {
 			fqn := fq.(string)
@@ -1414,6 +1512,45 @@ func deleteFqdn2Group (cache *groupCache) {
 			gfqs.Clear()
 		}
 		delete(grp2FqdnMap, cache.group.Name)
+	}
+}
+
+func updateIp2Group(cache *groupCache) {
+	deleteIp2Group(cache)
+	for _, ct := range cache.group.Criteria {
+		if ct.Key == share.CriteriaKeyAddress {
+			if ips := getIPList(ct.Value); ips != nil {
+				for _, ip := range ips {
+					ipstr := ip.String()
+					if ip2GrpMap[ipstr] == nil {
+						ip2GrpMap[ipstr] = utils.NewSet()
+					}
+					ip2GrpMap[ipstr].Add(cache.group.Name)
+					if grp2IpMap[cache.group.Name] == nil {
+						grp2IpMap[cache.group.Name] = utils.NewSet()
+					}
+					grp2IpMap[cache.group.Name].Add(ipstr)
+				}
+			}
+		}
+	}
+}
+
+func deleteIp2Group(cache *groupCache) {
+	if gips, ok := grp2IpMap[cache.group.Name]; ok {
+		for tip := range gips.Iter() {
+			aip := tip.(string)
+			if ip2gs, ok1 := ip2GrpMap[aip]; ok1 {
+				ip2gs.Remove(cache.group.Name)
+				if ip2gs.Cardinality() == 0 {
+					delete(ip2GrpMap, aip)
+				}
+			}
+		}
+		if gips != nil {
+			gips.Clear()
+		}
+		delete(grp2IpMap, cache.group.Name)
 	}
 }
 
@@ -1435,12 +1572,17 @@ func refreshGroupMember(cache *groupCache) {
 
 	if cache.group.Kind == share.GroupKindAddress {
 		updateFqdn2Group(cache)
+		updateIp2Group(cache)
 	}
 
 	if cache.group.Kind != share.GroupKindContainer {
 		return
 	}
-
+	if (cache.group.CfgType == share.Learned ||
+		cache.group.CfgType == share.UserCreated) &&
+		!cache.group.Reserved && !cache.group.MonMetric {
+		refreshGroupMetricMap(cache.group.Name, "", true)
+	}
 	// for openshift platform, add nv.ip.xxx to group if domain matches
 	if !policyApplyIngress && cache.group.CfgType != share.Learned {
 		//remove existing grp->nv.ip.xxx mapping

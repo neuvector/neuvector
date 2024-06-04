@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"fmt"
 	"net"
@@ -25,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
@@ -205,6 +203,8 @@ type Context struct {
 	NvSemanticVersion        string
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
+	CreateQuerySessionFunc   func(qsr *api.QuerySessionRequest) error
+	DeleteQuerySessionFunc   func(queryToken string) error
 }
 
 type k8sProbeCmd struct {
@@ -325,6 +325,10 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	// schedule a key deletion, as loong as one controller does it, it will be fine.
 	pruneHost()
 	SchedulePruneGroups()
+
+	if localDev.Host.Platform == share.PlatformKubernetes {
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+	}
 }
 
 func FillControllerCounter(c *share.CLUSControllerCounter) {
@@ -1662,11 +1666,14 @@ const unManagedWlProcDelayFast = time.Duration(time.Minute * 2)
 const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
+const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
+const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 
 func startWorkerThread(ctx *Context) {
 	ephemeralTicker := time.NewTicker(workloadEphemeralPeriod)
+	emptyGrpTicker := time.NewTicker(rmEmptyGroupPeriod)
 	scannerTicker := time.NewTicker(scannerCleanupPeriod)
 	usageReportTicker := time.NewTicker(usageReportPeriod)
 	unManagedWlTimer = time.NewTimer(unManagedWlProcDelaySlow)
@@ -1674,6 +1681,7 @@ func startWorkerThread(ctx *Context) {
 	if !cacher.rmNsGrps {
 		pruneTicker.Stop()
 	}
+	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
 
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1700,6 +1708,10 @@ func startWorkerThread(ctx *Context) {
 				if isLeader() {
 					writeUsageReport()
 				}
+			case <-groupMetricCheckTicker.C:
+				if isLeader() {
+					CheckGroupMetric()
+				}
 			case <-teleReportTicker.C:
 				if isLeader() {
 					if !noTelemetry {
@@ -1717,6 +1729,8 @@ func startWorkerThread(ctx *Context) {
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
+			case <-emptyGrpTicker.C:
+				rmEmptyGroupsFromCluster()
 			case <-unManagedWlTimer.C:
 				cacheMutexRLock()
 				refreshInternalIPNet()
@@ -1894,8 +1908,21 @@ func startWorkerThread(ctx *Context) {
 					if n != nil {
 						if o == nil { // create
 							if !isNeuvectorContainerName(n.Name) {
-								if len(n.LivenessCmds) > 0 || len(n.ReadinessCmds) > 0 {
-									addK8sPodEvent(*n)
+								var probeCmds [][]string
+								var bPrivileged bool
+								for _, c := range n.Containers {
+									if len(c.LivenessCmds) > 0 {
+										probeCmds = append(probeCmds, c.LivenessCmds)
+									}
+									if len(c.ReadinessCmds) > 0 {
+										probeCmds = append(probeCmds, c.ReadinessCmds)
+									}
+									if c.Privileged {
+										bPrivileged = true
+									}
+								}
+								if len(probeCmds) > 0 || bPrivileged {
+									addK8sPodEvent(*n, probeCmds)
 								}
 							}
 
@@ -2057,7 +2084,8 @@ func startWorkerThread(ctx *Context) {
 
 // handler of K8s resource watcher calls cbResourceWatcher() which sends to orchObjChan/objChan
 // [2021-02-15] CRD-related resource changes do not call this function.
-//              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
+//
+//	If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
 	updateDetected := false
 	config := newConfig
@@ -2142,6 +2170,9 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
 	automode_init(ctx)
 
+	// pass function to db so it can use it
+	db.InitGetCVERecord(GetCVERecord)
+
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()
 	return &cacher
@@ -2176,7 +2207,7 @@ func QueryK8sVersion() {
 	}
 }
 
-////// event handlers for enforcer's kv dispatcher
+// //// event handlers for enforcer's kv dispatcher
 // node: HostID
 func nodeLeaveDispatcher(node string, param interface{}) {
 	dispatchHelper.NodeLeave(node, isLeader())
@@ -2285,4 +2316,91 @@ func pruneWorkloadKV(suspected utils.Set) {
 			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
 		}
 	}
+}
+
+func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	workloadIDs := make([]string, 0)
+	for _, cache := range wlCacheMap {
+		if !acc.Authorize(cache.workload, nil) {
+			continue
+		}
+		if common.OEMIgnoreWorkload(cache.workload) {
+			continue
+		}
+		if !cache.workload.Running {
+			continue
+		}
+
+		if cache.workload.ShareNetNS == "" {
+			workloadIDs = append(workloadIDs, cache.workload.ID)
+			getFilteredVulTraits(cache.workload.ID, cache.vulTraits, filteredMap)
+
+			for child := range cache.children.Iter() {
+				if childCache, ok := wlCacheMap[child.(string)]; ok {
+					workloadIDs = append(workloadIDs, childCache.workload.ID)
+					getFilteredVulTraits(childCache.workload.ID, childCache.vulTraits, filteredMap)
+				}
+			}
+		}
+	}
+	return workloadIDs
+}
+
+func (m CacheMethod) GetAllHostsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
+
+	hostIDs := make([]string, 0)
+	for _, cache := range hostCacheMap {
+		if !acc.Authorize(cache.host, nil) || isDummyHostCache(cache) {
+			continue
+		}
+
+		hostIDs = append(hostIDs, cache.host.ID)
+		getFilteredVulTraits(cache.host.ID, cache.vulTraits, filteredMap)
+	}
+	return hostIDs
+}
+
+func (m CacheMethod) GetPlatformID(acc *access.AccessControl, filteredMap map[string]bool) string {
+	scanMutexRLock()
+	defer scanMutexRUnlock()
+
+	if acc.Authorize(&share.CLUSHost{}, nil) {
+		if info, ok := scanMap[common.ScanPlatformID]; ok {
+			getFilteredVulTraits(common.ScanPlatformID, info.vulTraits, filteredMap)
+			return common.ScanPlatformID
+		}
+	}
+
+	return ""
+}
+
+func getFilteredVulTraits(id string, vulTraits []*scanUtils.VulTrait, filteredMap map[string]bool) {
+	for _, v := range vulTraits {
+		if v.IsFiltered() {
+			key := fmt.Sprintf("%s;%s", id, v.Name)
+			filteredMap[key] = true
+			filteredMap[v.Name] = true
+		}
+	}
+}
+
+func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
+	cve := scanUtils.GetCVERecord(name, dbKey, baseOS)
+	vul := &db.DbVulAsset{
+		Severity:    cve.Severity,
+		Description: cve.Description,
+		Link:        cve.Link,
+		Score:       int(cve.Score * 10),
+		Vectors:     cve.Vectors,
+		ScoreV3:     int(cve.ScoreV3 * 10),
+		VectorsV3:   cve.VectorsV3,
+		PublishedTS: cve.PublishedTS,
+		LastModTS:   cve.LastModTS,
+	}
+	return vul
 }

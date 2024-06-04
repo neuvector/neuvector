@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -19,7 +18,7 @@ import (
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/system"
@@ -161,7 +160,7 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 		return "", fmt.Errorf("New Request fail - error=%s", err)
 	}
 	if useToken {
-		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
+		if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
 			return "", fmt.Errorf("Read File fail - tag=%s, error=%s", tag, err)
 		} else {
 			req.Header.Set("Authorization", "Bearer "+string(data))
@@ -169,13 +168,16 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 	}
 	if resp, err = client.Do(req); err != nil {
 		return "", fmt.Errorf("Get Version fail - error=%s", err)
-	} else if resp != nil && resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("getVersion fail - code=%d, tag=%s, useToken=%v", resp.StatusCode, tag, useToken)
 	}
+
 	defer resp.Body.Close()
 
+	if resp != nil && resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("getVersion fail - code=%d, tag=%s, useToken=%v", resp.StatusCode, tag, useToken)
+	}
+
 	var data []byte
-	data, err = ioutil.ReadAll(resp.Body)
+	data, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("Read data fail - error=%s", err)
 	}
@@ -437,14 +439,15 @@ func (d *kubernetes) GetServiceFromPodLabels(namespace, pod, node string, labels
 
 /*
 pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
-    "io.kubernetes.container.name": "POD"
-    "io.kubernetes.pod.name": "frontend-3823415956-853n5"
-    "pod-template-hash": "3823415956"
-       |
-       |
-       |--- d8f2f70211b0 gb-frontend k8s_php-redis_frontend-3823415956-853n5_default_...
-       |        "io.kubernetes.container.name": "php-redis"
-       |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
+
+	"io.kubernetes.container.name": "POD"
+	"io.kubernetes.pod.name": "frontend-3823415956-853n5"
+	"pod-template-hash": "3823415956"
+	   |
+	   |
+	   |--- d8f2f70211b0 gb-frontend k8s_php-redis_frontend-3823415956-853n5_default_...
+	   |        "io.kubernetes.container.name": "php-redis"
+	   |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
 */
 func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Service {
 	namespace, _ := meta.Labels[container.KubeKeyPodNamespace]
@@ -625,7 +628,7 @@ func (d *kubernetes) createCleanupScript(wr io.Writer, hostPorts map[string][]sh
 
 func (d *kubernetes) CleanupHostPorts(hostPorts map[string][]share.CLUSIPAddr) error {
 	if d.flavor == share.FlavorOpenShift {
-		if f, err := ioutil.TempFile("", "ovs"); err != nil {
+		if f, err := os.CreateTemp("", "ovs"); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to create file")
 			return err
 		} else {

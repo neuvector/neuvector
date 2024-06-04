@@ -105,6 +105,10 @@ type RESTRegistryDebugImageData struct {
 	Images []*RESTRegistryDebugImage `json:"images"`
 }
 
+type RESTRegistryTestDataV2 struct {
+	Config *RESTRegistryV2 `json:"config"`
+}
+
 type RESTRegistryTestData struct {
 	Config *RESTRegistry `json:"config"`
 }
@@ -177,18 +181,20 @@ type RESTRiskScoreMetrics struct {
 }
 
 type RESTExposedEndpoint struct {
-	ID           string                         `json:"id"`
-	Name         string                         `json:"name"`
-	DisplayName  string                         `json:"display_name"`
-	PodName      string                         `json:"pod_name"`
-	Service      string                         `json:"service"`
-	Severity     string                         `json:"severity"`
-	PolicyMode   string                         `json:"policy_mode"`
-	PolicyAction string                         `json:"policy_action"`
-	Protos       []string                       `json:"protocols,omitempty"`
-	Apps         []string                       `json:"applications,omitempty"`
-	Ports        []string                       `json:"ports,omitempty"`
-	Entries      []*RESTConversationReportEntry `json:"entries"`
+	ID             string                         `json:"id"`
+	Name           string                         `json:"name"`
+	DisplayName    string                         `json:"display_name"`
+	PodName        string                         `json:"pod_name"`
+	Service        string                         `json:"service"`
+	ThreatSeverity string                         `json:"severity"`
+	HighVuls       int                            `json:"high"`
+	MedVuls        int                            `json:"medium"`
+	PolicyMode     string                         `json:"policy_mode"`
+	PolicyAction   string                         `json:"policy_action"`
+	Protos         []string                       `json:"protocols,omitempty"`
+	Apps           []string                       `json:"applications,omitempty"`
+	Ports          []string                       `json:"ports,omitempty"`
+	Entries        []*RESTConversationReportEntry `json:"entries"`
 }
 
 type RESTInternalSystemData struct {

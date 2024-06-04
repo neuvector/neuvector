@@ -25,14 +25,18 @@ import (
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/ruleid"
 	"github.com/neuvector/neuvector/controller/scan"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/healthz"
+	"github.com/neuvector/neuvector/share/migration"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 var Host share.CLUSHost = share.CLUSHost{
@@ -427,7 +431,7 @@ func main() {
 	}
 
 	if platform == share.PlatformKubernetes {
-		resource.AdjustAdmWebhookName(nvcrd.Init, cache.QueryK8sVersion, admission.VerifyK8sNs, cspType)
+		resource.AdjustAdmWebhookName(cache.QueryK8sVersion, admission.VerifyK8sNs, cspType)
 	}
 
 	// Assign controller interface/IP scope
@@ -459,11 +463,61 @@ func main() {
 		Ctrler: &Ctrler,
 	}
 
+	var grpcServer *cluster.GRPCServer
+	var internalCertControllerCancel context.CancelFunc
+	var ctx context.Context
+
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+
+		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
+
+		go func() {
+			if err := healthz.StartHealthzServer(); err != nil {
+				log.WithError(err).Warn("failed to start healthz server")
+			}
+		}()
+
+		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
+		defer internalCertControllerCancel()
+		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
+		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
+			// Reload consul
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading consul config")
+				if err := cluster.Reload(nil); err != nil {
+					return fmt.Errorf("failed to reload consul: %w", err)
+				}
+
+				return nil
+			},
+			// Reload grpc servers/clients
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading gRPC servers/clients")
+				if err := cluster.ReloadInternalCert(); err != nil {
+					return fmt.Errorf("failed to reload gRPC's certificate: %w", err)
+				}
+				return nil
+			},
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to initialize internal secret controller")
+			os.Exit(-2)
+		}
+		log.Info("internal certificate is initialized")
+	}
+
+	err = cluster.ReloadInternalCert()
+	if err != nil {
+		log.WithError(err).Fatal("failed to reload internal certificate")
+	}
+
 	eventLogKey := share.CLUSControllerEventLogKey(Host.ID, Ctrler.ID)
 	evqueue = cluster.NewObjectQueue(eventLogKey, cluster.DefaultMaxQLen)
 	auditLogKey := share.CLUSAuditLogKey(Host.ID, Ctrler.ID)
 	auditQueue = cluster.NewObjectQueue(auditLogKey, 128)
 	messenger = cluster.NewMessenger(Host.ID, Ctrler.ID)
+
+	db.CreateVulAssetDb(false)
 
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData)
 	ruleid.Init()
@@ -495,7 +549,6 @@ func main() {
 	}
 
 	// get grpc port before put controller info to cluster
-	var grpcServer *cluster.GRPCServer
 	if *grpcPort == 0 {
 		*grpcPort = cluster.DefaultControllerGRPCPort
 	}
@@ -531,6 +584,7 @@ func main() {
 
 	restoredFedRole := ""
 	purgeFedRulesOnJoint := false
+	defAdminRestored := false
 
 	// Initialize installation ID.  Ignore if ID is already set.
 	clusHelper := kv.GetClusterHelper()
@@ -558,7 +612,7 @@ func main() {
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
 		// assuming the PV should have the latest config.
-		restoredFedRole, _ = kv.GetConfigHelper().Restore()
+		restoredFedRole, defAdminRestored, _ = kv.GetConfigHelper().Restore()
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
 			// 	we need to clean up fed rules & revisions in kv
@@ -586,8 +640,22 @@ func main() {
 	// So, for the new cluster, we only want the lead to upgrade the KV. In the rolling
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
+	crossCheckCRD := false
 	if Ctrler.Leader || !isNewCluster {
-		clusHelper.UpgradeClusterKV()
+		nvImageVersion := Version
+		if strings.HasPrefix(nvImageVersion, "interim/") {
+			// it's daily dev build image
+			if *teleCurrentVer != "" {
+				nvImageVersion = *teleCurrentVer
+			}
+		}
+		verUpdated := clusHelper.UpgradeClusterKV(nvImageVersion)
+		if Ctrler.Leader || verUpdated {
+			// corss-check existing CRs in k9s in situations:
+			// 1. the 1st lead controller in fresh deployment
+			// 2. the 1st new-version controller in rolling upgrade
+			crossCheckCRD = true
+		}
 		clusHelper.FixMissingClusterKV()
 	}
 
@@ -623,17 +691,6 @@ func main() {
 			} else {
 				// it's official release image
 				nvAppFullVersion = ver.CtrlVersion[1:]
-				if ver.CtrlVersion != Version {
-					log.WithFields(log.Fields{"CtrlVersion": ver.CtrlVersion, "Version": Version}).Info()
-					clusHelper := kv.GetClusterHelper()
-					users := clusHelper.GetAllUsersNoAuth()
-					for _, user := range users {
-						if len(user.AcceptedAlerts) > 0 {
-							user.AcceptedAlerts = nil
-							clusHelper.PutUser(user)
-						}
-					}
-				}
 			}
 			if ss := strings.Split(nvAppFullVersion, "-"); len(ss) >= 1 {
 				nvSemanticVersion = "v" + ss[0]
@@ -647,7 +704,8 @@ func main() {
 	}
 
 	// pre-build compliance map
-	scanUtils.GetComplianceMeta()
+	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor)
+	go scanUtils.UpdateComplianceConfigs()
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.
@@ -656,6 +714,11 @@ func main() {
 
 	if strings.HasSuffix(*teleNeuvectorEP, "apikeytest") {
 		rest.TESTApikeySpecifiedCretionTime = true
+		*teleNeuvectorEP = ""
+	}
+
+	if strings.HasSuffix(*teleNeuvectorEP, "dbperftest") {
+		rest.TESTDbPerf = true
 		*teleNeuvectorEP = ""
 	}
 
@@ -700,6 +763,8 @@ func main() {
 		NvSemanticVersion:        nvSemanticVersion,
 		StartStopFedPingPollFunc: rest.StartStopFedPingPoll,
 		RestConfigFunc:           rest.RestConfig,
+		CreateQuerySessionFunc:   rest.CreateQuerySession,
+		DeleteQuerySessionFunc:   rest.DeleteQuerySession,
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
@@ -738,14 +803,6 @@ func main() {
 	// start OPA server, should be started before RegisterStoreWatcher()
 	opa.InitOpaServer()
 
-	// Orch connector should be started after cacher so the listeners are ready
-	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered, cspType)
-
-	// GRPC should be started after cacher as the handler are cache functions
-	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
-
-	// init rest server context before listening KV object store, as federation server can be started from there.
 	rctx := rest.Context{
 		LocalDev:           dev,
 		EvQueue:            evqueue,
@@ -765,6 +822,21 @@ func main() {
 		CustomCheckControl: *custom_check_control,
 		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
 	}
+	// rest.PreInitContext() must be called before orch connector because existing CRD handling could happen right after orch connecter starts
+	rest.PreInitContext(&rctx)
+
+	// Orch connector should be started after cacher so the listeners are ready
+	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
+	orchConnector.Start(ocImageRegistered, cspType)
+
+	if platform == share.PlatformKubernetes {
+		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)
+	}
+
+	// GRPC should be started after cacher as the handler are cache functions
+	grpcServer, _ = startGRPCServer(uint16(*grpcPort))
+
+	// init rest server context before listening KV object store, as federation server can be started from there.
 	rest.InitContext(&rctx)
 
 	// Registry cluster event handlers
@@ -781,12 +853,35 @@ func main() {
 
 	access.UpdateUserRoleForFedRoleChange(fedRole)
 
-	// start rest server
-	rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform) // Load config from ConfigMap
+	// Load config from ConfigMap
+	defAdminLoaded := rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform)
+	if !defAdminRestored && !defAdminLoaded {
+		// if platform == share.PlatformKubernetes && Ctrler.Leader && isNewCluster && !*noDefAdmin {
+		if platform == share.PlatformKubernetes && Ctrler.Leader && !*noDefAdmin {
+			if bootstrapPwd := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+				acc := access.NewFedAdminAccessControl()
+				user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+				if user != nil {
+					user.PasswordHash = utils.HashPassword(bootstrapPwd)
+					user.ResetPwdInNextLogin = true
+					user.UseBootstrapPwd = true
+					user.PwdResetTime = time.Now().UTC()
+					err = clusHelper.PutUserRev(user, rev)
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"err": err}).Error()
+				}
+			}
+		}
+	}
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
-	go rest.StartRESTServer()
+
+	// start rest server
+	go rest.StartRESTServer(isNewCluster, Ctrler.Leader)
+
+	// go rest.StartLocalDevHttpServer() // for local dev only
 
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)

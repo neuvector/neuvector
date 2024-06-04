@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"crypto/md5"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -15,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -354,6 +352,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 					ScannerAutoscale: rconf.ScannerAutoscale,
 				},
 			}
+			if respV2.Config.ModeAuto.ModeAutoD2MDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoD2MDuration = 3600
+			}
+			if respV2.Config.ModeAuto.ModeAutoM2PDuration == 0 {
+				respV2.Config.ModeAuto.ModeAutoM2PDuration = 3600
+			}
 			restRespSuccess(w, r, respV2, acc, login, nil, "Get system configuration")
 			return
 		} else {
@@ -385,7 +389,7 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	// Authz is done when action is taken, setting service policies.
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var req api.RESTSystemRequestData
 	err := json.Unmarshal(body, &req)
@@ -621,7 +625,7 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTSystemWebhookConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -752,7 +756,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 
 	name := ps.ByName("name")
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTSystemWebhookConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1055,14 +1059,30 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 		}
 
 		if scope == share.ScopeLocal && rconf.AtmoConfig != nil {
-			if rconf.AtmoConfig.ModeAutoD2M != nil && rconf.AtmoConfig.ModeAutoD2MDuration != nil {
-				cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
-				cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+			if rconf.AtmoConfig.ModeAutoD2MDuration != nil {
+				if *rconf.AtmoConfig.ModeAutoD2MDuration < 3600 {
+					e := fmt.Sprintf("Invalid D2M automate duration time [%d] (minimum 3600 seconds)", *rconf.AtmoConfig.ModeAutoD2MDuration)
+					log.WithFields(log.Fields{"d2m duration": *rconf.AtmoConfig.ModeAutoD2MDuration}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+				if rconf.AtmoConfig.ModeAutoD2M != nil {
+					cconf.ModeAutoD2M = *rconf.AtmoConfig.ModeAutoD2M
+					cconf.ModeAutoD2MDuration = *rconf.AtmoConfig.ModeAutoD2MDuration
+				}
 			}
 
-			if rconf.AtmoConfig.ModeAutoM2P != nil && rconf.AtmoConfig.ModeAutoM2PDuration != nil {
-				cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
-				cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
+			if rconf.AtmoConfig.ModeAutoM2PDuration != nil {
+				if *rconf.AtmoConfig.ModeAutoM2PDuration < 3600 {
+					e := fmt.Sprintf("Invalid M2P automate duration time [%d] (minimum 3600 seconds)", *rconf.AtmoConfig.ModeAutoM2PDuration)
+					log.WithFields(log.Fields{"m2p duration": *rconf.AtmoConfig.ModeAutoM2PDuration}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+				if rconf.AtmoConfig.ModeAutoM2P != nil {
+					cconf.ModeAutoM2P = *rconf.AtmoConfig.ModeAutoM2P
+					cconf.ModeAutoM2PDuration = *rconf.AtmoConfig.ModeAutoM2PDuration
+				}
 			}
 		}
 
@@ -1551,7 +1571,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	scope := share.ScopeFed
 	dummy := share.CLUSSystemConfig{CfgType: share.FederalCfg}
 	var rconf api.RESTSystemConfigConfigData
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 	err := json.Unmarshal(body, &rconf)
 	if err == nil && apiVer == "v2" {
 		if rconf.ConfigV2 != nil {
@@ -1933,7 +1953,7 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
 				leader = true
 			}
-			nvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, cctx.CspType)
+			nvCrdSchemaErrors = checkCrdSchemaFunc(leader, false, false, cctx.CspType)
 		}
 	}
 
@@ -1962,10 +1982,10 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var accepted []string
-	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, acc); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
 		accepted = user.AcceptedAlerts
 	}
-	if user, _, _ := clusHelper.GetUserRev(login.fullname, access.NewReaderAccessControl()); user != nil {
+	if user, _, _ := clusHelper.GetUserRev(login.fullname, acc); user != nil {
 		accepted = append(accepted, user.AcceptedAlerts...)
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
@@ -2295,7 +2315,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 	}
 
 	var tmpfile *os.File
-	if tmpfile, err = ioutil.TempFile(importBackupDir, tempFilePrefix); err == nil {
+	if tmpfile, err = os.CreateTemp(importBackupDir, tempFilePrefix); err == nil {
 		importTask := share.CLUSImportTask{
 			TID:            utils.GetRandomID(tidLength, ""),
 			ImportType:     importType,
@@ -2318,7 +2338,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				lines, err = rawImportRead(r, tmpfile)
 			}
 		} else {
-			body, _ := ioutil.ReadAll(r.Body)
+			body, _ := io.ReadAll(r.Body)
 			body = _preprocessImportBody(body)
 			json_data, err := yaml.YAMLToJSON(body)
 			if err != nil {
@@ -2337,7 +2357,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 					Server:   login.server,
 				}
 				domainRoles := access.DomainRole{access.AccessDomainGlobal: api.UserRoleImportStatus}
-				_, tempToken, _ = jwtGenerateToken(user, domainRoles, login.remote, login.mainSessionID, "", nil)
+				_, tempToken, _ = jwtGenerateToken(user, domainRoles, nil, login.remote, login.mainSessionID, "", nil)
 			}
 
 			importTask.TotalLines = lines
@@ -2586,12 +2606,15 @@ func validateCertificate(certificate string) error {
 	if block == nil {
 		return errors.New("Invalid certificate")
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+	_, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return errors.New("Invalid certificate")
 	}
-	if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
-		return errors.New("Invalid certificate, certificate doesn't contain a public key")
-	}
+
+	// No need to check the specific type of public key; relying on x509.ParseCertificate() should be sufficient.
+	// Different signature algorithms have different types.
+	// if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+	// 	return errors.New("Invalid certificate, certificate doesn't contain a public key")
+	// }
 	return nil
 }

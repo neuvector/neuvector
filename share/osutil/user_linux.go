@@ -3,7 +3,7 @@ package osutil
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -117,7 +117,7 @@ func GetAllUsers(pid int, users map[int]string) (int, int, error) {
 
 func getUserNsUid(pid int) (int, error) {
 	filename := global.SYS.ContainerProcFilePath(pid, "/uid_map")
-	dat, err := ioutil.ReadFile(filename)
+	dat, err := os.ReadFile(filename)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get uid_map fail")
 		return -1, err

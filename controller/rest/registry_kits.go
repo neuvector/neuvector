@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
@@ -161,7 +160,7 @@ func (t *regTracer) SendRequest(method, url string) {
 }
 
 func (t *regTracer) GotResponse(statusCode int, status string, header http.Header, body io.ReadCloser) io.Reader {
-	c, _ := ioutil.ReadAll(body)
+	c, _ := io.ReadAll(body)
 	body.Close()
 
 	t.steps = append(t.steps, &api.RESTRegistryTestStep{
@@ -230,13 +229,24 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
-
 	var data api.RESTRegistryTestData
-	err := json.Unmarshal(body, &data)
-	if err != nil || data.Config == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
+	body, _ := io.ReadAll(r.Body)
+	var err error
+
+	if getRequestApiVersion(r) == ApiVersion2 {
+		var v2data api.RESTRegistryTestDataV2
+		err := json.Unmarshal(body, &v2data)
+		if err != nil || v2data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		data = registryTestV2ToV1(v2data)
+	} else {
+		err := json.Unmarshal(body, &data)
+		if err != nil || data.Config == nil {
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
 	}
 
 	var task *regTestTask
@@ -283,6 +293,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			config.AuthToken = rconf.AuthToken
 			config.AuthWithToken = rconf.AuthWithToken
 			config.CreaterDomains = acc.GetAdminDomains(share.PERM_REG_SCAN)
+			config.IgnoreProxy = rconf.IgnoreProxy
 
 			if config.AuthWithToken && config.AuthToken == "" {
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Missing authentication token")
@@ -404,4 +415,45 @@ func handlerRegistryTestCancel(w http.ResponseWriter, r *http.Request, ps httpro
 	task.cancel()
 
 	restRespSuccess(w, r, nil, acc, login, nil, "Cancel registry test")
+}
+
+func registryTestV2ToV1(v2data api.RESTRegistryTestDataV2) api.RESTRegistryTestData {
+	v1data := api.RESTRegistryTestData{
+		Config: &api.RESTRegistry{},
+	}
+
+	if v2data.Config != nil {
+		v1data.Config.Name = v2data.Config.Name
+		v1data.Config.Type = v2data.Config.Type
+		v1data.Config.Registry = v2data.Config.Registry
+		v1data.Config.Domains = v2data.Config.Domains
+		v1data.Config.Filters = v2data.Config.Filters
+		v1data.Config.CfgType = v2data.Config.CfgType
+
+		// auth
+		v1data.Config.Username = v2data.Config.Auth.Username
+		v1data.Config.Password = v2data.Config.Auth.Password
+		v1data.Config.AuthToken = v2data.Config.Auth.AuthToken
+		v1data.Config.AuthWithToken = v2data.Config.Auth.AuthWithToken
+		v1data.Config.AwsKey = &v2data.Config.Auth.AwsKey
+		v1data.Config.GcrKey = &v2data.Config.Auth.GcrKey
+
+		// scan
+		v1data.Config.RescanImage = v2data.Config.Scan.RescanImage
+		v1data.Config.ScanLayers = v2data.Config.Scan.ScanLayers
+		v1data.Config.RepoLimit = v2data.Config.Scan.RepoLimit
+		v1data.Config.TagLimit = v2data.Config.Scan.TagLimit
+		v1data.Config.Schedule = v2data.Config.Scan.Schedule
+		v1data.Config.IgnoreProxy = v2data.Config.Scan.IgnoreProxy
+
+		// integrations
+		v1data.Config.JfrogMode = v2data.Config.Integrations.JfrogMode
+		v1data.Config.JfrogAQL = v2data.Config.Integrations.JfrogAQL
+		v1data.Config.GitlabApiUrl = v2data.Config.Integrations.GitlabApiUrl
+		v1data.Config.GitlabPrivateToken = v2data.Config.Integrations.GitlabPrivateToken
+		v1data.Config.IBMCloudTokenURL = v2data.Config.Integrations.IBMCloudTokenURL
+		v1data.Config.IBMCloudAccount = v2data.Config.Integrations.IBMCloudAccount
+	}
+
+	return v1data
 }

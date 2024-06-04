@@ -5,15 +5,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"text/template"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
@@ -29,36 +31,49 @@ import (
 )
 
 const (
-	srcSh               = "/usr/local/bin/"
+	srcSh               = "/usr/local/bin/scripts/"
+	srcTmpl             = "/usr/local/bin/scripts/tmpl/"
+	srcRem              = "/usr/local/bin/scripts/rem/"
 	dstSh               = "/tmp/"
-	srcHostBenchSh      = srcSh + "host.tmpl"
+	dstYaml             = "/usr/local/bin/scripts/cis_yamls/"
+	srcHostBenchSh      = srcTmpl + "host.tmpl"
 	dstHostBenchSh      = dstSh + "host.sh"
-	srcContainerBenchSh = srcSh + "container.tmpl"
+	srcContainerBenchSh = srcTmpl + "container.tmpl"
 	dstContainerBenchSh = dstSh + "container.sh"
-	kube100MasterTmpl   = srcSh + "kube_master_1_0_0.tmpl"
-	kube100WorkerTmpl   = srcSh + "kube_worker_1_0_0.tmpl"
-	kube100Remediation  = srcSh + "kubecis_1_0_0.rem"
-	kube120MasterTmpl   = srcSh + "kube_master_1_2_0.tmpl"
-	kube120WorkerTmpl   = srcSh + "kube_worker_1_2_0.tmpl"
-	kube120Remediation  = srcSh + "kubecis_1_2_0.rem"
-	kube141MasterTmpl   = srcSh + "kube_master_1_4_1.tmpl"
-	kube141WorkerTmpl   = srcSh + "kube_worker_1_4_1.tmpl"
-	kube141Remediation  = srcSh + "kubecis_1_4_1.rem"
-	kube151MasterTmpl   = srcSh + "kube_master_1_5_1.tmpl"
-	kube151WorkerTmpl   = srcSh + "kube_worker_1_5_1.tmpl"
-	kube151Remediation  = srcSh + "kubecis_1_5_1.rem"
-	kube160MasterTmpl   = srcSh + "kube_master_1_6_0.tmpl"
-	kube160WorkerTmpl   = srcSh + "kube_worker_1_6_0.tmpl"
-	kube160Remediation  = srcSh + "kubecis_1_6_0.rem"
-	kubeGKEMasterTmpl   = srcSh + "kube_master_gke_1_0_0.tmpl"
-	kubeGKEWorkerTmpl   = srcSh + "kube_worker_gke_1_0_0.tmpl"
-	kubeGKERemediation  = srcSh + "kubecis_gke_1_0_0.rem"
-	kubeOC43MasterTmpl  = srcSh + "kube_master_ocp_4_3.tmpl"
-	kubeOC43WorkerTmpl  = srcSh + "kube_worker_ocp_4_3.tmpl"
-	kubeOC43Remediation = srcSh + "kubecis_ocp_4_3.rem"
-	kubeOC45MasterTmpl  = srcSh + "kube_master_ocp_4_5.tmpl"
-	kubeOC45WorkerTmpl  = srcSh + "kube_worker_ocp_4_5.tmpl"
-	kubeOC45Remediation = srcSh + "kubecis_ocp_4_5.rem"
+	kube100MasterTmpl   = srcTmpl + "kube_master_1_0_0.tmpl"
+	kube100WorkerTmpl   = srcTmpl + "kube_worker_1_0_0.tmpl"
+	kube100Remediation  = srcRem + "kubecis_1_0_0.rem"
+	kube120MasterTmpl   = srcTmpl + "kube_master_1_2_0.tmpl"
+	kube120WorkerTmpl   = srcTmpl + "kube_worker_1_2_0.tmpl"
+	kube120Remediation  = srcRem + "kubecis_1_2_0.rem"
+	kube141MasterTmpl   = srcTmpl + "kube_master_1_4_1.tmpl"
+	kube141WorkerTmpl   = srcTmpl + "kube_worker_1_4_1.tmpl"
+	kube141Remediation  = srcRem + "kubecis_1_4_1.rem"
+	kube151MasterTmpl   = srcTmpl + "kube_master_1_5_1.tmpl"
+	kube151WorkerTmpl   = srcTmpl + "kube_worker_1_5_1.tmpl"
+	kube151Remediation  = srcRem + "kubecis_1_5_1.rem"
+	kube160MasterTmpl   = srcTmpl + "kube_master_1_6_0.tmpl"
+	kube160WorkerTmpl   = srcTmpl + "kube_worker_1_6_0.tmpl"
+	kube160Remediation  = srcRem + "kubecis_1_6_0.rem"
+	kubeRunnerTmpl      = srcTmpl + "kube_runner.tmpl"
+	rhRunnerTmpl        = srcTmpl + "rh_runner.tmpl"
+	kube160YAMLFolder   = dstYaml + "cis-1.6.0/"
+	kube123YAMLFolder   = dstYaml + "cis-1.23/"
+	kube124YAMLFolder   = dstYaml + "cis-1.24/"
+	kube180YAMLFolder   = dstYaml + "cis-1.8.0/"
+	rh140YAMLFolder     = dstYaml + "rh-1.4.0/"
+	gke140YAMLFolder    = dstYaml + "gke-1.4.0/"
+	aks140YAMLFolder    = dstYaml + "aks-1.4.0/"
+	eks140YAMLFolder    = dstYaml + "eks-1.4.0/"
+	kubeGKEMasterTmpl   = srcTmpl + "kube_master_gke_1_0_0.tmpl"
+	kubeGKEWorkerTmpl   = srcTmpl + "kube_worker_gke_1_0_0.tmpl"
+	kubeGKERemediation  = srcRem + "kubecis_gke_1_0_0.rem"
+	kubeOC43MasterTmpl  = srcTmpl + "kube_master_ocp_4_3.tmpl"
+	kubeOC43WorkerTmpl  = srcTmpl + "kube_worker_ocp_4_3.tmpl"
+	kubeOC43Remediation = srcRem + "kubecis_ocp_4_3.rem"
+	kubeOC45MasterTmpl  = srcTmpl + "kube_master_ocp_4_5.tmpl"
+	kubeOC45WorkerTmpl  = srcTmpl + "kube_worker_ocp_4_5.tmpl"
+	kubeOC45Remediation = srcRem + "kubecis_ocp_4_5.rem"
 	masterScriptSh      = dstSh + "kube_master.sh"
 	workerScriptSh      = dstSh + "kube_worker.sh"
 	checkKubeVersion    = srcSh + "check_kube_version.sh"
@@ -73,7 +88,7 @@ const (
 	cmdKubelet          = "kubelet"
 	cmdKubeProxy        = "kube-proxy"
 	pathBaseImageBin    = "baseImageBin"
-	pathConfigPrefix	= "configPrefix"
+	pathConfigPrefix    = "configPrefix"
 	scriptTimeout       = 1 * time.Minute
 )
 
@@ -121,6 +136,7 @@ type Bench struct {
 	kubeCISVer      string
 	dockerCISVer    string
 	taskScanner     *TaskScanner
+	cisYAMLMode     bool
 }
 
 type DockerReplaceOpts struct {
@@ -137,6 +153,19 @@ type KubeCisReplaceOpts struct {
 	Replace_proxy_cmd         string
 	Replace_baseImageBin_path string
 	Replace_configPrefix_path string
+}
+
+type Check struct {
+	ID          string `yaml:"id"`
+	Remediation string `yaml:"remediation"`
+}
+
+type Group struct {
+	Checks []Check `yaml:"checks"`
+}
+
+type YamlFile struct {
+	Groups []Group `yaml:"groups"`
 }
 
 func newBench(platform, flavor string) *Bench {
@@ -202,17 +231,28 @@ func (b *Bench) logBenchFailure(benchPlat benchPlatform, status share.BenchStatu
 func (b *Bench) BenchLoop() {
 	var masterScript, workerScript, remediation string
 	b.taskScanner = newTaskScanner(b, scanWorkerMax)
+	b.cisYAMLMode = true
 	//after the host bench, it will schedule a container bench automaticly even if no container
 	for {
 		select {
 		case <-b.hostTimer.C:
 			if agentEnv.autoBenchmark {
+				if prober.IsNvProtectAlerted {
+					log.Info("Alerted: Ignore host bench tests")
+					continue
+				}
 				b.doDockerHostBench()
 			}
 		case <-b.kubeTimer.C:
 			if !agentEnv.autoBenchmark {
 				continue
 			}
+
+			if prober.IsNvProtectAlerted {
+				log.Info("Alerted: Ignore Kube bench tests")
+				continue
+			}
+
 			// Check version whenever the benchmark is rerun
 			k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 			if masterScript == "" {
@@ -222,23 +262,56 @@ func (b *Bench) BenchLoop() {
 				// 1.16- : 1.6.0
 				// GKE: GKE 1.0.0
 				if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorGKE {
-					b.kubeCISVer = "GKE-1.0.0"
-					masterScript = kubeGKEMasterTmpl
-					workerScript = kubeGKEWorkerTmpl
-					remediation = kubeGKERemediation
+					kVer, err := version.NewVersion(k8sVer)
+					if err != nil {
+						b.kubeCISVer = "GKE-1.4.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = gke140YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+						b.kubeCISVer = "GKE-1.4.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = gke140YAMLFolder
+					} else {
+						b.cisYAMLMode = false
+						b.kubeCISVer = "GKE-1.0.0"
+						masterScript = kubeGKEMasterTmpl
+						workerScript = kubeGKEWorkerTmpl
+						remediation = kubeGKERemediation
+					}
+				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorAKS {
+					// Currently support AKS-1.4.0 only
+					b.kubeCISVer = "AKS-1.4.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = aks140YAMLFolder
+				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorEKS {
+					// Currently support EKS-1.4.0 only
+					b.kubeCISVer = "EKS-1.4.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = eks140YAMLFolder
 				} else if b.platform == share.PlatformKubernetes && b.flavor == share.FlavorOpenShift {
 					ocVer, err := version.NewVersion(ocVer)
 					if err != nil {
-						b.kubeCISVer = "OpenShift-1.1.0"
-						masterScript = kubeOC45MasterTmpl
-						workerScript = kubeOC45WorkerTmpl
-						remediation = kubeOC45Remediation
+						b.kubeCISVer = "OpenShift-1.4.0"
+						masterScript = rhRunnerTmpl
+						workerScript = rhRunnerTmpl
+						remediation = rh140YAMLFolder
+					} else if ocVer.Compare(version.Must(version.NewVersion("4.6"))) >= 0 {
+						b.kubeCISVer = "OpenShift-1.4.0"
+						masterScript = rhRunnerTmpl
+						workerScript = rhRunnerTmpl
+						remediation = rh140YAMLFolder
 					} else if ocVer.Compare(version.Must(version.NewVersion("4.4"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "OpenShift-1.1.0"
 						masterScript = kubeOC45MasterTmpl
 						workerScript = kubeOC45WorkerTmpl
 						remediation = kubeOC45Remediation
 					} else {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "OpenShift-1.1.0"
 						masterScript = kubeOC43MasterTmpl
 						workerScript = kubeOC43WorkerTmpl
@@ -247,31 +320,50 @@ func (b *Bench) BenchLoop() {
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
-						b.kubeCISVer = "1.6.0"
-						masterScript = kube160MasterTmpl
-						workerScript = kube160WorkerTmpl
-						remediation = kube160Remediation
+						b.kubeCISVer = "1.8.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube180YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.27"))) >= 0 {
+						b.kubeCISVer = "1.8.0"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube180YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.24"))) >= 0 {
+						b.kubeCISVer = "1.24"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube124YAMLFolder
+					} else if kVer.Compare(version.Must(version.NewVersion("1.23"))) >= 0 {
+						b.kubeCISVer = "1.23"
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube123YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.16"))) >= 0 {
 						b.kubeCISVer = "1.6.0"
-						masterScript = kube160MasterTmpl
-						workerScript = kube160WorkerTmpl
-						remediation = kube160Remediation
+						masterScript = kubeRunnerTmpl
+						workerScript = kubeRunnerTmpl
+						remediation = kube160YAMLFolder
 					} else if kVer.Compare(version.Must(version.NewVersion("1.15"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.5.1"
 						masterScript = kube151MasterTmpl
 						workerScript = kube151WorkerTmpl
 						remediation = kube151Remediation
 					} else if kVer.Compare(version.Must(version.NewVersion("1.11"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.4.1"
 						masterScript = kube141MasterTmpl
 						workerScript = kube141WorkerTmpl
 						remediation = kube141Remediation
 					} else if kVer.Compare(version.Must(version.NewVersion("1.8"))) >= 0 {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.2.0"
 						masterScript = kube120MasterTmpl
 						workerScript = kube120WorkerTmpl
 						remediation = kube120Remediation
 					} else {
+						b.cisYAMLMode = false
 						b.kubeCISVer = "1.0.0"
 						masterScript = kube100MasterTmpl
 						workerScript = kube100WorkerTmpl
@@ -284,6 +376,11 @@ func (b *Bench) BenchLoop() {
 			b.doKubeBench(masterScript, workerScript, remediation)
 		case <-b.conTimer.C:
 			containers := b.cloneAllNewContainers()
+			if prober.IsNvProtectAlerted {
+				log.Info("Alerted: Ignore benchmarks")
+				continue
+			}
+
 			if agentEnv.autoBenchmark {
 				if Host.CapDockerBench {
 					b.doDockerContainerBench(containers)
@@ -347,7 +444,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeMaster {
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusRunning)
 
-		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh)
+		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh, remediation)
 		if errMaster != nil {
 			log.WithFields(log.Fields{
 				"error": errMaster, "script": masterScriptSh,
@@ -368,7 +465,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeWorker {
 		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusRunning)
 
-		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh)
+		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh, remediation)
 		if errWorker != nil {
 			log.WithFields(log.Fields{
 				"error": errWorker, "script": workerScriptSh,
@@ -436,21 +533,11 @@ func (b *Bench) RerunDocker(forced bool) {
 	}
 }
 
-func (b *Bench) kubeCheckPrerequisites() (error) {
-	kmasterProgs := []string{"kubectl"}
-	masterError := b.checkRequiredHostProgs(kmasterProgs)
-	return masterError
-}
-
 func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	if agentEnv.autoBenchmark == false && forced == false {
 		log.Info("ignored")
 		return
 	}
-
-	log.Info("")
-
-	masterErr := b.kubeCheckPrerequisites()
 
 	if cmd != "" && cmdRemap != "" {
 		b.kubeCisCmds[cmd] = cmdRemap
@@ -461,17 +548,12 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 
 	var sched bool
 
-	if masterErr != nil {
-		if !strings.Contains(masterErr.Error(), "kubectl") { // not possibly a master node
-			log.WithFields(log.Fields{"error": masterErr}).Error("Cannot run master node CIS benchmark")
-		}
-		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusNotSupport)
-	} else if !b.isKubeMaster {
-		log.Info("Not a kubernetes master node")
-		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
-	} else {
+	if b.isKubeMaster {
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusScheduled)
 		sched = true
+	} else {
+		log.Info("Not a kubernetes master node")
+		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusIdle)
 	}
 
 	if b.isKubeWorker {
@@ -524,6 +606,8 @@ func (b *Bench) parseBenchMsg(line string) (*benchItem, bool) {
 		level = share.BenchLevelWarn
 	} else if strings.Contains(line, "[NOTE]") {
 		level = share.BenchLevelNote
+	} else if strings.Contains(line, "[MANUAL]") {
+		level = share.BenchLevelManual
 	} else {
 		return nil, false
 	}
@@ -574,9 +658,9 @@ func (b *Bench) parseBenchMsg(line string) (*benchItem, bool) {
 	}, true
 }
 
-//replace the docker daemon config line, so that can run the script without pid=host
+// replace the docker daemon config line, so that can run the script without pid=host
 func (b *Bench) replaceDockerDaemonCmdline(srcPath, dstPath string, containers []string) error {
-	dat, err := ioutil.ReadFile(srcPath)
+	dat, err := os.ReadFile(srcPath)
 	if err != nil {
 		return err
 	}
@@ -1031,7 +1115,7 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 		return false, "Session ended", fmt.Errorf("Session ended")
 	}
 
-	file, err := ioutil.TempFile(os.TempDir(), "script")
+	file, err := os.CreateTemp(os.TempDir(), "script")
 	if err != nil {
 		return false, "file system error", err
 	}
@@ -1150,7 +1234,7 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 	}
 }
 
-//the script may use several command like grep netstat, check whether they exist in host
+// the script may use several command like grep netstat, check whether they exist in host
 func (b *Bench) checkRequiredHostProgs(progs []string) error {
 	for _, p := range progs {
 		dat, err := global.SYS.CheckHostProgram(p, 1)
@@ -1162,7 +1246,7 @@ func (b *Bench) checkRequiredHostProgs(progs []string) error {
 	return nil
 }
 
-func (b *Bench) runKubeBench(bench share.BenchType, script string) ([]byte, error) {
+func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder string) ([]byte, error) {
 	if !b.bEnable {
 		return nil, fmt.Errorf("Session ended")
 	}
@@ -1170,9 +1254,18 @@ func (b *Bench) runKubeBench(bench share.BenchType, script string) ([]byte, erro
 	var errb, outb bytes.Buffer
 	log.WithFields(log.Fields{"type": bench}).Debug("Running Kubernetes CIS bench")
 
-	var cmd *exec.Cmd 
+	var cmd *exec.Cmd
+	var config string
 
-	cmd = exec.Command("sh", script)
+	if b.cisYAMLMode {
+		if bench == share.BenchKubeMaster {
+			config = remediationFolder + "master"
+		} else if bench == share.BenchKubeWorker {
+			config = remediationFolder + "worker"
+		}
+	}
+
+	cmd = exec.Command("sh", script, config)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
@@ -1243,28 +1336,78 @@ func (b *Bench) getKubeVersion() string {
 	return string(out)
 }
 
-func (b *Bench) loadRemediation(remediation string) map[string]string {
-	r := make(map[string]string)
+func (b *Bench) loadRemediationFromYAML(path string) map[string]string {
+	remediationMap := make(map[string]string)
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Error encountered while walking through the path")
+			return err // return the error encountered
+		}
 
-	dat, err := ioutil.ReadFile(remediation)
+		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
+			fileContent, err := os.ReadFile(path)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Error reading file")
+				return err // return the error encountered
+			}
+
+			var yamlFile YamlFile
+			err = yaml.Unmarshal(fileContent, &yamlFile)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+				return err // return the error encountered
+			}
+
+			for _, group := range yamlFile.Groups {
+				for _, check := range group.Checks {
+					remediationMap[check.ID] = check.Remediation
+				}
+			}
+		}
+		return nil // no error, return nil
+	})
+
+	if err != nil || remediationMap == nil {
+		// When the filepath walk fail, fill remediationMap with a default version of remediation
+		fallbackRemediation := kube160Remediation
+		remediationMap = b.loadRemediationFromRem(fallbackRemediation)
+	}
+
+	return remediationMap
+}
+
+func (b *Bench) loadRemediationFromRem(path string) map[string]string {
+	remediationMap := make(map[string]string)
+	dat, err := os.ReadFile(path)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Open remediation file fail")
-		return r
+		return remediationMap
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(string(dat)))
 	for scanner.Scan() {
 		line := scanner.Text()
 		if i := strings.Index(line, ":"); i > 0 {
-			r[strings.TrimSpace(line[:i-1])] = line[i+1:]
+			remediationMap[strings.TrimSpace(line[:i-1])] = line[i+1:]
 		}
 	}
-	return r
+	return remediationMap
 }
 
-//replace the kubernetes cis command
+func (b *Bench) loadRemediation(path string) map[string]string {
+	var remediationMap map[string]string
+
+	if b.cisYAMLMode {
+		remediationMap = b.loadRemediationFromYAML(path)
+	} else {
+		remediationMap = b.loadRemediationFromRem(path)
+	}
+	return remediationMap
+}
+
+// replace the kubernetes cis command
 func (b *Bench) replaceKubeCisCmd(srcPath, dstPath string) error {
-	dat, err := ioutil.ReadFile(srcPath)
+	dat, err := os.ReadFile(srcPath)
 	if err != nil {
 		log.WithFields(log.Fields{"src": srcPath, "error": err}).Error("Open template file error")
 		return err
@@ -1386,7 +1529,7 @@ func (b *Bench) logHostCustomCheckResult(list []*benchItem) {
 	logHostAudit(logs, share.CLUSAuditComplianceHostCustomCheckViolation)
 }
 
-//////
+// ////
 func (b *Bench) runFindSecrets(rootPid int, name, id, group string) {
 	if !osutil.IsPidValid(rootPid) {
 		log.WithFields(log.Fields{"pid": rootPid}).Error("Exited")
@@ -1498,13 +1641,13 @@ type TaskScanner struct {
 	caseDone  int
 }
 
-////
+// //
 const scanWorkerMax int = 4 // 16
 const scanTimerTick int = 2 // tick at 2 sec
 const scanTimerSlow int = 5 // long period: 10 sec
 const scanTimerFast int = 1 // shorter period: 2 sec
 
-///
+// /
 func newTaskScanner(b *Bench, maxWorkers int) *TaskScanner {
 	scanTask := &TaskScanner{
 		bench:      b,
@@ -1517,7 +1660,7 @@ func newTaskScanner(b *Bench, maxWorkers int) *TaskScanner {
 	return scanTask
 }
 
-///
+// /
 func (t *TaskScanner) scanSecretLoop() {
 	bFirstScan := true
 	scanTicks := 0
@@ -1563,7 +1706,7 @@ func (t *TaskScanner) scanSecretLoop() {
 	}
 }
 
-///
+// /
 func (t *TaskScanner) nextScanTasks() bool {
 	// was locked at outside of the function
 	// log.WithFields(log.Fields{"curWorkers": t.curWorkers, "len": len(t.queue)}).Debug("SCRT")
@@ -1592,7 +1735,7 @@ func (t *TaskScanner) nextScanTasks() bool {
 	return bAddWorker
 }
 
-///
+// /
 func (t *TaskScanner) addScanTask(rootPid int, name, id, group string) {
 	// log.WithFields(log.Fields{"len": len(t.queue), "id": id, "group": group}).Debug("SCRT")
 	task := &taskScanSecrets{

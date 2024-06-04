@@ -2,64 +2,87 @@
 
 STAGE_DIR = stage
 BASE_IMAGE_TAG = latest
-BUILD_IMAGE_TAG = latest
+BUILD_IMAGE_TAG = v2
 
 copy_ctrl:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
 	mkdir -p ${STAGE_DIR}/etc/
 	mkdir -p ${STAGE_DIR}/etc/neuvector/templates
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/controller/controller ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/upgrader/upgrader ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
-	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/scripts/
 	#
 	cp neuvector/templates/podTemplate.json ${STAGE_DIR}/etc/neuvector/templates/podTemplate.json
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
 
 copy_enf:
-	mkdir -p ${STAGE_DIR}/usr/local/bin/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	mkdir -p ${STAGE_DIR}/usr/local/bin/scripts/rem/
 	mkdir -p ${STAGE_DIR}/etc/
 	#
 	cp neuvector/monitor/monitor ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/agent ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/agent/workerlet/pathWalker/pathWalker ${STAGE_DIR}/usr/local/bin/
 	cp neuvector/dp/dp ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/host.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/container.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/check_kube_version.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_1_2_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_1_2_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_1_4_1.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_1_4_1.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_1_5_1.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_1_5_1.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_1_6_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_1_6_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_gke_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_gke_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_ocp_4_3.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_ocp_4_3.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_master_ocp_4_5.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kube_worker_ocp_4_5.tmpl ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_1_0_0.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_1_2_0.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_1_4_1.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_1_5_1.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_1_6_0.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_gke_1_0_0.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_ocp_4_5.rem ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/agent/nvbench/kubecis_ocp_4_3.rem ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/agent/nvbench/kube_runner.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/rh_runner.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/host.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/container.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/check_kube_version.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/agent/nvbench/kube_master_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_1_2_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_1_2_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_1_4_1.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_1_4_1.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_1_5_1.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_1_5_1.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_1_6_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_1_6_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_gke_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_gke_1_0_0.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_ocp_4_3.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_ocp_4_3.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_master_ocp_4_5.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kube_worker_ocp_4_5.tmpl ${STAGE_DIR}/usr/local/bin/scripts/tmpl/
+	cp neuvector/agent/nvbench/kubecis_1_0_0.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_1_2_0.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_1_4_1.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_1_5_1.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_1_6_0.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_gke_1_0_0.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_ocp_4_5.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
+	cp neuvector/agent/nvbench/kubecis_ocp_4_3.rem ${STAGE_DIR}/usr/local/bin/scripts/rem/
 	cp neuvector/tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
+	cp -r neuvector/agent/nvbench/utils/ ${STAGE_DIR}/usr/local/bin/scripts/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.6.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.23/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.24/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/cis-1.8.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/gke-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/aks-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/kubernetes-cis-benchmark/eks-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+	cp -r neuvector/agent/nvbench/ocp/rh-1.4.0/ ${STAGE_DIR}/usr/local/bin/scripts/cis_yamls/
+
 	#
 	cp neuvector/scripts/sysctl.conf ${STAGE_DIR}/etc/
-	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/
-	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/
+	cp neuvector/scripts/configure.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/scripts/
+	cp neuvector/scripts/runtime-gdb.py ${STAGE_DIR}/usr/local/bin/scripts/
 
 copy_dp:
 	mkdir -p ${STAGE_DIR}/usr/local/bin/
@@ -75,6 +98,7 @@ copy_mgr:
 	cp manager/licenses/* ${STAGE_DIR}/licenses/
 	#
 	cp manager/cli/cli ${STAGE_DIR}/usr/local/bin/
+	cp manager/cli/cli.py ${STAGE_DIR}/usr/local/bin/
 	cp -r manager/cli/prog ${STAGE_DIR}/usr/local/bin/
 	cp manager/scripts/* ${STAGE_DIR}/usr/local/bin/
 	cp manager/java.security ${STAGE_DIR}/usr/lib/jvm/java-11-openjdk/lib/security/java.security

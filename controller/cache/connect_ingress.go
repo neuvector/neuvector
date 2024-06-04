@@ -178,6 +178,9 @@ func connectPAIToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip)
 		if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
 			conn.ServerWL = ep
 			sa.addrgrp = true
+		} else if ep = getIpAddrGroupName(net.IP(conn.ServerIP).String()); ep != "" {
+			conn.ServerWL = ep
+			sa.addrgrp = true
 		} else {
 			ep = specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
 			if wlGraph.Node(ep) == "" &&

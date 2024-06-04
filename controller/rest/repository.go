@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -22,7 +22,7 @@ import (
 
 const (
 	repositoryDefaultTag      = "latest"
-	maxRepoScanTasks          = 8
+	maxRepoScanTasks          = 32
 	repoScanTimeout           = time.Minute * 20
 	repoScanLingeringDuration = time.Second * 30
 	repoScanLongPollTimeout   = time.Second * 30
@@ -156,7 +156,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTScanRepoReqData
 	err := json.Unmarshal(body, &data)
@@ -247,7 +247,7 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTScanRepoSubmitData
 	err := json.Unmarshal(body, &data)
@@ -299,10 +299,11 @@ func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust,
 
 	for _, clusRoot := range clusRootsOfTrust {
 		scanRoot := &share.SigstoreRootOfTrust{
-			Name:           clusRoot.Name,
-			RekorPublicKey: clusRoot.RekorPublicKey,
-			RootCert:       clusRoot.RootCert,
-			SCTPublicKey:   clusRoot.SCTPublicKey,
+			Name:                 clusRoot.Name,
+			RekorPublicKey:       clusRoot.RekorPublicKey,
+			RootCert:             clusRoot.RootCert,
+			SCTPublicKey:         clusRoot.SCTPublicKey,
+			RootlessKeypairsOnly: clusRoot.RootlessKeypairsOnly,
 		}
 
 		verifiers, err := clusHelper.GetAllSigstoreVerifiersForRoot(clusRoot.Name)
@@ -312,8 +313,8 @@ func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust,
 
 		for _, verifier := range verifiers {
 			scanVerifier := &share.SigstoreVerifier{
-				Name:       verifier.Name,
-				Type:       verifier.VerifierType,
+				Name: verifier.Name,
+				Type: verifier.VerifierType,
 				KeypairOptions: &share.SigstoreKeypairOptions{
 					PublicKey: verifier.PublicKey,
 				},

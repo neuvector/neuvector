@@ -35,7 +35,7 @@ check_1_1_1() {
     return
   fi
   warn -s "$check"
-  logcheckresult "WARN"
+  warn "      * The Docker root directory $docker_root_dir is not mounted on a separate partition."
 }
 
 check_1_1_2() {
@@ -96,7 +96,8 @@ check_1_1_3() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * Auditing not configured for $file"
+    logcheckresult "WARN" "Auditing not configured for $file"
     return
   fi
   if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -105,7 +106,8 @@ check_1_1_3() {
     return
   fi
   warn -s "$check"
-  logcheckresult "WARN"
+  warn "     * $file is not audited in $auditrules or auditctl command not found"
+  logcheckresult "WARN" "$file is not audited in $auditrules or auditctl command not found"
 }
 
 check_1_1_4() {
@@ -124,7 +126,8 @@ check_1_1_4() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * Auditing not configured for $file"
+    logcheckresult "WARN" "Auditing not configured for $file"
     return
   fi
   if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -133,7 +136,8 @@ check_1_1_4() {
     return
   fi
   warn -s "$check"
-  logcheckresult "WARN"
+  warn "     * $file is not audited in $auditrules or auditctl command not found"
+  logcheckresult "WARN" "$file is not audited in $auditrules or auditctl command not found"
 }
 
 check_1_1_5() {
@@ -153,7 +157,8 @@ check_1_1_5() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $directory"
+      logcheckresult "WARN" "Auditing not configured for $directory"
       return
     fi
     if grep -s "$directory" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -162,12 +167,13 @@ check_1_1_5() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $directory is not audited in $auditrules"
+    logcheckresult "WARN" "$directory is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * Directory not found"
-  logcheckresult "INFO" "Directory not found"
+  warn -s "$check"
+  warn "       * Directory $directory not found"
+  logcheckresult "WARN" "Directory $directory not found"
 }
 
 check_1_1_6() {
@@ -187,7 +193,8 @@ check_1_1_6() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $directory"
+      logcheckresult "WARN" "Auditing not configured for $directory"
       return
     fi
     if grep -s "$directory" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -196,12 +203,13 @@ check_1_1_6() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $directory is not audited in $auditrules"
+    logcheckresult "WARN" "$directory is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * Directory not found"
-  logcheckresult "INFO" "Directory not found"
+  warn -s "$check"
+  warn "       * Directory $directory not found"
+  logcheckresult "WARN" "Directory $directory not found"
 }
 
 check_1_1_7() {
@@ -222,7 +230,8 @@ check_1_1_7() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file"
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -231,12 +240,13 @@ check_1_1_7() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_8() {
@@ -257,7 +267,8 @@ check_1_1_8() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -266,12 +277,13 @@ check_1_1_8() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 check_1_1_9() {
   local id="1.1.9"
@@ -291,7 +303,8 @@ check_1_1_9() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -300,12 +313,13 @@ check_1_1_9() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_10() {
@@ -325,7 +339,8 @@ check_1_1_10() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file"
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -334,12 +349,13 @@ check_1_1_10() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_11() {
@@ -359,7 +375,8 @@ check_1_1_11() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file"
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -368,12 +385,13 @@ check_1_1_11() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_12() {
@@ -393,7 +411,8 @@ check_1_1_12() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file"
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -402,12 +421,13 @@ check_1_1_12() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_13() {
@@ -427,7 +447,8 @@ check_1_1_13() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -436,12 +457,13 @@ check_1_1_13() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN"  "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "       * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_14() {
@@ -461,7 +483,8 @@ check_1_1_14() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -470,12 +493,13 @@ check_1_1_14() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "        * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_15() {
@@ -495,7 +519,8 @@ check_1_1_15() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -504,12 +529,13 @@ check_1_1_15() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "        * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_16() {
@@ -529,7 +555,8 @@ check_1_1_16() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -538,12 +565,13 @@ check_1_1_16() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "        * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_17() {
@@ -563,7 +591,8 @@ check_1_1_17() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -572,12 +601,13 @@ check_1_1_17() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "        * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_1_18() {
@@ -597,7 +627,8 @@ check_1_1_18() {
         return
       fi
       warn -s "$check"
-      logcheckresult "WARN"
+      warn "     * Auditing not configured for $file"
+      logcheckresult "WARN" "Auditing not configured for $file" 
       return
     fi
     if grep -s "$file" "$auditrules" | grep "^[^#;]" 2>/dev/null 1>&2; then
@@ -606,12 +637,13 @@ check_1_1_18() {
       return
     fi
     warn -s "$check"
-    logcheckresult "WARN"
+    warn "     * $file is not audited in $auditrules"
+    logcheckresult "WARN" "$file is not audited in $auditrules"
     return
   fi
-  info -c "$check"
-  info "        * File not found"
-  logcheckresult "INFO" "File not found"
+  warn -s "$check"
+  warn "       * File $file not found"
+  logcheckresult "WARN" "File $file not found"
 }
 
 check_1_2() {

@@ -564,11 +564,13 @@ const connectionListMax int = 2048 * 4
 
 func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 	fqdn := ""
+	ipFqdnStorageMutex.Lock()
 	if c.ExternalPeer && len(ipFqdnStorageCache) > 0 {
 		if name, ok := ipFqdnStorageCache[net.IP(c.ServerIP).String()]; ok {
 			fqdn = name
 		}
 	}
+	ipFqdnStorageMutex.Unlock()
 
 	return &share.CLUSConnection{
 		AgentID:      c.AgentID,
@@ -604,6 +606,9 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		TmpOpen:      c.TmpOpen,
 		UwlIp:        c.UwlIp,
 		FQDN:         fqdn,
+		EpSessCurIn:  c.EpSessCurIn,
+		EpSessIn60:   c.EpSessIn60,
+		EpByteIn60:   c.EpByteIn60,
 	}
 }
 

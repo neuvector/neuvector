@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -821,7 +820,8 @@ func putControlVersion(ver *share.CLUSCtrlVersion) error {
 	return cluster.Put(key, value)
 }
 
-func (m clusterHelper) UpgradeClusterKV() {
+// version param is the NV Version embedded in the controller process
+func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 	var run bool
 
 	lock, err := m.AcquireLock(share.CLUSLockUpgradeKey, upgradeClusterLockWait)
@@ -833,6 +833,17 @@ func (m clusterHelper) UpgradeClusterKV() {
 
 	ver := getControlVersion()
 	log.WithFields(log.Fields{"version": ver}).Info("Before upgrade")
+	if !strings.HasPrefix(version, "interim/") {
+		if ver.CtrlVersion != version {
+			users := m.GetAllUsersNoAuth()
+			for _, user := range users {
+				if len(user.AcceptedAlerts) > 0 {
+					user.AcceptedAlerts = nil
+					m.PutUser(user)
+				}
+			}
+		}
+	}
 
 	for i := 0; i < len(phases); i++ {
 		phase := &phases[i]
@@ -853,8 +864,16 @@ func (m clusterHelper) UpgradeClusterKV() {
 	if ver != newVer {
 		putControlVersion(newVer)
 		cfgHelper.writeBackupVersion()
+
+		if !strings.HasPrefix(version, "interim/") {
+			if ver.CtrlVersion != version {
+				verUpdated = true
+			}
+		}
 	}
 	log.WithFields(log.Fields{"version": newVer}).Info("After upgrade")
+
+	return
 }
 
 func (m clusterHelper) UpgradeClusterImport(importVer *share.CLUSCtrlVersion) {
@@ -993,7 +1012,8 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
 	// return "E907B7AE" // for 5.0
-	return "28ea479c" // for 5.1
+	// return "28ea479c" // for 5.1 ~ 5.2.x
+	return "449EC339" // for 5.3
 }
 
 func genFileAccessRule() {
@@ -1150,8 +1170,8 @@ func restoreKeyCertFromOldKvKey(certSvcNames []string, svcName, cn, keyPath, cer
 	if err := clusHelper.PutObjectCert(cn, keyPath, certPath, cert); err == nil {
 		if cn == share.CLUSRootCAKey && len(cert.Key) > 0 && len(cert.Cert) > 0 {
 			certData := []byte(cert.Cert)
-			err1 := ioutil.WriteFile(keyPath, []byte(cert.Key), 0600)
-			err2 := ioutil.WriteFile(certPath, certData, 0600)
+			err1 := os.WriteFile(keyPath, []byte(cert.Key), 0600)
+			err2 := os.WriteFile(certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
 				return true
 			} else {
@@ -1269,8 +1289,8 @@ func ValidateWebhookCert() {
 						}
 					} else {
 						if cert != nil {
-							err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
-							err2 := ioutil.WriteFile(certInfo.certPath, []byte(cert.Cert), 0600)
+							err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
+							err2 := os.WriteFile(certInfo.certPath, []byte(cert.Cert), 0600)
 							log.WithFields(log.Fields{"err1": err1, "err2": err2}).Info()
 						}
 					}
@@ -1293,8 +1313,8 @@ func ValidateWebhookCert() {
 		}
 		if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); !cert.IsEmpty() {
 			certData := []byte(cert.Cert)
-			err1 := ioutil.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
-			err2 := ioutil.WriteFile(certInfo.certPath, certData, 0600)
+			err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
+			err2 := os.WriteFile(certInfo.certPath, certData, 0600)
 			if err1 == nil && err2 == nil {
 				if certInfo.cn != share.CLUSRootCAKey {
 					if orchPlatform == share.PlatformKubernetes {

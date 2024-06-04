@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.3'
+  version: '5.4'
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -2423,7 +2423,7 @@ paths:
     get:
       tags:
         - Scan
-      summary: Get scan image summary
+      summary: Get runtime scan summary by workload's images
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -2438,7 +2438,7 @@ paths:
     get:
       tags:
         - Scan
-      summary: Get image scan report
+      summary: Get runtime scan report by workload's image ID
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -2538,6 +2538,26 @@ paths:
       responses:
         '200':
           description: Success
+  /v2/scan/registry:
+    post:
+      tags:
+        - Scan
+      summary: Create a registry
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Registry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRegistryConfigDataV2'
+      responses:
+        '200':
+          description: Success
   /v1/scan/registry/{name}:
     get:
       tags:
@@ -2596,6 +2616,31 @@ paths:
           description: Name of the registry
           required: true
           type: string
+      responses:
+        '200':
+          description: Success
+  /v2/scan/registry/{name}:
+    patch:
+      tags:
+        - Scan
+      summary: Update registry
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: path
+          name: name
+          description: Name of the registry
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: Registry data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTRegistryConfigDataV2'
       responses:
         '200':
           description: Success
@@ -2744,6 +2789,48 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanStatusData'
+  /v1/scan/cache_stat/{id}:
+    get:
+      tags:
+        - Scan
+      summary: Get scanner cache statistic data
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: id
+          description: Scanner ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanCacheStat'
+  /v1/scan/cache_data/{id}:
+    get:
+      tags:
+        - Scan
+      summary: Get scanner cache index data
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: id
+          description: Scanner ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanCacheData'
   /v1/scan/workload/{id}:
     get:
       tags:
@@ -2797,7 +2884,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/SigstoreAllRootsOfTrustGet'
+            $ref: '#/definitions/REST_SigstoreRootOfTrustCollection'
     post:
       tags:
         - Scan
@@ -2813,7 +2900,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustPost'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_POST'
       responses:
         '200':
           description: Success
@@ -2837,7 +2924,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustGet'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_GET'
     patch:
       tags:
         - Scan
@@ -2858,7 +2945,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreRootOfTrustPatch'
+            $ref: '#/definitions/REST_SigstoreRootOfTrust_PATCH'
       responses:
         '200':
           description: Success
@@ -2898,7 +2985,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/SigstoreAllVerifiersGet'
+            $ref: '#/definitions/REST_SigstoreVerifierCollection'
     post:
       tags:
         - Scan
@@ -2919,7 +3006,7 @@ paths:
           description: Root of Trust Data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifier'
+            $ref: '#/definitions/REST_SigstoreVerifier'
       responses:
         '200':
           description: Success
@@ -2948,7 +3035,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifier'
+            $ref: '#/definitions/REST_SigstoreVerifier'
     patch:
       tags:
         - Scan
@@ -2974,7 +3061,7 @@ paths:
           description: Verifier patch data
           required: true
           schema:
-            $ref: '#/definitions/RESTSigstoreVerifierPatch'
+            $ref: '#/definitions/REST_SigstoreVerifier_PATCH'
       responses:
         '200':
           description: Success
@@ -3458,6 +3545,25 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTSystemConfigDataV2'
+    patch:
+      tags:
+        - System
+      summary: System configure (starting from 5.0, rest client should call this api.)
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: System configure data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTSystemConfigConfigDataV2'
+      responses:
+        '200':
+          description: Success
   /v1/system/config/webhook:
     post:
       tags:
@@ -4027,7 +4133,7 @@ paths:
       responses:
         '200':
           description: Success
-  /v1/waf/sersor/{name}:
+  /v1/waf/sensor/{name}:
     get:
       tags:
         - WAF Rule
@@ -6727,6 +6833,9 @@ definitions:
     properties:
       eula:
         $ref: '#/definitions/RESTEULA'
+      bootstrap_password_command:
+        type: string
+        description: kubectl command for retrieving bootstrap password of default admin user
   RESTEventsData:
     type: object
     required:
@@ -6927,6 +7036,10 @@ definitions:
       - platform_role
       - cfg_type
       - baseline_profile
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
     properties:
       name:
         type: string
@@ -6970,6 +7083,21 @@ definitions:
       baseline_profile:
         type: string
         example: ""
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       cap_change_mode:
         type: boolean
         example: false
@@ -6995,6 +7123,10 @@ definitions:
       - platform_role
       - cap_change_mode
       - cfg_type
+      - monitor_metric
+      - group_sess_cur
+      - group_sess_rate
+      - group_band_width
       - criteria
       - members
       - policy_rules
@@ -7032,6 +7164,21 @@ definitions:
       cfg_type:
         type: string
         enum: [learned, user_created, ground, federal]
+      monitor_metric:
+        type: boolean
+        example: false
+      group_sess_cur:
+        type: integer
+        format: uint32
+        example: 1
+      group_sess_rate:
+        type: integer
+        format: uint32
+        example: 1
+      group_band_width:
+        type: integer
+        format: uint32
+        example: 1
       criteria:
         type: array
         items:
@@ -8029,6 +8176,9 @@ definitions:
       ibm_cloud_account:
         type: string
         example: ""
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistryConfigData:
     type: object
     required:
@@ -8148,6 +8298,105 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTRegistryImageSummary'
+  RESTRegistryConfigAuth:
+    type: object
+    properties:
+      username:
+        type: string
+        example: myusername
+      password:
+        type: string
+        format: password
+        example: mypassword
+      auth_token:
+        type: string
+        example: ""
+      auth_with_token:
+        type: boolean
+        example: true
+      aws_key:
+        $ref: '#/definitions/RESTAWSAccountKeyConfig'
+      gcr_key:
+        $ref: '#/definitions/RESTGCRKeyConfig'
+  RESTRegistryConfigScan:
+    type: object
+    properties:
+      rescan_after_db_update:
+        type: boolean
+        example: false
+      scan_layers:
+        type: boolean
+        example: false
+      repo_limit:
+        type: integer
+        example: 1
+      tag_limit:
+        type: integer
+        example: 1
+      schedule:
+        $ref: '#/definitions/RESTScanSchedule'
+      ignore_proxy:
+        type: boolean
+        example: false
+  RESTRegistryConfigIntegrations:
+    type: object
+    properties:
+      jfrog_mode:
+        type: string
+        example: ""
+      jfrog_aql:
+        type: boolean
+        example: false
+      gitlab_external_url:
+        type: string
+        example: ""
+      gitlab_private_token:
+        type: string
+        example: ""
+      ibm_cloud_token_url:
+        type: string
+        example: ""
+      ibm_cloud_account:
+        type: string
+        example: ""
+  RESTRegistryConfigV2:
+    type: object
+    required:
+      - name
+      - registry_type
+    properties:
+      name:
+        type: string
+        example: myregistry
+      registry_type:
+        type: string
+        example: docker
+      registry:
+        type: string
+        example: https://registry.hub.docker.com/
+      domains:
+        type: array
+        items:
+          type: string
+          example: ""
+      filters:
+        type: array
+        items:
+          type: string
+          example: neuvector/*:*
+      auth:
+        $ref: '#/definitions/RESTRegistryConfigAuth'
+      scan:
+        $ref: '#/definitions/RESTRegistryConfigScan'
+      integrations:
+        $ref: '#/definitions/RESTRegistryConfigIntegrations'
+  RESTRegistryConfigDataV2:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTRegistryConfigV2'
   RESTProxy:
     type: object
     required:
@@ -8607,6 +8856,9 @@ definitions:
         type: string
         format: date-time
         example: 2018-06-20T19:00:53Z
+      ignore_proxy:
+        type: boolean
+        example: false
   RESTRegistrySummaryData:
     type: object
     required:
@@ -9030,7 +9282,10 @@ definitions:
     properties:
       name:
         type: string
-        example: scanner
+        example: openssl
+      file:
+        type: string
+        example: example.jar 
       version:
         type: string
         example: "1.011"
@@ -9598,6 +9853,77 @@ definitions:
     properties:
       status:
         $ref: '#/definitions/RESTScanStatus'
+  RESTScanCacheStat:
+    type: object
+    required:
+      - record_count
+      - record_total_size
+      - cache_misses
+      - cache_hits
+    properties:
+      record_count:
+        type: integer
+        format: uint64
+        example: 0
+      record_total_size:
+        type: integer
+        format: uint64
+        example: 0
+      cache_misses:
+        type: integer
+        format: uint64
+        example: 0
+      cache_hits:
+        type: integer
+        format: uint64
+        example: 0
+  RESTScanCacheData:
+    type: object
+    required:
+      - cache_records
+      - record_total_size
+      - cache_misses
+      - cache_hits
+    properties:
+      cache_records:
+        type: array
+        items:
+          $ref: '#/definitions/RESTScanCacheRecord'
+      record_total_size:
+        type: integer
+        format: uint64
+        example: 0
+      cache_misses:
+        type: integer
+        format: uint64
+        example: 0
+      cache_hits:
+        type: integer
+        format: uint64
+        example: 0
+  RESTScanCacheRecord:
+    type: object
+    required:
+      - layer_id
+      - size
+      - reference_count
+      - last_referred
+    properties:
+      layer_id:
+        type: string
+        example: ""
+      size:
+        type: integer
+        format: uint64
+        example: 0
+      reference_count:
+        type: integer
+        format: uint32
+        example: 0
+      last_referred:
+        type: string
+        format: date-time
+        example: "2022-03-17T17:31:55.832768041Z"
   RESTSecurityData:
     type: object
     required:
@@ -9625,6 +9951,7 @@ definitions:
       - port
       - ssl
       - base_dn
+      - group_dn
       - bind_dn
       - group_member_attr
       - username_attr
@@ -9645,6 +9972,9 @@ definitions:
         type: boolean
         example: false
       base_dn:
+        type: string
+        example: dc=example,dc=org
+      group_dn:
         type: string
         example: dc=example,dc=org
       bind_dn:
@@ -9895,6 +10225,9 @@ definitions:
         type: boolean
         example: true
       base_dn:
+        type: string
+        example: dc=win,dc=nv,dc=com
+      group_dn:
         type: string
         example: dc=win,dc=nv,dc=com
       bind_dn:
@@ -10751,7 +11084,6 @@ definitions:
         $ref: '#/definitions/RESTFedSystemConfig'
   RESTSystemConfigConfig:
     type: object
-    description: only for POST(v1/system/config)
     properties:
       new_service_policy_mode:
         type: string
@@ -10863,7 +11195,6 @@ definitions:
           $ref: '#/definitions/RESTRemoteRepository'
   RESTSystemConfigConfigV2:
     type: object
-    description: only for POST(v2/system/config)
     properties:
       svc_cfg:
         $ref: '#/definitions/RESTSystemConfigSvcCfgV2'
@@ -10896,9 +11227,20 @@ definitions:
           $ref: '#/definitions/RESTWebhook'
   RESTSystemConfigConfigData:
     type: object
+    description: it leverages RESTSystemConfigConfigData in apis.go
     properties:
       config:
         $ref: '#/definitions/RESTSystemConfigConfig'
+      fed_config:
+        $ref: '#/definitions/RESTFedSystemConfigConfig'
+      net_config:
+        $ref: '#/definitions/RESTSysNetConfigConfig'
+      atmo_config:
+        $ref: '#/definitions/RESTSysAtmoConfigConfig'
+  RESTSystemConfigConfigDataV2:
+    type: object
+    description: it leverages RESTSystemConfigConfigData in apis.go
+    properties:
       config_v2:
         $ref: '#/definitions/RESTSystemConfigConfigV2'
       fed_config:
@@ -11066,6 +11408,11 @@ definitions:
       role:
         type: string
         example: admin
+      global_permissions:
+        description: permissions on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
       timeout:
         type: integer
         format: uint32
@@ -11086,6 +11433,21 @@ definitions:
           items:
             type: string
           example: ["domain1", "domain2"]
+      domain_permissions:
+        type: array
+        description: permissions on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      extra_permissions:
+        description: extra permissions(other than 'role') on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      extra_permissions_domains:
+        type: array
+        description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTPermitsAssigned'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11164,7 +11526,13 @@ definitions:
         example: user@mail.com
       role:
         type: string
+        description: role on global domain
         example: admin
+      extra_permissions:
+        description: extra permissions(other than 'role') on global domain. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
       timeout:
         type: integer
         format: uint32
@@ -11181,12 +11549,24 @@ definitions:
         description: If the password should be modified
       role_domains:
         type: object
-        description: Object key is role and value is array of domains
-        additionalProperties:
-          type: array
-          items:
+        description: map of roles on namespaces
+        properties:
+          key:
+            description: role
             type: string
-          example: ["domain1", "domain2"]
+          value:
+            type: object
+            description: array of domains
+            additionalProperties:
+              type: array
+              items:
+                type: string
+              example: ["domain1", "domain2"]
+      extra_permissions_domains:
+        type: array
+        description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTPermitsAssigned'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11208,6 +11588,20 @@ definitions:
         type: boolean
         description: whether the user's password can be reset by the current login user
         example: false
+  RESTPermitsAssigned:
+    type: object
+    properties:
+      permissions:
+        type: array
+        description: array of permissions
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      domains:
+        type: array
+        description: array of domains that have the same permissions
+        items:
+          type: string
+        example: ["domain1", "domain2"]
   RESTUserData:
     type: object
     required:
@@ -13335,11 +13729,11 @@ definitions:
       apikey_secret:
         type: string
         example: 0u+tVOWNPRfpCK7p9qz
-  SigstoreAllRootsOfTrustGet:
+  REST_SigstoreRootOfTrustCollection:
     type: array
     items:
-      $ref: '#/definitions/RESTSigstoreRootOfTrustGet'
-  RESTSigstoreRootOfTrustGet:
+      $ref: '#/definitions/REST_SigstoreRootOfTrust_GET'
+  REST_SigstoreRootOfTrust_GET:
     type: object
     properties:
       name:
@@ -13347,6 +13741,10 @@ definitions:
         example: example_name
       is_private:
         type: boolean
+        example: true
+      rootless_keypairs_only:
+        type: boolean
+        description: it overrides is_private attribute
         example: true
       rekor_public_key:
         type: string
@@ -13360,14 +13758,14 @@ definitions:
       verifiers:
         type: array
         items:
-          $ref: '#/definitions/RESTSigstoreVerifier'
+          $ref: '#/definitions/REST_SigstoreVerifier'
       cfg_type:
         type: string
         enum: [user_created, ground, federal]
       comment:
         type: string
         example: example comment
-  RESTSigstoreRootOfTrustPost:
+  REST_SigstoreRootOfTrust_POST:
     type: object
     required:
     - name
@@ -13377,6 +13775,10 @@ definitions:
         example: example_name
       is_private:
         type: boolean
+        example: true
+      rootless_keypairs_only:
+        type: boolean
+        description: it overrides is_private attribute
         example: true
       rekor_public_key:
         type: string
@@ -13390,7 +13792,7 @@ definitions:
       comment:
         type: string
         example: example comment
-  RESTSigstoreRootOfTrustPatch:
+  REST_SigstoreRootOfTrust_PATCH:
     type: object
     properties:
       rekor_public_key:
@@ -13405,11 +13807,11 @@ definitions:
       comment:
         type: string
         example: example comment
-  SigstoreAllVerifiersGet:
+  REST_SigstoreVerifierCollection:
     type: array
     items:
-      $ref: '#/definitions/RESTSigstoreVerifier'
-  RESTSigstoreVerifier:
+      $ref: '#/definitions/REST_SigstoreVerifier'
+  REST_SigstoreVerifier:
     type: object
     required:
     - name
@@ -13433,7 +13835,7 @@ definitions:
       comment:
         type: string
         example: example comment
-  RESTSigstoreVerifierPatch:
+  REST_SigstoreVerifier_PATCH:
     type: object
     properties:
       verifier_type:
@@ -13495,6 +13897,9 @@ definitions:
         example: github
       comment:
         type: string
+      enable:
+        type: boolean
+        example: true
       github_configuration:
         $ref: '#/definitions/RESTRemoteRepo_GitHubConfig'
   RESTRemoteRepository_GitHubConfigConfig:
@@ -13528,6 +13933,9 @@ definitions:
         example: default
       comment:
         type: string
+      enable:
+        type: boolean
+        example: true
       github_configuration:
         $ref: '#/definitions/RESTRemoteRepository_GitHubConfigConfig'
   RESTRemoteRepositoryConfigData:
@@ -13546,6 +13954,19 @@ definitions:
       file_path:
         type: string
         example: my_exports/example.yaml
+      comment:
+        type: string
+        description: commit message
+        example: commit for poc
       remote_repository_nickname:
         type: string
         example: default
+  NvPermissions:
+    type: object
+    properties:
+      read_value:
+        type: integer
+        format: uint32
+      write_value:
+        type: integer
+        format: uint32

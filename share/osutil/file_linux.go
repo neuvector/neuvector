@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -67,7 +66,7 @@ func fileExists(path string) bool {
 
 func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 	if inTest {
-		// Since we use ioutil.TempDir("", "proc") to mock proc file system
+		// Since we use os.MkdirTemp("", "proc") to mock proc file system
 		// Regular expression to match the pattern /proc/[number]/root/
 		re := regexp.MustCompile(`.*/proc/\d+/root/`)
 		matches := re.FindStringSubmatch(input)
@@ -106,17 +105,17 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 		}
 
 		if !fileExists(currentPath) {
-			log.WithError(err).Error("File not exist")
+			log.WithError(err).Debug("File not exist")
 			return "", err
 		}
 
 		if symlink, err = os.Readlink(currentPath); err != nil {
-			log.WithError(err).Error("Read file link fail")
+			log.WithError(err).Debug("Read file link fail")
 			return "", err
 		}
 
 		if procRoot, err = extractProcRootPath(pid, currentPath, inTest); err != nil {
-			log.WithError(err).Error("Get Proc Root Path fail")
+			log.WithError(err).Debug("Get Proc Root Path fail")
 			return "", err
 		}
 
@@ -142,7 +141,7 @@ func GetContainerRealFilePath(pid int, symlinkPath string, inTest bool) (string,
 			// nest link
 			finfo, err := os.Lstat(resolvedPath)
 			if err != nil {
-				log.WithError(err).Error("failed to read resolvedPath")
+				log.WithError(err).Debug("failed to read resolvedPath")
 				return "", err
 			}
 			if finfo.Mode()&os.ModeSymlink == 0 {
@@ -348,7 +347,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 
-	entries, err := ioutil.ReadDir(src)
+	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
@@ -363,7 +362,7 @@ func CopyDir(src string, dst string) error {
 			}
 		} else {
 			// Skip symlinks
-			if entry.Mode()&os.ModeSymlink != 0 {
+			if entry.Type()&os.ModeSymlink != 0 {
 				continue
 			}
 

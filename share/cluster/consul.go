@@ -156,9 +156,9 @@ func createConfigFile(cc *ClusterConfig) error {
 	sa = append(sa, "    \"skip_leave_on_interrupt\": false,\n")
 	sa = append(sa, "    \"leave_on_terminate\": true,\n")
 	sa = append(sa, fmt.Sprintf("    \"encrypt\": \"%s\",\n", gossipSharedKey()))
-	sa = append(sa, fmt.Sprintf("    \"ca_file\": \"%s%s\",\n", internalCertDir, internalCACert))
-	sa = append(sa, fmt.Sprintf("    \"cert_file\": \"%s%s\",\n", internalCertDir, internalCert))
-	sa = append(sa, fmt.Sprintf("    \"key_file\": \"%s%s\",\n", internalCertDir, internalCertKey))
+	sa = append(sa, fmt.Sprintf("    \"ca_file\": \"%s%s\",\n", InternalCertDir, InternalCACert))
+	sa = append(sa, fmt.Sprintf("    \"cert_file\": \"%s%s\",\n", InternalCertDir, InternalCert))
+	sa = append(sa, fmt.Sprintf("    \"key_file\": \"%s%s\",\n", InternalCertDir, InternalCertKey))
 	sa = append(sa, fmt.Sprintf("    \"verify_incoming\": true,\n"))
 	sa = append(sa, fmt.Sprintf("    \"verify_outgoing\": true,\n"))
 	if cc.Debug {
@@ -172,6 +172,7 @@ func createConfigFile(cc *ClusterConfig) error {
 	sa = append(sa, fmt.Sprintf("        \"serf_lan\": %d,\n", lanPort))
 	sa = append(sa, fmt.Sprintf("        \"serf_wan\": %d\n", -1))
 	sa = append(sa, fmt.Sprintf("    },\n"))
+	sa = append(sa, fmt.Sprintf("    \"tls_cipher_suites\": \"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384\",\n"))
 	sa = append(sa, fmt.Sprintf("    \"performance\": {\n"))
 	sa = append(sa, fmt.Sprintf("        \"rpc_hold_timeout\": \"%ds\"\n", 300))
 	sa = append(sa, fmt.Sprintf("    }\n"))
@@ -450,7 +451,7 @@ func ConsulGet(url string) (string, bool) {
 	log.Printf("Status of Get %s %d for %s", resp.Status, resp.StatusCode, url)
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		var jsonBody []consulBody
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		err = json.Unmarshal(body, &jsonBody)
 		existingValue, err := b64.StdEncoding.DecodeString(jsonBody[0].Value)
 		if err != nil {
@@ -494,7 +495,7 @@ func GetAll(store string) ([][]byte, []int, bool) {
 		var jsonBody []consulBody
 		valueArr := make([][]byte, 0)
 		indexArr := make([]int, 0)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		err = json.Unmarshal(body, &jsonBody)
 		for _, body := range jsonBody {
 			existingValue, _ := b64.StdEncoding.DecodeString(body.Value)
@@ -804,8 +805,12 @@ func (m *consulMethod) Transact(entries []transactEntry) (bool, error) {
 
 // Watch related
 var watchPlans []*watch.WatchPlan = make([]*watch.WatchPlan, 0)
+var watchPlansLock sync.RWMutex
 
 func (m *consulMethod) StopAllWatchers() {
+	watchPlansLock.Lock()
+	defer watchPlansLock.Unlock()
+
 	for _, wp := range watchPlans {
 		wp.Stop()
 	}
@@ -813,20 +818,29 @@ func (m *consulMethod) StopAllWatchers() {
 }
 
 func (m *consulMethod) PauseAllWatchers(includeMonitorWatch bool) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
-		if wp.Recover == nil || includeMonitorWatch == true {
+		if wp.Recover == nil || includeMonitorWatch {
 			wp.Pause()
 		}
 	}
 }
 
 func (m *consulMethod) ResumeAllWatchers() {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		wp.Resume()
 	}
 }
 
 func (m *consulMethod) PauseWatcher(key string) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key}).Debug("")
@@ -836,6 +850,9 @@ func (m *consulMethod) PauseWatcher(key string) {
 }
 
 func (m *consulMethod) ResumeWatcher(key string) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key}).Debug("")
@@ -845,6 +862,9 @@ func (m *consulMethod) ResumeWatcher(key string) {
 }
 
 func (m *consulMethod) SetWatcherCongestionCtl(key string, enabled bool) {
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	for _, wp := range watchPlans {
 		if wp.Key == key {
 			log.WithFields(log.Fields{"key": wp.Key, "enabled": enabled}).Debug("")
@@ -946,11 +966,15 @@ func register(params map[string]interface{}, handler watch.HandlerFunc) *watch.W
 	}
 	wp.Key = key
 
+	watchPlansLock.Lock()
+
 	if len(watchPlans) == 0 {
 		wp.Fail = watcherFailFunc
 		wp.Recover = watcherRecoverFunc
 	}
+
 	watchPlans = append(watchPlans, wp)
+	watchPlansLock.Unlock()
 
 	wp.Handler = handler
 	// Run the watch
@@ -1350,6 +1374,9 @@ func (m *consulMethod) RegisterExistingWatchers() {
 
 func (m *consulMethod) RegisterWatcherMonitor(failFunc func() bool, recoverFunc func()) {
 	log.Debug("")
+	watchPlansLock.RLock()
+	defer watchPlansLock.RUnlock()
+
 	watcherFailFunc = failFunc
 	watcherRecoverFunc = recoverFunc
 	if len(watchPlans) > 0 {

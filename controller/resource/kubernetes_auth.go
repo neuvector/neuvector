@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -87,9 +87,9 @@ func discoverAuthzEndpoint(endpoint string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -231,9 +231,9 @@ func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
 	if err != nil {
 		return groups, err
 	}
+	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return groups, err
 	}

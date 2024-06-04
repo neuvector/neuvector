@@ -7,13 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -39,7 +38,7 @@ type ClusterHelper interface {
 	AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error)
 	ReleaseLock(cluster.LockInterface) error
 
-	UpgradeClusterKV()
+	UpgradeClusterKV(version string) (verUpdated bool)
 	UpgradeClusterImport(ver *share.CLUSCtrlVersion)
 	FixMissingClusterKV()
 
@@ -298,6 +297,8 @@ type ClusterHelper interface {
 	GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error)
 	PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreTimestamp() (string, *uint64, error)
+	CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error
+	DeleteQuerySessionRequest(queryToken string)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -2003,8 +2004,8 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 					b1 := md5.Sum([]byte(cert.Cert))
 					b2 := md5.Sum([]byte(certExisting.Cert))
 					log.WithFields(log.Fields{"cn": cn, "certIn": hex.EncodeToString(b1[:]), "certExisting": hex.EncodeToString(b2[:])}).Info("md5")
-					err1 := ioutil.WriteFile(keyPath, []byte(certExisting.Key), 0600)
-					err2 := ioutil.WriteFile(certPath, []byte(certExisting.Cert), 0600)
+					err1 := os.WriteFile(keyPath, []byte(certExisting.Key), 0600)
+					err2 := os.WriteFile(certPath, []byte(certExisting.Cert), 0600)
 					if err1 == nil && err2 == nil {
 						return nil
 					} else {
@@ -2041,7 +2042,7 @@ func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, ou
 		}
 		return nil
 	} else {
-		return errors.Wrap(err, "cert is not there after PutIfNotExist")
+		return fmt.Errorf("cert is not there after PutIfNotExist: %w", err)
 	}
 }
 
@@ -3340,4 +3341,15 @@ func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
 	}
 
 	return string(configData), &rev, nil
+}
+
+func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error {
+	key := share.CLUSQuerySessionKey(qsr.QueryToken)
+	value, _ := json.Marshal(qsr)
+	return cluster.PutIfNotExist(key, value, false)
+}
+
+func (m clusterHelper) DeleteQuerySessionRequest(queryToken string) {
+	key := share.CLUSQuerySessionKey(queryToken)
+	cluster.Delete(key)
 }

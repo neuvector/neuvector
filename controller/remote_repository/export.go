@@ -49,6 +49,8 @@ func (exp *Export) Do() error {
 	}
 	if remoteRepository == nil || remoteRepository.GitHubConfiguration == nil {
 		return fmt.Errorf("could not retrieve remote export repository \"%s\"", exp.Options.RemoteRepositoryNickname)
+	} else if !remoteRepository.Enable {
+		return fmt.Errorf("remote export repository \"%s\" is disabled", exp.Options.RemoteRepositoryNickname)
 	}
 
 	if remoteRepository.Provider == share.RemoteRepositoryProvider_GitHub {
@@ -56,8 +58,12 @@ func (exp *Export) Do() error {
 		if exp.Options.FilePath != "" {
 			exportFilePath = exp.Options.FilePath
 		}
+		commitMessage := exportFilePath
+		if exp.Options.Comment != "" {
+			commitMessage = exp.Options.Comment
+		}
 
-		githubExport, err := NewGitHubExport(exportFilePath, exp.Content, exportFilePath, *remoteRepository.GitHubConfiguration)
+		githubExport, err := NewGitHubExport(exportFilePath, exp.Content, commitMessage, *remoteRepository.GitHubConfiguration)
 		if err != nil {
 			return fmt.Errorf("could not initialize github export object: %s", err.Error())
 		}

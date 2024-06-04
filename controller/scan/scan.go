@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -55,10 +56,11 @@ func isScanner() bool {
 // count vul. with the consideration of vul. profile (alives)
 // requirement: entries in 'vts' are in the same order as in 'vuls'
 func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alives utils.Set) (
-	[]string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
+	[]string, []string, []string, int, float32, map[string]map[string]share.CLUSScannedVulInfo, []share.CLUSScannedVulInfoSimple) {
 
 	highs := make([]string, 0)
 	meds := make([]string, 0)
+	lows := make([]string, 0)
 	var highWithFix, others int
 	var scoreTemp int
 
@@ -78,6 +80,10 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 			others++
 		}
 		scoreTemp += int(10 * v.Score)
+
+		if v.Severity == share.VulnSeverityLow {
+			lows = append(lows, v.Name)
+		}
 	}
 
 	highVulPublishDate := make(map[string]share.CLUSScannedVulInfo, len(highs))
@@ -159,7 +165,7 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 
 	s := fmt.Sprintf("%d.%s", scoreTemp/10, strconv.Itoa(scoreTemp%10))
 	totalScore, _ := strconv.ParseFloat(s, 32)
-	return highs, meds, highWithFix, float32(totalScore), vulPublishDate, otherVuls
+	return highs, meds, lows, highWithFix, float32(totalScore), vulPublishDate, otherVuls
 }
 
 func imageWatcher() {
@@ -329,14 +335,42 @@ func parseProxy(proxy *share.CLUSProxy) string {
 func UpdateProxy(httpProxy, httpsProxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"http": httpProxy, "https": httpsProxy}).Debug()
 
+	// This can be called before InitContext is called
 	if smd == nil {
 		smd = &scanMethod{
 			httpProxy:  parseProxy(httpProxy),
 			httpsProxy: parseProxy(httpsProxy),
 		}
+
+		// It is startup state if smd is nil, let registry init to handle proxy settings
 	} else {
 		smd.httpProxy = parseProxy(httpProxy)
 		smd.httpsProxy = parseProxy(httpsProxy)
+
+		var getFed bool
+		// when proxy setting changes, do nothing for fed registry on non-master cluster
+		if smd.fedRole == api.FedRoleMaster {
+			getFed = true
+		}
+
+		regs := regMapToArray(true, getFed)
+		for _, reg := range regs {
+			reg.driver.SetProxy()
+			reg.backupDrv.SetProxy()
+			reg.driver.Logout(true)
+			reg.backupDrv.Logout(true)
+			reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
+			if isScanner() {
+				reg.stateLock()
+				if reg.state.Status == api.RegistryStatusScanning {
+					if reg.sctx != nil {
+						reg.stopScan()
+					}
+					reg.startScan()
+				}
+				reg.stateUnlock()
+			}
+		}
 	}
 }
 

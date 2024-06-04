@@ -23,8 +23,9 @@ import (
 	"syscall"
 	"time"
 
+	"errors"
+
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/go-version"
@@ -49,6 +50,13 @@ import (
 
 const retryClusterMax int = 3
 const clusterLockWait = time.Duration(time.Second * 20)
+
+type ApiVersion int
+
+const (
+	ApiVersion1 ApiVersion = iota
+	ApiVersion2
+)
 
 const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's give ip/tcp/http header 300 bytes
 
@@ -102,7 +110,7 @@ var restErrWorkloadNotFound error = errors.New("Container is not found")
 var restErrAgentNotFound error = errors.New("Enforcer is not found")
 var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 
-var checkCrdSchemaFunc func(lead, create bool, cspType share.TCspType) []string
+var checkCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 
 var CertManager *kv.CertManager
 
@@ -157,6 +165,8 @@ var restErrMessage = []string{
 	api.RESTErrPromoteFail:           "Failed to promote rules",
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
+	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
+	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -353,7 +363,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 		return
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
-	log.WithFields(log.Fields{"roles": login.domainRoles, "nvPage": login.nvPage}).Error("Object access denied")
+	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
 	if login.nvPage != api.RESTNvPageDashboard {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
@@ -958,6 +968,7 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		if login.mainSessionID == _interactiveSessionID || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
 			clog.User = login.fullname
 			clog.UserRoles = login.domainRoles
+			clog.UserPermits = login.extraDomainPermits
 		} else {
 			userRole := api.UserRoleFedAdmin
 			if r, ok := login.domainRoles[access.AccessDomainGlobal]; ok && r == api.UserRoleReader {
@@ -1256,7 +1267,7 @@ type Context struct {
 	CspType            share.TCspType
 	CspPauseInterval   uint   // in minutes
 	CustomCheckControl string // disable / strict / loose
-	CheckCrdSchemaFunc func(leader, create bool, cspType share.TCspType) []string
+	CheckCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 	CertManager        *kv.CertManager
 }
 
@@ -1312,7 +1323,7 @@ func initJWTSignKey() error {
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate tls key/cert")
+				return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
 			}
 			return &share.CLUSX509Cert{
 				CN:   share.CLUSJWTKey,
@@ -1377,8 +1388,8 @@ func initJWTSignKey() error {
 	return nil
 }
 
-// InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
-func InitContext(ctx *Context) {
+// PreInitContext() must be called before orch connector starts in main()
+func PreInitContext(ctx *Context) {
 	cctx = ctx
 	localDev = ctx.LocalDev
 	cacher = ctx.Cacher
@@ -1390,6 +1401,10 @@ func InitContext(ctx *Context) {
 	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
+}
+
+// InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
+func InitContext(ctx *Context) {
 
 	_restPort = ctx.RESTPort
 	_fedPort = ctx.FedPort
@@ -1413,7 +1428,7 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer() {
+func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
 	licenseInit()
 	newRepoScanMgr()
@@ -1432,7 +1447,7 @@ func StartRESTServer() {
 	r.POST("/v1/auth/:server", handlerAuthLoginServer)
 	r.PATCH("/v1/auth", handlerAuthRefresh)
 	r.DELETE("/v1/auth", handlerAuthLogout)
-	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document
+	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document. Called by master cluster
 	r.GET("/v1/eula", handlerEULAShow)
 	r.POST("/v1/eula", handlerEULAConfig)
 	r.GET("/v1/user", handlerUserList)
@@ -1647,10 +1662,12 @@ func StartRESTServer() {
 	r.PATCH("/v1/scan/config", handlerScanConfig)
 	r.GET("/v1/scan/config", handlerScanConfigGet)
 	r.GET("/v1/scan/status", handlerScanStatus)
+	r.GET("/v1/scan/cache_stat/:id", handlerScanCacheStat)
+	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
-	r.GET("/v1/scan/image", handlerScanImageSummary)
-	r.GET("/v1/scan/image/:id", handlerScanImageReport)
+	r.GET("/v1/scan/image", handlerScanImageSummary)    // Returns all workload's scan result summary by images
+	r.GET("/v1/scan/image/:id", handlerScanImageReport) // Returns workload scan result by workload's image ID
 	r.POST("/v1/scan/host/:id", handlerScanHostReq)
 	r.GET("/v1/scan/host/:id", handlerScanHostReport)
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)
@@ -1659,8 +1676,11 @@ func StartRESTServer() {
 	r.POST("/v1/scan/result/repository", handlerScanRepositorySubmit) // Used by CI-integration, for scanner submit scan result. Skip API
 	r.POST("/v1/scan/repository", handlerScanRepositoryReq)           // Used by CI-integration, for scanning container image
 	r.POST("/v1/scan/registry", handlerRegistryCreate)
+	r.POST("/v2/scan/registry", handlerRegistryCreate)
 	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
+	r.PATCH("/v2/scan/registry/:name", handlerRegistryConfig)
 	r.POST("/v1/scan/registry/:name/test", handlerRegistryTest)         // debug
+	r.POST("/v2/scan/registry/:name/test", handlerRegistryTest)         // debug
 	r.DELETE("/v1/scan/registry/:name/test", handlerRegistryTestCancel) // debug
 	r.GET("/v1/scan/registry", handlerRegistryList)                     // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v1/scan/registry/:name", handlerRegistryShow)
@@ -1671,6 +1691,9 @@ func StartRESTServer() {
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
 	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
@@ -1773,6 +1796,10 @@ func StartRESTServer() {
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
 
+	if isNewCluster && isLead {
+		go loadFedInitCfg()
+	}
+
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
 		MinVersion:               tls.VersionTLS11,
@@ -1789,6 +1816,11 @@ func StartRESTServer() {
 	}
 	for {
 		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+			if err == http.ErrServerClosed {
+				if cfgmapRetryTimer != nil {
+					cfgmapRetryTimer.Stop()
+				}
+			}
 			log.WithFields(log.Fields{"error": err}).Error("Fail to start SSL rest")
 			time.Sleep(time.Second * 5)
 		} else {
@@ -1847,6 +1879,7 @@ func startFedRestServer(fedPingInterval uint32) {
 		for i := 0; i < 5; i++ {
 			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 				if err == http.ErrServerClosed {
+					log.Info("REST Server closed")
 					break
 				}
 				log.WithFields(log.Fields{"error": err}).Error("Fail to start fed SSL rest")
@@ -2024,7 +2057,7 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	return err
 }
 
-func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
 	var data []byte
 	json_data, _ := json.MarshalIndent(resp, "", "  ")
 	data, _ = yaml.JSONToYAML(json_data)
@@ -2039,15 +2072,12 @@ func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions,
 		}
 		err := remoteExport.Do()
 		if err != nil {
-			msg := "could not do remote export"
-			if strings.Contains(err.Error(), remote_repository.ErrGitHubRateLimitReached) {
-				msg = fmt.Sprintf("%s, %s", msg, err.Error())
-			}
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, msg)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteExportFail, err.Error())
 			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
 			return
 		}
-		restRespSuccess(w, r, nil, acc, login, nil, "Do remote dlp export")
+		msg := fmt.Sprintf("Export %s to remote repository", exportType)
+		restRespSuccess(w, r, nil, acc, login, nil, msg)
 	} else {
 		// tell the browser the returned content should be downloaded
 		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
@@ -2056,4 +2086,20 @@ func doExport(filename string, remoteExportOptions *api.RESTRemoteExportOptions,
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
 	}
+}
+
+// api version is always the first path element
+// Ex: /v1/scan/registry
+//
+//	^^
+func getRequestApiVersion(r *http.Request) ApiVersion {
+	if r.URL == nil || len(r.URL.Path) == 0 {
+		return ApiVersion1
+	}
+	trimmedPath := strings.Trim(r.URL.Path, "/")
+	splitPath := strings.Split(trimmedPath, "/")
+	if splitPath[0] == "v2" {
+		return ApiVersion2
+	}
+	return ApiVersion1
 }

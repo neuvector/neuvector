@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -518,7 +517,7 @@ func InspectFile(fullpath, reportPath string, config Config) ([]share.CLUSSecret
 	}
 
 	// load the content
-	content, err := ioutil.ReadFile(fullpath)
+	content, err := os.ReadFile(fullpath)
 	if err != nil {
 		log.WithFields(log.Fields{"filepath": dir + "/" + filename}).Error()
 		return res, false
@@ -673,6 +672,10 @@ func FindSecretsByRootpath(rootPath string, envVars []byte, config Config) ([]sh
 				return filepath.SkipDir
 			}
 		} else {
+			if utils.IsMountPoint(path) {
+				return nil
+			}
+
 			////
 			if p, yes := hasChangeAccessPerm(inpath, info.Mode()); yes {
 				log.WithFields(log.Fields{"set-perm": perm}).Debug()

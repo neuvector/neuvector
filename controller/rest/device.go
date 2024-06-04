@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -393,7 +393,7 @@ func handlerControllerConfig(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTControllerConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -482,7 +482,7 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTAgentConfigData
 	err := json.Unmarshal(body, &rconf)

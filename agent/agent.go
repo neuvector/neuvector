@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -24,6 +25,8 @@ import (
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/healthz"
+	"github.com/neuvector/neuvector/share/migration"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -34,6 +37,8 @@ var containerTaskExitChan chan interface{} = make(chan interface{}, 1)
 var errRestartChan chan interface{} = make(chan interface{}, 1)
 var restartChan chan interface{} = make(chan interface{}, 1)
 var monitorExitChan chan interface{} = make(chan interface{}, 1)
+
+var monitorHostIfaceStopCh chan struct{} = make(chan struct{})
 
 var Host share.CLUSHost = share.CLUSHost{
 	Platform: share.PlatformDocker,
@@ -74,6 +79,7 @@ func isAgentContainer(id string) bool {
 }
 
 func getHostIPs() {
+	gInfo.linkStates = getHostLinks()
 	addrs := getHostAddrs()
 	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
@@ -438,6 +444,9 @@ func main() {
 		time.Sleep(time.Second * 4)
 	}
 
+	//NVSHAS-6638,monitor host to see whether there is i/f or IP changes
+	go StartMonitorHostInterface(Host.ID, 1, monitorHostIfaceStopCh)
+
 	// Check anti-affinity
 	var retry int
 	retryDuration := time.Duration(time.Second * 2)
@@ -492,6 +501,58 @@ func main() {
 	log.WithFields(log.Fields{"hostIPs": gInfo.hostIPs}).Info("")
 	log.WithFields(log.Fields{"host": Host}).Info("")
 	log.WithFields(log.Fields{"agent": Agent}).Info("")
+	go func() {
+		if err := healthz.StartHealthzServer(); err != nil {
+			log.WithError(err).Warn("failed to start healthz server")
+		}
+	}()
+
+	var internalCertControllerCancel context.CancelFunc
+	var ctx context.Context
+
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+
+		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
+
+		go func() {
+			if err := healthz.StartHealthzServer(); err != nil {
+				log.WithError(err).Warn("failed to start healthz server")
+			}
+		}()
+
+		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
+		defer internalCertControllerCancel()
+		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
+		err = migration.InitializeInternalSecretController(ctx, []func([]byte, []byte, []byte) error{
+			// Reload consul
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading consul config")
+				if err := cluster.Reload(nil); err != nil {
+					return fmt.Errorf("failed to reload consul: %w", err)
+				}
+
+				return nil
+			},
+			// Reload grpc servers/clients
+			func(cacert []byte, cert []byte, key []byte) error {
+				log.Info("Reloading gRPC servers/clients")
+				if err := cluster.ReloadInternalCert(); err != nil {
+					return fmt.Errorf("failed to reload gRPC's certificate: %w", err)
+				}
+				return nil
+			},
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to initialize internal secret controller")
+			os.Exit(-2)
+		}
+		log.Info("internal certificate is initialized")
+	}
+
+	err = cluster.ReloadInternalCert()
+	if err != nil {
+		log.WithError(err).Fatal("failed to reload internal certificate")
+	}
 
 	// Other objects
 	eventLogKey := share.CLUSAgentEventLogKey(Host.ID, Agent.ID)
@@ -546,7 +607,8 @@ func main() {
 
 	agentTimerWheel = utils.NewTimerWheel()
 	agentTimerWheel.Start()
-
+	//save a reference in policy engine
+	policySetTimerWheel(agentTimerWheel)
 	// Read existing containers again, cluster start can take a while.
 	existing, _ := global.RT.ListContainerIDs()
 
@@ -596,6 +658,7 @@ func main() {
 		ProcPolicyLookupFunc: processPolicyLookup,
 		IsK8sGroupWithProbe:  pe.IsK8sGroupWithProbe,
 		ReportLearnProc:      addLearnedProcess,
+		IsNeuvectorContainer: isNeuvectorContainerById,
 		ContainerInContainer: agentEnv.containerInContainer,
 		GetContainerPid:      cbGetContainerPid,
 		GetAllContainerList:  cbGetAllContainerList,
@@ -651,8 +714,6 @@ func main() {
 	Agent.JoinedAt = time.Now().UTC()
 	putLocalInfo()
 	logAgent(share.CLUSEvAgentJoin)
-	//NVSHAS-6638,monitor host to see whether there is i/f or IP changes
-	prober.StartMonitorHostInterface(Host.ID, 1)
 
 	clusterLoop(existing)
 	existing = nil
@@ -703,6 +764,7 @@ func main() {
 	fileWatcher.Close()
 	bench.Close()
 
+	close(monitorHostIfaceStopCh) // stop host interface monitor
 	stopMonitorLoop()
 	closeCluster()
 

@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/scheduler"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/httptrace"
@@ -241,13 +242,13 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 				if oldCfg.Registry != config.Registry || oldCfg.AuthWithToken != config.AuthWithToken ||
 					(oldCfg.AuthWithToken && oldCfg.AuthToken != config.AuthToken) ||
 					(!oldCfg.AuthWithToken && (oldCfg.Username != config.Username || oldCfg.Password != config.Password)) ||
-					public != reg.public {
+					!oldCfg.IgnoreProxy != config.IgnoreProxy || public != reg.public {
 					// URL or credential changed, stop scan and force logout
 					credChanged = true
 					reg.driver.Logout(true)
 					reg.backupDrv.Logout(true)
-					// if the public change, need to renew the driver type.
-					if public != reg.public {
+					// if the ignoreProxy flag or the public flag change, need to renew the driver type.
+					if !oldCfg.IgnoreProxy != config.IgnoreProxy || public != reg.public {
 						reg.public = public
 						reg.driver = newRegistryDriver(reg.config, reg.public, new(httptrace.NopTracer))
 					}
@@ -451,7 +452,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 	}
 
 	var c *imageInfoCache
-	var highs, meds []string
+	var highs, meds, lows []string
 	var alives utils.Set // vul names that are not filtered
 	layerHighMap := make(map[string][]string, 0)
 	layerMedMap := make(map[string][]string, 0)
@@ -474,7 +475,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				}
 			}
 
-			highs, meds, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
+			highs, meds, lows, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
 			if info, ok := c.vulInfo[share.VulnSeverityHigh]; ok {
 				fixedHighsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
 				for _, v := range info {
@@ -532,6 +533,35 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 					layerMedMap[l.Digest] = layerMeds
 				}
 			}
+
+			sdb := scanUtils.GetScannerDB()
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, "", false)
+			dbAssetVul := getImageDbAssetVul(c, sum, highs, meds, lows)
+
+			// extract all package info, and assign to dbAssetVul
+			dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
+			var cveLists utils.Set = utils.NewSet()
+			for _, vul := range vuls {
+				vulPackage := &db.DbVulnResourcePackageVersion2{
+					CVEName:        vul.Name,
+					PackageName:    vul.PackageName,
+					PackageVersion: vul.PackageVersion,
+					FixedVersion:   vul.FixedVersion,
+				}
+
+				fix := "nf"
+				if len(vul.FixedVersion) > 0 {
+					fix = "wf"
+				}
+				cveLists.Add(fmt.Sprintf("%s;%s;%s", vul.Name, vul.DbKey, fix))
+				dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
+			}
+
+			b, err := json.Marshal(cveLists.ToStringSlice())
+			if err == nil {
+				dbAssetVul.CVE_lists = string(b)
+			}
+			db.PopulateAssetVul(dbAssetVul)
 		}
 	}
 
@@ -552,6 +582,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 		for _, image := range sum.Images {
 			delete(rs.image2ID, image)
 		}
+
+		// delete records in database
+		if _, exist := rs.cache[id]; exist {
+			if err := db.DeleteAssetByID(db.AssetImage, id); err != nil {
+				log.WithFields(log.Fields{"err": err, "id": id}).Error("Delete asset in db failed.")
+			}
+		}
+
 		delete(rs.digest2ID, sum.Digest)
 		delete(rs.summary, id)
 		delete(rs.cache, id)
@@ -616,10 +654,14 @@ func isPublicRegistry(cfg *share.CLUSRegistryConfig) bool {
 func newRegistryDriver(cfg *share.CLUSRegistryConfig, public bool, tracer httptrace.HTTPTrace) registryDriver {
 	baseDriver := base{
 		regURL:      cfg.Registry,
-		proxy:       GetProxy(cfg.Registry),
 		scanLayers:  cfg.ScanLayers,
 		scanSecrets: !cfg.DisableFiles,
 		tracer:      tracer,
+		ignoreProxy: cfg.IgnoreProxy,
+	}
+
+	if !baseDriver.ignoreProxy {
+		baseDriver.proxy = GetProxy(cfg.Registry)
 	}
 
 	if cfg.Type == share.RegistryTypeJFrog {
@@ -1665,6 +1707,7 @@ func (rs *Registry) getConfig(acc *access.AccessControl) *api.RESTRegistry {
 		GitlabPrivateToken: rs.config.GitlabPrivateToken,
 		IBMCloudTokenURL:   rs.config.IBMCloudTokenURL,
 		IBMCloudAccount:    rs.config.IBMCloudAccount,
+		IgnoreProxy:        rs.config.IgnoreProxy,
 	}
 	if len(rs.config.Domains) != 0 {
 		reg.Domains = rs.config.Domains
@@ -1867,4 +1910,18 @@ func IsRegistryImageScanned(id string) bool {
 
 	// smd.scanLog.WithFields(log.Fields{"img": id, "scanned": scanned}).Debug()
 	return scanned
+}
+
+func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, highs, meds, lows []string) *db.DbAssetVul {
+	d := &db.DbAssetVul{
+		Type:       db.AssetImage,
+		AssetID:    sum.ImageID,
+		CVE_high:   c.highVuls,
+		CVE_medium: c.medVuls,
+		CVE_low:    len(lows),
+	}
+	if len(sum.Images) > 0 {
+		d.Name = fmt.Sprintf("%s:%s", sum.Images[0].Repo, sum.Images[0].Tag)
+	}
+	return d
 }
