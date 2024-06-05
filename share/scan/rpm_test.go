@@ -3,7 +3,7 @@ package scan
 import (
 	"testing"
 
-	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
+	rpmdb "github.com/neuvector/go-rpmdb/pkg"
 )
 
 func TestSLESPackageList(t *testing.T) {
