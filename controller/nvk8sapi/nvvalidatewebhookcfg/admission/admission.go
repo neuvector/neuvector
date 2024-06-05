@@ -188,6 +188,7 @@ type AdmResObject struct {
 	Annotations   map[string]string
 	AllContainers [3][]*AdmContainerInfo // containers info in this resource object in containers, initContainers, ephemeralContainers order
 	//AdmResults map[string]*AdmResult // key is image repo. comment out because we do not re-use the matching result of owners anymore
+	ServiceAccountName string
 }
 
 type matchState int

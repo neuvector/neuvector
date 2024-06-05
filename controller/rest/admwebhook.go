@@ -681,6 +681,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	var specLabels map[string]string
 	var specAnnotations map[string]string
 	var allContainers [3][]*nvsysadmission.AdmContainerInfo
+	var saName string
 	if podSpec != nil {
 		switch podSpec.(type) {
 		case *corev1.PodTemplateSpec:
@@ -688,9 +689,11 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 			allContainers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
 			specLabels = podTemplateSpec.ObjectMeta.Labels
 			specAnnotations = podTemplateSpec.ObjectMeta.Annotations
+			saName = podTemplateSpec.Spec.ServiceAccountName
 		case *corev1.PodSpec:
 			podSpec, _ := podSpec.(*corev1.PodSpec)
 			allContainers, _ = parsePodSpec(objectMeta, podSpec)
+			saName = podSpec.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
 		}
@@ -717,16 +720,17 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	}
 
 	resObject := &nvsysadmission.AdmResObject{
-		ValidUntil:    time.Now().Add(time.Minute * 5).Unix(),
-		Kind:          req.Kind.Kind,
-		Name:          objectMeta.Name,
-		Namespace:     objectMeta.Namespace,
-		UserName:      userName,
-		Groups:        groups,
-		OwnerUIDs:     ownerUIDs,
-		Labels:        labels,
-		Annotations:   annotations,
-		AllContainers: allContainers,
+		ValidUntil:         time.Now().Add(time.Minute * 5).Unix(),
+		Kind:               req.Kind.Kind,
+		Name:               objectMeta.Name,
+		Namespace:          objectMeta.Namespace,
+		UserName:           userName,
+		Groups:             groups,
+		OwnerUIDs:          ownerUIDs,
+		Labels:             labels,
+		Annotations:        annotations,
+		AllContainers:      allContainers,
+		ServiceAccountName: saName,
 		// AdmResults: make(map[string]*nvsysadmission.AdmResult), // comment out because we do not re-use the matching result of owners anymore.
 	}
 	admResCacheMutex.Lock()
@@ -1122,17 +1126,6 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
-	case K8sKindRole, K8sKindRoleBinding, K8sKindClusterRole, K8sKindClusterRoleBinding:
-		docKey := formatOpaDocKey(ar)
-		jsonData, err := json.Marshal(ar)
-		if err != nil {
-			// log error message
-			log.WithFields(log.Fields{"docKey": docKey, "err": err}).Error("failed add rbac res to OPA")
-		} else {
-			opa.AddDocument(docKey, string(jsonData))
-			updateToOtherControllers(docKey, string(jsonData))
-		}
-		return composeResponse(nil), nil, reqIgnored
 	case k8sKindPersistentVolumeClaim:
 		return validatePVC(admission.NvAdmValidateType, ar, mode, defaultAction, forTesting)
 	default:
@@ -1701,21 +1694,6 @@ func updateToOtherControllers(docKey string, jsonData string) {
 			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
 		}
 	}
-}
-
-func formatOpaDocKey(ar *admissionv1beta1.AdmissionReview) string {
-	req := ar.Request
-	switch req.Kind.Kind {
-	case K8sKindRole:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", req.Namespace, req.Name)
-	case K8sKindRoleBinding:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", req.Namespace, req.Name)
-	case K8sKindClusterRole:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", req.Name)
-	case K8sKindClusterRoleBinding:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", req.Name)
-	}
-	return ""
 }
 
 func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {

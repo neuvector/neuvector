@@ -1352,7 +1352,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		}
 
 		// only handle predefined criteria
-		if crt.Type != "" {
+		if crt.Type != "" && crt.Type != share.CriteriaKeySaBindRiskyRole {
 			hasCustomCriteria = true
 			continue
 		}
@@ -1487,6 +1487,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			} else {
 				met, positive = isStorageClassNameCriterionMet(crt, admResObject.Namespace, c)
 			}
+		case share.CriteriaKeySaBindRiskyRole:
+			met, positive = isRiskyServiceAccountRuleMet(crt, admResObject.ServiceAccountName, admResObject.Namespace)
 		default:
 			met, positive = false, true
 		}
@@ -1520,13 +1522,13 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		statusCode, body, err := opa.OpaEvalByString(policyUrl, string(jsonData))
 
 		if err != nil {
-			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
+			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("opa.OpaEvalByString() failed")
 		} else {
-			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
+			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("opa.OpaEvalByString() success")
 
 			met, err := opa.AnalyzeResult(body)
 			if err != nil {
-				log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "body": body}).Error("isAdmissionRuleMet, opa.AnalyzeResult() failed")
+				log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "body": body}).Error("opa.AnalyzeResult() failed")
 			}
 
 			mets["custom_criteria"] = met
@@ -2552,162 +2554,6 @@ func PopulateRulesToOpa() {
 	}
 }
 
-func PopulateDefRiskyRules() {
-
-	var defaultRules = []*share.CLUSAdmissionRule{
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_view_secret",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "secrets, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*, get, list, watch",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_create_pod",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*, create",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_any_action_workload",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_any_action_rbac",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "roles,clusterroles,rolebindings,clusterrolebindings, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_exec_into_container",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods/exec",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*,create",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-	}
-
-	for i, r := range defaultRules {
-		r.ID = uint32(2000 + i + 1)
-		opa.ConvertToRegoRule(r)
-	}
-}
-
 func GetPredefinedRiskyRoles() []string {
 	keys := make([]string, 0, len(predefinedRiskyRoles))
 	for k := range predefinedRiskyRoles {
@@ -2930,4 +2776,51 @@ func isAdmissionPVCRuleMet(criteria []*share.CLUSAdmRuleCriterion, ns, name, scN
 	}
 
 	return true
+}
+
+func isRiskyServiceAccountRuleMet(crt *share.CLUSAdmRuleCriterion, saName, namespace string) (bool, bool) {
+	if saName == "" {
+		saName = "default"
+	}
+
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	allBoundRiksRoles, err := resource.GetAllRiskyRolesByServiceAccount(saName, namespace)
+
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "crt.Value": crt.Value, "namespace": namespace, "saName": saName}).Error("GetAllRiskyRolesByServiceAccount fail")
+		return false, true
+	}
+
+	log.WithFields(log.Fields{"crt.Value": crt.Value, "allBoundRiksRoles": allBoundRiksRoles, "namespace": namespace, "saName": saName}).Debug("isRiskyServiceAccountRuleMet")
+
+	if len(allBoundRiksRoles) > 0 {
+		checks := strings.Split(crt.Value, ",")
+		for _, check := range checks {
+			checkTag := 0
+			switch check {
+			case "risky_role_view_secret":
+				checkTag = resource.RiskyRole_ViewSecret
+			case "risky_role_any_action_workload":
+				checkTag = resource.RiskyRole_AnyActionWorkload
+			case "risky_role_any_action_rbac":
+				checkTag = resource.RiskyRole_AnyActionRBAC
+			case "risky_role_create_pod":
+				checkTag = resource.RiskyRole_CreatePod
+			case "risky_role_exec_into_container":
+				checkTag = resource.RiskyRole_ExecContainer
+			default:
+			}
+
+			for _, riskyTags := range allBoundRiksRoles {
+				if (riskyTags & checkTag) > 0 {
+					return true, true // found
+				}
+			}
+		}
+	}
+
+	return false, true
 }

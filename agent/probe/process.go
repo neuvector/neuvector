@@ -3136,7 +3136,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		//}
 	}
 
-	// mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
+	mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
 	// ZeroDrift: allow a family member of the root process
 	if isFamilyProcess(c.children, proc) || bRuncChild {
 		// a family member
@@ -3168,6 +3168,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("SHD: rissky session")
 					break
 				}
+
 			}
 
 			bPass = true
@@ -3179,11 +3180,8 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					ppe.Uuid = share.CLUSReservedUuidAnchorMode
 				}
 			}
-		case share.PolicyActionDeny: // from pmon during Protect mode
-			if ppe.Uuid == share.CLUSReservedUuidNotAlllowed {
-				// not a real deny rule
-				bPass = bImageFile
-			}
+		case share.PolicyActionDeny:
+			ppe.Uuid = share.CLUSReservedUuidNotAlllowed
 		}
 	} else {
 		switch ppe.Action {

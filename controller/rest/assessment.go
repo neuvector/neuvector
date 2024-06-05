@@ -19,10 +19,8 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
-	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -75,60 +73,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	resp.PropsUnavailable = []string{share.CriteriaKeyUser, share.CriteriaKeyK8sGroups}
 	resp.GlobalMode = mode
 	resp.Results = make([]*api.RESTAdmCtrlRulesTestResult, 0, len(yamlParts))
-
-	// first pass: put RBAC resources into OPA
-	// note the format and length of this guid is important, rego code rely on this signature
-	sessionGuid := fmt.Sprintf("%s_config_assessment_", utils.RandomString(5))
-	opaKeys := []string{}
-	for _, yamlPart := range yamlParts {
-		var sb strings.Builder
-		scanner := bufio.NewScanner(strings.NewReader(yamlPart))
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineTemp := strings.TrimSpace(line)
-			if len(lineTemp) == 0 || lineTemp[0] == byte('#') {
-				continue
-			} else {
-				sb.WriteString(line)
-				sb.WriteString("\n")
-			}
-		}
-		yamlPart = sb.String()
-		if len(yamlPart) == 0 {
-			continue
-		}
-
-		json_data, err := yaml.YAMLToJSON([]byte(yamlPart))
-		if err != nil {
-			msg = fmt.Sprintf("Invalid yaml: %s", err.Error())
-			log.WithFields(log.Fields{"i": i}).Error(msg)
-		} else {
-			var tempObj admissionRequestObject
-			if err := json.Unmarshal(json_data, &tempObj); err != nil {
-				msg = fmt.Sprintf("Invalid yaml: %s", err.Error())
-				log.WithFields(log.Fields{"i": i}).Error(msg)
-			} else {
-				switch tempObj.Kind {
-				case K8sKindRole:
-					docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s%s.%s", sessionGuid, tempObj.ObjectMeta.Namespace, tempObj.ObjectMeta.Name)
-					opaKeys = append(opaKeys, docKey)
-					opa.AddDocument(docKey, string(json_data))
-				case K8sKindClusterRole:
-					docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s%s", sessionGuid, tempObj.ObjectMeta.Name)
-					opaKeys = append(opaKeys, docKey)
-					opa.AddDocument(docKey, string(json_data))
-				case K8sKindRoleBinding:
-					docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s%s.%s", sessionGuid, tempObj.ObjectMeta.Namespace, tempObj.ObjectMeta.Name)
-					opaKeys = append(opaKeys, docKey)
-					opa.AddDocument(docKey, string(json_data))
-				case K8sKindClusterRoleBinding:
-					docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s%s", sessionGuid, tempObj.ObjectMeta.Name)
-					opaKeys = append(opaKeys, docKey)
-					opa.AddDocument(docKey, string(json_data))
-				}
-			}
-		}
-	}
 
 	for _, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -207,11 +151,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 		oneResult.Message = msg
 		resp.Results = append(resp.Results, &oneResult)
-	}
-
-	// cleanup, delete opa keys in opaKeys
-	for _, docKey := range opaKeys {
-		opa.DeleteDocument(docKey)
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Test admission control rules")
