@@ -1619,18 +1619,14 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 	return nil, 0, 0, errors.New("Common policy rules are too large")
 }
 
+//per node slot, since resource consuming address map
+//is already dealt with in preparePolicySlotsCommon separately
+//and policy is reorganized for each node, so slot number start small
+const beginSlotNode = 4
+
 func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte, int, int, error) {
 	//start from different base to save cpu
-	beginSlot := 0
-	if wlen < clusterSmall {
-		beginSlot = beginSlotSmall
-	} else if wlen < clusterMedium {
-		beginSlot = beginSlotMedium
-	} else if wlen < clusterLarge {
-		beginSlot = beginSlotLarge
-	} else {
-		beginSlot = beginSlotSuper
-	}
+	beginSlot := beginSlotNode
 	log.WithFields(log.Fields{
 			"wlen":           wlen,
 			"beginSlot":      beginSlot,
