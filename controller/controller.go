@@ -903,7 +903,6 @@ func main() {
 	logController(share.CLUSEvControllerJoin)
 
 	cache.PopulateRulesToOpa()
-	cache.PopulateDefRiskyRules()
 
 	go func() {
 		ticker := time.Tick(time.Second * time.Duration(5))

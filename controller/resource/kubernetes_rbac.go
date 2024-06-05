@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -17,7 +16,6 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
@@ -61,6 +59,7 @@ type k8sRole struct {
 	domain    string
 	nvRole    string              // deduced nv reserved role
 	nvPermits share.NvPermissions // deduced nv permissions, for Rancher SSO only
+	riskyTags int
 }
 
 type k8sRoleBinding struct {
@@ -144,6 +143,17 @@ var scannerSubjecstWanted []string = []string{"updater", "controller"}
 var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
+
+const (
+	RiskyRole_ViewSecret        = 1 << iota // 1 << 0 00001
+	RiskyRole_AnyActionWorkload             // 1 << 1
+	RiskyRole_AnyActionRBAC
+	RiskyRole_CreatePod
+	RiskyRole_ExecContainer
+)
+
+var riskyRoles = map[string]int{}
+var allRoleBindings = map[string]*k8sRoleBinding{}
 
 var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ // (cluster) role settings required by nv
 	NvAppRole: &k8sRbacRoleInfo{
@@ -719,6 +729,7 @@ func xlateRole(obj metav1.Object) (string, interface{}) {
 			domain: o.GetNamespace(),
 		}
 		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules) // Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 	} else if o, ok := obj.(*rbacv1b1.Role); ok {
 		ver = "v1beta1"
 		role = k8sRole{
@@ -727,6 +738,7 @@ func xlateRole(obj metav1.Object) (string, interface{}) {
 			domain: o.GetNamespace(),
 		}
 		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules) // Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 	}
 
 	if rules != nil {
@@ -752,6 +764,7 @@ func xlateClusRole(obj metav1.Object) (string, interface{}) {
 			name: o.GetName(),
 		}
 		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules)
 	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
 		ver = "v1beta1"
 		role = k8sRole{
@@ -759,6 +772,7 @@ func xlateClusRole(obj metav1.Object) (string, interface{}) {
 			name: o.GetName(),
 		}
 		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules)
 	}
 
 	if rules != nil {
@@ -803,10 +817,8 @@ func xlateRoleBinding(obj metav1.Object) (string, interface{}) {
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.Name, domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
 		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
@@ -843,10 +855,8 @@ func xlateRoleBinding(obj metav1.Object) (string, interface{}) {
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.Name, domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
 		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
@@ -886,10 +896,8 @@ func xlateClusRoleBinding(obj metav1.Object) (string, interface{}) {
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.Name, domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
 		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
@@ -925,10 +933,8 @@ func xlateClusRoleBinding(obj metav1.Object) (string, interface{}) {
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.Name, domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
 		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
@@ -1000,6 +1006,8 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 				cacheRbacEvent(d.flavor, msg, false)
 			}
 		}
+
+		delete(riskyRoles, fmt.Sprintf("%s#%s", o.domain, o.name))
 	} else {
 		n = res.(*k8sRole)
 		ref := k8sObjectRef{name: n.name, domain: n.domain}
@@ -1020,7 +1028,12 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 			delete(d.permitsCache, ref)
 		}
 		if old == nil || *(old.(*k8sRole)) != *n { // only for reducing debug logs
-			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole, "nv-perms": n.nvPermits}).Debug("Update role")
+			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole, "nv-perms": n.nvPermits, "risky": n.riskyTags}).Debug("Update role")
+		}
+
+		if n.riskyTags > 0 {
+			key := fmt.Sprintf("%s#%s", n.domain, n.name)
+			riskyRoles[key] = n.riskyTags
 		}
 
 		// starting from 5.1.3, we do not upgrade CRD schema anymore
@@ -1134,9 +1147,17 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 				d.rbacEvaluateUser(u)
 			}
 		}
+
+		bindingName := fmt.Sprintf("%s#%s", o.domain, o.name)
+		delete(allRoleBindings, bindingName)
 	} else {
 		n = res.(*k8sRoleBinding)
 		newRoleRef = k8sRoleRef{role: n.role, domain: n.domain}
+
+		if len(n.svcAccounts) > 0 {
+			bindingName := fmt.Sprintf("%s#%s", n.domain, n.name)
+			allRoleBindings[bindingName] = n
+		}
 
 		// sometimes Rancher doesn't delete a user's rolebinding, {user_id}-global-catalog-binding(in cattle-global-data ns), when the Rancher user is deleted.
 		// so we simply ignore rolebinding {user_id}-global-catalog-binding(binds a k8s user to global-catalog role in cattle-global-data ns)
@@ -1978,97 +1999,84 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	return clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors
 }
 
-func xlateRole2(obj metav1.Object, action string) {
-	var namespace string
-	var name string
-	var rbacBytes []byte
-
-	if o, ok := obj.(*rbacv1.Role); ok {
-		namespace = o.GetNamespace()
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	} else if o, ok := obj.(*rbacv1b1.Role); ok {
-		namespace = o.GetNamespace()
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	}
-
-	if name != "" {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", namespace, name)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacBytes))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
+func deduceRiskyRole(objs interface{}) int {
+	var tags int
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
+		for _, rule := range rules {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			rscs := utils.NewSetFromSliceKind(rule.Resources)
+			if verbs.Cardinality() == 0 && rscs.Cardinality() == 0 {
+				continue
+			}
+			tags = tagRiskyRoles(verbs, rscs)
+		}
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
+		for _, rule := range rules {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			rscs := utils.NewSetFromSliceKind(rule.Resources)
+			if verbs.Cardinality() == 0 && rscs.Cardinality() == 0 {
+				continue
+			}
+			tags = tagRiskyRoles(verbs, rscs)
 		}
 	}
+
+	return tags
 }
 
-func xlateRoleBinding2(obj metav1.Object, action string) {
-	var namespace string
-	var name string
-	var rbacBytes []byte
+func tagRiskyRoles(verbs, rscs utils.Set) int {
+	var tags int
 
-	if o, ok := obj.(*rbacv1.RoleBinding); ok {
-		namespace = o.GetNamespace()
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
-		namespace = o.GetNamespace()
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
+	// risky_role_view_secret
+	CheckRscs := utils.NewSet("secrets", "*")
+	CheckVerbs := utils.NewSet("*", "get", "list", "watch")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_ViewSecret
 	}
 
-	if name != "" {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", namespace, name)
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacBytes))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
+	// risky_role_create_pod
+	CheckRscs = utils.NewSet("pods", "deployments", "cronjobs", "jobs", "daemonsets", "statefulsets", "replicasets", "replicationcontrollers", "*")
+	CheckVerbs = utils.NewSet("*", "create")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_CreatePod
 	}
+
+	// risky_role_any_action_workload
+	CheckRscs = utils.NewSet("pods", "deployments", "cronjobs", "jobs", "daemonsets", "statefulsets", "replicasets", "replicationcontrollers", "*")
+	CheckVerbs = utils.NewSet("*")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_AnyActionWorkload
+	}
+
+	// risky_role_any_action_rbac
+	CheckRscs = utils.NewSet("roles", "clusterroles", "rolebindings", "clusterrolebindings", "*")
+	CheckVerbs = utils.NewSet("*")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_AnyActionRBAC
+	}
+
+	// risky_role_exec_into_container
+	CheckRscs = utils.NewSet("pods/exec")
+	CheckVerbs = utils.NewSet("*", "create")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_ExecContainer
+	}
+
+	return tags
 }
 
-func xlateClusRole2(obj metav1.Object, action string) {
-	var name string
-	var rbacBytes []byte
-
-	if o, ok := obj.(*rbacv1.ClusterRole); ok {
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	}
-
-	if name != "" {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", name)
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacBytes))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
+func GetAllRiskyRolesByServiceAccount(saName, namespace string) ([]int, error) {
+	riskyTags := make([]int, 0)
+	for _, binding := range allRoleBindings {
+		for _, sa := range binding.svcAccounts {
+			if sa.domain == namespace && sa.name == saName {
+				roleKey := fmt.Sprintf("%s#%s", binding.role.domain, binding.role.name)
+				if tags, exist := riskyRoles[roleKey]; exist {
+					riskyTags = append(riskyTags, tags)
+					log.WithFields(log.Fields{"saName": saName, "ns": namespace, "roleKey": roleKey, "riskyTags": tags}).Debug("found risky role for service account")
+				}
+			}
 		}
 	}
-}
-
-func xlateClusRoleBinding2(obj metav1.Object, action string) {
-	var name string
-	var rbacBytes []byte
-
-	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
-		name = o.GetName()
-		rbacBytes, _ = json.Marshal(o)
-	}
-
-	if name != "" {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", name)
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacBytes))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-	}
+	return riskyTags, nil
 }
