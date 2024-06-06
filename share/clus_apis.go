@@ -827,26 +827,53 @@ type CLUSEULA struct {
 	Accepted bool `json:"accepted"`
 }
 
+type NvPermissions struct {
+	ReadValue  uint32 `json:"read_value"`
+	WriteValue uint32 `json:"write_value"`
+}
+
+func (p *NvPermissions) IsEmpty() bool {
+	return (p.ReadValue == 0 && p.WriteValue == 0)
+}
+
+// whether this permissions object is treated as reserved role reader
+func (p *NvPermissions) IsReaderEqual() bool {
+	//return p.ReadValue == PERMS_GLOBAL_CONFIGURABLE_READ
+	return false
+}
+
+func (p *NvPermissions) HasPermFed() bool {
+	return ((p.ReadValue&PERM_FED) != 0 || (p.WriteValue&PERM_FED) != 0)
+}
+
+type CLUSPermitsAssigned struct {
+	Permits NvPermissions `json:"permissions"`
+	Domains []string      `json:"domains"` // all domains in this slice have the same permissions assigned
+}
+
 type CLUSUser struct {
-	Fullname            string              `json:"fullname"`
-	Username            string              `json:"username"`
-	PasswordHash        string              `json:"password_hash"`
-	PwdResetTime        time.Time           `json:"pwd_reset_time"`
-	PwdHashHistory      []string            `json:"pwd_hash_history"` // not including the current password's hash
-	Domain              string              `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
-	Server              string              `json:"server"`
-	EMail               string              `json:"email"`
-	Role                string              `json:"role"`
-	RoleOverride        bool                `json:"role_oride"` // Used for shadow user
-	Timeout             uint32              `json:"timeout"`
-	Locale              string              `json:"locale"`
-	RoleDomains         map[string][]string `json:"role_domains"`
-	LastLoginAt         time.Time           `json:"last_login_at"`
-	LoginCount          uint32              `json:"login_count"`
-	FailedLoginCount    uint32              `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
-	BlockLoginSince     time.Time           `json:"block_login_since"`  // reset to 0 after a successful login
-	AcceptedAlerts      []string            `json:"accepted_alerts,omitempty"`
-	ResetPwdInNextLogin bool                `json:"reset_password_in_next_login"`
+	Fullname            string                `json:"fullname"`
+	Username            string                `json:"username"`
+	PasswordHash        string                `json:"password_hash"`
+	PwdResetTime        time.Time             `json:"pwd_reset_time"`
+	PwdHashHistory      []string              `json:"pwd_hash_history"` // not including the current password's hash
+	Domain              string                `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
+	Server              string                `json:"server"`
+	EMail               string                `json:"email"`
+	Role                string                `json:"role"`
+	RoleOverride        bool                  `json:"role_oride"` // Used for shadow user
+	Timeout             uint32                `json:"timeout"`
+	Locale              string                `json:"locale"`
+	RoleDomains         map[string][]string   `json:"role_domains"`
+	ExtraPermits        NvPermissions         `json:"extra_permits"`         // extra permissions(other than 'Role') on global domain. only for Rancher SSO
+	ExtraPermitsDomains []CLUSPermitsAssigned `json:"extra_permits_domains"` // list of extra permissions(other than 'RoleDomains') on namespaces. only for Rancher SSO
+	LastLoginAt         time.Time             `json:"last_login_at"`
+	LoginCount          uint32                `json:"login_count"`
+	FailedLoginCount    uint32                `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
+	BlockLoginSince     time.Time             `json:"block_login_since"`  // reset to 0 after a successful login
+	AcceptedAlerts      []string              `json:"accepted_alerts,omitempty"`
+	ResetPwdInNextLogin bool                  `json:"reset_password_in_next_login"`
+	UseBootstrapPwd     bool                  `json:"use_bootstrap_password"`
 }
 
 type GroupRoleMapping struct {
@@ -1016,6 +1043,21 @@ type CLUSNetworkEP struct {
 	IP        []net.IP `json:"ip"`
 }
 
+type CLUSGroupMetric struct {
+	GroupName      string                   `json:"group_name"`
+	GroupSessCurIn uint32                   `json:"group_sess_cur_in"`
+	GroupSessIn60  uint32                   `json:"group_sess_in60"`
+	GroupByteIn60  uint64                   `json:"group_byte_in60"`
+	WlMetric       map[string]*CLUSWlMetric `json:"wl_metric"`
+}
+
+type CLUSWlMetric struct {
+	WlID        string `json:"wlid"`
+	WlSessCurIn uint32 `json:"wl_sess_cur_in"`
+	WlSessIn60  uint32 `json:"wl_sess_in60"`
+	WlByteIn60  uint64 `json:"wl_byte_in60"`
+}
+
 type CLUSWorkload struct {
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
@@ -1102,6 +1144,10 @@ type CLUSGroup struct {
 	CapIntcp        bool                `json:"cap_intcp"`
 	CfgType         TCfgType            `json:"cfg_type"`
 	BaselineProfile string              `json:"baseline_profile"`
+	MonMetric       bool                `json:"monitor_metric,omitempty"`
+	GrpSessCur      uint32              `json:"group_sess_cur,omitempty"`
+	GrpSessRate     uint32              `json:"group_sess_rate,omitempty"`
+	GrpBandWidth    uint32              `json:"group_band_width,omitempty"`
 }
 
 type CLUSPolicyRule struct {
@@ -1339,6 +1385,7 @@ const (
 	CLUSEvScannerAutoScaleDisabled   // when scanner autoscale is disabled by controller
 	CLUSEvCrdSkipped                 // for crd Config import
 	CLUSEvK8sAdmissionWebhookCChange // for admission control
+	CLUSEvGroupMetricViolation       //network metric violation per group level
 )
 
 const (
@@ -1371,27 +1418,28 @@ const (
 )
 
 type CLUSEventLog struct {
-	Event          TLogEvent         `json:"event"`
-	HostID         string            `json:"host_id"`
-	HostName       string            `json:"host_name"`
-	ControllerID   string            `json:"controller_id"`
-	ControllerName string            `json:"controller_name"`
-	AgentID        string            `json:"agent_id"`
-	AgentName      string            `json:"agent_name"`
-	WorkloadID     string            `json:"workload_id"`
-	WorkloadName   string            `json:"workload_name"`
-	ReportedAt     time.Time         `json:"reported_at"`
-	User           string            `json:"user"`
-	UserRoles      map[string]string `json:"user_roles"`
-	UserAddr       string            `json:"user_addr"`
-	UserSession    string            `json:"user_session"`
-	RESTMethod     string            `json:"rest_method,omitempty"`
-	RESTRequest    string            `json:"rest_request,omitempty"`
-	RESTBody       string            `json:"rest_body,omitempty"`
-	EnforcerLimit  int               `json:"enforcer_limit,omitempty"`
-	LicenseExpire  time.Time         `json:"license_expire,omitempty"`
-	GroupName      string            `json:"group_name"`
-	Msg            string            `json:"message"`
+	Event          TLogEvent                `json:"event"`
+	HostID         string                   `json:"host_id"`
+	HostName       string                   `json:"host_name"`
+	ControllerID   string                   `json:"controller_id"`
+	ControllerName string                   `json:"controller_name"`
+	AgentID        string                   `json:"agent_id"`
+	AgentName      string                   `json:"agent_name"`
+	WorkloadID     string                   `json:"workload_id"`
+	WorkloadName   string                   `json:"workload_name"`
+	ReportedAt     time.Time                `json:"reported_at"`
+	User           string                   `json:"user"`
+	UserRoles      map[string]string        `json:"user_roles"`       // domain -> role
+	UserPermits    map[string]NvPermissions `json:"user_permissions"` // domain -> permissions
+	UserAddr       string                   `json:"user_addr"`
+	UserSession    string                   `json:"user_session"`
+	RESTMethod     string                   `json:"rest_method,omitempty"`
+	RESTRequest    string                   `json:"rest_request,omitempty"`
+	RESTBody       string                   `json:"rest_body,omitempty"`
+	EnforcerLimit  int                      `json:"enforcer_limit,omitempty"`
+	LicenseExpire  time.Time                `json:"license_expire,omitempty"`
+	GroupName      string                   `json:"group_name"`
+	Msg            string                   `json:"message"`
 }
 
 type CLUSThreatLog struct {
@@ -2151,6 +2199,7 @@ func CLUSEmptyFedRulesRevision() *CLUSFedRulesRevision {
 			FedProcessProfilesType:     0,
 			FedSystemConfigType:        0,
 		},
+		LastUpdateTime: time.Now().UTC(),
 	}
 
 	return fedRev
@@ -2182,6 +2231,13 @@ func CLUSFedKey2ClusterIdKey(key string) string {
 type CLUSRestServerInfo struct { // provided by admin
 	Server string `json:"server"`
 	Port   uint   `json:"port"`
+}
+
+func (restInfo CLUSRestServerInfo) IsValid() bool {
+	if restInfo.Server == "" || restInfo.Port == 0 {
+		return false
+	}
+	return true
 }
 
 type CLUSFedMasterClusterInfo struct {
@@ -2216,7 +2272,7 @@ type CLUSFedMembership struct { // stored on each cluster (master & joint cluste
 	JointCluster     CLUSFedJointClusterInfo  `json:"joint_cluster,omitempty"`  // meaningful when the role is "joint"
 	PendingDismiss   bool                     `json:"pending_dismiss"`          // set to true when the cluster is demoted/kicked & leaves fed. set to false when the fed rules cleanup is done
 	PendingDismissAt time.Time                `json:"pending_dismiss_at"`
-	UseProxy         string                   `json:"use_proxy"` // http / https
+	UseProxy         string                   `json:"use_proxy"` // "" / https
 }
 
 // fed registry scan data is always deployed
@@ -2252,7 +2308,8 @@ type CLUSClusterCspUsage struct {
 
 // fed ruleTypes' revision data. stored under object/config/federation/rules_revision
 type CLUSFedRulesRevision struct {
-	Revisions map[string]uint64 `json:"revisions"` // key is fed rules type, value is revision
+	Revisions      map[string]uint64 `json:"revisions"` // key is fed rules type, value is revision
+	LastUpdateTime time.Time         `json:"last_update_time"`
 }
 
 type CLUSFedDoPingPoll struct {
@@ -2681,8 +2738,8 @@ type CLUSUserRoleInternal struct {
 	Name         string `json:"name"`
 	Comment      string `json:"comment"`
 	Reserved     bool   `json:"reserved"`      // true for pre-defined non-hidden roles: fedAdmin/admin/reader
-	ReadPermits  uint64 `json:"read_permits"`  // sum of all  read permissions of this role
-	WritePermits uint64 `json:"write_permits"` // sum of all write permissions of this role
+	ReadPermits  uint32 `json:"read_permits"`  // sum of all  read permissions of this role
+	WritePermits uint32 `json:"write_permits"` // sum of all write permissions of this role
 }
 
 type CLUSCIScanDummy struct{} // dummy type just for access control checking purpose
@@ -2814,7 +2871,7 @@ const (
 	ReviewTypeDisplayDLP         = "DLP Configurations"               // interactive import
 	ReviewTypeDisplayWAF         = "WAF Configurations"               // interactive import
 	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"            // interactive import
-	ReviewTypeDisplayCompProfile = "compliance Profile"               // interactive import
+	ReviewTypeDisplayCompProfile = "Compliance Profile"               // interactive import
 )
 
 // Telemetry (upgrade responder)

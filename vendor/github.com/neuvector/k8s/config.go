@@ -17,7 +17,7 @@ limitations under the License.
 package k8s
 
 import (
-	"github.com/neuvector/k8s/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Where possible, json tags match the cli argument names.

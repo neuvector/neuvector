@@ -1,0 +1,363 @@
+apiVersion: v1
+items:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+      creationTimestamp: '2024-01-26T00:00:00Z'
+      generation: 1
+      labels:
+        app: neuvector-updater-pod
+        batch.kubernetes.io/controller-uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+        batch.kubernetes.io/job-name: neuvector-updater-pod-28437120
+        controller-uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+        job-name: neuvector-updater-pod-28437120
+        release: release-name
+      name: neuvector-updater-pod-28437120
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: batch/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: CronJob
+          name: neuvector-updater-pod
+          uid: f1a82a25-eee7-4a3a-92e8-49a279a63f43
+      resourceVersion: '1325246'
+      uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: neuvector-updater-pod
+            batch.kubernetes.io/controller-uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+            batch.kubernetes.io/job-name: neuvector-updater-pod-28437120
+            controller-uid: 6638e5f2-8f92-4ada-adbb-3730b39a390c
+            job-name: neuvector-updater-pod-28437120
+            release: release-name
+        spec:
+          containers:
+            - command:
+                - /bin/sh
+                - -c
+                - /usr/bin/curl -kv -X PATCH -H "Authorization:Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+                  -H "Content-Type:application/strategic-merge-patch+json" -d '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'`date
+                  +%Y-%m-%dT%H:%M:%S%z`'"}}}}}' 'https://kubernetes.default/apis/apps/v1/namespaces/neuvector/deployments/neuvector-scanner-pod'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/neuvector/updater:latest
+              imagePullPolicy: Always
+              name: neuvector-updater-pod
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+    status:
+      active: 1
+      ready: 0
+      startTime: '2024-01-26T00:00:00Z'
+      uncountedTerminatedPods: {}
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+      creationTimestamp: '2024-01-27T00:00:00Z'
+      generation: 1
+      labels:
+        app: neuvector-updater-pod
+        batch.kubernetes.io/controller-uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+        batch.kubernetes.io/job-name: neuvector-updater-pod-28438560
+        controller-uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+        job-name: neuvector-updater-pod-28438560
+        release: release-name
+      name: neuvector-updater-pod-28438560
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: batch/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: CronJob
+          name: neuvector-updater-pod
+          uid: f1a82a25-eee7-4a3a-92e8-49a279a63f43
+      resourceVersion: '1541301'
+      uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: neuvector-updater-pod
+            batch.kubernetes.io/controller-uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+            batch.kubernetes.io/job-name: neuvector-updater-pod-28438560
+            controller-uid: 2cd1c273-e1bc-45dc-a144-006abc3623cc
+            job-name: neuvector-updater-pod-28438560
+            release: release-name
+        spec:
+          containers:
+            - command:
+                - /bin/sh
+                - -c
+                - /usr/bin/curl -kv -X PATCH -H "Authorization:Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+                  -H "Content-Type:application/strategic-merge-patch+json" -d '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'`date
+                  +%Y-%m-%dT%H:%M:%S%z`'"}}}}}' 'https://kubernetes.default/apis/apps/v1/namespaces/neuvector/deployments/neuvector-scanner-pod'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/neuvector/updater:latest
+              imagePullPolicy: Always
+              name: neuvector-updater-pod
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+    status:
+      active: 1
+      ready: 0
+      startTime: '2024-01-27T00:00:00Z'
+      uncountedTerminatedPods: {}
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+      creationTimestamp: '2024-01-28T00:00:00Z'
+      generation: 1
+      labels:
+        app: neuvector-updater-pod
+        batch.kubernetes.io/controller-uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+        batch.kubernetes.io/job-name: neuvector-updater-pod-28440000
+        controller-uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+        job-name: neuvector-updater-pod-28440000
+        release: release-name
+      name: neuvector-updater-pod-28440000
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: batch/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: CronJob
+          name: neuvector-updater-pod
+          uid: f1a82a25-eee7-4a3a-92e8-49a279a63f43
+      resourceVersion: '1758196'
+      uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: neuvector-updater-pod
+            batch.kubernetes.io/controller-uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+            batch.kubernetes.io/job-name: neuvector-updater-pod-28440000
+            controller-uid: d01f3275-99e9-4b59-b3ca-f30fb8593c52
+            job-name: neuvector-updater-pod-28440000
+            release: release-name
+        spec:
+          containers:
+            - command:
+                - /bin/sh
+                - -c
+                - /usr/bin/curl -kv -X PATCH -H "Authorization:Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+                  -H "Content-Type:application/strategic-merge-patch+json" -d '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'`date
+                  +%Y-%m-%dT%H:%M:%S%z`'"}}}}}' 'https://kubernetes.default/apis/apps/v1/namespaces/neuvector/deployments/neuvector-scanner-pod'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/neuvector/updater:latest
+              imagePullPolicy: Always
+              name: neuvector-updater-pod
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+    status:
+      active: 1
+      ready: 0
+      startTime: '2024-01-28T00:00:00Z'
+      uncountedTerminatedPods: {}
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+      creationTimestamp: '2024-01-29T00:00:00Z'
+      generation: 1
+      labels:
+        app: neuvector-updater-pod
+        batch.kubernetes.io/controller-uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+        batch.kubernetes.io/job-name: neuvector-updater-pod-28441440
+        controller-uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+        job-name: neuvector-updater-pod-28441440
+        release: release-name
+      name: neuvector-updater-pod-28441440
+      namespace: neuvector
+      ownerReferences:
+        - apiVersion: batch/v1
+          blockOwnerDeletion: true
+          controller: true
+          kind: CronJob
+          name: neuvector-updater-pod
+          uid: f1a82a25-eee7-4a3a-92e8-49a279a63f43
+      resourceVersion: '1975964'
+      uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: neuvector-updater-pod
+            batch.kubernetes.io/controller-uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+            batch.kubernetes.io/job-name: neuvector-updater-pod-28441440
+            controller-uid: 8dfde348-44bf-4459-984f-575e1cec1c03
+            job-name: neuvector-updater-pod-28441440
+            release: release-name
+        spec:
+          containers:
+            - command:
+                - /bin/sh
+                - -c
+                - /usr/bin/curl -kv -X PATCH -H "Authorization:Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+                  -H "Content-Type:application/strategic-merge-patch+json" -d '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'`date
+                  +%Y-%m-%dT%H:%M:%S%z`'"}}}}}' 'https://kubernetes.default/apis/apps/v1/namespaces/neuvector/deployments/neuvector-scanner-pod'
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/neuvector/updater:latest
+              imagePullPolicy: Always
+              name: neuvector-updater-pod
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+    status:
+      active: 1
+      ready: 0
+      startTime: '2024-01-29T00:00:00Z'
+      uncountedTerminatedPods: {}
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        batch.kubernetes.io/job-tracking: ''
+        cert-upgrader-uid: b8ec570e-444b-4866-b2f3-76fb4fe8c70ae04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+      creationTimestamp: '2024-01-25T23:00:08Z'
+      generation: 1
+      labels:
+        batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        batch.kubernetes.io/job-name: neuvector-cert-upgrader-job
+        controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+        job-name: neuvector-cert-upgrader-job
+      name: neuvector-cert-upgrader-job
+      namespace: neuvector
+      resourceVersion: '1316968'
+      uid: 26921c92-cfef-4056-97c0-e0a03a633308
+    spec:
+      backoffLimit: 6
+      completionMode: NonIndexed
+      completions: 1
+      parallelism: 1
+      selector:
+        matchLabels:
+          batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+      suspend: false
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            batch.kubernetes.io/controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+            batch.kubernetes.io/job-name: neuvector-cert-upgrader-job
+            controller-uid: 26921c92-cfef-4056-97c0-e0a03a633308
+            job-name: neuvector-cert-upgrader-job
+          name: neuvector-cert-upgrader-job
+          namespace: neuvector
+        spec:
+          containers:
+            - command:
+                - /usr/local/bin/upgrader
+                - upgrader-job
+              env:
+                - name: OVERRIDE_CHECKSUM
+                  value: e04b8cbfeeac05100a751f0a9e239bf535db56fcea6fd27f7d0f3e4e257265c3
+                - name: EXPIRY_CERT_THRESHOLD
+                  value: 87600h
+              image: 396800944890.dkr.ecr.us-east-1.amazonaws.com/controller:5.3.0-dev
+              imagePullPolicy: Always
+              name: cert-upgrader
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: my-docker-secret
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+    status:
+      completionTime: '2024-01-25T23:04:38Z'
+      conditions:
+        - lastProbeTime: '2024-01-25T23:04:38Z'
+          lastTransitionTime: '2024-01-25T23:04:38Z'
+          status: 'True'
+          type: Complete
+      ready: 0
+      startTime: '2024-01-25T23:00:08Z'
+      succeeded: 1
+      uncountedTerminatedPods: {}
+kind: List
+metadata:
+  resourceVersion: ''

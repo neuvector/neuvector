@@ -109,8 +109,8 @@ typedef struct proc_info_ {
 } proc_info_t;
 
 #define SCRIPT_SYSCTL   "sysctl -p"
-#define SCRIPT_CONFIG   "/usr/local/bin/configure.sh"
-#define SCRIPT_TEARDOWN "/usr/local/bin/teardown.sh"
+#define SCRIPT_CONFIG   "/usr/local/bin/scripts/configure.sh"
+#define SCRIPT_TEARDOWN "/usr/local/bin/scripts/teardown.sh"
 //#define SCRIPT_KILL_CONSUL "kill $(pgrep consul)"
 #define SCRIPT_KILL_CONSUL "consul leave"
 

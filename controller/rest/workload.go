@@ -3,7 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"time"
@@ -475,7 +475,7 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTWorkloadConfigCfgData
 	err = json.Unmarshal(body, &rconf)
@@ -703,7 +703,7 @@ func handlerWorkloadRequest(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var req api.RESTWorkloadRequestData
 	err = json.Unmarshal(body, &req)

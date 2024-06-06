@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -30,8 +30,8 @@ func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if authService := isTokenDemand(resp); authService != nil {
 		// We need authentication.
 		// At this point, we don't need resp.Body anymore.  Consume its buffer and close it, so golang can reuse its TCP connection.
-		// While resp.Body.Close() and ioutil.ReadAll() can fail, there is no point to stop the processing here.
-		_, _ = ioutil.ReadAll(resp.Body)
+		// While resp.Body.Close() and io.ReadAll() can fail, there is no point to stop the processing here.
+		_, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		resp, err = t.authAndRetry(authService, req)
 	}
@@ -73,7 +73,7 @@ func (t *TokenTransport) auth(authService *authService) (string, *http.Response,
 
 	if response.StatusCode != http.StatusOK {
 		var newerr error
-		errmsg, err := ioutil.ReadAll(response.Body)
+		errmsg, err := io.ReadAll(response.Body)
 		if err != nil {
 			newerr = fmt.Errorf("failed to authenticate: %d: failed to read error message: %w", response.StatusCode, err)
 		} else {

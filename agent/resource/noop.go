@@ -37,8 +37,8 @@ func (d *noop) GetAuthServerAlias() string {
 	return ""
 }
 
-func (d *noop) GetUserRoles(username string, subjType uint8) (map[string]string, error) {
-	return nil, ErrMethodNotSupported
+func (d *noop) GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvPermissions, error) {
+	return nil, nil, ErrMethodNotSupported
 }
 
 func (d *noop) ListUsers() []orchAPI.UserRBAC {

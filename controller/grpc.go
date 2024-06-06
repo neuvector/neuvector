@@ -280,6 +280,12 @@ func (ss *ScanService) SubmitScanResult(ctx context.Context, result *share.ScanR
 	return &share.RPCVoid{}, err
 }
 
+func (s *ScanService) GetCaps(ctx context.Context, v *share.RPCVoid) (*share.ControllerCaps, error) {
+	return &share.ControllerCaps{
+		CriticalVul: false,
+	}, nil
+}
+
 // --
 
 type ScanAdapterService struct {

@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
-	k8sAppsv1 "github.com/neuvector/k8s/apis/apps/v1"
-	k8sMetav1 "github.com/neuvector/k8s/apis/meta/v1"
-
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
@@ -47,6 +44,7 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
+	//"github.com/neuvector/neuvector/vendor/github.com/neuvector/k8s"
 )
 
 const (
@@ -580,47 +578,42 @@ func mergeMaps(labels1, labels2 map[string]string) map[string]string {
 // kind, name, ns are owner's attributes
 func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, bool) {
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
-		var objectMeta *k8sMetav1.ObjectMeta
+		var ownerReferences []metav1.OwnerReference
 		switch kind {
 		case resource.RscTypeStatefulSet:
 			// support pod -> statefulset
-			if ssObj := obj.(*k8sAppsv1.StatefulSet); ssObj != nil {
-				if len(ssObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(ssObj.Metadata.Labels, ssObj.Spec.Template.Metadata.Labels), mergeMaps(ssObj.Metadata.Annotations, ssObj.Spec.Template.Metadata.Annotations), true
+			if ssObj, ok := obj.(*appsv1.StatefulSet); ok {
+				if len(ssObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(ssObj.Labels, ssObj.Spec.Template.Labels), mergeMaps(ssObj.Annotations, ssObj.Spec.Template.Annotations), true
 				}
 			}
 		case resource.RscTypeReplicaSet:
 			// support pod -> replicaset -> deployment for now
-			if rsObj := obj.(*k8sAppsv1.ReplicaSet); rsObj != nil {
-				objectMeta = rsObj.Metadata
+			if rsObj, ok := obj.(*appsv1.ReplicaSet); ok {
+				ownerReferences = rsObj.OwnerReferences
 			}
 		case resource.RscTypeDeployment:
-			if deployObj := obj.(*k8sAppsv1.Deployment); deployObj != nil {
-				if len(deployObj.Metadata.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(deployObj.Metadata.Labels, deployObj.Spec.Template.Metadata.Labels), mergeMaps(deployObj.Metadata.Annotations, deployObj.Spec.Template.Metadata.Annotations), true
+			if deployObj, ok := obj.(*appsv1.Deployment); ok {
+				if len(deployObj.OwnerReferences) == 0 {
+					return "", utils.NewSet(), mergeMaps(deployObj.Labels, deployObj.Spec.Template.Labels), mergeMaps(deployObj.Annotations, deployObj.Spec.Template.Annotations), true
 				}
 			}
 		}
-		if objectMeta != nil {
-			for _, ownerRef := range objectMeta.OwnerReferences {
-				if ownerRef == nil {
-					continue
-				}
-				admResCacheMutex.RLock()
-				ownerObject, exist := admResCache[ownerRef.GetUid()]
-				admResCacheMutex.RUnlock()
-				if exist {
-					if len(ownerObject.OwnerUIDs) == 0 {
-						// owner is root resource (most likely deployment)
-						return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
-					} else {
-						log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
-					}
+		for _, ownerRef := range ownerReferences {
+			admResCacheMutex.RLock()
+			ownerObject, exist := admResCache[string(ownerRef.UID)]
+			admResCacheMutex.RUnlock()
+			if exist {
+				if len(ownerObject.OwnerUIDs) == 0 {
+					// owner is root resource (most likely deployment)
+					return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
 				} else {
-					// trace up one layer in the owner chain
-					if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.GetKind()), ownerRef.GetName(), ns); found {
-						return userName, groups, labels, annotations, true
-					}
+					log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
+				}
+			} else {
+				// trace up one layer in the owner chain
+				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.Kind), ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations, true
 				}
 			}
 		}
@@ -688,6 +681,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	var specLabels map[string]string
 	var specAnnotations map[string]string
 	var allContainers [3][]*nvsysadmission.AdmContainerInfo
+	var saName string
 	if podSpec != nil {
 		switch podSpec.(type) {
 		case *corev1.PodTemplateSpec:
@@ -695,9 +689,11 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 			allContainers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
 			specLabels = podTemplateSpec.ObjectMeta.Labels
 			specAnnotations = podTemplateSpec.ObjectMeta.Annotations
+			saName = podTemplateSpec.Spec.ServiceAccountName
 		case *corev1.PodSpec:
 			podSpec, _ := podSpec.(*corev1.PodSpec)
 			allContainers, _ = parsePodSpec(objectMeta, podSpec)
+			saName = podSpec.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
 		}
@@ -724,16 +720,17 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	}
 
 	resObject := &nvsysadmission.AdmResObject{
-		ValidUntil:    time.Now().Add(time.Minute * 5).Unix(),
-		Kind:          req.Kind.Kind,
-		Name:          objectMeta.Name,
-		Namespace:     objectMeta.Namespace,
-		UserName:      userName,
-		Groups:        groups,
-		OwnerUIDs:     ownerUIDs,
-		Labels:        labels,
-		Annotations:   annotations,
-		AllContainers: allContainers,
+		ValidUntil:         time.Now().Add(time.Minute * 5).Unix(),
+		Kind:               req.Kind.Kind,
+		Name:               objectMeta.Name,
+		Namespace:          objectMeta.Namespace,
+		UserName:           userName,
+		Groups:             groups,
+		OwnerUIDs:          ownerUIDs,
+		Labels:             labels,
+		Annotations:        annotations,
+		AllContainers:      allContainers,
+		ServiceAccountName: saName,
 		// AdmResults: make(map[string]*nvsysadmission.AdmResult), // comment out because we do not re-use the matching result of owners anymore.
 	}
 	admResCacheMutex.Lock()
@@ -1129,17 +1126,6 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
-	case K8sKindRole, K8sKindRoleBinding, K8sKindClusterRole, K8sKindClusterRoleBinding:
-		docKey := formatOpaDocKey(ar)
-		jsonData, err := json.Marshal(ar)
-		if err != nil {
-			// log error message
-			log.WithFields(log.Fields{"docKey": docKey, "err": err}).Error("failed add rbac res to OPA")
-		} else {
-			opa.AddDocument(docKey, string(jsonData))
-			updateToOtherControllers(docKey, string(jsonData))
-		}
-		return composeResponse(nil), nil, reqIgnored
 	case k8sKindPersistentVolumeClaim:
 		return validatePVC(admission.NvAdmValidateType, ar, mode, defaultAction, forTesting)
 	default:
@@ -1404,7 +1390,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -1567,7 +1553,7 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 
 	if clientAuth {
 		clientCACert := tlsClientCA
-		caCert, err := ioutil.ReadFile(clientCACert)
+		caCert, err := os.ReadFile(clientCACert)
 		if err != nil {
 			log.WithFields(log.Fields{"svcName": svcName}).Info("Cannot load CA cert for client authentication")
 			log.Fatal(err)
@@ -1708,21 +1694,6 @@ func updateToOtherControllers(docKey string, jsonData string) {
 			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
 		}
 	}
-}
-
-func formatOpaDocKey(ar *admissionv1beta1.AdmissionReview) string {
-	req := ar.Request
-	switch req.Kind.Kind {
-	case K8sKindRole:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", req.Namespace, req.Name)
-	case K8sKindRoleBinding:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", req.Namespace, req.Name)
-	case K8sKindClusterRole:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", req.Name)
-	case K8sKindClusterRoleBinding:
-		return fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", req.Name)
-	}
-	return ""
 }
 
 func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {

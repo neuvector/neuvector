@@ -1,0 +1,1130 @@
+{
+    "D.1.1.1": {
+        "Tags": []
+    },
+    "D.1.1.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.1.1.3": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.4": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.5": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.6": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.7": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.8": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.9": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.10": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.11": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.12": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.13": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.14": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.15": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.16": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.17": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.1.18": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "D.1.2.1": {
+        "Tags": []
+    },
+    "D.1.2.2": {
+        "Tags": []
+    },
+    "D.2.1": {
+        "Tags": []
+    },
+    "D.2.2": {
+        "Tags": []
+    },
+    "D.2.3": {
+        "Tags": []
+    },
+    "D.2.4": {
+        "Tags": []
+    },
+    "D.2.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.2.6": {
+        "Tags": []
+    },
+    "D.2.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.2.8": {
+        "Tags": []
+    },
+    "D.2.9": {
+        "Tags": []
+    },
+    "D.2.10": {
+        "Tags": []
+    },
+    "D.2.11": {
+        "Tags": []
+    },
+    "D.2.12": {
+        "Tags": []
+    },
+    "D.2.13": {
+        "Tags": []
+    },
+    "D.2.14": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.2.15": {
+        "Tags": []
+    },
+    "D.2.16": {
+        "Tags": []
+    },
+    "D.2.17": {
+        "Tags": []
+    },
+    "D.2.18": {
+        "Tags": []
+    },
+    "D.3.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.8": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.9": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.10": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.11": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.12": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.13": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.14": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.15": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.16": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.17": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.18": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.19": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.20": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.21": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.3.22": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "D.4.1": {
+        "Tags": []
+    },
+    "D.4.2": {
+        "Tags": []
+    },
+    "D.4.3": {
+        "Tags": []
+    },
+    "D.4.4": {
+        "Tags": []
+    },
+    "D.4.5": {
+        "Tags": []
+    },
+    "D.4.6": {
+        "Tags": []
+    },
+    "D.4.7": {
+        "Tags": []
+    },
+    "D.4.8": {
+        "Tags": []
+    },
+    "D.4.9": {
+        "Tags": []
+    },
+    "D.4.10": {
+        "Tags": []
+    },
+    "D.4.11": {
+        "Tags": []
+    },
+    "D.4.12": {
+        "Tags": []
+    },
+    "D.6.1": {
+        "Tags": []
+    },
+    "D.6.2": {
+        "Tags": []
+    },
+    "D.5.1": {
+        "Tags": []
+    },
+    "D.5.2": {
+        "Tags": []
+    },
+    "D.5.3": {
+        "Tags": []
+    },
+    "D.5.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.8": {
+        "Tags": []
+    },
+    "D.5.9": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.10": {
+        "Tags": []
+    },
+    "D.5.11": {
+        "Tags": []
+    },
+    "D.5.12": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.13": {
+        "Tags": []
+    },
+    "D.5.14": {
+        "Tags": []
+    },
+    "D.5.15": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.16": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.17": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.18": {
+        "Tags": []
+    },
+    "D.5.19": {
+        "Tags": []
+    },
+    "D.5.20": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.21": {
+        "Tags": []
+    },
+    "D.5.22": {
+        "Tags": []
+    },
+    "D.5.23": {
+        "Tags": []
+    },
+    "D.5.24": {
+        "Tags": []
+    },
+    "D.5.25": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.26": {
+        "Tags": []
+    },
+    "D.5.27": {
+        "Tags": []
+    },
+    "D.5.28": {
+        "Tags": []
+    },
+    "D.5.29": {
+        "Tags": []
+    },
+    "D.5.30": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "D.5.31": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.1.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.8": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.9": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.10": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.11": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.12": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.13": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.14": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.15": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.16": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.17": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.18": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.19": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.20": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.1.21": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.8": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.9": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.10": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.11": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.12": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.13": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.14": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.15": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.16": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.17": {
+        "Tags": [
+            "HIPAA",
+            "PCI"
+        ]
+    },
+    "K.1.2.18": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.19": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.20": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.21": {
+        "Tags": []
+    },
+    "K.1.2.22": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.1.2.23": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.1.2.24": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.1.2.25": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.1.2.26": {
+        "Tags": []
+    },
+    "K.1.2.27": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.28": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.29": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.30": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.31": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.32": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.33": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.34": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.2.35": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.3.1": {
+        "Tags": []
+    },
+    "K.1.3.2": {
+        "Tags": []
+    },
+    "K.1.3.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.3.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.3.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.3.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.1.3.7": {
+        "Tags": []
+    },
+    "K.1.4.1": {
+        "Tags": []
+    },
+    "K.1.4.2": {
+        "Tags": []
+    },
+    "K.2.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.2.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.3.1.1": {
+        "Tags": []
+    },
+    "K.3.2.1": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.3.2.2": {
+        "Tags": [
+            "HIPAA",
+            "GDPR"
+        ]
+    },
+    "K.4.1.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.5": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.7": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.8": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.9": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.1.10": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.1": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.2": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.3": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.4": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.5": {
+        "Tags": []
+    },
+    "K.4.2.6": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.7": {
+        "Tags": []
+    },
+    "K.4.2.8": {
+        "Tags": []
+    },
+    "K.4.2.9": {
+        "Tags": []
+    },
+    "K.4.2.10": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.11": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.12": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    },
+    "K.4.2.13": {
+        "Tags": [
+            "HIPAA",
+            "PCI",
+            "GDPR"
+        ]
+    }
+}

@@ -5,7 +5,6 @@ package share;
 import "common.proto";
 import "scan.proto";
 
-
 service ControllerCapService {
   rpc IsGRPCCompressed(RPCVoid) returns (CLUSBoolean);
 }
@@ -45,11 +44,16 @@ message ScannerDeregisterData {
     string ID = 1;
 }
 
+message ControllerCaps {
+    bool CriticalVul = 1;
+}
+
 service ControllerScanService {
   rpc ScannerRegister(ScannerRegisterData) returns (RPCVoid);
   rpc ScannerRegisterStream(stream ScannerRegisterData) returns (RPCVoid);
   rpc ScannerDeregister(ScannerDeregisterData) returns (RPCVoid);
   rpc SubmitScanResult(ScanResult) returns (RPCVoid);
+  rpc GetCaps(RPCVoid) returns (ControllerCaps);
 }
 
 message CLUSFilePacket {
@@ -133,7 +137,10 @@ message CLUSConnection {
 	bool TmpOpen = 31;
 	bool UwlIp = 32;
 	string FQDN = 33;
-	bool Nbe = 34;
+	uint32 EpSessCurIn = 34;
+	uint32 EpSessIn60 = 35;
+	uint64 EpByteIn60 = 36;
+	bool Nbe = 37;
 }
 
 message CLUSConnectionArray {

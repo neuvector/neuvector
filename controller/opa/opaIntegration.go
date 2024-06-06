@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -82,7 +82,7 @@ func IsOpaRestarted() bool {
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"error": readErr}).Error("OPA error on ReadAll")
 		return false
@@ -159,7 +159,7 @@ func addObject(key string, contentType string, data string) bool {
 	}
 	defer resp.Body.Close()
 
-	_, readErr := ioutil.ReadAll(resp.Body)
+	_, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"key": key, "contentType": contentType, "error": err}).Error("OPA addObject NewRequest")
 		return false
@@ -221,7 +221,7 @@ func DeleteDocument(key string) {
 	}
 	defer resp.Body.Close()
 
-	_, readErr := ioutil.ReadAll(resp.Body)
+	_, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithFields(log.Fields{"key": key, "error": readErr}).Error("OPA delDocument NewRequest")
 		return
@@ -237,7 +237,7 @@ func DeleteDocument(key string) {
 }
 
 func OpaEval(policyPath string, inputFile string) (int, string, error) {
-	bytes, err := ioutil.ReadFile(inputFile)
+	bytes, err := os.ReadFile(inputFile)
 	if err != nil {
 		return -1, "", err
 	}
@@ -266,7 +266,7 @@ func OpaEvalByString(policyPath string, inputData string) (int, string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		return resp.StatusCode, "", err
 	}
@@ -312,43 +312,4 @@ func AnalyzeResult(response string) (bool, error) {
 		log.WithFields(log.Fields{"spec": spec}).Error("AnalyzeResult unsupported spec.")
 		return false, errors.New("rego execution error, unsupported spec")
 	}
-}
-
-func GetRiskyRoleRuleIDByName(ruleName string) int {
-	if IsOpaRestarted() {
-		RestoreOpaData()
-	}
-
-	client := getOpaHTTPClient()
-
-	// get the base64 string
-	mappingKey := FormatRiskyRuleMappingKey(ruleName)
-
-	url := fmt.Sprintf("%s%s", opaServer, mappingKey)
-	resp, getErr := client.Get(url)
-	if getErr != nil {
-		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("GetRiskyRoleRuleIDByName get error")
-		return 0
-	}
-	defer resp.Body.Close()
-
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		log.WithFields(log.Fields{"url": url, "error": getErr}).Error("GetRiskyRoleRuleIDByName error on ReadAll")
-		return 0
-	}
-
-	type MappingRuleId struct {
-		RuldID int `json:"ruleid"`
-	}
-
-	response := struct {
-		Result MappingRuleId `json:"result"`
-	}{}
-
-	if err := json.Unmarshal(body, &response); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("json.Unmarshal to OpaPolicy failed.")
-	}
-
-	return response.Result.RuldID
 }

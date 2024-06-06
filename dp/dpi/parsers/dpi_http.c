@@ -539,6 +539,8 @@ static int http_header_xforwarded_port_token(void *param, uint8_t *ptr, int len,
     while (l < end) {
         if (likely(isdigit(*l))) {
             xffport = xffport * 10 + ctoi(*l);
+        } else if (unlikely(*l == ',')) {
+            break;
         }
         l ++;
     }

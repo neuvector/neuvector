@@ -1,22 +1,21 @@
 package resource
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/neuvector/k8s"
-	rbacv1 "github.com/neuvector/k8s/apis/rbac/v1"
-	rbacv1b1 "github.com/neuvector/k8s/apis/rbac/v1beta1"
 	log "github.com/sirupsen/logrus"
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1b1 "k8s.io/api/rbac/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
-	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
@@ -34,6 +33,7 @@ const (
 )
 
 const globalRolePrefix string = "cattle-globalrole-"
+const nvPermRscPrefix string = "nv-perm."
 
 const constNvNamespace string = "{nv}"
 
@@ -54,11 +54,12 @@ type k8sRoleRef struct {
 }
 
 type k8sRole struct {
-	uid        string
-	name       string
-	domain     string
-	nvRole     string
-	apiRtVerbs map[string]map[string]utils.Set // apiGroup -> (resource -> verbs), for nv-related k8sRole only
+	uid       string
+	name      string
+	domain    string
+	nvRole    string              // deduced nv reserved role
+	nvPermits share.NvPermissions // deduced nv permissions, for Rancher SSO only
+	riskyTags int
 }
 
 type k8sRoleBinding struct {
@@ -116,21 +117,17 @@ var ocReaderVerbs utils.Set = utils.NewSet(
 )
 
 // Rancher SSO: apiGroup									resources		verbs
-//------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // fedAdmin:    in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
 // fedReader:   in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"get}   // "cattle-globalrole-....." clusterrole(with clusterrolebinding)
 // admin:       in {"read-only.neuvector.api.io", "*"}	 	"*"				in {"*"}    // clusterrole(with clusterrolebinding)
 // reader:      in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}  // clusterrole(with clusterrolebinding)
 // ns admin:    in {"read-only.neuvector.api.io", "*"}		"*"				in {"*"}    // clusterrole(with rolebinding) or role
 // ns reader:   in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}  // clusterrole(with rolebinding) or role
-var nvReadVerbs utils.Set = utils.NewSet("get")
-var nvWriteVerbs utils.Set = utils.NewSet("*")
-var nvPermissionRscs utils.Set
-var nvRscsMap map[string]utils.Set // key is apiGroup, value is (permission) resources
-
-//Rancher SSO : (phase-2) custom roles. Pseudo role has name "custom_:[pseudo name]"
-//var nvPermissionIndex map[string]int // For rancher only: permission -> index in the pseudo role's [pseudo name]
-//var nvIndexPermission map[int]string // For rancher only: index -> permission in the pseudo role's [pseudo name]
+var nvReadVerbSSO utils.Set = utils.NewSet("get")                                                          // for view in SSO role/permissions mapping
+var nvWriteVerbSSO utils.Set = utils.NewSet("create", "delete", "get", "list", "patch", "update", "watch") // for modify in SSO role/permissions mapping
+var nvRscMapSSO map[string]utils.Set                                                                       // key is apiGroup, value is (nv-perm) resources
+var nvPermitsValueSSO map[string]share.NvPermissions                                                       // for Rancher SSO
 
 var appRoleVerbs utils.Set = utils.NewSet("get", "list", "update", "watch")
 var rbacRoleVerbs utils.Set = utils.NewSet("get", "list", "watch")
@@ -146,6 +143,17 @@ var scannerSubjecstWanted []string = []string{"updater", "controller"}
 var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
+
+const (
+	RiskyRole_ViewSecret        = 1 << iota // 1 << 0 00001
+	RiskyRole_AnyActionWorkload             // 1 << 1
+	RiskyRole_AnyActionRBAC
+	RiskyRole_CreatePod
+	RiskyRole_ExecContainer
+)
+
+var riskyRoles = map[string]int{}
+var allRoleBindings = map[string]*k8sRoleBinding{}
 
 var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ // (cluster) role settings required by nv
 	NvAppRole: &k8sRbacRoleInfo{
@@ -330,70 +338,145 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	},
 }
 
-// Rancher SSO : (future) custom role?
-func k8s2NVRole(k8sFlavor string, rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) string {
+// Reset unnessary permissions for
+// 1. roles fedAdmin/admin & PERM_FED(w) permission
+// 2. roles fedReader/reader & PERM_FED(r) permission
+func workFedPermit(rbacRoleName, domain, nvRole string, nvPermits share.NvPermissions) (string, share.NvPermissions) {
 
+	nvRoleIn := nvRole
+	nvPermitsIn := nvPermits
+	// Reset unnessary permissions for roles fedAdmin/admin & PERM_FED(w) permission
+	if nvRole == api.UserRoleAdmin && (nvPermits.WriteValue&share.PERM_FED != 0) {
+		nvRole = api.UserRoleFedAdmin
+	}
+	if nvRole == api.UserRoleFedAdmin {
+		nvPermits = share.NvPermissions{}
+	} else if nvRole == api.UserRoleAdmin {
+		// It's possible to have admin role + PERM_FED(r) permission
+		nvPermits.ReadValue &= share.PERM_FED
+		nvPermits.WriteValue = 0
+	}
+
+	// Reset unnessary permissions for roles fedReader/reader & PERM_FED(r) permission
+	if nvRole == api.UserRoleReader && (nvPermits.ReadValue&share.PERM_FED != 0) {
+		nvRole = api.UserRoleFedReader
+	}
+	if nvRole == api.UserRoleFedReader || nvRole == api.UserRoleReader {
+		if nvPermits.WriteValue == 0 {
+			// There is no write permission. So just take the fedReader/reader role
+			nvPermits.ReadValue = 0
+		} else {
+			// There is write permission. Move fedReader/reader role to permissions
+			nvPermits.ReadValue = share.PERMS_CLUSTER_READ
+			if nvRole == api.UserRoleFedReader {
+				nvPermits.ReadValue = share.PERMS_FED_READ
+			}
+			nvRole = api.UserRoleNone
+		}
+	}
+
+	if nvRole != nvRoleIn || nvPermits != nvPermitsIn {
+		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "domain": domain, "role_in": nvRoleIn, "permits_in": nvPermitsIn, "role_adjusted": nvRole, "permits_adjusted": nvPermits}).Debug()
+	}
+
+	return nvRole, nvPermits
+}
+
+// Map a k8s rbac policyrule to (nv fedAdmin/fedReader/admin/reader role, nv permissions)
+// Both the returned nvRole & nvPermits could be non-empty value
+//
+// rscs: 	   pre-defined NV permission resources for role/permissions mapping
+// readVerbs:  pre-defined view verbs for role/permissions mapping
+// writeVerbs: pre-defined modify verbs for role/permissions mapping
+// r2v:        resource -> verbs content in the k8s clusterrole/role object
+func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVerbs utils.Set, r2v map[string]utils.Set) (
+	string, share.NvPermissions) {
+
+	var nvPermits share.NvPermissions
 	if k8sFlavor == share.FlavorRancher {
 		var nvRole string
 		for rsc, verbs := range r2v {
-			if rscs.Contains(rsc) {
-				if rsc == "*" {
-					if writeVerbs.Intersect(verbs).Cardinality() != 0 {
-						return api.UserRoleAdmin
+			if rsc == "*" {
+				if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
+					nvRole = api.UserRoleAdmin
+				} else if readVerbs.Intersect(verbs).Cardinality() != 0 && nvRole == api.UserRoleNone {
+					nvRole = api.UserRoleReader
+				}
+			} else if strings.HasPrefix(rsc, nvPermRscPrefix) {
+				rsc = rsc[len(nvPermRscPrefix):]
+				if v, ok := nvPermitsValueSSO[rsc]; ok {
+					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
+						nvPermits.ReadValue |= v.ReadValue
+						nvPermits.WriteValue |= v.WriteValue
 					} else if readVerbs.Intersect(verbs).Cardinality() != 0 {
-						nvRole = api.UserRoleReader
+						nvPermits.ReadValue |= v.ReadValue
 					}
-				} else { // for custom roles
-					/* Rancher SSO => TO DO
-					v := VERB_NONE
-					if readVerbs.Intersect(verbs).Cardinality() != 0 {
-						v = VERB_READ
-					} else if writeVerbs.Intersect(verbs).Cardinality() != 0 {
-						v = VERB_WRITE
-					}
-					nvRole = updatePseudoRole(nvRole, rsc, v)
-					*/
 				}
 			}
 		}
-		return nvRole
-	}
+		// Now both nvRole & nvPermits could be non-empty value
 
-	//
-	// Both Kubernetes and OpenShift mapping goes here, keep these two using the same behavior.
-	// As v5.0, we do not support Kubernetes login.
-	// When it comes to support Kubernetes login, we should consider to provide more granular on the mapping.
-	//
-	for rsc, verbs := range r2v {
-		if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
-			return api.UserRoleAdmin
+		// When SSO happens on NV master cluster,
+		// 1. * verb on             * resource in Rancher Global  Role maps to fedAdmin
+		// 2. * verb on *,nv-perm.fed resource in Rancher Cluster Role maps to fedAdmin
+		// 3. * verb on             * resource in Rancher Cluster Role maps to admin
+		// When SSO happens on NV non-master cluster,
+		// 1. * verb on             * resource in Rancher Cluster Role maps to admin
+		// 2. nv-perm.fed resource is ignored
+		// Rancher's Global/Cluster/Project Roles are represented by k8s clusterrole.
+		// Unlike for Global Role, from k8s clusterrole name we we cannot tell it's for Rancher Cluster Role or Project Role.
+		// Rancher Cluster Role supports nv-perm.fed resource but Rancher Project Role doesn't(yet)
+		// So we treat every non-GlobalRole k8s clusterrole the same in this function.
+		// The actual user role/permission will be adjusted in rbacEvaluateUser()
+		if strings.HasPrefix(rbacRoleName, globalRolePrefix) {
+			if nvRole == api.UserRoleAdmin {
+				nvRole = api.UserRoleFedAdmin
+			} else if nvRole == api.UserRoleReader {
+				nvRole = api.UserRoleFedReader
+			}
+		}
+		nvRole, nvPermits = workFedPermit(rbacRoleName, "n/a", nvRole, nvPermits)
+
+		return nvRole, nvPermits
+	} else {
+		//
+		// Both Kubernetes and OpenShift mapping goes here, keep these two using the same behavior.
+		// As v5.0, we do not support Kubernetes login.
+		// When it comes to support Kubernetes login, we should consider to provide more granular on the mapping.
+		//
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && writeVerbs.Intersect(verbs).Cardinality() != 0 {
+				return api.UserRoleAdmin, nvPermits
+			}
+		}
+
+		for rsc, verbs := range r2v {
+			if rscs.Contains(rsc) && readVerbs.Intersect(verbs).Cardinality() != 0 {
+				return api.UserRoleReader, nvPermits
+			}
 		}
 	}
 
-	for rsc, verbs := range r2v {
-		if rscs.Contains(rsc) && readVerbs.Intersect(verbs).Cardinality() != 0 {
-			return api.UserRoleReader
-		}
-	}
-
-	return api.UserRoleNone
+	return api.UserRoleNone, nvPermits
 }
 
-func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{}) (string, map[string]map[string]utils.Set) {
+// Returns deduced (nv reserved role, nv permissions) for a k8s (cluster)role
+// Both returned values could be non-empty value
+// Rancher's Global/Cluster/Project Role is always represented by k8s clusterrole (param rbacRoleDomain is "")
+func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interface{}) (string, share.NvPermissions) {
 
 	_, getVerbs := rbacRolesWanted[rbacRoleName]
 	ag2r2v := make(map[string]map[string]utils.Set) // apiGroup -> (resource -> verbs)
-	if rules, ok := objs.([]*rbacv1.PolicyRule); ok {
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
-			verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-			rscs := rule.GetResources()
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
 
-			if verbs.Cardinality() == 0 && len(rscs) == 0 {
+			if verbs.Cardinality() == 0 && len(rule.Resources) == 0 {
 				continue
 			}
 			var apiGroup string
-			if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-				apiGroup = apiGroups[0]
+			if len(rule.APIGroups) > 0 {
+				apiGroup = rule.APIGroups[0]
 			}
 			r2v, ok := ag2r2v[apiGroup]
 
@@ -401,33 +484,32 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{
 				r2v = make(map[string]utils.Set)
 				ag2r2v[apiGroup] = r2v
 			}
-			for _, rsc := range rscs {
+			for _, rsc := range rule.Resources {
 				if v, ok := r2v[rsc]; ok {
-					v.Union(verbs)
+					r2v[rsc] = v.Union(verbs)
 				} else {
 					r2v[rsc] = verbs
 				}
 			}
 		}
-	} else if rules, ok := objs.([]*rbacv1b1.PolicyRule); ok {
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
 		for _, rule := range rules {
-			verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-			rscs := rule.GetResources()
-			if verbs.Cardinality() == 0 && len(rscs) == 0 {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			if verbs.Cardinality() == 0 && len(rule.Resources) == 0 {
 				continue
 			}
 			var apiGroup string
-			if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-				apiGroup = apiGroups[0]
+			if len(rule.APIGroups) > 0 {
+				apiGroup = rule.APIGroups[0]
 			}
 			r2v, ok := ag2r2v[apiGroup]
 			if !ok {
 				r2v = make(map[string]utils.Set)
 				ag2r2v[apiGroup] = r2v
 			}
-			for _, rsc := range rscs {
+			for _, rsc := range rule.Resources {
 				if v, ok := r2v[rsc]; ok {
-					v.Union(verbs)
+					r2v[rsc] = v.Union(verbs)
 				} else {
 					r2v[rsc] = verbs
 				}
@@ -435,41 +517,81 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, roleDomain string, objs interface{
 		}
 	}
 	if len(ag2r2v) > 0 {
-		var nvRole string
-		var rscsMap map[string]utils.Set = ocAdminRscsMap
+		var nvRole string                                 // deduced nv reserved role
+		var nvPermits share.NvPermissions                 // deduced nv permissions
+		var rscsMap map[string]utils.Set = ocAdminRscsMap // apiGroup -> set of resources
 		var readVerbs utils.Set = ocReaderVerbs
 		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
-			rscsMap = nvRscsMap
-			readVerbs = nvReadVerbs
-			writeVerbs = nvWriteVerbs
+			rscsMap = nvRscMapSSO
+			readVerbs = nvReadVerbSSO
+			writeVerbs = nvWriteVerbSSO
 		}
-		gAdjusted := map[string]string{api.UserRoleAdmin: api.UserRoleFedAdmin, api.UserRoleReader: api.UserRoleFedReader}
-		for apiGroup, rscs := range rscsMap {
-			if r2v, ok := ag2r2v[apiGroup]; ok && len(r2v) > 0 {
-				nvRoleTemp := k8s2NVRole(k8sFlavor, rscs, readVerbs, writeVerbs, r2v)
-
-				if roleDomain == "" && k8sFlavor == share.FlavorRancher && strings.HasPrefix(rbacRoleName, globalRolePrefix) {
-					if adjusted, ok := gAdjusted[nvRoleTemp]; ok {
-						nvRole = adjusted
+		for apiGroup, r2v := range ag2r2v {
+			if len(r2v) == 0 {
+				continue
+			}
+			if rscs, ok := rscsMap[apiGroup]; ok {
+				nvRoleTemp, nvPermitsTemp := k8s2NVRolePermits(k8sFlavor, rbacRoleName, rscs, readVerbs, writeVerbs, r2v)
+				// nvRoleMapped is empty value, or nvPermitsTemp is empty value, or both are empty value !
+				if nvRoleTemp != api.UserRoleNone {
+					if k8sFlavor == share.FlavorRancher {
+						switch nvRoleTemp {
+						case api.UserRoleFedAdmin:
+							nvRole = api.UserRoleFedAdmin
+						case api.UserRoleFedReader:
+							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
+								nvRole = api.UserRoleFedReader
+							} else if nvRole == api.UserRoleAdmin {
+								// This Rancher role maps to admin & fedReader roles.
+								// Take admin role and move PERM_FED(r) to permissions
+								nvPermits.ReadValue = share.PERM_FED
+							}
+						case api.UserRoleAdmin:
+							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
+								nvRole = api.UserRoleAdmin
+							} else if nvRole == api.UserRoleFedReader {
+								// This Rancher role maps to admin & fedReader roles.
+								// Take admin role and move PERM_FED(r) to permissions
+								nvRole = api.UserRoleAdmin
+								nvPermits.ReadValue = share.PERM_FED
+							}
+						case api.UserRoleReader:
+							if nvRole == api.UserRoleNone {
+								nvRole = api.UserRoleReader
+							}
+						}
+					} else {
+						// it's mapped from k8s (cluster)role on non-Rancer
+						if (nvRoleTemp == api.UserRoleAdmin && nvRole != api.UserRoleAdmin) ||
+							(nvRoleTemp == api.UserRoleReader && nvRole == api.UserRoleNone) {
+							nvRole = nvRoleTemp
+						}
+						// no other nv reserved role could be mapped
+					}
+					if nvRoleTemp == api.UserRoleFedAdmin {
 						break
 					}
 				}
-				if (nvRoleTemp == api.UserRoleAdmin && nvRole != api.UserRoleAdmin) ||
-					(nvRoleTemp == api.UserRoleReader && nvRole == api.UserRoleNone) {
-					nvRole = nvRoleTemp
-				} else if strings.HasPrefix(nvRoleTemp, "custom_:") {
-					// Rancher SSO => TO DO
-					//nvRole = mergePesudoRoles(nvRole, nvRoleTemp)
+				if !nvPermitsTemp.IsEmpty() {
+					// this k8s rbac policyrule is mapped to nv permissions
+					if k8sFlavor == share.FlavorRancher {
+						nvPermits.ReadValue |= nvPermitsTemp.ReadValue
+						nvPermits.WriteValue |= nvPermitsTemp.WriteValue
+					}
 				}
 			}
 		}
+
+		// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission
+		nvRole, nvPermits = workFedPermit(rbacRoleName, "n/a", nvRole, nvPermits)
+
 		if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
 			ag2r2v = nil
 		}
-		return nvRole, ag2r2v
+		return nvRole, nvPermits
 	} else {
-		return api.UserRoleNone, nil
+		return api.UserRoleNone, share.NvPermissions{}
 	}
 }
 
@@ -502,12 +624,12 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 		return nil
 	}
 	ag2r2v := make(map[string]map[string]utils.Set) // collected apiGroup -> (resource -> verbs) in k8s rbac
-	if rules, ok := objs.([]*rbacv1.PolicyRule); ok {
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
 			for _, roleInfoRule := range roleInfo.rules {
 				var apiGroup string
-				if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-					apiGroup = apiGroups[0]
+				if len(rule.APIGroups) > 0 {
+					apiGroup = rule.APIGroups[0]
 				}
 				if roleInfoRule.apiGroup != apiGroup {
 					continue
@@ -517,8 +639,8 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 					r2v = make(map[string]utils.Set)
 					ag2r2v[apiGroup] = r2v
 				}
-				verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-				for _, rsc := range rule.GetResources() {
+				verbs := utils.NewSetFromSliceKind(rule.Verbs)
+				for _, rsc := range rule.Resources {
 					if roleInfoRule.resources.Contains(rsc) {
 						if v, ok := r2v[rsc]; ok {
 							r2v[rsc] = v.Union(verbs)
@@ -529,12 +651,12 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 				}
 			}
 		}
-	} else if rules, ok := objs.([]*rbacv1b1.PolicyRule); ok {
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
 		for _, rule := range rules {
 			for _, roleInfoRule := range roleInfo.rules {
 				var apiGroup string
-				if apiGroups := rule.GetApiGroups(); len(apiGroups) > 0 {
-					apiGroup = apiGroups[0]
+				if len(rule.APIGroups) > 0 {
+					apiGroup = rule.APIGroups[0]
 				}
 				if roleInfoRule.apiGroup != apiGroup {
 					continue
@@ -544,8 +666,8 @@ func checkNvRbacRoleRules(roleName, rbacRoleDesc string, objs interface{}) error
 					r2v = make(map[string]utils.Set)
 					ag2r2v[apiGroup] = r2v
 				}
-				verbs := utils.NewSetFromSliceKind(rule.GetVerbs())
-				for _, rsc := range rule.GetResources() {
+				verbs := utils.NewSetFromSliceKind(rule.Verbs)
+				for _, rsc := range rule.Resources {
 					if roleInfoRule.resources.Contains(rsc) {
 						if v, ok := r2v[rsc]; ok {
 							r2v[rsc] = v.Union(verbs)
@@ -594,268 +716,232 @@ CHECK:
 	return nil
 }
 
-func xlateRole(obj k8s.Resource) (string, interface{}) {
+func xlateRole(obj metav1.Object) (string, interface{}) {
+	var ver string
+	var role k8sRole
+	var rules interface{}
+
 	if o, ok := obj.(*rbacv1.Role); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1"
+		role = k8sRole{
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
-		role := &k8sRole{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
-		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, role.domain, rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1")
-		return role.uid, role
+		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules) // Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 	} else if o, ok := obj.(*rbacv1b1.Role); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1beta1"
+		role = k8sRole{
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
-		role := &k8sRole{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
+		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules) // Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+	}
+
+	if rules != nil {
+		role.nvRole, role.nvPermits = deduceRoleRules(_k8sFlavor, role.name, role.domain, rules)
+		if role.nvRole != api.UserRoleNone || !role.nvPermits.IsEmpty() { // only for reducing debug logs
+			log.WithFields(log.Fields{"role": role}).Debug(ver)
 		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, role.domain, rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1beta1")
-		return role.uid, role
+		return role.uid, &role
 	}
 
 	return "", nil
 }
 
-func xlateClusRole(obj k8s.Resource) (string, interface{}) {
+func xlateClusRole(obj metav1.Object) (string, interface{}) {
+	var ver string
+	var role k8sRole
+	var rules interface{}
+
 	if o, ok := obj.(*rbacv1.ClusterRole); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1"
+		role = k8sRole{
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
-		role := &k8sRole{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
-		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, "", rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1")
-		return role.uid, role
+		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules)
 	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
-		meta := o.GetMetadata()
-		if meta == nil {
-			log.Warn("Metadat not present")
-			return "", nil
+		ver = "v1beta1"
+		role = k8sRole{
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
-		role := &k8sRole{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
+		rules = o.Rules
+		role.riskyTags = deduceRiskyRole(rules)
+	}
+
+	if rules != nil {
+		role.nvRole, role.nvPermits = deduceRoleRules(_k8sFlavor, role.name, access.AccessDomainGlobal, rules)
+		if role.nvRole != api.UserRoleNone || !role.nvPermits.IsEmpty() { // only for reducing debug logs
+			log.WithFields(log.Fields{"clusterrole": role}).Debug(ver)
 		}
-
-		rules := o.GetRules()
-		role.nvRole, role.apiRtVerbs = deduceRoleRules(_k8sFlavor, role.name, "", rules)
-
-		log.WithFields(log.Fields{"role": role}).Debug("v1beta1")
-		return role.uid, role
+		return role.uid, &role
 	}
 
 	return "", nil
 }
 
-func xlateRoleBinding(obj k8s.Resource) (string, interface{}) {
+func xlateRoleBinding(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*rbacv1.RoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "Role":
-			roleBind.role = k8sObjectRef{name: role.GetName(), domain: roleBind.domain}
+			roleBind.role = k8sObjectRef{name: role.Name, domain: roleBind.domain}
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
-
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1")
+		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
+			log.WithFields(log.Fields{"rolebinding": roleBind}).Debug("v1")
+		}
 		return roleBind.uid, roleBind
 	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:    meta.GetUid(),
-			name:   meta.GetName(),
-			domain: meta.GetNamespace(),
+			uid:    string(o.GetUID()),
+			name:   o.GetName(),
+			domain: o.GetNamespace(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "Role":
-			roleBind.role = k8sObjectRef{name: role.GetName(), domain: roleBind.domain}
+			roleBind.role = k8sObjectRef{name: role.Name, domain: roleBind.domain}
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
-
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1beta1")
+		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
+			log.WithFields(log.Fields{"rolebinding": roleBind}).Debug("v1beta1")
+		}
 		return roleBind.uid, roleBind
 	}
 
 	return "", nil
 }
 
-func xlateClusRoleBinding(obj k8s.Resource) (string, interface{}) {
+func xlateClusRoleBinding(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
-
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1")
+		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
+			if _, ok := rbacRoleBindingsWanted[roleBind.name]; !ok {
+				log.WithFields(log.Fields{"clusterrolebinding": roleBind}).Debug("v1")
+			}
+		}
 		return roleBind.uid, roleBind
 	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		role := o.GetRoleRef()
-		subjects := o.GetSubjects()
-		if meta == nil || role == nil {
-			log.Warn("Metadat or role not present")
-			return "", nil
-		}
-
+		role := o.RoleRef
+		subjects := o.Subjects
 		roleBind := &k8sRoleBinding{
-			uid:  meta.GetUid(),
-			name: meta.GetName(),
+			uid:  string(o.GetUID()),
+			name: o.GetName(),
 		}
 
-		var roleKind, subKind string
-		switch roleKind = role.GetKind(); roleKind {
+		switch role.Kind {
 		case "ClusterRole":
-			roleBind.role = k8sObjectRef{name: role.GetName()}
+			roleBind.role = k8sObjectRef{name: role.Name}
 		default:
-			log.WithFields(log.Fields{"role": roleKind}).Warn("Unknown role kind")
+			log.WithFields(log.Fields{"role": role.Kind}).Warn("Unknown role kind")
 			return "", nil
 		}
-		roleBind.roleKind = role.GetKind()
+		roleBind.roleKind = role.Kind
 
 		for _, s := range subjects {
-			ns := s.GetNamespace()
-			switch subKind = s.GetKind(); subKind {
+			ns := s.Namespace
+			switch s.Kind {
 			case "User", "Group":
-				objRef := k8sSubjectObjRef{name: s.GetName(), domain: ns, subType: SUBJECT_USER}
-				if subKind == "Group" {
+				objRef := k8sSubjectObjRef{name: s.Name, domain: ns, subType: SUBJECT_USER}
+				if s.Kind == "Group" {
 					objRef.subType = SUBJECT_GROUP
 				}
 				roleBind.users = append(roleBind.users, objRef)
 			case "ServiceAccount":
-				if ns == NvAdmSvcNamespace {
-					objRef := k8sObjectRef{name: s.GetName(), domain: ns}
-					roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
-				}
+				objRef := k8sObjectRef{name: s.Name, domain: ns}
+				roleBind.svcAccounts = append(roleBind.svcAccounts, objRef)
 			}
 		}
-
-		log.WithFields(log.Fields{"binding": roleBind}).Debug("v1beta1")
+		if len(roleBind.users) > 0 || len(roleBind.svcAccounts) > 0 { // only for reducing debug logs
+			if _, ok := rbacRoleBindingsWanted[roleBind.name]; !ok {
+				log.WithFields(log.Fields{"clusterrolebinding": roleBind}).Debug("v1beta1")
+			}
+		}
 		return roleBind.uid, roleBind
 	}
 
@@ -876,31 +962,28 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 	if event == WatchEventDelete {
 		o = old.(*k8sRole)
 		ref := k8sObjectRef{name: o.name, domain: o.domain}
-		if nvRole, ok := d.roleCache[ref]; ok {
-			users := utils.NewSet()
-			for u, roleRefs := range d.userCache {
+		affectedUsers := utils.NewSet()
+		nvRole, ok1 := d.roleCache[ref]
+		nvPermits, ok2 := d.permitsCache[ref]
+		if ok1 || ok2 {
+			for u, roleRefs := range d.userCache { // roleRefs: set of k8sRoleRef
 				for roleRef := range roleRefs.Iter() {
-					if roleRef.(k8sRoleRef).role == ref {
-						roleRefs.Remove(roleRef)
-						log.WithFields(log.Fields{"k8s-role": ref, "user": u, "left": roleRefs}).Debug("Delete roleRef")
-						if !users.Contains(u) {
-							users.Add(u)
+					if roleRef.(k8sRoleRef).role == ref { // the deleted k8s (cluster)role affects a user in userCache
+						log.WithFields(log.Fields{"k8s-role": ref, "user": u, "left": roleRefs}).Debug("Reset roleRef")
+						if !affectedUsers.Contains(u) {
+							affectedUsers.Add(u)
 						}
 					}
 				}
-				if roleRefs.Cardinality() == 0 {
-					// delete user
-					delete(d.userCache, u)
-					log.WithFields(log.Fields{"user": u}).Debug("Delete user")
-				}
 			}
-			delete(d.roleCache, ref)
-			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": nvRole}).Debug("Delete role")
+			d.roleCache[ref] = api.UserRoleNone
+			d.permitsCache[ref] = share.NvPermissions{}
+			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": nvRole, "nv-perms": nvPermits}).Debug("Delete role")
+		}
 
-			// re-evaluate users who bind to the deleted role
-			for u := range users.Iter() {
-				d.rbacEvaluateUser(u.(k8sSubjectObjRef))
-			}
+		// re-evaluate users who bind to the deleted (cluster)role
+		for u := range affectedUsers.Iter() {
+			d.rbacEvaluateUser(u.(k8sSubjectObjRef))
 		}
 
 		if roleInfo, ok := rbacRolesWanted[o.name]; ok && !roleInfo.k8sReserved {
@@ -915,7 +998,7 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 			}
 			if evLog {
 				desc := "role"
-				if o.domain == "" {
+				if o.domain == access.AccessDomainGlobal {
 					desc = "clusterrole"
 				}
 				msg := fmt.Sprintf(`Kubernetes %s "%s" is deleted.`, desc, o.name)
@@ -923,15 +1006,35 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 				cacheRbacEvent(d.flavor, msg, false)
 			}
 		}
+
+		delete(riskyRoles, fmt.Sprintf("%s#%s", o.domain, o.name))
 	} else {
 		n = res.(*k8sRole)
 		ref := k8sObjectRef{name: n.name, domain: n.domain}
-		if n.nvRole != "" {
+		if n.nvRole != api.UserRoleNone {
 			d.roleCache[ref] = n.nvRole
-		} else {
-			delete(d.roleCache, ref)
+			if n.nvPermits.IsEmpty() {
+				delete(d.permitsCache, ref)
+			}
 		}
-		log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole}).Debug("Update role")
+		if !n.nvPermits.IsEmpty() {
+			d.permitsCache[ref] = n.nvPermits
+			if n.nvRole == api.UserRoleNone {
+				delete(d.roleCache, ref)
+			}
+		}
+		if n.nvRole == api.UserRoleNone && n.nvPermits.IsEmpty() {
+			delete(d.roleCache, ref)
+			delete(d.permitsCache, ref)
+		}
+		if old == nil || *(old.(*k8sRole)) != *n { // only for reducing debug logs
+			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": n.nvRole, "nv-perms": n.nvPermits, "risky": n.riskyTags}).Debug("Update role")
+		}
+
+		if n.riskyTags > 0 {
+			key := fmt.Sprintf("%s#%s", n.domain, n.name)
+			riskyRoles[key] = n.riskyTags
+		}
 
 		// starting from 5.1.3, we do not upgrade CRD schema anymore
 		/*
@@ -961,17 +1064,17 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 			}
 		*/
 
-		// re-evaluate users who bind to the role
+		// re-evaluate users who bind to the updated (cluster)role
 		for u, roleRefs := range d.userCache {
 			for roleRef := range roleRefs.Iter() {
-				if roleRef.(k8sRoleRef).role == ref {
+				if roleRef.(k8sRoleRef).role == ref { // a user in k8s is affected
 					d.rbacEvaluateUser(u)
 					break
 				}
 			}
 		}
 
-		// if it's nv-required role, check whether its configuration meets nv's need
+		// if it's nv-required k8s rbac (cluster)role, check whether its configuration meets nv's need
 		if roleInfo, ok := rbacRolesWanted[n.name]; ok && !roleInfo.k8sReserved {
 			checkRBAC := true
 			if n.name == NvScannerRole {
@@ -1021,7 +1124,7 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 			}
 			if evLog {
 				var rtName string
-				if o.domain == "" {
+				if o.domain == access.AccessDomainGlobal {
 					rtName = "clusterrolebinding"
 				} else {
 					rtName = "rolebinding"
@@ -1032,9 +1135,9 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 			}
 		}
 		for _, u := range o.users {
-			if roleRefs, ok := d.userCache[u]; ok && roleRefs.Contains(oldRoleRef) {
+			if roleRefs, ok := d.userCache[u]; ok && roleRefs.Contains(oldRoleRef) { // the deleted k8s (cluster)rolebinding affects a user in userCache
 				roleRefs.Remove(oldRoleRef)
-				log.WithFields(log.Fields{"name": o.name, "k8s-role": oldRoleRef, "user": u, "left": roleRefs}).Debug("Delete role binding")
+				log.WithFields(log.Fields{"name": o.name, "k8s-role": oldRoleRef, "user": u, "left": roleRefs, "op": "delete"}).Debug()
 
 				if roleRefs.Cardinality() == 0 {
 					// delete user
@@ -1044,9 +1147,17 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 				d.rbacEvaluateUser(u)
 			}
 		}
+
+		bindingName := fmt.Sprintf("%s#%s", o.domain, o.name)
+		delete(allRoleBindings, bindingName)
 	} else {
 		n = res.(*k8sRoleBinding)
 		newRoleRef = k8sRoleRef{role: n.role, domain: n.domain}
+
+		if len(n.svcAccounts) > 0 {
+			bindingName := fmt.Sprintf("%s#%s", n.domain, n.name)
+			allRoleBindings[bindingName] = n
+		}
 
 		// sometimes Rancher doesn't delete a user's rolebinding, {user_id}-global-catalog-binding(in cattle-global-data ns), when the Rancher user is deleted.
 		// so we simply ignore rolebinding {user_id}-global-catalog-binding(binds a k8s user to global-catalog role in cattle-global-data ns)
@@ -1068,13 +1179,13 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 		}
 		newUsers := utils.NewSetFromSliceKind(n.users)
 
-		// 2. Delete roles for users removed from the binding
+		// 2. Delete roles for users removed from the binding. When there is no role for a user, remove the user entry from userCache.
 		deletes := oldUsers.Difference(newUsers)
 		for u := range deletes.Iter() {
 			userRef := u.(k8sSubjectObjRef)
-			if roleRefs, ok := d.userCache[userRef]; ok && roleRefs.Contains(oldRoleRef) {
+			if roleRefs, ok := d.userCache[userRef]; ok && roleRefs.Contains(oldRoleRef) { // the updated k8s (cluster)rolebinding affects a user in userCache
 				roleRefs.Remove(oldRoleRef)
-				log.WithFields(log.Fields{"name": n.name, "k8s-role": oldRoleRef, "user": userRef, "left": roleRefs}).Debug("Delete role binding")
+				log.WithFields(log.Fields{"name": n.name, "k8s-role": oldRoleRef, "user": userRef, "left": roleRefs, "op": "delete"}).Debug()
 
 				if roleRefs.Cardinality() == 0 {
 					// delete user
@@ -1090,31 +1201,35 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 		//    to the object, and save the working domain separately.
 		creates := newUsers.Difference(oldUsers)
 		for u := range creates.Iter() {
+			op := "create"
 			userRef := u.(k8sSubjectObjRef)
 			if roleRefs, ok := d.userCache[userRef]; !ok {
 				// create user
 				d.userCache[userRef] = utils.NewSet(newRoleRef)
-				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef}).Debug("Create user role binding")
 			} else {
+				op = "add"
 				roleRefs.Add(newRoleRef)
-				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef}).Debug("Add user role binding")
 			}
+			log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef, "op": op}).Debug()
 
 			d.rbacEvaluateUser(userRef)
 		}
 
-		// 4. For users whose bindings are changed
+		// 4. For users whose bindings, role binding references (cluster) role, or cluster role binding references cluster role, are changed
 		changes := newUsers.Difference(creates)
 		for u := range changes.Iter() {
+			op := "create"
 			userRef := u.(k8sSubjectObjRef)
 			if roleRefs, ok := d.userCache[userRef]; !ok {
 				// create user
 				d.userCache[userRef] = utils.NewSet(newRoleRef)
-				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef}).Debug("Create user role binding")
 			} else if o.role != n.role {
 				// o won't be nil when we get here
+				op = "add"
 				roleRefs.Add(newRoleRef)
-				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef}).Debug("Add user role binding")
+			}
+			if oldRoleRef != newRoleRef { // only for reducing debug logs
+				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef, "op": op}).Debug()
 			}
 
 			d.rbacEvaluateUser(userRef)
@@ -1156,8 +1271,16 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 	}
 
 	if roleRefs, ok := d.userCache[user]; !ok {
-		if rbac, ok := d.rbacCache[subj]; ok {
-			delete(d.rbacCache, subj)
+		// there is no entry in the cache for this user yet
+		rbacRoles, ok1 := d.rbacCache[subj]
+		rbacPermits, ok2 := d.permitsRbacCache[subj]
+		if ok1 || ok2 {
+			if ok1 {
+				delete(d.rbacCache, subj)
+			}
+			if ok2 {
+				delete(d.permitsRbacCache, subj)
+			}
 			log.WithFields(log.Fields{"user": user}).Debug("Delete rbac user")
 
 			d.lock.Lock()
@@ -1166,112 +1289,352 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 			if ok && w.cb != nil {
 				w.cb(RscTypeRBAC, WatchEventDelete,
 					nil,
-					&RBAC{Name: user.name, Domain: user.domain, Roles: rbac},
-				)
+					&RBAC{Name: user.name, Domain: user.domain, DomainRoles: rbacRoles, DomainPermits: rbacPermits},
+				) //-> calls cbResourceWatcher("rbac", ...)
 			}
 		}
 	} else {
-		rbac := make(map[string]string) // domain -> nvRole
-
+		// found an entry in userCache for this user
+		domainRole := make(map[string]string)                 // domain -> nv reserved role
+		domainPermits := make(map[string]share.NvPermissions) // domain -> nv permissions
+		// iterate thru all k8s (cluster)roles for this user to see what their domainRole/domainPermits should be
 		for r := range roleRefs.Iter() {
+			movePermFedRead := false
 			roleRef := r.(k8sRoleRef)
+			nvRole, ok1 := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
+			if ok1 {
+				// This k8s (cluster)role is in roleCache (i.e. it has a mpped nv reserved role).
+				// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
+				// It's possible that nvRole is fedAdmin/fedReader even it's Rancher Project Role which is not allowed.
+				// If found, downgrade nvRole to admin/reader(for namespace)
+				if roleRef.domain != "" {
+					// This k8s (cluster)role is bound to the user by k8s rolebinding(i.e. it's Rancher Project Role)
+					if nvRole == api.UserRoleFedAdmin {
+						nvRole = api.UserRoleAdmin
+					} else if nvRole == api.UserRoleFedReader {
+						nvRole = api.UserRoleReader
+					}
+				}
+				// Merge this nv role into this domain's nv role
+				if currNVRole, ok := domainRole[roleRef.domain]; ok && currNVRole != nvRole {
+					if (currNVRole == api.UserRoleReader && nvRole != api.UserRoleNone) || (currNVRole == api.UserRoleNone) || (nvRole == api.UserRoleFedAdmin) {
+						// nvRole has higher auth than currNVRole
+					} else if (currNVRole == api.UserRoleFedReader && nvRole == api.UserRoleAdmin) ||
+						(currNVRole == api.UserRoleAdmin && nvRole == api.UserRoleFedReader) {
+						// role mapping priority: admin > fedReader
+						nvRole = api.UserRoleAdmin
+						if roleRef.domain == "" {
+							// move PERM_FED(r) to permissions if it's global domain (we don't support PERM_FED for namespace yet)
+							movePermFedRead = true
+						}
+					} else {
+						// nvRole has lower auth than currNVRole
+						nvRole = currNVRole
+					}
+				}
+			} else {
+				nvRole, _ = domainRole[roleRef.domain]
+			}
 
-			if newNVRole, ok := d.roleCache[roleRef.role]; ok {
-				if oldNVRole, ok := rbac[roleRef.domain]; !ok {
-					rbac[roleRef.domain] = newNVRole
-				} else if oldNVRole != newNVRole {
-					if (oldNVRole == api.UserRoleReader && newNVRole != api.UserRoleNone) || (oldNVRole == api.UserRoleNone) || (newNVRole == api.UserRoleFedAdmin) {
-						rbac[roleRef.domain] = newNVRole
+			nvPermits, ok2 := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
+			if ok2 {
+				// This k8s (cluster)role is in permitsCache (i.e. it has mapped nv permissions).
+				// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
+				// It's possible that nvPermits contains PERM_FED even it's Rancher Project Role which is not allowed.
+				// If found, remove PERM_FED from nvPermits(for namespace)
+				if roleRef.domain != "" {
+					// This k8s (cluster)role is bound to the user by k8s rolebinding(i.e. it's Rancher Project Role)
+					nvPermits.ReadValue ^= share.PERM_FED
+					nvPermits.WriteValue ^= share.PERM_FED
+				} else if movePermFedRead {
+					nvPermits.ReadValue |= share.PERM_FED
+				}
+				// Merge this nv permissions into this domain's nv permissions
+				if currNVPermits, ok := domainPermits[roleRef.domain]; ok && currNVPermits != nvPermits {
+					nvPermits.ReadValue |= currNVPermits.ReadValue
+					nvPermits.WriteValue |= currNVPermits.WriteValue
+				}
+			} else {
+				nvPermits, _ = domainPermits[roleRef.domain]
+				if movePermFedRead {
+					nvPermits.ReadValue = share.PERM_FED
+					ok2 = true
+				}
+			}
+
+			if ok1 || ok2 {
+				// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission for this domain
+				nvRole, nvPermits = workFedPermit(roleRef.role.name, roleRef.domain, nvRole, nvPermits)
+				if nvRole != api.UserRoleNone {
+					domainRole[roleRef.domain] = nvRole
+				} else {
+					delete(domainRole, roleRef.domain)
+				}
+				if !nvPermits.IsEmpty() {
+					domainPermits[roleRef.domain] = nvPermits
+				} else {
+					delete(domainPermits, roleRef.domain)
+				}
+			}
+		}
+
+		// For namespace permissions, delete empty-value entries and those entries that have the subset permission value of global domain's nv permission value
+		// Because we don't support PERM_FED for namespace yet, reset PERM_FED if found
+		var gpReduced share.NvPermissions // global domain's reduced nv permission value(for comparing with namespace permissions)
+		if nvRole, ok := domainRole[access.AccessDomainGlobal]; ok && nvRole != api.UserRoleNone {
+			switch nvRole {
+			case api.UserRoleFedAdmin, api.UserRoleAdmin:
+				gpReduced.WriteValue = share.PERMS_DOMAIN_WRITE
+			case api.UserRoleFedReader, api.UserRoleReader:
+				gpReduced.ReadValue = share.PERMS_DOMAIN_READ
+			}
+		} else {
+			if gp, ok := domainPermits[access.AccessDomainGlobal]; ok {
+				gpReduced.ReadValue = gp.ReadValue & share.PERMS_DOMAIN_READ
+				gpReduced.WriteValue = gp.WriteValue & share.PERMS_DOMAIN_WRITE
+			}
+		}
+		for d, p := range domainPermits {
+			if d != access.AccessDomainGlobal {
+				if p.IsEmpty() {
+					delete(domainPermits, d)
+				} else {
+					p.ReadValue = p.ReadValue & share.PERMS_DOMAIN_READ
+					p.WriteValue = p.WriteValue & share.PERMS_DOMAIN_WRITE
+					if p == gpReduced {
+						// This namespace's nv permission value is the subset of global domain's nv permission value
+						delete(domainPermits, d)
+					} else {
+						domainPermits[d] = p
 					}
 				}
 			}
 		}
 
-		for d, r := range rbac {
-			if d != "" {
+		// For namespace role, delete empty-value entries that don't have nv permission entries.
+		// Because we don't support fedAdmin/fedReader roles for namespace scope, downgrade to admin/reader if found
+		for d, r := range domainRole {
+			if d != access.AccessDomainGlobal {
 				if r == api.UserRoleNone {
-					delete(rbac, d)
+					if _, ok := domainPermits[d]; !ok {
+						// There is no nv reserved role/permission for this namespace
+						delete(domainRole, d)
+					}
 				} else if r == api.UserRoleFedAdmin {
-					rbac[d] = api.UserRoleAdmin
+					// We don't support PERM_FED for namespace yet
+					domainRole[d] = api.UserRoleAdmin
 				} else if r == api.UserRoleFedReader {
-					rbac[d] = api.UserRoleReader
+					// We don't support PERM_FED for namespace yet
+					domainRole[d] = api.UserRoleReader
 				}
 			}
 		}
 
-		if nvRole, ok := rbac[""]; ok {
+		// If global domain has nv reserved role, delete unnecessary namespace role/permission entries(either unnecessary entries or having the same role)
+		if nvRole, ok := domainRole[access.AccessDomainGlobal]; ok {
 			if nvRole == api.UserRoleFedAdmin || nvRole == api.UserRoleAdmin {
-				// If the user is cluster admin or fed admin, it is the admin of all namespaces
-				rbac = map[string]string{"": nvRole}
+				// If the user is admin or fed admin role on global domain, it is the admin of all namespaces
+				// However, admin role on global domain could still have PERM_FED(r) permission
+				domainRole = map[string]string{access.AccessDomainGlobal: nvRole}
+				if nvRole == api.UserRoleFedAdmin {
+					domainPermits = make(map[string]share.NvPermissions)
+				} else {
+					nvPermits, ok := domainPermits[access.AccessDomainGlobal]
+					domainPermits = make(map[string]share.NvPermissions)
+					if ok && nvPermits.ReadValue&share.PERM_FED > 0 {
+						domainPermits = map[string]share.NvPermissions{
+							access.AccessDomainGlobal: share.NvPermissions{ReadValue: share.PERM_FED},
+						}
+					}
+				}
 			} else if nvRole == api.UserRoleFedReader || nvRole == api.UserRoleReader {
 				// If the user is cluster reader or fed reader, it is the reader of all namespaces
-				for domain, nvDomainRole := range rbac {
-					if domain != "" && nvDomainRole == api.UserRoleReader {
-						delete(rbac, domain)
+				for domain, nvDomainRole := range domainRole {
+					if domain != access.AccessDomainGlobal && nvDomainRole == api.UserRoleReader {
+						delete(domainRole, domain)
+					}
+				}
+				// If the user is cluster reader or fed reader, those domain permission entries for read-only permissions are unnecessary
+				for domain, permits := range domainPermits {
+					if domain != access.AccessDomainGlobal && permits.WriteValue == 0 {
+						delete(domainPermits, domain)
 					}
 				}
 			}
-		} else if len(rbac) > 0 {
-			rbac[""] = api.UserRoleNone
 		}
 
-		oldrbac, _ := d.rbacCache[subj]
+		// Check whether both nv reserved role & permissions are assigne to a domain
+		for d, nvRole := range domainRole {
+			if nvRole != api.UserRoleNone {
+				if nvPermits, ok := domainPermits[d]; ok {
+					// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission
+					nvRole, nvPermits = workFedPermit("", d, nvRole, nvPermits)
+					if nvRole == api.UserRoleNone {
+						delete(domainRole, d)
+					} else {
+						domainRole[d] = nvRole
+					}
+					if nvPermits.IsEmpty() {
+						delete(domainPermits, d)
+					} else {
+						domainPermits[d] = nvPermits
+					}
+				}
+			}
+		}
+		for d, nvPermits := range domainPermits {
+			if nvPermits.IsEmpty() {
+				delete(domainPermits, d)
+			}
+		}
+
+		if _, ok := domainRole[access.AccessDomainGlobal]; !ok {
+			domainRole[access.AccessDomainGlobal] = api.UserRoleNone
+		}
+
+		oldDomainRole, _ := d.rbacCache[subj]
+		oldDomainPermits, _ := d.permitsRbacCache[subj]
 
 		// callback
-		log.WithFields(log.Fields{"rbac": rbac, "oldrbac": oldrbac, "user": user}).Debug()
-		if reflect.DeepEqual(oldrbac, rbac) {
-			return
-		} else if len(rbac) > 0 {
-			d.rbacCache[subj] = rbac
+		if len(domainPermits) > 0 || len(domainRole) > 0 || len(oldDomainPermits) > 0 || len(oldDomainRole) > 0 { // only for reducing debug logs
+			log.WithFields(log.Fields{"domainRole": domainRole, "oldDomainRole": oldDomainRole, "domainPermits": domainPermits, "oldDomainPermits": oldDomainPermits, "user": user}).Debug()
+		}
+		domainRoleUnchanged := false
+		domainPermitsUnchanged := false
+		if reflect.DeepEqual(oldDomainRole, domainRole) {
+			domainRoleUnchanged = true
+		} else if len(domainRole) > 0 {
+			d.rbacCache[subj] = domainRole
 		} else {
 			delete(d.rbacCache, subj)
+		}
+		if reflect.DeepEqual(oldDomainPermits, domainPermits) {
+			domainPermitsUnchanged = true
+		} else if len(domainPermits) > 0 {
+			d.permitsRbacCache[subj] = domainPermits
+		} else {
+			delete(d.permitsRbacCache, subj)
+		}
+		if domainRoleUnchanged && domainPermitsUnchanged {
+			return
 		}
 
 		d.lock.Lock()
 		w, ok := d.watchers[RscTypeRBAC]
 		d.lock.Unlock()
 		if ok && w.cb != nil {
-			if oldrbac == nil {
+			if oldDomainRole == nil && oldDomainPermits == nil {
 				w.cb(RscTypeRBAC, WatchEventAdd,
-					&RBAC{Name: user.name, Domain: user.domain, Roles: rbac},
+					&RBAC{Name: user.name, Domain: user.domain, DomainRoles: domainRole, DomainPermits: domainPermits},
 					nil,
 				)
 			} else {
 				w.cb(RscTypeRBAC, WatchEventModify,
-					&RBAC{Name: user.name, Domain: user.domain, Roles: rbac},
-					&RBAC{Name: user.name, Domain: user.domain, Roles: oldrbac},
+					&RBAC{Name: user.name, Domain: user.domain, DomainRoles: domainRole, DomainPermits: domainPermits},
+					&RBAC{Name: user.name, Domain: user.domain, DomainRoles: oldDomainRole, DomainPermits: oldDomainPermits},
 				)
 			}
 		}
 	}
 }
 
-func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string, error) {
+func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string, map[string]share.NvPermissions, error) {
+
+	var domainRole map[string]string
+	var domainPermits map[string]share.NvPermissions
 	userRef := k8sSubjectObjRef{name: user, domain: "", subType: subType}
 
 	d.rbacLock.RLock()
 	defer d.rbacLock.RUnlock()
 
-	if rbac, ok := d.rbacCache[userRef]; ok {
-		// rbac is replaced as a whole -> no need to clone
-		return rbac, nil
+	userDomainRole, ok1 := d.rbacCache[userRef]
+	if ok1 {
+		domainRole = make(map[string]string, len(userDomainRole))
+	}
+	userDomainPermits, ok2 := d.permitsRbacCache[userRef]
+	if ok2 {
+		domainPermits = make(map[string]share.NvPermissions, len(userDomainPermits))
 	}
 
-	return nil, ErrUserNotFound
+	if !ok1 && !ok2 {
+		return nil, nil, ErrUserNotFound
+	} else {
+		// if there is no role/permission in any domain, return nil for domainRoles / domainPermits
+		// if a namespace's role/permissions entry is empty value, remove it from the corresponding map
+		for d, r := range userDomainRole {
+			if r == api.UserRoleNone && d != access.AccessDomainGlobal {
+				delete(domainRole, d)
+				continue
+			}
+			domainRole[d] = r
+		}
+		for d, p := range userDomainPermits {
+			if p.IsEmpty() {
+				delete(domainPermits, d)
+			} else {
+				domainPermits[d] = p
+			}
+		}
+
+		if len(domainRole) == 0 {
+			domainRole = nil
+		}
+		if len(domainPermits) == 0 {
+			domainPermits = nil
+		}
+
+		return domainRole, domainPermits, nil
+	}
 }
 
 func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
-	list := make([]orchAPI.UserRBAC, len(d.rbacCache))
-	i := 0
+	size := len(d.rbacCache)
+	if len(d.permitsRbacCache) > size {
+		size = len(d.permitsRbacCache)
+	}
+
+	allUsers := make(map[k8sSubjectObjRef]*orchAPI.UserRBAC, size)
 
 	d.rbacLock.RLock()
 	defer d.rbacLock.RUnlock()
 
 	for userRef, rbac := range d.rbacCache {
 		// rbac is replaced as a whole -> no need to clone
-		list[i] = orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC: rbac}
+		var domainRole map[string]string = map[string]string{}
+		for d, r := range rbac {
+			if r != api.UserRoleNone {
+				domainRole[d] = r
+			}
+		}
+		if len(domainRole) == 0 {
+			domainRole = nil
+		}
+		allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC: domainRole}
+	}
+
+	for userRef, rbac := range d.permitsRbacCache {
+		domainPermits := make(map[string]share.NvPermissions)
+		for d, p := range rbac {
+			if !p.IsEmpty() {
+				domainPermits[d] = p
+			}
+		}
+		if len(domainPermits) > 0 {
+			if userRBAC, _ := allUsers[userRef]; rbac != nil {
+				userRBAC.RBAC2 = domainPermits
+			} else {
+				allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC2: domainPermits}
+			}
+		}
+	}
+
+	i := 0
+	list := make([]orchAPI.UserRBAC, len(allUsers))
+	for _, userRBAC := range allUsers {
+		list[i] = *userRBAC
 		i++
 	}
+
 	return list
 }
 
@@ -1301,15 +1664,15 @@ func VerifyNvRbacRoles(roleNames []string, existOnly bool) ([]string, bool) { //
 						var ruleObj interface{}
 						if roleWanted.namespace == "" {
 							if r, ok := obj.(*rbacv1.ClusterRole); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							} else if r, ok := obj.(*rbacv1b1.ClusterRole); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							}
 						} else {
 							if r, ok := obj.(*rbacv1.Role); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							} else if r, ok := obj.(*rbacv1b1.Role); ok && r != nil {
-								ruleObj = r.GetRules()
+								ruleObj = r.Rules
 							}
 						}
 						if ruleObj != nil {
@@ -1511,7 +1874,7 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	cacheEventFunc = objFunc
 	nvControllerSA := ctrlerSubjectWanted
 	filePath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	if data, err := ioutil.ReadFile(filePath); err == nil {
+	if data, err := os.ReadFile(filePath); err == nil {
 		if sa, err := GetSaFromJwtToken(string(data)); err == nil {
 			nvControllerSA = sa
 		}
@@ -1636,98 +1999,84 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	return clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors
 }
 
-func xlateRole2(obj k8s.Resource, action string) {
-	if o, ok := obj.(*rbacv1.Role); ok {
-
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
+func deduceRiskyRole(objs interface{}) int {
+	var tags int
+	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
+		for _, rule := range rules {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			rscs := utils.NewSetFromSliceKind(rule.Resources)
+			if verbs.Cardinality() == 0 && rscs.Cardinality() == 0 {
+				continue
+			}
+			tags = tagRiskyRoles(verbs, rscs)
 		}
-
-	} else if o, ok := obj.(*rbacv1b1.Role); ok {
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/roles/%s.%s", *o.Metadata.Namespace, *o.Metadata.Name)
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
+	} else if rules, ok := objs.([]rbacv1b1.PolicyRule); ok {
+		for _, rule := range rules {
+			verbs := utils.NewSetFromSliceKind(rule.Verbs)
+			rscs := utils.NewSetFromSliceKind(rule.Resources)
+			if verbs.Cardinality() == 0 && rscs.Cardinality() == 0 {
+				continue
+			}
+			tags = tagRiskyRoles(verbs, rscs)
 		}
 	}
+
+	return tags
 }
 
-func xlateRoleBinding2(obj k8s.Resource, action string) {
-	if o, ok := obj.(*rbacv1.RoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
-		rbacv1, _ := json.Marshal(o)
+func tagRiskyRoles(verbs, rscs utils.Set) int {
+	var tags int
 
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-	} else if o, ok := obj.(*rbacv1b1.RoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/rolebindings/%s.%s", meta.GetNamespace(), meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
+	// risky_role_view_secret
+	CheckRscs := utils.NewSet("secrets", "*")
+	CheckVerbs := utils.NewSet("*", "get", "list", "watch")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_ViewSecret
 	}
+
+	// risky_role_create_pod
+	CheckRscs = utils.NewSet("pods", "deployments", "cronjobs", "jobs", "daemonsets", "statefulsets", "replicasets", "replicationcontrollers", "*")
+	CheckVerbs = utils.NewSet("*", "create")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_CreatePod
+	}
+
+	// risky_role_any_action_workload
+	CheckRscs = utils.NewSet("pods", "deployments", "cronjobs", "jobs", "daemonsets", "statefulsets", "replicasets", "replicationcontrollers", "*")
+	CheckVerbs = utils.NewSet("*")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_AnyActionWorkload
+	}
+
+	// risky_role_any_action_rbac
+	CheckRscs = utils.NewSet("roles", "clusterroles", "rolebindings", "clusterrolebindings", "*")
+	CheckVerbs = utils.NewSet("*")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_AnyActionRBAC
+	}
+
+	// risky_role_exec_into_container
+	CheckRscs = utils.NewSet("pods/exec")
+	CheckVerbs = utils.NewSet("*", "create")
+	if CheckVerbs.Intersect(verbs).Cardinality() != 0 && CheckRscs.Intersect(rscs).Cardinality() != 0 {
+		tags = tags | RiskyRole_ExecContainer
+	}
+
+	return tags
 }
 
-func xlateClusRole2(obj k8s.Resource, action string) {
-	if o, ok := obj.(*rbacv1.ClusterRole); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-	} else if o, ok := obj.(*rbacv1b1.ClusterRole); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterroles/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
+func GetAllRiskyRolesByServiceAccount(saName, namespace string) ([]int, error) {
+	riskyTags := make([]int, 0)
+	for _, binding := range allRoleBindings {
+		for _, sa := range binding.svcAccounts {
+			if sa.domain == namespace && sa.name == saName {
+				roleKey := fmt.Sprintf("%s#%s", binding.role.domain, binding.role.name)
+				if tags, exist := riskyRoles[roleKey]; exist {
+					riskyTags = append(riskyTags, tags)
+					log.WithFields(log.Fields{"saName": saName, "ns": namespace, "roleKey": roleKey, "riskyTags": tags}).Debug("found risky role for service account")
+				}
+			}
 		}
 	}
-}
-
-func xlateClusRoleBinding2(obj k8s.Resource, action string) {
-	if o, ok := obj.(*rbacv1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-	} else if o, ok := obj.(*rbacv1b1.ClusterRoleBinding); ok {
-		meta := o.Metadata
-		docKey := fmt.Sprintf("/v1/data/neuvector/k8s/clusterrolebindings/%s", meta.GetName())
-		rbacv1, _ := json.Marshal(o)
-
-		if action == "ADDED" || action == "MODIFIED" {
-			opa.AddDocument(docKey, string(rbacv1))
-		} else if action == "DELETED" {
-			opa.DeleteDocument(docKey)
-		}
-	}
+	return riskyTags, nil
 }

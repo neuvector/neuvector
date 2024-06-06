@@ -134,6 +134,8 @@ const DlpRulePatternMaxNum int = 16
 const DlpRulePatternMaxLen int = 512
 const DlpRulePatternTotalMaxLen int = 1024
 
+const GrpMetricMax uint32 = (1<<32 - 1)
+
 const ConfSectionAll string = "all"
 const ConfSectionUser string = "user"
 const ConfSectionPolicy string = "policy"
@@ -256,7 +258,7 @@ type RESTTokenRedirect struct {
 type RESTToken struct {
 	Token         string                           `json:"token"`
 	GlobalPermits []*RESTRolePermission            `json:"global_permissions"`
-	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions"` // domain -> permissions
+	DomainPermits map[string][]*RESTRolePermission `json:"domain_permissions"` // domain -> permissions list
 	RESTUser
 }
 
@@ -509,7 +511,8 @@ type RESTEULA struct {
 }
 
 type RESTEULAData struct {
-	EULA *RESTEULA `json:"eula"`
+	EULA            *RESTEULA `json:"eula"`
+	BootstrapPwdCmd string    `json:"bootstrap_password_command"` // k8s command to retrieve the bootstrap password
 }
 
 type RESTList struct {
@@ -551,24 +554,31 @@ type RESTCompProfilesExport struct {
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
+type RESTPermitsAssigned struct {
+	Permits []*RESTRolePermission `json:"permissions"`
+	Domains []string              `json:"domains"` // all domains in this slice have the same permissions assigned
+}
+
 type RESTUser struct {
-	Fullname              string              `json:"fullname"`
-	Server                string              `json:"server"`
-	Username              string              `json:"username"`
-	Password              string              `json:"password,cloak"`
-	EMail                 string              `json:"email"`
-	Role                  string              `json:"role"`
-	Timeout               uint32              `json:"timeout"`
-	Locale                string              `json:"locale"`
-	DefaultPWD            bool                `json:"default_password"`       // If the user is using default password
-	ModifyPWD             bool                `json:"modify_password"`        // if the password should be modified
-	RoleDomains           map[string][]string `json:"role_domains,omitempty"` // role -> domains
-	LastLoginTimeStamp    int64               `json:"last_login_timestamp"`
-	LastLoginAt           string              `json:"last_login_at"`
-	LoginCount            uint32              `json:"login_count"`
-	BlockedForFailedLogin bool                `json:"blocked_for_failed_login"`     // if the user is blocked for too mnay failed login
-	BlockedForPwdExpired  bool                `json:"blocked_for_password_expired"` // if the user is blocked for expired password
-	PwdResettable         bool                `json:"password_resettable"`          // if the user's password can be reset by the current login user
+	Fullname              string                `json:"fullname"`
+	Server                string                `json:"server"`
+	Username              string                `json:"username"`
+	Password              string                `json:"password,cloak"`
+	EMail                 string                `json:"email"`
+	Role                  string                `json:"role"`
+	ExtraPermits          []*RESTRolePermission `json:"extra_permissions,omitempty"` // extra permissions(other than 'Role') on global domain. only for Rancher SSO
+	Timeout               uint32                `json:"timeout"`
+	Locale                string                `json:"locale"`
+	DefaultPWD            bool                  `json:"default_password"`                    // If the user is using default password
+	ModifyPWD             bool                  `json:"modify_password"`                     // if the password should be modified
+	RoleDomains           map[string][]string   `json:"role_domains,omitempty"`              // role -> domains
+	ExtraPermitsDomains   []RESTPermitsAssigned `json:"extra_permissions_domains,omitempty"` // list of extra permissions(other than 'RoleDomains') on namespaces. only for Rancher SSO
+	LastLoginTimeStamp    int64                 `json:"last_login_timestamp"`
+	LastLoginAt           string                `json:"last_login_at"`
+	LoginCount            uint32                `json:"login_count"`
+	BlockedForFailedLogin bool                  `json:"blocked_for_failed_login"`     // if the user is blocked for too mnay failed login
+	BlockedForPwdExpired  bool                  `json:"blocked_for_password_expired"` // if the user is blocked for expired password
+	PwdResettable         bool                  `json:"password_resettable"`          // if the user's password can be reset by the current login user
 }
 
 type RESTUserConfig struct {
@@ -1196,6 +1206,10 @@ type RESTGroupBrief struct {
 	PlatformRole    string   `json:"platform_role"`
 	CfgType         string   `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	BaselineProfile string   `json:"baseline_profile"`
+	MonMetric       bool     `json:"monitor_metric"`
+	GrpSessCur      uint32   `json:"group_sess_cur"`
+	GrpSessRate     uint32   `json:"group_sess_rate"`
+	GrpBandWidth    uint32   `json:"group_band_width"`
 	RESTGroupCaps
 }
 
@@ -1216,10 +1230,14 @@ type RESTGroupDetail struct {
 }
 
 type RESTGroupConfig struct {
-	Name     string               `json:"name"`
-	Comment  *string              `json:"comment"`
-	Criteria *[]RESTCriteriaEntry `json:"criteria,omitempty"`
-	CfgType  string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	Name         string               `json:"name"`
+	Comment      *string              `json:"comment"`
+	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
+	CfgType      string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	MonMetric    *bool                `json:"monitor_metric,omitempty"`
+	GrpSessCur   *uint32              `json:"group_sess_cur,omitempty"`
+	GrpSessRate  *uint32              `json:"group_sess_rate,omitempty"`
+	GrpBandWidth *uint32              `json:"group_band_width,omitempty"`
 }
 
 type RESTCrdGroupConfig struct {
@@ -2561,16 +2579,22 @@ type RESTWorkloadInterceptData struct {
 	Intercept *RESTWorkloadIntercept `json:"intercept"`
 }
 
+type TagDetail struct {
+	ID          string `yaml:"id" json:"id"`
+	Title       string `yaml:"title" json:"title"`
+	Description string `yaml:"description" json:"description"`
+}
+
 type RESTBenchCheck struct {
-	TestNum     string   `json:"test_number"`
-	Category    string   `json:"category"`
-	Type        string   `json:"type"`
-	Profile     string   `json:"profile"`
-	Scored      bool     `json:"scored"`
-	Automated   bool     `json:"automated"`
-	Description string   `json:"description"`
-	Remediation string   `json:"remediation"`
-	Tags        []string `json:"tags"`
+	TestNum     string                   `json:"test_number"`
+	Category    string                   `json:"category"`
+	Type        string                   `json:"type"`
+	Profile     string                   `json:"profile"`
+	Scored      bool                     `json:"scored"`
+	Automated   bool                     `json:"automated"`
+	Description string                   `json:"description"`
+	Remediation string                   `json:"remediation"`
+	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
 }
 
 type RESTBenchMeta struct {
@@ -2602,21 +2626,21 @@ type RESTComplianceData struct {
 }
 
 type RESTComplianceAsset struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Type        string   `json:"type"`
-	Level       string   `json:"level"`
-	Profile     string   `json:"profile"`
-	Scored      bool     `json:"scored"`
-	Description string   `json:"description"`
-	Message     []string `json:"message"`
-	Remediation string   `json:"remediation"`
-	Group       string   `json:"group"`
-	Tags        []string `json:"tags"`
-	Workloads   []string `json:"workloads"`
-	Nodes       []string `json:"nodes"`
-	Images      []string `json:"images"`
-	Platforms   []string `json:"platforms"`
+	Name        string                   `json:"name"`
+	Category    string                   `json:"category"`
+	Type        string                   `json:"type"`
+	Level       string                   `json:"level"`
+	Profile     string                   `json:"profile"`
+	Scored      bool                     `json:"scored"`
+	Description string                   `json:"description"`
+	Message     []string                 `json:"message"`
+	Remediation string                   `json:"remediation"`
+	Group       string                   `json:"group"`
+	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
+	Workloads   []string                 `json:"workloads"`
+	Nodes       []string                 `json:"nodes"`
+	Images      []string                 `json:"images"`
+	Platforms   []string                 `json:"platforms"`
 }
 
 type RESTComplianceAssetData struct {
@@ -3610,7 +3634,7 @@ type RESTAllUserPermitOptions struct {
 
 type RESTRolePermitOptionInternal struct {
 	ID             string
-	Value          uint64
+	Value          uint32
 	SupportScope   byte // 1: support global scope, 2: support domain scope, 3: support both scopes
 	ReadSupported  bool
 	WriteSupported bool
@@ -3620,7 +3644,7 @@ type RESTRolePermitOptionInternal struct {
 }
 
 type RESTRolePermission struct {
-	ID    string `json:"id"`
+	ID    string `json:"id"` // permission id. see share/access.go
 	Read  bool   `json:"read"`
 	Write bool   `json:"write"`
 }
@@ -3926,11 +3950,12 @@ type UserAccessControl struct {
 	LoginID             string
 	LoginType           int
 	Op                  string
-	Roles               map[string]string
-	WRoles              map[string]string
+	Roles               map[string]string              // domain -> role
+	WRoles              map[string]string              // special domain(containing wildcard char) -> role
+	ExtraPermits        map[string]share.NvPermissions // domain -> permissions. only for Rancher SSO
 	ApiCategoryID       int8
-	RequiredPermissions uint64
-	BoostPermissions    uint64
+	RequiredPermissions uint32
+	BoostPermissions    uint32
 }
 
 type QuerySessionRequest struct {
