@@ -243,7 +243,7 @@ func CLUSFqdnIpKey(hostID string, fqdname string) string {
 
 const InternalIPNetDefaultName string = "InternalIPNet"
 const SpecialIPNetDefaultName string = "SpecialIPNet"
-const NsBoundaryKey string = "nv-ns-boundary"
+const NsBoundaryKey string = "NeuvectorNamespaceBoundary"
 const NsBoundaryValEnable string = "enabled"
 
 func CLUSInternalIPNetsKey(name string) string {
