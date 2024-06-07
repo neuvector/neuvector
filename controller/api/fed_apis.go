@@ -281,14 +281,15 @@ type RESTFedCspSupportReq struct { // for joint clusters to request csp-config d
 }
 
 type RESTFedCspSupportResp struct { // csp-config data returned from master cluster
-	Compliant        bool     `json:"compliant"`
-	ExpireTime       int64    `json:"expire_time"`     // the last billing "compliant" state's expiration time in seconds
-	CspErrors        []string `json:"csp_errors"`      // internal errors from csp-adapter
-	NvError          string   `json:"nv_error"`        // error message for nv to check csp-config
-	CspConfigData    string   `json:"csp_config_data"` // raw csp-config data
-	CspConfigFrom    string   `json:"csp_config_from"` // "master"/"joint"/ "": where is csp-config data from
-	JointReportUsage bool     `json:"joint_report_usage"`
-	AdapterVersions  string   `json:"adapter_versions"`
+	Compliant           bool     `json:"compliant"`
+	ExpireTime          int64    `json:"expire_time"`     // the last billing "compliant" state's expiration time in seconds
+	CspErrors           []string `json:"csp_errors"`      // internal errors from csp-adapter
+	NvError             string   `json:"nv_error"`        // error message for nv to check csp-config
+	CspConfigData       string   `json:"csp_config_data"` // raw csp-config data
+	CspConfigFrom       string   `json:"csp_config_from"` // "master"/"joint"/ "": where is csp-config data from
+	JointReportUsage    bool     `json:"joint_report_usage"`
+	AdapterVersions     string   `json:"adapter_versions"`
+	MeteringArchiveData string   `json:"metering_archive_data"` // raw metering-archive data
 }
 
 type RESTFedCspUsage struct {
