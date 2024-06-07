@@ -495,10 +495,8 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 					sizeErrMsg = fmt.Sprintf("CRD resource metadata name(%s) is not allowed", mdName)
 				}
 			} else if reqUpdateByK8sGC {
-				_, err := global.ORCH.GetResource(req.Resource.Resource, req.Namespace, secRulePartial.GetName())
-				if err != nil && strings.Contains(err.Error(), " 404 ") {
-					// The NV CR to update is not found in k8s & it's requested by "system:serviceaccount:kube-system:generic-garbage-collector" !
-					log.WithFields(log.Fields{"err": err, "name": ar.Request.Name}).Debug()
+				if ts := secRulePartial.DeletionTimestamp; ts != nil && !ts.IsZero() {
+					log.WithFields(log.Fields{"ignored": string(body)}).Debug()
 					skipUpdateReqByK8sGC = true
 				}
 			}
