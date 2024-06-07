@@ -1382,7 +1382,8 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	var reqData api.RESTFedConfigData
 	body, _ := io.ReadAll(r.Body)
 	if err := json.Unmarshal(body, &reqData); err != nil || (reqData.Name != nil && *reqData.Name == "") ||
-		!reqData.RestInfo.IsValid() || (reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
+		(reqData.RestInfo != nil && !reqData.RestInfo.IsValid()) ||
+		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
