@@ -23,6 +23,7 @@ static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dp
 static bool _dpi_policy_implicit_default(dpi_policy_hdl_t *hdl, dpi_policy_desc_t *desc);
 static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                                     uint8_t iptype, dpi_policy_desc_t **pol_desc);
+static void _dpi_policy_chk_nbe(dpi_packet_t *p, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc);
 
 /*
  * -----------------------------------------------------
@@ -651,6 +652,8 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                  hdl, proto, DBG_IPV4_TUPLE(sip), DBG_IPV4_TUPLE(dip), dport, app, is_ingress, to_server);
     dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc, p);
 
+    _dpi_policy_chk_nbe(p, hdl, &desc);
+
     if ((desc->flags & POLICY_DESC_INTERNAL)) {
         if (is_ingress) {
             iptype = dpi_ip4_iptype(sip);
@@ -714,6 +717,39 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
 exit:
     DEBUG_POLICY("return " DP_POLICY_DESC_STR "\n", DP_POLICY_DESC(desc));
     return 0;
+}
+
+static void _dpi_policy_chk_nbe(dpi_packet_t *p, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc)
+{
+    if (hdl == NULL || pol_desc == NULL) return;
+
+    dpi_policy_desc_t *desc = *pol_desc;
+    if (desc->action == DP_POLICY_ACTION_CHECK_NBE) {
+
+        if (!p || !p->ep) {
+            return;
+        }
+        //if ns_boundary is enforced, we need to adjust
+        //action for corresponding policy mode
+        if (p->ep->nbe) {
+            //set policy id to 0 plus flag to indicate
+            //it is a cross namespace violation
+            desc->id = 0;
+            desc->flags |= POLICY_DESC_CHK_NBE;
+            if (hdl->def_action == DP_POLICY_ACTION_LEARN) {//discover
+                desc->action = DP_POLICY_ACTION_VIOLATE;
+            }
+            if (hdl->def_action == DP_POLICY_ACTION_VIOLATE) {//monitor
+                desc->action = DP_POLICY_ACTION_VIOLATE;
+            }
+            if (hdl->def_action == DP_POLICY_ACTION_DENY) {//protect
+                desc->action = DP_POLICY_ACTION_DENY;
+            }
+        } else {
+            //if ns_boundary is not enforced, allow traffic
+            desc->action = DP_POLICY_ACTION_ALLOW;
+        }
+    }
 }
 
 static bool _dpi_policy_implicit_default(dpi_policy_hdl_t *hdl, dpi_policy_desc_t *desc)
@@ -844,6 +880,17 @@ exit:
     return 0;
 }
 
+static bool _dpi_is_chk_nbe(dpi_packet_t *p)
+{
+    if (!p || !p->ep) {
+        return false;
+    }
+    if (p->ep->nbe) {
+        return true;
+    }
+    return false;
+}
+
 #define policy_desc_merge(desc1, desc2) \
     if ((desc2)->id > 0 && (desc2)->order < (desc1)->order) { \
         memcpy((desc1), (desc2), sizeof(dpi_policy_desc_t)); \
@@ -854,6 +901,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                                     int is_ingress, dpi_policy_desc_t *desc, dpi_packet_t *p)
 {
     dpi_rule_key_t key;
+    bool is_nbe = _dpi_is_chk_nbe(p);
 
     if (unlikely(!hdl || th_disable_net_policy)) {
         // workload just created, allow traffic pass until policy being configured
@@ -891,7 +939,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         uint8_t iptype = dpi_ip4_iptype(key.sip);
 
         if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_INGRESS) &&
-            iptype != DP_IPTYPE_UWLIP) {
+            iptype != DP_IPTYPE_UWLIP && !is_nbe) {
             // east-west ingress traffic is always allowed
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;
@@ -976,8 +1024,8 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         }
         //on k8s platform, we want to learn policy if
         //egress traffic is to host ip
-        if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS) &&
-            !ipv4_ent && iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP) {
+        if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS) && !ipv4_ent &&
+            iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP && !is_nbe) {
             // east-west egress traffic is always allowed
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;
@@ -989,6 +1037,13 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
                 desc->id = 0;
                 desc->action = DP_POLICY_ACTION_OPEN;
                 desc->flags = is_internal ? POLICY_DESC_INTERNAL:POLICY_DESC_EXTERNAL;
+                goto exit;
+            }
+            if (is_nbe && iptype == DP_IPTYPE_SVCIP) {
+                //no check for cross namespace for svc ip traffic
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = POLICY_DESC_INTERNAL;
                 goto exit;
             }
             dpi_policy_desc_t desc2;

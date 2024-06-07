@@ -209,6 +209,10 @@ func dpMsgConnection(msg []byte) {
 			// uwl connection
 			cc.UwlIp = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_CHK_NBE) != 0 {
+			// connection cross namespace
+			cc.Nbe = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),

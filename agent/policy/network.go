@@ -78,6 +78,39 @@ func isWorkloadIP(wl string) bool {
 	return false
 }
 
+func isWorkloadIngress(wl string) bool {
+	if strings.HasPrefix(wl, share.CLUSLearnedWorkloadPrefix) {
+		if names := strings.Split(wl, share.CLUSLearnedWorkloadPrefix); len(names) == 2 {
+			if names[1] == share.CLUSEndpointIngress {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isHostWl(wl string) bool {
+	if strings.HasPrefix(wl, share.CLUSLearnedHostPrefix) {
+		return true
+	}
+	return false
+}
+
+func isHostWlIP(wl string) bool {
+	if strings.HasPrefix(wl, share.CLUSLearnedHostPrefix) {
+		if names := strings.Split(wl, share.CLUSLearnedHostPrefix); len(names) == 2 {
+			if net.ParseIP(names[1]) != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isHostWlID(wl string) bool {
+	return isHostWl(wl) && !isHostWlIP(wl)
+}
+
 func isSameHostEP(wl, hid string) bool {
 	return wl == fmt.Sprintf("%s%s", share.CLUSLearnedHostPrefix, hid)
 }
@@ -248,6 +281,31 @@ func createIPRule(from, to, fromR, toR net.IP, portApps []share.CLUSPortApp, act
 	}
 }
 
+func adjustActionNs(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) uint8 {
+	var adjustedAction uint8 = action
+	fromDomain := from.Domain
+	toDomain := to.Domain
+	fromRole := from.PlatformRole
+	toRole := to.PlatformRole
+
+	if (to.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLExternal) ||//"external"->inter-ns
+		(to.WlID == share.CLUSWLAddressGroup || from.WlID == share.CLUSWLAddressGroup) ||//"address group"->inter-ns
+		(isWorkloadFqdn(to.WlID) || isWorkloadFqdn(from.WlID)) ||//"FQDN address group"->inter-ns
+		(isHostWlIP(to.WlID) || isHostWlIP(from.WlID)) ||//"Host:ip"->inter-ns
+		(isWorkloadIP(to.WlID) || isWorkloadIP(from.WlID)) {//"Workload:ip"->inter-ns
+		adjustedAction = C.DP_POLICY_ACTION_CHECK_NBE
+	} else if (to.WlID == share.CLUSHostAddrGroup || from.WlID == share.CLUSHostAddrGroup) ||//"nodes"->intra-ns
+		(isHostWlID(to.WlID) || isHostWlID(from.WlID)) ||//"Host:hostid"->intra-ns
+		(isWorkloadIngress(to.WlID) || isWorkloadIngress(from.WlID)) {//"Workload:ingress"->intra-ns
+		adjustedAction = action
+	} else if fromRole == share.CLUSPlatformContainerCore || toRole == share.CLUSPlatformContainerCore {//system container->intra-ns
+		adjustedAction = action
+	} else if fromDomain != toDomain {//inter-ns
+		adjustedAction = C.DP_POLICY_ACTION_CHECK_NBE
+	}
+	return adjustedAction
+}
+
 func adjustAction(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) uint8 {
 	var adjustedAction uint8 = action
 	fromMode := from.PolicyMode
@@ -309,6 +367,10 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 	// deny cannot be enforced for non-interceptable container
 	if !pInfo.CapIntcp && action == C.DP_POLICY_ACTION_DENY {
 		action = C.DP_POLICY_ACTION_VIOLATE
+	}
+
+	if action == C.DP_POLICY_ACTION_LEARN || action == C.DP_POLICY_ACTION_ALLOW {
+		action = adjustActionNs(action, from, to, policy.ID)
 	}
 
 	ctx := &ruleContext{ingress: ingress, id: policy.ID}
@@ -538,6 +600,8 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 func fillWorkloadAddress(addr *share.CLUSWorkloadAddr, addrMap map[string]*share.CLUSWorkloadAddr) {
 	if a, ok := addrMap[addr.WlID]; ok {
 		addr.PolicyMode = a.PolicyMode
+		addr.Domain = a.Domain
+		addr.PlatformRole = a.PlatformRole
 		addr.LocalIP = a.LocalIP
 		addr.GlobalIP = a.GlobalIP
 		addr.NatIP = a.NatIP
@@ -823,9 +887,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					}
 					e.createWorkloadRule(from, to, &pp, pInfo, false, sameHost)
 				} else {
+					isFromNbe := pInfo.Nbe
 					// Only configure egress rule to external, as east-west egress traffic
 					// will be automatically allowed at DP
-					if to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
+					if isFromNbe || to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
 						to.WlID == share.CLUSHostAddrGroup || isWorkloadFqdn(to.WlID) || isWorkloadIP(to.WlID) {
 						fillWorkloadAddress(from, addrMap)
 						fillWorkloadAddress(to, addrMap)
@@ -865,9 +930,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					}
 					e.createWorkloadRule(from, to, &pp, pInfo, true, sameHost)
 				} else {
+					isToNbe := pInfo.Nbe
 					// Only configure ingress rule from external, as east-west ingress traffic
 					// will be automatically allowed at DP
-					if from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||
+					if isToNbe || from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||
 						from.WlID == share.CLUSHostAddrGroup || isWorkloadFqdn(from.WlID) || isWorkloadIP(from.WlID) {
 						fillWorkloadAddress(from, addrMap)
 						fillWorkloadAddress(to, addrMap)
@@ -1076,6 +1142,35 @@ func policy_chk_unknown_ip(pInfo *WorkloadIPPolicyInfo, srcip, dstip net.IP, ipt
 	}
 }
 
+func policy_chk_nbe(pInfo *WorkloadIPPolicyInfo, conn *dp.Connection, policyId uint32, taction uint8) (uint32, uint8, bool) {
+	isNbe := pInfo.Nbe
+	def_action := policyModeToDefaultAction(pInfo.Policy.Mode, pInfo.CapIntcp)
+	action := taction
+	id := policyId
+	chg := false
+	if action == C.DP_POLICY_ACTION_CHECK_NBE {
+		if isNbe {
+			//set policy id to 0 plus flag to indicate
+			//it is a cross namespace violation
+			id = 0
+			conn.Nbe = true
+			if def_action == C.DP_POLICY_ACTION_LEARN {//discover
+				action = C.DP_POLICY_ACTION_VIOLATE
+			}
+			if def_action == C.DP_POLICY_ACTION_VIOLATE {//monitor
+				action = C.DP_POLICY_ACTION_VIOLATE
+			}
+			if def_action == C.DP_POLICY_ACTION_DENY {//protect
+				action = C.DP_POLICY_ACTION_DENY
+			}
+		} else {
+			//if ns_boundary is not enforced, allow traffic
+			action = C.DP_POLICY_ACTION_ALLOW
+		}
+		chg = true
+	}
+	return id, action, chg
+}
 func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32, uint8, bool) {
 	e.Mutex.Lock()
 	pInfo := e.NetworkPolicy[wl]
@@ -1084,10 +1179,11 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 	if pInfo == nil || !pInfo.Configured {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	}
-
+	isNbe := pInfo.Nbe
 	if conn.Ingress {
 		if !conn.ExternalPeer &&
-			(pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_INGRESS == 0) {
+			(pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_INGRESS == 0) &&
+			!isNbe {
 			return 0, C.DP_POLICY_ACTION_OPEN, false
 		}
 
@@ -1096,12 +1192,18 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 				continue
 			}
 			if match, id, action := hostPolicyMatch(p, conn); match {
+				tid, taction, tchg := policy_chk_nbe(pInfo, conn, id, action)
+				if tchg {
+					id = tid
+					action = taction
+				}
 				return id, action, action > C.DP_POLICY_ACTION_CHECK_APP
 			}
 		}
 	} else {
 		if !conn.ExternalPeer &&
-			(pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_EGRESS == 0) {
+			(pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_EGRESS == 0) &&
+			!isNbe {
 			return 0, C.DP_POLICY_ACTION_OPEN, false
 		}
 
@@ -1111,6 +1213,11 @@ func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32
 			}
 
 			if match, id, action := hostPolicyMatch(p, conn); match {
+				tid, taction, tchg := policy_chk_nbe(pInfo, conn, id, action)
+				if tchg {
+					id = tid
+					action = taction
+				}
 				return id, action, action > C.DP_POLICY_ACTION_CHECK_APP
 			}
 		}
@@ -1346,4 +1453,11 @@ func (e *Engine) PushNetworkDlpToDP() {
 	e.Mutex.Unlock()
 
 	log.Debug("dlp config and build done")
+}
+
+func (e *Engine) GetPolDomNBEMap() map[string]bool {
+	e.Mutex.Lock()
+	defer e.Mutex.Unlock()
+
+	return e.PolDomNBEMap
 }

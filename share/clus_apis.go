@@ -243,6 +243,8 @@ func CLUSFqdnIpKey(hostID string, fqdname string) string {
 
 const InternalIPNetDefaultName string = "InternalIPNet"
 const SpecialIPNetDefaultName string = "SpecialIPNet"
+const NsBoundaryKey string = "nv-ns-boundary"
+const NsBoundaryValEnable string = "enabled"
 
 func CLUSInternalIPNetsKey(name string) string {
 	return fmt.Sprintf("%s%s", CLUSNetworkStore, name)
@@ -1219,6 +1221,7 @@ var CLUSLearnedHostPrefix string = "Host:"
 var CLUSLearnedWorkloadPrefix string = "Workload:"
 var CLUSEndpointIngress string = "ingress"
 var CLUSWLAllContainer string = "nv.allcontainer"
+var CLUSPlatformContainerCore string = "core"
 
 const DefaultGroupRuleID uint32 = 0
 const PolicyLearnedIDBase = 10000
@@ -1246,6 +1249,8 @@ type CLUSPortApp struct {
 type CLUSWorkloadAddr struct {
 	WlID         string        `json:"workload_id"`
 	PolicyMode   string        `json:"mode,omitempty"`
+	Domain       string        `json:"domain,omitempty"`
+	PlatformRole string        `json:"platform_role,omitempty"`
 	LocalIP      []net.IP      `json:"local_ip,omitempty"`
 	GlobalIP     []net.IP      `json:"global_ip,omitempty"`
 	NatIP        []net.IP      `json:"nat_ip,omitempty"`

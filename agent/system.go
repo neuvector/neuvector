@@ -37,6 +37,7 @@ type domainCache struct {
 
 var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
 var domainMutex sync.RWMutex
+var domainNBEMap map[string]bool = make(map[string]bool)
 
 func initDomain(name string, nsLabels map[string]string) *share.CLUSDomain {
 	return &share.CLUSDomain{Name: name, Labels: nsLabels}
@@ -183,6 +184,17 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 	}
 }
 
+func isDomainNBE(c *containerData) bool {
+	domNbeMap := pe.GetPolDomNBEMap()
+	if c.role != "" {//system container
+		return false
+	}
+	if onbe, ok := domNbeMap[c.domain]; ok {
+		return onbe
+	}
+	return false
+}
+
 var policyVerVal uint64 = 0
 const polVerMax uint64 = (1<<16-1)
 func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
@@ -210,6 +222,7 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 			CapIntcp:   c.capIntcp,
 			Configured: false,
 			PolVer: policyVer,
+			Nbe: isDomainNBE(c),
 		}
 
 		for _, pair := range c.intcpPairs {
@@ -1351,6 +1364,57 @@ func getDomainData(name string) *share.CLUSDomain {
 	return nil
 }
 
+func domainConfigNbeDp(c *containerData, newnbe bool) {
+	if !c.hasDatapath {
+		return
+	}
+	macs := make([]string, len(c.intcpPairs))
+	for i, pair := range c.intcpPairs {
+		macs[i] = pair.MAC.String()
+	}
+	dp.DPCtrlConfigNBE(macs, &newnbe)
+}
+
+func domainConfigNbe(domain string, newnbe bool) {
+	for _, c := range gInfo.activeContainers {
+		if c.domain == domain {
+			if c.role != "" {//system container
+				domainConfigNbeDp(c, false)
+			} else {
+				domainConfigNbeDp(c, newnbe)
+			}
+		}
+	}
+}
+
+func domainNBEChange(domain share.CLUSDomain) {
+	log.WithFields(log.Fields{"domain": domain}).Debug("")
+	oldnbe := false
+	newnbe := false
+	if onbe, ok := domainNBEMap[domain.Name]; ok {
+		oldnbe = onbe
+	}
+
+	if v, ok := domain.Labels[share.NsBoundaryKey]; ok {
+		if strings.ToLower(v) == share.NsBoundaryValEnable {
+			domainNBEMap[domain.Name] = true
+			newnbe = true
+		} else {
+			domainNBEMap[domain.Name] = false
+			newnbe = false
+		}
+	} else {
+		domainNBEMap[domain.Name] = false
+		newnbe = false
+	}
+	if newnbe != oldnbe {
+		domainConfigNbe(domain.Name, newnbe)
+	}
+	pe.Mutex.Lock()
+	pe.PolDomNBEMap = domainNBEMap //new
+	pe.Mutex.Unlock()
+}
+
 func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	name := share.CLUSDomainKey2Name(key)
 	switch nType {
@@ -1365,6 +1429,8 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
 			domainChange(domain)
+			//ns-boundary enforcement
+			domainNBEChange(domain)
 		}
 		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -27,6 +28,7 @@ type domainCache struct {
 var domainCacheMap map[string]*domainCache = make(map[string]*domainCache)
 var domainMutex sync.RWMutex
 var domainRemoveMap map[string]time.Time = make(map[string]time.Time)
+var domainNBEMap map[string]bool = make(map[string]bool)
 
 var _pruningOrphanGroups uint32
 
@@ -74,6 +76,31 @@ func getDomainData(name string) *share.CLUSDomain {
 	return nil
 }
 
+func domainNBEChange(domain share.CLUSDomain) {
+	log.WithFields(log.Fields{"domain": domain}).Debug("")
+	oldnbe := false
+	newnbe := false
+	if onbe, ok := domainNBEMap[domain.Name]; ok {
+		oldnbe = onbe
+	}
+
+	if v, ok := domain.Labels[share.NsBoundaryKey]; ok {
+		if strings.ToLower(v) == share.NsBoundaryValEnable {
+			domainNBEMap[domain.Name] = true
+			newnbe = true
+		} else {
+			domainNBEMap[domain.Name] = false
+			newnbe = false
+		}
+	} else {
+		domainNBEMap[domain.Name] = false
+		newnbe = false
+	}
+	if newnbe != oldnbe {
+		scheduleIPPolicyCalculation(false)
+	}
+}
+
 func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	name := share.CLUSDomainKey2Name(key)
 	switch nType {
@@ -94,6 +121,8 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels) {
 			domainChange(domain)
+			//ns-boundary enforcement
+			domainNBEChange(domain)
 		}
 		log.WithFields(log.Fields{"domain": domain, "name": name}).Debug()
 
@@ -180,7 +209,11 @@ func (m CacheMethod) GetAllDomains(acc *access.AccessControl) ([]*api.RESTDomain
 		if !acc.Authorize(cache.domain, nil) {
 			continue
 		}
-		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags, Labels: cache.domain.Labels}
+		newnbe := false
+		if onbe, ok := domainNBEMap[name]; ok {
+			newnbe = onbe
+		}
+		dmap[name] = &api.RESTDomain{Name: name, Tags: cache.domain.Tags, Labels: cache.domain.Labels, Nbe: newnbe}
 	}
 
 	domainMutex.RUnlock()

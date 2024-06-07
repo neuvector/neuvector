@@ -2244,6 +2244,13 @@ func taskDPConnect() {
 			programProxyMeshDP(c, false, false)
 			updateProxyMeshMac(c, false)
 		}
+		if c.hasDatapath {
+			newnbe := false
+			if onbe, ok := domainNBEMap[c.domain]; ok {
+				newnbe = onbe
+			}
+			domainConfigNbeDp(c, newnbe)
+		}
 	}
 	pe.PushFqdnInfoToDP()
 	if gInfo.disableNetPolicy == false {

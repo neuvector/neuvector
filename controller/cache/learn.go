@@ -371,6 +371,11 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 		if ge.fqdn == "" || conn.FQDN != "" {
 			ge.fqdn = conn.FQDN
 		}
+		if conn.Nbe {
+			ge.nbe = 1
+		} else {
+			ge.nbe = 0
+		}
 	} else {
 		ge := &graphEntry{
 			bytes:    conn.Bytes,
@@ -388,6 +393,11 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 			ge.toSidecar = 1
 		} else {
 			ge.toSidecar = 0
+		}
+		if conn.Nbe {
+			ge.nbe = 1
+		} else {
+			ge.nbe = 0
 		}
 		if isDlpThreatID(conn.ThreatID) {
 			ge.dlpID = conn.ThreatID
@@ -1319,6 +1329,7 @@ type GraphSyncEntry struct {
 	Xff          uint8
 	ToSidecar    uint8
 	FQDN         string
+	Nbe          uint8
 }
 
 func graphEntry2Sync(k *graphKey, e *graphEntry) *GraphSyncEntry {
@@ -1330,6 +1341,7 @@ func graphEntry2Sync(k *graphKey, e *graphEntry) *GraphSyncEntry {
 		Severity: e.severity, DlpSeverity: e.dlpSeverity, WafSeverity: e.wafSeverity,
 		ThreatID: e.threatID, DlpID: e.dlpID, WafID: e.wafID, PolicyAction: e.policyAction,
 		PolicyID: e.policyID, Last: e.last, Xff: e.xff, ToSidecar: e.toSidecar, FQDN: e.fqdn,
+		Nbe: e.nbe,
 	}
 }
 
@@ -1342,7 +1354,7 @@ func graphSync2Entry(e *GraphSyncEntry) (*graphKey, *graphEntry) {
 		bytes: e.Bytes, sessions: e.Sessions,
 		server: e.Server, severity: e.Severity, dlpSeverity: e.DlpSeverity, wafSeverity: e.WafSeverity,
 		threatID: e.ThreatID, dlpID: e.DlpID, wafID: e.WafID, policyAction: e.PolicyAction,
-		policyID: e.PolicyID, last: e.Last, xff: e.Xff, toSidecar: e.ToSidecar, fqdn: e.FQDN,
+		policyID: e.PolicyID, last: e.Last, xff: e.Xff, toSidecar: e.ToSidecar, fqdn: e.FQDN, nbe: e.Nbe,
 	}
 	return &gkey, &gEntry
 }

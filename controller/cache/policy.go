@@ -442,6 +442,8 @@ func getWorkloadBaselineProfile(wlCache *workloadCache) string {
 func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 	wlAddr := share.CLUSWorkloadAddr{
 		WlID: wlCache.workload.ID,
+		Domain: wlCache.workload.Domain,
+		PlatformRole: wlCache.platformRole,
 	}
 	wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache)
 	for _, addrs := range wlCache.workload.Ifaces {
@@ -1248,13 +1250,29 @@ func isWlRelate2Node(wlid string) bool {
 	return true
 }
 
+func isDomNBE(addr *share.CLUSWorkloadAddr, addrMap map[string]*share.CLUSWorkloadAddr) bool {
+	if a, ok := addrMap[addr.WlID]; ok {
+		if a.PlatformRole == api.PlatformContainerCore {
+			return false
+		}
+		if onbe, ok := domainNBEMap[a.Domain]; ok {
+			return onbe
+		}
+	}
+	return false
+}
+
 func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 	if nodePolicy == nil {
 		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
 	}
 	//important: order in rules needs to be preserved
+	addrMap := make(map[string]*share.CLUSWorkloadAddr)
 	for idx, rul := range rules {
 		if idx == 0 {
+			for _, from := range rul.From {
+				addrMap[from.WlID] = from
+			}
 			//printOneNodeGroupIPPolicy(&rul)
 			continue
 		}
@@ -1394,6 +1412,24 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 					}
 					nodePolicy[nid] = append(nodePolicy[nid], pol)
 				}
+				//also need to check namespace boundary enforcement
+				var tmpNodePolicyNBE map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+				for _, addr := range rul.From {
+					if hid, ok := wlNode[addr.WlID]; ok && isDomNBE(addr, addrMap) {
+						t := tmpNodePolicyNBE[hid]
+						t.ID = rul.ID
+						t.From = append(t.From, addr)
+						t.To = rul.To
+						t.Action = rul.Action
+						tmpNodePolicyNBE[hid] = t
+					}
+				}
+				for nid, pol := range tmpNodePolicyNBE {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], pol)
+				}
 			}
 		} else {
 			//if destination group is not container group
@@ -1435,9 +1471,13 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 	if nodePolicy == nil {
 		nodePolicy = make(map[string][]share.CLUSGroupIPPolicy)
 	}
+	addrMap := make(map[string]*share.CLUSWorkloadAddr)
 	//important: order in rules needs to be preserved
 	for idx, rul := range rules {
 		if idx == 0 {
+			for _, from := range rul.From {
+				addrMap[from.WlID] = from
+			}
 			//printOneNodeGroupIPPolicy(&rul)
 			continue
 		}
@@ -1468,6 +1508,24 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 				}
 				nodePolicy[nid] = append(nodePolicy[nid], pol)
 			}
+				//also need to check namespace boundary enforcement
+				var tmpNodePolicyNBE map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+				for _, addr := range rul.To {
+					if hid, ok := wlNode[addr.WlID]; ok && isDomNBE(addr, addrMap) {
+						t := tmpNodePolicyNBE[hid]
+						t.ID = rul.ID
+						t.From = rul.From
+						t.To = append(t.To, addr)
+						t.Action = rul.Action
+						tmpNodePolicyNBE[hid] = t
+					}
+				}
+				for nid, pol := range tmpNodePolicyNBE {
+					if nodePolicy[nid] == nil {
+						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
+					}
+					nodePolicy[nid] = append(nodePolicy[nid], pol)
+				}
 		} else {
 			//if destination group is not container group
 			//use source group to decide which node
