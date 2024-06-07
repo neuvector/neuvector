@@ -437,6 +437,9 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	b.replaceKubeCisCmd(masterScript, masterScriptSh)
 	b.replaceKubeCisCmd(workerScript, workerScriptSh)
 
+	defer os.Remove(masterScriptSh)
+	defer os.Remove(workerScriptSh)
+
 	var errMaster, errWorker error
 	var out []byte
 
@@ -835,6 +838,7 @@ func (b *Bench) runDockerHostBench() ([]byte, error) {
 		log.WithFields(log.Fields{"error": err}).Error("Replace host docker daemon cmdline error")
 		return nil, err
 	}
+	defer os.Remove(dstHostBenchSh)
 
 	args := []string{system.NSActRun, "-f", dstHostBenchSh,
 		"-m", global.SYS.GetMountNamespacePath(1), "-n", global.SYS.GetNetNamespacePath(1)}
@@ -1038,6 +1042,8 @@ func (b *Bench) runDockerContainerBench(containers map[string]string) ([]byte, e
 		log.WithFields(log.Fields{"error": err}).Error("Replace container docker daemon cmdline error")
 		return nil, fmt.Errorf("Replace container docker daemon cmdline error, error=%v", err)
 	}
+
+	defer os.Remove(dstContainerBenchSh)
 
 	args := []string{system.NSActRun, "-f", dstContainerBenchSh, "-m", global.SYS.GetMountNamespacePath(1)}
 	var errb, outb bytes.Buffer

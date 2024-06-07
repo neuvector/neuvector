@@ -625,12 +625,22 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	}
 
 	if r.bNeuVectorSvc {
+		log.WithFields(log.Fields{"linkPath": linkPath}).Debug("FMON:")
 		if strings.HasPrefix(linkPath, "/usr/local/bin/scripts/") {
-			if filepath.Dir(pInfo.Path) == "/usr/local/bin" {
-				switch filepath.Base(pInfo.Path) {
-				case "agent", "monitor", "controller", "nstools", "workerlet", "dp":
-					return true, 0, nil, nil
+			pid := pInfo.Pid
+			path := pInfo.Path
+			for i := 0; i < 5; i++ {
+				if filepath.Dir(path) == "/usr/local/bin" {
+					switch filepath.Base(path) {
+					case "agent", "monitor", "controller", "nstools", "workerlet", "dp":
+						return true, 0, nil, nil
+					}
 				}
+				// find the parent
+				if _, pid, err = fn.sys.GetProcessName(pid); err != nil {
+					break
+				}
+				path, _ = fn.sys.GetFilePath(pid)
 			}
 			return false, mask, nil, nil
 		}
