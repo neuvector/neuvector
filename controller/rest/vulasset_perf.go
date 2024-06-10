@@ -95,31 +95,7 @@ func perf_generateWorkloadDbAssetVul(assetid string, vuls []string) *db.DbAssetV
 		d.W_applications = string(b)
 	}
 
-	// compile cve list
-	allCVEs := make([]string, 0)
-	for _, vul := range vuls {
-		c := _get_cvename(vul)
-		allCVEs = append(allCVEs, fmt.Sprintf("%s;%s", c, vul))
-	}
-	b, err = json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
-
 	d.Scanned_at = "2023-12-29T08:46:32Z"
-
-	d.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
-	for _, vul := range vuls {
-		name := _get_cvename(vul)
-		vulPackage := &db.DbVulnResourcePackageVersion2{
-			CVEName:        name,
-			PackageName:    fmt.Sprintf("package-%s", utils.GetRandomID(3, "")),
-			PackageVersion: "1.0.0",
-			FixedVersion:   "1.0.1",
-			DbKey:          vul,
-		}
-		d.Packages = append(d.Packages, vulPackage)
-	}
 
 	return d
 }

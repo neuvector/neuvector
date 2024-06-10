@@ -581,7 +581,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, wl.VulTraits, "", false)
+			reportVuls, _ := db.GetVulnerability(wl.ID)
+			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, localVulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -595,7 +598,11 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, n.VulTraits, "", false)
+
+			reportVuls, _ := db.GetVulnerability(n.ID)
+			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+
+			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, localVulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -726,7 +733,7 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 	restRespSuccess(w, r, resp, acc, login, nil, "Get vulnerabiility asset report")
 }
 
-func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, map[string]bool) {
+func getAllAllowedResourceId(acc *access.AccessControl) map[string]utils.Set {
 	allowed := map[string]utils.Set{
 		db.AssetWorkload: utils.NewSet(),
 		db.AssetNode:     utils.NewSet(),
@@ -736,23 +743,20 @@ func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, m
 
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 
-	// key formats: (1) cve (2) asssetID;cve
-	filteredMap := make(map[string]bool)
-
-	podIDs := cacher.GetAllWorkloadsID(acc, filteredMap)
+	podIDs := cacher.GetAllWorkloadsID(acc)
 	for _, podID := range podIDs {
 		allowed[db.AssetWorkload].Add(podID)
 	}
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
-		nodes := cacher.GetAllHostsID(acc, filteredMap)
+		nodes := cacher.GetAllHostsID(acc)
 		for _, n := range nodes {
 			allowed[db.AssetNode].Add(n)
 		}
 	}
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
-		platformID := cacher.GetPlatformID(acc, filteredMap)
+		platformID := cacher.GetPlatformID(acc)
 		if platformID != "" {
 			allowed[db.AssetPlatform].Add(platformID) // platform
 		}
@@ -760,7 +764,7 @@ func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, m
 
 	registries := scanner.GetAllRegistrySummary(share.ScopeAll, acc)
 	for _, reg := range registries {
-		registryImagesIDs, err := scanner.GetRegistryImagesIDs(reg.Name, vpf, "", acc, filteredMap)
+		registryImagesIDs, err := scanner.GetRegistryImagesIDs(reg.Name, vpf, "", acc)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Debug("GetRegistryImagesIDs failed")
 		} else {
@@ -770,12 +774,11 @@ func getAllAllowedResourceId(acc *access.AccessControl) (map[string]utils.Set, m
 		}
 	}
 
-	return allowed, filteredMap
+	return allowed
 }
 
 func handlerVulAssetCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	if r.Method == http.MethodPost {
-		// createVulAssetSession(w, r)
 		createVulAssetSessionV2(w, r)
 		return
 	}

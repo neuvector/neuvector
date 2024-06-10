@@ -3989,7 +3989,7 @@ type RESTWorkloadAssetView struct {
 }
 
 type RESTHostAssetView struct {
-	ID              string   `json:"id"` //TODO: remove later
+	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	PolicyMode      string   `json:"policy_mode"`
 	OS              string   `json:"os"`
@@ -4005,7 +4005,7 @@ type RESTHostAssetView struct {
 }
 
 type RESTPlatformAssetView struct {
-	ID              string   `json:"id"` //TODO: remove later
+	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	Version         string   `json:"version"`
 	BaseOS          string   `json:"base_os"`
@@ -4016,7 +4016,7 @@ type RESTPlatformAssetView struct {
 }
 
 type RESTImageAssetView struct {
-	ID              string   `json:"id"` //TODO: remove later
+	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`

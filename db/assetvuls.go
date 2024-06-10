@@ -3,12 +3,13 @@ package db
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/alitto/pond"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/utils"
 
@@ -205,7 +206,7 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 	records := make([]*api.RESTWorkloadAssetView, 0)
 
 	columns := []interface{}{"assetid", "name", "w_domain", "w_applications", "policy_mode", "w_service_group",
-		"cve_high", "cve_medium", "cve_low", "cve_lists", "scanned_at", "packagesb"}
+		"scanned_at", "idns", "vulsb"}
 
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForWorkload(assets, queryFilter.Filters)).Prepared(true).ToSQL()
@@ -216,40 +217,38 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 	}
 	defer rows.Close()
 
+	poolSize := queryFilter.ThreadCount
+	pool := pond.New(poolSize, 0, pond.MinWorkers(poolSize))
+	var mux sync.Mutex
+
 	for rows.Next() {
 		av := &api.RESTWorkloadAssetView{}
 		av.Vulnerabilities = make([]string, 0)
 
-		var assetId, cveStr, apps string
-		var packagesBytes []byte
-		err = rows.Scan(&assetId, &av.Name, &av.Domain, &apps, &av.PolicyMode, &av.ServiceGroup, &av.High, &av.Medium, &av.Low, &cveStr, &av.ScannedAt, &packagesBytes)
+		var assetId, apps, idnsStr string
+		var vulsBytes []byte
+		err = rows.Scan(&assetId, &av.Name, &av.Domain, &apps, &av.PolicyMode, &av.ServiceGroup, &av.ScannedAt, &idnsStr, &vulsBytes)
 
 		if err != nil {
+			pool.StopAndWait()
 			return nil, err
 		}
 
 		av.Applications = parseJsonStrToSlice(apps)
 
-		// keep only CVE exist in vulMap
-		var cveList []string
-		err := json.Unmarshal([]byte(cveStr), &cveList)
-		if err != nil {
-			return nil, err
+		cveStats := map[string]*int{
+			"High":   &av.High,
+			"Medium": &av.Medium,
+			"Low":    &av.Low,
 		}
 
-		for _, c := range cveList {
-			name, _, _ := parseCVEDbKey(c)
-			if v, exist := vulMap[name]; exist {
-				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
-			}
-		}
+		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 
-		// fetch the packages from matched assets
-		fillCvePackages(cvePackages, packagesBytes)
-
-		av.ID = assetId // TODO: for debug, remove later
+		av.ID = assetId
 		records = append(records, av)
 	}
+	pool.StopAndWait()
+
 	return records, nil
 }
 
@@ -257,8 +256,7 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 	records := make([]*api.RESTHostAssetView, 0)
 
 	columns := []interface{}{"assetid", "name", "policy_mode",
-		"cve_high", "cve_medium", "cve_low", "cve_lists", "scanned_at",
-		"n_os", "n_kernel", "n_cpus", "n_memory", "n_containers", "packagesb"}
+		"scanned_at", "n_os", "n_kernel", "n_cpus", "n_memory", "n_containers", "idns", "vulsb"}
 
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForNode(assets, queryFilter.Filters)).Prepared(true).ToSQL()
@@ -269,48 +267,42 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 	}
 	defer rows.Close()
 
+	poolSize := queryFilter.ThreadCount
+	pool := pond.New(poolSize, 0, pond.MinWorkers(poolSize))
+	var mux sync.Mutex
+
 	for rows.Next() {
 		av := &api.RESTHostAssetView{}
 		av.Vulnerabilities = make([]string, 0)
 
-		var assetId, cveStr string
-		var packagesBytes []byte
+		var assetId, idnsStr string
+		var vulsBytes []byte
 		err = rows.Scan(&assetId, &av.Name, &av.PolicyMode,
-			&av.High, &av.Medium, &av.Low, &cveStr, &av.ScannedAt,
-			&av.OS, &av.Kernel, &av.CPUs, &av.Memory, &av.Containers, &packagesBytes)
+			&av.ScannedAt, &av.OS, &av.Kernel, &av.CPUs, &av.Memory, &av.Containers, &idnsStr, &vulsBytes)
 		if err != nil {
+			pool.StopAndWait()
 			return nil, err
 		}
 
-		// keep only CVE exist in vulMap
-		var cveList []string
-		err := json.Unmarshal([]byte(cveStr), &cveList)
-		if err != nil {
-			return nil, err
+		cveStats := map[string]*int{
+			"High":   &av.High,
+			"Medium": &av.Medium,
+			"Low":    &av.Low,
 		}
+		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 
-		for _, c := range cveList {
-			name, _, _ := parseCVEDbKey(c)
-			if v, exist := vulMap[name]; exist {
-				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
-			}
-		}
-
-		// fetch the packages from matched assets
-		fillCvePackages(cvePackages, packagesBytes)
-
-		av.ID = assetId // TODO: for debug, remove later
+		av.ID = assetId
 		records = append(records, av)
 	}
+	pool.StopAndWait()
+
 	return records, nil
 }
 
 func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTImageAssetView, error) {
 	records := make([]*api.RESTImageAssetView, 0)
 
-	columns := []interface{}{"assetid", "name",
-		"cve_high", "cve_medium", "cve_low", "cve_lists", "packagesb"}
-
+	columns := []interface{}{"assetid", "name", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
 
@@ -320,48 +312,42 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 	}
 	defer rows.Close()
 
+	poolSize := queryFilter.ThreadCount
+	pool := pond.New(poolSize, 0, pond.MinWorkers(poolSize))
+	var mux sync.Mutex
+
 	for rows.Next() {
 		av := &api.RESTImageAssetView{}
 		av.Vulnerabilities = make([]string, 0)
 
-		var assetId, cveStr string
-		var packagesBytes []byte
-		err = rows.Scan(&assetId, &av.Name, &av.High, &av.Medium, &av.Low, &cveStr, &packagesBytes)
+		var assetId, idnsStr string
+		var vulsBytes []byte
+		err = rows.Scan(&assetId, &av.Name, &idnsStr, &vulsBytes)
 
 		if err != nil {
+			pool.StopAndWait()
 			return nil, err
 		}
 
-		// keep only CVE exist in vulMap
-		var cveList []string
-		err := json.Unmarshal([]byte(cveStr), &cveList)
-		if err != nil {
-			return nil, err
+		cveStats := map[string]*int{
+			"High":   &av.High,
+			"Medium": &av.Medium,
+			"Low":    &av.Low,
 		}
+		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 
-		for _, c := range cveList {
-			name, _, _ := parseCVEDbKey(c)
-			if v, exist := vulMap[name]; exist {
-				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
-			}
-		}
-
-		// fetch the packages from matched assets
-		fillCvePackages(cvePackages, packagesBytes)
-
-		av.ID = assetId // TODO: for debug, remove later
+		av.ID = assetId
 		records = append(records, av)
 	}
+	pool.StopAndWait()
+
 	return records, nil
 }
 
 func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTPlatformAssetView, error) {
 	records := make([]*api.RESTPlatformAssetView, 0)
 
-	columns := []interface{}{"assetid", "name",
-		"cve_high", "cve_medium", "cve_low", "cve_lists",
-		"p_version", "p_base_os", "packagesb"}
-
+	columns := []interface{}{"assetid", "name", "p_version", "p_base_os", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForPlatform(assets, queryFilter.Filters)).Prepared(true).ToSQL()
 
@@ -371,38 +357,33 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 	}
 	defer rows.Close()
 
+	poolSize := 1
+	pool := pond.New(poolSize, 0, pond.MinWorkers(poolSize))
+	var mux sync.Mutex
 	for rows.Next() {
 		av := &api.RESTPlatformAssetView{}
 		av.Vulnerabilities = make([]string, 0)
 
-		var assetId, cveStr string
-		var packagesBytes []byte
-		err = rows.Scan(&assetId, &av.Name, &av.High, &av.Medium, &av.Low, &cveStr, &av.Version, &av.BaseOS, &packagesBytes)
+		var assetId, idnsStr string
+		var vulsBytes []byte
+		err = rows.Scan(&assetId, &av.Name, &av.Version, &av.BaseOS, &idnsStr, &vulsBytes)
 
 		if err != nil {
+			pool.StopAndWait()
 			return nil, err
 		}
 
-		// keep only CVE exist in vulMap
-		var cveList []string
-		err := json.Unmarshal([]byte(cveStr), &cveList)
-		if err != nil {
-			return nil, err
+		cveStats := map[string]*int{
+			"High":   &av.High,
+			"Medium": &av.Medium,
+			"Low":    &av.Low,
 		}
-
-		for _, c := range cveList {
-			name, _, _ := parseCVEDbKey(c)
-			if v, exist := vulMap[name]; exist {
-				av.Vulnerabilities = append(av.Vulnerabilities, formatCVEName(name, v.Severity))
-			}
-		}
-
-		// fetch the packages from matched assets
-		fillCvePackages(cvePackages, packagesBytes)
-
-		av.ID = assetId // TODO: for debug, remove later
+		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
+		av.ID = assetId
 		records = append(records, av)
 	}
+	pool.StopAndWait()
+
 	return records, nil
 }
 
@@ -796,12 +777,12 @@ func buildWhereClauseForPlatform(allowedID []string, queryFilter *api.VulQueryFi
 }
 
 func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
-	var zipBytes []byte
-	if len(assetVul.Packages) > 0 {
+	var vulsBytes []byte
+	if len(assetVul.Vuls) > 0 {
 		var buf bytes.Buffer
 		enc := gob.NewEncoder(&buf)
-		if err := enc.Encode(&assetVul.Packages); err == nil {
-			zipBytes = utils.GzipBytes(buf.Bytes())
+		if err := enc.Encode(&assetVul.Vuls); err == nil {
+			vulsBytes = utils.GzipBytes(buf.Bytes())
 		}
 	}
 
@@ -820,7 +801,6 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 		"cve_medium": assetVul.CVE_medium,
 		"cve_low":    assetVul.CVE_low,
 		"cve_count":  assetVul.CVE_high + assetVul.CVE_medium + assetVul.CVE_low,
-		"cve_lists":  assetVul.CVE_lists,
 		"scanned_at": assetVul.Scanned_at,
 
 		"n_os":     assetVul.N_os,
@@ -831,7 +811,8 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 		"n_containers": assetVul.N_containers,
 		"p_version":    assetVul.P_version,
 		"p_base_os":    assetVul.P_base_os,
-		"packagesb":    zipBytes,
+		"idns":         assetVul.Idns,
+		"vulsb":        vulsBytes,
 	}
 
 	return record
@@ -881,4 +862,18 @@ func hasNamespaceFilter(queryFilter *api.VulQueryFilterViewModel) bool {
 		return true
 	}
 	return false
+}
+
+func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte, idnsStr string, vulnerabilities *[]string, vulMap map[string]*DbVulAsset, cveStat map[string]*int) {
+	pool.Submit(func() {
+		cveList := make([]string, 0)
+		funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, &cveList, cveStat)
+
+		for _, c := range cveList {
+			name, _, _ := parseCVEDbKey(c)
+			if v, exist := vulMap[name]; exist {
+				*vulnerabilities = append(*vulnerabilities, formatCVEName(name, v.Severity))
+			}
+		}
+	})
 }

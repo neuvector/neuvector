@@ -19,7 +19,6 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
-	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
@@ -46,7 +45,6 @@ type WorkloadRisk struct {
 	Domain           string
 	BaseOS           string
 	PolicyMode       string
-	VulTraits        []*scanUtils.VulTrait
 	Children         []*WorkloadRisk
 	CustomBenchValue []byte
 	DockerBenchValue []byte
