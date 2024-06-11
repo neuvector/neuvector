@@ -165,6 +165,10 @@ func dpMsgConnection(msg []byte) {
 			PolicyId:     uint32(conn.PolicyId),
 			Violates:     uint32(conn.Violates),
 			EpSessCurIn:  uint32(conn.EpSessCurIn),
+			EpSessIn1:    uint32(conn.EpSessIn1),
+			EpByteIn1:    uint64(conn.EpByteIn1),
+			EpSessIn12:   uint32(conn.EpSessIn12),
+			EpByteIn12:   uint64(conn.EpByteIn12),
 			EpSessIn60:   uint32(conn.EpSessIn60),
 			EpByteIn60:   uint64(conn.EpByteIn60),
 		}

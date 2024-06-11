@@ -266,6 +266,10 @@ typedef struct {
     uint16_t XffApp;
     uint16_t XffPort;
     uint32_t EpSessCurIn;
+    uint32_t EpSessIn1;
+    uint64_t EpByteIn1;
+    uint32_t EpSessIn12;
+    uint64_t EpByteIn12;
     uint32_t EpSessIn60;
     uint64_t EpByteIn60;
 } DPMsgSession;
@@ -438,6 +442,10 @@ typedef struct {
     uint32_t Violates;
     uint32_t ThreatID;
     uint32_t EpSessCurIn;
+    uint32_t EpSessIn1;
+    uint64_t EpByteIn1;
+    uint32_t EpSessIn12;
+    uint64_t EpByteIn12;
     uint32_t EpSessIn60;
     uint64_t EpByteIn60;
 } DPMsgConnect;
