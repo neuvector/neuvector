@@ -6,6 +6,7 @@ replace (
 	github.com/containerd/cri => github.com/containerd/cri v1.19.0
 	github.com/docker/distribution => github.com/docker/distribution v2.8.0-beta.1+incompatible
 	github.com/docker/docker => github.com/docker/docker v1.13.1
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	github.com/jrhouston/k8slock => github.com/holyspectral/k8slock v0.0.0-20240306020054-dcc2a005b265
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc5
 	google.golang.org/grpc/security/advancedtls => github.com/holyspectral/grpc-go/security/advancedtls v0.0.0-20240202204003-24d7309846bd
@@ -140,6 +141,7 @@ require (
 )
 
 require (
+	github.com/alitto/pond v1.8.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
 )
@@ -147,7 +149,6 @@ require (
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
-	github.com/alitto/pond v1.8.3 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

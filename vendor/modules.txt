@@ -288,8 +288,8 @@ github.com/fatih/camelcase
 # github.com/felixge/httpsnoop v1.0.3
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
-# github.com/fsnotify/fsnotify v1.7.0
-## explicit; go 1.17
+# github.com/fsnotify/fsnotify v1.7.0 => github.com/fsnotify/fsnotify v1.4.9
+## explicit; go 1.13
 github.com/fsnotify/fsnotify
 # github.com/glebarez/go-sqlite v1.20.3
 ## explicit; go 1.17
@@ -1429,6 +1429,7 @@ sigs.k8s.io/yaml/goyaml.v2
 # github.com/containerd/cri => github.com/containerd/cri v1.19.0
 # github.com/docker/distribution => github.com/docker/distribution v2.8.0-beta.1+incompatible
 # github.com/docker/docker => github.com/docker/docker v1.13.1
+# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 # github.com/jrhouston/k8slock => github.com/holyspectral/k8slock v0.0.0-20240306020054-dcc2a005b265
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc5
 # google.golang.org/grpc/security/advancedtls => github.com/holyspectral/grpc-go/security/advancedtls v0.0.0-20240202204003-24d7309846bd
