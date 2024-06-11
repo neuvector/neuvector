@@ -538,11 +538,10 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		p.FaEndChan <- true
 	}
 
-	if p.bProfileEnable {
-		var ok bool
-		if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
-			log.Error("FSN: failed")
-		}
+	// NV Protect is always on even if the the process profile is disabled
+	var ok bool
+	if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
+		log.Error("FSN: failed")
 	}
 
 	// build current process maps, host container is established here
