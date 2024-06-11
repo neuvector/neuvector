@@ -501,11 +501,6 @@ func main() {
 	log.WithFields(log.Fields{"hostIPs": gInfo.hostIPs}).Info("")
 	log.WithFields(log.Fields{"host": Host}).Info("")
 	log.WithFields(log.Fields{"agent": Agent}).Info("")
-	go func() {
-		if err := healthz.StartHealthzServer(); err != nil {
-			log.WithError(err).Warn("failed to start healthz server")
-		}
-	}()
 
 	var internalCertControllerCancel context.CancelFunc
 	var ctx context.Context
