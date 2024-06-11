@@ -1,7 +1,9 @@
 package db
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +16,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 type DbVulAsset struct {
@@ -59,20 +63,13 @@ type DbCVESource struct {
 	BaseOS     string `json:"baseos"`
 }
 
-type DbVulnResourcePackageVersion2 struct {
-	CVEName        string `json:"cn"`
-	PackageName    string `json:"pn"`
-	PackageVersion string `json:"pv"`
-	FixedVersion   string `json:"fv"`
-	DbKey          string `json:"dbkey"`
-}
-
 type VulQueryFilter struct {
 	QueryToken                     string
 	QueryStart                     int
 	QueryCount                     int
 	Debug                          int
 	PerfTest                       int
+	ThreadCount                    int
 	CreateDummyAsset_Enable        int
 	CreateDummyAsset_CVE           int
 	CreateDummyAsset_Asset         int
@@ -95,7 +92,7 @@ type DbAssetVul struct {
 	CVE_high   int
 	CVE_medium int
 	CVE_low    int
-	CVE_lists  string
+	Vuls       []*share.ScanVulnerability
 	Scanned_at string
 
 	N_os         string
@@ -107,7 +104,7 @@ type DbAssetVul struct {
 	P_version string
 	P_base_os string
 
-	Packages []*DbVulnResourcePackageVersion2
+	Idns string
 }
 
 type AssetMaps struct {
@@ -164,7 +161,11 @@ const (
 
 var dbHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
-var GetCveRecordFunc func(string, string, string) *DbVulAsset
+
+var funcGetCveRecord func(string, string, string) *DbVulAsset
+var funcGetCVEList func([]byte, string) []string
+var funcFillVulPackages func(*sync.Mutex, map[string]map[string]utils.Set, []byte, string, *[]string, map[string]*int) error
+
 var memdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
@@ -258,8 +259,16 @@ func GetAllTableInMemoryDb() string {
 	return strings.Join(names, ";")
 }
 
-func InitGetCVERecord(getCVERecord func(string, string, string) *DbVulAsset) {
-	GetCveRecordFunc = getCVERecord
+func SetGetCVERecordFunc(funcObj func(string, string, string) *DbVulAsset) {
+	funcGetCveRecord = funcObj
+}
+
+func SetGetCVEListFunc(funcObj func([]byte, string) []string) {
+	funcGetCVEList = funcObj
+}
+
+func SetFillVulPackagesFunc(funcObj func(*sync.Mutex, map[string]map[string]utils.Set, []byte, string, *[]string, map[string]*int) error) {
+	funcFillVulPackages = funcObj
 }
 
 func getVulassetSchema() []string {
@@ -273,25 +282,13 @@ func getVulassetSchema() []string {
 	return schema
 }
 
-func getVulassetColumns() []interface{} {
-	schema := getVulassetSchema()
-
-	var interfaceSlice []interface{}
-	for _, s := range schema {
-		parts := strings.Split(s, " ")
-		if len(parts) > 0 {
-			interfaceSlice = append(interfaceSlice, parts[0])
-		}
-	}
-	return interfaceSlice
-}
-
 func getAssetvulSchema() []string {
 	schema := []string{"id INTEGER NOT NULL PRIMARY KEY", "type TEXT", "assetid TEXT UNIQUE", "name TEXT",
 		"w_domain TEXT", "w_applications TEXT", "policy_mode TEXT", "w_service_group TEXT", "w_image TEXT",
-		"cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "cve_lists TEXT", "scanned_at TEXT",
+		"cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "scanned_at TEXT",
 		"n_os TEXT", "n_kernel TEXT", "n_cpus INTEGER", "n_memory INTEGER",
-		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "packages TEXT", "packagesb BLOB"}
+		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB"}
+
 	return schema
 }
 
@@ -348,4 +345,24 @@ func convertToJSON(input interface{}) (string, error) {
 		return "", err
 	}
 	return string(jsonData), nil
+}
+
+func GetVulnerability(assetid string) ([]*share.ScanVulnerability, error) {
+	vulsb, err := getVulsBytes(assetid)
+	if err != nil {
+		return nil, err
+	}
+	return UnzipVuls(vulsb)
+}
+
+func UnzipVuls(vulsb []byte) ([]*share.ScanVulnerability, error) {
+	var Vuls []*share.ScanVulnerability
+	if uzb := utils.GunzipBytes(vulsb); uzb != nil {
+		buf := bytes.NewBuffer(uzb)
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(&Vuls); err != nil {
+			return nil, err
+		}
+	}
+	return Vuls, nil
 }

@@ -66,8 +66,7 @@ type scanInfo struct {
 	objType                        share.ScanObjectType
 	version                        string
 	cveDBCreateTime                string
-	brief                          *api.RESTScanBrief    // Stats of filtered entries
-	vulTraits                      []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	brief                          *api.RESTScanBrief // Stats of filtered entries
 	filteredTime                   time.Time
 	idns                           []api.RESTIDName
 	modules                        []*share.ScanModule
@@ -390,8 +389,11 @@ func (m CacheMethod) ScanPlatform(acc *access.AccessControl) error {
 
 // With scan mutex locked
 func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
-	vpf.FilterVulTraits(info.vulTraits, info.idns)
-	highs, meds := scanUtils.CountVulTrait(info.vulTraits)
+	reportVuls, _ := db.GetVulnerability(id)
+	localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+
+	vpf.FilterVulTraits(localVulTraits, info.idns)
+	highs, meds := scanUtils.CountVulTrait(localVulTraits)
 	brief := fillScanBrief(info, highs, meds)
 	info.brief = brief
 	info.filteredTime = time.Now()
@@ -400,12 +402,10 @@ func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
 	case share.ScanObjectType_CONTAINER:
 		if c := getWorkloadCache(id); c != nil {
 			c.scanBrief = brief
-			c.vulTraits = info.vulTraits
 		}
 	case share.ScanObjectType_HOST:
 		if c := getHostCache(id); c != nil {
 			c.scanBrief = brief
-			c.vulTraits = info.vulTraits
 		}
 	}
 }
@@ -474,7 +474,6 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	var highs, meds, lows []string
 	var fixedHighsInfo []scanUtils.FixedVulInfo
 	var alives utils.Set // vul names that are not filtered
-	var vuls2Populate []*api.RESTVulnerability
 	var dbAssetVul *db.DbAssetVul
 	var baseOS string
 
@@ -496,9 +495,9 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		info.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
-		alives = vpf.FilterVulTraits(info.vulTraits, info.idns)
-		highs, meds, lows, fixedHighsInfo = scanUtils.GatherVulTrait(info.vulTraits)
+		localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
+		alives = vpf.FilterVulTraits(localVulTraits, info.idns)
+		highs, meds, lows, fixedHighsInfo = scanUtils.GatherVulTrait(localVulTraits)
 		brief := fillScanBrief(info, len(highs), len(meds))
 		info.brief = brief
 		info.filteredTime = time.Now()
@@ -507,38 +506,14 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		case share.ScanObjectType_CONTAINER:
 			if c := getWorkloadCache(id); c != nil {
 				c.scanBrief = brief
-				c.vulTraits = info.vulTraits
-				sdb := scanUtils.GetScannerDB()
-
-				baseOS = ""
-				if c.scanBrief != nil {
-					baseOS = c.scanBrief.BaseOS
-				}
-
-				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
 				dbAssetVul = getWorkloadDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_HOST:
 			if c := getHostCache(id); c != nil {
 				c.scanBrief = brief
-				c.vulTraits = info.vulTraits
-
-				sdb := scanUtils.GetScannerDB()
-				baseOS = ""
-				if c.scanBrief != nil {
-					baseOS = c.scanBrief.BaseOS
-				}
-
-				vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, c.vulTraits, "", true)
 				dbAssetVul = getHostDbAssetVul(c, highs, meds, lows, info.lastScanTime)
 			}
 		case share.ScanObjectType_PLATFORM:
-			sdb := scanUtils.GetScannerDB()
-			baseOS = ""
-			if brief != nil {
-				baseOS = brief.BaseOS
-			}
-			vuls2Populate = scanUtils.FillVulTraits(sdb.CVEDB, baseOS, info.vulTraits, "", true)
 			dbAssetVul = getPlatformDbAssetVul(highs, meds, lows, baseOS, info.lastScanTime)
 		}
 	} else {
@@ -547,33 +522,15 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	scanMutexUnlock()
 
 	if ok && dbAssetVul != nil {
-		// extract package info
-		dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
-		var cveLists utils.Set = utils.NewSet()
-		for _, vul := range vuls2Populate {
-			vulPackage := &db.DbVulnResourcePackageVersion2{
-				CVEName:        vul.Name,
-				PackageName:    vul.PackageName,
-				PackageVersion: vul.PackageVersion,
-				FixedVersion:   vul.FixedVersion,
-				DbKey:          vul.DbKey,
-			}
+		dbAssetVul.Vuls = report.Vuls
 
-			fix := "nf"
-			if len(vul.FixedVersion) > 0 {
-				fix = "wf"
+		if len(info.idns) > 0 {
+			b, err := json.Marshal(info.idns)
+			if err == nil {
+				dbAssetVul.Idns = string(b)
 			}
-
-			cveLists.Add(fmt.Sprintf("%s;%s;%s", vul.Name, vul.DbKey, fix))
-			dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
 		}
 
-		b, err := json.Marshal(cveLists.ToStringSlice())
-		if err == nil {
-			dbAssetVul.CVE_lists = string(b)
-		}
-
-		// populate assetvul
 		db.PopulateAssetVul(dbAssetVul)
 	}
 
@@ -1458,7 +1415,15 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		}
 
 		sdb := scanUtils.GetScannerDB()
-		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, info.vulTraits, showTag, false)
+
+		reportVuls, err := db.GetVulnerability(id)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+		vpf.FilterVulTraits(localVulTraits, info.idns)
+		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, localVulTraits, showTag, false)
 		modules := make([]*api.RESTScanModule, len(info.modules))
 		for i, m := range info.modules {
 			modules[i] = scanUtils.ScanModule2REST(m)
@@ -1544,4 +1509,103 @@ func getPlatformDbAssetVul(highs, meds, lows []string, baseOS string, lastScanTi
 	}
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
+}
+
+func ExtractVulAttributes(vulsb []byte, indsStr string) []string {
+	cveList := make([]string, 0)
+
+	Vuls, err := db.UnzipVuls(vulsb)
+	if err != nil {
+		return cveList
+	}
+
+	inds := make([]api.RESTIDName, 0)
+	if indsStr != "" {
+		if err := json.Unmarshal([]byte(indsStr), &inds); err != nil {
+			return cveList
+		}
+	}
+
+	// perform VPF, only non-filtered vuls will be returned..
+	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
+	Vuls = vpf.FilterVuls(Vuls, inds)
+
+	var cveSet utils.Set = utils.NewSet()
+	for _, vul := range Vuls {
+		if cveSet.Contains(vul.Name) {
+			continue
+		}
+		cveSet.Add(vul.Name)
+
+		fix := "nf"
+		if len(vul.FixedVersion) > 0 {
+			fix = "wf"
+		}
+		cveList = append(cveList, fmt.Sprintf("%s;%s;%s", vul.Name, vul.DBKey, fix))
+	}
+
+	return cveList
+}
+
+func FillVulPackages(mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsb []byte, idnsStr string, cveList *[]string, cveStat map[string]*int) error {
+
+	var Vuls []*share.ScanVulnerability
+	if uzb := utils.GunzipBytes(vulsb); uzb != nil {
+		buf := bytes.NewBuffer(uzb)
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(&Vuls); err != nil {
+			log.WithFields(log.Fields{"vulsb": string(vulsb)}).Error("unzip vuls bytes error")
+			return err
+		}
+	}
+
+	idns := make([]api.RESTIDName, 0)
+	if idnsStr != "" {
+		if err := json.Unmarshal([]byte(idnsStr), &idns); err != nil {
+			log.WithFields(log.Fields{"idnsStr": idnsStr}).Error("unmarshal idnsStr error")
+			return err
+		}
+	}
+
+	// perform VPF, only non-filtered vuls will be returned..
+	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
+	Vuls = vpf.FilterVuls(Vuls, idns)
+
+	var cveSet utils.Set = utils.NewSet()
+	mu.Lock()
+	for _, vul := range Vuls {
+		if _, exist := cvePackages[vul.Name]; exist {
+			_, ok := cvePackages[vul.Name][vul.PackageName]
+			if !ok {
+				cvePackages[vul.Name][vul.PackageName] = utils.NewSet()
+			}
+			cvePackages[vul.Name][vul.PackageName].Add(api.RESTVulnPackageVersion{
+				PackageVersion: vul.PackageVersion,
+				FixedVersion:   vul.FixedVersion,
+			})
+		}
+
+		if cveStat != nil {
+			if value, exists := cveStat[vul.Severity]; exists && value != nil {
+				*value++
+			}
+		}
+
+		// get distinct CVEs
+		if cveList != nil {
+			if cveSet.Contains(vul.Name) {
+				continue
+			}
+			cveSet.Add(vul.Name)
+			fix := "nf"
+			if len(vul.FixedVersion) > 0 {
+				fix = "wf"
+			}
+
+			*cveList = append(*cveList, fmt.Sprintf("%s;%s;%s", vul.Name, vul.DBKey, fix))
+		}
+	}
+	mu.Unlock()
+
+	return nil
 }

@@ -54,9 +54,9 @@ type CacheInterface interface {
 	GetAllWorkloadsRisk(acc *access.AccessControl) []*common.WorkloadRisk
 	GetWorkloadRisk(id string, acc *access.AccessControl) (*common.WorkloadRisk, error)
 	CanAccessWorkload(id string, acc *access.AccessControl) error
-	GetAllWorkloadsID(acc *access.AccessControl, filteredMap map[string]bool) []string
-	GetAllHostsID(acc *access.AccessControl, filteredMap map[string]bool) []string
-	GetPlatformID(acc *access.AccessControl, filteredMap map[string]bool) string
+	GetAllWorkloadsID(acc *access.AccessControl) []string
+	GetAllHostsID(acc *access.AccessControl) []string
+	GetPlatformID(acc *access.AccessControl) string
 
 	GetAllGroups(scope, view string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroup
 	GetAllGroupsBrief(scope string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroupBrief

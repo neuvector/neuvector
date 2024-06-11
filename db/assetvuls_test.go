@@ -98,11 +98,6 @@ func generateHostDbAssetVul(assetid string, containerCount int) *DbAssetVul {
 	}
 
 	d.Policy_mode = "Discover"
-	allCVEs := []string{"CVE-2030-1001", "CVE-2030-2001", "CVE-2030-3001"}
-	b, err := json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
 	return d
 }
 
@@ -126,11 +121,6 @@ func generateWorkloadDbAssetVul(assetid string) *DbAssetVul {
 	}
 
 	d.Policy_mode = "Discover"
-	allCVEs := []string{"CVE-2030-1001", "CVE-2030-2001", "CVE-2030-3001"}
-	b, err = json.Marshal(allCVEs)
-	if err == nil {
-		d.CVE_lists = string(b)
-	}
 
 	d.Scanned_at = "2023-12-29T08:46:32Z"
 	return d
