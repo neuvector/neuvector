@@ -1119,6 +1119,8 @@ func syncLearnedPolicyToCluster() int {
 }
 
 func SyncLearnedPolicyFromCluster() {
+	graphMutexLock()
+	defer graphMutexUnlock()
 	lprWrapperMap = make(map[groupPair]*learnedPolicyRuleWrapper)
 	maxLearnRuleID = api.PolicyLearnedIDBase
 
