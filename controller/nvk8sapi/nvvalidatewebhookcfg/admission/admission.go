@@ -312,8 +312,20 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVECriticalCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
 			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
 				Name:       share.CriteriaKeyCVEHighCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVEHighCountNoCritical,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
@@ -324,8 +336,20 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
+			share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
 			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
 				Name:       share.CriteriaKeyCVEHighWithFixCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVEHighWithFixCountNoCritical,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
@@ -528,8 +552,18 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVECriticalCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyCVEHighCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVEHighCountNoCritical,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
@@ -538,8 +572,18 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyCVEHighWithFixCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVEHighWithFixCountNoCritical,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
