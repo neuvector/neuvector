@@ -635,7 +635,7 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup str
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, Action: share.PolicyActionAllow, DerivedGroup: svcGroup}
 
 	if res == rule_not_defined {
-		ppe.Action = share.PolicyActionOpen
+		ppe.Action = share.PolicyActionDeny
 	}
 
 	if res == rule_allowed_updateAlert {

@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"encoding/json"
 	"fmt"
@@ -225,14 +222,11 @@ func workload2EndpointREST(cache *workloadCache, withChildren bool) *api.RESTCon
 func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
 	wl := cache.workload
 	r := &common.WorkloadRisk{
-		ID:           wl.ID,
-		Name:         cache.podName,
-		PlatformRole: cache.platformRole,
-		ImageID:      wl.ImageID,
-		Domain:       wl.Domain,
-		// When vul. profile updates, it will refresh all scanMap and workload/host cache.
-		// No refresh in this path, which is different from GetVulnerabilityReport().
-		VulTraits:        cache.vulTraits,
+		ID:               wl.ID,
+		Name:             cache.podName,
+		PlatformRole:     cache.platformRole,
+		ImageID:          wl.ImageID,
+		Domain:           wl.Domain,
 		CustomBenchValue: cache.customBenchValue,
 		DockerBenchValue: cache.dockerBenchValue,
 		SecretBenchValue: cache.secretBenchValue,
@@ -1924,9 +1918,9 @@ func putSpecialIPNetToCluseter(checkDiff bool) {
 	}
 }
 
-//for rolling upgrade case, especially with mixed version controller,
-//old still use 16bit loose factor for mask while new use 8bit loose
-//factor, here we push internal subnet to enforcer after lead change
+// for rolling upgrade case, especially with mixed version controller,
+// old still use 16bit loose factor for mask while new use 8bit loose
+// factor, here we push internal subnet to enforcer after lead change
 func PutInternalIPNetToCluseterUpgrade() {
 	log.Debug("")
 	cacheMutexLock()
@@ -2237,13 +2231,12 @@ func scheduleUnmanagedWlProc(fast bool) {
 	}
 }
 
-//// KV store map
+// // KV store map
 type kvConfigStore struct {
 	mutex  sync.RWMutex
 	stores map[string][]byte // [confug key] = values
 }
 
-//
 var backupKvStores *kvConfigStore = &kvConfigStore{stores: make(map[string][]byte)}
 var backupKvStoreEPs utils.Set = utils.NewSet(share.CFGEndpointFileMonitor, share.CFGEndpointFileAccessRule, share.CFGEndpointGroup, share.CFGEndpointProcessProfile, share.CFGEndpointScript)
 

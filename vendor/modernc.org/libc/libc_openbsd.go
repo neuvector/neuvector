@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"syscall"
@@ -38,11 +39,6 @@ import (
 
 var (
 	in6_addr_any in.In6_addr
-)
-
-type (
-	long  = int64
-	ulong = uint64
 )
 
 // // Keep these outside of the var block otherwise go generate will miss them.
@@ -314,6 +310,8 @@ func Xsysconf(t *TLS, name int32) long {
 		return -1
 	case unistd.X_SC_GETGR_R_SIZE_MAX:
 		return -1
+	case unistd.X_SC_NPROCESSORS_ONLN:
+		return long(runtime.NumCPU())
 	}
 
 	panic(todo("", name))
@@ -751,30 +749,6 @@ func Xbacktrace_symbols_fd(t *TLS, buffer uintptr, size, fd int32) {
 // int fileno(FILE *stream);
 func Xfileno(t *TLS, stream uintptr) int32 {
 	panic(todo(""))
-}
-
-func newFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscall.Errno) (r *fts.FTSENT) {
-	var statp uintptr
-	if stat != nil {
-		statp = Xmalloc(t, types.Size_t(unsafe.Sizeof(unix.Stat_t{})))
-		if statp == 0 {
-			panic("OOM")
-		}
-
-		*(*unix.Stat_t)(unsafe.Pointer(statp)) = *stat
-	}
-	csp, errx := CString(path)
-	if errx != nil {
-		panic("OOM")
-	}
-
-	return &fts.FTSENT{
-		Ffts_info:    uint16(info),
-		Ffts_path:    csp,
-		Ffts_pathlen: uint64(len(path)),
-		Ffts_statp:   statp,
-		Ffts_errno:   int32(err),
-	}
 }
 
 func newCFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscall.Errno) uintptr {
@@ -1449,39 +1423,13 @@ func Xclosedir(t *TLS, dir uintptr) int32 {
 	return r
 }
 
-// DIR *opendir(const char *name);
-func Xopendir(t *TLS, name uintptr) uintptr {
-	p := Xmalloc(t, uint64(unsafe.Sizeof(darwinDir{})))
-	if p == 0 {
-		panic("OOM")
-	}
-
-	fd := int(Xopen(t, name, fcntl.O_RDONLY|fcntl.O_DIRECTORY|fcntl.O_CLOEXEC, 0))
-	if fd < 0 {
-		if dmesgs {
-			dmesg("%v: FAIL %v", origin(1), (*darwinDir)(unsafe.Pointer(p)).fd)
-		}
-		Xfree(t, p)
-		return 0
-	}
-
-	if dmesgs {
-		dmesg("%v: ok", origin(1))
-	}
-	(*darwinDir)(unsafe.Pointer(p)).fd = fd
-	(*darwinDir)(unsafe.Pointer(p)).h = 0
-	(*darwinDir)(unsafe.Pointer(p)).l = 0
-	(*darwinDir)(unsafe.Pointer(p)).eof = false
-	return p
-}
-
 // int __xuname(int namesize, void *namebuf)
 func X__xuname(t *TLS, namesize int32, namebuf uintptr) int32 {
 	return Xuname(t, namebuf)
 }
 
 // int chflags(const char *path, u_int flags);
-func Xchflags(t *TLS, path uintptr, flags uint64) int32 {
+func Xchflags(t *TLS, path uintptr, flags uint32) int32 {
 	if err := unix.Chflags(GoString(path), int(flags)); err != nil {
 		if dmesgs {
 			dmesg("%v: %v FAIL", origin(1), err)
@@ -1541,7 +1489,7 @@ func X__errno(t *TLS) uintptr {
 }
 
 func X__ccgo_pthreadMutexattrGettype(tls *TLS, a uintptr) int32 { /* pthread_attr_get.c:93:5: */
-	return (int32((*pthread_mutexattr_t)(unsafe.Pointer(a)).__attr & uint32(3)))
+	return (int32((*pthread_mutexattr_t)(unsafe.Pointer(a)).F__attr & uint32(3)))
 }
 
 func X__ccgo_getMutexType(tls *TLS, m uintptr) int32 { /* pthread_mutex_lock.c:3:5: */
@@ -1578,7 +1526,7 @@ func Xpthread_mutexattr_settype(tls *TLS, a uintptr, type1 int32) int32 { /* pth
 	if uint32(type1) > uint32(2) {
 		return 22
 	}
-	(*pthread_mutexattr_t)(unsafe.Pointer(a)).__attr = (((*pthread_mutexattr_t)(unsafe.Pointer(a)).__attr & Uint32FromInt32(CplInt32(3))) | uint32(type1))
+	(*pthread_mutexattr_t)(unsafe.Pointer(a)).F__attr = (((*pthread_mutexattr_t)(unsafe.Pointer(a)).F__attr & Uint32FromInt32(CplInt32(3))) | uint32(type1))
 	return 0
 }
 
@@ -1605,3 +1553,46 @@ func X__assert2(t *TLS, file uintptr, line int32, fn, expr uintptr) {
 func Xgetpagesize(t *TLS) int32 {
 	return int32(unix.Getpagesize())
 }
+
+const PTHREAD_MUTEX_DEFAULT = 0
+
+// The pthread_mutex_init() function shall initialize the mutex referenced by
+// mutex with attributes specified by attr. If attr is NULL, the default mutex
+// attributes are used; the effect shall be the same as passing the address of
+// a default mutex attributes object. Upon successful initialization, the state
+// of the mutex becomes initialized and unlocked.
+//
+// If successful, the pthread_mutex_destroy() and pthread_mutex_init()
+// functions shall return zero; otherwise, an error number shall be returned to
+// indicate the error.
+//
+// int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr);
+func Xpthread_mutex_init(t *TLS, pMutex, pAttr uintptr) int32 {
+	typ := PTHREAD_MUTEX_DEFAULT
+	if pAttr != 0 {
+		typ = int(X__ccgo_pthreadMutexattrGettype(t, pAttr))
+	}
+	mutexesMu.Lock()
+
+	defer mutexesMu.Unlock()
+
+	mutexes[pMutex] = newMutex(typ)
+	return 0
+}
+
+// uint16_t __builtin_bswap16 (uint32_t x)
+func Xbswap16(t *TLS, x uint16) uint16 {
+	return X__builtin_bswap16(t, x)
+}
+
+// uint32_t __builtin_bswap32 (uint32_t x)
+func Xbswap32(t *TLS, x uint32) uint32 {
+	return X__builtin_bswap32(t, x)
+}
+
+// uint64_t __builtin_bswap64 (uint64_t x)
+func Xbswap64(t *TLS, x uint64) uint64 {
+	return X__builtin_bswap64(t, x)
+}
+
+func X__builtin_isblank(t *TLS, _c int32) int32 { return Xisblank(t, _c) }

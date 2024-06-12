@@ -30,6 +30,8 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	k8sCorev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -99,6 +101,7 @@ var critDisplayName map[string]string = map[string]string{
 	share.CriteriaKeyCustomPath:                    "custom path violation",
 	share.CriteriaKeySaBindRiskyRole:               "service account bounds high risk role violation",
 	share.CriteriaKeyImageVerifiers:                "image verifiers",
+  share.CriteriaKeyStorageClassName:              "StorageClass name",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
@@ -1330,6 +1333,24 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 	var mets map[string]bool = make(map[string]bool)
 	var poss map[string]bool = make(map[string]bool)
 	var hasCustomCriteria bool
+	var kind string
+
+	statefuleSetVCT := make([]string, 0)
+	if ar != nil {
+		req := ar.Request
+		if req.Kind.Kind == "StatefulSet" {
+			var statefulSet appsv1.StatefulSet
+			if err := json.Unmarshal(req.Object.Raw, &statefulSet); err == nil {
+				for _, vct := range statefulSet.Spec.VolumeClaimTemplates {
+					if vct.Spec.StorageClassName != nil {
+						statefuleSetVCT = append(statefuleSetVCT, *vct.Spec.StorageClassName)
+					}
+				}
+			}
+			kind = "StatefulSet"
+		}
+	}
+
 	for _, crt := range criteria {
 		if c.Type == nvsysadmission.K8SEphemeralContainer || c.Type == nvsysadmission.K8sInitContainer {
 			if crt.Name != share.CriteriaKeyHasPssViolation {
@@ -1339,7 +1360,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		}
 
 		// only handle predefined criteria
-		if crt.Type != "" {
+		if crt.Type != "" && crt.Type != share.CriteriaKeySaBindRiskyRole {
 			hasCustomCriteria = true
 			continue
 		}
@@ -1477,6 +1498,19 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			positive = true
 		case share.CriteriaKeyImageVerifiers:
 			met, positive = isSetCriterionMet(crt, utils.NewSetFromStringSlice(scannedImage.Verifiers))
+		case share.CriteriaKeyStorageClassName:
+			if kind == "StatefulSet" {
+				for _, scName := range statefuleSetVCT {
+					met, positive = isStringCriterionMet(crt, scName)
+					if met {
+						break
+					}
+				}
+			} else {
+				met, positive = isStorageClassNameCriterionMet(crt, admResObject.Namespace, c)
+			}
+		case share.CriteriaKeySaBindRiskyRole:
+			met, positive = isRiskyServiceAccountRuleMet(crt, admResObject.ServiceAccountName, admResObject.Namespace)
 		default:
 			met, positive = false, true
 		}
@@ -1510,13 +1544,13 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		statusCode, body, err := opa.OpaEvalByString(policyUrl, string(jsonData))
 
 		if err != nil {
-			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("isAdmissionRuleMet, opa.OpaEvalByString() failed")
+			log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "ar.RequestID": ar.Request.UID}).Error("opa.OpaEvalByString() failed")
 		} else {
-			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("isAdmissionRuleMet, opa.OpaEvalByString() success")
+			log.WithFields(log.Fields{"policyUrl": policyUrl, "statusCode": statusCode, "body": body, "ar.RequestID": ar.Request.UID}).Debug("opa.OpaEvalByString() success")
 
 			met, err := opa.AnalyzeResult(body)
 			if err != nil {
-				log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "body": body}).Error("isAdmissionRuleMet, opa.AnalyzeResult() failed")
+				log.WithFields(log.Fields{"err": err, "policyUrl": policyUrl, "body": body}).Error("opa.AnalyzeResult() failed")
 			}
 
 			mets["custom_criteria"] = met
@@ -2542,162 +2576,6 @@ func PopulateRulesToOpa() {
 	}
 }
 
-func PopulateDefRiskyRules() {
-
-	var defaultRules = []*share.CLUSAdmissionRule{
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_view_secret",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "secrets, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*, get, list, watch",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_create_pod",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*, create",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_any_action_workload",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods, deployments, cronjobs, jobs, daemonsets, statefulsets, replicasets, replicationcontrollers, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_any_action_rbac",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "roles,clusterroles,rolebindings,clusterrolebindings, *",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-		&share.CLUSAdmissionRule{
-			Category: admission.AdmRuleCatK8s,
-			Comment:  "risky_role_exec_into_container",
-			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].resources[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].resources[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "pods/exec",
-					ValueType: "string",
-				},
-				&share.CLUSAdmRuleCriterion{
-					Name:      "item.rules[_].verbs[_]",
-					Op:        "arrayContainsAny",
-					Path:      "item.rules[_].verbs[_]",
-					Kind:      "Roles",
-					Type:      "customPath",
-					Value:     "*,create",
-					ValueType: "string",
-				},
-			},
-			Disable:           false,
-			Critical:          false,
-			RuleType:          api.ValidatingDenyRuleType,
-			CfgType:           share.UserCreated,
-			UseAsRiskyRoleTag: true,
-		},
-	}
-
-	for i, r := range defaultRules {
-		r.ID = uint32(2000 + i + 1)
-		opa.ConvertToRegoRule(r)
-	}
-}
-
 func GetPredefinedRiskyRoles() []string {
 	keys := make([]string, 0, len(predefinedRiskyRoles))
 	for k := range predefinedRiskyRoles {
@@ -2717,4 +2595,254 @@ func formatRiskyRoleCriteriaMsg(critValue string) string {
 	}
 
 	return strings.Join(results, ",")
+}
+
+func isStorageClassNameCriterionMet(crt *share.CLUSAdmRuleCriterion, namespace string, c *nvsysadmission.AdmContainerInfo) (bool, bool) {
+	claimeNames := make([]string, 0)
+	for _, v := range c.Volumes {
+		if v.VolumeSource.PersistentVolumeClaim != nil {
+			claimName := v.VolumeSource.PersistentVolumeClaim.ClaimName
+			claimeNames = append(claimeNames, claimName)
+		}
+	}
+
+	for _, claimName := range claimeNames {
+		scName, err := getStorageClassNameFromK8s(namespace, claimName)
+		if err == nil {
+			met, positive := isStringCriterionMet(crt, scName)
+			if met {
+				return met, positive
+			}
+		} else {
+			log.WithFields(log.Fields{"claimeNames": claimeNames, "namespace": namespace, "claimName": claimName}).Debug("get sc name in PVC failed")
+		}
+	}
+
+	return false, true
+}
+
+func getStorageClassNameFromK8s(ns, name string) (string, error) {
+	// for assessment
+	if ns == "" {
+		ns = "default"
+	}
+
+	if obj, err := global.ORCH.GetResource(resource.RscTypePersistentVolumeClaim, ns, name); err == nil {
+		if pvcObj := obj.(*k8sCorev1.PersistentVolumeClaim); pvcObj != nil {
+			return *pvcObj.Spec.StorageClassName, nil
+		}
+	}
+	return "", errors.New("PVC not found")
+}
+
+func (m CacheMethod) MatchK8sAdmissionRulesForPVC(admType string, ns, name, scName string, forTesting bool) (*nvsysadmission.AdmResult, bool) {
+	result := &nvsysadmission.AdmResult{}
+
+	// if we are in federation, compare with fed admission rules(i.e. fed_admctrl_exception/fed_admctrl_deny rules) before crd/local user-defined rules
+	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
+		if matched := matchK8sAdmissionRulesForPVC(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
+			ns, name, scName, result, forTesting); matched && !forTesting {
+			// it's not assessment. simply return the matched result
+			result.MatchDeny = true
+			result.MatchFedRule = true
+			return result, true
+		}
+	}
+
+	// 1. CRD deny rules
+	// 2. user-defined deny rules
+	for _, matchScope := range []int{share.GroundCfg, share.UserCreated} {
+		if matched := matchK8sAdmissionRulesForPVC(admType, api.ValidatingDenyRuleType, matchScope,
+			ns, name, scName, result, forTesting); matched && !forTesting {
+			// it's not assessment. simply return the matched result
+			result.MatchDeny = true
+			return result, true
+		}
+	}
+
+	if forTesting { // assessment
+		found := false
+		for _, r := range result.AssessResults {
+			if !r.Disabled {
+				found = true
+				result.Image = r.ContainerImage
+				result.RuleID = r.RuleID
+				result.AdmRule = r.RuleDetails
+				result.RuleCfgType = r.RuleCfgType
+				result.MatchedSource = r.MatchedSource
+				result.AssessMatchedRuleType = r.RuleType
+				result.RuleMode = r.RuleMode
+				break
+			}
+		}
+		if !found {
+			result.AssessMatchedRuleType = ""
+		}
+		return result, found
+	}
+
+	return result, false
+}
+
+func matchK8sAdmissionRulesForPVC(admType, ruleType string, matchCfgType int, ns, name, scName string, result *nvsysadmission.AdmResult, forTesting bool) bool { // return true means match
+	var isDenyRuleType bool
+	var assessMatched bool                              // whether a non-disabled rule is matched in this assessment call
+	var assessResults []*nvsysadmission.AdmAssessResult // all matched rules'(disabled or not) results for assessment only
+
+	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
+		isDenyRuleType = true
+	}
+	admPolicyCache := selectAdminPolicyCache(admType, ruleType)
+	if admPolicyCache != nil {
+		cacheMutexRLock()
+		defer cacheMutexRUnlock()
+		for _, head := range admPolicyCache.RuleHeads {
+			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok && (forTesting || !rule.Disable) && rule.Category == admission.AdmRuleCatK8s {
+				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
+					if matched := isAdmissionPVCRuleMet(rule.Criteria, ns, name, scName); matched {
+						// for assessment, disabled rule could be matched even though it's ignored in the calc of final webhook request result
+						ruleDetails := ruleToString(rule)
+						if forTesting {
+							assessResult := &nvsysadmission.AdmAssessResult{
+								RuleID:      rule.ID,
+								Disabled:    rule.Disable,
+								RuleDetails: fmt.Sprintf("It matches rule with criteria: %s", ruleDetails),
+								RuleCfgType: rule.CfgType,
+							}
+							if isDenyRuleType {
+								assessResult.RuleType = api.ValidatingDenyRuleType
+								assessResult.RuleMode = rule.RuleMode
+							} else {
+								assessResult.RuleType = api.ValidatingAllowRuleType
+							}
+							if !rule.Disable {
+								// for assessment, disabled rules' matching results are collected as well.
+								// however, disabled rules' matching results are ignored in the calc of final webhook request result
+								if result.AssessMatchedRuleType == "" {
+									// the 1st matched non-disabled rule's type is recorded the container-image's result
+									if isDenyRuleType {
+										result.AssessMatchedRuleType = api.ValidatingDenyRuleType
+									} else {
+										result.AssessMatchedRuleType = api.ValidatingAllowRuleType
+									}
+								}
+								assessMatched = true
+							}
+							assessResults = append(assessResults, assessResult)
+						}
+						if !forTesting || len(result.AssessMatchedRuleType) == 0 {
+							result.RuleID = rule.ID
+							result.RuleCfgType = rule.CfgType
+							if isDenyRuleType && rule.RuleMode != "" {
+								result.RuleMode = rule.RuleMode
+							}
+							result.AdmRule = ruleDetails
+							if !forTesting {
+								log.WithFields(log.Fields{"id": head.ID, "namespace": ns, "StorageClassName": scName, "type": ruleType}).Debug("matched a rule")
+								return true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if forTesting {
+		if len(assessResults) > 0 {
+			result.AssessResults = append(result.AssessResults, assessResults...)
+		}
+		return assessMatched
+	}
+	return false
+}
+
+func isAdmissionPVCRuleMet(criteria []*share.CLUSAdmRuleCriterion, ns, name, scName string) bool {
+	var met, positive bool
+	var mets map[string]bool = make(map[string]bool)
+	var poss map[string]bool = make(map[string]bool)
+
+	for _, crt := range criteria {
+		key := crt.Name
+
+		switch crt.Name {
+		case share.CriteriaKeyNamespace:
+			met, positive = isStringCriterionMet(crt, ns)
+		case share.CriteriaKeyStorageClassName:
+			met, positive = isStringCriterionMet(crt, scName)
+		default:
+			met, positive = false, true
+		}
+
+		if v, ok := mets[key]; !ok {
+			mets[key] = met
+			poss[key] = positive
+		} else {
+			p, _ := poss[key]
+			if !positive && !p {
+				mets[key] = v && met
+			} else {
+				mets[key] = v || met
+			}
+			poss[key] = p || positive
+		}
+	}
+
+	if len(mets) == 0 {
+		return false
+	}
+	for _, met = range mets {
+		if !met {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isRiskyServiceAccountRuleMet(crt *share.CLUSAdmRuleCriterion, saName, namespace string) (bool, bool) {
+	if saName == "" {
+		saName = "default"
+	}
+
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	allBoundRiksRoles, err := resource.GetAllRiskyRolesByServiceAccount(saName, namespace)
+
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "crt.Value": crt.Value, "namespace": namespace, "saName": saName}).Error("GetAllRiskyRolesByServiceAccount fail")
+		return false, true
+	}
+
+	log.WithFields(log.Fields{"crt.Value": crt.Value, "allBoundRiksRoles": allBoundRiksRoles, "namespace": namespace, "saName": saName}).Debug("isRiskyServiceAccountRuleMet")
+
+	if len(allBoundRiksRoles) > 0 {
+		checks := strings.Split(crt.Value, ",")
+		for _, check := range checks {
+			checkTag := 0
+			switch check {
+			case "risky_role_view_secret":
+				checkTag = resource.RiskyRole_ViewSecret
+			case "risky_role_any_action_workload":
+				checkTag = resource.RiskyRole_AnyActionWorkload
+			case "risky_role_any_action_rbac":
+				checkTag = resource.RiskyRole_AnyActionRBAC
+			case "risky_role_create_pod":
+				checkTag = resource.RiskyRole_CreatePod
+			case "risky_role_exec_into_container":
+				checkTag = resource.RiskyRole_ExecContainer
+			default:
+			}
+
+			for _, riskyTags := range allBoundRiksRoles {
+				if (riskyTags & checkTag) > 0 {
+					return true, true // found
+				}
+			}
+		}
+	}
+
+	return false, true
 }

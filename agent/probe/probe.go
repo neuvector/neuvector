@@ -46,6 +46,7 @@ type Probe struct {
 	procPolicyLookupFunc func(id, riskType, pname, ppath string, pid, pgid, shellCmd int, proc *share.CLUSProcessProfileEntry) (string, string, string, string, bool, error)
 	bK8sGroupWithProbe   func(svcGroup string) bool
 	reportLearnProc      func(svcGroup string, proc *share.CLUSProcessProfileEntry)
+	isNeuvectorContainer func(id string) (string, bool)
 	disableNvProtect     bool
 	bKubePlatform        bool
 	kubeFlavor			 string
@@ -102,6 +103,7 @@ type Probe struct {
 	msgAggregatesMux    sync.Mutex
 	fsnCtr              *FileNotificationCtr // anchor profile helper
 	exitProcSlices      []*procDelayExit
+	IsNvProtectAlerted  bool
 }
 
 func (p *Probe) cbOpenNetlinkSockets(param interface{}) {
@@ -469,6 +471,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		procPolicyLookupFunc: pc.ProcPolicyLookupFunc,
 		bK8sGroupWithProbe:   pc.IsK8sGroupWithProbe,
 		reportLearnProc:      pc.ReportLearnProc,
+		isNeuvectorContainer: pc.IsNeuvectorContainer,
 		containerInContainer: pc.ContainerInContainer,
 		getContainerPid:      pc.GetContainerPid,
 		getAllContainerList:  pc.GetAllContainerList,
@@ -510,6 +513,10 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		log.Info("Process profiler is disabled")
 	}
 
+	p.selfID = global.RT.GetSelfID()
+	p.agentSessionID = osutil.GetSessionId(p.agentPid)
+	//log.WithFields(log.Fields{"sessionID": p.agentSessionID, "container ID": p.selfID}).Info("PROC: ")
+
 	// p.pidNetlink = false // for test scan mode
 	if err := global.SYS.CallNetNamespaceFunc(1, p.cbOpenNetlinkSockets, nil); err != nil {
 		return nil, err
@@ -531,16 +538,11 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		p.FaEndChan <- true
 	}
 
-	if p.bProfileEnable {
-		var ok bool
-		if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
-			log.Error("FSN: failed")
-		}
+	// NV Protect is always on even if the the process profile is disabled
+	var ok bool
+	if p.fsnCtr, ok = NewFsnCenter(p, global.RT.GetStorageDriver()); !ok {
+		log.Error("FSN: failed")
 	}
-
-	p.selfID = global.RT.GetSelfID()
-	p.agentSessionID = osutil.GetSessionId(p.agentPid)
-	//log.WithFields(log.Fields{"sessionID": p.agentSessionID, "container ID": p.selfID}).Info("PROC: ")
 
 	// build current process maps, host container is established here
 	runKube := p.initReadProcesses()
@@ -749,6 +751,37 @@ func (p *Probe) ProcessFsnEvent(id string, files []string, finfo fileInfo) {
 
 		if finfo.bJavaPkg && (finfo.fileType == file_added || finfo.fileType == file_deleted) {
 			p.sendFsnJavaPkgReport(id, files, finfo.fileType == file_added)
+		}
+	}
+
+	mLog.WithFields(log.Fields{"id": id, "files": files}).Info()
+	if !p.disableNvProtect {
+		if role, ok := p.isNeuvectorContainer(id); ok {
+			// NV Protect alerts
+			var violated [] string
+			for _, f := range files {
+				if strings.HasPrefix(f, "/bin/") || strings.HasPrefix(f, "/sbin/") || strings.HasPrefix(f, "/usr/bin/") || strings.HasPrefix(f, "/usr/sbin/") {
+					violated = append(violated, f)
+					continue
+				}
+
+				if strings.HasPrefix(f, "/usr/local/bin/") {
+					if strings.Contains(role, "manager") {
+						// exclude CLI path
+						if strings.HasPrefix(f, "/usr/local/bin/prog/") {
+							continue
+						}
+					}
+					violated = append(violated, f)
+					continue
+				}
+			}
+
+			if len(violated) > 0 {
+				mLog.WithFields(log.Fields{"id": id, "violated": violated, "role": role}).Info("FSN: NV.Protect, no more script tests")
+				p.IsNvProtectAlerted = true
+				p.sendFsnNvProtectReport(id, violated)
+			}
 		}
 	}
 }

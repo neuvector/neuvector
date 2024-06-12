@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -424,6 +424,21 @@ func validateGroupConfig(rg *api.RESTGroupConfig, create bool) (int, string) {
 		log.WithFields(log.Fields{"name": rg.Name}).Error(e)
 		return api.RESTErrInvalidName, e
 	}
+	if rg.GrpSessCur != nil && *rg.GrpSessCur > api.GrpMetricMax {
+		e := "Metric group active session number exceed max limit"
+		log.WithFields(log.Fields{"GrpSessCur": *rg.GrpSessCur, "Max": api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
+	if rg.GrpSessRate != nil && *rg.GrpSessRate > api.GrpMetricMax {
+		e := "Metric group session rate exceed max limit"
+		log.WithFields(log.Fields{"GrpSessRate": *rg.GrpSessRate, "Max": api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
+	if rg.GrpBandWidth != nil && *rg.GrpBandWidth > api.GrpMetricMax {
+		e := "Metric group bandwidth exceed max limit"
+		log.WithFields(log.Fields{"GrpBandWidth": *rg.GrpBandWidth, "Max": api.GrpMetricMax}).Error(e)
+		return api.RESTErrInvalidRequest, e
+	}
 	switch rg.CfgType {
 	case api.CfgTypeFederal:
 		if !strings.HasPrefix(rg.Name, api.FederalGroupPrefix) || rg.Name == api.FederalGroupPrefix {
@@ -553,7 +568,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTGroupConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -610,6 +625,18 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	if rg.Comment != nil {
 		cg.Comment = *rg.Comment
 	}
+	if rg.MonMetric != nil {
+		cg.MonMetric = *rg.MonMetric
+	}
+	if rg.GrpSessCur != nil {
+		cg.GrpSessCur = *rg.GrpSessCur
+	}
+	if rg.GrpSessRate != nil {
+		cg.GrpSessRate = *rg.GrpSessRate
+	}
+	if rg.GrpBandWidth != nil {
+		cg.GrpBandWidth = *rg.GrpBandWidth
+	}
 
 	// Write group definition into key-value store. Make sure group doesn't exist.
 	if err := clusHelper.PutGroup(&cg, true); err != nil {
@@ -643,7 +670,7 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTGroupConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -715,8 +742,8 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Apply changes
-	cg.Criteria = nil
 	if rg.Criteria != nil && len(*rg.Criteria) > 0 {
+		cg.Criteria = nil
 		bHasCriteriaAddress := false
 		for _, ct := range *rg.Criteria {
 			cg.Criteria = append(cg.Criteria, share.CLUSCriteriaEntry{
@@ -738,6 +765,18 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	if rg.Comment != nil {
 		cg.Comment = *rg.Comment
+	}
+	if rg.MonMetric != nil {
+		cg.MonMetric = *rg.MonMetric
+	}
+	if rg.GrpSessCur != nil {
+		cg.GrpSessCur = *rg.GrpSessCur
+	}
+	if rg.GrpSessRate != nil {
+		cg.GrpSessRate = *rg.GrpSessRate
+	}
+	if rg.GrpBandWidth != nil {
+		cg.GrpBandWidth = *rg.GrpBandWidth
 	}
 
 	if !acc.Authorize(cg, nil) {
@@ -923,7 +962,7 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1009,7 +1048,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1429,7 +1468,7 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1532,7 +1571,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTServiceBatchConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -1716,21 +1755,21 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := ioutil.ReadFile(importTask.TempFilename)
+	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvSecurityRuleList
 	var secRule resource.NvSecurityRule
-	var secRules []*resource.NvSecurityRule = []*resource.NvSecurityRule{nil}
+	var secRules []resource.NvSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules[0] = &secRule
+			secRules = append(secRules, secRule)
 		}
 	} else {
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.Kind == nil || (*r.Kind != resource.NvSecurityRuleKind && *r.Kind != resource.NvClusterSecurityRuleKind) {
+		if r.APIVersion != "neuvector.com/v1" || (r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
 			invalidCrdKind = true
 			break
 		}
@@ -1768,10 +1807,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		// ---------------------------------------------------
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if secRule == nil || (secRule.Kind == nil || secRule.ApiVersion == nil || secRule.Metadata == nil) {
-				continue
-			}
-			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
+			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
 				err = fmt.Errorf(errMsg)
 				break
 			} else {

@@ -10,19 +10,19 @@ import (
 	"strings"
 	"time"
 
-	metav1 "github.com/neuvector/k8s/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Option represents optional call parameters, such as label selectors.
 type Option interface {
 	updateURL(base string, v url.Values) string
-	updateDelete(r Resource, d *deleteOptions)
+	updateDelete(r metav1.Object, d *deleteOptions)
 }
 
 type optionFunc func(base string, v url.Values) string
 
-func (f optionFunc) updateDelete(r Resource, d *deleteOptions)  {}
-func (f optionFunc) updateURL(base string, v url.Values) string { return f(base, v) }
+func (f optionFunc) updateDelete(r metav1.Object, d *deleteOptions) {}
+func (f optionFunc) updateURL(base string, v url.Values) string     { return f(base, v) }
 
 type deleteOptions struct {
 	Kind       string `json:"kind"`
@@ -43,20 +43,20 @@ func QueryParam(name, value string) Option {
 	})
 }
 
-type deleteOptionFunc func(r Resource, d *deleteOptions)
+type deleteOptionFunc func(r metav1.Object, d *deleteOptions)
 
-func (f deleteOptionFunc) updateDelete(r Resource, d *deleteOptions)  { f(r, d) }
-func (f deleteOptionFunc) updateURL(base string, v url.Values) string { return base }
+func (f deleteOptionFunc) updateDelete(r metav1.Object, d *deleteOptions) { f(r, d) }
+func (f deleteOptionFunc) updateURL(base string, v url.Values) string     { return base }
 
 func DeleteAtomic() Option {
-	return deleteOptionFunc(func(r Resource, d *deleteOptions) {
-		d.Preconditions.UID = *r.GetMetadata().Uid
+	return deleteOptionFunc(func(r metav1.Object, d *deleteOptions) {
+		d.Preconditions.UID = string(r.GetUID())
 	})
 }
 
 // DeletePropagationOrphan orphans the dependent resources during a delete.
 func DeletePropagationOrphan() Option {
-	return deleteOptionFunc(func(r Resource, d *deleteOptions) {
+	return deleteOptionFunc(func(r metav1.Object, d *deleteOptions) {
 		d.PropagationPolicy = "Orphan"
 	})
 }
@@ -64,7 +64,7 @@ func DeletePropagationOrphan() Option {
 // DeletePropagationBackground deletes the resources and causes the garbage
 // collector to delete dependent resources in the background.
 func DeletePropagationBackground() Option {
-	return deleteOptionFunc(func(r Resource, d *deleteOptions) {
+	return deleteOptionFunc(func(r metav1.Object, d *deleteOptions) {
 		d.PropagationPolicy = "Background"
 	})
 }
@@ -75,14 +75,14 @@ func DeletePropagationBackground() Option {
 // finalizer on the object, and sets its deletionTimestamp.  This policy is
 // cascading, i.e., the dependents will be deleted with Foreground.
 func DeletePropagationForeground() Option {
-	return deleteOptionFunc(func(r Resource, d *deleteOptions) {
+	return deleteOptionFunc(func(r metav1.Object, d *deleteOptions) {
 		d.PropagationPolicy = "Foreground"
 	})
 }
 
 func DeleteGracePeriod(d time.Duration) Option {
 	seconds := int64(d / time.Second)
-	return deleteOptionFunc(func(r Resource, d *deleteOptions) {
+	return deleteOptionFunc(func(r metav1.Object, d *deleteOptions) {
 		d.GracePeriod = &seconds
 	})
 }
@@ -127,18 +127,7 @@ var (
 	resourceLists = map[reflect.Type]resourceType{}
 )
 
-// Resource is a Kubernetes resource, such as a Node or Pod.
-type Resource interface {
-	GetMetadata() *metav1.ObjectMeta
-}
-
-// Resource is list of common Kubernetes resources, such as a NodeList or
-// PodList.
-type ResourceList interface {
-	GetMetadata() *metav1.ListMeta
-}
-
-func Register(apiGroup, apiVersion, name string, namespaced bool, r Resource) {
+func Register(apiGroup, apiVersion, name string, namespaced bool, r metav1.Object) {
 	rt := reflect.TypeOf(r)
 	if _, ok := resources[rt]; ok {
 		panic(fmt.Sprintf("resource registered twice %T", r))
@@ -146,7 +135,7 @@ func Register(apiGroup, apiVersion, name string, namespaced bool, r Resource) {
 	resources[rt] = resourceType{apiGroup, apiVersion, name, namespaced}
 }
 
-func RegisterList(apiGroup, apiVersion, name string, namespaced bool, l ResourceList) {
+func RegisterList(apiGroup, apiVersion, name string, namespaced bool, l metav1.ListInterface) {
 	rt := reflect.TypeOf(l)
 	if _, ok := resources[rt]; ok {
 		panic(fmt.Sprintf("resource registered twice %T", l))
@@ -196,36 +185,32 @@ func urlForPath(endpoint, path string) string {
 	return endpoint + "/" + path
 }
 
-func resourceURL(endpoint string, r Resource, withName bool, options ...Option) (string, error) {
+func resourceURL(endpoint string, r metav1.Object, withName bool, options ...Option) (string, error) {
 	t, ok := resources[reflect.TypeOf(r)]
 	if !ok {
 		return "", fmt.Errorf("unregistered type %T", r)
 	}
-	meta := r.GetMetadata()
-	if meta == nil {
-		return "", errors.New("resource has no object meta")
-	}
 	switch {
-	case t.namespaced && (meta.Namespace == nil || *meta.Namespace == ""):
+	case t.namespaced && r.GetNamespace() == "":
 		return "", errors.New("no resource namespace provided")
-	case !t.namespaced && (meta.Namespace != nil && *meta.Namespace != ""):
+	case !t.namespaced && r.GetNamespace() != "":
 		return "", errors.New("resource not namespaced")
-	case withName && (meta.Name == nil || *meta.Name == ""):
+	case withName && r.GetName() == "":
 		return "", errors.New("no resource name provided")
 	}
 	name := ""
 	if withName {
-		name = *meta.Name
+		name = r.GetName()
 	}
 	namespace := ""
 	if t.namespaced {
-		namespace = *meta.Namespace
+		namespace = r.GetNamespace()
 	}
 
 	return urlFor(endpoint, t.apiGroup, t.apiVersion, namespace, t.name, name, options...), nil
 }
 
-func resourceGetURL(endpoint, namespace, name string, r Resource, options ...Option) (string, error) {
+func resourceGetURL(endpoint, namespace, name string, r metav1.Object, options ...Option) (string, error) {
 	t, ok := resources[reflect.TypeOf(r)]
 	if !ok {
 		return "", fmt.Errorf("unregistered type %T", r)
@@ -241,7 +226,7 @@ func resourceGetURL(endpoint, namespace, name string, r Resource, options ...Opt
 	return urlFor(endpoint, t.apiGroup, t.apiVersion, namespace, t.name, name, options...), nil
 }
 
-func resourceListURL(endpoint, namespace string, r ResourceList, options ...Option) (string, error) {
+func resourceListURL(endpoint, namespace string, r metav1.ListInterface, options ...Option) (string, error) {
 	t, ok := resourceLists[reflect.TypeOf(r)]
 	if !ok {
 		return "", fmt.Errorf("unregistered type %T", r)
@@ -254,7 +239,7 @@ func resourceListURL(endpoint, namespace string, r ResourceList, options ...Opti
 	return urlFor(endpoint, t.apiGroup, t.apiVersion, namespace, t.name, "", options...), nil
 }
 
-func resourceWatchURL(endpoint, namespace string, r Resource, options ...Option) (string, error) {
+func resourceWatchURL(endpoint, namespace string, r metav1.Object, options ...Option) (string, error) {
 	t, ok := resources[reflect.TypeOf(r)]
 	if !ok {
 		return "", fmt.Errorf("unregistered type %T", r)

@@ -25,10 +25,10 @@
 package identifiers
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -42,24 +42,24 @@ var (
 	identifierRe = regexp.MustCompile(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
 )
 
-// Validate return nil if the string s is a valid identifier.
+// Validate returns nil if the string s is a valid identifier.
 //
-// identifiers must be valid domain names according to RFC 1035, section 2.3.1.  To
-// enforce case insensitivity, all characters must be lower case.
+// identifiers are similar to the domain name rules according to RFC 1035, section 2.3.1. However
+// rules in this package are relaxed to allow numerals to follow period (".") and mixed case is
+// allowed.
 //
-// In general, identifiers that pass this validation, should be safe for use as
-// a domain names or filesystem path component.
+// In general identifiers that pass this validation should be safe for use as filesystem path components.
 func Validate(s string) error {
 	if len(s) == 0 {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier must not be empty")
+		return fmt.Errorf("identifier must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if len(s) > maxLength {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q greater than maximum length (%d characters)", s, maxLength)
+		return fmt.Errorf("identifier %q greater than maximum length (%d characters): %w", s, maxLength, errdefs.ErrInvalidArgument)
 	}
 
 	if !identifierRe.MatchString(s) {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q must match %v", s, identifierRe)
+		return fmt.Errorf("identifier %q must match %v: %w", s, identifierRe, errdefs.ErrInvalidArgument)
 	}
 	return nil
 }

@@ -122,6 +122,10 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 			data:     nvUsageData,
 			filename: "neuvector/neuvectorUsage.json",
 		},
+		&tFileContent{
+			data:     []byte(resp.MeteringArchiveData),
+			filename: "neuvector/metering_archive.json",
+		},
 	}
 	w.Header().Set("Content-Disposition", "Attachment; filename=suse_supportconfig.tar.gz")
 	w.Header().Set("Content-Encoding", "gzip")

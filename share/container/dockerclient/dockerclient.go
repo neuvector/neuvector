@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -89,7 +88,7 @@ func (client *DockerClient) doRequest(method string, path string, body []byte, h
 	}
 
 	defer reader.Close()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +121,7 @@ func (client *DockerClient) doStreamRequest(method string, path string, in io.Re
 	}
 	if resp.StatusCode == 404 {
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, ErrNotFound
 		}
@@ -137,7 +136,7 @@ func (client *DockerClient) doStreamRequest(method string, path string, in io.Re
 	}
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -697,7 +696,7 @@ func (client *DockerClient) PullImage(name string, auth *AuthConfig) error {
 		return ErrNotFound
 	}
 	if resp.StatusCode >= 400 {
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}

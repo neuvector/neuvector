@@ -2,7 +2,6 @@ package fsmon
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -79,7 +78,7 @@ func NewFaNotify(endFaChan chan bool, cb PidLookupCallback, sys *system.SystemTo
 }
 
 func (fn *FaNotify) checkConfigPerm() bool {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "fan_test")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "fan_test")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FMON: Create temp directory fail")
 		return false
@@ -607,7 +606,6 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	}
 
 	// log.WithFields(log.Fields{"path": linkPath}).Debug("FMON:")
-
 	// lookup the root pid
 	r, pInfo := fn.lookupContainer(pid)
 	if r == nil {
@@ -617,13 +615,36 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	}
 
 	// skip our containers, host runc, system containers
-	if (r.bNeuVectorSvc || pInfo.RootPid == 1 || !r.capBlock) && perm {
+	if (pInfo.RootPid == 1 || !r.capBlock) && perm {
 		return true, 0, nil, nil
 	}
 
 	ifile, _, mask := fn.lookupFile(r, linkPath, pInfo)
 	if ifile == nil {
 		return true, mask, nil, nil
+	}
+
+	if r.bNeuVectorSvc {
+		log.WithFields(log.Fields{"linkPath": linkPath}).Debug("FMON:")
+		if strings.HasPrefix(linkPath, "/usr/local/bin/scripts/") {
+			pid := pInfo.Pid
+			path := pInfo.Path
+			for i := 0; i < 5; i++ {
+				if filepath.Dir(path) == "/usr/local/bin" {
+					switch filepath.Base(path) {
+					case "agent", "monitor", "controller", "nstools", "workerlet", "dp":
+						return true, 0, nil, nil
+					}
+				}
+				// find the parent
+				if _, pid, err = fn.sys.GetProcessName(pid); err != nil {
+					break
+				}
+				path, _ = fn.sys.GetFilePath(pid)
+			}
+			return false, mask, nil, nil
+		}
+		return true, 0, nil, nil
 	}
 
 	// log.WithFields(log.Fields{"protect": ifile.protect, "perm": perm, "path": linkPath, "ifile": ifile, "evMask": fmt.Sprintf("0x%08x", fmask)}).Debug("FMON:")

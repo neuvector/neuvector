@@ -178,6 +178,13 @@ func connectPAIToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip)
 		if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
 			conn.ServerWL = ep
 			sa.addrgrp = true
+		} else if ep = getIpAddrGroupName(net.IP(conn.ServerIP).String()); ep != "" {
+			conn.ServerWL = ep
+			sa.addrgrp = true
+			tep := specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
+			if wlGraph.DeleteNode(tep) != "" {
+				log.WithFields(log.Fields{"endpoint": tep}).Debug("Delete unknown host ip endpoint")
+			}
 		} else {
 			ep = specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
 			if wlGraph.Node(ep) == "" &&
@@ -216,6 +223,14 @@ func connectPAIToGlobal(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTi
 			stip.wlPort = uint16(conn.ServerPort)
 			sa.workload = true
 			return true
+		} else if conn.Nbe {
+			if alive {
+				conn.ServerWL = wl
+				stip.wlPort = uint16(conn.ServerPort)
+				sa.workload = true
+				sa.managed = true
+				return true
+			}
 		}
 		cctx.ConnLog.WithFields(log.Fields{
 			"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
@@ -435,8 +450,7 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 						if ep := getAddrGroupNameFromPolicy(conn.PolicyId, false); ep != "" {
 							conn.ServerWL = ep
 							sa.addrgrp = true
-						} else if conn.FQDN != "" && conn.PolicyId == 0 &&
-							conn.PolicyAction <= C.DP_POLICY_ACTION_LEARN {
+						} else if conn.FQDN != "" && conn.PolicyId == 0 {
 							//learn to predefined address group
 							if fqdngrp := getFqdnAddrGroupName(conn.FQDN); fqdngrp != "" {
 								conn.ServerWL = fqdngrp

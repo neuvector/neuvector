@@ -83,7 +83,7 @@ func deserializeRoute(m []byte) (netlink.Route, error) {
 	}
 	route := netlink.Route{
 		Scope:    netlink.Scope(msg.Scope),
-		Protocol: int(msg.Protocol),
+		Protocol: netlink.RouteProtocol(msg.Protocol),
 		Table:    int(msg.Table),
 		Type:     int(msg.Type),
 		Tos:      int(msg.Tos),

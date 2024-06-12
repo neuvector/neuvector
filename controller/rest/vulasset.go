@@ -53,7 +53,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 
 	// use acc.Authorize() to filter allowed resources
 	start := time.Now()
-	allowed, filteredMap := getAllAllowedResourceId(acc)
+	allowed := getAllAllowedResourceId(acc)
 	elapsed := time.Since(start)
 
 	// For performance testing, when enabled it will treat all workload ID as allowed.
@@ -66,8 +66,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 
 	// get vul records in vulAssets table
 	start = time.Now()
-	// vulAssets, nTotalCVE, err := db.FilterVulAssets(allowed, queryFilter, filteredMap)
-	vulAssets, nTotalCVE, perf, err := db.FilterVulAssetsV2(allowed, queryFilter, filteredMap)
+	vulAssets, nTotalCVE, perf, err := db.FilterVulAssetsV2(allowed, queryFilter)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("FilterVulAssets error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -305,10 +304,10 @@ func _createQuerySession(qsr *api.QuerySessionRequest) error {
 	}
 
 	// use acc.Authorize() to filter allowed resources
-	allowed, filteredMapVul := getAllAllowedResourceId(acc)
+	allowed := getAllAllowedResourceId(acc)
 
 	// get all records in vulAssets table which represent the complete data
-	vulAssets, _, _, err := db.FilterVulAssetsV2(allowed, queryFilter, filteredMapVul)
+	vulAssets, _, _, err := db.FilterVulAssetsV2(allowed, queryFilter)
 	if err != nil {
 		return err
 	}
@@ -440,7 +439,7 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	elapsed = time.Since(start)
-	perfStat.PerfStats = append(perfStat.PerfStats, fmt.Sprintf("2/2, get assets from db, took=%v", elapsed))
+	perfStat.PerfStats = append(perfStat.PerfStats, fmt.Sprintf("2/2, get assets from db, poolSize=%v, took=%v", queryFilter.ThreadCount, elapsed))
 
 	if queryFilter.Debug == 1 {
 		resp.QueryStat = perfStat
@@ -475,6 +474,7 @@ func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, error) {
 	}
 	queryFilter.Filters = qsr.Filters
 	queryFilter.Filters.LastModifiedTime = qf.Filters.LastModifiedTime
+	queryFilter.ThreadCount = 10
 
 	return queryFilter, nil
 }

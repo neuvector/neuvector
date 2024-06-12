@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 
@@ -115,7 +115,7 @@ func handlerControllerProfiling(w http.ResponseWriter, r *http.Request, ps httpr
 
 	id := ps.ByName("id")
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTProfilingData
 	err := json.Unmarshal(body, &rconf)
@@ -166,7 +166,7 @@ func handlerAgentProfiling(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTProfilingData
 	err := json.Unmarshal(body, &rconf)

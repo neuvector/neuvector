@@ -123,6 +123,15 @@ type DPConfigMACReq struct {
 	Cfg *DPMacConfig `json:"ctrl_cfg_mac"`
 }
 
+type DPNbeConfig struct {
+	MACs []string          `json:"macs"`
+	Nbe  *bool             `json:"nbe,omitempty"`
+}
+
+type DPConfigNbeReq struct {
+	Cfg *DPNbeConfig `json:"ctrl_cfg_nbe"`
+}
+
 type DPRefreshApp struct {
 }
 

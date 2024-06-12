@@ -363,7 +363,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 		return
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
-	log.WithFields(log.Fields{"roles": login.domainRoles, "nvPage": login.nvPage}).Error("Object access denied")
+	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
 	if login.nvPage != api.RESTNvPageDashboard {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
@@ -968,6 +968,7 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		if login.mainSessionID == _interactiveSessionID || strings.HasPrefix(login.mainSessionID, _rancherSessionPrefix) {
 			clog.User = login.fullname
 			clog.UserRoles = login.domainRoles
+			clog.UserPermits = login.extraDomainPermits
 		} else {
 			userRole := api.UserRoleFedAdmin
 			if r, ok := login.domainRoles[access.AccessDomainGlobal]; ok && r == api.UserRoleReader {
@@ -1427,7 +1428,7 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer() {
+func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
 	licenseInit()
 	newRepoScanMgr()
@@ -1446,7 +1447,7 @@ func StartRESTServer() {
 	r.POST("/v1/auth/:server", handlerAuthLoginServer)
 	r.PATCH("/v1/auth", handlerAuthRefresh)
 	r.DELETE("/v1/auth", handlerAuthLogout)
-	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document
+	r.DELETE("/v1/fed_auth", handlerFedAuthLogout) // Skip API document. Called by master cluster
 	r.GET("/v1/eula", handlerEULAShow)
 	r.POST("/v1/eula", handlerEULAConfig)
 	r.GET("/v1/user", handlerUserList)
@@ -1665,8 +1666,8 @@ func StartRESTServer() {
 	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
-	r.GET("/v1/scan/image", handlerScanImageSummary)
-	r.GET("/v1/scan/image/:id", handlerScanImageReport)
+	r.GET("/v1/scan/image", handlerScanImageSummary)    // Returns all workload's scan result summary by images
+	r.GET("/v1/scan/image/:id", handlerScanImageReport) // Returns workload scan result by workload's image ID
 	r.POST("/v1/scan/host/:id", handlerScanHostReq)
 	r.GET("/v1/scan/host/:id", handlerScanHostReport)
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)
@@ -1795,6 +1796,10 @@ func StartRESTServer() {
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
 
+	if isNewCluster && isLead {
+		go loadFedInitCfg()
+	}
+
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
 		MinVersion:               tls.VersionTLS11,
@@ -1811,6 +1816,11 @@ func StartRESTServer() {
 	}
 	for {
 		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+			if err == http.ErrServerClosed {
+				if cfgmapRetryTimer != nil {
+					cfgmapRetryTimer.Stop()
+				}
+			}
 			log.WithFields(log.Fields{"error": err}).Error("Fail to start SSL rest")
 			time.Sleep(time.Second * 5)
 		} else {
@@ -1869,6 +1879,7 @@ func startFedRestServer(fedPingInterval uint32) {
 		for i := 0; i < 5; i++ {
 			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 				if err == http.ErrServerClosed {
+					log.Info("REST Server closed")
 					break
 				}
 				log.WithFields(log.Fields{"error": err}).Error("Fail to start fed SSL rest")
@@ -2079,7 +2090,8 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 // api version is always the first path element
 // Ex: /v1/scan/registry
-//      ^^
+//
+//	^^
 func getRequestApiVersion(r *http.Request) ApiVersion {
 	if r.URL == nil || len(r.URL.Path) == 0 {
 		return ApiVersion1

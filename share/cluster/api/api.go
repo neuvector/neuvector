@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -558,7 +557,7 @@ func NewClient(config *Config) (*Client, error) {
 	// This is because when TokenFile is set it is read into the Token field.
 	// We want any derived clients to have to re-read the token file.
 	if config.TokenFile != "" {
-		data, err := ioutil.ReadFile(config.TokenFile)
+		data, err := os.ReadFile(config.TokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("Error loading token file: %s", err)
 		}
@@ -839,7 +838,7 @@ func (c *Client) write(endpoint string, in, out interface{}, q *WriteOptions) (*
 		if err := decodeBody(resp, &out); err != nil {
 			return nil, err
 		}
-	} else if _, err := ioutil.ReadAll(resp.Body); err != nil {
+	} else if _, err := io.ReadAll(resp.Body); err != nil {
 		return nil, err
 	}
 	return wm, nil
@@ -903,7 +902,7 @@ func parseQueryMeta(resp *http.Response, q *QueryMeta) error {
 // decodeBody is used to JSON decode a body
 func decodeBody(resp *http.Response, out interface{}) error {
 	// Neuvector: improve memory usage which incurs from manipulating buffering data
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err==nil && data != nil {
 		return json.Unmarshal(data, out)
 	}

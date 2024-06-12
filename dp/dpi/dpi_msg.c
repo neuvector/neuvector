@@ -141,6 +141,9 @@ static void netify_session_log(DPMsgSession *dps)
     dps->ThreatID = htonl(dps->ThreatID);
     dps->XffApp = htons(dps->XffApp);
     dps->XffPort = htons(dps->XffPort);
+    dps->EpSessCurIn = htonl(dps->EpSessCurIn);
+    dps->EpSessIn60 = htonl(dps->EpSessIn60);
+    dps->EpByteIn60 = htonll(dps->EpByteIn60);
 }
 
 static void dpi_list_session()

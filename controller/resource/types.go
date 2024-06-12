@@ -3,6 +3,8 @@ package resource
 import (
 	"errors"
 	"net"
+
+	"github.com/neuvector/neuvector/share"
 )
 
 var ErrMethodNotSupported = errors.New("Method not supported")
@@ -25,6 +27,7 @@ const (
 	RscTypePod                            = "pod"
 	RscTypeRBAC                           = "rbac"
 	RscTypeImage                          = "image"
+	RscTypeSecret                         = "secret"
 	RscTypeCrd                            = "customresourcedefinition"
 	RscTypeConfigMap                      = "configmap"
 	RscTypeMutatingWebhookConfiguration   = "mutatingwebhookconfiguration"   // case sensitive!
@@ -46,6 +49,7 @@ const (
 	RscTypeDaemonSet                      = "daemonset"
 	RscTypeReplicaSet                     = "replicaset"
 	RscTypeStatefulSet                    = "statefulset"
+	RscTypePersistentVolumeClaim          = "persistentvolumeclaims"
 )
 
 const (
@@ -64,8 +68,8 @@ const (
 const RscCspUsageName = "neuvector-usage"
 
 // ValidatingWebhookConfiguration resource instance (neuvector-validating-admission-webhook) contains 2 webhooks:
-// 	1. neuvector-validating-admission-webhook.neuvector.svc
-// 	2. neuvector-validating-status-webhook.neuvector.svc
+//  1. neuvector-validating-admission-webhook.neuvector.svc
+//  2. neuvector-validating-status-webhook.neuvector.svc
 var NvAdmMutatingName = "neuvector-mutating-admission-webhook"     // ValidatingWebhookConfiguration resource instance metadata name
 var NvAdmValidatingName = "neuvector-validating-admission-webhook" // ValidatingWebhookConfiguration resource instance metadata name
 var NvCrdValidatingName = "neuvector-validating-crd-webhook"       // ValidatingWebhookConfiguration resource instance metadata name
@@ -120,20 +124,20 @@ type Container struct {
 }
 
 type Pod struct {
-	UID           string
-	Name          string
-	Domain        string
-	Node          string
-	IPNet         net.IPNet
-	HostNet       bool
-	Running       bool
-	OwnerUID      string
-	OwnerName     string
-	OwnerType     string
-	Containers    []Container
-	SA            string   // service account of this pod
-	ContainerIDs  []string // all workload id
-	Labels        map[string]string
+	UID          string
+	Name         string
+	Domain       string
+	Node         string
+	IPNet        net.IPNet
+	HostNet      bool
+	Running      bool
+	OwnerUID     string
+	OwnerName    string
+	OwnerType    string
+	Containers   []Container
+	SA           string   // service account of this pod
+	ContainerIDs []string // all workload id
+	Labels       map[string]string
 }
 
 type Deployment struct {
@@ -183,16 +187,10 @@ type Image struct {
 }
 
 type RBAC struct {
-	Name   string
-	Domain string
-	Roles  map[string]string // domain -> role
-}
-
-type CRD struct {
-	UID     string
-	Name    string
-	Domain  string
-	Version string
+	Name          string
+	Domain        string
+	DomainRoles   map[string]string              // domain -> nv reserved role
+	DomainPermits map[string]share.NvPermissions // domain -> nv permissions. for Rancher SSO custom roles only
 }
 
 type ConfigMap struct {

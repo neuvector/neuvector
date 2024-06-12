@@ -5,7 +5,7 @@
 package sysinfo
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"syscall"
@@ -96,7 +96,7 @@ func getSupported(name string) uint32 {
 
 func (si *SysInfo) getNetworkInfo() {
 	sysClassNet := "/sys/class/net"
-	devices, err := ioutil.ReadDir(sysClassNet)
+	devices, err := os.ReadDir(sysClassNet)
 	if err != nil {
 		return
 	}
@@ -112,13 +112,13 @@ func (si *SysInfo) getNetworkInfo() {
 			continue
 		}
 
-		supp := getSupported(link.Name())
+		//		supp := getSupported(link.Name())
 
 		device := NetworkDevice{
 			Name:       link.Name(),
 			MACAddress: slurpFile(path.Join(fullpath, "address")),
-			Port:       getPortType(supp),
-			Speed:      getMaxSpeed(supp),
+			//			Port:       getPortType(supp),
+			//			Speed:      getMaxSpeed(supp),
 		}
 
 		if driver, err := readLink(path.Join(fullpath, "device", "driver")); err == nil {

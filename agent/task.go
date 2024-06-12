@@ -320,6 +320,9 @@ func fileModifiedToIncidentLog(e *fsmon.MonitorMessage) *share.CLUSIncidentLog {
 		} else {
 			eLog.ID = share.CLUSIncidContainerFileAccessViolation
 		}
+	} else if c, ok := gInfoReadNeuvectorContainer(e.ID); ok {
+		eLog.WorkloadName = c.name
+		eLog.ID = share.CLUSIncidContainerFileAccessViolation // TODO:  UI needs to an update. share.CLUSIncidNvProtectFileViolation
 	} else {
 		eLog.WorkloadName = ""
 		if e.Package {
@@ -328,7 +331,6 @@ func fileModifiedToIncidentLog(e *fsmon.MonitorMessage) *share.CLUSIncidentLog {
 			eLog.ID = share.CLUSIncidContainerFileAccessViolation
 		}
 	}
-
 	return &eLog
 }
 

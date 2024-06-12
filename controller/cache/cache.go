@@ -1,8 +1,5 @@
 package cache
 
-// #include "../../defs.h"
-import "C"
-
 import (
 	"fmt"
 	"net"
@@ -56,9 +53,8 @@ type hostCache struct {
 	workloads        utils.Set
 	portWLMap        map[string]*workloadDigest
 	ipWLMap          map[string]*workloadDigest
-	wlSubnets        utils.Set             // host-scope subnet *net.IPNet, such as 172.17.0.0/16
-	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
-	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	wlSubnets        utils.Set          // host-scope subnet *net.IPNet, such as 172.17.0.0/16
+	scanBrief        *api.RESTScanBrief // Stats of filtered entries
 	customBenchValue []byte
 	dockerBenchValue []byte
 	masterBenchValue []byte
@@ -104,8 +100,7 @@ type workloadCache struct {
 	podName          string
 	svcChanged       string // old learned group name
 	serviceAccount   string
-	scanBrief        *api.RESTScanBrief    // Stats of filtered entries
-	vulTraits        []*scanUtils.VulTrait // Full list of vuls. There is a filtered flag on each entry.
+	scanBrief        *api.RESTScanBrief // Stats of filtered entries
 	customBenchValue []byte
 	dockerBenchValue []byte
 	secretBenchValue []byte
@@ -328,6 +323,10 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	// schedule a key deletion, as loong as one controller does it, it will be fine.
 	pruneHost()
 	SchedulePruneGroups()
+
+	if localDev.Host.Platform == share.PlatformKubernetes {
+		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+	}
 }
 
 func FillControllerCounter(c *share.CLUSControllerCounter) {
@@ -1120,13 +1119,10 @@ func (m CacheMethod) GetAllHostsRisk(acc *access.AccessControl) []*common.Worklo
 		}
 		pm, _ := getHostPolicyMode(cache)
 		hosts = append(hosts, &common.WorkloadRisk{
-			ID:         cache.host.ID,
-			Name:       cache.host.Name,
-			BaseOS:     baseOS,
-			PolicyMode: pm,
-			// When vul. profile updates, it will refresh all scanMap and workload/host cache.
-			// No refresh in this path, which is different from GetVulnerabilityReport().
-			VulTraits:        cache.vulTraits,
+			ID:               cache.host.ID,
+			Name:             cache.host.Name,
+			BaseOS:           baseOS,
+			PolicyMode:       pm,
 			CustomBenchValue: cache.customBenchValue,
 			DockerBenchValue: cache.dockerBenchValue,
 			MasterBenchValue: cache.masterBenchValue,
@@ -1666,6 +1662,7 @@ const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
+const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
 
 var unManagedWlTimer *time.Timer
 
@@ -1679,6 +1676,7 @@ func startWorkerThread(ctx *Context) {
 	if !cacher.rmNsGrps {
 		pruneTicker.Stop()
 	}
+	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
 
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1704,6 +1702,10 @@ func startWorkerThread(ctx *Context) {
 			case <-usageReportTicker.C:
 				if isLeader() {
 					writeUsageReport()
+				}
+			case <-groupMetricCheckTicker.C:
+				if isLeader() {
+					CheckGroupMetric()
 				}
 			case <-teleReportTicker.C:
 				if isLeader() {
@@ -2077,7 +2079,8 @@ func startWorkerThread(ctx *Context) {
 
 // handler of K8s resource watcher calls cbResourceWatcher() which sends to orchObjChan/objChan
 // [2021-02-15] CRD-related resource changes do not call this function.
-//              If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
+//
+//	If they need to in the future, re-work the calling of SyncAdmCtrlStateToK8s()
 func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWebhookConfiguration) {
 	updateDetected := false
 	config := newConfig
@@ -2162,8 +2165,9 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
 	automode_init(ctx)
 
-	// pass function to db so it can use it
-	db.InitGetCVERecord(GetCVERecord)
+	db.SetGetCVERecordFunc(GetCVERecord)
+	db.SetGetCVEListFunc(ExtractVulAttributes)
+	db.SetFillVulPackagesFunc(FillVulPackages)
 
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()
@@ -2199,7 +2203,7 @@ func QueryK8sVersion() {
 	}
 }
 
-////// event handlers for enforcer's kv dispatcher
+// //// event handlers for enforcer's kv dispatcher
 // node: HostID
 func nodeLeaveDispatcher(node string, param interface{}) {
 	dispatchHelper.NodeLeave(node, isLeader())
@@ -2310,7 +2314,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 	}
 }
 
-func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl) []string {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
@@ -2328,12 +2332,9 @@ func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl, filteredMap ma
 
 		if cache.workload.ShareNetNS == "" {
 			workloadIDs = append(workloadIDs, cache.workload.ID)
-			getFilteredVulTraits(cache.workload.ID, cache.vulTraits, filteredMap)
-
 			for child := range cache.children.Iter() {
 				if childCache, ok := wlCacheMap[child.(string)]; ok {
 					workloadIDs = append(workloadIDs, childCache.workload.ID)
-					getFilteredVulTraits(childCache.workload.ID, childCache.vulTraits, filteredMap)
 				}
 			}
 		}
@@ -2341,7 +2342,7 @@ func (m CacheMethod) GetAllWorkloadsID(acc *access.AccessControl, filteredMap ma
 	return workloadIDs
 }
 
-func (m CacheMethod) GetAllHostsID(acc *access.AccessControl, filteredMap map[string]bool) []string {
+func (m CacheMethod) GetAllHostsID(acc *access.AccessControl) []string {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
@@ -2352,33 +2353,21 @@ func (m CacheMethod) GetAllHostsID(acc *access.AccessControl, filteredMap map[st
 		}
 
 		hostIDs = append(hostIDs, cache.host.ID)
-		getFilteredVulTraits(cache.host.ID, cache.vulTraits, filteredMap)
 	}
 	return hostIDs
 }
 
-func (m CacheMethod) GetPlatformID(acc *access.AccessControl, filteredMap map[string]bool) string {
+func (m CacheMethod) GetPlatformID(acc *access.AccessControl) string {
 	scanMutexRLock()
 	defer scanMutexRUnlock()
 
 	if acc.Authorize(&share.CLUSHost{}, nil) {
-		if info, ok := scanMap[common.ScanPlatformID]; ok {
-			getFilteredVulTraits(common.ScanPlatformID, info.vulTraits, filteredMap)
+		if _, ok := scanMap[common.ScanPlatformID]; ok {
 			return common.ScanPlatformID
 		}
 	}
 
 	return ""
-}
-
-func getFilteredVulTraits(id string, vulTraits []*scanUtils.VulTrait, filteredMap map[string]bool) {
-	for _, v := range vulTraits {
-		if v.IsFiltered() {
-			key := fmt.Sprintf("%s;%s", id, v.Name)
-			filteredMap[key] = true
-			filteredMap[v.Name] = true
-		}
-	}
 }
 
 func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {

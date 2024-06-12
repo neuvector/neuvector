@@ -13,6 +13,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -35,7 +36,7 @@ type ScanInterface interface {
 	StopRegistry(name string) error
 	GetFedRegistryCache(getCfg, getNames bool) ([]*share.CLUSRegistryConfig, utils.Set)
 	CheckRegistry(name string) bool
-	GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl, filteredMap map[string]bool) ([]string, error)
+	GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) ([]string, error)
 
 	// GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vpf scanUtils.VPFInterface) []*nvsysadmission.ScannedImageSummary
 	// RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSummary, vpf scanUtils.VPFInterface) (utils.Set, []string, []string)
@@ -46,8 +47,9 @@ type ScanInterface interface {
 // --
 
 type imageSummary struct {
-	summary *share.CLUSRegistryImageSummary
-	cache   *imageInfoCache
+	summary  *share.CLUSRegistryImageSummary
+	cache    *imageInfoCache
+	vulNames utils.Set
 }
 
 func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, c *imageInfoCache, vpf scanUtils.VPFInterface) {
@@ -55,9 +57,10 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 		key := share.CLUSRegistryImageDataKey(rs.config.Name, id)
 		if report := clusHelper.GetScanReport(key); report != nil {
 			var criticals, highs, meds []string
-			alives := vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
+			localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
+			alives := vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 			criticals, highs, meds, _, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
-			c.criticalVuls = len(criticals)
+      c.criticalVuls = len(criticals)
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.filteredTime = time.Now()
@@ -70,7 +73,8 @@ func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, v
 		if c, ok := rs.cache[id]; ok {
 			if s, ok := sumMap[id]; !ok || sum.ScannedAt.After(s.summary.ScannedAt) {
 				refreshScanCache(rs, id, sum, c, vpf)
-				sumMap[id] = &imageSummary{summary: sum, cache: c}
+				sumMap[id] = &imageSummary{summary: sum, cache: c, vulNames: utils.NewSet()}
+				getCVENames(rs, id, sumMap[id].vulNames, vpf)
 			}
 		}
 	}
@@ -232,11 +236,9 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			Modules:             s.cache.modules,
 			Verifiers:           s.cache.signatureVerifiers,
 		}
-		for _, v := range s.cache.vulTraits {
-			if !v.IsFiltered() {
-				summary.VulNames.Add(v.Name)
-			}
-		}
+
+		summary.VulNames = s.vulNames
+
 		if s.cache.vulInfo != nil {
 			summary.CriticalVulInfo, _ = s.cache.vulInfo[share.VulnSeverityCritical]
 			summary.HighVulInfo, _ = s.cache.vulInfo[share.VulnSeverityHigh]
@@ -449,7 +451,9 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
+				reportVuls, _ := db.GetVulnerability(id)
+				localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -459,7 +463,9 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
+					reportVuls, _ := db.GetVulnerability(id)
+					localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
 					nmap[id] = images2IDNames(rs, sum)
 				}
 			}
@@ -512,9 +518,35 @@ func (m *scanMethod) GetRegistryBenches(name string, tagMap map[string][]string,
 	return cmap, nmap, nil
 }
 
+func (m *scanMethod) getAllRegistryImageReport(id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
+	rpt, _ := m.GetRegistryImageReport(common.RegistryRepoScanName, id, vpf, showTag, tagMap, acc)
+	if rpt != nil {
+		return rpt, nil
+	}
+
+	rpt, _ = m.GetRegistryImageReport(common.RegistryFedRepoScanName, id, vpf, showTag, tagMap, acc)
+	if rpt != nil {
+		return rpt, nil
+	}
+
+	regs := regMapToArray(true, true)
+	for _, rs := range regs {
+		rpt, _ = m.GetRegistryImageReport(rs.config.Name, id, vpf, showTag, tagMap, acc)
+		if rpt != nil {
+			return rpt, nil
+		}
+	}
+
+	return nil, common.ErrObjectNotFound
+}
+
 func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
 	var rs *Registry
 	var ok bool
+
+	if name == common.RegistryAllName {
+		return m.getAllRegistryImageReport(id, vpf, showTag, tagMap, acc)
+	}
 
 	if name == common.RegistryRepoScanName {
 		rs = repoScanRegistry
@@ -550,7 +582,16 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			rrpt.Cmds = c.cmds
 
 			refreshScanCache(rs, id, sum, c, vpf)
-			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, showTag, false)
+
+			reportVuls, err := db.GetVulnerability(id)
+			if err != nil {
+				return nil, err
+			}
+
+			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+			vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
+			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
+
 			// The checks are still to be filtered
 			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
 
@@ -909,7 +950,7 @@ func (m *scanMethod) TestRegistry(ctx context.Context, config *share.CLUSRegistr
 	return nil
 }
 
-func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl, filteredMap map[string]bool) ([]string, error) {
+func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterface, showTag string, acc *access.AccessControl) ([]string, error) {
 	var rs *Registry
 	var ok bool
 
@@ -929,45 +970,42 @@ func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterfac
 
 	allowed := make([]string, 0)
 
-	// sdb := scanUtils.GetScannerDB()
 	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
 		// To avoid authorize for every image - run faster.
-		for id, c := range rs.cache {
-			if sum, ok := rs.summary[id]; ok {
+		for id, _ := range rs.cache {
+			if _, ok := rs.summary[id]; ok {
 				allowed = append(allowed, id)
-
-				refreshScanCache(rs, id, sum, c, vpf)
-
-				// vpf handling
-				for _, v := range c.vulTraits {
-					if v.IsFiltered() {
-						key := fmt.Sprintf("%s;%s", id, v.Name)
-						filteredMap[key] = true
-						filteredMap[v.Name] = true
-					}
-				}
 			}
 		}
 	} else {
-		for id, c := range rs.cache {
+		for id, _ := range rs.cache {
 			if sum, ok := rs.summary[id]; ok {
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					allowed = append(allowed, id)
-
-					refreshScanCache(rs, id, sum, c, vpf)
-
-					// vpf handling
-					for _, v := range c.vulTraits {
-						if v.IsFiltered() {
-							key := fmt.Sprintf("%s;%s", id, v.Name)
-							filteredMap[key] = true
-							filteredMap[v.Name] = true
-						}
-					}
 				}
 			}
 		}
 	}
 
 	return allowed, nil
+}
+
+func getCVENames(rs *Registry, id string, vulNames utils.Set, vpf scanUtils.VPFInterface) error {
+	Vuls, err := db.GetVulnerability(id)
+	if err != nil {
+		return err
+	}
+
+	localVulTraits := scanUtils.ExtractVulnerability(Vuls)
+
+	if sum, ok := rs.summary[id]; ok && sum.Status == api.ScanStatusFinished {
+		vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
+		for _, v := range localVulTraits {
+			if !v.IsFiltered() {
+				vulNames.Add(v.Name)
+			}
+		}
+	}
+
+	return nil
 }

@@ -54,8 +54,7 @@ type imageInfoCache struct {
 	criticalVulsWithFix            int
 	highVulsWithFix                int
 	vulScore                       float32
-	vulTraits                      []*scanUtils.VulTrait
-	vulInfo                        map[string]map[string]share.CLUSScannedVulInfo // 1st key is "Critical"/"High"/"Medium". 2nd key is "{vul_name}::{package_name}"
+	vulInfo                        map[string]map[string]share.CLUSScannedVulInfo // 1st key is "critical/high"/"medium". 2nd key is "{vul_name}::{package_name}"
 	lowVulInfo                     []share.CLUSScannedVulInfoSimple
 	layers                         []string
 	envs                           []string
@@ -469,24 +468,25 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 			// Filter the vulnerabilities
 			c.filteredTime = time.Now()
-			c.vulTraits = scanUtils.ExtractVulnerability(report.Vuls)
+			localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
 			if vpf != nil {
-				alives = vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
+				alives = vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 			} else {
 				alives = utils.NewSet()
-				for _, t := range c.vulTraits {
+				for _, t := range localVulTraits {
 					alives.Add(t.Name)
 				}
 			}
 
-			criticals, highs, meds, lows, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, c.vulTraits, alives)
-			if info, ok := c.vulInfo[share.VulnSeverityCritical]; ok {
+			criticals, highs, meds, lows, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, localVulTraits, alives)
+      if info, ok := c.vulInfo[share.VulnSeverityCritical]; ok {
 				fixedCriticalsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
 				for _, v := range info {
 					// ks is in format "{vul name}::{package name}"
 					fixedCriticalsInfo = append(fixedCriticalsInfo, scanUtils.FixedVulInfo{PubTS: v.PublishDate})
 				}
 			}
+
 			if info, ok := c.vulInfo[share.VulnSeverityHigh]; ok {
 				fixedHighsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
 				for _, v := range info {
@@ -522,10 +522,10 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 					var layerAlives utils.Set // vul names that are not filtered
 
 					if vpf != nil {
-						layerAlives = vpf.FilterVulTraits(c.vulTraits, images2IDNames(rs, sum))
+						layerAlives = vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 					} else {
 						layerAlives = utils.NewSet()
-						for _, t := range c.vulTraits {
+						for _, t := range localVulTraits {
 							layerAlives.Add(t.Name)
 						}
 					}
@@ -550,33 +550,14 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				}
 			}
 
-			sdb := scanUtils.GetScannerDB()
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, c.vulTraits, "", false)
 			dbAssetVul := getImageDbAssetVul(c, sum, criticals, highs, meds, lows)
+			dbAssetVul.Vuls = report.Vuls
 
-			// extract all package info, and assign to dbAssetVul
-			dbAssetVul.Packages = make([]*db.DbVulnResourcePackageVersion2, 0)
-			var cveLists utils.Set = utils.NewSet()
-			for _, vul := range vuls {
-				vulPackage := &db.DbVulnResourcePackageVersion2{
-					CVEName:        vul.Name,
-					PackageName:    vul.PackageName,
-					PackageVersion: vul.PackageVersion,
-					FixedVersion:   vul.FixedVersion,
-				}
-
-				fix := "nf"
-				if len(vul.FixedVersion) > 0 {
-					fix = "wf"
-				}
-				cveLists.Add(fmt.Sprintf("%s;%s;%s", vul.Name, vul.DbKey, fix))
-				dbAssetVul.Packages = append(dbAssetVul.Packages, vulPackage)
-			}
-
-			b, err := json.Marshal(cveLists.ToStringSlice())
+			b, err := json.Marshal(images2IDNames(rs, sum))
 			if err == nil {
-				dbAssetVul.CVE_lists = string(b)
+				dbAssetVul.Idns = string(b)
 			}
+
 			db.PopulateAssetVul(dbAssetVul)
 		}
 	}

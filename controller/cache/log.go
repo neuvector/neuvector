@@ -1786,6 +1786,10 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 				rlog.HighCnt, _ = strconv.Atoi(v)
 			case nvsysadmission.AuditLogPropMedVulsCnt:
 				rlog.MediumCnt, _ = strconv.Atoi(v)
+			case nvsysadmission.AuditLogPropPVCName:
+				rlog.PVCName = v
+			case nvsysadmission.AuditLogPVCStorageClassName:
+				rlog.PVCStorageClassName = v
 			}
 		}
 	} else if audit.ID >= share.CLUSAuditAwsLambdaScanWarning && audit.ID <= share.CLUSAuditAwsLambdaScanNormal {

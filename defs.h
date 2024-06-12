@@ -198,6 +198,7 @@ typedef struct {
 #define DPSESS_FLAG_LINK_LOCAL    0x0080 // link local(169.254.0.0)
 #define DPSESS_FLAG_TMP_OPEN      0x0100 // temp open connection
 #define DPSESS_FLAG_UWLIP         0x0200 // uwl connection
+#define DPSESS_FLAG_CHK_NBE       0x0400 // check nbe
 
 #define DP_POLICY_APPLY_EGRESS  0x1
 #define DP_POLICY_APPLY_INGRESS 0x2
@@ -206,9 +207,10 @@ typedef struct {
 #define DP_POLICY_ACTION_LEARN         1
 #define DP_POLICY_ACTION_ALLOW         2
 #define DP_POLICY_ACTION_CHECK_VH      3
-#define DP_POLICY_ACTION_CHECK_APP     4
-#define DP_POLICY_ACTION_VIOLATE       5
-#define DP_POLICY_ACTION_DENY          6
+#define DP_POLICY_ACTION_CHECK_NBE     4
+#define DP_POLICY_ACTION_CHECK_APP     5
+#define DP_POLICY_ACTION_VIOLATE       6
+#define DP_POLICY_ACTION_DENY          7
 
 #define DP_POLICY_APP_ANY      0
 #define DP_POLICY_APP_UNKNOWN  0xffffffff
@@ -263,6 +265,13 @@ typedef struct {
     uint8_t  XffIP[16];
     uint16_t XffApp;
     uint16_t XffPort;
+    uint32_t EpSessCurIn;
+    uint32_t EpSessIn1;
+    uint64_t EpByteIn1;
+    uint32_t EpSessIn12;
+    uint64_t EpByteIn12;
+    uint32_t EpSessIn60;
+    uint64_t EpByteIn60;
 } DPMsgSession;
     
 typedef struct {
@@ -402,25 +411,26 @@ typedef struct {
     uint32_t DlpNameHash;
 } DPMsgThreatLog;
 
-#define DPCONN_FLAG_INGRESS       0x01
-#define DPCONN_FLAG_EXTERNAL      0x02
-#define DPCONN_FLAG_XFF           0x04
-#define DPCONN_FLAG_SVC_EXTIP     0x08
-#define DPCONN_FLAG_MESH_TO_SVR   0x10
-#define DPCONN_FLAG_LINK_LOCAL    0x20
-#define DPCONN_FLAG_TMP_OPEN      0x40
-#define DPCONN_FLAG_UWLIP         0x80
+#define DPCONN_FLAG_INGRESS       0x0001
+#define DPCONN_FLAG_EXTERNAL      0x0002
+#define DPCONN_FLAG_XFF           0x0004
+#define DPCONN_FLAG_SVC_EXTIP     0x0008
+#define DPCONN_FLAG_MESH_TO_SVR   0x0010
+#define DPCONN_FLAG_LINK_LOCAL    0x0020
+#define DPCONN_FLAG_TMP_OPEN      0x0040
+#define DPCONN_FLAG_UWLIP         0x0080
+#define DPCONN_FLAG_CHK_NBE       0x0100
 
 typedef struct {
     uint8_t  EPMAC[6];
     uint8_t  IPProto;
-    uint8_t  Flags;
+    uint8_t  Padding;
     uint16_t ServerPort;
     uint16_t ClientPort;
     uint8_t  ClientIP[16];
     uint8_t  ServerIP[16];
     uint16_t EtherType;
-    uint16_t Padding;
+    uint16_t Flags;
     uint32_t Bytes;  // Delta to last sent
     uint32_t Sessions;
     uint32_t FirstSeenAt;
@@ -431,6 +441,13 @@ typedef struct {
     uint32_t PolicyId;
     uint32_t Violates;
     uint32_t ThreatID;
+    uint32_t EpSessCurIn;
+    uint32_t EpSessIn1;
+    uint64_t EpByteIn1;
+    uint32_t EpSessIn12;
+    uint64_t EpByteIn12;
+    uint32_t EpSessIn60;
+    uint64_t EpByteIn60;
 } DPMsgConnect;
 
 typedef struct {

@@ -249,7 +249,7 @@ func (s *DockerDriver) GetContainerLogs(fromDocker bool, id string, start, limit
 			return nil, fmt.Errorf("Get container log from docker fail:%v", err)
 		} else {
 			defer r.Close()
-			if dat, err := ioutil.ReadAll(r); err != nil {
+			if dat, err := io.ReadAll(r); err != nil {
 				return nil, fmt.Errorf("Read container log fail:%v", err)
 			} else {
 				return dat, nil

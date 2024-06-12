@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "github.com/neuvector/k8s/apis/core/v1"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/global"
@@ -72,6 +72,15 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 			}
 		}
 	}
+
+	if obj, err = global.ORCH.GetResource(RscTypeConfigMap, NvAdmSvcNamespace, "metering-archive"); err == nil {
+		if cm, ok := obj.(*corev1.ConfigMap); cm == nil || !ok {
+			err = fmt.Errorf("Error: Unknown type")
+		} else if cm.Data != nil {
+			resp.MeteringArchiveData, _ = cm.Data["archive"]
+		}
+	}
+
 	if err != nil || len(resp.CspErrors) > 0 {
 		if err != nil {
 			resp.NvError = err.Error()

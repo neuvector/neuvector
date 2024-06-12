@@ -3,13 +3,15 @@ package scan
 import (
 	"testing"
 
-	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
+	rpmdb "github.com/neuvector/go-rpmdb/pkg"
 )
 
 func TestSLESPackageList(t *testing.T) {
 	db, err := rpmdb.Open("testdata/Packages.sles")
 	if err != nil {
 		t.Errorf(err.Error())
+	} else {
+		defer db.Close()
 	}
 
 	pkgs, err := db.ListPackages()
@@ -35,6 +37,8 @@ func TestUbiPackageList(t *testing.T) {
 	db, err := rpmdb.Open("testdata/Packages.ubi")
 	if err != nil {
 		t.Errorf("%s", err.Error())
+	} else {
+		defer db.Close()
 	}
 
 	pkgs, err := db.ListPackages()

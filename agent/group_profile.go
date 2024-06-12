@@ -823,7 +823,7 @@ func applyFileGroupProfile(c *containerData) bool {
 		}
 
 		//
-		fileWatcher.ContainerCleanup(c.pid)
+		fileWatcher.ContainerCleanup(c.pid, false)
 		if len(file.Filters) > 0 && c.pid != 0 {
 			fileWatcher.StartWatch(c.id, c.pid, config, c.capBlock, false)
 		}
@@ -905,7 +905,7 @@ func workloadLeaveGroup(c *containerData) {
 	// log.WithFields(log.Fields{"cid": id}).Debug("GRP: ")
 	// remove monitors
 	prober.RemoveProcessControl(c.id)
-	fileWatcher.ContainerCleanup(c.pid)
+	fileWatcher.ContainerCleanup(c.pid, true)
 
 	grpCacheLock.Lock()
 	for name, grpCache := range grpProfileCacheMap {
@@ -938,7 +938,7 @@ func ObtainGroupProcessPolicy(id string) (*share.CLUSProcessProfile, bool) {
 		id = ""
 	}
 
-	if isNeuvectorContainerById(id) { // NeuVector: no group process profile
+	if _, ok := isNeuvectorContainerById(id); ok { // NeuVector: no group process profile
 		return nil, true
 	}
 
@@ -1003,7 +1003,7 @@ func cbEstimateDeniedProcessdByGroup(id, name, path string) (string, string) {
 		return svcGroup, share.CLUSReservedUuidNotAlllowed
 	}
 
-	if isNeuvectorContainerById(id) { // NeuVector
+	if _, ok := isNeuvectorContainerById(id); ok {  // NeuVector
 		log.WithFields(log.Fields{"id": id, "name": name, "path": path}).Info("GRP: NV Protect")
 		return share.GroupNVProtect, share.CLUSReservedUuidNotAlllowed
 	}
@@ -1061,7 +1061,7 @@ func cbEstimateFileAlertByGroup(id, path string, bBlocked bool) string {
 		return dgroup
 	}
 
-	if isNeuvectorContainerById(id) { // NeuVector
+	if _, ok := isNeuvectorContainerById(id); ok {  // NeuVector
 		log.WithFields(log.Fields{"id": id, "path": path, "bBlocked": bBlocked}).Info("GRP: NV Protect")
 		return share.GroupNVProtect
 	}

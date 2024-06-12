@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -82,7 +82,7 @@ func handlerDomainConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTDomainConfigData
 	err := json.Unmarshal(body, &rconf)
@@ -143,7 +143,7 @@ func handlerDomainEntryConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	name, _ = url.PathUnescape(name)
 
 	// Read body
-	body, _ := ioutil.ReadAll(r.Body)
+	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTDomainEntryConfigData
 	err := json.Unmarshal(body, &rconf)

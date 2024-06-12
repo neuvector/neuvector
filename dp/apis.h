@@ -146,6 +146,7 @@ typedef struct io_ep_ {
     uint16_t dlp_detect_ver;
     bool dlp_inside;
     bool waf_inside;
+    bool nbe;
 } io_ep_t;
 
 typedef struct io_mac_ {
