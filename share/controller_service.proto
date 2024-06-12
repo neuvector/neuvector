@@ -138,9 +138,13 @@ message CLUSConnection {
 	bool UwlIp = 32;
 	string FQDN = 33;
 	uint32 EpSessCurIn = 34;
-	uint32 EpSessIn60 = 35;
-	uint64 EpByteIn60 = 36;
-	bool Nbe = 37;
+	uint32 EpSessIn1 = 35;
+	uint64 EpByteIn1 = 36;
+	uint32 EpSessIn12 = 37;
+	uint64 EpByteIn12 = 38;
+	uint32 EpSessIn60 = 39;
+	uint64 EpByteIn60 = 40;
+	bool Nbe = 41;
 }
 
 message CLUSConnectionArray {

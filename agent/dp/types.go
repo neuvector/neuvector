@@ -52,6 +52,10 @@ type Connection struct {
 	TmpOpen      bool
 	UwlIp        bool
 	EpSessCurIn  uint32
+	EpSessIn1    uint32
+	EpByteIn1    uint64
+	EpSessIn12   uint32
+	EpByteIn12   uint64
 	EpSessIn60   uint32
 	EpByteIn60   uint64
 	Nbe          bool
