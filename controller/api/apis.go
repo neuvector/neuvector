@@ -2156,6 +2156,10 @@ type RESTScanBrief struct {
 	CVEDBCreateTime  string `json:"cvedb_create_time"`
 }
 
+func (sb *RESTScanBrief) CVECount() int {
+	return sb.CriticalVuls + sb.HighVuls + sb.MedVuls
+}
+
 type RESTScanPlatformSummary struct {
 	Platform   string `json:"platform"`
 	K8sVersion string `json:"kube_version"`

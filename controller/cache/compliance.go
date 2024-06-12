@@ -280,7 +280,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 
 			// workload cve
 			if cache.scanBrief != nil {
-				cve := cache.scanBrief.HighVuls + cache.scanBrief.MedVuls
+				cve := cache.scanBrief.CVECount()
 				switch mode {
 				case share.PolicyModeLearn:
 					s.CVEs.DiscoverCVEs += cve
@@ -303,7 +303,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 			continue
 		}
 		if cache.scanBrief != nil && scoreHost {
-			s.CVEs.HostCVEs += cache.scanBrief.HighVuls + cache.scanBrief.MedVuls
+			s.CVEs.HostCVEs += cache.scanBrief.CVECount()
 		}
 		s.Hosts++
 	}
@@ -316,7 +316,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 	scanMutexRLock()
 	if acc.Authorize(&share.CLUSHost{}, nil) {
 		if info, ok := scanMap[common.ScanPlatformID]; ok && info.brief != nil {
-			s.CVEs.PlatformCVEs = info.brief.HighVuls + info.brief.MedVuls
+			s.CVEs.PlatformCVEs = info.brief.CVECount()
 		}
 	}
 	scanMutexRUnlock()
