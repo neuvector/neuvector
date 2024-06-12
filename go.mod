@@ -57,7 +57,6 @@ require (
 	google.golang.org/grpc v1.62.1
 	google.golang.org/grpc/security/advancedtls v0.0.0-20240408170116-ec257b4e1cec
 	gopkg.in/ldap.v2 v2.5.1
-	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.3
 	k8s.io/apiextensions-apiserver v0.29.3
@@ -136,6 +135,7 @@ require (
 
 require (
 	github.com/alitto/pond v1.8.3
+	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
 )
