@@ -331,6 +331,7 @@ func (e *Engine) IsAllowedByParentApp(service, id, name, pname, ppath string, pg
 func buildCustomizedProfile(serviceGroup, mode string, whtLst, blackLst []ProcProfileBrief) *share.CLUSProcessProfile {
 	profile := &share.CLUSProcessProfile{
 		Group:        serviceGroup,
+		Baseline:     share.ProfileZeroDrift,
 		AlertDisable: false,
 		HashEnable:   false,
 		Mode:         mode,
@@ -394,7 +395,6 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"sh", "*"},
 		{"bash", "*"},	// arm64
 		{"dash", "*"},
-		{"kill", "*"},
 
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
@@ -404,7 +404,6 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// below entries for debug purpose : docker exec -ti manager sh
 		{"ip", "/sbin/ip"},
-		{"ls", "*"},
 		{"tee", "/usr/bin/tee"},
 		{"stty", "*"},  // python
 
@@ -474,7 +473,6 @@ func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProf
 		{"ps", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	          // arm64
-		{"ls", "*"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -494,7 +492,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"consul", "*"}, // monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
-		{"nstools", "/usr/local/bin/nstools"},
 		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"opa", "/usr/local/bin/opa"},
 
@@ -506,11 +503,9 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"cat", "*"},                     // k8s readiness and openshift operations
-		{"kill", "*"},
 		// busybox
 		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
 		{"mv", "/bin/busybox"},
@@ -520,8 +515,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// below entries for debug purpose : docker exec -ti allinone sh
 		{"ip", "/sbin/ip"},
-		{"top", "/usr/bin/top"}, // new procps package
-		{"kill", "/bin/kill"},   // new procps package
 		{"ls", "/bin/busybox"},
 		{"nslookup", "/bin/busybox"},
 
@@ -555,16 +548,13 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getconf", "/usr/bin/getconf"},  // get configuration values
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
-		{"lsof", "/usr/bin/lsof"},        // new lsof package
 		{"curl", "/usr/bin/curl"},        // cis benchmark
 		{"jq", "/usr/bin/jq"},            // cis benchmark
 		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"dash", "*"},
-		{"kill", "*"},
 
 		// busybox
 		{"busybox", "/bin/busybox"},      // below busybox and its symbolic links
@@ -623,12 +613,10 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getconf", "/usr/bin/getconf"},  // get configuration values
 		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
-		{"lsof", "/usr/bin/lsof"},        // new lsof package
 		{"curl", "/usr/bin/curl"},        // cis benchmark
 		{"jq", "/usr/bin/jq"},            // cis benchmark
 		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
 		{"ps", "*"},
-		{"lsof", "*"},
 		{"sh", "*"},
 		{"bash", "*"},	                  // arm64
 		{"dash", "*"},
