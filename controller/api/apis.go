@@ -382,6 +382,7 @@ type RESTServerOIDC struct {
 	DefaultRole      string                    `json:"default_role"`
 	RoleGroups       map[string][]string       `json:"role_groups,omitempty"`        // role -> groups
 	GroupMappedRoles []*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+	UseProxy         bool                      `json:"use_proxy,omitempty"`
 }
 
 type RESTServer struct {
@@ -465,6 +466,7 @@ type RESTServerOIDCConfig struct {
 	DefaultRole      *string                    `json:"default_role"`
 	RoleGroups       *map[string][]string       `json:"role_groups,omitempty"`        // role -> groups. deprecated since 4.2
 	GroupMappedRoles *[]*share.GroupRoleMapping `json:"group_mapped_roles,omitempty"` // group -> (role -> domains)
+	UseProxy         *bool                      `json:"use_proxy"`
 }
 
 type RESTServerOIDCConfigCfgMap struct {
@@ -1769,6 +1771,8 @@ type RESTSystemConfigConfig struct {
 	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
 	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
 	RemoteRepositories        *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
+	EnableTLSVerification     *bool                            `json:"enable_tls_verification"`
+	GlobalCaCerts             *[]string                        `json:"cacerts"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
@@ -1842,6 +1846,11 @@ type RESTSystemConfigProxyCfgV2 struct {
 	RegistryHttpsProxyCfg    *RESTProxyConfig `json:"registry_https_proxy_cfg,omitempty"`
 }
 
+type RESTSystemConfigTlsCfg struct {
+	EnableTLSVerification *bool     `json:"enable_tls_verification"`
+	GlobalCaCerts         *[]string `json:"cacerts"`
+}
+
 type RESTSystemConfigMiscCfgV2 struct {
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 	UnusedGroupAging   *uint8    `json:"unused_group_aging,omitempty"`
@@ -1862,6 +1871,7 @@ type RESTSystemConfigConfigV2 struct {
 	SyslogCfg          *RESTSystemConfigSyslogCfgV2     `json:"syslog_cfg,omitempty"`
 	AuthCfg            *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
 	ProxyCfg           *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
+	TlsCfg             *RESTSystemConfigTlsCfg          `json:"tls_cfg,omitempty"`
 	Webhooks           *[]*RESTWebhook                  `json:"webhooks,omitempty"`
 	IbmsaCfg           *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
 	ScannerAutoscale   *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
@@ -1935,6 +1945,8 @@ type RESTSystemConfig struct {
 	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
 	CspType                   string                    `json:"csp_type"`
 	RemoteRepositories        []RESTRemoteRepository    `json:"remote_repositories"`
+	EnableTLSVerification     bool                      `json:"enable_tls_verification"`
+	GlobalCaCerts             []string                  `json:"cacerts"`
 }
 
 type RESTSystemConfigData struct {
@@ -2022,6 +2034,11 @@ type RESTSystemConfigModeAutoV2 struct {
 	ModeAutoM2PDuration int64 `json:"mode_auto_m2p_duration"`
 }
 
+type RESTSystemConfigTls struct {
+	EnableTLSVerification bool     `json:"enable_tls_verification"`
+	GlobalCaCerts         []string `json:"cacerts"`
+}
+
 type RESTSystemConfigV2 struct {
 	NewSvc             RESTSystemConfigNewSvcV2   `json:"new_svc"`
 	Syslog             RESTSystemConfigSyslogV2   `json:"syslog"`
@@ -2034,6 +2051,7 @@ type RESTSystemConfigV2 struct {
 	ModeAuto           RESTSystemConfigModeAutoV2 `json:"mode_auto"`
 	ScannerAutoscale   RESTSystemConfigAutoscale  `json:"scanner_autoscale"`
 	RemoteRepositories []RESTRemoteRepository     `json:"remote_repositories"`
+	TlsCfg             RESTSystemConfigTls        `json:"tls_cfg"`
 }
 
 type RESTIBMSAConfig struct {

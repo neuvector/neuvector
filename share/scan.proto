@@ -181,3 +181,11 @@ message ScanAwsLambdaRequest {
     string FuncLink = 4;
     bool ScanSecrets = 5;
 }
+
+message ScannerSettings {
+    bool EnableTLSVerification = 1;
+    string CACerts = 2;
+    string httpProxy = 3;
+    string httpsProxy = 4;
+    string noProxy = 5;
+}

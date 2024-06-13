@@ -58,9 +58,13 @@ func ClientContext(ctx context.Context, client *http.Client) context.Context {
 }
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
-	client := http.DefaultClient
+	var client *http.Client
 	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
 		client = c
+	} else {
+		// We should have assigned oauth2.HTTPClient in all paths.
+		// For compliance reason, we don't fallback.
+		return nil, errors.New("failed to find http.Client")
 	}
 	return client.Do(req.WithContext(ctx))
 }
