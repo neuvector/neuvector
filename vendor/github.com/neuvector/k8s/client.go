@@ -30,6 +30,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -332,10 +333,31 @@ func newClient(cluster Cluster, user AuthInfo, namespace string) (*Client, error
 	return client, nil
 }
 
+// [2024/June]
+type jsonStatus metav1.Status
+
+func (s *jsonStatus) UnmarshalJSON(data []byte) error {
+	var j metav1.Status
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
+	}
+	*s = jsonStatus(j)
+	return nil
+}
+
 // APIError is an error from a unexpected status code.
 type APIError struct {
+	// [2024/June]
+	// unmarshal() in codec.go checks whether the type implements json.Unmarshaler but metav1.Status doesn't implement json.Unmarshaler
+	// we don't want to change unmarshal() behavior simply because of type metav1.Status
+	// neither do we want to change k8s.io/apimachinery/pkg/apis/meta/v1 for this issue
+	// so we define type jsonStatus backed by metav1.Status & implement json.Unmarshaler for jsonStatus
+	//
+	//Status *metav1.Status
+	//
 	// The status object returned by the Kubernetes API,
-	Status *metav1.Status
+
+	Status *jsonStatus
 
 	// Status code returned by the HTTP request.
 	//
@@ -361,7 +383,7 @@ func checkStatusCode(contentType string, statusCode int, body []byte) error {
 }
 
 func newAPIError(contentType string, statusCode int, body []byte) error {
-	status := new(metav1.Status)
+	status := new(jsonStatus)
 	if err := unmarshal(body, contentType, status); err != nil {
 		return fmt.Errorf("decode error status %d: %v", statusCode, err)
 	}

@@ -69,7 +69,7 @@ func (w *watcherJSON) Next(r metav1.Object) (string, error) {
 			return "", fmt.Errorf("decoding event error: %v", err)
 		}
 		return event.Type, &APIError{
-			Status: status,
+			Status: (*jsonStatus)(status),
 			Code:   int(status.Code),
 		}
 	}
@@ -101,7 +101,7 @@ func (w *watcherPB) Next(r metav1.Object) (string, error) {
 			return "", fmt.Errorf("decoding event error: %v", err)
 		}
 		return event.Type, &APIError{
-			Status: status,
+			Status: (*jsonStatus)(status),
 			Code:   int(status.Code),
 		}
 	}
