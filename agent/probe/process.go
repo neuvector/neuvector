@@ -3293,7 +3293,7 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 	}
 	if bAdd {
 		if rootPid != 0 {
-			if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
+			if ok, files := p.fsnCtr.AddContainer(id, cPath, "", rootPid); !ok {
 				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
 			} else {
 				p.lockProcMux()
@@ -3323,11 +3323,11 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 	}
 }
 
-func (p *Probe) HandleAnchorNvProtectChange(bAdd bool, id, cPath string, rootPid int) {
+func (p *Probe) HandleAnchorNvProtectChange(bAdd bool, id, cPath, role string, rootPid int) {
 	// log.WithFields(log.Fields{"bAdd": bAdd,"id": id, "cPath": cPath, "rootPid": rootPid}).Debug()
 	if bAdd {
 		if rootPid != 0 {
-			if ok, _ := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
+			if ok, _ := p.fsnCtr.AddContainer(id, cPath, role, rootPid); !ok {
 				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
 			}
 		}

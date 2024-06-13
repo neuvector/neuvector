@@ -1715,7 +1715,7 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// process blocker per container: can be removed by its container id
 		// applyProcessProfilePolicy(c, group)
 		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
-		prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, c.pid)
+		prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, role, c.pid)
 		// file monitors : protect mode, core-definitions, only modification alerts
 		fileWatcher.ContainerCleanup(info.Pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
@@ -1804,7 +1804,7 @@ func stopNeuVectorMonitor(c *containerData) {
 		pe.DeleteProcessPolicy(group)
 	}
 
-	prober.HandleAnchorNvProtectChange(false, c.id, c.upperDir, c.pid)
+	prober.HandleAnchorNvProtectChange(false, c.id, c.upperDir, "", c.pid)
 	log.WithFields(log.Fields{"id": c.id, "pid": c.pid}).Debug("FMON:")
 	fileWatcher.ContainerCleanup(c.pid, true)
 
