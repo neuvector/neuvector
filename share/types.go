@@ -91,9 +91,10 @@ const (
 	FlavorOpenShift = "OpenShift"
 	FlavorRancher   = "Rancher"
 	FlavorIKE       = "IKE"
-	FlavorGKE       = "GKE"
-	FlavorAKS 	   	= "AKS"
-	FlavorEKS 	   	= "EKS"
+
+	CloudGKE = "GKE"
+	CloudAKS = "AKS"
+	CloudEKS = "EKS"
 
 	NetworkFlannel   = "Flannel"
 	NetworkCalico    = "Calico"
