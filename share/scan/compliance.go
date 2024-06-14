@@ -2814,13 +2814,13 @@ type PrimeCISBenchmarkConfig struct {
 	CISChecksWithTags []CISCheckWithTags `yaml:"checks"`
 }
 
-func InitComplianceMeta(platform, flavor string) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+func InitComplianceMeta(platform, flavor, cloudPlatform string) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	// Ensuring initialization happens only once
 	once.Do(func() {
 		// For fast rollback to original setting when fail
 		PrepareBackup()
 		// Check the current k8s version, then read the correct folder
-		GetCISFolder(platform, flavor)
+		GetCISFolder(platform, flavor, cloudPlatform)
 		GetK8sCISMeta(remediationFolder, cisItems)
 		PrepareBenchMeta(cisItems, &complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
 	})
@@ -2837,7 +2837,7 @@ func GetComplianceMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	if complianceMetas == nil || complianceMetaMap == nil {
 		// if this is still nil, wait for the InitComplianceMeta
 		// scanUtils.InitComplianceMeta() is called in controller\controller.go before cache/rest call GetComplianceMeta => we can assume the platform / flavor is correct at this point
-		return InitComplianceMeta("", "")
+		return InitComplianceMeta("", "", "")
 	}
 
 	if isUpdateComplianceMetaMap {
@@ -2932,10 +2932,10 @@ func DeepCopyRESTBenchCheck(orig api.RESTBenchCheck) api.RESTBenchCheck {
 	return copy
 }
 
-func GetCISFolder(platform, flavor string) {
+func GetCISFolder(platform, flavor, cloudPlatform string) {
 	if global.ORCH != nil {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
-		if platform == share.PlatformKubernetes && flavor == share.FlavorGKE {
+		if platform == share.PlatformKubernetes && cloudPlatform == share.CloudGKE {
 			kVer, err := version.NewVersion(k8sVer)
 			if err != nil {
 				cisVersion = gke140
@@ -2944,10 +2944,10 @@ func GetCISFolder(platform, flavor string) {
 			} else {
 				cisVersion = defaultCISVersion
 			}
-		} else if platform == share.PlatformKubernetes && flavor == share.FlavorAKS {
+		} else if platform == share.PlatformKubernetes && cloudPlatform == share.CloudAKS {
 			// Currently support AKS-1.4.0 only
 			cisVersion = aks140
-		} else if platform == share.PlatformKubernetes && flavor == share.FlavorEKS {
+		} else if platform == share.PlatformKubernetes && cloudPlatform == share.CloudEKS {
 			// Currently support EKS-1.4.0 only
 			cisVersion = eks140
 		} else if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
