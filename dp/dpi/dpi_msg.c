@@ -142,6 +142,10 @@ static void netify_session_log(DPMsgSession *dps)
     dps->XffApp = htons(dps->XffApp);
     dps->XffPort = htons(dps->XffPort);
     dps->EpSessCurIn = htonl(dps->EpSessCurIn);
+    dps->EpSessIn1 = htonl(dps->EpSessIn1);
+    dps->EpByteIn1 = htonll(dps->EpByteIn1);
+    dps->EpSessIn12 = htonl(dps->EpSessIn12);
+    dps->EpByteIn12 = htonll(dps->EpByteIn12);
     dps->EpSessIn60 = htonl(dps->EpSessIn60);
     dps->EpByteIn60 = htonll(dps->EpByteIn60);
 }

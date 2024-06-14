@@ -1662,7 +1662,7 @@ const unManagedWlProcDelaySlow = time.Duration(time.Minute * 8)
 const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
-const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
+const groupMetricCheckPeriod = time.Duration(time.Second * 10)
 
 var unManagedWlTimer *time.Timer
 

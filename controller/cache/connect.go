@@ -552,6 +552,25 @@ func CheckGroupMetric() {
 			grpBandwidthIn60 := uint32(grpmet.GroupByteIn60*8/uint64(60*MetSlotInterval)/1000000)//mbps
 			grpSessRateInVio := grpSessRateIn1
 			grpBandwidthInVio := grpBandwidthIn1
+			cctx.ConnLog.WithFields(log.Fields{
+				"GroupSessCurIn":    grpmet.GroupSessCurIn,
+				"GroupSessIn1":      grpmet.GroupSessIn1,
+				"GroupByteIn1":      grpmet.GroupByteIn1,
+				"GroupSessIn12":     grpmet.GroupSessIn12,
+				"GroupByteIn12":     grpmet.GroupByteIn12,
+				"GroupSessIn60":     grpmet.GroupSessIn60,
+				"GroupByteIn60":     grpmet.GroupByteIn60,
+				"grpSessCurIn":      grpSessCurIn,
+				"grpSessRateIn1":    grpSessRateIn1,
+				"grpBandwidthIn1":   grpBandwidthIn1,
+				"grpSessRateIn12":   grpSessRateIn12,
+				"grpBandwidthIn12":  grpBandwidthIn12,
+				"grpSessRateIn60":   grpSessRateIn60,
+				"grpBandwidthIn60":  grpBandwidthIn60,
+				"grpSessRateInVio":  grpSessRateInVio,
+				"grpBandwidthInVio": grpBandwidthInVio,
+			}).Debug()
+
 			if grpcache.group.GrpSessCur > 0 && grpSessCurIn > grpcache.group.GrpSessCur {
 				vioMet |= sessCurInViolation
 				grpmet.GroupSessCurIn = 0//reset
@@ -600,6 +619,12 @@ func CheckGroupMetric() {
 					grpmet.GroupByteIn60 = 0
 				}
 			}
+			cctx.ConnLog.WithFields(log.Fields{
+				"vioMet":            vioMet,
+				"grpSessCurIn":      grpSessCurIn,
+				"grpSessRateInVio":  grpSessRateInVio,
+				"grpBandwidthInVio": grpBandwidthInVio,
+			}).Debug()
 			if vioMet > 0 {
 				groupMetricViolationEvent(share.CLUSEvGroupMetricViolation, lgrpname, vioMet,
 					grpSessCurIn, grpSessRateInVio, grpBandwidthInVio)
@@ -848,6 +873,13 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"linkLocal":      conn.LinkLocal,
 			"fqdn":           conn.FQDN,
 			"nbe":            conn.Nbe,
+			"EpSessCurIn":    conn.EpSessCurIn,
+			"EpSessIn1":      conn.EpSessIn1,
+			"EpByteIn1":      conn.EpByteIn1,
+			"EpSessIn12":     conn.EpSessIn12,
+			"EpByteIn12":     conn.EpByteIn12,
+			"EpSessIn60":     conn.EpSessIn60,
+			"EpByteIn60":     conn.EpByteIn60,
 		}).Debug()
 
 		if policyApplyIngress {
