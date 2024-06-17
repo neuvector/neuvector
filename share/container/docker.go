@@ -242,6 +242,12 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		LogPath:     info.LogPath,
 	}
 
+	if info.Config != nil && info.Config.Healthcheck != nil {
+		// log.WithFields(log.Fields{"health": info.Config.Healthcheck}).Debug()
+		meta.Healthcheck = make([]string, len(info.Config.Healthcheck.Test))
+		copy(meta.Healthcheck, info.Config.Healthcheck.Test)
+	}
+
 	if info, err := d.client.InspectImage(meta.ImageID); err == nil {
 		meta.Author = info.Author
 		meta.ImgCreateAt = info.Created

@@ -85,6 +85,7 @@ type containerData struct {
 	examIntface    bool
 	scanCache      []byte
 	nvRole         string
+	healthCheck    []string			// docker: healthcheck commands
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -1691,14 +1692,14 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	// Send event to controller
 	if !isChild {
 		if c.pid != 0 {
-			prober.BuildProcessFamilyGroups(c.id, c.pid, true, info.Privileged)
+			prober.BuildProcessFamilyGroups(c.id, c.pid, true, info.Privileged, nil)
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
 			examNeuVectorInterface(c, changeInit)
 		}
 	} else {
 		if parent != nil && !parent.examIntface {
-			prober.BuildProcessFamilyGroups(c.id, c.pid, false, info.Privileged)
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false, info.Privileged, nil)
 			parent.examIntface = true
 			c.examIntface = true
 			prober.StartMonitorInterface(c.id, c.pid, containerReexamIntfMax)
@@ -1889,7 +1890,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 
 	hostMode := isContainerNetHostMode(info, parent)
 	fillContainerProperties(c, parent, info, hostMode)
-	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, info.Privileged)
+	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, info.Privileged, c.healthCheck)
 	prober.HandleAnchorModeChange(true, c.id, c.upperDir, c.pid)
 
 	if parent == nil {
@@ -2056,6 +2057,7 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		portMap:        info.MappedPorts,
 		pods:           utils.NewSet(),
 		ownListenPorts: utils.NewSet(),
+		healthCheck:    info.Healthcheck,
 	}
 	gInfoLock()
 	gInfo.activeContainers[id] = c
