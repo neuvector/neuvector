@@ -3181,7 +3181,14 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				}
 			}
 		case share.PolicyActionDeny:
-			ppe.Uuid = share.CLUSReservedUuidNotAlllowed
+			if svcGroup == share.GroupNVProtect {
+				if bImageFile {
+					bPass = true
+					ppe.Action = share.PolicyActionAllow
+				}
+			} else {
+				ppe.Uuid = share.CLUSReservedUuidNotAlllowed
+			}
 		}
 	} else {
 		switch ppe.Action {

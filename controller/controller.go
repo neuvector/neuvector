@@ -312,7 +312,7 @@ func main() {
 	}
 
 	// Set global objects at the very first
-	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
+	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
 		if err == global.ErrEmptyContainerList {
@@ -415,6 +415,7 @@ func main() {
 
 	Host.Platform = platform
 	Host.Flavor = flavor
+	Host.CloudPlatform = cloudPlatform
 	Host.Network = network
 	Host.StorageDriver = global.RT.GetStorageDriver()
 
@@ -704,7 +705,7 @@ func main() {
 	}
 
 	// pre-build compliance map
-	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor)
+	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor, Host.CloudPlatform)
 	go scanUtils.UpdateComplianceConfigs()
 
 	// start orchestration connection.

@@ -370,7 +370,7 @@ func main() {
 	}
 
 	// Set global objects at the very first
-	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
+	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
 		if err == global.ErrEmptyContainerList {
@@ -477,6 +477,7 @@ func main() {
 
 	Host.Platform = platform
 	Host.Flavor = flavor
+	Host.CloudPlatform = cloudPlatform
 	Host.Network = network
 	Host.CapDockerBench = (global.RT.String() == container.RuntimeDocker)
 	Host.CapKubeBench = global.ORCH.SupportKubeCISBench()
@@ -621,7 +622,7 @@ func main() {
 	dp.Open(dpTaskCallback, dpStatusChan, errRestartChan)
 
 	// Benchmark
-	bench = newBench(Host.Platform, Host.Flavor)
+	bench = newBench(Host.Platform, Host.Flavor, Host.CloudPlatform)
 	go bench.BenchLoop()
 
 	if Host.CapDockerBench {

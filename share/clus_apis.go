@@ -959,7 +959,8 @@ type CLUSHost struct {
 	Name           string                  `json:"name"`
 	Runtime        string                  `json:"runtime"`
 	Platform       string                  `json:"platform"`
-	Flavor         string                  `json:"flavor"` // platform flavor
+	Flavor         string                  `json:"flavor"`         // platform flavor
+	CloudPlatform  string                  `json:"cloud_platform"` // cloud_platform
 	Network        string                  `json:"network"`
 	RuntimeVer     string                  `json:"runtime_version"`
 	RuntimeAPIVer  string                  `json:"runtime_api_version"`

@@ -27,10 +27,10 @@ var SYS *system.SystemTools
 var RT container.Runtime
 var ORCH *orchHub
 
-func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, string, string, []*container.ContainerMeta, error) {
+func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, string, string, string, []*container.ContainerMeta, error) {
 	var err error
 	var containers []*container.ContainerMeta
-	var platform, flavor, network string
+	var platform, flavor, network, cloudPlatform string
 
 	SYS = system.NewSystemTools()
 	RT, err = container.Connect(rtSocket, SYS)
@@ -43,16 +43,16 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 			time.Sleep(time.Millisecond * 50)
 		}
 		if len(containers) == 0 {
-			return "", "", "", nil, ErrEmptyContainerList
+			return "", "", "", "", nil, ErrEmptyContainerList
 		}
 		platform, flavor, network = getPlatform(containers)
 	} else {
 		if container.IsPidHost() {
-			return "", "", "", nil, err
+			return "", "", "", "", nil, err
 		}
 
 		if RT, err = container.InitStubRtDriver(SYS); err != nil {
-			return "", "", "", nil, err
+			return "", "", "", "", nil, err
 		}
 		platform, flavor, network = getPlatformFromEnv()
 	}
@@ -64,23 +64,27 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	if flavor == "" && ocVer != "" {
 		flavor = share.FlavorOpenShift
 	}
+
 	if flavor == share.FlavorOpenShift && platform == "" {
 		platform = share.PlatformKubernetes
 	}
+
 	if platform == share.PlatformGoogleGKE {
 		// Follow the style of BenchLoop in bench.go
 		platform = share.PlatformKubernetes
-		flavor = share.FlavorGKE
+		cloudPlatform = share.CloudGKE
 	}
+
 	if platform == share.PlatformAzureAKS {
 		// Follow the style of BenchLoop in bench.go
 		platform = share.PlatformKubernetes
-		flavor = share.FlavorAKS
+		cloudPlatform = share.CloudAKS
 	}
+
 	if platform == share.PlatformAmazonEKS {
 		// Follow the style of BenchLoop in bench.go
 		platform = share.PlatformKubernetes
-		flavor = share.FlavorEKS
+		cloudPlatform = share.CloudEKS
 	}
 
 	ORCH = &orchHub{Driver: orchAPI.GetDriver(platform, flavor, network, k8sVer, ocVer, SYS, RT)}
@@ -88,20 +92,21 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 		ORCH.ResourceDriver = regResource(platform, flavor, network)
 	}
 
-	return platform, flavor, network, containers, nil
+	return platform, flavor, cloudPlatform, network, containers, nil
 }
 
 func getContainerPlatform(c *container.ContainerMeta) string {
 	if _, ok := c.Labels[container.RancherKeyContainerSystem]; ok {
 		return share.PlatformRancher
 	}
+
 	if strings.Contains(c.Image, "gke") {
 		return share.PlatformGoogleGKE
-	}	
-	if strings.Contains(c.Image, "amazonaws") {
+	}
+	if strings.Contains(c.Image, "amazonaws.com/eks") {
 		return share.PlatformAmazonEKS
 	}
-	if strings.Contains(c.Name, "azure") {
+	if strings.Contains(c.Image, "microsoft") {
 		return share.PlatformAzureAKS
 	}
 	if _, ok := c.Labels[container.KubeKeyPodNamespace]; ok {
@@ -142,8 +147,8 @@ func normalize(platform, flavor string) (string, string) {
 		flavor = share.FlavorRancher
 	case strings.ToLower(share.FlavorIKE):
 		flavor = share.FlavorIKE
-	case strings.ToLower(share.FlavorGKE):
-		flavor = share.FlavorGKE
+	case strings.ToLower(share.CloudGKE):
+		flavor = share.CloudGKE
 	}
 
 	return platform, flavor
