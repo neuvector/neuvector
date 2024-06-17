@@ -310,9 +310,19 @@ func InitializeInternalSecretController(ctx context.Context, reloadFuncs []func(
 		return fmt.Errorf("failed to get k8s config: %w", err)
 	}
 
-	factory := informers.NewSharedInformerFactoryWithOptions(clientset, time.Hour*24, informers.WithNamespace(os.Getenv("POD_NAMESPACE")))
+	var namespace string
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		namespace = string(data)
+	}
 
-	controller, err := NewInternalSecretController(factory, os.Getenv("POD_NAMESPACE"), "neuvector-internal-certs", reloadFuncs)
+	// Allow overriding via POD_NAMESPACE variable for testing
+	if nsenv := os.Getenv("POD_NAMESPACE"); nsenv != "" {
+		namespace = nsenv
+	}
+
+	factory := informers.NewSharedInformerFactoryWithOptions(clientset, time.Hour*24, informers.WithNamespace(namespace))
+
+	controller, err := NewInternalSecretController(factory, namespace, "neuvector-internal-certs", reloadFuncs)
 	if err != nil {
 		return fmt.Errorf("failed to create internal secret controller: %w", err)
 	}

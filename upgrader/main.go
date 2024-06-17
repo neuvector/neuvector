@@ -159,6 +159,12 @@ func main() {
 					Usage:   "Whether it's a fresh install.  When in fresh install mode, upgrader will create certs and bypass the rolling update flow.",
 					EnvVars: []string{"FRESH_INSTALL"},
 				},
+				&cli.BoolFlag{
+					Name:    "disable-rotation",
+					Value:   false,
+					Usage:   "When this is specified, this program will skip the whole logic to rotate certificate.",
+					EnvVars: []string{"DISABLE_ROTATION"},
+				},
 			},
 			Action: PostSyncHook,
 		},

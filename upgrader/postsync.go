@@ -743,6 +743,7 @@ func PostSyncHook(ctx *cli.Context) error {
 	renewThreshold := ctx.Duration("expiry-cert-threshold")
 	timeout := ctx.Duration("timeout")
 	waitDeploymentTimeout := ctx.Duration("rollout-timeout")
+	disableRotation := ctx.Bool("disable-rotation")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
 	defer cancel()
@@ -846,6 +847,11 @@ func PostSyncHook(ctx *cli.Context) error {
 	if noInitialSecret && retSecret != nil && freshInstall {
 		log.Info("This is fresh install.  Everything is done.")
 		// Everything is good now.  Exit.
+		return nil
+	}
+
+	if disableRotation {
+		log.Info("Rotation is disabled. Finishing.")
 		return nil
 	}
 
