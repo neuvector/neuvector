@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.manifest")
@@ -51,9 +51,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -77,9 +77,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.manifest")
@@ -113,9 +113,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"    
           if [ -f "$file" ]; then
@@ -139,9 +139,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.manifest")
@@ -175,9 +175,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -201,9 +201,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           config_manifest=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.manifest")
@@ -237,9 +237,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -263,9 +263,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           # Initialize counters and non-compliant files list
@@ -306,9 +306,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           # Initialize counters and non-compliant files list
@@ -349,9 +349,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           file=""
@@ -384,9 +384,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -413,9 +413,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/admin.conf"
@@ -443,9 +443,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -469,9 +469,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/scheduler.conf"
@@ -499,9 +499,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -525,9 +525,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/controller-manager.conf"
@@ -555,9 +555,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -581,9 +581,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/pki/"
@@ -613,9 +613,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           files=$(find $file -name "*.crt")
@@ -643,9 +643,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           files=$(find $file -name "*.key")
@@ -675,9 +675,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
@@ -695,9 +695,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--basic-auth-file' >/dev/null 2>&1; then
@@ -716,9 +716,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--token-auth-file' >/dev/null 2>&1; then
@@ -737,9 +737,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--kubelet-https=false' >/dev/null 2>&1; then
@@ -758,9 +758,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--kubelet-client-certificate' >/dev/null 2>&1; then
@@ -790,9 +790,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--kubelet-certificate-authority' >/dev/null 2>&1; then
@@ -814,9 +814,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'AlwaysAllow' >/dev/null 2>&1; then
@@ -835,9 +835,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'Node' >/dev/null 2>&1; then
@@ -856,9 +856,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--authorization-mode'| grep 'RBAC' >/dev/null 2>&1; then
@@ -878,8 +878,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'EventRateLimit' >/dev/null 2>&1; then
@@ -900,8 +900,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysAdmit' >/dev/null 2>&1; then
@@ -921,8 +921,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'AlwaysPullImages' >/dev/null 2>&1; then
@@ -942,8 +942,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
@@ -967,8 +967,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'ServiceAccount' >/dev/null 2>&1; then
@@ -989,8 +989,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--disable-admission-plugins'| grep 'NamespaceLifecycle' >/dev/null 2>&1; then
@@ -1010,8 +1010,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
@@ -1034,8 +1034,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: {}
+          PCI: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'NodeRestriction' >/dev/null 2>&1; then
@@ -1055,9 +1055,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--insecure-bind-address' >/dev/null 2>&1; then
@@ -1075,9 +1075,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--insecure-port' >/dev/null 2>&1; then
@@ -1101,9 +1101,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--secure-port' >/dev/null 2>&1; then
@@ -1127,7 +1127,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--profiling=false' >/dev/null 2>&1; then
@@ -1145,8 +1145,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--audit-log-path' >/dev/null 2>&1; then
@@ -1167,8 +1167,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxage' >/dev/null 2>&1; then
@@ -1195,8 +1195,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxbackup' >/dev/null 2>&1; then
@@ -1223,8 +1223,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--audit-log-maxsize' >/dev/null 2>&1; then
@@ -1250,7 +1250,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--request-timeout' >/dev/null 2>&1; then
@@ -1271,9 +1271,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--service-account-lookup=false' >/dev/null 2>&1; then
@@ -1292,9 +1292,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--service-account-key-file' >/dev/null 2>&1; then
@@ -1317,9 +1317,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--etcd-certfile' >/dev/null 2>&1; then
@@ -1351,9 +1351,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--tls-cert-file' >/dev/null 2>&1; then
@@ -1384,9 +1384,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
@@ -1409,9 +1409,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--etcd-cafile' >/dev/null 2>&1; then
@@ -1435,9 +1435,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config'| grep 'EncryptionConfig' >/dev/null 2>&1; then
@@ -1458,9 +1458,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--encryption-provider-config' >/dev/null 2>&1; then
@@ -1488,9 +1488,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--tls-cipher-suites' >/dev/null 2>&1; then
@@ -1519,7 +1519,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           # Filter out processes like "/bin/tee -a /var/log/kube-controller-manager.log"
@@ -1541,7 +1541,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_MANAGER_CMD" '--profiling=false' >/dev/null 2>&1; then
@@ -1560,9 +1560,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_MANAGER_CMD" '--use-service-account-credentials=true' >/dev/null 2>&1; then
@@ -1581,9 +1581,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_MANAGER_CMD" '--service-account-private-key-file' >/dev/null 2>&1; then
@@ -1606,9 +1606,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_MANAGER_CMD" '--root-ca-file' >/dev/null 2>&1; then
@@ -1631,9 +1631,9 @@ groups:
         profile: Level 2
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: {}
+          PCI: {}
+          GDPR: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_MANAGER_CMD" '--feature-gates' >/dev/null 2>&1; then
@@ -1657,7 +1657,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_MANAGER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
@@ -1677,7 +1677,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_SCHEDULER_CMD" '--profiling=false' >/dev/null 2>&1; then
@@ -1694,7 +1694,7 @@ groups:
         scored: true
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           if get_argument_value "$CIS_SCHEDULER_CMD" '--bind-address'| grep '127.0.0.1' >/dev/null 2>&1; then
