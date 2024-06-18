@@ -91,7 +91,7 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 	if _, ok := cpf.filter[r.TestNum]; ok {
 		r.Tags = metaMap[r.TestNum].Tags
 	} else {
-		r.Tags = make([]map[string][]api.TagDetail, 0)
+		r.Tags = map[string]share.TagDetails{}
 	}
 
 	return r

@@ -159,23 +159,36 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
 	_, metaMap := scanUtils.GetComplianceMeta()
-	if _, ok := metaMap[re.TestNum]; !ok {
+	meta, ok := metaMap[re.TestNum]
+	if !ok {
 		return errors.New("Unknonwn compliance ID")
 	}
 
-	// Make sure empty tags is allowed
-	tagSet := utils.NewSet()
-	for _, t := range re.Tags {
-		switch t {
-		case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST:
-			tagSet.Add(t)
-		default:
-			return errors.New("Invalid compliance profile template values")
+	complianceMeta := map[string]share.TagDetails{}
+	for compliance, complianceDetails := range meta.Tags {
+		complianceMeta[compliance] = complianceDetails
+	}
+
+	resultTags := map[string]share.TagDetails{}
+	for compliance, complianceDetails := range re.Tags {
+		existInTagMap := false
+		if _, ok := complianceMeta[compliance]; ok {
+			existInTagMap = true
+		}
+
+		if existInTagMap {
+			resultTags[compliance] = complianceDetails
+		} else {
+			switch compliance {
+			case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST:
+				resultTags[compliance] = share.TagDetails{}
+			default:
+				return errors.New("Invalid compliance profile template values")
+			}
 		}
 	}
-	tags := tagSet.ToStringSlice()
-	sort.Strings(tags)
-	ccp.Entries[re.TestNum] = share.CLUSComplianceProfileEntry{TestNum: re.TestNum, Tags: tags}
+
+	ccp.Entries[re.TestNum] = share.CLUSComplianceProfileEntry{TestNum: re.TestNum, Tags: resultTags}
 	return nil
 }
 

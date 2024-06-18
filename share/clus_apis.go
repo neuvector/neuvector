@@ -1111,6 +1111,8 @@ type CLUSGroupMetric struct {
 type CLUSWlMetric struct {
 	WlID        string `json:"wlid"`
 	WlSessCurIn uint32 `json:"wl_sess_cur_in"`
+	WlSessIn1   uint32 `json:"wl_sess_in1"`
+	WlByteIn1   uint64 `json:"wl_byte_in1"`
 	WlSessIn12  uint32 `json:"wl_sess_in12"`
 	WlByteIn12  uint64 `json:"wl_byte_in12"`
 }
@@ -1597,9 +1599,18 @@ type CLUSAuditLog struct {
 
 const SnifferIdAgentField = 12
 
+type TagDetail struct {
+	ID              string `yaml:"id" json:"id"`
+	Title           string `yaml:"title" json:"title"`
+	Description     string `yaml:"description" json:"description"`
+	CIS_Sub_Control string `yaml:"cis-sub-control"`
+}
+
+type TagDetails map[string]TagDetail
+
 type CLUSComplianceProfileEntry struct {
-	TestNum string   `json:"test_num"`
-	Tags    []string `json:"tags"`
+	TestNum string                `json:"test_num"`
+	Tags    map[string]TagDetails `json:"tags,omitempty"`
 }
 
 type CLUSComplianceProfile struct {

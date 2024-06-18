@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -108,10 +107,8 @@ func TestTagConsistance(t *testing.T) {
 		mockTagCount := make(map[string]int)
 		cisItemTagCount := make(map[string]int)
 
-		for _, tags := range cisItems[id].Tags {
-			for tag, _ := range tags {
-				cisItemTagCount[tag]++
-			}
+		for tag, _ := range cisItems[id].Tags {
+			cisItemTagCount[tag]++
 		}
 
 		for _, tag := range value.Tags {
@@ -146,7 +143,7 @@ func TestGetComplianceMeta(t *testing.T) {
 	mockMetas, mockMetaMap := getMetaMapForTest(remediationFolder, mockCISItems, mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 
 	if diff := cmp.Diff(mockMetas, metas); diff != "" {
-		t.Errorf("mockMetas metas (-want +got):\n%s", diff)
+		t.Errorf("mockMetas mismatch (-want +got):\n%s", diff)
 	}
 
 	if diff := cmp.Diff(mockMetaMap, metaMap); diff != "" {
@@ -206,7 +203,6 @@ func TestLoadCreateEmpty(t *testing.T) {
 	go func() {
 		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 		close(done)
-		fmt.Println("stop the channel")
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -251,7 +247,6 @@ func TestLoadCreateExisting(t *testing.T) {
 	go func() {
 		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 		close(done)
-		fmt.Println("XXX done", mockLoadMetaMap)
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -266,17 +261,14 @@ func TestLoadCreateExisting(t *testing.T) {
 
 	<-done
 	getMetaMapForLoadTest(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	fmt.Println("XXX getMetaMapForLoadTest", mockLoadMetaMap)
 
 	// Iterate over the slice of Meta structs
 	for _, meta := range mockLoadMetas {
 		// Check if the current meta ID is one we're interested in
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			for compliance, _ := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {
@@ -287,11 +279,9 @@ func TestLoadCreateExisting(t *testing.T) {
 	for _, meta := range mockLoadMetaMap {
 		// Check if the current meta ID is one we're interested in
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			for compliance, _ := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {

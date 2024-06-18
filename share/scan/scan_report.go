@@ -262,17 +262,16 @@ func ImageBench2REST(cmds []string, secrets []*share.ScanSecretLog, setids []*sh
 		item := checks[i]
 
 		if tagMap == nil {
-			item.Tags = make([]map[string][]api.TagDetail, 0)
+			item.Tags = map[string]share.TagDetails{}
 		} else if tags, ok := tagMap[item.TestNum]; ok {
-			item.Tags = make([]map[string][]api.TagDetail, 0, len(tags))
+			item.Tags = map[string]share.TagDetails{}
 
 			for _, tag := range tags {
-				tagMap := map[string][]api.TagDetail{tag: []api.TagDetail{}}
-				item.Tags = append(item.Tags, tagMap)
+				item.Tags[tag] = share.TagDetails{}
 			}
 
 		} else {
-			item.Tags = make([]map[string][]api.TagDetail, 0)
+			item.Tags = map[string]share.TagDetails{}
 		}
 	}
 

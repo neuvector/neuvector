@@ -2803,6 +2803,24 @@ func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resourc
 	return crdCfgRet, 0, "", recordName
 }
 
+func MergeComplianceTags(baseComplianeTag, crdComplianceTag map[string]share.TagDetails) map[string]share.TagDetails {
+	merge := baseComplianeTag
+
+	for compliance, complianceDetails := range crdComplianceTag {
+		if _, ok := merge[compliance]; ok {
+			for id, detail := range complianceDetails {
+				if _, exist := merge[compliance][id]; !exist {
+					merge[compliance][id] = detail
+				}
+			}
+		} else {
+			merge[compliance] = complianceDetails
+		}
+	}
+
+	return merge
+}
+
 // for CRD compliance profile import
 func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resource.NvCompProfileSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
@@ -2830,10 +2848,7 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 			entriesMap := make(map[string]*api.RESTComplianceProfileEntry, len(specTemplates.Entries))
 			for _, crdEntry := range specTemplates.Entries {
 				if entry, ok := entriesMap[crdEntry.TestNum]; ok {
-					tags1 := utils.NewSetFromStringSlice(entry.Tags)
-					tags2 := utils.NewSetFromStringSlice(crdEntry.Tags)
-					tags1 = tags1.Union(tags2)
-					entriesMap[crdEntry.TestNum].Tags = tags1.ToStringSlice()
+					entriesMap[crdEntry.TestNum].Tags = MergeComplianceTags(entry.Tags, crdEntry.Tags)
 				} else {
 					entriesMap[crdEntry.TestNum] = crdEntry
 				}

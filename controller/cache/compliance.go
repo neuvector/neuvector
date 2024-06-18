@@ -92,26 +92,30 @@ func filterComplianceLog(audit *api.Audit) *api.Audit {
 	return audit
 }
 
+func buildTagListFromTagDetails(tags map[string]share.TagDetails) []string {
+	var complianceTags []string
+	for _, complianceTagMap := range tags {
+		for tag, _ := range complianceTagMap {
+			complianceTags = append(complianceTags, tag)
+		}
+	}
+	return complianceTags
+}
+
 func buildComplianceFilter(ccp *share.CLUSComplianceProfile) map[string][]string {
 	filter := make(map[string][]string)
 
 	// First create user override entries
 	for _, e := range ccp.Entries {
-		filter[e.TestNum] = e.Tags
+		filter[e.TestNum] = buildTagListFromTagDetails(e.Tags)
 	}
 
 	// Add checks that are not in the override list
 	_, metaMap := scanUtils.GetComplianceMeta()
 	for _, m := range metaMap {
 		if _, ok := filter[m.TestNum]; !ok {
-			var complianceTags []string
-			for _, complianceTagMap := range m.Tags {
-				for tag, _ := range complianceTagMap {
-					complianceTags = append(complianceTags, tag)
-				}
-			}
 
-			filter[m.TestNum] = complianceTags
+			filter[m.TestNum] = buildTagListFromTagDetails(m.Tags)
 		}
 	}
 
