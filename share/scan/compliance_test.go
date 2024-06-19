@@ -10,8 +10,10 @@ import (
 	"os"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
 )
 
 var (
@@ -74,7 +76,7 @@ func TestSetup(t *testing.T) {
 		backupMockLoadMetas = append(backupMockLoadMetas, backupMeta)
 	}
 
-	PrepareBenchMeta(mockLoadItems, &mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
+	PrepareBenchMeta(mockLoadItems, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 	if isUpdateMockLoadMetaMap {
 		updateMetasFromMap(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 	}
@@ -129,12 +131,62 @@ func TestTagConsistance(t *testing.T) {
 
 func getMetaMapForTest(remediationFolder string, items map[string]api.RESTBenchCheck, metas []api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	GetK8sCISMeta(remediationFolder, items)
-	PrepareBenchMeta(items, &metas, metaMap, updateFlag)
+	PrepareBenchMeta(items, metaMap, updateFlag)
 	if *updateFlag {
 		updateMetasFromMap(&metas, metaMap, updateFlag)
 	}
 
 	return metas, metaMap
+}
+
+func TestGetComplianceFilterMap(t *testing.T) {
+	// Reset the once variable and the availableFilter map before running the test
+	var mockComplianceFilterMap map[string]int
+	mockMetas := []api.RESTBenchMeta{
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.1",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.2",
+				Tags: map[string]share.TagDetails{
+					"PCI": {},
+				},
+			},
+		},
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.3",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+	}
+
+	expected := map[string]int{"HIPAA": 2, "PCI": 1}
+	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
+	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should match the expected values")
+
+	// Call the function again to ensure it doesn't run the initialization code again
+	mockMetas = []api.RESTBenchMeta{
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.1",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+	}
+	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
+	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should not change after the first call")
+
 }
 
 func TestGetComplianceMeta(t *testing.T) {
@@ -163,7 +215,7 @@ func TestGetComplianceMeta(t *testing.T) {
 	remediationFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
 	metas, metaMap = getMetaMapForTest(remediationFolder, cisItems, complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
 
-	PrepareBenchMeta(mockCISItems, &mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
+	PrepareBenchMeta(mockCISItems, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 	updateMetasFromMap(&mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 
 	if diff := cmp.Diff(mockComplianceMetas, metas); diff != "" {
