@@ -2594,6 +2594,10 @@ type RESTWorkloadInterceptData struct {
 	Intercept *RESTWorkloadIntercept `json:"intercept"`
 }
 
+type RESTAvaiableComplianceFilter struct {
+	AvailableFilter []string `json:"available_filter"`
+}
+
 type RESTBenchCheck struct {
 	TestNum     string                      `json:"test_number"`
 	Category    string                      `json:"category"`
@@ -2668,6 +2672,8 @@ const (
 	ComplianceTemplateGDPR  = "GDPR"
 	ComplianceTemplateHIPAA = "HIPAA"
 	ComplianceTemplateNIST  = "NIST" // NIST SP 800-190
+	ComplianceTemplatePCIv4 = "PCIv4"
+	ComplianceTemplateDISA  = "DISA"
 )
 
 type RESTComplianceProfileEntry struct {

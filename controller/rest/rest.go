@@ -1823,6 +1823,7 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.GET("/v1/custom_check/:group", handlerCustomCheckShow)
 	r.GET("/v1/custom_check", handlerCustomCheckList)
 	r.PATCH("/v1/custom_check/:group", handlerCustomCheckConfig)
+	r.GET("/v1/compliance/available_filter", handlerGetAvaiableComplianceFilter)
 	r.GET("/v1/compliance/profile", handlerComplianceProfileList) // Only default is accepted, so not POST/DELETE
 	r.GET("/v1/compliance/profile/:name", handlerComplianceProfileShow)
 	r.PATCH("/v1/compliance/profile/:name", handlerComplianceProfileConfig)

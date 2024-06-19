@@ -563,6 +563,7 @@ func initTest() {
 	router.GET("/v1/scan/registry/:name", handlerRegistryShow)
 	router.DELETE("/v1/scan/registry/:name", handlerRegistryDelete)
 
+	router.GET("/v1/compliance/available_filter", handlerGetAvaiableComplianceFilter)
 	router.GET("/v1/compliance/profile", handlerComplianceProfileList)
 	router.GET("/v1/compliance/profile/:name", handlerComplianceProfileShow)
 	router.PATCH("/v1/compliance/profile/:name", handlerComplianceProfileConfig)

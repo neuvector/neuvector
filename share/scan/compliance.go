@@ -2814,6 +2814,18 @@ type PrimeCISBenchmarkConfig struct {
 	CISChecksWithTags []CISCheckWithTags `yaml:"checks"`
 }
 
+func GetComplianceFilterMap(metas []api.RESTBenchMeta, complianceFilterMap map[string]int) map[string]int {
+	if complianceFilterMap == nil {
+		complianceFilterMap = make(map[string]int)
+		for _, meta := range metas {
+			for compliance, _ := range meta.Tags {
+				complianceFilterMap[compliance]++
+			}
+		}
+	}
+	return complianceFilterMap
+}
+
 func InitComplianceMeta(platform, flavor, cloudPlatform string) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	// Ensuring initialization happens only once
 	once.Do(func() {
@@ -2822,7 +2834,8 @@ func InitComplianceMeta(platform, flavor, cloudPlatform string) ([]api.RESTBench
 		// Check the current k8s version, then read the correct folder
 		GetCISFolder(platform, flavor, cloudPlatform)
 		GetK8sCISMeta(remediationFolder, cisItems)
-		PrepareBenchMeta(cisItems, &complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
+		PrepareBenchMeta(cisItems, complianceMetaMap, &isUpdateComplianceMetaMap)
+		PrepareBenchMeta(dockerImageCISItems, complianceMetaMap, &isUpdateComplianceMetaMap)
 	})
 
 	if isUpdateComplianceMetaMap {
@@ -2850,7 +2863,7 @@ func GetComplianceMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 func InitImageBenchMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	// Ensuring initialization happens only once
 	once.Do(func() {
-		PrepareBenchMeta(dockerImageCISItems, &imageBenchMetas, imageBenchMetaMap, &isUpdateImageBenchMetaMap)
+		PrepareBenchMeta(dockerImageCISItems, imageBenchMetaMap, &isUpdateImageBenchMetaMap)
 	})
 
 	if isUpdateImageBenchMetaMap {
@@ -3038,7 +3051,7 @@ func GetK8sCISMeta(remediationFolder string, cis_bench_items map[string]api.REST
 	}
 }
 
-func PrepareBenchMeta(items map[string]api.RESTBenchCheck, metas *[]api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) {
+func PrepareBenchMeta(items map[string]api.RESTBenchCheck, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) {
 	for _, item := range items {
 		metaMap[item.TestNum] = api.RESTBenchMeta{RESTBenchCheck: item}
 	}
