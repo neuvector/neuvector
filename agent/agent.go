@@ -621,24 +621,11 @@ func main() {
 	dpStatusChan := make(chan bool, 2)
 	dp.Open(dpTaskCallback, dpStatusChan, errRestartChan)
 
-	// Benchmark
+	// bench initialized before the probe
 	bench = newBench(Host.Platform, Host.Flavor, Host.CloudPlatform)
-	go bench.BenchLoop()
-
-	if Host.CapDockerBench {
-		bench.RerunDocker(false)
-	} else {
-		// If the older version write status into the cluster, clear it.
-		bench.ResetDockerStatus()
-	}
-	if !Host.CapKubeBench {
-		// If the older version write status into the cluster, clear it.
-		bench.ResetKubeStatus()
-	}
-
-	bPassiveContainerDetect := global.RT.String() == container.RuntimeCriO
 
 	// Probe
+	bPassiveContainerDetect := global.RT.String() == container.RuntimeCriO
 	probeTaskChan := make(chan *probe.ProbeMessage, 256) // increase to avoid underflow
 	fsmonTaskChan := make(chan *fsmon.MonitorMessage, 8)
 	faEndChan := make(chan bool, 1)
@@ -674,6 +661,7 @@ func main() {
 		os.Exit(-2)
 	}
 
+	// File monitor
 	fmonConfig := fsmon.FileMonitorConfig{
 		ProfileEnable:  agentEnv.systemProfiles,
 		IsAufs:         global.RT.GetStorageDriver() == "aufs",
@@ -693,6 +681,20 @@ func main() {
 
 	prober.SetFileMonitor(fileWatcher)
 
+	// Benchmark
+	go bench.BenchLoop()
+	if Host.CapDockerBench {
+		bench.RerunDocker(false)
+	} else {
+		// If the older version write status into the cluster, clear it.
+		bench.ResetDockerStatus()
+	}
+	if !Host.CapKubeBench {
+			// If the older version write status into the cluster, clear it.
+		bench.ResetKubeStatus()
+	}
+
+	// Workload scans
 	scanUtil = scanUtils.NewScanUtil(global.SYS)
 
 	// grpc need to be put after probe (grpc requests like sessionList, ProbeSummary require probe ready),
