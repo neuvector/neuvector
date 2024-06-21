@@ -748,23 +748,23 @@ func PostSyncHook(ctx *cli.Context) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
 	defer cancel()
 
-	log.Info("Initializing lock")
-
-	// Make sure only one cert-upgrader will be running at the same time.
-	lock, err := CreateLocker(namespace, UPGRADER_LEASE_NAME)
-	if err != nil {
-		log.Fatal("failed to acquire cluster-wide lock: %w", err)
-	}
-
-	lock.Lock()
-	defer lock.Unlock()
-
 	log.Info("Creating k8s client")
 
 	client, err := NewK8sClient(kubeconfig)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client: %w", err)
 	}
+
+	log.Info("Initializing lock")
+
+	// Make sure only one cert-upgrader will be running at the same time.
+	lock, err := CreateLocker(client, namespace, UPGRADER_LEASE_NAME)
+	if err != nil {
+		log.Fatal("failed to acquire cluster-wide lock: %w", err)
+	}
+
+	lock.Lock()
+	defer lock.Unlock()
 
 	// Start watcher, so when `neuvector-internal-certs` secret is deleted, cert-upgrader will stop
 	watcher, err := client.Resource(schema.GroupVersionResource{
