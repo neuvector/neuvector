@@ -359,41 +359,18 @@ groups:
         tags: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--eventRecordQPS' >/dev/null 2>&1; then
-              qps=$(get_argument_value "$CIS_KUBELET_CMD" '--eventRecordQPS' | cut -d "=" -f 2)
-              if [ "$qps" -eq 0 -o "$qps" -eq 5]; then 
-                pass "$check"
+          if check_argument "$CIS_KUBELET_CMD" '--event-qps' >/dev/null 2>&1; then
+              qps=$(get_argument_value "$CIS_KUBELET_CMD" '--event-qps' | cut -d " " -f 1)
+              if [ "$qps" -gt 0 ]; then
+                  pass "$check"
               else
                   warn "$check"
-                  warn "      * --eventRecordQPS should be set to 0"
+                  warn "      * --event-qps: $qps is not set to a positive value"
               fi
           else
-              if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
-                  file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'| cut -d " " -f 2)
-                  file=$(append_prefix "$CONFIG_PREFIX" "$file")
-                  if [ -f "$file" ]; then
-                      found=$(sed -rn '/--eventrecordqps=[^ ]+/p' $file)
-                      if [ -z "$found" ]; then
-                          warn "$check"
-                          warn "      * --eventrecordqps is not set in $file"
-                      else
-                          extracted_value=$(echo "$found" | sed 's/.*--eventrecordqps=\([^ ]*\).*/\1/')
-                          if [[ "$extracted_value" -eq 0 -o  "$extracted_value" -eq 5]]; then
-                              pass "$check"
-                          else
-                              warn "$check"
-                              warn "      * --eventrecordqps should be set 0, but set $extracted_value"
-                          fi
-                      fi
-                  else
-                      warn "$check"
-                      warn "      * $file is not found!"
-                  fi
-              else 
-                  warn "$check"
-                  warn "      * --event-qps should be set to 0"
-              fi
-          fi        
+              warn "$check"
+              warn "      * --event-qps is not set"
+          fi     
         remediation: |
           If using a Kubelet config file, edit the file to set eventRecordQPS: to an appropriate level. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
           Based on your system, restart the kubelet service. For example:
