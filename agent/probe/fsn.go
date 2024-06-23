@@ -46,6 +46,7 @@ type fileInfo struct {
 
 type fsnRootFd struct {
 	id        string
+	role      string
 	cLayer    string // on the local node's path
 	cLayerLen int
 	imgLayer  string // btrfs: image folder
@@ -375,6 +376,9 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 			// sample: mkdir -p /tmp/test/bin, only "/tmp" was reported.
 			for d := range dirs.Iter() {
 				dir := d.(string)
+				if fsn.skipPathByRole(root.role, dir[root.cLayerLen:]) {
+					continue
+				}
 				// mLog.WithFields(log.Fields{"rdir": dir[root.cLayerLen:]}).Debug("FSN: new dir")
 				fsn.addDir(dir)
 				root.dirs.Add(dir)
@@ -446,7 +450,21 @@ func (fsn *FileNotificationCtr) Close() {
 	}
 }
 
-func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, map[string]*fileInfo) {
+func (fsn *FileNotificationCtr) skipPathByRole(role, path string) bool {
+	switch role {
+	case "enforcer":
+		if strings.HasPrefix(path, "/tmp") {
+			return true
+		}
+	case "scanner":
+		if strings.HasPrefix(path, "/tmp/images") || strings.HasPrefix(path, "/tmp/neuvector") {
+			return true
+		}
+	}
+	return false
+}
+
+func (fsn *FileNotificationCtr) AddContainer(id, cPath, role string, pid int) (bool, map[string]*fileInfo) {
 	if !fsn.bEnabled {
 		return false, nil
 	}
@@ -483,6 +501,7 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, m
 	//// create root records
 	root := &fsnRootFd{
 		id:        id,
+		role:      role,
 		cLayer:    path,
 		cLayerLen: len(path),
 		pid:       pid,
@@ -499,9 +518,14 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath string, pid int) (bool, m
 		root.dirs, root.files = fsn.enumFiles(path, id, true)
 	}
 
-	for dir := range root.dirs.Iter() {
+	for d := range root.dirs.Iter() {
+		dir := d.(string)
 		// log.WithFields(log.Fields{"dir": dir}).Debug("FSN: ")
-		if err := fsn.addDir(dir.(string)); err != nil {
+		if fsn.skipPathByRole(role, dir[root.cLayerLen:]) {
+			continue
+		}
+
+		if err := fsn.addDir(dir); err != nil {
 			log.WithFields(log.Fields{"dir": dir, "id": id, "error": err}).Debug("FSN: failed")
 		}
 	}
