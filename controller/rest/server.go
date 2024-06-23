@@ -2031,8 +2031,8 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 	users := global.ORCH.ListUsers()
 
 	var resp api.RESTUsersData
-	resp.Users = make([]*api.RESTUser, len(users))
-	for i, user := range users {
+	resp.Users = make([]*api.RESTUser, 0, len(users))
+	for _, user := range users {
 		globalRole, roleDomains, permits, permitsDomains := rbac2UserRole(user.RBAC, user.RBAC2)
 
 		var extraPermitsDomains []api.RESTPermitsAssigned
@@ -2046,17 +2046,18 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 
-		u := &api.RESTUser{
-			Fullname:            user.Name,
-			Server:              server,
-			Username:            user.Name,
-			Role:                globalRole,
-			RoleDomains:         roleDomains,
-			ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, permits),
-			ExtraPermitsDomains: extraPermitsDomains,
+		if globalRole != "" || len(roleDomains) > 0 || !permits.IsEmpty() || len(permitsDomains) > 0 {
+			u := &api.RESTUser{
+				Fullname:            user.Name,
+				Server:              server,
+				Username:            user.Name,
+				Role:                globalRole,
+				RoleDomains:         roleDomains,
+				ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, permits),
+				ExtraPermitsDomains: extraPermitsDomains,
+			}
+			resp.Users = append(resp.Users, u)
 		}
-
-		resp.Users[i] = u
 	}
 
 	sort.Slice(resp.Users, func(i, j int) bool { return resp.Users[i].Fullname < resp.Users[j].Fullname })
