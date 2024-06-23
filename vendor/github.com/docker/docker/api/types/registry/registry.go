@@ -1,15 +1,19 @@
-package registry
+package registry // import "github.com/docker/docker/api/types/registry"
 
 import (
 	"encoding/json"
 	"net"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ServiceConfig stores daemon registry services configuration.
 type ServiceConfig struct {
-	InsecureRegistryCIDRs []*NetIPNet           `json:"InsecureRegistryCIDRs"`
-	IndexConfigs          map[string]*IndexInfo `json:"IndexConfigs"`
-	Mirrors               []string
+	AllowNondistributableArtifactsCIDRs     []*NetIPNet
+	AllowNondistributableArtifactsHostnames []string
+	InsecureRegistryCIDRs                   []*NetIPNet           `json:"InsecureRegistryCIDRs"`
+	IndexConfigs                            map[string]*IndexInfo `json:"IndexConfigs"`
+	Mirrors                                 []string
 }
 
 // NetIPNet is the net.IPNet type, which can be marshalled and
@@ -41,31 +45,32 @@ func (ipnet *NetIPNet) UnmarshalJSON(b []byte) (err error) {
 // IndexInfo contains information about a registry
 //
 // RepositoryInfo Examples:
-// {
-//   "Index" : {
-//     "Name" : "docker.io",
-//     "Mirrors" : ["https://registry-2.docker.io/v1/", "https://registry-3.docker.io/v1/"],
-//     "Secure" : true,
-//     "Official" : true,
-//   },
-//   "RemoteName" : "library/debian",
-//   "LocalName" : "debian",
-//   "CanonicalName" : "docker.io/debian"
-//   "Official" : true,
-// }
 //
-// {
-//   "Index" : {
-//     "Name" : "127.0.0.1:5000",
-//     "Mirrors" : [],
-//     "Secure" : false,
-//     "Official" : false,
-//   },
-//   "RemoteName" : "user/repo",
-//   "LocalName" : "127.0.0.1:5000/user/repo",
-//   "CanonicalName" : "127.0.0.1:5000/user/repo",
-//   "Official" : false,
-// }
+//	{
+//	  "Index" : {
+//	    "Name" : "docker.io",
+//	    "Mirrors" : ["https://registry-2.docker.io/v1/", "https://registry-3.docker.io/v1/"],
+//	    "Secure" : true,
+//	    "Official" : true,
+//	  },
+//	  "RemoteName" : "library/debian",
+//	  "LocalName" : "debian",
+//	  "CanonicalName" : "docker.io/debian"
+//	  "Official" : true,
+//	}
+//
+//	{
+//	  "Index" : {
+//	    "Name" : "127.0.0.1:5000",
+//	    "Mirrors" : [],
+//	    "Secure" : false,
+//	    "Official" : false,
+//	  },
+//	  "RemoteName" : "user/repo",
+//	  "LocalName" : "127.0.0.1:5000/user/repo",
+//	  "CanonicalName" : "127.0.0.1:5000/user/repo",
+//	  "Official" : false,
+//	}
 type IndexInfo struct {
 	// Name is the name of the registry, such as "docker.io"
 	Name string
@@ -101,4 +106,15 @@ type SearchResults struct {
 	NumResults int `json:"num_results"`
 	// Results is a slice containing the actual results for the search
 	Results []SearchResult `json:"results"`
+}
+
+// DistributionInspect describes the result obtained from contacting the
+// registry to retrieve image metadata
+type DistributionInspect struct {
+	// Descriptor contains information about the manifest, including
+	// the content addressable digest
+	Descriptor ocispec.Descriptor
+	// Platforms contains the list of platforms supported by the image,
+	// obtained by parsing the manifest
+	Platforms []ocispec.Platform
 }

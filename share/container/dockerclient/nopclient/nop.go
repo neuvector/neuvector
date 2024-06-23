@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/samalba/dockerclient"
+	"github.com/neuvector/neuvector/share/container/dockerclient"
 )
 
 var (
