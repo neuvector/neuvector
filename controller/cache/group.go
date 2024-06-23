@@ -1224,12 +1224,12 @@ func refreshGroupMetricMap(groupname string, wlid string, deletegrp bool) {
 			} else {
 				//reset group metric
 				grpMet.GroupSessCurIn = 0
-				grpMet.GroupSessIn60 = 0
-				grpMet.GroupByteIn60 = 0
+				grpMet.GroupSessIn12 = 0
+				grpMet.GroupByteIn12 = 0
 				for _, cwlmet := range grpMet.WlMetric {
 					grpMet.GroupSessCurIn += cwlmet.WlSessCurIn
-					grpMet.GroupSessIn60 += cwlmet.WlSessIn60
-					grpMet.GroupByteIn60 += cwlmet.WlByteIn60
+					grpMet.GroupSessIn12 += cwlmet.WlSessIn12
+					grpMet.GroupByteIn12 += cwlmet.WlByteIn12
 				}
 			}
 		}

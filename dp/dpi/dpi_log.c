@@ -767,21 +767,13 @@ static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
 {
     uint32_t cur = g_stats_slot;
     uint32_t last = s->cur_slot;
-    uint32_t i, n, sess, from;
-    uint64_t byte;
-    // 5s, last slot
-    if (cur > 0 && last + 1 >= cur) {
-        i = (cur - 1) % STATS_SLOTS;
-        sess = 0;
-        byte = 0;
-        sess += s->in.sess_ring[i];
-        byte += s->in.byte_ring[i];
-        dps->EpSessIn1 = sess;
-        dps->EpByteIn1 = byte;
-    }
-    // 12s
+    register uint32_t i, n;
+    register uint32_t sess;
+    register uint64_t byte;
+
+    // 12x5s
     if (last + 12 >= cur) {
-        from = (cur >= 12) ? cur - 12 : 0;
+        uint32_t from = (cur >= 12) ? cur - 12 : 0;
         sess = 0;
         byte = 0;
         for (n = from; n < last; n ++) {
@@ -791,19 +783,6 @@ static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
         }
         dps->EpSessIn12 = sess;
         dps->EpByteIn12 = byte;
-    }
-    // 60s
-    if (last + 59 >= cur) {
-        from = (cur >= 59) ? cur - 59 : 0;
-        sess = 0;
-        byte = 0;
-        for (n = from; n < last; n ++) {
-            i = n % STATS_SLOTS;
-            sess += s->in.sess_ring[i];
-            byte += s->in.byte_ring[i];
-        }
-        dps->EpSessIn60 = sess;
-        dps->EpByteIn60 = byte;
     }
     dps->EpSessCurIn = s->in.cur_session;
 }
@@ -907,8 +886,8 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
     io_mac_t *mac = rcu_map_lookup(&g_ep_map, dps->EPMAC);
     if (mac != NULL) {
         get_ingress_stats(dps, &mac->ep->stats);
-        DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn=%lu EpSessIn60=%lu EpByteIn60=%llu EpSessIn12=%lu EpByteIn12=%llu EpSessIn1=%lu EpByteIn1=%llu\n",
-            dps->EpSessCurIn, dps->EpSessIn60, dps->EpByteIn60, dps->EpSessIn12, dps->EpByteIn12, dps->EpSessIn1, dps->EpByteIn1 );
+        /*DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn(%lu) EpSessIn12(%lu) EpByteIn12(%llu)\n",
+        dps->EpSessCurIn, dps->EpSessIn12, dps->EpByteIn12);*/
     }
 }
 

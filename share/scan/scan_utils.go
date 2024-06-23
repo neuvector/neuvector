@@ -289,15 +289,39 @@ func isRpmKernelPackage(p *rpmdb.PackageInfo) string {
 }
 
 func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
+	if strings.HasPrefix(fullpath, "/proc/") || strings.HasPrefix(fullpath, "/host/proc/") {
+		// container scans
+		if rpmFile, err := os.Open(fullpath); err != nil {
+			// log.WithFields(log.Fields{"file": fullpath, "error": err}).Error()
+			return nil, err
+		} else {
+			tempDir, err := os.MkdirTemp("", "")
+			if err == nil {
+				defer os.RemoveAll(tempDir)
+			}
+			dstPath := filepath.Join(tempDir, filepath.Base(fullpath)) // retain the filename
+			if dstFile, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666); err == nil {
+				if _, err := io.Copy(dstFile, rpmFile); err == nil {
+					fullpath = dstPath // updated
+				}
+				dstFile.Close()
+			} else {
+				log.WithFields(log.Fields{"file": dstPath, "error": err}).Error("failed: Copy")
+			}
+			rpmFile.Close()
+		}
+	}
+
 	db, err := rpmdb.Open(fullpath)
 	if err != nil {
+		log.WithFields(log.Fields{"file": fullpath, "error": err}).Error("Failed to open rpm packages")
 		return nil, err
 	}
 	defer db.Close()
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
-		log.WithFields(log.Fields{"file": fullpath, "kernel": kernel}).Error("Failed to read rpm packages")
+		log.WithFields(log.Fields{"file": fullpath, "error": err}).Error("Failed to read rpm packages")
 		return nil, err
 	}
 

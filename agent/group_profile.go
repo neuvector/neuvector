@@ -1089,7 +1089,7 @@ func updateContainerFamilyTrees(name string) {
 			if c.info != nil {
 				bPrivileged = c.info.Privileged
 			}
-			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivileged)
+			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivileged, c.healthCheck)
 		}
 	}
 }
