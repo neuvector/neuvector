@@ -358,13 +358,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 		}
 	}
 
-	var fedRole string
-	var err error
-	if acc.HasPermFed() {
-		fedRole, err = cacher.GetFedMembershipRole(access.NewReaderAccessControl())
-	} else {
-		fedRole, err = cacher.GetFedMembershipRole(acc)
-	}
+	fedRole, err := cacher.GetFedMembershipRole(acc)
 	if err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return nil, nil
@@ -391,7 +385,7 @@ func isFedRulesCleanupOngoing(w http.ResponseWriter) bool {
 	return false
 }
 
-// Be careful. This function is only for between-clusters joining/leaving APIs
+// Be careful. This function is only for between-clusters joining/leaving/polling/csp_support APIs
 func isNoAuthFedOpAllowed(expectedFedRole string, w http.ResponseWriter, r *http.Request, acc *access.AccessControl) bool {
 	fedRole, err := cacher.GetFedMembershipRole(acc)
 	if err != nil || (expectedFedRole != FedRoleAny && fedRole != expectedFedRole) {

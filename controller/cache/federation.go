@@ -319,11 +319,11 @@ func (m CacheMethod) GetFedMembershipRole(acc *access.AccessControl) (string, er
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if !acc.Authorize(&fedMembershipCache, nil) {
-		return "", common.ErrObjectAccessDenied
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
+		return fedMembershipCache.FedRole, nil
 	}
 
-	return fedMembershipCache.FedRole, nil
+	return "", common.ErrObjectAccessDenied
 }
 
 func (m CacheMethod) GetFedMember(statusMap map[int]string, acc *access.AccessControl) (*api.RESTFedMembereshipData, error) {
@@ -392,7 +392,7 @@ func (m CacheMethod) GetFedLocalRestInfo(acc *access.AccessControl) (share.CLUSR
 	if fedMembershipCache.UseProxy == "https" {
 		useProxy = 1 // 1 means const_https_proxy
 	}
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		return fedMembershipCache.LocalRestInfo, useProxy
 	}
 	return share.CLUSRestServerInfo{}, useProxy
@@ -432,7 +432,7 @@ func (m CacheMethod) GetFedJoinedClusterToken(id, mainSessionID string, acc *acc
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		if c, ok := fedJoinedClustersCache[id]; ok && c != nil && c.cluster != nil {
 			if token, ok := c.tokenCache[mainSessionID]; ok {
 				return token, nil
@@ -455,7 +455,7 @@ func (m CacheMethod) GetFedJoinedClusterIdMap(acc *access.AccessControl) map[str
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		list := make(map[string]bool, len(fedJoinedClustersCache))
 		for id, cache := range fedJoinedClustersCache {
 			list[id] = cache.cluster.Disabled
@@ -483,7 +483,7 @@ func (m CacheMethod) GetFedJoinedCluster(id string, acc *access.AccessControl) s
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		if c, ok := fedJoinedClustersCache[id]; ok && c != nil && c.cluster != nil {
 			return *c.cluster
 		}
