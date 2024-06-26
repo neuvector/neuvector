@@ -8116,7 +8116,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -8370,7 +8370,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -8763,7 +8763,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
