@@ -89,11 +89,12 @@ type DbAssetVul struct {
 	W_service_group  string
 	W_workload_image string
 
-	CVE_high   int
-	CVE_medium int
-	CVE_low    int
-	Vuls       []*share.ScanVulnerability
-	Scanned_at string
+  CVE_critical int
+	CVE_high     int
+	CVE_medium   int
+	CVE_low      int
+	Vuls         []*share.ScanVulnerability
+	Scanned_at   string
 
 	N_os         string
 	N_kernel     string

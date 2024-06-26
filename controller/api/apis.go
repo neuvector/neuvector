@@ -2166,6 +2166,7 @@ const ScanStatusUnsupported string = "unsupported"
 
 type RESTScanBrief struct {
 	Status           string `json:"status"`
+	CriticalVuls     int    `json:"critical"`
 	HighVuls         int    `json:"high"`
 	MedVuls          int    `json:"medium"`
 	Result           string `json:"result"`
@@ -2174,6 +2175,10 @@ type RESTScanBrief struct {
 	BaseOS           string `json:"base_os"`
 	CVEDBVersion     string `json:"scanner_version"`
 	CVEDBCreateTime  string `json:"cvedb_create_time"`
+}
+
+func (sb *RESTScanBrief) CVECount() int {
+	return sb.CriticalVuls + sb.HighVuls + sb.MedVuls
 }
 
 type RESTScanPlatformSummary struct {
@@ -4039,6 +4044,7 @@ type VulAssetSessionSummary struct {
 }
 
 type VulAssetCountDist struct {
+	Critical   int `json:"critical"`
 	High       int `json:"high"`
 	Medium     int `json:"medium"`
 	Low        int `json:"low"`
@@ -4051,6 +4057,7 @@ type VulAssetCountDist struct {
 type AssetCVECount struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
+	Critical    int    `json:"critical"`
 	High        int    `json:"high"`
 	Medium      int    `json:"medium"`
 	Low         int    `json:"low"`

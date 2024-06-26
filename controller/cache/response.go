@@ -19,19 +19,21 @@ import (
 )
 
 type eventDesc struct {
-	id                  string
-	event               string
-	name                string
-	groupName           string
-	level               string
-	proc                string
-	cve_high            int
-	cve_med             int
-	cve_high_fixed_info []scanUtils.FixedVulInfo
-	items               []string
-	vuls                utils.Set
-	arg                 interface{}
-	noQuar              bool
+	id                      string
+	event                   string
+	name                    string
+	groupName               string
+	level                   string
+	proc                    string
+	cve_critical            int
+	cve_high                int
+	cve_med                 int
+	cve_critical_fixed_info []scanUtils.FixedVulInfo
+	cve_high_fixed_info     []scanUtils.FixedVulInfo
+	items                   []string
+	vuls                    utils.Set
+	arg                     interface{}
+	noQuar                  bool
 }
 
 type actionDesc struct {
