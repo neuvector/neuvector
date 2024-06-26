@@ -685,11 +685,9 @@ func calGrpMet(lgrpname, epWL string, cache *workloadCache, grpcache *groupCache
 }
 
 func isCalGrpMet(grpcache *groupCache) bool {
-	if (grpcache.group.CfgType == share.Learned ||
-		grpcache.group.CfgType == share.UserCreated) &&
-		!grpcache.group.Reserved && grpcache.group.MonMetric &&
-		(grpcache.group.GrpSessCur > 0 || grpcache.group.GrpSessRate > 0 ||
-		grpcache.group.GrpBandWidth > 0) {
+	if  grpcache.group.MonMetric && (grpcache.group.GrpSessCur > 0 || grpcache.group.GrpSessRate > 0 ||
+		grpcache.group.GrpBandWidth > 0) && (grpcache.group.CfgType == share.Learned ||
+		grpcache.group.CfgType == share.UserCreated) &&	!grpcache.group.Reserved {
 		return true
 	}
 	return false
@@ -731,9 +729,10 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 		if !preQualifyConnect(conn) {
 			continue
 		}
-		if !policyApplyIngress {
+		if conn.Ingress {
 			CalculateGroupMetric(conn)
 		}
+
 		var ca, sa *nodeAttr
 		var stip *serverTip
 		var add bool
@@ -798,9 +797,6 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"EpByteIn12":     conn.EpByteIn12,
 		}).Debug()
 
-		if policyApplyIngress {
-			CalculateGroupMetric(conn)
-		}
 		addConnectToGraph(conn, ca, sa, stip)
 
 		//add additional conversation link between sidecar and app

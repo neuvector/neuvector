@@ -170,6 +170,10 @@ func addConnectToGraph(conn *share.CLUSConnection, ca, sa *nodeAttr, stip *serve
 		}).Debug("empty endpoint!")
 		return
 	}
+	//check whether network policy is disabled
+	if getDisableNetPolicyStatus() {
+		return
+	}
 
 	// Node attributes: not to replace the attribute node so the alias can be kept.
 	if a := wlGraph.Attr(conn.ClientWL, attrLink, dummyEP); a == nil {
