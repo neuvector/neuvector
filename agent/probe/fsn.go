@@ -452,12 +452,8 @@ func (fsn *FileNotificationCtr) Close() {
 
 func (fsn *FileNotificationCtr) skipPathByRole(role, path string) bool {
 	switch role {
-	case "enforcer":
-		if strings.HasPrefix(path, "/tmp") {
-			return true
-		}
-	case "scanner":
-		if strings.HasPrefix(path, "/tmp/images") || strings.HasPrefix(path, "/tmp/neuvector") {
+	case "enforcer", "scanner", "controller+enforcer+manager":
+		if strings.HasPrefix(path + "/", "/tmp/") {
 			return true
 		}
 	}
