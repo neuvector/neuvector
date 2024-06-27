@@ -205,6 +205,10 @@ func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]stri
 func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTWorkloadAssetView, error) {
 	records := make([]*api.RESTWorkloadAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "w_domain", "w_applications", "policy_mode", "w_service_group",
 		"scanned_at", "idns", "vulsb"}
 
@@ -255,6 +259,10 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTHostAssetView, error) {
 	records := make([]*api.RESTHostAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "policy_mode",
 		"scanned_at", "n_os", "n_kernel", "n_cpus", "n_memory", "n_containers", "idns", "vulsb"}
 
@@ -302,6 +310,10 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTImageAssetView, error) {
 	records := make([]*api.RESTImageAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
@@ -346,6 +358,10 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 
 func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTPlatformAssetView, error) {
 	records := make([]*api.RESTPlatformAssetView, 0)
+
+	if len(assets) == 0 {
+		return records, nil
+	}
 
 	columns := []interface{}{"assetid", "name", "p_version", "p_base_os", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")

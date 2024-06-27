@@ -421,9 +421,11 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed := getAllAllowedResourceId(acc)
+
 	// apply cve based filter (last modified time)
 	start := time.Now()
-	vulMap, assetsMap, err := db.GetSessionMatchedVuls(queryFilter.QueryToken, queryFilter.Filters.LastModifiedTime)
+	vulMap, assetsMap, err := db.GetSessionMatchedVuls(allowed, queryFilter.QueryToken, queryFilter.Filters.LastModifiedTime)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return
