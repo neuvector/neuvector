@@ -2745,9 +2745,6 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
 
 static void send_connects(int count)
 {
-    if (g_disable_net_policy) {
-        return;
-    }
     //DEBUG_CTRL("count=%d\n", count);
 
     DPMsgHdr *hdr = (DPMsgHdr *)g_notify_msg;
