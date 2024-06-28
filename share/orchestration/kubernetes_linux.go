@@ -7,7 +7,7 @@ import (
 func (d *kubernetes) isTunnelInterface(name, kind string) bool {
 	// OpenShift: tun0; calico: tunl0
 	// OpenShift: openvswitch; calico: ipip
-	if strings.HasPrefix(name, "tun") && (kind == "ipip" || kind == "openvswitch") {
+	if (strings.HasPrefix(name, "tun") || strings.HasPrefix(name, "ovn")) && (kind == "ipip" || kind == "openvswitch") {
 		return true
 	}
 	//antreaCNI's antrea-gw0 i/f

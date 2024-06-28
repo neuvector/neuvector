@@ -78,7 +78,7 @@ func isAgentContainer(id string) bool {
 func getHostIPs() {
 	gInfo.linkStates = getHostLinks()
 	addrs := getHostAddrs()
-	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
+	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Flavor, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
 		Host.TunnelIP = tun
 	}
