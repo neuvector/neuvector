@@ -1993,6 +1993,7 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedLeaveReq,
 	masterCluster api.RESTFedMasterClusterInfo, jointCluster api.RESTFedJointClusterInfo) (share.CLUSFedMembership, int, int, error) {
 
+	var statueCode int = http.StatusOK
 	var membership share.CLUSFedMembership
 
 	if masterCluster.ID == "" || jointCluster.ID == "" {
@@ -2034,6 +2035,9 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 			}
 		} else {
 			err99 = err
+			if err != nil {
+				statueCode = http.StatusInternalServerError
+			}
 		}
 	} else {
 		err99 = err
@@ -2042,7 +2046,7 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 	// after leaving federation, standalone NV reports its usage to CSP
 	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
 
-	return membership, http.StatusOK, 0, err99
+	return membership, statueCode, 0, err99
 }
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
