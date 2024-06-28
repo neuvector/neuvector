@@ -297,7 +297,7 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 	vulAsset.Skip = !keep
 }
 
-func GetSessionMatchedVuls(sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
+func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
@@ -332,7 +332,7 @@ func GetSessionMatchedVuls(sessionToken string, LastModifiedTime int64) (map[str
 	imageSet := utils.NewSet()
 	platformSet := utils.NewSet()
 
-	allowed := make(map[string][]string, 0)
+	assets := make(map[string][]string, 0)
 
 	records := make(map[string]*DbVulAsset)
 	for rows.Next() {
@@ -355,12 +355,12 @@ func GetSessionMatchedVuls(sessionToken string, LastModifiedTime int64) (map[str
 		}
 	}
 
-	allowed[AssetWorkload] = workloadSet.ToStringSlice()
-	allowed[AssetNode] = nodeSet.ToStringSlice()
-	allowed[AssetImage] = imageSet.ToStringSlice()
-	allowed[AssetPlatform] = platformSet.ToStringSlice()
+	assets[AssetWorkload] = allowed[AssetWorkload].Intersect(workloadSet).ToStringSlice()
+	assets[AssetNode] = allowed[AssetNode].Intersect(nodeSet).ToStringSlice()
+	assets[AssetImage] = allowed[AssetImage].Intersect(imageSet).ToStringSlice()
+	assets[AssetPlatform] = allowed[AssetPlatform].Intersect(platformSet).ToStringSlice()
 
-	return records, allowed, nil
+	return records, assets, nil
 }
 
 func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
@@ -840,14 +840,15 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 		return nil, errors.New("unsupport type")
 	}
 
-	// step-1: format query statement
-	// SELECT "assetid", "name", "cve_high", "cve_medium", "cve_low" FROM "assetvuls" WHERE ("type" = 'image') ORDER BY "cve_count" DESC LIMIT 3
-	// SELECT "assetid", "name", "cve_high", "cve_medium", "cve_low" FROM "assetvuls" WHERE (("type" = 'image') AND ("assetid" IN ('dc00f1198a444104617989bde31132c22d7527c65e825b9de4bbe6313f22637f', '9a48168d5ab29a332e14541be713b0be76f330c035f2dfbf115f2583c74edd33'))) ORDER BY "cve_count" DESC LIMIT 3
+	tops := make([]*api.AssetCVECount, 0)
+
+	if len(allowedAssets) == 0 {
+		return tops, nil
+	}
+
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From("assetvuls").Select("assetid", "name", "cve_high", "cve_medium", "cve_low").Where(buildTopAssetWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
 
-	// step-2: execute it and fetch the data
-	// db := memoryDbHandle
 	db := dbHandle
 	rows, err := db.Query(statement, args...)
 	if err != nil {
@@ -855,7 +856,6 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	}
 	defer rows.Close()
 
-	tops := make([]*api.AssetCVECount, 0)
 	for rows.Next() {
 		record := &api.AssetCVECount{}
 		err = rows.Scan(&record.ID, &record.DisplayName, &record.High, &record.Medium, &record.Low)
