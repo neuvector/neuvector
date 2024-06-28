@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -43,7 +43,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	}
 
 	if r.Method == http.MethodPatch || r.Method == http.MethodPost {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -117,10 +117,6 @@ func (q *VulQueryFilter) GetAssestBasedFilters() map[string]int {
 	stats[AssetRulePlatform] = 1
 
 	return stats
-}
-
-func catchMeGetAll() {
-	fmt.Println()
 }
 
 func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter) ([]*DbVulAsset, int, []string, error) {
@@ -952,33 +948,6 @@ func buildAssetFilterWhereClause(queryFilter *api.VulQueryFilterViewModel) exp.E
 	exp4 := buildWhereClauseForPlatform(nil, queryFilter)
 
 	return goqu.Or(exp1, exp2, exp3, exp4)
-}
-
-func getVulsBytes(assetid string) ([]byte, error) {
-	db := dbHandle
-	if db == nil {
-		return nil, errors.New("db is not ready")
-	}
-
-	dialect := goqu.Dialect("sqlite3")
-	columns := []interface{}{"vulsb"}
-
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"assetid": assetid}).Prepared(true).ToSQL()
-	rows, err := db.Query(statement, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var vulsBytes []byte
-	for rows.Next() {
-		err = rows.Scan(&vulsBytes)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return vulsBytes, nil
 }
 
 func batchProessFillVulPackages(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte, idnsStr string, cveList *[]string) {

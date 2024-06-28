@@ -16,13 +16,10 @@ import (
 )
 
 var TESTDbPerf bool
-var createQuerySessionTS time.Time
 
 func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
-
-	createQuerySessionTS = time.Now()
 
 	queryStat := &api.RESTScanAssetQueryStats{
 		PerfStats: make([]string, 0),
@@ -79,8 +76,8 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	// get [top_image] and [top_nodes] summary,
 	// it's static data (don't interact with filter)
 	start = time.Now()
-	top5Images, err := db.GetTopAssets(allowed, db.AssetImage, 5)
-	top5Nodes, err := db.GetTopAssets(allowed, db.AssetNode, 5)
+	top5Images, _ := db.GetTopAssets(allowed, db.AssetImage, 5)
+	top5Nodes, _ := db.GetTopAssets(allowed, db.AssetNode, 5)
 	elapsed = time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("3/4, get summary top_image and top_node, took=%v", elapsed))
 

@@ -37,6 +37,7 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 			"data1":            queryStat.Data1,
 			"data2":            queryStat.Data2,
 			"data3":            queryStat.Data3,
+			"filedb_ready":     queryStat.FileDBReady,
 		},
 	)
 	sql, args, _ := ds.Prepared(true).ToSQL()
@@ -89,8 +90,8 @@ func GetQueryStat(token string) (*QueryStat, error) {
 		defer rows.Close()
 
 		stat := &QueryStat{}
-		for rows.Next() {
-			rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
+		if rows.Next() {
+			err = rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
 				&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady)
 			if err != nil {
 				return nil, err

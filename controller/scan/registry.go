@@ -58,7 +58,6 @@ type imageInfoCache struct {
 	envs                           []string
 	cmds                           []string
 	labels                         map[string]string
-	modules                        []*share.ScanModule
 	secrets                        []*share.ScanSecretLog
 	setIDPerm                      []*share.ScanSetIdPermLog
 	filteredTime                   time.Time
@@ -487,7 +486,6 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			c.envs = report.Envs
 			c.labels = report.Labels
 			c.cmds = report.Cmds
-			c.modules = report.Modules
 			if report.Secrets != nil {
 				c.secrets = report.Secrets.Logs
 			}
@@ -535,6 +533,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 			dbAssetVul := getImageDbAssetVul(c, sum, highs, meds, lows)
 			dbAssetVul.Vuls = report.Vuls
+			dbAssetVul.Modules = report.Modules
 
 			b, err := json.Marshal(images2IDNames(rs, sum))
 			if err == nil {
@@ -542,6 +541,8 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			}
 
 			db.PopulateAssetVul(dbAssetVul)
+			report.Vuls = nil
+			report.Modules = nil
 		}
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -491,38 +492,58 @@ func benchStateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	if nType == cluster.ClusterNotifyDelete {
+		db.DeleteBenchByID(share.CLUSBenchStateKey2ID(key))
 		return
 	}
 
 	id := share.CLUSBenchStateKey2ID(key)
 	if share.CLUSBenchStateKey2Type(key) == "host" {
 		if c := getHostCache(id); c != nil {
+			benchData := &db.DbBench{
+				Type:    "host",
+				AssetID: id,
+			}
 			if v := readBenchFromCluster(id, share.BenchCustomHost); v != nil {
-				c.customBenchValue = v
+				benchData.CustomBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchDockerHost); v != nil {
-				c.dockerBenchValue = v
+				benchData.DockerBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchKubeMaster); v != nil {
-				c.masterBenchValue = v
+				benchData.MasterBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchKubeWorker); v != nil {
-				c.workerBenchValue = v
+				benchData.WorkerBenchValue = v
+			}
+
+			err := db.PopulateBenchData(benchData)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "id": id}).Error("save bench data failed")
 			}
 		}
 	} else {
 		if c := getWorkloadCache(id); c != nil {
+			benchData := &db.DbBench{
+				Type:    "workload",
+				AssetID: id,
+			}
+
 			if v := readBenchFromCluster(id, share.BenchCustomContainer); v != nil {
-				c.customBenchValue = v
+				benchData.CustomBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchContainer); v != nil {
-				c.dockerBenchValue = v
+				benchData.DockerBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchContainerSecret); v != nil {
-				c.secretBenchValue = v
+				benchData.SecretBenchValue = v
 			}
 			if v := readBenchFromCluster(id, share.BenchContainerSetID); v != nil {
-				c.setidBenchValue = v
+				benchData.SetidBenchValue = v
+			}
+
+			err := db.PopulateBenchData(benchData)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "id": id}).Error("save bench data failed")
 			}
 		}
 	}

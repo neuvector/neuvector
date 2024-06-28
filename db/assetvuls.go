@@ -89,7 +89,7 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 
 	// Insert case
 	if assetVul.Db_ID == 0 {
-		ds := dialect.Insert(targetTable).Rows(getCompiledRecord(assetVul))
+		ds := dialect.Insert(targetTable).Rows(getCompiledAssetVulRecord(assetVul))
 		sql, args, _ := ds.Prepared(true).ToSQL()
 
 		result, err := db.Exec(sql, args...)
@@ -106,7 +106,7 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 	}
 
 	// Update case
-	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledRecord(assetVul)).Prepared(true).ToSQL()
+	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledAssetVulRecord(assetVul)).Prepared(true).ToSQL()
 	_, err := db.Exec(sql, args...)
 	if err != nil {
 		return 0, err
@@ -792,14 +792,23 @@ func buildWhereClauseForPlatform(allowedID []string, queryFilter *api.VulQueryFi
 	return goqu.And(part1_assetType, part2_allowed)
 }
 
-func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
-	var vulsBytes []byte
+func encodeAndCompress(data interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(data); err != nil {
+		return nil, err
+	}
+	return utils.GzipBytes(buf.Bytes()), nil
+}
+
+func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
+	var vulsBytes, modulesBytes []byte
 	if len(assetVul.Vuls) > 0 {
-		var buf bytes.Buffer
-		enc := gob.NewEncoder(&buf)
-		if err := enc.Encode(&assetVul.Vuls); err == nil {
-			vulsBytes = utils.GzipBytes(buf.Bytes())
-		}
+		vulsBytes, _ = encodeAndCompress(assetVul.Vuls)
+	}
+
+	if len(assetVul.Modules) > 0 {
+		modulesBytes, _ = encodeAndCompress(assetVul.Modules)
 	}
 
 	record := &goqu.Record{
@@ -829,6 +838,7 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 		"p_base_os":    assetVul.P_base_os,
 		"idns":         assetVul.Idns,
 		"vulsb":        vulsBytes,
+		"modulesb":     modulesBytes,
 	}
 
 	return record
