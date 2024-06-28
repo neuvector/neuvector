@@ -446,8 +446,10 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 
 
 	// it depends on the init conditions by runtime engine
-	if isRunTimeAddedFile(filepath.Join("/root", path)) && time.Since(grp.startAt) < time.Duration(time.Second * 60) {
-		return
+	if isRunTimeAddedFile(filepath.Join("/root", path)) {
+		if event == fileEventAccessed || time.Since(grp.startAt) < time.Duration(time.Second * 60) {
+			return
+		}
 	}
 
 	if event != fileEventAccessed ||
@@ -840,9 +842,7 @@ func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, pa
 						event = fileEventModified
 						fmod.finfo.Hash = hash
 					}
-				}
-
-				if (fmod.mask & syscall.IN_MODIFY) > 0 {
+				} else if (fmod.mask & syscall.IN_MODIFY) > 0 {
 					event = fileEventModified
 				}
 			}
@@ -890,9 +890,8 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 					event = fileEventModified
 					fmod.finfo.Hash = hash
 				}
-				if (fmod.mask & syscall.IN_MODIFY) > 0 {
-					event = fileEventModified
-				}
+			} else if (fmod.mask & syscall.IN_MODIFY) > 0 {
+				event = fileEventModified
 			}
 		} else {
 			log.WithFields(log.Fields{"fullPath": fullPath, "mask": fmod.mask}).Debug("file event not found")
