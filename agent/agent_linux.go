@@ -91,7 +91,7 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, flavor, network str
 			}
 
 			for _, addr := range iface.Addrs {
-				if utils.IsIPv4(addr.IPNet.IP) {
+				if utils.IsIPv4(addr.IPNet.IP) && !addr.IPNet.IP.IsLinkLocalUnicast() {//169.254.x.x IP should not be included
 					log.WithFields(log.Fields{"link": name, "ipnet": addr.IPNet}).Info("Switch")
 					if name == "azure0" || (iface.Type == "openvswitch" && name == "br-ex") {
 						devs[name] = append(devs[name], share.CLUSIPAddr{
