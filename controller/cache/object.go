@@ -219,23 +219,30 @@ func workload2EndpointREST(cache *workloadCache, withChildren bool) *api.RESTCon
 }
 
 // For internal use, only needed fields are assigned
-func workload2Risk(cache *workloadCache) *common.WorkloadRisk {
+func workload2Risk(cache *workloadCache, includeBench bool) *common.WorkloadRisk {
 	wl := cache.workload
 	r := &common.WorkloadRisk{
-		ID:               wl.ID,
-		Name:             cache.podName,
-		PlatformRole:     cache.platformRole,
-		ImageID:          wl.ImageID,
-		Domain:           wl.Domain,
-		CustomBenchValue: cache.customBenchValue,
-		DockerBenchValue: cache.dockerBenchValue,
-		SecretBenchValue: cache.secretBenchValue,
-		SetidBenchValue:  cache.setidBenchValue,
+		ID:           wl.ID,
+		Name:         cache.podName,
+		PlatformRole: cache.platformRole,
+		ImageID:      wl.ImageID,
+		Domain:       wl.Domain,
 	}
 	if cache.scanBrief != nil {
 		r.BaseOS = cache.scanBrief.BaseOS
 	}
 	r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
+
+	if includeBench {
+		bench, err := db.GetBenchData(wl.ID)
+		if err == nil {
+			r.CustomBenchValue = bench.CustomBenchValue
+			r.DockerBenchValue = bench.DockerBenchValue
+			r.SecretBenchValue = bench.SecretBenchValue
+			r.SetidBenchValue = bench.SetidBenchValue
+		}
+	}
+
 	return r
 }
 

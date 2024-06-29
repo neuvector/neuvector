@@ -50,6 +50,7 @@ type imageSummary struct {
 	summary  *share.CLUSRegistryImageSummary
 	cache    *imageInfoCache
 	vulNames utils.Set
+	modules  []*share.ScanModule
 }
 
 func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSummary, c *imageInfoCache, vpf scanUtils.VPFInterface) {
@@ -73,7 +74,7 @@ func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, v
 			if s, ok := sumMap[id]; !ok || sum.ScannedAt.After(s.summary.ScannedAt) {
 				refreshScanCache(rs, id, sum, c, vpf)
 				sumMap[id] = &imageSummary{summary: sum, cache: c, vulNames: utils.NewSet()}
-				getCVENames(rs, id, sumMap[id].vulNames, vpf)
+				fillImageVulModule(rs, id, sumMap[id], vpf)
 			}
 		}
 	}
@@ -230,15 +231,15 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 			Labels:          make(map[string]string, len(s.cache.labels)),
 			SecretsCnt:      len(s.cache.secrets),
 			SetIDPermCnt:    len(s.cache.setIDPerm),
-			Modules:         s.cache.modules,
 			Verifiers:       s.cache.signatureVerifiers,
 		}
 
 		summary.VulNames = s.vulNames
+		summary.Modules = s.modules
 
 		if s.cache.vulInfo != nil {
-			summary.HighVulInfo, _ = s.cache.vulInfo[share.VulnSeverityHigh]
-			summary.MediumVulInfo, _ = s.cache.vulInfo[share.VulnSeverityMedium]
+			summary.HighVulInfo = s.cache.vulInfo[share.VulnSeverityHigh]
+			summary.MediumVulInfo = s.cache.vulInfo[share.VulnSeverityMedium]
 		}
 		summary.LowVulInfo = s.cache.lowVulInfo
 		for _, envVar := range s.cache.envs {
@@ -579,7 +580,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 
 			refreshScanCache(rs, id, sum, c, vpf)
 
-			reportVuls, err := db.GetVulnerability(id)
+			reportVuls, reportModules, err := db.GetVulnerabilityModule(id)
 			if err != nil {
 				return nil, err
 			}
@@ -603,8 +604,8 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 				rrpt.SetIDs = append(rrpt.SetIDs, scanUtils.ScanSetIdPerm2REST(p))
 			}
 
-			rrpt.Modules = make([]*api.RESTScanModule, len(c.modules))
-			for i, m := range c.modules {
+			rrpt.Modules = make([]*api.RESTScanModule, len(reportModules))
+			for i, m := range reportModules {
 				rrpt.Modules[i] = scanUtils.ScanModule2REST(m)
 			}
 
@@ -968,13 +969,13 @@ func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterfac
 
 	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
 		// To avoid authorize for every image - run faster.
-		for id, _ := range rs.cache {
+		for id := range rs.cache {
 			if _, ok := rs.summary[id]; ok {
 				allowed = append(allowed, id)
 			}
 		}
 	} else {
-		for id, _ := range rs.cache {
+		for id := range rs.cache {
 			if sum, ok := rs.summary[id]; ok {
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					allowed = append(allowed, id)
@@ -986,22 +987,21 @@ func (m *scanMethod) GetRegistryImagesIDs(name string, vpf scanUtils.VPFInterfac
 	return allowed, nil
 }
 
-func getCVENames(rs *Registry, id string, vulNames utils.Set, vpf scanUtils.VPFInterface) error {
-	Vuls, err := db.GetVulnerability(id)
+func fillImageVulModule(rs *Registry, id string, image *imageSummary, vpf scanUtils.VPFInterface) error {
+	vuls, modules, err := db.GetVulnerabilityModule(id)
 	if err != nil {
 		return err
 	}
 
-	localVulTraits := scanUtils.ExtractVulnerability(Vuls)
-
+	image.modules = modules
+	localVulTraits := scanUtils.ExtractVulnerability(vuls)
 	if sum, ok := rs.summary[id]; ok && sum.Status == api.ScanStatusFinished {
 		vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 		for _, v := range localVulTraits {
 			if !v.IsFiltered() {
-				vulNames.Add(v.Name)
+				image.vulNames.Add(v.Name)
 			}
 		}
 	}
-
 	return nil
 }

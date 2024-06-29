@@ -48,22 +48,18 @@ type hostDigest struct {
 }
 
 type hostCache struct {
-	host             *share.CLUSHost
-	agents           utils.Set
-	workloads        utils.Set
-	portWLMap        map[string]*workloadDigest
-	ipWLMap          map[string]*workloadDigest
-	wlSubnets        utils.Set          // host-scope subnet *net.IPNet, such as 172.17.0.0/16
-	scanBrief        *api.RESTScanBrief // Stats of filtered entries
-	customBenchValue []byte
-	dockerBenchValue []byte
-	masterBenchValue []byte
-	workerBenchValue []byte
-	state            string
-	timerTask        string
-	timerSched       time.Time
-	runningPods      utils.Set
-	runningCntrs     utils.Set
+	host         *share.CLUSHost
+	agents       utils.Set
+	workloads    utils.Set
+	portWLMap    map[string]*workloadDigest
+	ipWLMap      map[string]*workloadDigest
+	wlSubnets    utils.Set          // host-scope subnet *net.IPNet, such as 172.17.0.0/16
+	scanBrief    *api.RESTScanBrief // Stats of filtered entries
+	state        string
+	timerTask    string
+	timerSched   time.Time
+	runningPods  utils.Set
+	runningCntrs utils.Set
 }
 
 type agentCache struct {
@@ -101,10 +97,6 @@ type workloadCache struct {
 	svcChanged       string // old learned group name
 	serviceAccount   string
 	scanBrief        *api.RESTScanBrief // Stats of filtered entries
-	customBenchValue []byte
-	dockerBenchValue []byte
-	secretBenchValue []byte
-	setidBenchValue  []byte
 	children         utils.Set
 }
 
@@ -690,10 +682,10 @@ func (m CacheMethod) GetWorkloadRisk(id string, acc *access.AccessControl) (*com
 			return nil, common.ErrObjectAccessDenied
 		}
 
-		wl := workload2Risk(cache)
+		wl := workload2Risk(cache, true)
 		for child := range cache.children.Iter() {
 			if childCache, ok := wlCacheMap[child.(string)]; ok {
-				wl.Children = append(wl.Children, workload2Risk(childCache))
+				wl.Children = append(wl.Children, workload2Risk(childCache, true))
 			}
 		}
 
@@ -1118,16 +1110,22 @@ func (m CacheMethod) GetAllHostsRisk(acc *access.AccessControl) []*common.Worklo
 			baseOS = cache.scanBrief.BaseOS
 		}
 		pm, _ := getHostPolicyMode(cache)
-		hosts = append(hosts, &common.WorkloadRisk{
-			ID:               cache.host.ID,
-			Name:             cache.host.Name,
-			BaseOS:           baseOS,
-			PolicyMode:       pm,
-			CustomBenchValue: cache.customBenchValue,
-			DockerBenchValue: cache.dockerBenchValue,
-			MasterBenchValue: cache.masterBenchValue,
-			WorkerBenchValue: cache.workerBenchValue,
-		})
+
+		wr := &common.WorkloadRisk{
+			ID:         cache.host.ID,
+			Name:       cache.host.Name,
+			BaseOS:     baseOS,
+			PolicyMode: pm,
+		}
+
+		bench, err := db.GetBenchData(cache.host.ID)
+		if err == nil {
+			wr.CustomBenchValue = bench.CustomBenchValue
+			wr.DockerBenchValue = bench.DockerBenchValue
+			wr.MasterBenchValue = bench.MasterBenchValue
+			wr.WorkerBenchValue = bench.WorkerBenchValue
+		}
+		hosts = append(hosts, wr)
 	}
 	return hosts
 }
@@ -1339,10 +1337,10 @@ func (m CacheMethod) GetAllWorkloadsRisk(acc *access.AccessControl) []*common.Wo
 		}
 
 		if cache.workload.ShareNetNS == "" {
-			wl := workload2Risk(cache)
+			wl := workload2Risk(cache, true)
 			for child := range cache.children.Iter() {
 				if childCache, ok := wlCacheMap[child.(string)]; ok {
-					wl.Children = append(wl.Children, workload2Risk(childCache))
+					wl.Children = append(wl.Children, workload2Risk(childCache, true))
 				}
 			}
 			wls = append(wls, wl)
