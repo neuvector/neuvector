@@ -124,7 +124,7 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		},
 		&tFileContent{
 			data:     []byte(resp.MeteringArchiveData),
-			filename: "neuvector/metering_archive.json",
+			filename: "neuvector/csp_billing_adapter_metering_archive.json",
 		},
 	}
 	w.Header().Set("Content-Disposition", "Attachment; filename=suse_supportconfig.tar.gz")
