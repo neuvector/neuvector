@@ -27,7 +27,7 @@ extern int dp_ctrl_send_json(json_t *root);
 extern int dp_ctrl_send_binary(void *data, int len);
 extern int dp_ctrl_threat_log(DPMsgThreatLog *log);
 extern int dp_ctrl_traffic_log(DPMsgSession *log);
-extern int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_violate);
+extern int dp_ctrl_connect_report(DPMsgSession *log, DPMonitorMetric *metric, int count_session, int count_violate);
 extern void dp_ctrl_init_thread_data(void);
 
 extern int dp_data_add_tap(const char *netns, const char *iface, const char *ep_mac, int thr_id);
@@ -318,7 +318,7 @@ int pcap_traffic_log(DPMsgSession *log)
     return sizeof(*log);
 }
 
-int pcap_connect_report(DPMsgSession *log, int count_session, int count_violate)
+int pcap_connect_report(DPMsgSession *log, DPMonitorMetric *metric, int count_session, int count_violate)
 {
     return sizeof(*log);
 }

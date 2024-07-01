@@ -149,6 +149,7 @@ int dpi_session_start_log(dpi_session_t *s, bool xff)
     DEBUG_LOG_FUNC_ENTRY(DBG_SESSION | DBG_LOG, NULL);
 
     DPMsgSession dps;
+    DPMonitorMetric dpm;
     if (!xff) {
         if (unlikely((s->last_report > 0))) {
             // Indicating this start log is a retry. The early failure should be due to
@@ -158,9 +159,9 @@ int dpi_session_start_log(dpi_session_t *s, bool xff)
             }
         }
 
-        dpi_session_log(s, &dps);
+        dpi_session_log(s, &dps, &dpm);
     } else {
-        dpi_session_log(s, &dps);
+        dpi_session_log(s, &dps, &dpm);
         //change xff related value
         if (dpi_session_log_xff(s, &dps) < 0) {
             return -1;
@@ -170,10 +171,10 @@ int dpi_session_start_log(dpi_session_t *s, bool xff)
     if (likely(!FLAGS_TEST(s->flags, DPI_SESS_FLAG_FAKE_EP))) {
         int ret;
         if (!xff) {
-            ret = g_io_callback->connect_report(&dps, 1,
+            ret = g_io_callback->connect_report(&dps, &dpm, 1,
                      (s->policy_desc.action > DP_POLICY_ACTION_CHECK_APP)?1:0);
         } else {
-            ret = g_io_callback->connect_report(&dps, 1,
+            ret = g_io_callback->connect_report(&dps, &dpm, 1,
                      (s->xff_desc.action > DP_POLICY_ACTION_CHECK_APP)?1:0);
         }
         s->last_report = th_snap.tick;
@@ -195,7 +196,8 @@ static void dpi_session_end_log(dpi_session_t *s, int log_violate, bool xff)
               s->policy_desc.action, s->term_reason, s->severity, s->client.pkts, s->server.pkts);
 
     DPMsgSession dps;
-    dpi_session_log(s, &dps);
+    DPMonitorMetric dpm;
+    dpi_session_log(s, &dps, &dpm);
 
     // g_io_callback->traffic_log(&dps);
 
@@ -214,9 +216,9 @@ static void dpi_session_end_log(dpi_session_t *s, int log_violate, bool xff)
             if (unlikely(s->xff_desc.action > DP_POLICY_ACTION_CHECK_APP)) {
                 // See if start_log has been done
                 if (likely(FLAGS_TEST(s->flags, DPI_SESS_FLAG_START_LOGGED))) {
-                    g_io_callback->connect_report(&dps, 0, log_violate);
+                    g_io_callback->connect_report(&dps, &dpm, 0, log_violate);
                 } else {
-                    g_io_callback->connect_report(&dps, 1, 1);
+                    g_io_callback->connect_report(&dps, &dpm, 1, 1);
                 }
             }
         }
@@ -239,9 +241,9 @@ static void dpi_session_end_log(dpi_session_t *s, int log_violate, bool xff)
                      s->term_reason != DPI_SESS_TERM_NORMAL)) {
             // See if start_log has been done
             if (likely(FLAGS_TEST(s->flags, DPI_SESS_FLAG_START_LOGGED))) {
-                g_io_callback->connect_report(&dps, 0, log_violate);
+                g_io_callback->connect_report(&dps, &dpm, 0, log_violate);
             } else {
-                g_io_callback->connect_report(&dps, 1, 1);
+                g_io_callback->connect_report(&dps, &dpm, 1, 1);
             }
         } else if (likely(s->server.pkts > s_pkts_min)) {
             if (s->ip_proto != IPPROTO_TCP ||
@@ -249,17 +251,17 @@ static void dpi_session_end_log(dpi_session_t *s, int log_violate, bool xff)
                 unlikely(s->severity > 0)) {
                 // See if start_log has been done
                 if (likely(FLAGS_TEST(s->flags, DPI_SESS_FLAG_START_LOGGED))) {
-                    g_io_callback->connect_report(&dps, 0, 0);
+                    g_io_callback->connect_report(&dps, &dpm, 0, 0);
                 } else {
-                    g_io_callback->connect_report(&dps, 1, 0);
+                    g_io_callback->connect_report(&dps, &dpm, 1, 0);
                 }
             }
         } else if (unlikely(s->severity > 0)) {
             // See if start_log has been done
             if (likely(FLAGS_TEST(s->flags, DPI_SESS_FLAG_START_LOGGED))) {
-                g_io_callback->connect_report(&dps, 0, 0);
+                g_io_callback->connect_report(&dps, &dpm, 0, 0);
             } else {
-                g_io_callback->connect_report(&dps, 1, 0);
+                g_io_callback->connect_report(&dps, &dpm, 1, 0);
             }
         }
     }
@@ -271,7 +273,8 @@ void dpi_session_mid_log(dpi_session_t *s, int log_violate, bool xff)
     DEBUG_LOG_FUNC_ENTRY(DBG_SESSION | DBG_LOG, NULL);
 
     DPMsgSession dps;
-    dpi_session_log(s, &dps);
+    DPMonitorMetric dpm;
+    dpi_session_log(s, &dps, &dpm);
 
     if (xff) {
         //change xff related value
@@ -286,7 +289,7 @@ void dpi_session_mid_log(dpi_session_t *s, int log_violate, bool xff)
     dps.ServerBytes -= s->server.reported_bytes;
 
     if (likely(!FLAGS_TEST(s->flags, DPI_SESS_FLAG_FAKE_EP))) {
-        int ret = g_io_callback->connect_report(&dps, 0, log_violate);
+        int ret = g_io_callback->connect_report(&dps, &dpm, 0, log_violate);
         if (likely(ret > 0)) {
             s->client.reported_bytes = s->client.bytes;
             s->client.reported_pkts = s->client.pkts;

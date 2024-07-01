@@ -214,7 +214,7 @@ typedef struct io_callback_ {
     int (*send_ctrl_binary) (void *buf, int len);
     int (*threat_log) (DPMsgThreatLog *log);
     int (*traffic_log) (DPMsgSession *log);
-    int (*connect_report) (DPMsgSession *log, int count_session, int count_violate);
+    int (*connect_report) (DPMsgSession *log, DPMonitorMetric *metric, int count_session, int count_violate);
 } io_callback_t;
 
 typedef struct dpi_config_ {

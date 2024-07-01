@@ -52,7 +52,7 @@ void dpi_ddos_log(uint32_t idx, dpi_meter_t *m, const char *format, ...);
 int dpi_session_start_log(dpi_session_t *s, bool xff);
 void dpi_session_mid_log(dpi_session_t *s, int log_violate, bool xff);
 
-void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps);
+void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps, DPMonitorMetric *dpm);
 int dpi_session_log_xff(dpi_session_t *s, DPMsgSession *dps);
 void dpi_policy_violate_log(dpi_packet_t *p, bool to_server,
                             dpi_policy_desc_t *desc);
