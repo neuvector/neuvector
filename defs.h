@@ -265,11 +265,14 @@ typedef struct {
     uint8_t  XffIP[16];
     uint16_t XffApp;
     uint16_t XffPort;
+} DPMsgSession;
+
+typedef struct {
     uint32_t EpSessCurIn;
     uint32_t EpSessIn12;
     uint64_t EpByteIn12;
-} DPMsgSession;
-    
+} DPMonitorMetric;
+
 typedef struct {
     uint16_t Sessions;
     uint16_t Reserved;

@@ -2595,7 +2595,7 @@ int dp_ctrl_traffic_log(DPMsgSession *log)
 }
 
 #define TUNNEL_THRESHOLD 800
-int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_violate)
+int dp_ctrl_connect_report(DPMsgSession *log, DPMonitorMetric *metric, int count_session, int count_violate)
 {
     dp_thread_data_t *th_data = &g_dp_thread_data[THREAD_ID];
 
@@ -2675,9 +2675,11 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
                     log->ClientBytes > TUNNEL_THRESHOLD) {
                 conn->ClientPort = log->ClientPort;
             }
-            conn->EpSessCurIn = log->EpSessCurIn;
-            conn->EpSessIn12 = log->EpSessIn12;
-            conn->EpByteIn12 = log->EpByteIn12;
+            if (metric != NULL) {
+                conn->EpSessCurIn = metric->EpSessCurIn;
+                conn->EpSessIn12 = metric->EpSessIn12;
+                conn->EpByteIn12 = metric->EpByteIn12;
+            }
         } else if (dp_rate_limiter_check(rl) == 0 && (n = calloc(sizeof(*n), 1)) != NULL) {
             DPMsgConnect *conn = &n->conn;
             mac_cpy(conn->EPMAC, log->EPMAC);
@@ -2727,9 +2729,11 @@ int dp_ctrl_connect_report(DPMsgSession *log, int count_session, int count_viola
             conn->ThreatID = log->ThreatID;
             conn->Severity = log->Severity;
             conn->PolicyId = log->PolicyId;
-            conn->EpSessCurIn = log->EpSessCurIn;
-            conn->EpSessIn12 = log->EpSessIn12;
-            conn->EpByteIn12 = log->EpByteIn12;
+            if (metric != NULL) {
+                conn->EpSessCurIn = metric->EpSessCurIn;
+                conn->EpSessIn12 = metric->EpSessIn12;
+                conn->EpByteIn12 = metric->EpByteIn12;
+            }
             rcu_map_add(conn4_map, n, &key);
             (*cnt)++;
         }

@@ -763,7 +763,7 @@ int dpi_session_log_xff(dpi_session_t *s, DPMsgSession *dps)
     return 0;
 }
 
-static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
+static void get_ingress_stats(DPMonitorMetric *dpm, io_stats_t *s)
 {
     uint32_t cur = g_stats_slot;
     uint32_t last = s->cur_slot;
@@ -781,13 +781,13 @@ static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
             sess += s->in.sess_ring[i];
             byte += s->in.byte_ring[i];
         }
-        dps->EpSessIn12 = sess;
-        dps->EpByteIn12 = byte;
+        dpm->EpSessIn12 = sess;
+        dpm->EpByteIn12 = byte;
     }
-    dps->EpSessCurIn = s->in.cur_session;
+    dpm->EpSessCurIn = s->in.cur_session;
 }
 
-void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
+void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps, DPMonitorMetric *dpm)
 {
     memset(dps, 0, sizeof(DPMsgSession));
 
@@ -883,11 +883,16 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
     dps->PolicyAction = sess->policy_desc.action;
     dps->PolicyId = sess->policy_desc.id;
 
+    if (dpm == NULL) {
+        return;
+    }
+
+    memset(dpm, 0, sizeof(DPMonitorMetric));
     io_mac_t *mac = rcu_map_lookup(&g_ep_map, dps->EPMAC);
     if (mac != NULL) {
-        get_ingress_stats(dps, &mac->ep->stats);
+        get_ingress_stats(dpm, &mac->ep->stats);
         /*DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn(%lu) EpSessIn12(%lu) EpByteIn12(%llu)\n",
-        dps->EpSessCurIn, dps->EpSessIn12, dps->EpByteIn12);*/
+        dpm->EpSessCurIn, dpm->EpSessIn12, dpm->EpByteIn12);*/
     }
 }
 
@@ -1011,6 +1016,7 @@ void dpi_policy_violate_log(dpi_packet_t *p, bool to_server,
                             dpi_policy_desc_t *desc)
 {
     DPMsgSession dps;
+    DPMonitorMetric dpm;
 
     IF_DEBUG_LOG(DBG_PACKET | DBG_LOG, p) {
         if (likely(dpi_is_ipv4(p))) {
@@ -1024,13 +1030,13 @@ void dpi_policy_violate_log(dpi_packet_t *p, bool to_server,
     }
 
     if (unlikely(p->session != NULL)) {
-        dpi_session_log(p->session, &dps);
+        dpi_session_log(p->session, &dps, &dpm);
     } else {
         dpi_session_log_from_pkt(p, to_server, desc, &dps);
     }
 
     if (likely(!FLAGS_TEST(p->flags, DPI_PKT_FLAG_FAKE_EP))) {
-        g_io_callback->connect_report(&dps, 0, 1);
+        g_io_callback->connect_report(&dps, p->session != NULL ? &dpm : NULL, 0, 1);
     }
     // g_io_callback->traffic_log(&dps);
 }
