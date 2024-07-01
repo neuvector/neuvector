@@ -167,10 +167,10 @@ type CacheInterface interface {
 	SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDetected bool) (bool, error)
 	WaitUntilApiPathReady() bool
 	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
-	MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-		matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
-		containerType string, forTesting bool) (*nvsysadmission.AdmResult, bool)
-	MatchK8sAdmissionRulesForPVC(admType string, ns, name, scName string, forTesting bool) (*nvsysadmission.AdmResult, bool)
+	MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
+		evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
+		containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool)
+	MatchK8sAdmissionRulesForPVC(ns, name, scName string, evalContext *nvsysadmission.AdmCtrlEvalContext) (*nvsysadmission.AdmCtrlAssessResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
 	UpdateLocalAdmCtrlStats(category string, stats int) error
 	IncrementAdmCtrlProcessing()

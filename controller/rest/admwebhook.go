@@ -731,7 +731,6 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 		Annotations:        annotations,
 		AllContainers:      allContainers,
 		ServiceAccountName: saName,
-		// AdmResults: make(map[string]*nvsysadmission.AdmResult), // comment out because we do not re-use the matching result of owners anymore.
 	}
 	admResCacheMutex.Lock()
 	admResCache[string(objectMeta.UID)] = resObject
@@ -741,17 +740,16 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	return resObject, nil
 }
 
-func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObject, op int, stamps *api.AdmCtlTimeStamps,
-	ar *admissionv1beta1.AdmissionReview, forTesting bool) (*nvsysadmission.AdmResult, []*nvsysadmission.AdmAssessResult) {
+func walkThruContainers(admResObject *nvsysadmission.AdmResObject, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
+	evalContext *nvsysadmission.AdmCtrlEvalContext, reqEvalResult *nvsysadmission.AdmCtrlReqEvalResult) {
 
-	matchData := &nvsysadmission.AdmMatchData{}
 	if len(admResObject.OwnerUIDs) > 0 {
 		// If there is owner for this resource, check if the root owner's cache is still available.
 		// If not, do not compare user/user group
-		matchData.RootAvail = isRootOwnerCacheAvailable(admResObject.OwnerUIDs)
+		evalContext.RootAvail = isRootOwnerCacheAvailable(admResObject.OwnerUIDs)
 
 		//----------------------------------------------------------------------------------------------------
-		// Do not re-use the matching result of owners. i.e. call MatchK8sAdmissionRules() for every resource CREATE request
+		// Do not re-use the matching result of owners. i.e. call EvaluateK8sAdmissionRules() for every resource CREATE request
 		//----------------------------------------------------------------------------------------------------
 		/*var allowedImageName string
 		var allowedResult *nvsysadmission.AdmResult
@@ -762,7 +760,7 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 			admResCacheMutex.RUnlock()
 			if exist {
 				for imageName, ownerResult := range ownerObject.AdmResults {
-					if ownerResult.MatchDeny {
+					if ownerResult.MatchDenyRule {
 						admResObject.AdmResults[imageName] = ownerResult
 						return ownerResult
 					} else if ownerResult.RuleID != 0 {
@@ -780,78 +778,47 @@ func walkThruContainers(admType string, admResObject *nvsysadmission.AdmResObjec
 		// If it reaches here, it means we cannot find owner's matching result info in the session cache
 	} else {
 		// this resource has no owner. So it's a root resource by itself
-		matchData.RootAvail = true
+		evalContext.RootAvail = true
 	}
 	// if it's Create operation or no owner for this resource or no owner's matching result info for this resource, use the container info for rule matching
-	var scannedImages strings.Builder
-	var unscannedImages strings.Builder
-	var noMatchedResult nvsysadmission.AdmResult
-	var allowMatchedResult *nvsysadmission.AdmResult    // from first allow match
-	var denyMatchedResult *nvsysadmission.AdmResult     // from first deny match
-	var assessResults []*nvsysadmission.AdmAssessResult // for all matched rules of all containers in assessment
+	var unscannedImages = make([]string, 0, evalContext.ContainersInReq)
+	var allImages = make([]string, 0, evalContext.ContainersInReq)
+	var assessResults = make([]*nvsysadmission.AdmCtrlAssessResult, 0, evalContext.ContainersInReq)
+
 	containerTypes := []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
 	for i, containers := range admResObject.AllContainers { // range (initContainers, Containers, ephemeralContainers)
 		for _, c := range containers {
 			var thisStamp api.AdmCtlTimeStamps
-			perMatchData := &nvsysadmission.AdmMatchData{RootAvail: matchData.RootAvail}
-			result, licenseAllowed := cacher.MatchK8sAdmissionRules(admType, admResObject, c, perMatchData, &thisStamp, ar, containerTypes[i], forTesting)
-			// result is per-container-image's matching result
-			if !licenseAllowed {
-				continue
-			}
+			result, _ := cacher.MatchK8sAdmissionRules(admResObject, c, evalContext, &thisStamp, ar, containerTypes[i])
+			// result is per-container-image's matching result, in type nvsysadmission.AdmCtrlAssessResult
 			if thisStamp.Fetched.Sub(thisStamp.GonnaFetch).Seconds() > stamps.Fetched.Sub(stamps.GonnaFetch).Seconds() {
 				stamps.GonnaFetch = thisStamp.GonnaFetch
 				stamps.Fetched = thisStamp.Fetched
 			}
-			if result.ImageNotScanned {
-				if unscannedImages.Len() > 0 {
-					unscannedImages.WriteString(", ")
-				}
-				unscannedImages.WriteString(c.Image)
-			} else if result.RuleID == 0 {
-				// image is scanned but doesn't match any rule
-				if scannedImages.Len() > 0 {
-					scannedImages.WriteString(", ")
-				}
-				scannedImages.WriteString(c.Image)
-				noMatchedResult.HighVulsCnt += result.HighVulsCnt
-				noMatchedResult.MedVulsCnt += result.MedVulsCnt
+			if !result.ContainerImageInfo.ImageScanned {
+				unscannedImages = append(unscannedImages, c.Image)
 			}
-			if result.RuleID != 0 {
-				// result.MatchDeny is for non-assessment only
-				// result.AssessDenyRuleMatched is for assessment only
-				if (!forTesting && result.MatchDeny) || (forTesting && result.AssessMatchedRuleType == api.ValidatingDenyRuleType) {
-					// deny this resource request if any container matches a deny rule. Still keep collecting unscanned-image info
-					if denyMatchedResult == nil {
-						matchData.MatchState = nvsysadmission.MatchedDeny
-						denyMatchedResult = result
-					}
-				} else if (!forTesting && !result.MatchDeny) || (forTesting && result.AssessMatchedRuleType == api.ValidatingAllowRuleType) {
-					// matches an allow rule. we only cache the 1st allow matching result and keep checking if any container matches deny rule
-					// matching a deny rule overrides matching any allow rule. Still keep collecting unscanned-image info
-					if allowMatchedResult == nil {
-						matchData.MatchState = nvsysadmission.MatchedAllow
-						allowMatchedResult = result
-					}
-				}
-				if forTesting {
-					assessResults = append(assessResults, result.AssessResults...)
-				}
+			allImages = append(allImages, c.Image)
+
+			reqEvalResult.AllCriticalVulsCnt += result.ContainerImageInfo.CriticalVulsCnt
+			reqEvalResult.AllHighVulsCnt += result.ContainerImageInfo.HighVulsCnt
+			reqEvalResult.AllMedVulsCnt += result.ContainerImageInfo.MedVulsCnt
+			if (result.AssessAction == share.AdmCtrlActionAllow && reqEvalResult.ReqAction == "") ||
+				(result.AssessAction == share.AdmCtrlActionDeny && reqEvalResult.ReqAction != share.AdmCtrlActionDeny) {
+				reqEvalResult.ReqAction = result.AssessAction
+				reqEvalResult.CriticalAssessment = result
+				evalContext.ReqActionSoFar = result.AssessAction
 			}
+			assessResults = append(assessResults, result)
 			// admResObject.AdmResults[c.ImageRepo] = result // comment out because we do not re-use the matching result of owners anymore.
 		}
 	}
-	if denyMatchedResult != nil {
-		denyMatchedResult.UnscannedImages = unscannedImages.String()
-		return denyMatchedResult, assessResults
-	} else if allowMatchedResult != nil {
-		allowMatchedResult.UnscannedImages = unscannedImages.String()
-		return allowMatchedResult, assessResults
-	} else {
-		noMatchedResult.Image = scannedImages.String()
-		noMatchedResult.UnscannedImages = unscannedImages.String()
-		return &noMatchedResult, assessResults // return empty result & will apply defaultAction later
+
+	reqEvalResult.AllContainerImages = strings.Join(allImages, ", ")
+	if len(unscannedImages) > 0 {
+		reqEvalResult.UnscannedImages = strings.Join(unscannedImages, ", ")
 	}
+	reqEvalResult.AssessResults = assessResults
 }
 
 func composeResponse(err *error) *admissionv1beta1.AdmissionResponse {
@@ -880,13 +847,15 @@ func logUnmarshallError(kind *string, uid *types.UID, err *error) *admissionv1be
 //     If yes, add them to auditQueue and delete their entries from aggrLogsCache
 //     If it's the dummy log entry sitting in aggrLogsCache for 8(+) minutes, delete it as well.
 //  5. The next 'denied' audit for the same key starts over from step 1
-func aggregateDenyLogs(result *nvsysadmission.AdmResult, ownerUID string, alog *share.CLUSAuditLog) (bool, *share.CLUSAuditLog) {
-	if result == nil || result.Image == "" || ownerUID == "" {
+func aggregateDenyLogs(reqResult *nvsysadmission.AdmCtrlReqEvalResult, ownerUID string, alog *share.CLUSAuditLog) (bool, *share.CLUSAuditLog) {
+
+	if reqResult == nil || reqResult.CriticalAssessment == nil || reqResult.CriticalAssessment.ContainerImageInfo.Image == "" || ownerUID == "" {
 		return false, alog
 	}
+	criticalAssessment := reqResult.CriticalAssessment
 
 	// aggregation is for image with the same owner resource
-	key := fmt.Sprintf("%s.%s", ownerUID, result.Image)
+	key := fmt.Sprintf("%s.%s", ownerUID, criticalAssessment.ContainerImageInfo.Image)
 	aggrLogsCacheMutex.Lock()
 	defer aggrLogsCacheMutex.Unlock()
 	if alog == nil {
@@ -921,11 +890,15 @@ func aggregateDenyLogs(result *nvsysadmission.AdmResult, ownerUID string, alog *
 	}
 }
 
-func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult, admResObject *nvsysadmission.AdmResObject) error {
+func cacheAdmCtrlAudit(auditId share.TLogAudit, reqResult *nvsysadmission.AdmCtrlReqEvalResult, criticalAssessment *nvsysadmission.AdmCtrlAssessResult,
+	matchedImageInfo *nvsysadmission.AdmCtrlMatchedImageInfo, admResObject *nvsysadmission.AdmResObject) error {
+
+	// assessResult is the container that triggers this audit event.
+	// it's possible that assessResult/matchedImageInfo is nil when no container matches any rule.
 	// any controller that handles admission control request could save result to queue
 	if auditId >= share.CLUSAuditAdmCtrlK8sReqAllowed && auditId <= share.CLUSAuditAdmCtrlK8sReqDenied {
 		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
-			if aggregated, _ := aggregateDenyLogs(result, admResObject.OwnerUIDs[0], nil); aggregated {
+			if aggregated, _ := aggregateDenyLogs(reqResult, admResObject.OwnerUIDs[0], nil); aggregated {
 				// we increased the occurrences field in the aggregated log by 1 so we don't need to keep processing for this audit
 				return nil
 			}
@@ -935,37 +908,38 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult
 			Count:      1,
 			ReportedAt: time.Now().UTC(),
 		}
-		if result.Image != "" {
-			if auditId == share.CLUSAuditAdmCtrlK8sReqViolation || auditId == share.CLUSAuditAdmCtrlK8sReqDenied {
-				alog.Props = map[string]string{
-					nvsysadmission.AuditLogPropImage:       result.Image,
-					nvsysadmission.AuditLogPropImageID:     result.ImageID,
-					nvsysadmission.AuditLogPropRegistry:    result.Registry,
-					nvsysadmission.AuditLogPropRepository:  result.Repository,
-					nvsysadmission.AuditLogPropTag:         result.Tag,
-					nvsysadmission.AuditLogPropBaseOS:      result.BaseOS,
-					nvsysadmission.AuditLogPropHighVulsCnt: strconv.Itoa(result.HighVulsCnt),
-					nvsysadmission.AuditLogPropMedVulsCnt:  strconv.Itoa(result.MedVulsCnt),
-				}
-			} else {
-				alog.Props = map[string]string{
-					nvsysadmission.AuditLogPropImage:       result.Image,
-					nvsysadmission.AuditLogPropHighVulsCnt: strconv.Itoa(result.HighVulsCnt),
-					nvsysadmission.AuditLogPropMedVulsCnt:  strconv.Itoa(result.MedVulsCnt),
-				}
+
+		props := make(map[string]string, 10)
+		if reqResult.AllContainerImages != "" {
+			props[nvsysadmission.AuditLogPropImage] = reqResult.AllContainerImages
+			props[nvsysadmission.AuditLogPropCriticalVulsCnt] = strconv.Itoa(reqResult.AllCriticalVulsCnt)
+			props[nvsysadmission.AuditLogPropHighVulsCnt] = strconv.Itoa(reqResult.AllHighVulsCnt)
+			props[nvsysadmission.AuditLogPropMedVulsCnt] = strconv.Itoa(reqResult.AllMedVulsCnt)
+			if criticalAssessment != nil {
+				props[nvsysadmission.AuditLogPropImage] = criticalAssessment.ContainerImageInfo.Image
+				props[nvsysadmission.AuditLogPropRepository] = criticalAssessment.ContainerImageInfo.Repository
+				props[nvsysadmission.AuditLogPropTag] = criticalAssessment.ContainerImageInfo.Tag
 			}
-			alog.Props[nvsysadmission.AuditLogPropNamespace] = admResObject.Namespace
+			if matchedImageInfo != nil {
+				props[nvsysadmission.AuditLogPropImageID] = matchedImageInfo.ImageID
+				props[nvsysadmission.AuditLogPropRegistry] = matchedImageInfo.Registry
+				props[nvsysadmission.AuditLogPropBaseOS] = matchedImageInfo.BaseOS
+				props[nvsysadmission.AuditLogPropCriticalVulsCnt] = strconv.Itoa(matchedImageInfo.CriticalVulsCnt)
+				props[nvsysadmission.AuditLogPropHighVulsCnt] = strconv.Itoa(matchedImageInfo.HighVulsCnt)
+				props[nvsysadmission.AuditLogPropMedVulsCnt] = strconv.Itoa(matchedImageInfo.MedVulsCnt)
+			}
 		} else {
-			alog.Props = make(map[string]string, 3)
+			props[nvsysadmission.AuditLogPropPVCName] = reqResult.PVCName
+			props[nvsysadmission.AuditLogPVCStorageClassName] = reqResult.PVCStorageClassName
 		}
-		alog.Props[nvsysadmission.AuditLogPropMessage] = result.Msg
-		alog.Props[nvsysadmission.AuditLogPropUser] = result.User
-		alog.Props[nvsysadmission.AuditLogPropFirstLogAt] = api.RESTTimeString(alog.ReportedAt)
-		alog.Props[nvsysadmission.AuditLogPropPVCName] = result.PVCName
-		alog.Props[nvsysadmission.AuditLogPVCStorageClassName] = result.PVCStorageClassName
+		props[nvsysadmission.AuditLogPropNamespace] = admResObject.Namespace
+		props[nvsysadmission.AuditLogPropMessage] = reqResult.Msg
+		props[nvsysadmission.AuditLogPropUser] = reqResult.User
+		props[nvsysadmission.AuditLogPropFirstLogAt] = api.RESTTimeString(alog.ReportedAt)
+		alog.Props = props
 
 		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
-			_, alog = aggregateDenyLogs(result, admResObject.OwnerUIDs[0], alog)
+			_, alog = aggregateDenyLogs(reqResult, admResObject.OwnerUIDs[0], alog)
 		}
 		if alog != nil {
 			auditQueue.Append(alog)
@@ -975,14 +949,16 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, result *nvsysadmission.AdmResult
 	return nil
 }
 
-func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode string, defaultAction int, stamps *api.AdmCtlTimeStamps,
-	forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmAssessResult, bool) {
+func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globalMode string, defaultAction int, stamps *api.AdmCtlTimeStamps,
+	forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmCtrlMatchedResult, bool) {
 
 	req := ar.Request
 	var objectMeta *metav1.ObjectMeta
 	var podTemplateSpec *corev1.PodTemplateSpec
 	var admResObject *nvsysadmission.AdmResObject
 	var opDisplay string
+	var msgHeader string
+	var scName string // pvc.Spec.StorageClassName
 	var op int
 	var reqIgnored bool
 
@@ -998,6 +974,13 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 	default:
 		return composeResponse(nil), nil, reqIgnored
 	}
+
+	if req.DryRun != nil && *req.DryRun {
+		msgHeader = "<Server Dry Run> "
+	} else if forTesting {
+		msgHeader = "<Assessment> "
+	}
+
 	switch req.Kind.Kind {
 	case k8sKindCronJob:
 		var cronJob batchv1beta1.CronJob // The batch/v1beta1 API version of CronJob will no longer be served in v1.25 !!
@@ -1127,168 +1110,217 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, mode 
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
 	case k8sKindPersistentVolumeClaim:
-		return validatePVC(admission.NvAdmValidateType, ar, mode, defaultAction, forTesting)
+		var pvc corev1.PersistentVolumeClaim
+		if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
+		}
+		// not all pvc has StorageClassName
+		if pvc.Spec.StorageClassName == nil {
+			if forTesting {
+				return &admissionv1beta1.AdmissionResponse{
+					Allowed: true,
+					Result:  &metav1.Status{Message: fmt.Sprintf("%s%s of Kubernetes %s is allowed.", msgHeader, opDisplay, req.Kind.Kind)},
+				}, nil, false
+			}
+			return logUnmarshallError(&req.Kind.Kind, &req.UID, nil), nil, reqIgnored
+		}
+		objectMeta = &pvc.ObjectMeta
+		scName = *pvc.Spec.StorageClassName
 	default:
 		return composeResponse(nil), nil, reqIgnored
 	}
 
-	// for non-Pod requests only
-	if objectMeta != nil && podTemplateSpec != nil {
-		admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
+	// parse request meta object
+	if objectMeta != nil {
+		if req.Kind.Kind == k8sKindPersistentVolumeClaim {
+			admResObject, _ = parseAdmRequest(req, objectMeta, nil)
+		} else if podTemplateSpec != nil {
+			admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
+		}
 	}
 	stamps.Parsed = time.Now()
+
 	totalContainers := 0
-	for _, containers := range admResObject.AllContainers {
-		if len(containers) > 0 {
-			stamps.Image = containers[0].Image
+	{
+		reqImages := make([]string, 0, len(admResObject.AllContainers))
+		for _, containers := range admResObject.AllContainers {
+			for _, c := range containers {
+				reqImages = append(reqImages, c.Image)
+			}
+			totalContainers += len(containers)
 		}
-		totalContainers += len(containers)
+		stamps.Images = strings.Join(reqImages, ",")
 	}
 
-	var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
 	var allowed = true
 	var statusResult = &metav1.Status{}
-	var admResult *nvsysadmission.AdmResult
-	var assessResults []*nvsysadmission.AdmAssessResult
-	if admResObject != nil && totalContainers > 0 {
-		var requestedBy string
-		if admResObject.UserName != "" {
-			requestedBy = admResObject.UserName
-		} else {
-			for group := range admResObject.Groups.Iter() {
-				if group != "system:authenticated" {
-					requestedBy, _ = group.(string)
-					break
-				}
-			}
-		}
-		var subMsg, ruleScope, msgHeader string
-		// check whether the containers are allowed.
-		// assessResults is for all the matched rules(disabled or not)
-		admResult, assessResults = walkThruContainers(admission.NvAdmValidateType, admResObject, op, stamps, ar, forTesting)
-		if req.DryRun != nil && *req.DryRun {
-			msgHeader = "<Server Dry Run> "
-		} else if forTesting {
-			msgHeader = "<Assessment> "
-		}
-		stamps.Matched = time.Now()
+	var matchedResults []*nvsysadmission.AdmCtrlMatchedResult
+	var reqEvalResult nvsysadmission.AdmCtrlReqEvalResult
 
-		// if whsvr.dumpRequestObj {
-		// 	const (
-		// 		DDMMYYYYhhmmss = "2006-01-02-15-04-05"
-		// 	)
-		// 	now := time.Now().UTC()
-
-		// 	jsonData, _ := json.Marshal(ar)
-		// 	docKey := fmt.Sprintf("/v1/data/debug/ar/%s_%s_%s_MatchDeny_%v", now.Format(DDMMYYYYhhmmss), ar.Request.UID, req.Kind.Kind, admResult.MatchDeny)
-		// 	opa.AddDocument(docKey, string(jsonData))
-		// }
-
-		admResult.RuleCategory = admission.AdmRuleCatK8s
-		admResult.User = requestedBy
-		if admResult.MatchFedRule {
-			ruleScope = "federal "
+	if admResObject != nil {
+		evalContext := nvsysadmission.AdmCtrlEvalContext{
+			ForTesting:      forTesting,
+			GlobalMode:      globalMode,
+			ContainersInReq: totalContainers,
+			AdmCtrlType:     admission.NvAdmValidateType,
 		}
-		if len(admResult.UnscannedImages) > 0 {
-			subMsg = fmt.Sprintf(" [Notice: the requested image(s) are not scanned: %s]", admResult.UnscannedImages)
-		}
-		if forTesting {
-			finalAction := "allowed"
-			if admResult.AssessMatchedRuleType == api.ValidatingDenyRuleType {
-				if admResult.RuleMode != "" {
-					// a deny rule's "rule mode"(if specified) takes precedence over global mode
-					mode = admResult.RuleMode
+		reqEvalResult.ContainersInReq = totalContainers
+		if req.Kind.Kind == k8sKindPersistentVolumeClaim {
+			result, _ := cacher.MatchK8sAdmissionRulesForPVC(objectMeta.Namespace, objectMeta.Name, scName, &evalContext)
+			// result is pvc's matching result, in type nvsysadmission.AdmCtrlAssessResult
+			if forTesting || len(result.MatchedResults) > 0 {
+				if result.AssessAction == share.AdmCtrlActionDeny && reqEvalResult.ReqAction != share.AdmCtrlActionDeny {
+					reqEvalResult.ReqAction = share.AdmCtrlActionDeny
+					reqEvalResult.CriticalAssessment = result
 				}
-				if mode == share.AdmCtrlModeProtect {
-					allowed = false
-					finalAction = "denied"
-				}
+				reqEvalResult.AssessResults = []*nvsysadmission.AdmCtrlAssessResult{result}
+				reqEvalResult.User = admResObject.UserName
+				reqEvalResult.PVCName = objectMeta.Name
+				reqEvalResult.PVCStorageClassName = scName
 			}
-			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, finalAction, subMsg)
-			for _, assessResult := range assessResults {
-				matchedSrcMsg := ""
-				if assessResult.MatchedSource != "" {
-					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", assessResult.MatchedSource)
-				}
-				assessResult.RuleDetails = fmt.Sprintf("It matches rule with criteria: %s%s", assessResult.RuleDetails, matchedSrcMsg)
-			}
-		} else if admResult.MatchDeny {
-			msg := admResult.Msg
-			var modeStr string
-			// matches deny rule
-			if admResult.RuleMode != "" {
-				// a deny rule's "rule mode"(if specified) takes precedence over global mode
-				mode = admResult.RuleMode
-				modeStr = "per-rule " + mode
+		} else if totalContainers > 0 {
+			var requestedBy string
+			if admResObject.UserName != "" {
+				requestedBy = admResObject.UserName
 			} else {
-				modeStr = mode
-			}
-			if mode == share.AdmCtrlModeMonitor {
-				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr, subMsg)
-				eventID = share.CLUSAuditAdmCtrlK8sReqViolation
-			} else {
-				allowed = false
-				matchedSrcMsg := ""
-				if admResult.MatchedSource != "" {
-					matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
-				}
-				statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg, subMsg)
-				eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-			}
-
-			// append the causes
-			if len(msg) > 0 {
-				admResult.Msg += ", " + msg
-			}
-		} else {
-			if admResult.RuleID != 0 {
-				// matches allow rule
-				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because of %sallow rule id %d with criteria: %s%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, admResult.AdmRule, subMsg)
-			} else {
-				// doesn't match any rule
-				var actionMsg string
-				switch defaultAction {
-				case nvsysadmission.AdmCtrlActionAllow:
-					actionMsg = "allowed"
-				case nvsysadmission.AdmCtrlActionDeny:
-					actionMsg = "denied"
-					allowed = false
-					statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-					eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-				default:
-					actionMsg = "allowed"
-				}
-				admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is %s because it doesn't match any rule%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, actionMsg, subMsg)
-				var images strings.Builder
-				for _, containers := range admResObject.AllContainers {
-					for _, c := range containers { //->
-						if images.Len() > 0 {
-							images.WriteString(", ")
-						}
-						images.WriteString(c.Image)
+				for group := range admResObject.Groups.Iter() {
+					if group != "system:authenticated" {
+						requestedBy, _ = group.(string)
+						break
 					}
 				}
-				admResult.Image = images.String()
 			}
+			reqEvalResult.User = requestedBy
+			// check whether the containers are allowed.
+			walkThruContainers(admResObject, stamps, ar, &evalContext, &reqEvalResult)
 		}
 	}
-	if !forTesting {
-		cacheAdmCtrlAudit(eventID, admResult, admResObject) // so that controller can write to cluster periodically
+	stamps.Evaluated = time.Now()
+
+	// if whsvr.dumpRequestObj {
+	// 	const (
+	// 		DDMMYYYYhhmmss = "2006-01-02-15-04-05"
+	// 	)
+	// 	now := time.Now().UTC()
+
+	// 	jsonData, _ := json.Marshal(ar)
+	// 	docKey := fmt.Sprintf("/v1/data/debug/ar/%s_%s_%s_MatchDeny_%v", now.Format(DDMMYYYYhhmmss), ar.Request.UID, req.Kind.Kind, admResult.MatchDenyRule)
+	// 	opa.AddDocument(docKey, string(jsonData))
+	// }
+
+	unscannedImagesMsg := ""
+	if reqEvalResult.UnscannedImages != "" {
+		unscannedImagesMsg = fmt.Sprintf(" [Notice: the requested image(s) are not scanned: %s]", reqEvalResult.UnscannedImages)
+	}
+
+	if forTesting {
+		var actioMsg string = "allowed"
+		if reqEvalResult.ReqAction == share.AdmCtrlActionDeny {
+			actioMsg = "denied"
+			allowed = false
+		}
+
+		matchedCount := 0
+		for _, assessResult := range reqEvalResult.AssessResults {
+			// assessResult is per-container-image's matching result, in type nvsysadmission.AdmCtrlAssessResult
+			for _, matchedResult := range assessResult.MatchedResults {
+				matchedResult.RuleDetails = fmt.Sprintf("It matches rule with criteria: %s.", matchedResult.RuleDetails)
+				matchedCount++
+			}
+		}
+		matchedResults = make([]*nvsysadmission.AdmCtrlMatchedResult, 0, matchedCount)
+		for _, assessResult := range reqEvalResult.AssessResults {
+			matchedResults = append(matchedResults, assessResult.MatchedResults...)
+		}
+
+		statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, actioMsg, unscannedImagesMsg)
+
+	} else {
+		violatedContainers := make([]string, 0, 4)
+		for _, assessResult := range reqEvalResult.AssessResults {
+			// assessResult is per-container-image's matching result, in type nvsysadmission.AdmCtrlAssessResult
+			// when the request is denied, collect the matched deny/monitor rules before the deny/protect match
+			violatedRules := make([]string, 0, 4) // for matched deny/monitor rules before the deny/protect match
+			for _, matchedResult := range assessResult.MatchedResults {
+				if matchedResult == assessResult.CriticalMatch {
+					break
+				}
+				if matchedResult.IsDenyRuleType && matchedResult.IsMatchedMode(globalMode, share.AdmCtrlModeMonitor) {
+					ruleScope := ""
+					if matchedResult.IsFedRule {
+						ruleScope = "federal "
+					}
+					msg := fmt.Sprintf("%sdeny rule id %d with criteria: %s", ruleScope, matchedResult.RuleID, matchedResult.RuleDetails)
+					violatedRules = append(violatedRules, msg)
+				}
+			}
+			if len(violatedRules) > 0 {
+				msg := fmt.Sprintf("Container %s violates %s.", assessResult.ContainerImageInfo.Name, strings.Join(violatedRules, ", ")) // for only this container
+				violatedContainers = append(violatedContainers, msg)
+			}
+			if reqEvalResult.ReqAction == share.AdmCtrlActionDeny && assessResult == reqEvalResult.CriticalAssessment {
+				break
+			}
+		}
+
+		if len(violatedContainers) > 0 {
+			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control monitor-mode rule(s). %s%s",
+				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, strings.Join(violatedContainers, " "), unscannedImagesMsg)
+			cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqViolation, &reqEvalResult, nil, nil, admResObject)
+		}
+
+		if reqEvalResult.ReqAction != "" {
+			criticalAssessment := reqEvalResult.CriticalAssessment
+			criticalMatch := criticalAssessment.CriticalMatch
+			if reqEvalResult.ReqAction == share.AdmCtrlActionDeny {
+				statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
+				allowed = false
+				ruleScope := ""
+				if criticalMatch.IsFedRule {
+					ruleScope = "federal "
+				}
+				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied because of %sdeny rule id %d with criteria: %s.%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, criticalMatch.RuleID, criticalMatch.RuleDetails, unscannedImagesMsg)
+				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqDenied, &reqEvalResult, criticalAssessment, &criticalMatch.ImageInfo, admResObject)
+			} else {
+				allowedContainers := make([]string, 0, 4) // containers that explicitly match allow rule
+				for _, assessResult := range reqEvalResult.AssessResults {
+					// assessResult is per-container-image's matching result, in type nvsysadmission.AdmCtrlAssessResult
+					if assessResult.CriticalMatch != nil && assessResult.AssessAction == share.AdmCtrlActionAllow {
+						ruleScope := ""
+						if assessResult.CriticalMatch.IsFedRule {
+							ruleScope = "federal "
+						}
+						msg := fmt.Sprintf("conatiner %s matches %sallow rule id %d with criteria: %s",
+							assessResult.ContainerImageInfo.Name, ruleScope, assessResult.CriticalMatch.RuleID, assessResult.CriticalMatch.RuleDetails)
+						allowedContainers = append(allowedContainers, msg)
+					}
+				}
+				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because %s.%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, strings.Join(allowedContainers, ", "), unscannedImagesMsg)
+				matchedImageInfo := &criticalMatch.ImageInfo
+				if reqEvalResult.ContainersInReq > 1 {
+					criticalAssessment = nil
+					matchedImageInfo = nil
+				}
+				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, criticalAssessment, matchedImageInfo, admResObject)
+			}
+		} else {
+			// doesn't match any rule
+			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because it doesn't match any decisive rule.%s",
+				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, unscannedImagesMsg)
+			cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, nil, nil, admResObject)
+		}
 	}
 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: allowed,
 		Result:  statusResult,
-	}, assessResults, false
+	}, matchedResults, false
 }
 
 // Serve method for Kubernetes Admission Control
-func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, admType, category, mode string,
+func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, admType, category, globalMode string,
 	defaultAction int, body []byte, stamps *api.AdmCtlTimeStamps, nvStatusReq bool) {
 	var admissionResponse *admissionv1beta1.AdmissionResponse
 	var ignoredReq bool
@@ -1316,7 +1348,7 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 		}
 
 		if admType == admission.NvAdmValidateType {
-			admissionResponse, _, ignoredReq = whsvr.validate(&ar, mode, defaultAction, stamps, false)
+			admissionResponse, _, ignoredReq = whsvr.validate(&ar, globalMode, defaultAction, stamps, false)
 			admissionResponse.UID = ar.Request.UID
 		} else {
 			log.WithFields(log.Fields{"path": r.URL.Path}).Debug("unsupported path")
@@ -1378,7 +1410,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 	if !nvStatusReq {
 		cacher.IncrementAdmCtrlProcessing()
 	}
-	enabled, mode, defaultAction, admType, category := cacher.IsAdmControlEnabled(&r.URL.Path)
+	enabled, globalMode, defaultAction, admType, category := cacher.IsAdmControlEnabled(&r.URL.Path)
 	if !enabled {
 		log.WithFields(log.Fields{"path": r.URL.Path, "admType": admType, "category": category}).Debug("disabled path")
 		http.Error(w, "disabled", http.StatusNotImplemented)
@@ -1414,7 +1446,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	whsvr.serveK8s(w, r, admType, category, mode, defaultAction, body, stamps, nvStatusReq)
+	whsvr.serveK8s(w, r, admType, category, globalMode, defaultAction, body, stamps, nvStatusReq)
 }
 
 // Serve method for Admission Control webhook server
@@ -1425,7 +1457,7 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 	whsvr.serveWithTimeStamps(w, r, &stamps)
 	diff := time.Now().Sub(stamps.Start)
 	if diff.Seconds() >= 28 {
-		log.WithFields(log.Fields{"image": stamps.Image, "seconds": diff.Seconds(),
+		log.WithFields(log.Fields{"image": stamps.Images, "seconds": diff.Seconds(),
 			"fetch": stamps.Fetched.Sub(stamps.GonnaFetch).Seconds()}).Warn("unexpected")
 	}
 }
@@ -1702,125 +1734,4 @@ func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
 	b := opa.AddDocument(docKey, string(json_data))
 
 	log.WithFields(log.Fields{"docKey": info.DocKey, "AddDocument_Result": b}).Debug("ReportK8SResToOPA(grpc-server)")
-}
-
-func validatePVC(admType string, ar *admissionv1beta1.AdmissionReview, mode string, defaultAction int, forTesting bool) (*admissionv1beta1.AdmissionResponse, []*nvsysadmission.AdmAssessResult, bool) {
-	var reqIgnored bool
-	req := ar.Request
-
-	var pvc corev1.PersistentVolumeClaim
-	if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
-		return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
-	}
-
-	var ruleScope, msgHeader string
-	var eventID = share.CLUSAuditAdmCtrlK8sReqAllowed
-	var allowed = true
-	var statusResult = &metav1.Status{}
-	opDisplay := "Creation" // we only handle create
-
-	if req.DryRun != nil && *req.DryRun {
-		msgHeader = "<Server Dry Run> "
-	} else if forTesting {
-		msgHeader = "<Assessment> "
-	}
-
-	ns := pvc.ObjectMeta.Namespace
-	pvcName := pvc.ObjectMeta.Name
-
-	// not all pvc has StorageClassName
-	if pvc.Spec.StorageClassName == nil {
-		if forTesting {
-			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s.", msgHeader, opDisplay, req.Kind.Kind, "allowed")
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-				Result:  statusResult,
-			}, nil, false
-		}
-		return logUnmarshallError(&req.Kind.Kind, &req.UID, nil), nil, reqIgnored
-	}
-
-	scName := pvc.Spec.StorageClassName
-	admResObject, _ := parseAdmRequest(req, &pvc.ObjectMeta, nil)
-
-	admResult, matched := cacher.MatchK8sAdmissionRulesForPVC(admType, ns, pvcName, *scName, forTesting)
-	if admResult.MatchFedRule {
-		ruleScope = "federal "
-	}
-
-	if forTesting {
-		finalAction := "allowed"
-		if admResult.AssessMatchedRuleType == api.ValidatingDenyRuleType {
-			if admResult.RuleMode != "" {
-				// a deny rule's "rule mode"(if specified) takes precedence over global mode
-				mode = admResult.RuleMode
-			}
-			if mode == share.AdmCtrlModeProtect {
-				allowed = false
-				finalAction = "denied"
-			}
-		}
-		statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s.", msgHeader, opDisplay, req.Kind.Kind, finalAction)
-	} else if matched {
-		// equal to [else if admResult.MatchDeny]
-		msg := admResult.Msg
-		var modeStr string
-		// matches deny rule
-		if admResult.RuleMode != "" {
-			// a deny rule's "rule mode"(if specified) takes precedence over global mode
-			mode = admResult.RuleMode
-			modeStr = "per-rule " + mode
-		} else {
-			modeStr = mode
-		}
-		if mode == share.AdmCtrlModeMonitor {
-			admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control %sdeny rule id %d but is allowed in %s mode",
-				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, admResult.RuleID, modeStr)
-			eventID = share.CLUSAuditAdmCtrlK8sReqViolation
-		} else {
-			allowed = false
-			matchedSrcMsg := ""
-			if admResult.MatchedSource != "" {
-				matchedSrcMsg = fmt.Sprintf(" and matched data from %s", admResult.MatchedSource)
-			}
-			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-			admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied in %s mode because of %sdeny rule id %d with criteria: %s%s",
-				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, modeStr, ruleScope, admResult.RuleID, admResult.AdmRule, matchedSrcMsg)
-			eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-		}
-
-		// append the causes
-		if len(msg) > 0 {
-			admResult.Msg += ", " + msg
-		}
-
-		admResult.User = admResObject.UserName
-		admResult.PVCName = pvcName
-		admResult.PVCStorageClassName = *scName
-	} else {
-		// doesn't match any rule
-		var actionMsg string
-		switch defaultAction {
-		case nvsysadmission.AdmCtrlActionAllow:
-			actionMsg = "allowed"
-		case nvsysadmission.AdmCtrlActionDeny:
-			actionMsg = "denied"
-			allowed = false
-			statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is denied.", msgHeader, opDisplay, req.Kind.Kind)
-			eventID = share.CLUSAuditAdmCtrlK8sReqDenied
-		default:
-			actionMsg = "allowed"
-		}
-		admResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is %s because it doesn't match any rule",
-			msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, actionMsg)
-	}
-
-	if !forTesting {
-		cacheAdmCtrlAudit(eventID, admResult, admResObject)
-	}
-
-	return &admissionv1beta1.AdmissionResponse{
-		Allowed: allowed,
-		Result:  statusResult,
-	}, admResult.AssessResults, false
 }

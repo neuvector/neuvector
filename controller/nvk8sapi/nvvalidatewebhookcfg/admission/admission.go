@@ -27,6 +27,7 @@ const (
 	AuditLogPropRepository      = "Repository"
 	AuditLogPropTag             = "Tag"
 	AuditLogPropBaseOS          = "BaseOS"
+	AuditLogPropCriticalVulsCnt = "CriticalVulsCnt"
 	AuditLogPropHighVulsCnt     = "HighVulsCnt"
 	AuditLogPropMedVulsCnt      = "MedVulsCnt"
 	AuditLogPropNamespace       = "Namespace"
@@ -45,6 +46,7 @@ type ScannedImageSummary struct {
 	Author          string
 	ScannedAt       time.Time
 	Result          int32
+	CriticalVuls    int
 	HighVuls        int
 	MedVuls         int
 	HighVulsWithFix int
@@ -138,63 +140,94 @@ type AdmUriState struct {
 	DefaultAction int // AdmCtrlActionAllow or AdmCtrlActionDeny
 }
 
-type AdmAssessResult struct {
-	ContainerImage string
-	RuleID         uint32
-	Disabled       bool
-	RuleDetails    string
-	RuleMode       string
-	RuleType       string // "allow"/"deny"
-	RuleCfgType    share.TCfgType
-	MatchedSource  string
+type AdmCtrlMatchedImageInfo struct {
+	ImageScanned    bool
+	ImageID         string // starting from this field, the following fields are available when the scan result for the image is available
+	Registry        string
+	BaseOS          string
+	CriticalVulsCnt int // critical vuls # of the image that gets allow/deny action or monitor
+	HighVulsCnt     int // high     vuls # of the image that gets allow/deny action or monitor
+	MedVulsCnt      int // medium   vuls # of the image that gets allow/deny action or monitor
 }
 
-type AdmResult struct { // AdmResult is per-container-image
-	MatchDeny             bool // for non-assessment only
-	ImageNotScanned       bool
-	MatchFedRule          bool // for non-assessment only
-	RuleID                uint32
-	RuleCategory          string
-	RuleMode              string
-	RuleCfgType           share.TCfgType
-	User                  string
-	AdmRule               string
-	Msg                   string
-	Image                 string // the image specified in yaml
-	ImageID               string // starting from this field, the following fields are available when the scan result for the image is available
-	Registry              string
-	Repository            string
-	Tag                   string
-	BaseOS                string
-	UnscannedImages       string
-	MatchedSource         string
-	HighVulsCnt           int
-	MedVulsCnt            int
-	AssessResults         []*AdmAssessResult // for assessment only, including all matched rules (disabled or not)
-	AssessMatchedRuleType string             // for assessment only, the 1st matched non-disabled rule's type(""/"allow"/"deny")
-	PVCName               string
-	PVCStorageClassName   string
+// AdmCtrlMatchedResult is for each matched occurrence.
+// One rule could be matched multiple times when there are multiple containers in a request
+type AdmCtrlMatchedResult struct {
+	ContainerImage  string
+	RuleID          uint32                  // matched rule's id
+	IsFedRule       bool                    // whether the matched rule is a fed rule
+	IsDenyRuleType  bool                    // whether the matched rule is a deny rule
+	IsMatchMonitor  bool                    // whether the matched deny rule gets "monitor" action (neither "allow" nor "deny")
+	IsCriticalMatch bool                    // whether this result is from a matched rule that decides "allow"/"deny" action
+	Disabled        bool                    // whether the matched rule is a disabled rule. for assessment, disabled rules are evaluated as well.
+	RuleDetails     string                  // matched rule's criteria description in plain-text
+	RuleMode        string                  // matched deny rule's per-rule mode. could be ""/"monitor"/"protect"
+	ImageInfo       AdmCtrlMatchedImageInfo // info of the image that matches a rule
+	RuleCfgType     share.TCfgType
+}
+
+func (r AdmCtrlMatchedResult) IsMatchedMode(globalMode, matchedMode string) bool {
+	if r.RuleMode == matchedMode || (r.RuleMode == "" && globalMode == matchedMode) {
+		return true
+	}
+	return false
+}
+
+type AdmCtrlContainerImageInfo struct {
+	ImageScanned    bool   // true when at least one image scan summary says so
+	Name            string // container name specified in yaml
+	Image           string // the image specified in yaml
+	Repository      string
+	Tag             string
+	CriticalVulsCnt int // the max critical vuls # in the (multiple) image scan summary
+	HighVulsCnt     int // the max high     vuls # in the (multiple) image scan summary
+	MedVulsCnt      int // the max medium   vuls # in the (multiple) image scan summary
+}
+
+type AdmCtrlAssessResult struct { // it is for a container-image or pvc
+	ContainerImageInfo AdmCtrlContainerImageInfo
+	AssessAction       string                  // ""/"allow"/"deny" : action matched for this assessment(container or pvc)
+	CriticalMatch      *AdmCtrlMatchedResult   // the match that decides "allow"/"deny" action (not including deny/monitor)
+	MatchedResults     []*AdmCtrlMatchedResult // list of matched rules' info for this container. a rule could matched without action taken(i.e. "monitor").
+}
+
+type AdmCtrlReqEvalResult struct { // it is for an admission control request
+	ReqAction           string // ""/"allow"/"deny" : action matched for this request
+	User                string
+	Msg                 string
+	UnscannedImages     string                 // those images in the request that not scanned, no matter what the container-image match result is
+	AllContainerImages  string                 // all images in the request
+	ContainersInReq     int                    // total containers in this request
+	AllCriticalVulsCnt  int                    // critical vuls count found for all containers in the request
+	AllHighVulsCnt      int                    // high     vuls count found for all containers in the request
+	AllMedVulsCnt       int                    // medium   vuls count found for all containers in the request
+	CriticalAssessment  *AdmCtrlAssessResult   // the container/pvc assessment that decides "allow"/"deny" action (not including deny/monitor)
+	AssessResults       []*AdmCtrlAssessResult // list of assessment match results. one entry per-container/pvc
+	PVCName             string
+	PVCStorageClassName string
 }
 
 type AdmResObject struct {
-	ValidUntil    int64 // seconds since the epoch
-	Kind          string
-	Name          string
-	Namespace     string
-	UserName      string
-	Groups        utils.Set
-	OwnerUIDs     []string
-	Labels        map[string]string
-	Annotations   map[string]string
-	AllContainers [3][]*AdmContainerInfo // containers info in this resource object in containers, initContainers, ephemeralContainers order
-	//AdmResults map[string]*AdmResult // key is image repo. comment out because we do not re-use the matching result of owners anymore
+	ValidUntil         int64 // seconds since the epoch
+	Kind               string
+	Name               string
+	Namespace          string
+	UserName           string
+	Groups             utils.Set
+	OwnerUIDs          []string
+	Labels             map[string]string
+	Annotations        map[string]string
+	AllContainers      [3][]*AdmContainerInfo // containers info in this resource object in containers, initContainers, ephemeralContainers order
 	ServiceAccountName string
 }
 
-type matchState int
-type AdmMatchData struct {
-	RootAvail  bool
-	MatchState matchState
+type AdmCtrlEvalContext struct {
+	RootAvail       bool
+	ForTesting      bool
+	ContainersInReq int
+	GlobalMode      string
+	AdmCtrlType     string
+	ReqActionSoFar  string
 }
 
 const (
@@ -203,14 +236,6 @@ const (
 	ReqErrored
 	ReqIgnored
 )
-
-const (
-	MatchedNone  matchState = 0
-	MatchedAllow matchState = 1
-	MatchedDeny  matchState = 2
-)
-
-//var admMutatingKind = resource.RscKindMutatingWebhookConfiguration
 
 var admRuleTypeOptions map[string]*api.RESTAdmCatOptions           // key is rules type, like "deny", "exception"
 var admK8sDenyRuleOptions map[string]*api.RESTAdmissionRuleOption  // key is criterion name

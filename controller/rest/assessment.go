@@ -134,9 +134,13 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 								ContainerImage: assessResult.ContainerImage,
 								ID:             assessResult.RuleID,
 								Disabled:       assessResult.Disabled,
-								Type:           assessResult.RuleType,
 								Mode:           assessResult.RuleMode,
 								RuleDetails:    assessResult.RuleDetails,
+							}
+							if assessResult.IsDenyRuleType {
+								matchedRule.Type = api.ValidatingDenyRuleType
+							} else {
+								matchedRule.Type = api.ValidatingAllowRuleType
 							}
 							matchedRule.RuleCfgType, _ = cfgTypeMap2Api[assessResult.RuleCfgType]
 							matchedRules = append(matchedRules, matchedRule)

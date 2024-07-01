@@ -3512,8 +3512,8 @@ type AdmCtlTimeStamps struct {
 	Parsed     time.Time
 	GonnaFetch time.Time
 	Fetched    time.Time
-	Matched    time.Time
-	Image      string // the original image specified in the admission request
+	Evaluated  time.Time
+	Images     string // the original images specified in the admission request
 }
 
 type RESTAdmissionStatsData struct {
