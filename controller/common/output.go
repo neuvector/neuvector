@@ -244,7 +244,7 @@ func NewWebHook(url, target string) *Webhook {
 	return w
 }
 
-func (w *Webhook) Notify(elog interface{}, level, category, cluster, title string, proxy *share.CLUSProxy) {
+func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comment string, proxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"title": title}).Debug()
 
 	if logText := struct2Text(elog); logText != "" {
@@ -256,7 +256,12 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title strin
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
-			logText = fmt.Sprintf("*%s: %s level*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), title, logText)
+			if comment != "" {
+				logText = fmt.Sprintf("*%s: %s level, Comment: %s*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment, title, logText)
+			} else {
+				logText = fmt.Sprintf("*%s: %s level*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), title, logText)
+			}
+
 			fields := make(map[string]string)
 			fields["text"] = logText
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
@@ -264,18 +269,35 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title strin
 		case api.WebhookTypeTeams:
 			ctype = ctypeJSON
 			fields := make(map[string]string)
+			if comment != "" {
+				fields["title"] = fmt.Sprintf("%s: %s level, Comment: %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
+			} else {
+				fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			}
+
 			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
 			data, _ = json.Marshal(fields)
 		case api.WebhookTypeJSON:
 			ctype = ctypeJSON
-			extra := fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster)
+			var extra string
+			if comment != "" {
+				extra = fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",\"comment\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster, comment)
+			} else {
+				extra = fmt.Sprintf("{\"level\":\"%s\",\"cluster\":\"%s\",", strings.ToUpper(LevelToString(level)), cluster)
+			}
+
 			data, _ = json.Marshal(elog)
 			data = append([]byte(extra), data[1:]...)
 		default:
 			ctype = ctypeText
-			msg := fmt.Sprintf("level=%s,cluster=%s,%s", strings.ToUpper(LevelToString(level)), cluster, logText)
+			var msg string
+			if comment != "" {
+				msg = fmt.Sprintf("level=%s,cluster=%s,comment=%s,%s", strings.ToUpper(LevelToString(level)), cluster, comment, logText)
+			} else {
+				msg = fmt.Sprintf("level=%s,cluster=%s,%s", strings.ToUpper(LevelToString(level)), cluster, logText)
+			}
 			data = []byte(msg)
 		}
 

@@ -419,7 +419,7 @@ func webhookActivity(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryEvent, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryEvent, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 	}
@@ -433,7 +433,7 @@ func webhookEvent(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryEvent, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryEvent, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 	}
@@ -447,7 +447,7 @@ func webhookViolation(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryViolation, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryViolation, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 	}
@@ -468,7 +468,7 @@ func webhookThreat(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryThreat, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryThreat, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 		rlog.CapLen, rlog.Packet = len, pkt
@@ -483,7 +483,7 @@ func webhookIncident(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryIncident, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryIncident, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 	}
@@ -512,7 +512,7 @@ func webhookAudit(act *actionDesc, arg interface{}) {
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
-				whc.c.Notify(rlog, rlog.Level, api.CategoryAudit, rlog.ClusterName, title, proxy)
+				whc.c.Notify(rlog, rlog.Level, api.CategoryAudit, rlog.ClusterName, title, act.comment, proxy)
 			}
 		}
 	}
