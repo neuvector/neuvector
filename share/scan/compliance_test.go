@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,8 +10,10 @@ import (
 	"os"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
 )
 
 var (
@@ -75,7 +76,7 @@ func TestSetup(t *testing.T) {
 		backupMockLoadMetas = append(backupMockLoadMetas, backupMeta)
 	}
 
-	PrepareBenchMeta(mockLoadItems, &mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
+	PrepareBenchMeta(mockLoadItems, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 	if isUpdateMockLoadMetaMap {
 		updateMetasFromMap(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 	}
@@ -108,10 +109,8 @@ func TestTagConsistance(t *testing.T) {
 		mockTagCount := make(map[string]int)
 		cisItemTagCount := make(map[string]int)
 
-		for _, tags := range cisItems[id].Tags {
-			for tag, _ := range tags {
-				cisItemTagCount[tag]++
-			}
+		for tag, _ := range cisItems[id].Tags {
+			cisItemTagCount[tag]++
 		}
 
 		for _, tag := range value.Tags {
@@ -132,12 +131,62 @@ func TestTagConsistance(t *testing.T) {
 
 func getMetaMapForTest(remediationFolder string, items map[string]api.RESTBenchCheck, metas []api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	GetK8sCISMeta(remediationFolder, items)
-	PrepareBenchMeta(items, &metas, metaMap, updateFlag)
+	PrepareBenchMeta(items, metaMap, updateFlag)
 	if *updateFlag {
 		updateMetasFromMap(&metas, metaMap, updateFlag)
 	}
 
 	return metas, metaMap
+}
+
+func TestGetComplianceFilterMap(t *testing.T) {
+	// Reset the once variable and the availableFilter map before running the test
+	var mockComplianceFilterMap map[string]int
+	mockMetas := []api.RESTBenchMeta{
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.1",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.2",
+				Tags: map[string]share.TagDetails{
+					"PCI": {},
+				},
+			},
+		},
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.3",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+	}
+
+	expected := map[string]int{"HIPAA": 2, "PCI": 1}
+	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
+	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should match the expected values")
+
+	// Call the function again to ensure it doesn't run the initialization code again
+	mockMetas = []api.RESTBenchMeta{
+		{
+			RESTBenchCheck: api.RESTBenchCheck{
+				TestNum: "1.1.1",
+				Tags: map[string]share.TagDetails{
+					"HIPAA": {},
+				},
+			},
+		},
+	}
+	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
+	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should not change after the first call")
+
 }
 
 func TestGetComplianceMeta(t *testing.T) {
@@ -146,7 +195,7 @@ func TestGetComplianceMeta(t *testing.T) {
 	mockMetas, mockMetaMap := getMetaMapForTest(remediationFolder, mockCISItems, mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 
 	if diff := cmp.Diff(mockMetas, metas); diff != "" {
-		t.Errorf("mockMetas metas (-want +got):\n%s", diff)
+		t.Errorf("mockMetas mismatch (-want +got):\n%s", diff)
 	}
 
 	if diff := cmp.Diff(mockMetaMap, metaMap); diff != "" {
@@ -166,7 +215,7 @@ func TestGetComplianceMeta(t *testing.T) {
 	remediationFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
 	metas, metaMap = getMetaMapForTest(remediationFolder, cisItems, complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
 
-	PrepareBenchMeta(mockCISItems, &mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
+	PrepareBenchMeta(mockCISItems, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 	updateMetasFromMap(&mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
 
 	if diff := cmp.Diff(mockComplianceMetas, metas); diff != "" {
@@ -206,7 +255,6 @@ func TestLoadCreateEmpty(t *testing.T) {
 	go func() {
 		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 		close(done)
-		fmt.Println("stop the channel")
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -251,7 +299,6 @@ func TestLoadCreateExisting(t *testing.T) {
 	go func() {
 		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
 		close(done)
-		fmt.Println("XXX done", mockLoadMetaMap)
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -266,17 +313,14 @@ func TestLoadCreateExisting(t *testing.T) {
 
 	<-done
 	getMetaMapForLoadTest(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	fmt.Println("XXX getMetaMapForLoadTest", mockLoadMetaMap)
 
 	// Iterate over the slice of Meta structs
 	for _, meta := range mockLoadMetas {
 		// Check if the current meta ID is one we're interested in
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			for compliance, _ := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {
@@ -287,11 +331,9 @@ func TestLoadCreateExisting(t *testing.T) {
 	for _, meta := range mockLoadMetaMap {
 		// Check if the current meta ID is one we're interested in
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			for compliance, _ := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {

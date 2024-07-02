@@ -2579,22 +2579,20 @@ type RESTWorkloadInterceptData struct {
 	Intercept *RESTWorkloadIntercept `json:"intercept"`
 }
 
-type TagDetail struct {
-	ID          string `yaml:"id" json:"id"`
-	Title       string `yaml:"title" json:"title"`
-	Description string `yaml:"description" json:"description"`
+type RESTAvaiableComplianceFilter struct {
+	AvailableFilter []string `json:"available_filter"`
 }
 
 type RESTBenchCheck struct {
-	TestNum     string                   `json:"test_number"`
-	Category    string                   `json:"category"`
-	Type        string                   `json:"type"`
-	Profile     string                   `json:"profile"`
-	Scored      bool                     `json:"scored"`
-	Automated   bool                     `json:"automated"`
-	Description string                   `json:"description"`
-	Remediation string                   `json:"remediation"`
-	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
+	TestNum     string                      `json:"test_number"`
+	Category    string                      `json:"category"`
+	Type        string                      `json:"type"`
+	Profile     string                      `json:"profile"`
+	Scored      bool                        `json:"scored"`
+	Automated   bool                        `json:"automated"`
+	Description string                      `json:"description"`
+	Remediation string                      `json:"remediation"`
+	Tags        map[string]share.TagDetails `json:"tags,omitempty"`
 }
 
 type RESTBenchMeta struct {
@@ -2626,21 +2624,21 @@ type RESTComplianceData struct {
 }
 
 type RESTComplianceAsset struct {
-	Name        string                   `json:"name"`
-	Category    string                   `json:"category"`
-	Type        string                   `json:"type"`
-	Level       string                   `json:"level"`
-	Profile     string                   `json:"profile"`
-	Scored      bool                     `json:"scored"`
-	Description string                   `json:"description"`
-	Message     []string                 `json:"message"`
-	Remediation string                   `json:"remediation"`
-	Group       string                   `json:"group"`
-	Tags        []map[string][]TagDetail `json:"tags,omitempty"`
-	Workloads   []string                 `json:"workloads"`
-	Nodes       []string                 `json:"nodes"`
-	Images      []string                 `json:"images"`
-	Platforms   []string                 `json:"platforms"`
+	Name        string                      `json:"name"`
+	Category    string                      `json:"category"`
+	Type        string                      `json:"type"`
+	Level       string                      `json:"level"`
+	Profile     string                      `json:"profile"`
+	Scored      bool                        `json:"scored"`
+	Description string                      `json:"description"`
+	Message     []string                    `json:"message"`
+	Remediation string                      `json:"remediation"`
+	Group       string                      `json:"group"`
+	Tags        map[string]share.TagDetails `json:"tags,omitempty"`
+	Workloads   []string                    `json:"workloads"`
+	Nodes       []string                    `json:"nodes"`
+	Images      []string                    `json:"images"`
+	Platforms   []string                    `json:"platforms"`
 }
 
 type RESTComplianceAssetData struct {
@@ -2659,11 +2657,13 @@ const (
 	ComplianceTemplateGDPR  = "GDPR"
 	ComplianceTemplateHIPAA = "HIPAA"
 	ComplianceTemplateNIST  = "NIST" // NIST SP 800-190
+	ComplianceTemplatePCIv4 = "PCIv4"
+	ComplianceTemplateDISA  = "DISA"
 )
 
 type RESTComplianceProfileEntry struct {
-	TestNum string   `json:"test_number"`
-	Tags    []string `json:"tags"`
+	TestNum string                      `json:"test_number"`
+	Tags    map[string]share.TagDetails `json:"tags,omitempty"`
 }
 
 type RESTComplianceProfile struct {
