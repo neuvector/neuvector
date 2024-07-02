@@ -150,7 +150,7 @@ func GetCronJobDetail(ctx context.Context, client dynamic.Interface, namespace s
 func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace string, certUpgraderUID string, withLock bool) (*batchv1.Job, error) {
 	// Global cluster-level lock with 5 mins TTL
 	if withLock {
-		lock, err := CreateLocker(namespace, CONTROLLER_LEASE_NAME)
+		lock, err := CreateLocker(client, namespace, CONTROLLER_LEASE_NAME)
 		if err != nil {
 			return nil, fmt.Errorf("failed to acquire cluster-wide lock: %w", err)
 		}
