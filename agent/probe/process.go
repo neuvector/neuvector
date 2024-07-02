@@ -3034,10 +3034,32 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 		} else if mounted {
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
-		} else {
-			// this file is not existed
-			bImageFile = false
-			mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+		} else { // yes: not a container file
+			bFromPrivilegedPod := false
+			ppid := 0
+			cID := ""
+			// The process (like "setns") is from a privileged pod (like enforcer)
+			if proc.ppid == p.agentPid {
+				ppid = p.agentPid
+				cID = p.selfID
+			} else if pContainer, ok := p.pidContainerMap[proc.ppid]; ok && pContainer.id != "" && pContainer.bPrivileged {
+				ppid = pContainer.rootPid
+				cID = pContainer.id
+			}
+
+			// need to validate it from the calling pod
+			if ppid != 0 {
+				if yes, _ = global.SYS.IsNotContainerFile(ppid, ppe.Path); yes {
+					bFromPrivilegedPod = true
+					log.WithFields(log.Fields{"file": ppe.Path, "id": cID, "ppid": ppid}).Debug("SHD: calling from a priviiged pod")
+				}
+			}
+
+			if !bFromPrivilegedPod {
+				// this file is not existed
+				bImageFile = false
+				mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+			}
 		}
 
 		// from docker run, v20.10.7
