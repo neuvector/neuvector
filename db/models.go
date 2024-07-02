@@ -404,20 +404,24 @@ func unzipAndDecode(data []byte, target interface{}) error {
 
 func UnzipModules(sb []byte) ([]*share.ScanModule, error) {
 	var modules []*share.ScanModule
+
+	if len(sb) == 0 {
+		return modules, nil
+	}
+
 	err := unzipAndDecode(sb, &modules)
 	return modules, err
 }
 
 func UnzipVuls(vulsb []byte) ([]*share.ScanVulnerability, error) {
 	var vuls []*share.ScanVulnerability
+
+	if len(vuls) == 0 {
+		return vuls, nil
+	}
+
 	err := unzipAndDecode(vulsb, &vuls)
 	return vuls, err
-}
-
-func UnzipStrSlice(vulsb []byte) ([]string, error) {
-	var items []string
-	err := unzipAndDecode(vulsb, &items)
-	return items, err
 }
 
 func getBytesColumns(assetid string, columnFlags int) (map[int][]byte, error) {
