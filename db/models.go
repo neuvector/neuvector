@@ -416,7 +416,7 @@ func UnzipModules(sb []byte) ([]*share.ScanModule, error) {
 func UnzipVuls(vulsb []byte) ([]*share.ScanVulnerability, error) {
 	var vuls []*share.ScanVulnerability
 
-	if len(vuls) == 0 {
+	if len(vulsb) == 0 {
 		return vuls, nil
 	}
 
