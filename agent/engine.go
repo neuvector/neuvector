@@ -2507,6 +2507,10 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 
 	log.Debug("Start monitoring Host Interface changes...")
 
+	// Set up a timer to call taskReexamHostIntf only once after 1 minute
+	timer := time.NewTimer(1 * time.Minute)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-stopCh:
@@ -2533,6 +2537,9 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 				// for all other conditions(includes address delete) re-exam host interface
 				taskReexamHostIntf()
 			}
+		case <-timer.C:
+			taskReexamHostIntf()
+			timer.Stop()
 		}
 	}
 }
