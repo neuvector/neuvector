@@ -49,7 +49,7 @@ const (
 	RscTypeDaemonSet                      = "daemonset"
 	RscTypeReplicaSet                     = "replicaset"
 	RscTypeStatefulSet                    = "statefulset"
-	RscTypePersistentVolumeClaim          = "persistentvolumeclaims"
+	RscTypePersistentVolumeClaim          = "persistentvolumeclaim"
 )
 
 const (
