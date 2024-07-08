@@ -244,6 +244,63 @@ func NewWebHook(url, target string) *Webhook {
 	return w
 }
 
+func getDetailInfoFromLog(elog interface{}) string {
+	details := ""
+	v := reflect.ValueOf(elog).Elem()
+
+	if field := v.FieldByName("ClusterName"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("cluster: %s, ", field.String())
+	}
+
+	// For Audit, Incident, Event
+	if field := v.FieldByName("WorkloadDomain"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("namespace: %s, ", field.String())
+	}
+
+	if field := v.FieldByName("WorkloadImage"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("image: %s, ", field.String())
+	}
+
+	// For Audit, Incident, Event
+	if field := v.FieldByName("ClientWLDomain"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("client namespace: %s, ", field.String())
+	} else if field := v.FieldByName("ClientDomain"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("client namespace: %s, ", field.String())
+	}
+
+	if field := v.FieldByName("ClientWLImage"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("client image: %s, ", field.String())
+	} else if field := v.FieldByName("ClientImage"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("client image: %s, ", field.String())
+	}
+
+	if field := v.FieldByName("ServerWLDomain"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("server namespace: %s, ", field.String())
+	} else if field := v.FieldByName("ServerDomain"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("server namespace: %s, ", field.String())
+	}
+
+	if field := v.FieldByName("ServerWLImage"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("server image: %s, ", field.String())
+	} else if field := v.FieldByName("ServerImage"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("server image: %s, ", field.String())
+	}
+
+	// Common part
+	if field := v.FieldByName("HostName"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("node: %s, ", field.String())
+	}
+
+	if field := v.FieldByName("ReportedAt"); field.IsValid() && field.Kind() == reflect.String {
+		details += fmt.Sprintf("time: %s, ", field.String())
+	}
+
+	if len(details) > 0 {
+		details = details[:len(details)-2]
+	}
+	return details
+}
+
 func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comment string, proxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"title": title}).Debug()
 
@@ -256,12 +313,17 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
+			logheader := fmt.Sprintf("*%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			if comment != "" {
-				logText = fmt.Sprintf("*%s: %s level, Comment: %s*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment, title, logText)
-			} else {
-				logText = fmt.Sprintf("*%s: %s level*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), title, logText)
+				logheader += fmt.Sprintf(", Comment: %s*", comment)
 			}
 
+			logheader += fmt.Sprintf("\n_%s_", title)
+			if detail := getDetailInfoFromLog(elog); detail != "" {
+				logheader += fmt.Sprintf("\n_%s_", detail)
+			}
+
+			logText = fmt.Sprintf("%s\n>>> %s", logheader, logText)
 			fields := make(map[string]string)
 			fields["text"] = logText
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
@@ -269,13 +331,15 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 		case api.WebhookTypeTeams:
 			ctype = ctypeJSON
 			fields := make(map[string]string)
-			if comment != "" {
-				fields["title"] = fmt.Sprintf("%s: %s level, Comment: %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
-			} else {
-				fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
-			}
 
-			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			logheader := fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			if comment != "" {
+				logheader += fmt.Sprintf(", Comment: %s", comment)
+			}
+			if detail := getDetailInfoFromLog(elog); detail != "" {
+				logheader += fmt.Sprintf("\n%s", detail)
+			}
+			fields["title"] = logheader
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
 			data, _ = json.Marshal(fields)
