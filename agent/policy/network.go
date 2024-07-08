@@ -390,7 +390,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 				// log.WithFields(log.Fields{"from": from.WlID}).Debug("Missing ip for host mode container!")
 				return
 			}
-			fromIPList = from.NatIP[:1]
+			fromIPList = from.NatIP//there could be multiple host i/f
 		} else {
 			fromIPList = from.LocalIP
 		}
@@ -461,7 +461,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 				// log.WithFields(log.Fields{"to": to.WlID}).Debug("Missing ip for host mode container!")
 				return
 			}
-			toIPList = to.NatIP[:1]
+			toIPList = to.NatIP//there could be multiple host i/f
 			//(NVSHAS-4175) for host mode container we also need
 			//to include LocalPortApp to create ip rule. For host
 			//mode workload we do not check application but only
