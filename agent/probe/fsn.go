@@ -358,7 +358,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 		return
 	}
 
-	if path == "" { // ignore root's operation
+	if path == "" || fsn.skipPathByRole(root.role, file) { // ignore root's operation
 		return
 	}
 
@@ -452,7 +452,12 @@ func (fsn *FileNotificationCtr) Close() {
 
 func (fsn *FileNotificationCtr) skipPathByRole(role, path string) bool {
 	switch role {
-	case "enforcer", "scanner", "controller+enforcer+manager":
+	case "controller+enforcer+manager":
+		if strings.HasPrefix(path, "/supervisord.log") {
+			return true
+		}
+		fallthrough
+	case "enforcer", "scanner":
 		if strings.HasPrefix(path + "/", "/tmp/") {
 			return true
 		}
