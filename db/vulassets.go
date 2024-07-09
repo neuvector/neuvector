@@ -293,7 +293,7 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 	vulAsset.Skip = !keep
 }
 
-func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
+func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, error) {
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
@@ -305,30 +305,23 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 
 	queryStat, err := GetQueryStat(sessionToken)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	db := memoryDbHandle
 	if queryStat.FileDBReady == 1 {
 		db, err = openSessionFileDb(sessionToken)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		defer db.Close() // close it after done
 	}
 
 	rows, err := db.Query(statement, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer rows.Close()
-
-	workloadSet := utils.NewSet()
-	nodeSet := utils.NewSet()
-	imageSet := utils.NewSet()
-	platformSet := utils.NewSet()
-
-	assets := make(map[string][]string, 0)
 
 	records := make(map[string]*DbVulAsset)
 	for rows.Next() {
@@ -337,36 +330,16 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 			&vulasset.Vectors, &vulasset.ScoreV3, &vulasset.VectorsV3, &vulasset.PublishedTS, &vulasset.LastModTS,
 			&vulasset.Workloads, &vulasset.Nodes, &vulasset.Images, &vulasset.Platforms)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		// this fitler (CVE based) is specific to asset view
 		if (LastModifiedTime == 0) || vulasset.LastModTS > LastModifiedTime {
 			records[vulasset.Name] = vulasset
-
-			addAssetsToSet(vulasset.Workloads, workloadSet)
-			addAssetsToSet(vulasset.Nodes, nodeSet)
-			addAssetsToSet(vulasset.Images, imageSet)
-			addAssetsToSet(vulasset.Platforms, platformSet)
 		}
 	}
 
-	assets[AssetWorkload] = allowed[AssetWorkload].Intersect(workloadSet).ToStringSlice()
-	assets[AssetNode] = allowed[AssetNode].Intersect(nodeSet).ToStringSlice()
-	assets[AssetImage] = allowed[AssetImage].Intersect(imageSet).ToStringSlice()
-	assets[AssetPlatform] = allowed[AssetPlatform].Intersect(platformSet).ToStringSlice()
-
-	return records, assets, nil
-}
-
-func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
-	items := make([]string, 0)
-	err := json.Unmarshal([]byte(assetsIDStr), &items)
-	if err == nil {
-		for _, v := range items {
-			assetSet.Add(v)
-		}
-	}
+	return records, nil
 }
 
 func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
