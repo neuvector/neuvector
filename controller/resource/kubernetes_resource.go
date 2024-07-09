@@ -60,6 +60,9 @@ const (
 	K8sResReplicationControllers  = "replicationcontrollers"
 	K8sResReplicasets             = "replicasets"
 	K8sResServices                = "services"
+	k8sResNamespaces              = "namespaces"
+	k8sResConfigMaps              = "configmaps"
+	k8sResSecrets                 = "secrets"
 	K8sResStatefulSets            = "statefulsets"
 	K8sResRoles                   = "roles"
 	K8sResRolebindings            = "rolebindings"
@@ -102,6 +105,8 @@ const (
 	nvCrdCompProfileRoleBinding = nvCrdCompProfileRole
 	NvScannerRole               = "neuvector-binding-scanner"
 	NvScannerRoleBinding        = NvScannerRole
+	NvSecretRole                = "neuvector-binding-secret"
+	nvSecretRoleBinding         = NvSecretRole
 	NvAdminRoleBinding          = "neuvector-admin"
 	nvViewRoleBinding           = "neuvector-binding-view"
 )

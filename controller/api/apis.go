@@ -512,7 +512,8 @@ type RESTEULA struct {
 
 type RESTEULAData struct {
 	EULA            *RESTEULA `json:"eula"`
-	BootstrapPwdCmd string    `json:"bootstrap_password_command"` // k8s command to retrieve the bootstrap password
+	BootstrapPwdCmd string    `json:"bootstrap_password_command"`       // k8s command to retrieve the bootstrap password
+	K8sRbacAlertMsg string    `json:"k8s_rbac_alert_message,omitempty"` // alert message when k8s role/rolebinding neuvector-binding-secret is not correct
 }
 
 type RESTList struct {
