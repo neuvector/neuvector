@@ -1747,23 +1747,85 @@ func isApiPathAvailable(ctrlStates map[string]*share.CLUSAdmCtrlState) bool {
 	return true
 }
 
-// matchCfgType being 0 means to compare with default(critical) rules only
-// result is per-container-image's result. (a pod could have multiple containers)
-func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmResult,
-	ar *admissionv1beta1.AdmissionReview, containerType string, forTesting bool) bool { // return true means match
+// return true means the match is a critical match that decides the action of the admission control request
+func collectMatchedResult(rule *share.CLUSAdmissionRule, evalContext *nvsysadmission.AdmCtrlEvalContext,
+	imageSummary *nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmCtrlAssessResult,
+	ruleType, image, matchedSource, extraDenyRuleMsg string) bool {
 
-	var isDenyRuleType bool
-	var assessMatched bool                              // whether a non-disabled rule is matched in this assessment call
-	var assessResults []*nvsysadmission.AdmAssessResult // all matched rules'(disabled or not) results for assessment only
+	// 1. for assessment, disabled rules' matched results are collected as well.
+	//    however, disabled rules' matched results are ignored in the calc of the final webhook request result.
+	// 2. for non-assessment, disabled rules are not evaluated at all.
+
+	isDenyRuleType := false
+	isCriticalMatch := false // meaning the matched rule gets allow/deny action(not including deny/monitor)
+	matchedAction := ""
 
 	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
 		isDenyRuleType = true
 	}
-	admPolicyCache := selectAdminPolicyCache(admType, ruleType)
+
+	ruleDetails := fmt.Sprintf("%s%s.", ruleToString(rule), matchedSource)
+	if len(extraDenyRuleMsg) > 0 {
+		ruleDetails += " " + extraDenyRuleMsg
+	}
+	if len(ruleDetails) > 0 && ruleDetails[len(ruleDetails)-1] == '.' {
+		ruleDetails = ruleDetails[0 : len(ruleDetails)-1]
+	}
+
+	if !isDenyRuleType {
+		matchedAction = share.PolicyActionAllow
+	} else if rule.RuleMode == share.AdmCtrlModeProtect || (rule.RuleMode == "" && evalContext.GlobalMode == share.AdmCtrlModeProtect) {
+		matchedAction = share.AdmCtrlActionDeny
+	}
+
+	if result.AssessAction == "" && !rule.Disable && matchedAction != "" {
+		isCriticalMatch = true
+	}
+	matchedResult := &nvsysadmission.AdmCtrlMatchedResult{
+		ContainerImage:  image,
+		RuleID:          rule.ID,
+		IsFedRule:       ruleType == share.FedAdmCtrlDenyRulesType || ruleType == share.FedAdmCtrlExceptRulesType,
+		IsDenyRuleType:  isDenyRuleType,
+		Disabled:        rule.Disable,
+		IsCriticalMatch: isCriticalMatch,
+		RuleDetails:     ruleDetails,
+		RuleMode:        rule.RuleMode, // matched rule's per-rule mode. for deny rules only
+		RuleCfgType:     rule.CfgType,
+	}
+	if imageSummary != nil {
+		matchedResult.ImageInfo = nvsysadmission.AdmCtrlMatchedImageInfo{
+			ImageScanned:    imageSummary.Scanned,
+			ImageID:         imageSummary.ImageID,
+			Registry:        imageSummary.Registry,
+			BaseOS:          imageSummary.BaseOS,
+			CriticalVulsCnt: imageSummary.CriticalVuls,
+			HighVulsCnt:     imageSummary.HighVuls,
+			MedVulsCnt:      imageSummary.MedVuls,
+		}
+	}
+	result.MatchedResults = append(result.MatchedResults, matchedResult)
+	if isCriticalMatch {
+		result.AssessAction = matchedAction
+		result.CriticalMatch = matchedResult
+	}
+
+	return isCriticalMatch
+}
+
+// matchCfgType being 0 means to compare with default(critical) rules only
+// result is per-container-image's result. (a pod could have multiple containers)
+// return true means an enabled rule is matched with allow/deny action
+func matchK8sAdmissionRules(ruleType string, matchCfgType int, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
+	evalContext *nvsysadmission.AdmCtrlEvalContext, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmCtrlAssessResult,
+	ar *admissionv1beta1.AdmissionReview, containerType string) bool {
+
+	forTesting := evalContext.ForTesting
+	hasActionMatched := false
+	admPolicyCache := selectAdminPolicyCache(evalContext.AdmCtrlType, ruleType)
 	if admPolicyCache != nil {
 		cacheMutexRLock()
 		defer cacheMutexRUnlock()
+
 		for _, head := range admPolicyCache.RuleHeads {
 			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok && (forTesting || !rule.Disable) && rule.Category == admission.AdmRuleCatK8s {
 				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
@@ -1794,68 +1856,24 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 					}
 
 					for _, scannedImage := range scannedImages {
-						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, matchData.RootAvail, ar, rule.ID); matched {
-							// for assessment, disabled rule could be matched even though it's ignored in the calc of final webhook request result
-							ruleDetails := ruleToString(rule)
-							matchedDenyMsg := fillDenyMessageFromRule(c, rule, scannedImage)
-							if forTesting {
-								assessResult := &nvsysadmission.AdmAssessResult{
-									ContainerImage: c.Image,
-									RuleID:         rule.ID,
-									Disabled:       rule.Disable,
-									RuleDetails:    ruleDetails,
-									RuleCfgType:    rule.CfgType,
-									MatchedSource:  matchedSource,
+						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, evalContext.RootAvail, ar, rule.ID); matched {
+							extraDenyRuleMsg := ""
+							if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
+								if matchedSource != "" {
+									matchedSource = fmt.Sprintf(" and matched data from %s", matchedSource)
 								}
-								if isDenyRuleType {
-									assessResult.RuleType = api.ValidatingDenyRuleType
-									//assessResult.DenyRuleMatched = true
-									assessResult.RuleMode = rule.RuleMode
-									if len(matchedDenyMsg) > 0 {
-										assessResult.RuleDetails += ", " + matchedDenyMsg
-									}
-								} else {
-									assessResult.RuleType = api.ValidatingAllowRuleType
-								}
-								if !rule.Disable {
-									// for assessment, disabled rules' matching results are collected as well.
-									// however, disabled rules' matching results are ignored in the calc of final webhook request result
-									if result.AssessMatchedRuleType == "" {
-										// the 1st matched non-disabled rule's type is recorded the container-image's result
-										if isDenyRuleType {
-											result.AssessMatchedRuleType = api.ValidatingDenyRuleType
-										} else {
-											result.AssessMatchedRuleType = api.ValidatingAllowRuleType
-										}
-									}
-									assessMatched = true
-								}
-								assessResults = append(assessResults, assessResult)
+								extraDenyRuleMsg = fillDenyMessageFromRule(c, rule, scannedImage)
 							}
-							if !forTesting || len(result.AssessMatchedRuleType) == 0 {
-								result.RuleID = rule.ID
-								result.RuleCfgType = rule.CfgType
-								if isDenyRuleType && rule.RuleMode != "" {
-									result.RuleMode = rule.RuleMode
-								}
-								result.AdmRule = ruleDetails
-								result.Image = c.Image
-								result.MatchedSource = matchedSource
-								if !result.ImageNotScanned {
-									result.ImageID = scannedImage.ImageID
-									result.Registry = scannedImage.Registry
-									result.Repository = c.ImageRepo
-									result.Tag = c.ImageTag
-									result.BaseOS = scannedImage.BaseOS
-									result.HighVulsCnt = scannedImage.HighVuls
-									result.MedVulsCnt = scannedImage.MedVuls
-								}
-								// denied condition
-								if isDenyRuleType {
-									result.Msg = matchedDenyMsg
-								}
-								if !forTesting {
-									log.WithFields(log.Fields{"id": head.ID, "image": c.Image, "type": ruleType}).Debug("matched a rule")
+							isActionMatched := collectMatchedResult(rule, evalContext, scannedImage, result, ruleType, c.Image, matchedSource, extraDenyRuleMsg)
+							// for assessment, disabled rule could be matched even though it's ignored in the calc of final request result
+							if !forTesting {
+								log.WithFields(log.Fields{"id": head.ID, "image": c.Image, "type": ruleType, "isActionMatched": isActionMatched}).Debug("matched a rule")
+							}
+
+							if isActionMatched {
+								if forTesting {
+									hasActionMatched = true
+								} else {
 									return true
 								}
 							}
@@ -1865,13 +1883,8 @@ func matchK8sAdmissionRules(admType, ruleType string, matchCfgType int, admResOb
 			}
 		}
 	}
-	if forTesting {
-		if len(assessResults) > 0 {
-			result.AssessResults = append(result.AssessResults, assessResults...)
-		}
-		return assessMatched
-	}
-	return false
+
+	return hasActionMatched
 }
 
 // Admission control - non-UI
@@ -2003,63 +2016,91 @@ func (m CacheMethod) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, i
 	}
 }
 
-func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	matchData *nvsysadmission.AdmMatchData, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
-	containerType string, forTesting bool) (*nvsysadmission.AdmResult, bool) {
+// it's for a container/image's evaluation only
+func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
+	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
+	containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool) {
 
-	result := &nvsysadmission.AdmResult{}
+	forTesting := evalContext.ForTesting
+	result := &nvsysadmission.AdmCtrlAssessResult{} // match result for the container-image
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	stamps.GonnaFetch = time.Now()
 	scannedImages := scan.GetScannedImageSummary(c.ImageRegistry, c.ImageRepo, c.ImageTag, vpf)
 	stamps.Fetched = time.Now()
-	if len(scannedImages) == 1 && !scannedImages[0].Scanned {
-		log.WithFields(log.Fields{"ImageRegistry": c.ImageRegistry.Any(), "ImageRepo": c.ImageRepo, "ImageTag": c.ImageTag}).Info("requested image not scanned")
-		result.ImageNotScanned = true
-	} else {
-		// As specified in https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/,
-		// the environment variables set using the env or envFrom field will override any environment variables specified in the container image.
-		// So environment variables set in yaml will override any environment variables specified in the scanned result.
-		for _, scannedImage := range scannedImages {
+
+	// criticalVuls, highVuls, medVuls are the max vulns found for the image
+	scanned, criticalVuls, highVuls, medVuls := false, 0, 0, 0
+	if len(scannedImages) > 0 {
+		imageSummaryCount := 1
+		firstScannedImage := scannedImages[0]
+
+		for i, scannedImage := range scannedImages {
+			if scannedImage.Scanned {
+				scanned = true
+				if scannedImage.CriticalVuls > criticalVuls {
+					criticalVuls = scannedImage.CriticalVuls
+				}
+				if scannedImage.HighVuls > highVuls {
+					highVuls = scannedImage.HighVuls
+				}
+				if scannedImage.MedVuls > medVuls {
+					medVuls = scannedImage.MedVuls
+				}
+			}
+
+			if i > 0 && (scannedImage.ImageID != firstScannedImage.ImageID || scannedImage.Digest != firstScannedImage.Digest) {
+				imageSummaryCount++
+				log.WithFields(log.Fields{"Image": c.Image, "imageID": scannedImage.ImageID, "digest": scannedImage.ImageID}).Info("multiple image summary")
+			}
+
+			// As specified in https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/,
+			// the environment variables set using the env or envFrom field will override any environment variables specified in the container image.
+			// So environment variables set in yaml will override any environment variables specified in the scanned result.
 			for k, _ := range c.EnvVars {
 				if _, exist := scannedImage.EnvVars[k]; exist {
 					delete(scannedImage.EnvVars, k)
 				}
 			}
 		}
+
+		if imageSummaryCount > 0 {
+			log.WithFields(log.Fields{"Image": c.Image, "imageID": firstScannedImage.ImageID, "digest": firstScannedImage.Digest}).Info("first image summary")
+		}
+	}
+	if !scanned {
+		log.WithFields(log.Fields{"ImageRegistry": c.ImageRegistry.Any(), "ImageRepo": c.ImageRepo, "ImageTag": c.ImageTag}).Info("requested image not scanned")
 	}
 
-	// matchData.MatchState records the matching result so far for an admission control request, which could contain multiple containers.
-	// 1. if any container's matching result is "deny", the final action of this admission control request is "deny".
-	// 2. if any container's matching result is "allow", the final action of this admission control request is "allow" only when no container's matching result is "deny".
-	// 3. if no rule is matched for all containers in a request, the default action(allow) is the final action
+	result.ContainerImageInfo.Name = c.Name
+	result.ContainerImageInfo.Image = c.Image
+	result.ContainerImageInfo.Repository = c.ImageRepo
+	result.ContainerImageInfo.Tag = c.ImageTag
+	result.ContainerImageInfo.ImageScanned = scanned
+	result.ContainerImageInfo.CriticalVulsCnt = criticalVuls
+	result.ContainerImageInfo.HighVulsCnt = highVuls
+	result.ContainerImageInfo.MedVulsCnt = medVuls
+
+	if !forTesting && evalContext.ReqActionSoFar == share.AdmCtrlActionDeny {
+		return result, false
+	}
 
 	// we compare with default allow rules first when this container doesn't match any rule yet
-	if forTesting || matchData.MatchState == nvsysadmission.MatchedNone {
-		if matched := matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, _criticalRulesOnly,
-			admResObject, c, matchData, scannedImages, result, ar, containerType, forTesting); matched && !forTesting {
-			return result, true
-		}
+	if isActionMatched := matchK8sAdmissionRules(api.ValidatingExceptRuleType, _criticalRulesOnly,
+		admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+		return result, true
 	}
 
 	// if we are in federation, compare with fed admission rules(i.e. fed_admctrl_exception/fed_admctrl_deny rules) before crd/local user-defined rules
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
-		if forTesting || matchData.MatchState == nvsysadmission.MatchedNone {
-			if matched := matchK8sAdmissionRules(admType, share.FedAdmCtrlExceptRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result, ar, containerType, forTesting); matched && !forTesting {
-				result.MatchFedRule = true
-				return result, true
-			}
+		if isActionMatched := matchK8sAdmissionRules(share.FedAdmCtrlExceptRulesType, share.FederalCfg,
+			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			return result, true
 		}
-		// 1. if it's not assessment, keep matching fed deny rules when we don't match a deny rule yet (for reducing unnecessary matching)
-		// 2. if it's assessment, keep matching deny rules (for collecting all matched deny rules)
-		if forTesting || matchData.MatchState != nvsysadmission.MatchedDeny {
-			if matched := matchK8sAdmissionRules(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
-				admResObject, c, matchData, scannedImages, result, ar, containerType, forTesting); matched && !forTesting {
-				// it's not assessment. simply return the matched result
-				result.MatchDeny = true
-				result.MatchFedRule = true
-				return result, true
-			}
+
+		if isActionMatched := matchK8sAdmissionRules(share.FedAdmCtrlDenyRulesType, share.FederalCfg,
+			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			// it's not assessment. the matched deny rule will trigger protect-deny action
+			return result, true
 		}
 	}
 
@@ -2069,65 +2110,19 @@ func (m CacheMethod) MatchK8sAdmissionRules(admType string, admResObject *nvsysa
 	// 3. user-defined allow rules
 	// 4. user-defined deny rules
 	for _, matchScope := range []int{share.GroundCfg, share.UserCreated} {
-		// we compare with allow rules when this container doesn't match any rule yet
-		// 1. if it's not assessment, keep matching crd/user-defined allow rules when we don't match a deny rule yet (for reducing unnecessary matching)
-		// 2. if it's assessment, keep matching crd/user-defined allow rules (for collecting all matched allow rules)
-		if forTesting || matchData.MatchState == nvsysadmission.MatchedNone {
-			if matched := matchK8sAdmissionRules(admType, api.ValidatingExceptRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result, ar, containerType, forTesting); matched && !forTesting {
-				// it's not assessment. simply return the matched result
-				return result, true
-			}
+		if isActionMatched := matchK8sAdmissionRules(api.ValidatingExceptRuleType, matchScope,
+			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			return result, true
 		}
-		// 1. if it's not assessment, keep matching crd/user-defined deny rules when we don't match a deny rule yet (for reducing unnecessary matching)
-		// 2. if it's assessment, keep matching crd/user-defined deny rules (for collecting all matched deny rules)
-		if forTesting || matchData.MatchState != nvsysadmission.MatchedDeny {
-			if matched := matchK8sAdmissionRules(admType, api.ValidatingDenyRuleType, matchScope,
-				admResObject, c, matchData, scannedImages, result, ar, containerType, forTesting); matched && !forTesting {
-				// it's not assessment. simply return the matched result
-				result.MatchDeny = true
-				return result, true
-			}
+
+		if isActionMatched := matchK8sAdmissionRules(api.ValidatingDenyRuleType, matchScope,
+			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			// it's not assessment. the matched deny rule will trigger protect-deny action
+			return result, true
 		}
 	}
 
-	if forTesting {
-		found := false
-		for _, r := range result.AssessResults {
-			if !r.Disabled {
-				found = true
-				result.Image = r.ContainerImage
-				result.RuleID = r.RuleID
-				result.AdmRule = r.RuleDetails
-				result.RuleCfgType = r.RuleCfgType
-				result.MatchedSource = r.MatchedSource
-				result.AssessMatchedRuleType = r.RuleType
-				result.RuleMode = r.RuleMode
-				break
-			}
-		}
-		if !found {
-			result.AssessMatchedRuleType = ""
-		}
-	}
-
-	scanned, highVuls, medVuls := false, 0, 0
-	for _, scannedImage := range scannedImages {
-		if scannedImage.Scanned {
-			scanned = true
-			if scannedImage.HighVuls > highVuls {
-				highVuls = scannedImage.HighVuls
-			}
-			if scannedImage.MedVuls > medVuls {
-				medVuls = scannedImage.MedVuls
-			}
-		}
-	}
-	result.ImageNotScanned = !scanned
-	result.HighVulsCnt = highVuls
-	result.MedVulsCnt = medVuls
-
-	return result, true
+	return result, false
 }
 
 func (m CacheMethod) IsAdmControlEnabled(uri *string) (bool, string, int, string, string) {
@@ -2523,7 +2518,7 @@ func fillDenyMessageFromRule(c *nvsysadmission.AdmContainerInfo, rule *share.CLU
 		case share.CriteriaKeyHasPssViolation:
 			selectedPolicyViolations := pssViolations(crt, c, scannedImage.RunAsRoot)
 			if len(selectedPolicyViolations) > 0 {
-				message = fmt.Sprintf("Deployment has PSS/PSA Violations: %s", strings.Join(selectedPolicyViolations, " "))
+				message = fmt.Sprintf("Deployment has PSS/PSA Violations: %s.", strings.Join(selectedPolicyViolations, " "))
 			}
 		}
 		if message != "" {
@@ -2613,16 +2608,16 @@ func getStorageClassNameFromK8s(ns, name string) (string, error) {
 	return "", errors.New("PVC not found")
 }
 
-func (m CacheMethod) MatchK8sAdmissionRulesForPVC(admType string, ns, name, scName string, forTesting bool) (*nvsysadmission.AdmResult, bool) {
-	result := &nvsysadmission.AdmResult{}
+func (m CacheMethod) MatchK8sAdmissionRulesForPVC(ns, name, scName string, evalContext *nvsysadmission.AdmCtrlEvalContext) (
+	*nvsysadmission.AdmCtrlAssessResult, bool) {
+
+	forTesting := evalContext.ForTesting
+	result := &nvsysadmission.AdmCtrlAssessResult{}
 
 	// if we are in federation, compare with fed admission rules(i.e. fed_admctrl_exception/fed_admctrl_deny rules) before crd/local user-defined rules
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
-		if matched := matchK8sAdmissionRulesForPVC(admType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
-			ns, name, scName, result, forTesting); matched && !forTesting {
-			// it's not assessment. simply return the matched result
-			result.MatchDeny = true
-			result.MatchFedRule = true
+		if isActionMatched := matchK8sAdmissionRulesForPVC(evalContext.AdmCtrlType, share.FedAdmCtrlDenyRulesType, share.FederalCfg,
+			ns, name, scName, evalContext, result); isActionMatched && !forTesting {
 			return result, true
 		}
 	}
@@ -2630,93 +2625,42 @@ func (m CacheMethod) MatchK8sAdmissionRulesForPVC(admType string, ns, name, scNa
 	// 1. CRD deny rules
 	// 2. user-defined deny rules
 	for _, matchScope := range []int{share.GroundCfg, share.UserCreated} {
-		if matched := matchK8sAdmissionRulesForPVC(admType, api.ValidatingDenyRuleType, matchScope,
-			ns, name, scName, result, forTesting); matched && !forTesting {
-			// it's not assessment. simply return the matched result
-			result.MatchDeny = true
+		if isActionMatched := matchK8sAdmissionRulesForPVC(evalContext.AdmCtrlType, api.ValidatingDenyRuleType, matchScope,
+			ns, name, scName, evalContext, result); isActionMatched && !forTesting {
 			return result, true
 		}
-	}
-
-	if forTesting { // assessment
-		found := false
-		for _, r := range result.AssessResults {
-			if !r.Disabled {
-				found = true
-				result.Image = r.ContainerImage
-				result.RuleID = r.RuleID
-				result.AdmRule = r.RuleDetails
-				result.RuleCfgType = r.RuleCfgType
-				result.MatchedSource = r.MatchedSource
-				result.AssessMatchedRuleType = r.RuleType
-				result.RuleMode = r.RuleMode
-				break
-			}
-		}
-		if !found {
-			result.AssessMatchedRuleType = ""
-		}
-		return result, found
 	}
 
 	return result, false
 }
 
-func matchK8sAdmissionRulesForPVC(admType, ruleType string, matchCfgType int, ns, name, scName string, result *nvsysadmission.AdmResult, forTesting bool) bool { // return true means match
-	var isDenyRuleType bool
-	var assessMatched bool                              // whether a non-disabled rule is matched in this assessment call
-	var assessResults []*nvsysadmission.AdmAssessResult // all matched rules'(disabled or not) results for assessment only
+// matchCfgType being 0 means to compare with default(critical) rules only
+// return true means an enabled rule is matched with allow/deny action
+func matchK8sAdmissionRulesForPVC(admType, ruleType string, matchCfgType int, ns, name, scName string,
+	evalContext *nvsysadmission.AdmCtrlEvalContext, result *nvsysadmission.AdmCtrlAssessResult) bool {
 
-	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
-		isDenyRuleType = true
-	}
+	var hasActionMatched bool
+
+	forTesting := evalContext.ForTesting
 	admPolicyCache := selectAdminPolicyCache(admType, ruleType)
 	if admPolicyCache != nil {
 		cacheMutexRLock()
 		defer cacheMutexRUnlock()
+
 		for _, head := range admPolicyCache.RuleHeads {
 			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok && (forTesting || !rule.Disable) && rule.Category == admission.AdmRuleCatK8s {
 				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
 					if matched := isAdmissionPVCRuleMet(rule.Criteria, ns, name, scName); matched {
-						// for assessment, disabled rule could be matched even though it's ignored in the calc of final webhook request result
-						ruleDetails := ruleToString(rule)
-						if forTesting {
-							assessResult := &nvsysadmission.AdmAssessResult{
-								RuleID:      rule.ID,
-								Disabled:    rule.Disable,
-								RuleDetails: fmt.Sprintf("It matches rule with criteria: %s", ruleDetails),
-								RuleCfgType: rule.CfgType,
-							}
-							if isDenyRuleType {
-								assessResult.RuleType = api.ValidatingDenyRuleType
-								assessResult.RuleMode = rule.RuleMode
-							} else {
-								assessResult.RuleType = api.ValidatingAllowRuleType
-							}
-							if !rule.Disable {
-								// for assessment, disabled rules' matching results are collected as well.
-								// however, disabled rules' matching results are ignored in the calc of final webhook request result
-								if result.AssessMatchedRuleType == "" {
-									// the 1st matched non-disabled rule's type is recorded the container-image's result
-									if isDenyRuleType {
-										result.AssessMatchedRuleType = api.ValidatingDenyRuleType
-									} else {
-										result.AssessMatchedRuleType = api.ValidatingAllowRuleType
-									}
-								}
-								assessMatched = true
-							}
-							assessResults = append(assessResults, assessResult)
+						// for assessment, disabled rule could be matched even though it's ignored in the calc of final request result
+						isActionMatched := collectMatchedResult(rule, evalContext, nil, result, ruleType, "", "", "")
+						if !forTesting {
+							log.WithFields(log.Fields{"id": head.ID, "namespace": ns, "StorageClassName": scName, "type": ruleType}).Debug("matched a rule")
 						}
-						if !forTesting || len(result.AssessMatchedRuleType) == 0 {
-							result.RuleID = rule.ID
-							result.RuleCfgType = rule.CfgType
-							if isDenyRuleType && rule.RuleMode != "" {
-								result.RuleMode = rule.RuleMode
-							}
-							result.AdmRule = ruleDetails
-							if !forTesting {
-								log.WithFields(log.Fields{"id": head.ID, "namespace": ns, "StorageClassName": scName, "type": ruleType}).Debug("matched a rule")
+
+						if isActionMatched {
+							if forTesting {
+								hasActionMatched = true
+							} else {
 								return true
 							}
 						}
@@ -2726,13 +2670,7 @@ func matchK8sAdmissionRulesForPVC(admType, ruleType string, matchCfgType int, ns
 		}
 	}
 
-	if forTesting {
-		if len(assessResults) > 0 {
-			result.AssessResults = append(result.AssessResults, assessResults...)
-		}
-		return assessMatched
-	}
-	return false
+	return hasActionMatched
 }
 
 func isAdmissionPVCRuleMet(criteria []*share.CLUSAdmRuleCriterion, ns, name, scName string) bool {

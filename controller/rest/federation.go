@@ -1993,7 +1993,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedLeaveReq,
 	masterCluster api.RESTFedMasterClusterInfo, jointCluster api.RESTFedJointClusterInfo) (share.CLUSFedMembership, int, int, error) {
 
-	var statueCode int = http.StatusOK
+	var code int = api.RESTErrFedOperationFailed
+	var httpStatus int = http.StatusInternalServerError
 	var membership share.CLUSFedMembership
 
 	if masterCluster.ID == "" || jointCluster.ID == "" {
@@ -2030,14 +2031,13 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 				} else {
 					go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 				}
+				httpStatus = http.StatusOK
+				code = 0
 			} else {
 				err99 = err
 			}
 		} else {
 			err99 = err
-			if err != nil {
-				statueCode = http.StatusInternalServerError
-			}
 		}
 	} else {
 		err99 = err
@@ -2046,7 +2046,7 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 	// after leaving federation, standalone NV reports its usage to CSP
 	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
 
-	return membership, statueCode, 0, err99
+	return membership, httpStatus, code, err99
 }
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -3346,9 +3346,24 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	forbidden := false
 	regScanTest := false
 	txnID := ""
-	if accCaller.IsFedReader() || accCaller.HasPermFed() {
-		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") ||
-			(method == http.MethodPost && (request == "/v1/vulasset" || request == "/v1/assetvul")) {
+	if accCaller.IsFedReader() || accCaller.HasPermFedForReadOnly() {
+		allowedPost := false
+		if method == http.MethodPost {
+			exportURIs := utils.NewSetFromStringSlice([]string{
+				"/v1/file/group",
+				"/v1/file/admission",
+				"/v1/file/waf",
+				"/v1/file/dlp",
+				"/v1/file/compliance/profile",
+				"/v1/file/vulnerability/profile",
+				"/v1/vulasset",
+				"/v1/assetvul",
+			})
+			if exportURIs.Contains(request) {
+				allowedPost = true
+			}
+		}
+		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") || allowedPost {
 			// forward is allowed
 			// In fedReader user sessions, controller needs to update cluster state as well. So the acc needs to have write permissions for that purpose.
 			acc = access.NewFedAdminAccessControl()

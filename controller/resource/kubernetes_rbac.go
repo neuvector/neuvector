@@ -138,8 +138,11 @@ var crdPolicyRoleVerbs utils.Set = utils.NewSet("delete", "get", "list")
 var ctrlerSubjectWanted string = "controller"
 var updaterSubjectWanted string = "updater"
 var enforcerSubjectWanted string = "enforcer"
+var scannerSubjectWanted string = "scanner"
+var regAdapterSubjectWanted string = "registry-adapter"
 var ctrlerSubjectsWanted []string = []string{"controller"}
 var scannerSubjecstWanted []string = []string{"updater", "controller"}
+var secretSubjecstWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
 var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
@@ -161,7 +164,7 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 		rules: []*k8sRbacRoleRuleInfo{
 			&k8sRbacRoleRuleInfo{
 				apiGroup:  "",
-				resources: utils.NewSet(RscNamespaces, K8sResNodes, K8sResPods, RscServices),
+				resources: utils.NewSet(k8sResNamespaces, K8sResNodes, K8sResPods, K8sResServices),
 				verbs:     appRoleVerbs,
 			},
 		},
@@ -262,8 +265,19 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 		rules: []*k8sRbacRoleRuleInfo{
 			&k8sRbacRoleRuleInfo{
 				apiGroup:  "apps",
-				resources: utils.NewSet(RscDeployments),
+				resources: utils.NewSet(K8sResDeployments),
 				verbs:     utils.NewSet("get", "watch", "patch", "update"),
+			},
+		},
+	},
+	NvSecretRole: &k8sRbacRoleInfo{
+		name:      NvSecretRole,
+		namespace: constNvNamespace,
+		rules: []*k8sRbacRoleRuleInfo{
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "",
+				resources: utils.NewSet(k8sResSecrets),
+				verbs:     utils.NewSet("get", "watch", "list"),
 			},
 		},
 	},
@@ -330,6 +344,11 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 		namespace: constNvNamespace,
 		subjects:  scannerSubjecstWanted,
 		rbacRole:  rbacRolesWanted[NvScannerRole],
+	},
+	nvSecretRoleBinding: &k8sRbacBindingInfo{
+		namespace: constNvNamespace,
+		subjects:  secretSubjecstWanted,
+		rbacRole:  rbacRolesWanted[NvSecretRole],
 	},
 	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
 		namespace: constNvNamespace,
@@ -1888,6 +1907,10 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 		scannerSubjecstWanted[1] = updaterSubjectWanted
 		enforcerSubjecstWanted[0] = ctrlerSubjectWanted
 		enforcerSubjecstWanted[1] = enforcerSubjectWanted
+		secretSubjecstWanted[0] = ctrlerSubjectWanted
+		secretSubjecstWanted[1] = enforcerSubjectWanted
+		secretSubjecstWanted[2] = scannerSubjectWanted
+		secretSubjecstWanted[3] = regAdapterSubjectWanted
 	}
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
 

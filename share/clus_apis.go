@@ -846,6 +846,10 @@ func (p *NvPermissions) HasPermFed() bool {
 	return ((p.ReadValue&PERM_FED) != 0 || (p.WriteValue&PERM_FED) != 0)
 }
 
+func (p *NvPermissions) HasPermFedForReadOnly() bool {
+	return ((p.ReadValue&PERM_FED) != 0 && (p.WriteValue&PERM_FED) == 0)
+}
+
 type CLUSPermitsAssigned struct {
 	Permits NvPermissions `json:"permissions"`
 	Domains []string      `json:"domains"` // all domains in this slice have the same permissions assigned

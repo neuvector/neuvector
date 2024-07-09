@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
@@ -33,11 +34,20 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		resp.EULA = &api.RESTEULA{Accepted: false}
 	}
 	if k8sPlatform && !resp.EULA.Accepted {
-		accReadAll := access.NewReaderAccessControl()
-		user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll)
-		if user != nil && user.ResetPwdInNextLogin && user.UseBootstrapPwd {
-			strK8sCmdFormat := `kubectl get secret --namespace %s neuvector-bootstrap-secret -o go-template='{{ .data.bootstrapPassword|base64decode}}{{ "\n" }}'`
-			resp.BootstrapPwdCmd = fmt.Sprintf(strK8sCmdFormat, resource.NvAdmSvcNamespace)
+		var errs []string
+		k8sRequiredRoles := []string{resource.NvRbacRole, resource.NvSecretRole}
+		if errs, _ = resource.VerifyNvRbacRoles(k8sRequiredRoles, false); len(errs) == 0 {
+			errs, _ = resource.VerifyNvRbacRoleBindings(k8sRequiredRoles, false, true)
+		}
+		if len(errs) > 0 {
+			resp.K8sRbacAlertMsg = strings.Join(errs, "<p>")
+		} else {
+			accReadAll := access.NewReaderAccessControl()
+			user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll)
+			if user != nil && user.ResetPwdInNextLogin && user.UseBootstrapPwd {
+				strK8sCmdFormat := `kubectl get secret --namespace %s neuvector-bootstrap-secret -o go-template='{{ .data.bootstrapPassword|base64decode}}{{ "\n" }}'`
+				resp.BootstrapPwdCmd = fmt.Sprintf(strK8sCmdFormat, resource.NvAdmSvcNamespace)
+			}
 		}
 	}
 
