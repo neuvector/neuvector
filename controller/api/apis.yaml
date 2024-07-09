@@ -4038,6 +4038,8 @@ paths:
       responses:
         '200':
           description: Success
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileEntryConfigData'
   /v1/vulnerability/profile/{name}/entry/{id}:
     patch:
       tags:
@@ -6836,6 +6838,9 @@ definitions:
       bootstrap_password_command:
         type: string
         description: kubectl command for retrieving bootstrap password of default admin user
+      k8s_rbac_alert_message:
+        type: string
+        description: alert message when k8s role/rolebinding neuvector-binding-secret is not correctly configured
   RESTEventsData:
     type: object
     required:

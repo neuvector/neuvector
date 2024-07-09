@@ -53,10 +53,6 @@ const (
 )
 
 const (
-	RscNamespaces                          = "namespaces"
-	RscServices                            = "services"
-	RscDeployments                         = "deployments"
-	RscConfigMaps                          = "configmaps"
 	RscNameMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"   // case sensitive!
 	RscNameValidatingWebhookConfigurations = "validatingwebhookconfigurations" // case sensitive!
 	RscNameCustomResourceDefinitions       = "customresourcedefinitions"       // case sensitive!
