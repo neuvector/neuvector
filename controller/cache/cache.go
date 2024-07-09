@@ -2186,6 +2186,9 @@ func CacheEvent(ev share.TLogEvent, msg string) error {
 			Msg:            msg,
 		}
 		cctx.EvQueue.Append(&log)
+		if ev == share.CLUSEvK8sNvRBAC {
+			cctx.EvQueue.Flush()
+		}
 	}
 
 	return nil
