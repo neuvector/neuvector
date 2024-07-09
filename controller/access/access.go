@@ -1694,6 +1694,17 @@ func (acc *AccessControl) HasPermFed() bool {
 	return false
 }
 
+// returns true only when the access control object is created for user whose global permission has PERM_FED(r) but no PERM_FED(w)
+func (acc *AccessControl) HasPermFedForReadOnly() bool {
+	if acc.IsFedAdmin() {
+		return false
+	}
+	if permits := acc.extraPermits[AccessDomainGlobal]; permits.HasPermFedForReadOnly() || acc.IsFedReader() {
+		return true
+	}
+	return false
+}
+
 // returns true only when the access control object is created for user whose global role has the specified read/write permissions
 func (acc *AccessControl) HasGlobalPermissions(readPermitsRequired, writePermsRequired uint32) bool {
 	if acc.roles.hasGlobalPermissions(readPermitsRequired, writePermsRequired) {
