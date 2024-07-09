@@ -444,6 +444,14 @@ func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 		WlID: wlCache.workload.ID,
 		Domain: wlCache.workload.Domain,
 		PlatformRole: wlCache.platformRole,
+		Ports: wlCache.workload.Ports,
+		Apps: wlCache.workload.Apps,
+	}
+	if wlCache.workload.ShareNetNS != "" {
+		if wlCache1, ok1 := wlCacheMap[wlCache.workload.ShareNetNS]; ok1 {
+			wlAddr.Ports = wlCache1.workload.Ports
+			wlAddr.Apps = wlCache1.workload.Apps
+		}
 	}
 	wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache)
 	for _, addrs := range wlCache.workload.Ifaces {
@@ -670,7 +678,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			groupAddrs[0].NatIP = append(groupAddrs[0].NatIP, []net.IP{utils.IPv4Loopback, nil}...)
 		}
 		return groupAddrs
-	} else if isAllContainerGrp(name) && !isDst {
+	} else if isAllContainerGrp(name){
 		groupAddrs := []*share.CLUSWorkloadAddr{
 			&share.CLUSWorkloadAddr{
 				WlID:       share.CLUSWLAllContainer,
@@ -1680,7 +1688,7 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 //per node slot, since resource consuming address map
 //is already dealt with in preparePolicySlotsCommon separately
 //and policy is reorganized for each node, so slot number start small
-const beginSlotNode = 4
+const beginSlotNode = 1
 
 func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte, int, int, error) {
 	//start from different base to save cpu
