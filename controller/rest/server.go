@@ -2033,27 +2033,31 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 	var resp api.RESTUsersData
 	resp.Users = make([]*api.RESTUser, 0, len(users))
 	for _, user := range users {
-		globalRole, roleDomains, permits, permitsDomains := rbac2UserRole(user.RBAC, user.RBAC2)
+		gRole, roleDomains, gExtraPermits, permitsDomains, _ := rbac2UserRole(user.RBAC, user.RBAC2)
 
 		var extraPermitsDomains []api.RESTPermitsAssigned
 		if len(permitsDomains) > 0 {
 			extraPermitsDomains = make([]api.RESTPermitsAssigned, len(permitsDomains))
-			for i, permitsDomains := range permitsDomains {
+			for i, assignedPermits := range permitsDomains {
+				var supportScope uint8 = access.CONST_PERM_SUPPORT_DOMAIN
+				if len(assignedPermits.Domains) == 1 && assignedPermits.Domains[0] == "" {
+					supportScope = access.CONST_PERM_SUPPORT_GLOBAL
+				}
 				extraPermitsDomains[i] = api.RESTPermitsAssigned{
-					Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
-					Domains: permitsDomains.Domains,
+					Permits: access.GetTopLevelPermitsList(supportScope, assignedPermits.Permits),
+					Domains: assignedPermits.Domains,
 				}
 			}
 		}
 
-		if globalRole != "" || len(roleDomains) > 0 || !permits.IsEmpty() || len(permitsDomains) > 0 {
+		if gRole != "" || len(roleDomains) > 0 || !gExtraPermits.IsEmpty() || len(permitsDomains) > 0 {
 			u := &api.RESTUser{
 				Fullname:            user.Name,
 				Server:              server,
 				Username:            user.Name,
-				Role:                globalRole,
+				Role:                gRole,
 				RoleDomains:         roleDomains,
-				ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, permits),
+				ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, gExtraPermits),
 				ExtraPermitsDomains: extraPermitsDomains,
 			}
 			resp.Users = append(resp.Users, u)

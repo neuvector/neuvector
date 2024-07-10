@@ -357,45 +357,41 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	},
 }
 
-// Reset unnessary permissions for
-// 1. roles fedAdmin/admin & PERM_FED(w) permission
-// 2. roles fedReader/reader & PERM_FED(r) permission
-func workFedPermit(rbacRoleName, domain, nvRole string, nvPermits share.NvPermissions) (string, share.NvPermissions) {
+// For one k8s (cluster)role, reset unnessary mapped permissions(but PERM_FED permission yet) for
+// 1. roles fedAdmin/admin & fed permission
+// 2. roles fedReader/reader & fed permission
+func adjustNvRolePermits(rbacRoleName, nvRole string, nvPermits share.NvPermissions) (string, share.NvPermissions) {
 
 	nvRoleIn := nvRole
 	nvPermitsIn := nvPermits
-	// Reset unnessary permissions for roles fedAdmin/admin & PERM_FED(w) permission
+	// Reset unnessary permissions for roles fedAdmin/admin
 	if nvRole == api.UserRoleAdmin && (nvPermits.WriteValue&share.PERM_FED != 0) {
 		nvRole = api.UserRoleFedAdmin
 	}
 	if nvRole == api.UserRoleFedAdmin {
 		nvPermits = share.NvPermissions{}
 	} else if nvRole == api.UserRoleAdmin {
-		// It's possible to have admin role + PERM_FED(r) permission
-		nvPermits.ReadValue &= share.PERM_FED
+		// It's possible to have local admin role + fed read permissions
+		nvPermits.ReadValue &= share.PERMS_FED_READ
 		nvPermits.WriteValue = 0
+		if nvPermits.ReadValue&share.PERM_FED == 0 {
+			nvPermits.ReadValue = 0
+		}
 	}
 
-	// Reset unnessary permissions for roles fedReader/reader & PERM_FED(r) permission
+	// Reset unnessary permissions for roles fedReader/reader
 	if nvRole == api.UserRoleReader && (nvPermits.ReadValue&share.PERM_FED != 0) {
 		nvRole = api.UserRoleFedReader
 	}
 	if nvRole == api.UserRoleFedReader || nvRole == api.UserRoleReader {
-		if nvPermits.WriteValue == 0 {
-			// There is no write permission. So just take the fedReader/reader role
-			nvPermits.ReadValue = 0
-		} else {
-			// There is write permission. Move fedReader/reader role to permissions
-			nvPermits.ReadValue = share.PERMS_CLUSTER_READ
-			if nvRole == api.UserRoleFedReader {
-				nvPermits.ReadValue = share.PERMS_FED_READ
-			}
-			nvRole = api.UserRoleNone
-		}
+		nvPermits.ReadValue = 0
 	}
 
-	if nvRole != nvRoleIn || nvPermits != nvPermitsIn {
-		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "domain": domain, "role_in": nvRoleIn, "permits_in": nvPermitsIn, "role_adjusted": nvRole, "permits_adjusted": nvPermits}).Debug()
+	if nvRole != nvRoleIn {
+		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "role_in": nvRoleIn, "role_adjusted": nvRole}).Debug()
+	}
+	if nvPermits != nvPermitsIn {
+		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "permits_in": nvPermitsIn, "permits_adjusted": nvPermits}).Debug()
 	}
 
 	return nvRole, nvPermits
@@ -415,7 +411,8 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 	if k8sFlavor == share.FlavorRancher {
 		var nvRole string
 		for rsc, verbs := range r2v {
-			if rsc == "*" {
+			// resource "nv-perm.all-permissions" is equivalent to "*"
+			if rsc == "*" || rsc == "nv-perm.all-permissions" {
 				if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 					nvRole = api.UserRoleAdmin
 				} else if readVerbs.Intersect(verbs).Cardinality() != 0 && nvRole == api.UserRoleNone {
@@ -425,28 +422,29 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 				rsc = rsc[len(nvPermRscPrefix):]
 				if v, ok := nvPermitsValueSSO[rsc]; ok {
 					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
-						nvPermits.ReadValue |= v.ReadValue
-						nvPermits.WriteValue |= v.WriteValue
+						nvPermits.Union(v)
 					} else if readVerbs.Intersect(verbs).Cardinality() != 0 {
 						nvPermits.ReadValue |= v.ReadValue
 					}
 				}
 			}
 		}
-		// Now both nvRole & nvPermits could be non-empty value
+		// Now nvRole & nvPermits could be non-empty value
 
 		// When SSO happens on NV master cluster,
-		// 1. * verb on             * resource in Rancher Global  Role maps to fedAdmin
-		// 2. * verb on *,nv-perm.fed resource in Rancher Cluster Role maps to fedAdmin
-		// 3. * verb on             * resource in Rancher Cluster Role maps to admin
+		// 1. * verb on  * or nv-perm.all-permissions 								resource in Rancher Global  Role maps to fedAdmin
+		// 2. * verb on  "*, nv-perm.fed" or "nv-perm.all-permissions, nv-perm.fed" resource in Rancher Cluster Role maps to fedAdmin
+		// 3. * verb on  * or nv-perm.all-permissions 								resource in Rancher Cluster Role maps to admin
+		// 4. * verb on  * or nv-perm.all-permissions								resource in Rancher Project Role maps to admin (namespace)
 		// When SSO happens on NV non-master cluster,
-		// 1. * verb on             * resource in Rancher Cluster Role maps to admin
-		// 2. nv-perm.fed resource is ignored
+		// 1. * verb on  * or nv-perm.all-permissions	resource in Rancher Cluster Role maps to admin
+		// 2. * verb on  * or nv-perm.all-permissions	resource in Rancher Project Role maps to namespace admin
+		// 3. nv-perm.fed resource is ignored
 		// Rancher's Global/Cluster/Project Roles are represented by k8s clusterrole.
 		// Unlike for Global Role, from k8s clusterrole name we we cannot tell it's for Rancher Cluster Role or Project Role.
 		// Rancher Cluster Role supports nv-perm.fed resource but Rancher Project Role doesn't(yet)
-		// So we treat every non-GlobalRole k8s clusterrole the same in this function.
-		// The actual user role/permission will be adjusted in rbacEvaluateUser()
+		// So we treat every non-GlobalRole k8s clusterrole the same in this function (i.e. nv-perm.fed resource is not ignored in this function).
+		// The actual user role/permission will be adjusted in rbacEvaluateUser() by leveraging k8s (cluster)rolebinding to know it's Project/Nameapce Role or not
 		if strings.HasPrefix(rbacRoleName, globalRolePrefix) {
 			if nvRole == api.UserRoleAdmin {
 				nvRole = api.UserRoleFedAdmin
@@ -454,7 +452,6 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 				nvRole = api.UserRoleFedReader
 			}
 		}
-		nvRole, nvPermits = workFedPermit(rbacRoleName, "n/a", nvRole, nvPermits)
 
 		return nvRole, nvPermits
 	} else {
@@ -552,28 +549,30 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 			}
 			if rscs, ok := rscsMap[apiGroup]; ok {
 				nvRoleTemp, nvPermitsTemp := k8s2NVRolePermits(k8sFlavor, rbacRoleName, rscs, readVerbs, writeVerbs, r2v)
-				// nvRoleMapped is empty value, or nvPermitsTemp is empty value, or both are empty value !
+				// nvRoleTemp and nvPermitsTemp could be empty value, meaning no nv role/permissions mapped for this k8s rbac PolicyRule !
 				if nvRoleTemp != api.UserRoleNone {
 					if k8sFlavor == share.FlavorRancher {
 						switch nvRoleTemp {
 						case api.UserRoleFedAdmin:
 							nvRole = api.UserRoleFedAdmin
+							nvPermits.Reset()
+							break
 						case api.UserRoleFedReader:
 							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
 								nvRole = api.UserRoleFedReader
 							} else if nvRole == api.UserRoleAdmin {
 								// This Rancher role maps to admin & fedReader roles.
-								// Take admin role and move PERM_FED(r) to permissions
-								nvPermits.ReadValue = share.PERM_FED
+								// Take admin role as nvRole and move PERMS_FED_READ to nvPermits.ReadValue
+								nvPermits.ReadValue = share.PERMS_FED_READ
 							}
 						case api.UserRoleAdmin:
 							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
 								nvRole = api.UserRoleAdmin
 							} else if nvRole == api.UserRoleFedReader {
 								// This Rancher role maps to admin & fedReader roles.
-								// Take admin role and move PERM_FED(r) to permissions
+								// Take admin role as nvRole and PERMS_FED_READ to nvPermits.ReadValue
 								nvRole = api.UserRoleAdmin
-								nvPermits.ReadValue = share.PERM_FED
+								nvPermits.ReadValue = share.PERMS_FED_READ
 							}
 						case api.UserRoleReader:
 							if nvRole == api.UserRoleNone {
@@ -595,15 +594,14 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 				if !nvPermitsTemp.IsEmpty() {
 					// this k8s rbac policyrule is mapped to nv permissions
 					if k8sFlavor == share.FlavorRancher {
-						nvPermits.ReadValue |= nvPermitsTemp.ReadValue
-						nvPermits.WriteValue |= nvPermitsTemp.WriteValue
+						nvPermits.Union(nvPermitsTemp)
 					}
 				}
 			}
 		}
 
-		// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission
-		nvRole, nvPermits = workFedPermit(rbacRoleName, "n/a", nvRole, nvPermits)
+		// Adjustment between fedAdmin/fedReader/admin/reader roles & fed permission
+		nvRole, nvPermits = adjustNvRolePermits(rbacRoleName, nvRole, nvPermits)
 
 		if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
 			ag2r2v = nil
@@ -995,12 +993,12 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 					}
 				}
 			}
-			d.roleCache[ref] = api.UserRoleNone
-			d.permitsCache[ref] = share.NvPermissions{}
+			delete(d.roleCache, ref)
+			delete(d.permitsCache, ref)
 			log.WithFields(log.Fields{"k8s-role": ref, "nv-role": nvRole, "nv-perms": nvPermits}).Debug("Delete role")
 		}
 
-		// re-evaluate users who bind to the deleted (cluster)role
+		// re-evaluate users who bind to the deleted k8s (cluster)role
 		for u := range affectedUsers.Iter() {
 			d.rbacEvaluateUser(u.(k8sSubjectObjRef))
 		}
@@ -1032,18 +1030,12 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 		ref := k8sObjectRef{name: n.name, domain: n.domain}
 		if n.nvRole != api.UserRoleNone {
 			d.roleCache[ref] = n.nvRole
-			if n.nvPermits.IsEmpty() {
-				delete(d.permitsCache, ref)
-			}
+		} else {
+			delete(d.roleCache, ref)
 		}
 		if !n.nvPermits.IsEmpty() {
 			d.permitsCache[ref] = n.nvPermits
-			if n.nvRole == api.UserRoleNone {
-				delete(d.roleCache, ref)
-			}
-		}
-		if n.nvRole == api.UserRoleNone && n.nvPermits.IsEmpty() {
-			delete(d.roleCache, ref)
+		} else {
 			delete(d.permitsCache, ref)
 		}
 		if old == nil || *(old.(*k8sRole)) != *n { // only for reducing debug logs
@@ -1083,7 +1075,7 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 			}
 		*/
 
-		// re-evaluate users who bind to the updated (cluster)role
+		// re-evaluate users who bind to the updated k8s (cluster)role
 		for u, roleRefs := range d.userCache {
 			for roleRef := range roleRefs.Iter() {
 				if roleRef.(k8sRoleRef).role == ref { // a user in k8s is affected
@@ -1237,21 +1229,26 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 		// 4. For users whose bindings, role binding references (cluster) role, or cluster role binding references cluster role, are changed
 		changes := newUsers.Difference(creates)
 		for u := range changes.Iter() {
+			eval := false
 			op := "create"
 			userRef := u.(k8sSubjectObjRef)
 			if roleRefs, ok := d.userCache[userRef]; !ok {
 				// create user
 				d.userCache[userRef] = utils.NewSet(newRoleRef)
-			} else if o.role != n.role {
+				eval = true
+			} else if oldRoleRef != newRoleRef {
 				// o won't be nil when we get here
-				op = "add"
+				op = "update"
+				roleRefs.Remove(oldRoleRef)
 				roleRefs.Add(newRoleRef)
+				eval = true
 			}
 			if oldRoleRef != newRoleRef { // only for reducing debug logs
 				log.WithFields(log.Fields{"name": n.name, "k8s-role": newRoleRef, "user": userRef, "op": op}).Debug()
 			}
-
-			d.rbacEvaluateUser(userRef)
+			if eval {
+				d.rbacEvaluateUser(userRef)
+			}
 		}
 
 		// 5. nv-required clusterrolebinding check
@@ -1282,6 +1279,144 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 	}
 }
 
+// extra fed access is not supported for namespace role/permission yet
+// this function deletes those entries(for namespaces) in domainRole/domainPermits that are subset of the global domain's effective permissions
+func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainPermits map[string]share.NvFedPermissions, fedRole string) (
+	map[string]string, map[string]share.NvFedPermissions) {
+
+	var domainRole map[string]string = make(map[string]string)
+
+	for d, nvRoles := range allDomainRoles {
+		if d != access.AccessDomainGlobal || fedRole != api.FedRoleMaster {
+			if nvRoles&share.UserRoleFedAdmin != 0 {
+				nvRoles &= ^share.UserRoleFedAdmin
+				nvRoles |= share.UserRoleAdmin
+			}
+			if nvRoles&share.UserRoleFedReader != 0 {
+				nvRoles &= ^share.UserRoleFedReader
+				nvRoles |= share.UserRoleReader
+			}
+		}
+		if nvRoles&share.UserRoleFedAdmin != 0 {
+			domainRole = map[string]string{d: api.UserRoleFedAdmin}
+			break
+		} else if nvRoles&share.UserRoleAdmin != 0 {
+			if nvRoles&share.UserRoleFedReader != 0 && fedRole == api.FedRoleMaster {
+				if d == access.AccessDomainGlobal {
+					// move fedReader to permissions
+					nvPermits, _ := domainPermits[access.AccessDomainGlobal]
+					nvPermits.Local.ReadValue = share.PERMS_FED_READ
+					nvPermits.Remote.ReadValue = share.PERMS_CLUSTER_READ
+					if nvPermits.Local.WriteValue&share.PERM_FED == 0 {
+						nvPermits.Local.WriteValue = 0
+						nvPermits.Remote.WriteValue = 0
+					}
+					domainPermits[d] = nvPermits
+				} else {
+					delete(domainPermits, d)
+				}
+			}
+			domainRole[d] = api.UserRoleAdmin
+		} else if nvRoles&share.UserRoleFedReader != 0 {
+			domainRole[d] = api.UserRoleFedReader
+		} else if nvRoles&share.UserRoleReader != 0 {
+			domainRole[d] = api.UserRoleReader
+		}
+	}
+
+	// For entries(for namespaces) in domainRole, delete
+	// 1. empty-value entries
+	// 2. those entries that have the subset role of global domain's nv role.
+	nvGlobalRole := domainRole[access.AccessDomainGlobal]
+	if nvGlobalRole == api.UserRoleFedAdmin {
+		if len(domainRole) > 1 {
+			domainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleFedAdmin}
+		}
+		if len(domainPermits) > 0 {
+			domainPermits = map[string]share.NvFedPermissions{}
+		}
+
+		return domainRole, domainPermits
+	}
+
+	for d, r := range domainRole {
+		if d != access.AccessDomainGlobal {
+			rAdjusted := r
+			if r == api.UserRoleFedAdmin {
+				rAdjusted = api.UserRoleAdmin
+			} else if r == api.UserRoleFedReader {
+				rAdjusted = api.UserRoleReader
+			}
+			if ((nvGlobalRole == api.UserRoleFedReader || nvGlobalRole == api.UserRoleReader) && (rAdjusted == api.UserRoleReader)) ||
+				(nvGlobalRole == api.UserRoleAdmin && (rAdjusted == api.UserRoleAdmin || rAdjusted == api.UserRoleReader)) ||
+				(rAdjusted == api.UserRoleNone) {
+				delete(domainRole, d)
+			}
+			if rAdjusted != r {
+				domainRole[d] = rAdjusted
+			}
+		}
+	}
+
+	// For entries(for namespaces) in domainPermits, delete
+	// 1. empty-value entries
+	// 2. those entries that have the subset permissions of global domain's effective permissions
+	// Because we don't support PERM_FED for namespace yet, reset PERM_FED if found in entries for namespace
+	var nvGlobalRolePermits share.NvFedPermissions // global role's equivalent permissions
+	switch nvGlobalRole {
+	case api.UserRoleFedReader:
+		nvGlobalRolePermits.Local.ReadValue = share.PERMS_FED_READ
+		nvGlobalRolePermits.Remote.ReadValue = share.PERMS_CLUSTER_READ
+	case api.UserRoleAdmin:
+		nvGlobalRolePermits.Local.ReadValue = share.PERMS_CLUSTER_READ
+		nvGlobalRolePermits.Local.WriteValue = share.PERMS_CLUSTER_WRITE
+	case api.UserRoleReader:
+		nvGlobalRolePermits.Local.ReadValue = share.PERMS_CLUSTER_READ
+	}
+
+	nvGlobalPermits, _ := domainPermits[access.AccessDomainGlobal] // extra permissions on global domain
+	nvGlobalPermits.Local.FilterPermits("", "local", fedRole)
+	nvGlobalPermits.Local.ResetIfSubsetOf(nvGlobalRolePermits.Local)
+	nvGlobalPermits.Remote.FilterPermits("", "remote", fedRole)
+	if (nvGlobalPermits.Remote.ReadValue | nvGlobalRolePermits.Remote.ReadValue) == nvGlobalRolePermits.Remote.ReadValue {
+		// if extra global remote read permissions is subset of global role's remote read permissions, reset extra global remote read permissions to 0 (duplicate)
+		nvGlobalPermits.Remote.ReadValue = 0
+	}
+	// nvGlobalPermits.Local  : extra nv permissions on local cluster  (other than local global role)
+	// nvGlobalPermits.Remote : extra nv permissions on remote clusters(other than local global role)
+
+	if nvGlobalPermits.IsEmpty() {
+		delete(domainPermits, access.AccessDomainGlobal)
+		nvGlobalPermits = nvGlobalRolePermits
+	} else {
+		domainPermits[access.AccessDomainGlobal] = nvGlobalPermits
+		nvGlobalPermits.Local.Union(nvGlobalRolePermits.Local)
+		nvGlobalPermits.Remote.Union(nvGlobalRolePermits.Remote)
+	}
+	// now nvGlobalPermits is global domain's effective permissions (role + extra permissions)
+
+	for d, nvPermits := range domainPermits {
+		nvPermits.Local.FilterPermits(d, "local", fedRole)
+		nvPermits.Remote.FilterPermits(d, "remote", fedRole)
+		if d != access.AccessDomainGlobal {
+			// extra permissions for namespaces
+			nvPermits.Local.ResetIfSubsetOf(nvGlobalPermits.Local)
+			nvPermits.Remote.Reset() // fed access is not supported for namespace yet
+			if nvPermits.IsEmpty() {
+				delete(domainPermits, d)
+			} else {
+				domainPermits[d] = nvPermits
+			}
+		}
+	}
+
+	if _, ok := domainRole[access.AccessDomainGlobal]; !ok {
+		domainRole[access.AccessDomainGlobal] = api.UserRoleNone
+	}
+
+	return domainRole, domainPermits
+}
+
 // Called with rbacLock
 func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 	subj := k8sSubjectObjRef{
@@ -1294,12 +1429,8 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		rbacRoles, ok1 := d.rbacCache[subj]
 		rbacPermits, ok2 := d.permitsRbacCache[subj]
 		if ok1 || ok2 {
-			if ok1 {
-				delete(d.rbacCache, subj)
-			}
-			if ok2 {
-				delete(d.permitsRbacCache, subj)
-			}
+			delete(d.rbacCache, subj)
+			delete(d.permitsRbacCache, subj)
 			log.WithFields(log.Fields{"user": user}).Debug("Delete rbac user")
 
 			d.lock.Lock()
@@ -1314,202 +1445,60 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		}
 	} else {
 		// found an entry in userCache for this user
-		domainRole := make(map[string]string)                 // domain -> nv reserved role
-		domainPermits := make(map[string]share.NvPermissions) // domain -> nv permissions
+		var permitFed uint32 = share.PERM_FED
+		var noPermitFed uint32 = ^permitFed
+		var domainRole map[string]string
+		fedRole := api.FedRoleMaster // always assume it's on fed master now
+		allDomainRoles := make(map[string]share.NvReservedUserRole)
+		reservedRoleMapping := map[string]share.NvReservedUserRole{
+			api.UserRoleAdmin:     share.UserRoleAdmin,
+			api.UserRoleReader:    share.UserRoleReader,
+			api.UserRoleFedAdmin:  share.UserRoleFedAdmin,
+			api.UserRoleFedReader: share.UserRoleFedReader,
+		}
+		//domainRole := make(map[string]string)                    // domain -> nv reserved role
+		domainPermits := make(map[string]share.NvFedPermissions) // domain -> nv permissions
 		// iterate thru all k8s (cluster)roles for this user to see what their domainRole/domainPermits should be
 		for r := range roleRefs.Iter() {
-			movePermFedRead := false
+			var nvPermits share.NvFedPermissions
 			roleRef := r.(k8sRoleRef)
-			nvRole, ok1 := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
-			if ok1 {
-				// This k8s (cluster)role is in roleCache (i.e. it has a mpped nv reserved role).
-				// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
-				// It's possible that nvRole is fedAdmin/fedReader even it's Rancher Project Role which is not allowed.
-				// If found, downgrade nvRole to admin/reader(for namespace)
-				if roleRef.domain != "" {
-					// This k8s (cluster)role is bound to the user by k8s rolebinding(i.e. it's Rancher Project Role)
+			nvRole, _ := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
+			// This k8s (cluster)role is in roleCache (i.e. it has a mpped nv reserved role).
+			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
+			// It's possible that nvRole is fedAdmin/fedReader even it's Rancher Project Role which is not allowed.
+			// If found, downgrade nvRole to admin/reader(for namespace)
+			if nvRole != api.UserRoleNone {
+				if roleRef.domain != access.AccessDomainGlobal {
 					if nvRole == api.UserRoleFedAdmin {
 						nvRole = api.UserRoleAdmin
-					} else if nvRole == api.UserRoleFedReader {
+					} else if r == api.UserRoleFedReader {
 						nvRole = api.UserRoleReader
 					}
 				}
-				// Merge this nv role into this domain's nv role
-				if currNVRole, ok := domainRole[roleRef.domain]; ok && currNVRole != nvRole {
-					if (currNVRole == api.UserRoleReader && nvRole != api.UserRoleNone) || (currNVRole == api.UserRoleNone) || (nvRole == api.UserRoleFedAdmin) {
-						// nvRole has higher auth than currNVRole
-					} else if (currNVRole == api.UserRoleFedReader && nvRole == api.UserRoleAdmin) ||
-						(currNVRole == api.UserRoleAdmin && nvRole == api.UserRoleFedReader) {
-						// role mapping priority: admin > fedReader
-						nvRole = api.UserRoleAdmin
-						if roleRef.domain == "" {
-							// move PERM_FED(r) to permissions if it's global domain (we don't support PERM_FED for namespace yet)
-							movePermFedRead = true
-						}
-					} else {
-						// nvRole has lower auth than currNVRole
-						nvRole = currNVRole
-					}
-				}
-			} else {
-				nvRole, _ = domainRole[roleRef.domain]
+				allDomainRoles[roleRef.domain] = allDomainRoles[roleRef.domain] | reservedRoleMapping[nvRole]
 			}
 
-			nvPermits, ok2 := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
-			if ok2 {
-				// This k8s (cluster)role is in permitsCache (i.e. it has mapped nv permissions).
-				// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
-				// It's possible that nvPermits contains PERM_FED even it's Rancher Project Role which is not allowed.
-				// If found, remove PERM_FED from nvPermits(for namespace)
-				if roleRef.domain != "" {
-					// This k8s (cluster)role is bound to the user by k8s rolebinding(i.e. it's Rancher Project Role)
-					nvPermits.ReadValue ^= share.PERM_FED
-					nvPermits.WriteValue ^= share.PERM_FED
-				} else if movePermFedRead {
-					nvPermits.ReadValue |= share.PERM_FED
-				}
-				// Merge this nv permissions into this domain's nv permissions
-				if currNVPermits, ok := domainPermits[roleRef.domain]; ok && currNVPermits != nvPermits {
-					nvPermits.ReadValue |= currNVPermits.ReadValue
-					nvPermits.WriteValue |= currNVPermits.WriteValue
-				}
-			} else {
-				nvPermits, _ = domainPermits[roleRef.domain]
-				if movePermFedRead {
-					nvPermits.ReadValue = share.PERM_FED
-					ok2 = true
-				}
+			k8sRolePermits, _ := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
+			// Merge this k8s role's local/remote nv permissions into this domain's local/remote nv permissions
+			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
+			// It's possible that k8sRolePermits contains PERM_FED even it's Rancher Project Role which is not allowed.
+			k8sRolePermits.FilterPermits(roleRef.domain, "local", fedRole)
+			nvPermits.Local = k8sRolePermits
+			if k8sRolePermits.ReadValue&share.PERM_FED != 0 {
+				nvPermits.Remote.ReadValue = k8sRolePermits.ReadValue & noPermitFed
 			}
-
-			if ok1 || ok2 {
-				// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission for this domain
-				nvRole, nvPermits = workFedPermit(roleRef.role.name, roleRef.domain, nvRole, nvPermits)
-				if nvRole != api.UserRoleNone {
-					domainRole[roleRef.domain] = nvRole
-				} else {
-					delete(domainRole, roleRef.domain)
-				}
-				if !nvPermits.IsEmpty() {
-					domainPermits[roleRef.domain] = nvPermits
-				} else {
-					delete(domainPermits, roleRef.domain)
-				}
+			if k8sRolePermits.WriteValue&share.PERM_FED != 0 {
+				nvPermits.Remote.WriteValue = k8sRolePermits.WriteValue & noPermitFed
+			}
+			if !nvPermits.IsEmpty() {
+				p, _ := domainPermits[roleRef.domain]
+				p.Local.Union(nvPermits.Local)
+				p.Remote.Union(nvPermits.Remote)
+				domainPermits[roleRef.domain] = p
 			}
 		}
 
-		// For namespace permissions, delete empty-value entries and those entries that have the subset permission value of global domain's nv permission value
-		// Because we don't support PERM_FED for namespace yet, reset PERM_FED if found
-		var gpReduced share.NvPermissions // global domain's reduced nv permission value(for comparing with namespace permissions)
-		if nvRole, ok := domainRole[access.AccessDomainGlobal]; ok && nvRole != api.UserRoleNone {
-			switch nvRole {
-			case api.UserRoleFedAdmin, api.UserRoleAdmin:
-				gpReduced.WriteValue = share.PERMS_DOMAIN_WRITE
-			case api.UserRoleFedReader, api.UserRoleReader:
-				gpReduced.ReadValue = share.PERMS_DOMAIN_READ
-			}
-		} else {
-			if gp, ok := domainPermits[access.AccessDomainGlobal]; ok {
-				gpReduced.ReadValue = gp.ReadValue & share.PERMS_DOMAIN_READ
-				gpReduced.WriteValue = gp.WriteValue & share.PERMS_DOMAIN_WRITE
-			}
-		}
-		for d, p := range domainPermits {
-			if d != access.AccessDomainGlobal {
-				if p.IsEmpty() {
-					delete(domainPermits, d)
-				} else {
-					p.ReadValue = p.ReadValue & share.PERMS_DOMAIN_READ
-					p.WriteValue = p.WriteValue & share.PERMS_DOMAIN_WRITE
-					if p == gpReduced {
-						// This namespace's nv permission value is the subset of global domain's nv permission value
-						delete(domainPermits, d)
-					} else {
-						domainPermits[d] = p
-					}
-				}
-			}
-		}
-
-		// For namespace role, delete empty-value entries that don't have nv permission entries.
-		// Because we don't support fedAdmin/fedReader roles for namespace scope, downgrade to admin/reader if found
-		for d, r := range domainRole {
-			if d != access.AccessDomainGlobal {
-				if r == api.UserRoleNone {
-					if _, ok := domainPermits[d]; !ok {
-						// There is no nv reserved role/permission for this namespace
-						delete(domainRole, d)
-					}
-				} else if r == api.UserRoleFedAdmin {
-					// We don't support PERM_FED for namespace yet
-					domainRole[d] = api.UserRoleAdmin
-				} else if r == api.UserRoleFedReader {
-					// We don't support PERM_FED for namespace yet
-					domainRole[d] = api.UserRoleReader
-				}
-			}
-		}
-
-		// If global domain has nv reserved role, delete unnecessary namespace role/permission entries(either unnecessary entries or having the same role)
-		if nvRole, ok := domainRole[access.AccessDomainGlobal]; ok {
-			if nvRole == api.UserRoleFedAdmin || nvRole == api.UserRoleAdmin {
-				// If the user is admin or fed admin role on global domain, it is the admin of all namespaces
-				// However, admin role on global domain could still have PERM_FED(r) permission
-				domainRole = map[string]string{access.AccessDomainGlobal: nvRole}
-				if nvRole == api.UserRoleFedAdmin {
-					domainPermits = make(map[string]share.NvPermissions)
-				} else {
-					nvPermits, ok := domainPermits[access.AccessDomainGlobal]
-					domainPermits = make(map[string]share.NvPermissions)
-					if ok && nvPermits.ReadValue&share.PERM_FED > 0 {
-						domainPermits = map[string]share.NvPermissions{
-							access.AccessDomainGlobal: share.NvPermissions{ReadValue: share.PERM_FED},
-						}
-					}
-				}
-			} else if nvRole == api.UserRoleFedReader || nvRole == api.UserRoleReader {
-				// If the user is cluster reader or fed reader, it is the reader of all namespaces
-				for domain, nvDomainRole := range domainRole {
-					if domain != access.AccessDomainGlobal && nvDomainRole == api.UserRoleReader {
-						delete(domainRole, domain)
-					}
-				}
-				// If the user is cluster reader or fed reader, those domain permission entries for read-only permissions are unnecessary
-				for domain, permits := range domainPermits {
-					if domain != access.AccessDomainGlobal && permits.WriteValue == 0 {
-						delete(domainPermits, domain)
-					}
-				}
-			}
-		}
-
-		// Check whether both nv reserved role & permissions are assigne to a domain
-		for d, nvRole := range domainRole {
-			if nvRole != api.UserRoleNone {
-				if nvPermits, ok := domainPermits[d]; ok {
-					// Adjustment between fedAdmin/fedReader/admin/reader roles & PERM_FED permission
-					nvRole, nvPermits = workFedPermit("", d, nvRole, nvPermits)
-					if nvRole == api.UserRoleNone {
-						delete(domainRole, d)
-					} else {
-						domainRole[d] = nvRole
-					}
-					if nvPermits.IsEmpty() {
-						delete(domainPermits, d)
-					} else {
-						domainPermits[d] = nvPermits
-					}
-				}
-			}
-		}
-		for d, nvPermits := range domainPermits {
-			if nvPermits.IsEmpty() {
-				delete(domainPermits, d)
-			}
-		}
-
-		if _, ok := domainRole[access.AccessDomainGlobal]; !ok {
-			domainRole[access.AccessDomainGlobal] = api.UserRoleNone
-		}
+		domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster) // assuming it's master cluster for now
 
 		oldDomainRole, _ := d.rbacCache[subj]
 		oldDomainPermits, _ := d.permitsRbacCache[subj]
@@ -1557,10 +1546,10 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 	}
 }
 
-func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string, map[string]share.NvPermissions, error) {
+func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string, map[string]share.NvFedPermissions, error) {
 
 	var domainRole map[string]string
-	var domainPermits map[string]share.NvPermissions
+	var domainPermits map[string]share.NvFedPermissions
 	userRef := k8sSubjectObjRef{name: user, domain: "", subType: subType}
 
 	d.rbacLock.RLock()
@@ -1572,7 +1561,7 @@ func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string
 	}
 	userDomainPermits, ok2 := d.permitsRbacCache[userRef]
 	if ok2 {
-		domainPermits = make(map[string]share.NvPermissions, len(userDomainPermits))
+		domainPermits = make(map[string]share.NvFedPermissions, len(userDomainPermits))
 	}
 
 	if !ok1 && !ok2 {
@@ -1588,9 +1577,7 @@ func (d *kubernetes) GetUserRoles(user string, subType uint8) (map[string]string
 			domainRole[d] = r
 		}
 		for d, p := range userDomainPermits {
-			if p.IsEmpty() {
-				delete(domainPermits, d)
-			} else {
+			if !p.IsEmpty() {
 				domainPermits[d] = p
 			}
 		}
@@ -1632,7 +1619,7 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 	}
 
 	for userRef, rbac := range d.permitsRbacCache {
-		domainPermits := make(map[string]share.NvPermissions)
+		domainPermits := make(map[string]share.NvFedPermissions)
 		for d, p := range rbac {
 			if !p.IsEmpty() {
 				domainPermits[d] = p

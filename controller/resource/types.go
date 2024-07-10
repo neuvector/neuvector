@@ -185,8 +185,8 @@ type Image struct {
 type RBAC struct {
 	Name          string
 	Domain        string
-	DomainRoles   map[string]string              // domain -> nv reserved role
-	DomainPermits map[string]share.NvPermissions // domain -> nv permissions. for Rancher SSO custom roles only
+	DomainRoles   map[string]string                 // domain -> nv reserved role
+	DomainPermits map[string]share.NvFedPermissions // domain -> extra nv permissions. for Rancher SSO custom roles only
 }
 
 type ConfigMap struct {
