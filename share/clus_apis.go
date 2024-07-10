@@ -1252,15 +1252,17 @@ type CLUSPortApp struct {
 }
 
 type CLUSWorkloadAddr struct {
-	WlID         string        `json:"workload_id"`
-	PolicyMode   string        `json:"mode,omitempty"`
-	Domain       string        `json:"domain,omitempty"`
-	PlatformRole string        `json:"platform_role,omitempty"`
-	LocalIP      []net.IP      `json:"local_ip,omitempty"`
-	GlobalIP     []net.IP      `json:"global_ip,omitempty"`
-	NatIP        []net.IP      `json:"nat_ip,omitempty"`
-	LocalPortApp []CLUSPortApp `json:"local_port_app,omitempty"`
-	NatPortApp   []CLUSPortApp `json:"nat_port_app,omitempty"`
+	WlID         string                    `json:"workload_id"`
+	PolicyMode   string                    `json:"mode,omitempty"`
+	Domain       string                    `json:"domain,omitempty"`
+	PlatformRole string                    `json:"platform_role,omitempty"`
+	LocalIP      []net.IP                  `json:"local_ip,omitempty"`
+	GlobalIP     []net.IP                  `json:"global_ip,omitempty"`
+	NatIP        []net.IP                  `json:"nat_ip,omitempty"`
+	LocalPortApp []CLUSPortApp             `json:"local_port_app,omitempty"`
+	NatPortApp   []CLUSPortApp             `json:"nat_port_app,omitempty"`
+	Ports        map[string]CLUSMappedPort `json:"ports,omitempty"`
+	Apps         map[string]CLUSApp        `json:"apps,omitempty"`
 }
 
 type CLUSGroupIPPolicy struct {
