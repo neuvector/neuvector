@@ -248,8 +248,8 @@ func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 		}
 
 		if user.RemoteRolePermits != nil {
+			var remoteRolePermits api.RESTRemoteRolePermits
 			if len(user.RemoteRolePermits.DomainRole) > 0 {
-				var remoteRolePermits api.RESTRemoteRolePermits
 				remoteRoleDomains := make(map[string][]string, 3)
 				for d, r := range user.RemoteRolePermits.DomainRole {
 					if d == access.AccessDomainGlobal {
@@ -260,15 +260,12 @@ func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 					}
 				}
 				remoteRolePermits.RoleDomains = remoteRoleDomains
-				if remoteRolePermits.Role != "" && len(remoteRolePermits.RoleDomains) > 0 {
-					userRest.RemoteRolePermits = &remoteRolePermits
-				}
 			}
 			if len(user.RemoteRolePermits.ExtraPermits) > 0 {
 				remoteExtraPermitsDomains := make(map[share.NvPermissions][]string, len(user.ExtraPermitsDomains))
 				for d, p := range user.RemoteRolePermits.ExtraPermits {
 					if d == access.AccessDomainGlobal {
-						userRest.RemoteRolePermits.ExtraPermits = access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, p)
+						remoteRolePermits.ExtraPermits = access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, p)
 					} else {
 						domains := remoteExtraPermitsDomains[p]
 						remoteExtraPermitsDomains[p] = append(domains, d)
@@ -283,8 +280,12 @@ func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 						}
 						extraPermitsDomains = append(extraPermitsDomains, assigned)
 					}
-					userRest.RemoteRolePermits.ExtraPermitsDomains = extraPermitsDomains
+					remoteRolePermits.ExtraPermitsDomains = extraPermitsDomains
 				}
+			}
+			if remoteRolePermits.Role != "" || len(remoteRolePermits.RoleDomains) > 0 ||
+				len(remoteRolePermits.ExtraPermits) > 0 || len(remoteRolePermits.ExtraPermitsDomains) > 0 {
+				userRest.RemoteRolePermits = &remoteRolePermits
 			}
 		}
 	}
