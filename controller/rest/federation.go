@@ -850,6 +850,16 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 		return "", common.ErrObjectAccessDenied
 	}
 
+	var remoteRolePermits share.CLUSRemoteRolePermits
+	if user.RemoteRolePermits == nil {
+		if user.Role == api.UserRoleFedAdmin {
+			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleAdmin}
+		} else if user.Role == api.UserRoleFedReader {
+			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleReader}
+		}
+		user.RemoteRolePermits = &remoteRolePermits
+	}
+
 	reqTokenLock.Lock()
 	defer reqTokenLock.Unlock()
 

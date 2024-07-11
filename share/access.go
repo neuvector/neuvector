@@ -12,6 +12,15 @@ const (
 	AccessAllAsReader = "*" // Namespace user can read, global user follow roles
 )
 
+type NvReservedUserRole uint8
+
+const (
+	UserRoleAdmin     NvReservedUserRole = 0x01
+	UserRoleReader    NvReservedUserRole = 0x02
+	UserRoleFedAdmin  NvReservedUserRole = 0x04
+	UserRoleFedReader NvReservedUserRole = 0x08
+)
+
 const (
 	// All PERM_xyz_BASIC permissions can be enabled/disabled indirectly by enabling/disabling some composite permission(s)
 	PERM_IBMSA                 = 0x00000001 // hidden(non-configurable by user), only for IBM SA to set up with NV
