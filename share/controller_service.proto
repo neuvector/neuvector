@@ -54,6 +54,7 @@ service ControllerScanService {
   rpc ScannerDeregister(ScannerDeregisterData) returns (RPCVoid);
   rpc SubmitScanResult(ScanResult) returns (RPCVoid);
   rpc GetCaps(RPCVoid) returns (ControllerCaps);
+  rpc HealthCheck(RPCVoid) returns (RPCVoid);
 }
 
 message CLUSFilePacket {

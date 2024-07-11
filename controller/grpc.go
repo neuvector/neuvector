@@ -150,6 +150,10 @@ func (ss *ScanService) ScannerRegister(ctx context.Context, data *share.ScannerR
 	}
 }
 
+func (ss *ScanService) HealthCheck(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
+	return nil, nil
+}
+
 func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	log.WithFields(log.Fields{
 		"id": data.ID, "version": data.CVEDBVersion, "create": data.CVEDBCreateTime, "server": data.RPCServer, "entries": len(data.CVEDB),
