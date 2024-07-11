@@ -84,6 +84,7 @@ type joinTicket struct {
 
 type tRancherUser struct {
 	valid             bool
+	userGone          bool
 	id                string
 	name              string
 	provider          string                            // from Rancher's v3/principals?me=true
@@ -573,6 +574,9 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 		}
 	}
 	if err != nil {
+		if statusCode == http.StatusGone {
+			rancherUser.userGone = true
+		}
 		log.WithFields(log.Fields{"data": string(data), "url": urlStr, "err": err}).Error()
 	}
 
@@ -2214,7 +2218,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 					log.WithFields(log.Fields{"err": err}).Error()
 				}
 				if err != nil {
-					restRespError(w, http.StatusUnauthorized, code)
+					status := http.StatusUnauthorized
+					if code == api.RESTErrUnauthorized && rancherUser.userGone {
+						status = http.StatusGone
+					}
+					restRespError(w, status, code)
 					return
 				}
 				cacheRancherCookie = true
