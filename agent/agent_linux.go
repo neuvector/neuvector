@@ -51,7 +51,7 @@ With Azure advanced networking plugin:
  5: azure0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP qlen 1000
 */
 
-func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (map[string][]share.CLUSIPAddr, utils.Set, bool, bool) {
+func parseHostAddrs(ifaces map[string]sk.NetIface, platform, flavor, network string) (map[string][]share.CLUSIPAddr, utils.Set, bool, bool) {
 	devs := make(map[string][]share.CLUSIPAddr)
 	ips := utils.NewSet()
 	maxMTU := 0
@@ -78,7 +78,10 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 					ips.Add(addr.IPNet.IP.String())
 				}
 			}
-		} else if iface.Type == "bridge" {
+		} else if iface.Type == "bridge" || iface.Type == "openvswitch" {
+			if iface.Type == "openvswitch" && (flavor != share.FlavorOpenShift || name != "br-ex") {
+				continue
+			}
 			if platform == share.PlatformKubernetes && strings.HasPrefix(name, "cni") {
 				continue
 			}
@@ -88,9 +91,9 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, network string) (ma
 			}
 
 			for _, addr := range iface.Addrs {
-				if utils.IsIPv4(addr.IPNet.IP) {
+				if utils.IsIPv4(addr.IPNet.IP) && !addr.IPNet.IP.IsLinkLocalUnicast() {//169.254.x.x IP should not be included
 					log.WithFields(log.Fields{"link": name, "ipnet": addr.IPNet}).Info("Switch")
-					if name == "azure0" {
+					if name == "azure0" || (iface.Type == "openvswitch" && name == "br-ex") {
 						devs[name] = append(devs[name], share.CLUSIPAddr{
 							IPNet: addr.IPNet,
 							Scope: share.CLUSIPAddrScopeNAT,
