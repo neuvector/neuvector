@@ -151,7 +151,7 @@ func (ss *ScanService) ScannerRegister(ctx context.Context, data *share.ScannerR
 }
 
 func (ss *ScanService) HealthCheck(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
-	return nil, nil
+	return &share.RPCVoid{}, nil
 }
 
 func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
