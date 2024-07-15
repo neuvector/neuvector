@@ -1254,6 +1254,10 @@ type RESTCrdGroupConfig struct {
 	Name         string               `json:"name"`
 	Comment      string               `json:"comment"`
 	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
+	MonMetric    *bool                `json:"mon_metric,omitempty"`
+	GrpSessCur   *uint32              `json:"grp_sess_cur,omitempty"`
+	GrpSessRate  *uint32              `json:"grp_sess_rate,omitempty"`
+	GrpBandWidth *uint32              `json:"grp_band_width,omitempty"`
 }
 
 type RESTGroupsData struct {
