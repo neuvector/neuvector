@@ -526,6 +526,10 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 			fileName: v.FileName,
 			pkgName:  v.PackageName, pkgVer: v.PackageVersion, fixVer: v.FixedVersion,
 		}
+
+		if v.ScoreV3 > 8.9 {
+			traits[i].severity = vulnSeverityCritical
+		}
 	}
 	return traits
 }
