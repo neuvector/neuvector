@@ -82,7 +82,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdAppV1Schema() apiextv1.JSONSchemaPr
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() apiextv1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema(owner string) apiextv1.JSONSchemaProps {
 	schema := apiextv1.JSONSchemaProps{
 		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
@@ -118,11 +118,22 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema() apiextv1.JSONSch
 			},
 		},
 	}
+	if owner == "target" {
+		schema.Properties["mon_metric"] = apiextv1.JSONSchemaProps{
+			Type: b.schemaTypeBoolean,
+		}
+		intJsonSchemaProps := apiextv1.JSONSchemaProps{
+			Type: b.schemaTypeInteger,
+		}
+		schema.Properties["grp_sess_cur"] = intJsonSchemaProps
+		schema.Properties["grp_sess_rate"] = intJsonSchemaProps
+		schema.Properties["grp_band_width"] = intJsonSchemaProps
+	}
 
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() apiextv1b1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema(owner string) apiextv1b1.JSONSchemaProps {
 	schema := apiextv1b1.JSONSchemaProps{
 		Type:     b.schemaTypeObject,
 		Required: []string{"name"},
@@ -158,11 +169,22 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema() apiextv1b1.JSO
 			},
 		},
 	}
+	if owner == "target" {
+		schema.Properties["mon_metric"] = apiextv1b1.JSONSchemaProps{
+			Type: b.schemaTypeBoolean,
+		}
+		intJsonSchemaProps := apiextv1b1.JSONSchemaProps{
+			Type: b.schemaTypeInteger,
+		}
+		schema.Properties["grp_sess_cur"] = intJsonSchemaProps
+		schema.Properties["grp_sess_rate"] = intJsonSchemaProps
+		schema.Properties["grp_band_width"] = intJsonSchemaProps
+	}
 
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() apiextv1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema(owner string) apiextv1.JSONSchemaProps {
 	schema := apiextv1.JSONSchemaProps{
 		Type: b.schemaTypeArray,
 		Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -186,7 +208,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() apiextv1.JSONSchem
 					"name": apiextv1.JSONSchemaProps{
 						Type: b.schemaTypeString,
 					},
-					"selector":     b.buildNvSeurityCrdSelectorV1Schema(),
+					"selector":     b.buildNvSeurityCrdSelectorV1Schema(owner),
 					"applications": b.buildNvSeurityCrdAppV1Schema(),
 				},
 			},
@@ -196,7 +218,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1Schema() apiextv1.JSONSchem
 	return schema
 }
 
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() apiextv1b1.JSONSchemaProps {
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema(owner string) apiextv1b1.JSONSchemaProps {
 	schema := apiextv1b1.JSONSchemaProps{
 		Type: b.schemaTypeArray,
 		Items: &apiextv1b1.JSONSchemaPropsOrArray{
@@ -220,7 +242,7 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema() apiextv1b1.JSONS
 					"name": apiextv1b1.JSONSchemaProps{
 						Type: b.schemaTypeString,
 					},
-					"selector":     b.buildNvSeurityCrdSelectorV1B1Schema(),
+					"selector":     b.buildNvSeurityCrdSelectorV1B1Schema(owner),
 					"applications": b.buildNvSeurityCrdAppV1B1Schema(),
 				},
 			},
@@ -319,11 +341,11 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
 								},
 							},
-							"selector": b.buildNvSeurityCrdSelectorV1Schema(),
+							"selector": b.buildNvSeurityCrdSelectorV1Schema("target"),
 						},
 					},
-					"ingress": b.buildNvSeurityCrdPolicyV1Schema(),
-					"egress":  b.buildNvSeurityCrdPolicyV1Schema(),
+					"ingress": b.buildNvSeurityCrdPolicyV1Schema("ingress"),
+					"egress":  b.buildNvSeurityCrdPolicyV1Schema("egress"),
 					"process": apiextv1.JSONSchemaProps{
 						Type: b.schemaTypeArray,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -421,11 +443,11 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeUnavailable]},
 								},
 							},
-							"selector": b.buildNvSeurityCrdSelectorV1B1Schema(),
+							"selector": b.buildNvSeurityCrdSelectorV1B1Schema("target"),
 						},
 					},
-					"ingress": b.buildNvSeurityCrdPolicyV1B1Schema(),
-					"egress":  b.buildNvSeurityCrdPolicyV1B1Schema(),
+					"ingress": b.buildNvSeurityCrdPolicyV1B1Schema("ingress"),
+					"egress":  b.buildNvSeurityCrdPolicyV1B1Schema("egress"),
 					"process": apiextv1b1.JSONSchemaProps{
 						Type: b.schemaTypeArray,
 						Items: &apiextv1b1.JSONSchemaPropsOrArray{
@@ -915,41 +937,41 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1Schema() *apiextv1.JS
 }
 
 /*
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1Schema() *apiextv1.JSONSchemaProps {
-	schema := apiextv1.JSONSchemaProps{
-		Type:     b.schemaTypeObject,
-		Required: []string{"name"},
-		Properties: map[string]apiextv1.JSONSchemaProps{
-			"name": apiextv1.JSONSchemaProps{
-				Type: b.schemaTypeString,
-			},
-			"disable": apiextv1.JSONSchemaProps{
-				Type: b.schemaTypeBoolean,
-			},
-			"dummy": apiextv1.JSONSchemaProps{
-				Type: b.schemaTypeBoolean,
-			},
-			"labels": apiextv1.JSONSchemaProps{
-				Type: b.schemaTypeObject,
-				AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-					Schema: &apiextv1.JSONSchemaProps{
-						Type: b.schemaTypeString,
+	func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1Schema() *apiextv1.JSONSchemaProps {
+		schema := apiextv1.JSONSchemaProps{
+			Type:     b.schemaTypeObject,
+			Required: []string{"name"},
+			Properties: map[string]apiextv1.JSONSchemaProps{
+				"name": apiextv1.JSONSchemaProps{
+					Type: b.schemaTypeString,
+				},
+				"disable": apiextv1.JSONSchemaProps{
+					Type: b.schemaTypeBoolean,
+				},
+				"dummy": apiextv1.JSONSchemaProps{
+					Type: b.schemaTypeBoolean,
+				},
+				"labels": apiextv1.JSONSchemaProps{
+					Type: b.schemaTypeObject,
+					AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+						Schema: &apiextv1.JSONSchemaProps{
+							Type: b.schemaTypeString,
+						},
+					},
+				},
+				"tags": apiextv1.JSONSchemaProps{
+					Type: b.schemaTypeArray,
+					Items: &apiextv1.JSONSchemaPropsOrArray{
+						Schema: &apiextv1.JSONSchemaProps{
+							Type: b.schemaTypeString,
+						},
 					},
 				},
 			},
-			"tags": apiextv1.JSONSchemaProps{
-				Type: b.schemaTypeArray,
-				Items: &apiextv1.JSONSchemaPropsOrArray{
-					Schema: &apiextv1.JSONSchemaProps{
-						Type: b.schemaTypeString,
-					},
-				},
-			},
-		},
-	}
+		}
 
-	return &schema
-}
+		return &schema
+	}
 */
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1Schema() *apiextv1.JSONSchemaProps {
 	schema := apiextv1.JSONSchemaProps{
@@ -1160,41 +1182,41 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdVulnProfileV1B1Schema() *apiextv1b
 }
 
 /*
-func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1B1Schema() apiextv1b1.JSONSchemaProps {
-	schema := apiextv1b1.JSONSchemaProps{
-		Type:     b.schemaTypeObject,
-		Required: []string{"name"},
-		Properties: map[string]*apiextv1b1.JSONSchemaProps{
-			"name": apiextv1b1.JSONSchemaProps{
-				Type: b.schemaTypeString,
-			},
-			"disable": apiextv1b1.JSONSchemaProps{
-				Type: b.schemaTypeBoolean,
-			},
-			"dummy": apiextv1b1.JSONSchemaProps{
-				Type: b.schemaTypeBoolean,
-			},
-			"labels": apiextv1b1.JSONSchemaProps{
-				Type: b.schemaTypeObject,
-				AdditionalProperties: apiextv1b1.JSONSchemaPropsOrBool{
-					Schema: &apiextv1b1.JSONSchemaProps{
-						Type: b.schemaTypeString,
+	func (b *nvCrdSchmaBuilder) buildNvSeurityCrdCompAssetV1B1Schema() apiextv1b1.JSONSchemaProps {
+		schema := apiextv1b1.JSONSchemaProps{
+			Type:     b.schemaTypeObject,
+			Required: []string{"name"},
+			Properties: map[string]*apiextv1b1.JSONSchemaProps{
+				"name": apiextv1b1.JSONSchemaProps{
+					Type: b.schemaTypeString,
+				},
+				"disable": apiextv1b1.JSONSchemaProps{
+					Type: b.schemaTypeBoolean,
+				},
+				"dummy": apiextv1b1.JSONSchemaProps{
+					Type: b.schemaTypeBoolean,
+				},
+				"labels": apiextv1b1.JSONSchemaProps{
+					Type: b.schemaTypeObject,
+					AdditionalProperties: apiextv1b1.JSONSchemaPropsOrBool{
+						Schema: &apiextv1b1.JSONSchemaProps{
+							Type: b.schemaTypeString,
+						},
+					},
+				},
+				"tags": apiextv1b1.JSONSchemaProps{
+					Type: b.schemaTypeArray,
+					Items: &apiextv1b1.JSONSchemaPropsOrArray{
+						Schema: &apiextv1b1.JSONSchemaProps{
+							Type: b.schemaTypeString,
+						},
 					},
 				},
 			},
-			"tags": apiextv1b1.JSONSchemaProps{
-				Type: b.schemaTypeArray,
-				Items: &apiextv1b1.JSONSchemaPropsOrArray{
-					Schema: &apiextv1b1.JSONSchemaProps{
-						Type: b.schemaTypeString,
-					},
-				},
-			},
-		},
-	}
+		}
 
-	return &schema
-}
+		return &schema
+	}
 */
 func (b *nvCrdSchmaBuilder) buildNvSecurityCrdCompProfileV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := apiextv1b1.JSONSchemaProps{
