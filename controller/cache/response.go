@@ -38,6 +38,7 @@ type eventDesc struct {
 
 type actionDesc struct {
 	id       uint32
+	comment  string
 	actions  []string
 	webhooks []string
 }
@@ -338,7 +339,7 @@ func lookup(desc *eventDesc) []actionDesc {
 				}
 			}
 			if len(rule.Conditions) == 0 || matchConditions(desc, rule.Conditions) {
-				ret = append(ret, actionDesc{id: rule.ID, actions: rule.Actions, webhooks: rule.Webhooks})
+				ret = append(ret, actionDesc{id: rule.ID, comment: rule.Comment, actions: rule.Actions, webhooks: rule.Webhooks})
 			}
 		}
 	}

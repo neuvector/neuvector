@@ -56,6 +56,7 @@ type procContainer struct {
 	checkRemovedPort uint
 	fInfo            map[string]*fileInfo
 	bPrivileged      bool
+	healthCheck      []string
 }
 
 type procInternal struct {
@@ -3033,10 +3034,32 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 		} else if mounted {
 			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
-		} else {
-			// this file is not existed
-			bImageFile = false
-			mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+		} else { // yes: not a container file
+			bFromPrivilegedPod := false
+			ppid := 0
+			cID := ""
+			// The process (like "setns") is from a privileged pod (like enforcer)
+			if proc.ppid == p.agentPid {
+				ppid = p.agentPid
+				cID = p.selfID
+			} else if pContainer, ok := p.pidContainerMap[proc.ppid]; ok && pContainer.id != "" && pContainer.bPrivileged {
+				ppid = pContainer.rootPid
+				cID = pContainer.id
+			}
+
+			// need to validate it from the calling pod
+			if ppid != 0 {
+				if yes, _ = global.SYS.IsNotContainerFile(ppid, ppe.Path); yes {
+					bFromPrivilegedPod = true
+					log.WithFields(log.Fields{"file": ppe.Path, "id": cID, "ppid": ppid}).Debug("SHD: calling from a priviiged pod")
+				}
+			}
+
+			if !bFromPrivilegedPod {
+				// this file is not existed
+				bImageFile = false
+				mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
+			}
 		}
 
 		// from docker run, v20.10.7
@@ -3064,7 +3087,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	bCanBeLearned := true
 	bRuncChild := false
-	if ppe.Action != share.PolicyActionViolate && p.bK8sGroupWithProbe(svcGroup) {
+	if ppe.Action != share.PolicyActionViolate && (p.bK8sGroupWithProbe(svcGroup) || len(c.healthCheck) > 0) {
 		// allowing "kubctl exec ...", adpot the binary path to resolve the name
 		bRuncChild = global.RT.IsRuntimeProcess(proc.pname, nil)
 		if !bRuncChild {
@@ -3181,7 +3204,14 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				}
 			}
 		case share.PolicyActionDeny:
-			ppe.Uuid = share.CLUSReservedUuidNotAlllowed
+			if svcGroup == share.GroupNVProtect {
+				if bImageFile {
+					bPass = true
+					ppe.Action = share.PolicyActionAllow
+				}
+			} else {
+				ppe.Uuid = share.CLUSReservedUuidNotAlllowed
+			}
 		}
 	} else {
 		switch ppe.Action {
@@ -3209,7 +3239,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	return bPass
 }
 
-func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool) {
+func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool, healthCheck []string) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
 	if !p.bProfileEnable {
 		return
@@ -3244,6 +3274,9 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 
 	c.rootPid = rootPid
 	c.bPrivileged = bPrivileged
+	if healthCheck != nil {
+		c.healthCheck = healthCheck		// no override
+	}
 	allPids := c.outsider.Union(c.children)
 	allPids.Add(rootPid) // all collections: add rootPid as a pivot point
 	c.outsider.Clear()   // reset
@@ -3293,7 +3326,7 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 	}
 	if bAdd {
 		if rootPid != 0 {
-			if ok, files := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
+			if ok, files := p.fsnCtr.AddContainer(id, cPath, "", rootPid); !ok {
 				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
 			} else {
 				p.lockProcMux()
@@ -3323,11 +3356,11 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 	}
 }
 
-func (p *Probe) HandleAnchorNvProtectChange(bAdd bool, id, cPath string, rootPid int) {
+func (p *Probe) HandleAnchorNvProtectChange(bAdd bool, id, cPath, role string, rootPid int) {
 	// log.WithFields(log.Fields{"bAdd": bAdd,"id": id, "cPath": cPath, "rootPid": rootPid}).Debug()
 	if bAdd {
 		if rootPid != 0 {
-			if ok, _ := p.fsnCtr.AddContainer(id, cPath, rootPid); !ok {
+			if ok, _ := p.fsnCtr.AddContainer(id, cPath, role, rootPid); !ok {
 				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
 			}
 		}

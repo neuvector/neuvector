@@ -12,6 +12,15 @@ const (
 	AccessAllAsReader = "*" // Namespace user can read, global user follow roles
 )
 
+type NvReservedUserRole uint8
+
+const (
+	UserRoleAdmin     NvReservedUserRole = 0x01
+	UserRoleReader    NvReservedUserRole = 0x02
+	UserRoleFedAdmin  NvReservedUserRole = 0x04
+	UserRoleFedReader NvReservedUserRole = 0x08
+)
+
 const (
 	// All PERM_xyz_BASIC permissions can be enabled/disabled indirectly by enabling/disabling some composite permission(s)
 	PERM_IBMSA                 = 0x00000001 // hidden(non-configurable by user), only for IBM SA to set up with NV
@@ -59,7 +68,7 @@ const (
 	// Effective permissions for domain admin/reader roles. Even for the reserved admin/reader roles assigned to domain, they cannot access controller/enforcer objects(PERM_NV_RESOURCE)
 	PERMS_DOMAIN_READ = PERM_RUNTIME_SCAN_BASIC | PERM_REG_SCAN | PERM_NETWORK_POLICY_BASIC | PERM_SYSTEM_POLICY_BASIC | PERM_GROUP_BASIC | PERM_WORKLOAD_BASIC | PERM_INFRA_BASIC |
 		PERM_COMPLIANCE_BASIC | PERM_AUTHORIZATION | PERM_SYSTEM_CONFIG | PERM_AUDIT_EVENTS | PERM_SECURITY_EVENTS_BASIC | PERM_EVENTS // all read permissions a domain admin could have eventually
-	PERMS_DOMAIN_WRITE = PERM_RUNTIME_SCAN_BASIC | PERM_REG_SCAN | PERM_NETWORK_POLICY_BASIC | PERM_SYSTEM_POLICY_BASIC | PERM_GROUP_BASIC | PERM_WORKLOAD_BASIC |
+	PERMS_DOMAIN_WRITE = PERM_RUNTIME_SCAN_BASIC | PERM_REG_SCAN | PERM_NETWORK_POLICY_BASIC | PERM_SYSTEM_POLICY_BASIC | PERM_GROUP_BASIC | PERM_WORKLOAD_BASIC | PERM_INFRA_BASIC |
 		PERM_COMPLIANCE_BASIC | PERM_AUTHORIZATION // all write permissions a domain admin could have eventually
 	PERMS_DOMAIN = PERMS_DOMAIN_READ | PERMS_DOMAIN_WRITE // sum of all permissions that are supporedt in domain
 

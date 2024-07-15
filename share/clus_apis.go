@@ -827,6 +827,15 @@ type CLUSEULA struct {
 	Accepted bool `json:"accepted"`
 }
 
+type NvFedPermissions struct {
+	Local  NvPermissions `json:"local"`
+	Remote NvPermissions `json:"remote"`
+}
+
+func (p *NvFedPermissions) IsEmpty() bool {
+	return p.Local.IsEmpty() && p.Remote.IsEmpty()
+}
+
 type NvPermissions struct {
 	ReadValue  uint32 `json:"read_value"`
 	WriteValue uint32 `json:"write_value"`
@@ -835,15 +844,56 @@ type NvPermissions struct {
 func (p *NvPermissions) IsEmpty() bool {
 	return (p.ReadValue == 0 && p.WriteValue == 0)
 }
-
-// whether this permissions object is treated as reserved role reader
-func (p *NvPermissions) IsReaderEqual() bool {
-	//return p.ReadValue == PERMS_GLOBAL_CONFIGURABLE_READ
-	return false
+func (p *NvPermissions) Reset() {
+	p.ReadValue = 0
+	p.WriteValue = 0
 }
 
 func (p *NvPermissions) HasPermFed() bool {
 	return ((p.ReadValue&PERM_FED) != 0 || (p.WriteValue&PERM_FED) != 0)
+}
+
+func (p *NvPermissions) HasPermFedForReadOnly() bool {
+	return ((p.ReadValue&PERM_FED) != 0 && (p.WriteValue&PERM_FED) == 0)
+}
+
+func (p *NvPermissions) FilterPermits(domain, scope, fedRole string) {
+	if domain != "" {
+		// fed access for namespace is not supported yet
+		p.ReadValue &= PERMS_DOMAIN_READ
+		p.WriteValue &= PERMS_DOMAIN_WRITE
+	} else {
+		if scope == "local" && fedRole == "master" {
+			p.ReadValue &= PERMS_FED_READ
+			p.WriteValue &= PERMS_FED_WRITE
+		} else if scope == "remote" && fedRole != "master" {
+			p.ReadValue = 0
+			p.WriteValue = 0
+		} else {
+			p.ReadValue &= PERMS_CLUSTER_READ
+			p.WriteValue &= PERMS_CLUSTER_WRITE
+		}
+	}
+}
+
+func (p *NvPermissions) Union(other NvPermissions) {
+	p.ReadValue |= other.ReadValue
+	p.WriteValue |= other.WriteValue
+}
+
+func (p *NvPermissions) ResetIfSubsetOf(other NvPermissions) {
+	if (p.ReadValue | other.ReadValue) == other.ReadValue {
+		// if p's read permissions is subset of other's read permissions, reset p's read permissions to 0 (duplicate)
+		p.ReadValue = 0
+	}
+	if (p.WriteValue | other.WriteValue) == other.WriteValue {
+		// if p's write permissions is subset of other's write permissions, reset p's write permissions to 0 (duplicate)
+		p.WriteValue = 0
+	}
+}
+
+func (p *NvPermissions) IsSubsetOf(other NvPermissions) bool {
+	return ((other.ReadValue | p.ReadValue) == other.ReadValue) && ((other.WriteValue | p.WriteValue) == other.WriteValue)
 }
 
 type CLUSPermitsAssigned struct {
@@ -851,29 +901,35 @@ type CLUSPermitsAssigned struct {
 	Domains []string      `json:"domains"` // all domains in this slice have the same permissions assigned
 }
 
+type CLUSRemoteRolePermits struct {
+	DomainRole   map[string]string        `json:"domain_role"`       // domain -> role
+	ExtraPermits map[string]NvPermissions `json:"extra_permissions"` // domain -> extra permissions(other than in 'DomainRole')
+}
+
 type CLUSUser struct {
-	Fullname            string                `json:"fullname"`
-	Username            string                `json:"username"`
-	PasswordHash        string                `json:"password_hash"`
-	PwdResetTime        time.Time             `json:"pwd_reset_time"`
-	PwdHashHistory      []string              `json:"pwd_hash_history"` // not including the current password's hash
-	Domain              string                `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
-	Server              string                `json:"server"`
-	EMail               string                `json:"email"`
-	Role                string                `json:"role"`
-	RoleOverride        bool                  `json:"role_oride"` // Used for shadow user
-	Timeout             uint32                `json:"timeout"`
-	Locale              string                `json:"locale"`
-	RoleDomains         map[string][]string   `json:"role_domains"`
-	ExtraPermits        NvPermissions         `json:"extra_permits"`         // extra permissions(other than 'Role') on global domain. only for Rancher SSO
-	ExtraPermitsDomains []CLUSPermitsAssigned `json:"extra_permits_domains"` // list of extra permissions(other than 'RoleDomains') on namespaces. only for Rancher SSO
-	LastLoginAt         time.Time             `json:"last_login_at"`
-	LoginCount          uint32                `json:"login_count"`
-	FailedLoginCount    uint32                `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
-	BlockLoginSince     time.Time             `json:"block_login_since"`  // reset to 0 after a successful login
-	AcceptedAlerts      []string              `json:"accepted_alerts,omitempty"`
-	ResetPwdInNextLogin bool                  `json:"reset_password_in_next_login"`
-	UseBootstrapPwd     bool                  `json:"use_bootstrap_password"`
+	Fullname            string                 `json:"fullname"`
+	Username            string                 `json:"username"`
+	PasswordHash        string                 `json:"password_hash"`
+	PwdResetTime        time.Time              `json:"pwd_reset_time"`
+	PwdHashHistory      []string               `json:"pwd_hash_history"` // not including the current password's hash
+	Domain              string                 `json:"domain"`           // This is not used. Other 'domain' maps to namespace, this is not.
+	Server              string                 `json:"server"`
+	EMail               string                 `json:"email"`
+	Role                string                 `json:"role"`
+	RoleOverride        bool                   `json:"role_oride"` // Used for shadow user
+	Timeout             uint32                 `json:"timeout"`
+	Locale              string                 `json:"locale"`
+	RoleDomains         map[string][]string    `json:"role_domains"`
+	ExtraPermits        NvPermissions          `json:"extra_permits"`                 // extra permissions(other than 'Role') for global domain on local cluster. only for Rancher SSO
+	ExtraPermitsDomains []CLUSPermitsAssigned  `json:"extra_permits_domains"`         // list of extra permissions(other than 'RoleDomains') for namespaces on local cluster. only for Rancher SSO
+	RemoteRolePermits   *CLUSRemoteRolePermits `json:"remote_role_permits,omitempty"` // role/permissions on managed clusters in fed. only for Rancher SSO
+	LastLoginAt         time.Time              `json:"last_login_at"`
+	LoginCount          uint32                 `json:"login_count"`
+	FailedLoginCount    uint32                 `json:"failed_login_count"` // failed consecutive login failure. reset to 0 after a successful login
+	BlockLoginSince     time.Time              `json:"block_login_since"`  // reset to 0 after a successful login
+	AcceptedAlerts      []string               `json:"accepted_alerts,omitempty"`
+	ResetPwdInNextLogin bool                   `json:"reset_password_in_next_login"`
+	UseBootstrapPwd     bool                   `json:"use_bootstrap_password"`
 }
 
 type GroupRoleMapping struct {
@@ -959,7 +1015,8 @@ type CLUSHost struct {
 	Name           string                  `json:"name"`
 	Runtime        string                  `json:"runtime"`
 	Platform       string                  `json:"platform"`
-	Flavor         string                  `json:"flavor"` // platform flavor
+	Flavor         string                  `json:"flavor"`         // platform flavor
+	CloudPlatform  string                  `json:"cloud_platform"` // cloud_platform
 	Network        string                  `json:"network"`
 	RuntimeVer     string                  `json:"runtime_version"`
 	RuntimeAPIVer  string                  `json:"runtime_api_version"`
@@ -1046,24 +1103,16 @@ type CLUSNetworkEP struct {
 type CLUSGroupMetric struct {
 	GroupName      string                   `json:"group_name"`
 	GroupSessCurIn uint32                   `json:"group_sess_cur_in"`
-	GroupSessIn1   uint32                   `json:"group_sess_in1"`
-	GroupByteIn1   uint64                   `json:"group_byte_in1"`
 	GroupSessIn12  uint32                   `json:"group_sess_in12"`
 	GroupByteIn12  uint64                   `json:"group_byte_in12"`
-	GroupSessIn60  uint32                   `json:"group_sess_in60"`
-	GroupByteIn60  uint64                   `json:"group_byte_in60"`
 	WlMetric       map[string]*CLUSWlMetric `json:"wl_metric"`
 }
 
 type CLUSWlMetric struct {
 	WlID        string `json:"wlid"`
 	WlSessCurIn uint32 `json:"wl_sess_cur_in"`
-	WlSessIn1  uint32 `json:"wl_sess_in1"`
-	WlByteIn1  uint64 `json:"wl_byte_in1"`
 	WlSessIn12  uint32 `json:"wl_sess_in12"`
 	WlByteIn12  uint64 `json:"wl_byte_in12"`
-	WlSessIn60  uint32 `json:"wl_sess_in60"`
-	WlByteIn60  uint64 `json:"wl_byte_in60"`
 }
 
 type CLUSWorkload struct {
@@ -1255,15 +1304,17 @@ type CLUSPortApp struct {
 }
 
 type CLUSWorkloadAddr struct {
-	WlID         string        `json:"workload_id"`
-	PolicyMode   string        `json:"mode,omitempty"`
-	Domain       string        `json:"domain,omitempty"`
-	PlatformRole string        `json:"platform_role,omitempty"`
-	LocalIP      []net.IP      `json:"local_ip,omitempty"`
-	GlobalIP     []net.IP      `json:"global_ip,omitempty"`
-	NatIP        []net.IP      `json:"nat_ip,omitempty"`
-	LocalPortApp []CLUSPortApp `json:"local_port_app,omitempty"`
-	NatPortApp   []CLUSPortApp `json:"nat_port_app,omitempty"`
+	WlID         string                    `json:"workload_id"`
+	PolicyMode   string                    `json:"mode,omitempty"`
+	Domain       string                    `json:"domain,omitempty"`
+	PlatformRole string                    `json:"platform_role,omitempty"`
+	LocalIP      []net.IP                  `json:"local_ip,omitempty"`
+	GlobalIP     []net.IP                  `json:"global_ip,omitempty"`
+	NatIP        []net.IP                  `json:"nat_ip,omitempty"`
+	LocalPortApp []CLUSPortApp             `json:"local_port_app,omitempty"`
+	NatPortApp   []CLUSPortApp             `json:"nat_port_app,omitempty"`
+	Ports        map[string]CLUSMappedPort `json:"ports,omitempty"`
+	Apps         map[string]CLUSApp        `json:"apps,omitempty"`
 }
 
 type CLUSGroupIPPolicy struct {

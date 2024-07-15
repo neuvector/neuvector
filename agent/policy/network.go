@@ -390,7 +390,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 				// log.WithFields(log.Fields{"from": from.WlID}).Debug("Missing ip for host mode container!")
 				return
 			}
-			fromIPList = from.NatIP[:1]
+			fromIPList = from.NatIP//there could be multiple host i/f
 		} else {
 			fromIPList = from.LocalIP
 		}
@@ -461,7 +461,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 				// log.WithFields(log.Fields{"to": to.WlID}).Debug("Missing ip for host mode container!")
 				return
 			}
-			toIPList = to.NatIP[:1]
+			toIPList = to.NatIP//there could be multiple host i/f
 			//(NVSHAS-4175) for host mode container we also need
 			//to include LocalPortApp to create ip rule. For host
 			//mode workload we do not check application but only
@@ -611,21 +611,21 @@ func fillWorkloadAddress(addr *share.CLUSWorkloadAddr, addrMap map[string]*share
 	}
 }
 
-func getPortsForApplicationAg(appMap map[share.CLUSProtoPort]*share.CLUSApp, application uint32) string {
+func getPortsForApplicationAg(appMap map[string]share.CLUSApp, application uint32) string {
 	var ports string = ""
-	for protoPort, app := range appMap {
+	for port, app := range appMap {
 		if app.Application == application || app.Proto == application {
 			if ports == "" {
-				ports = fmt.Sprintf("%d", protoPort.Port)
+				ports = port
 			} else {
-				ports = fmt.Sprintf("%s,%d", ports, protoPort.Port)
+				ports = fmt.Sprintf("%s,%s", ports, port)
 			}
 		}
 	}
 	return ports
 }
 
-func getMappedPortAg(portMap map[share.CLUSProtoPort]*share.CLUSMappedPort, ports string) string {
+func getMappedPortAg(portMap map[string]share.CLUSMappedPort, ports string) string {
 	var pp string = ""
 	portList := strings.Split(ports, ",")
 	for _, ap := range portList {
@@ -648,8 +648,14 @@ func getMappedPortAg(portMap map[share.CLUSProtoPort]*share.CLUSMappedPort, port
 	return pp
 }
 
-func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.CLUSPortApp, pInfo *WorkloadIPPolicyInfo) {
+func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.CLUSPortApp, wlMap map[string]*share.CLUSWorkloadAddr) {
 	var pp string
+	aPortsMap := make(map[string]share.CLUSMappedPort)
+	aAppsMap := make(map[string]share.CLUSApp)
+	if a, ok := wlMap[wlAddr.WlID]; ok {
+		aPortsMap = a.Ports
+		aAppsMap = a.Apps
+	}
 
 	//log.WithFields(log.Fields{"pInfo": pInfo, "apps": apps}).Debug("")
 	if apps != nil && len(apps) != 0 {
@@ -667,7 +673,7 @@ func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.
 					Application: app.Application,
 					CheckApp:    app.CheckApp,
 				})
-			mapp := getMappedPortAg(pInfo.PortMap, pp)
+			mapp := getMappedPortAg(aPortsMap, pp)
 			if mapp != "" {
 				wlAddr.NatPortApp = append(wlAddr.NatPortApp,
 					share.CLUSPortApp{
@@ -682,7 +688,7 @@ func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.
 			// is not identified on these ports, we handle them the same as
 			// the specified app
 			if app.CheckApp && app.Application >= C.DPI_APP_PROTO_MARK {
-				appPorts := getPortsForApplicationAg(pInfo.AppMap, app.Application)
+				appPorts := getPortsForApplicationAg(aAppsMap, app.Application)
 				if app.Ports == "" {
 					pp = appPorts
 				} else {
@@ -696,7 +702,7 @@ func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.
 							CheckApp:    true,
 						})
 
-					mapp := getMappedPortAg(pInfo.PortMap, pp)
+					mapp := getMappedPortAg(aPortsMap, pp)
 					if mapp != "" {
 						wlAddr.NatPortApp = append(wlAddr.NatPortApp,
 							share.CLUSPortApp{
@@ -711,8 +717,8 @@ func fillPortsForWorkloadAddressAg(wlAddr *share.CLUSWorkloadAddr, apps []share.
 	}
 }
 
-func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
-	pMap map[string]*WorkloadIPPolicyInfo, isto bool) ([]*share.CLUSWorkloadAddr, []*WorkloadIPPolicyInfo) {
+func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr, pMap map[string]*WorkloadIPPolicyInfo,
+	wlMap map[string]*share.CLUSWorkloadAddr, isto bool) ([]*share.CLUSWorkloadAddr, []*WorkloadIPPolicyInfo) {
 
 	wlList := make([]*share.CLUSWorkloadAddr, 0)
 	pInfoList := make([]*WorkloadIPPolicyInfo, 0)
@@ -739,7 +745,7 @@ func getRelevantWorkload(addrs []*share.CLUSWorkloadAddr,
 					PolicyMode: pInfo.Policy.Mode,
 				}
 				if isto {
-					fillPortsForWorkloadAddressAg(&wlAddr, addr.LocalPortApp, pInfo)
+					fillPortsForWorkloadAddressAg(&wlAddr, addr.LocalPortApp, wlMap)
 				}
 				wlList = append(wlList, &wlAddr)
 				pInfoList = append(pInfoList, pInfo)
@@ -775,15 +781,15 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 				}
 			}
 		} else if addr.WlID == share.CLUSWLAllContainer {
-			if (polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 && isto) ||
-				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
-				for id, wl := range wlMap {
-					wlAddr := share.CLUSWorkloadAddr{
-						WlID:       id,
-						PolicyMode: wl.PolicyMode,
-					}
-					wlList = append(wlList, &wlAddr)
+			for id, wl := range wlMap {
+				wlAddr := share.CLUSWorkloadAddr{
+					WlID:       id,
+					PolicyMode: wl.PolicyMode,
 				}
+				if isto {
+					fillPortsForWorkloadAddressAg(&wlAddr, addr.LocalPortApp, wlMap)
+				}
+				wlList = append(wlList, &wlAddr)
 			}
 		} else {
 			wlList = append(wlList, addr)
@@ -868,7 +874,7 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 		}
 
 		/* create egress rules */
-		wlList, pInfoList := getRelevantWorkload(pp.From, workloadPolicyMap, false)
+		wlList, pInfoList := getRelevantWorkload(pp.From, workloadPolicyMap, addrMap, false)
 		wlToList := getWorkload(pp.To, addrMap, true)
 		for i, from := range wlList {
 			pInfo := pInfoList[i]
@@ -911,7 +917,7 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 		}
 
 		/* create ingress rules */
-		wlList, pInfoList = getRelevantWorkload(pp.To, workloadPolicyMap, true)
+		wlList, pInfoList = getRelevantWorkload(pp.To, workloadPolicyMap, addrMap, true)
 		wlFromList := getWorkload(pp.From, addrMap, false)
 		for i, to := range wlList {
 			pInfo := pInfoList[i]

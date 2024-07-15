@@ -141,9 +141,6 @@ static void netify_session_log(DPMsgSession *dps)
     dps->ThreatID = htonl(dps->ThreatID);
     dps->XffApp = htons(dps->XffApp);
     dps->XffPort = htons(dps->XffPort);
-    dps->EpSessCurIn = htonl(dps->EpSessCurIn);
-    dps->EpSessIn60 = htonl(dps->EpSessIn60);
-    dps->EpByteIn60 = htonll(dps->EpByteIn60);
 }
 
 static void dpi_list_session()
@@ -160,7 +157,7 @@ static void dpi_list_session()
     struct cds_lfht_iter iter;
     RCU_MAP_ITR_FOR_EACH(&th_session4_map, iter, node) {
         dpi_session_t *sess = STRUCT_OF(node, dpi_session_t, node);
-        dpi_session_log(sess, dps);
+        dpi_session_log(sess, dps, NULL);
         netify_session_log(dps);
 
         count ++;
@@ -175,7 +172,7 @@ static void dpi_list_session()
     if (th_session4_proxymesh_map.map) {
         RCU_MAP_ITR_FOR_EACH(&th_session4_proxymesh_map, iter, node) {
             dpi_session_t *sess = STRUCT_OF(node, dpi_session_t, node);
-            dpi_session_log(sess, dps);
+            dpi_session_log(sess, dps, NULL);
             netify_session_log(dps);
 
             count ++;
@@ -190,7 +187,7 @@ static void dpi_list_session()
 
     RCU_MAP_ITR_FOR_EACH(&th_session6_map, iter, node) {
         dpi_session_t *sess = STRUCT_OF(node, dpi_session_t, node);
-        dpi_session_log(sess, dps);
+        dpi_session_log(sess, dps, NULL);
 
         count ++;
         dps ++;
@@ -204,7 +201,7 @@ static void dpi_list_session()
     if (th_session6_proxymesh_map.map) {
         RCU_MAP_ITR_FOR_EACH(&th_session6_proxymesh_map, iter, node) {
             dpi_session_t *sess = STRUCT_OF(node, dpi_session_t, node);
-            dpi_session_log(sess, dps);
+            dpi_session_log(sess, dps, NULL);
         
             count ++;
             dps ++;

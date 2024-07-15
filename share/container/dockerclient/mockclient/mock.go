@@ -1,9 +1,10 @@
 package mockclient
 
 import (
+	"errors"
 	"io"
 
-	"github.com/samalba/dockerclient"
+	"github.com/neuvector/neuvector/share/container/dockerclient"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -141,6 +142,10 @@ func (client *MockClient) ListImages(all bool) ([]*dockerclient.Image, error) {
 	return args.Get(0).([]*dockerclient.Image), args.Error(1)
 }
 
+func (client *MockClient) ListDanglingImages() ([]*dockerclient.Image, error) {
+	return nil, errors.New("implememt me")
+}
+
 func (client *MockClient) RemoveImage(name string, force bool) ([]*dockerclient.ImageDelete, error) {
 	args := client.Mock.Called(name, force)
 	return args.Get(0).([]*dockerclient.ImageDelete), args.Error(1)
@@ -234,4 +239,12 @@ func (client *MockClient) DisconnectNetwork(id, container string, force bool) er
 func (client *MockClient) RemoveNetwork(id string) error {
 	args := client.Mock.Called(id)
 	return args.Error(0)
+}
+
+func (client *MockClient) InspectService(id string) (*dockerclient.ServiceResource, error) {
+	return nil, errors.New("implememt me")
+}
+
+func (client *MockClient) ListServices() ([]*dockerclient.ServiceResource, error) {
+	return nil, errors.New("implememt me")
 }

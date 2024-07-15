@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -10,7 +11,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -67,12 +70,22 @@ func NewK8sClient(kubeconfig string) (dynamic.Interface, error) {
 	return dynamic.NewForConfig(config)
 }
 
-func CreateLocker(namespace string, lockName string) (*k8slock.Locker, error) {
+func CreateLocker(client dynamic.Interface, namespace string, lockName string) (*k8slock.Locker, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Info("failed to get hostname: %w", err)
 	}
 	hostname += "_" + uuid.New().String()
+
+	if _, err := client.Resource(
+		schema.GroupVersionResource{
+			Resource: "leases",
+			Version:  "v1",
+			Group:    "coordination.k8s.io",
+		},
+	).Namespace(namespace).Get(context.TODO(), lockName, metav1.GetOptions{}); err != nil {
+		return nil, fmt.Errorf("failed to find lease object: %w", err)
+	}
 
 	return k8slock.NewLocker(
 		lockName,
@@ -158,6 +171,12 @@ func main() {
 					Value:   false,
 					Usage:   "Whether it's a fresh install.  When in fresh install mode, upgrader will create certs and bypass the rolling update flow.",
 					EnvVars: []string{"FRESH_INSTALL"},
+				},
+				&cli.BoolFlag{
+					Name:    "disable-rotation",
+					Value:   false,
+					Usage:   "When this is specified, this program will skip the whole logic to rotate certificate.",
+					EnvVars: []string{"DISABLE_ROTATION"},
 				},
 			},
 			Action: PostSyncHook,

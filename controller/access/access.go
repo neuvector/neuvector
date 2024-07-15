@@ -619,6 +619,9 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 	if len(gPermitsList) == 0 && len(dPermitsList) == 0 {
 		return nil, nil, fmt.Errorf("This user has no permission enabled!")
 	}
+	if gPermitsList == nil {
+		gPermitsList = []*api.RESTRolePermission{}
+	}
 
 	return gPermitsList, dPermitsList, nil
 }
@@ -1682,7 +1685,21 @@ func (acc *AccessControl) IsFedReader() bool {
 // returns true only when the access control object is created for user whose global permission has PERM_FED
 // custom fed role is not supported yet
 func (acc *AccessControl) HasPermFed() bool {
+	if acc.IsFedAdmin() || acc.IsFedReader() {
+		return true
+	}
 	if permits, ok := acc.extraPermits[AccessDomainGlobal]; ok && permits.HasPermFed() {
+		return true
+	}
+	return false
+}
+
+// returns true only when the access control object is created for user whose global permission has PERM_FED(r) but no PERM_FED(w)
+func (acc *AccessControl) HasPermFedForReadOnly() bool {
+	if acc.IsFedAdmin() {
+		return false
+	}
+	if permits := acc.extraPermits[AccessDomainGlobal]; permits.HasPermFedForReadOnly() || acc.IsFedReader() {
 		return true
 	}
 	return false

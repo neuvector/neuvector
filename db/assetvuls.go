@@ -89,7 +89,7 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 
 	// Insert case
 	if assetVul.Db_ID == 0 {
-		ds := dialect.Insert(targetTable).Rows(getCompiledRecord(assetVul))
+		ds := dialect.Insert(targetTable).Rows(getCompiledAssetVulRecord(assetVul))
 		sql, args, _ := ds.Prepared(true).ToSQL()
 
 		result, err := db.Exec(sql, args...)
@@ -106,7 +106,7 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 	}
 
 	// Update case
-	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledRecord(assetVul)).Prepared(true).ToSQL()
+	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledAssetVulRecord(assetVul)).Prepared(true).ToSQL()
 	_, err := db.Exec(sql, args...)
 	if err != nil {
 		return 0, err
@@ -205,6 +205,10 @@ func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]stri
 func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTWorkloadAssetView, error) {
 	records := make([]*api.RESTWorkloadAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "w_domain", "w_applications", "policy_mode", "w_service_group",
 		"scanned_at", "idns", "vulsb"}
 
@@ -255,6 +259,10 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTHostAssetView, error) {
 	records := make([]*api.RESTHostAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "policy_mode",
 		"scanned_at", "n_os", "n_kernel", "n_cpus", "n_memory", "n_containers", "idns", "vulsb"}
 
@@ -302,6 +310,10 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTImageAssetView, error) {
 	records := make([]*api.RESTImageAssetView, 0)
 
+	if len(assets) == 0 {
+		return records, nil
+	}
+
 	columns := []interface{}{"assetid", "name", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
@@ -346,6 +358,10 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 
 func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTPlatformAssetView, error) {
 	records := make([]*api.RESTPlatformAssetView, 0)
+
+	if len(assets) == 0 {
+		return records, nil
+	}
 
 	columns := []interface{}{"assetid", "name", "p_version", "p_base_os", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
@@ -776,14 +792,23 @@ func buildWhereClauseForPlatform(allowedID []string, queryFilter *api.VulQueryFi
 	return goqu.And(part1_assetType, part2_allowed)
 }
 
-func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
-	var vulsBytes []byte
+func encodeAndCompress(data interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(data); err != nil {
+		return nil, err
+	}
+	return utils.GzipBytes(buf.Bytes()), nil
+}
+
+func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
+	var vulsBytes, modulesBytes []byte
 	if len(assetVul.Vuls) > 0 {
-		var buf bytes.Buffer
-		enc := gob.NewEncoder(&buf)
-		if err := enc.Encode(&assetVul.Vuls); err == nil {
-			vulsBytes = utils.GzipBytes(buf.Bytes())
-		}
+		vulsBytes, _ = encodeAndCompress(assetVul.Vuls)
+	}
+
+	if len(assetVul.Modules) > 0 {
+		modulesBytes, _ = encodeAndCompress(assetVul.Modules)
 	}
 
 	record := &goqu.Record{
@@ -813,6 +838,7 @@ func getCompiledRecord(assetVul *DbAssetVul) *exp.Record {
 		"p_base_os":    assetVul.P_base_os,
 		"idns":         assetVul.Idns,
 		"vulsb":        vulsBytes,
+		"modulesb":     modulesBytes,
 	}
 
 	return record

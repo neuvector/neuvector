@@ -219,32 +219,75 @@ func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 		defaultPW = true
 	}
 
-	var extraPermitsDomains []api.RESTPermitsAssigned
-	if len(user.ExtraPermitsDomains) > 0 {
-		extraPermitsDomains = make([]api.RESTPermitsAssigned, len(user.ExtraPermitsDomains))
-		for i, permitsDomains := range user.ExtraPermitsDomains {
-			extraPermitsDomains[i] = api.RESTPermitsAssigned{
-				Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
-				Domains: permitsDomains.Domains,
-			}
-		}
+	userRest := &api.RESTUser{
+		Fullname:           user.Fullname,
+		Server:             user.Server,
+		Username:           user.Username,
+		Role:               user.Role,
+		EMail:              user.EMail,
+		Timeout:            user.Timeout,
+		Locale:             user.Locale,
+		DefaultPWD:         defaultPW,
+		RoleDomains:        user.RoleDomains,
+		LastLoginTimeStamp: user.LastLoginAt.Unix(),
+		LastLoginAt:        api.RESTTimeString(user.LastLoginAt),
+		LoginCount:         user.LoginCount,
 	}
 
-	userRest := &api.RESTUser{
-		Fullname:            user.Fullname,
-		Server:              user.Server,
-		Username:            user.Username,
-		Role:                user.Role,
-		ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, user.ExtraPermits),
-		EMail:               user.EMail,
-		Timeout:             user.Timeout,
-		Locale:              user.Locale,
-		DefaultPWD:          defaultPW,
-		RoleDomains:         user.RoleDomains,
-		ExtraPermitsDomains: extraPermitsDomains,
-		LastLoginTimeStamp:  user.LastLoginAt.Unix(),
-		LastLoginAt:         api.RESTTimeString(user.LastLoginAt),
-		LoginCount:          user.LoginCount,
+	if strings.HasPrefix(user.Server, share.FlavorRancher) {
+		userRest.ExtraPermits = access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, user.ExtraPermits)
+		if len(user.ExtraPermitsDomains) > 0 {
+			extraPermitsDomains := make([]api.RESTPermitsAssigned, len(user.ExtraPermitsDomains))
+			for i, permitsDomains := range user.ExtraPermitsDomains {
+				extraPermitsDomains[i] = api.RESTPermitsAssigned{
+					Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
+					Domains: permitsDomains.Domains,
+				}
+			}
+			userRest.ExtraPermitsDomains = extraPermitsDomains
+		}
+
+		if user.RemoteRolePermits != nil {
+			var remoteRolePermits api.RESTRemoteRolePermits
+			if len(user.RemoteRolePermits.DomainRole) > 0 {
+				remoteRoleDomains := make(map[string][]string, 3)
+				for d, r := range user.RemoteRolePermits.DomainRole {
+					if d == access.AccessDomainGlobal {
+						remoteRolePermits.Role = r
+					} else {
+						domains := remoteRoleDomains[r]
+						remoteRoleDomains[r] = append(domains, d)
+					}
+				}
+				remoteRolePermits.RoleDomains = remoteRoleDomains
+			}
+			if len(user.RemoteRolePermits.ExtraPermits) > 0 {
+				remoteExtraPermitsDomains := make(map[share.NvPermissions][]string, len(user.ExtraPermitsDomains))
+				for d, p := range user.RemoteRolePermits.ExtraPermits {
+					if d == access.AccessDomainGlobal {
+						remoteRolePermits.ExtraPermits = access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, p)
+					} else {
+						domains := remoteExtraPermitsDomains[p]
+						remoteExtraPermitsDomains[p] = append(domains, d)
+					}
+				}
+				if len(remoteExtraPermitsDomains) > 0 {
+					extraPermitsDomains := make([]api.RESTPermitsAssigned, 0, len(remoteExtraPermitsDomains))
+					for p, domains := range remoteExtraPermitsDomains {
+						assigned := api.RESTPermitsAssigned{
+							Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, p),
+							Domains: domains,
+						}
+						extraPermitsDomains = append(extraPermitsDomains, assigned)
+					}
+					remoteRolePermits.ExtraPermitsDomains = extraPermitsDomains
+				}
+			}
+			if remoteRolePermits.Role != "" || len(remoteRolePermits.RoleDomains) > 0 ||
+				len(remoteRolePermits.ExtraPermits) > 0 || len(remoteRolePermits.ExtraPermitsDomains) > 0 {
+				userRest.RemoteRolePermits = &remoteRolePermits
+			}
+		}
 	}
 
 	if acc != nil && acc.HasGlobalPermissions(0, share.PERM_AUTHORIZATION) && userRest.Server == "" {

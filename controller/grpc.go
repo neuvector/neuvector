@@ -555,11 +555,13 @@ func (cs *ControllerService) GetControllerCounter(ctx context.Context, v *share.
 	lsof, _ := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
 
 	// Finding correct group pid
-	groupPid := Ctrler.Pid
+	var ps []byte
 	if name, _ := os.Readlink("/proc/1/exe"); name == "/usr/local/bin/monitor" { // when pid mode != host
-		groupPid = 1
+		ps, _ = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-A").Output()
+	} else {
+		// processes under the controller
+		ps, _ = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Ctrler.Pid)).Output()
 	}
-	ps, _ := sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(groupPid)).Output()
 
 	c := share.CLUSControllerCounter{
 		GoRoutines: uint32(runtime.NumGoroutine()),

@@ -46,8 +46,8 @@ type StateCallback func(state string, err error)
 type UserRBAC struct {
 	Name   string
 	Domain string
-	RBAC   map[string]string              // domain -> nv role
-	RBAC2  map[string]share.NvPermissions // domain -> nv permissions
+	RBAC   map[string]string                 // domain -> nv role
+	RBAC2  map[string]share.NvFedPermissions // domain -> nv permissions
 }
 
 type ResourceDriver interface {
@@ -55,7 +55,7 @@ type ResourceDriver interface {
 	Login(username, password string) (string, string, error)
 	Logout(username, token string) error
 	GetAuthServerAlias() string
-	GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvPermissions, error)
+	GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvFedPermissions, error)
 	ListUsers() []UserRBAC
 	RegisterResource(rt string) error
 	ListResource(rt string) ([]interface{}, error)

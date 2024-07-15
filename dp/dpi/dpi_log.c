@@ -763,25 +763,17 @@ int dpi_session_log_xff(dpi_session_t *s, DPMsgSession *dps)
     return 0;
 }
 
-static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
+static void get_ingress_stats(DPMonitorMetric *dpm, io_stats_t *s)
 {
     uint32_t cur = g_stats_slot;
     uint32_t last = s->cur_slot;
-    uint32_t i, n, sess, from;
-    uint64_t byte;
-    // 5s, last slot
-    if (cur > 0 && last + 1 >= cur) {
-        i = (cur - 1) % STATS_SLOTS;
-        sess = 0;
-        byte = 0;
-        sess += s->in.sess_ring[i];
-        byte += s->in.byte_ring[i];
-        dps->EpSessIn1 = sess;
-        dps->EpByteIn1 = byte;
-    }
-    // 12s
+    register uint32_t i, n;
+    register uint32_t sess;
+    register uint64_t byte;
+
+    // 12x5s
     if (last + 12 >= cur) {
-        from = (cur >= 12) ? cur - 12 : 0;
+        uint32_t from = (cur >= 12) ? cur - 12 : 0;
         sess = 0;
         byte = 0;
         for (n = from; n < last; n ++) {
@@ -789,26 +781,13 @@ static void get_ingress_stats(DPMsgSession *dps, io_stats_t *s)
             sess += s->in.sess_ring[i];
             byte += s->in.byte_ring[i];
         }
-        dps->EpSessIn12 = sess;
-        dps->EpByteIn12 = byte;
+        dpm->EpSessIn12 = sess;
+        dpm->EpByteIn12 = byte;
     }
-    // 60s
-    if (last + 59 >= cur) {
-        from = (cur >= 59) ? cur - 59 : 0;
-        sess = 0;
-        byte = 0;
-        for (n = from; n < last; n ++) {
-            i = n % STATS_SLOTS;
-            sess += s->in.sess_ring[i];
-            byte += s->in.byte_ring[i];
-        }
-        dps->EpSessIn60 = sess;
-        dps->EpByteIn60 = byte;
-    }
-    dps->EpSessCurIn = s->in.cur_session;
+    dpm->EpSessCurIn = s->in.cur_session;
 }
 
-void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
+void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps, DPMonitorMetric *dpm)
 {
     memset(dps, 0, sizeof(DPMsgSession));
 
@@ -904,11 +883,16 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps)
     dps->PolicyAction = sess->policy_desc.action;
     dps->PolicyId = sess->policy_desc.id;
 
+    if (dpm == NULL) {
+        return;
+    }
+
+    memset(dpm, 0, sizeof(DPMonitorMetric));
     io_mac_t *mac = rcu_map_lookup(&g_ep_map, dps->EPMAC);
     if (mac != NULL) {
-        get_ingress_stats(dps, &mac->ep->stats);
-        DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn=%lu EpSessIn60=%lu EpByteIn60=%llu EpSessIn12=%lu EpByteIn12=%llu EpSessIn1=%lu EpByteIn1=%llu\n",
-            dps->EpSessCurIn, dps->EpSessIn60, dps->EpByteIn60, dps->EpSessIn12, dps->EpByteIn12, dps->EpSessIn1, dps->EpByteIn1 );
+        get_ingress_stats(dpm, &mac->ep->stats);
+        /*DEBUG_LOG(DBG_LOG, NULL, "EpSessCurIn(%lu) EpSessIn12(%lu) EpByteIn12(%llu)\n",
+        dpm->EpSessCurIn, dpm->EpSessIn12, dpm->EpByteIn12);*/
     }
 }
 
@@ -1032,6 +1016,7 @@ void dpi_policy_violate_log(dpi_packet_t *p, bool to_server,
                             dpi_policy_desc_t *desc)
 {
     DPMsgSession dps;
+    DPMonitorMetric dpm;
 
     IF_DEBUG_LOG(DBG_PACKET | DBG_LOG, p) {
         if (likely(dpi_is_ipv4(p))) {
@@ -1045,13 +1030,13 @@ void dpi_policy_violate_log(dpi_packet_t *p, bool to_server,
     }
 
     if (unlikely(p->session != NULL)) {
-        dpi_session_log(p->session, &dps);
+        dpi_session_log(p->session, &dps, &dpm);
     } else {
         dpi_session_log_from_pkt(p, to_server, desc, &dps);
     }
 
     if (likely(!FLAGS_TEST(p->flags, DPI_PKT_FLAG_FAKE_EP))) {
-        g_io_callback->connect_report(&dps, 0, 1);
+        g_io_callback->connect_report(&dps, p->session != NULL ? &dpm : NULL, 0, 1);
     }
     // g_io_callback->traffic_log(&dps);
 }

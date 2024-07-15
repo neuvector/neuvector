@@ -15,8 +15,6 @@ type GroupProcPolicyCallback func(id string) (*share.CLUSProcessProfile, bool)
 
 type WorkloadIPPolicyInfo struct {
 	RuleMap    map[string]*dp.DPPolicyIPRule
-	AppMap     map[share.CLUSProtoPort]*share.CLUSApp
-	PortMap    map[share.CLUSProtoPort]*share.CLUSMappedPort
 	Policy     dp.DPWorkloadIPPolicy
 	Configured bool
 	SkipPush   bool

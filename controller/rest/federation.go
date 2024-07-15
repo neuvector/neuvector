@@ -358,13 +358,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 		}
 	}
 
-	var fedRole string
-	var err error
-	if acc.HasPermFed() {
-		fedRole, err = cacher.GetFedMembershipRole(access.NewReaderAccessControl())
-	} else {
-		fedRole, err = cacher.GetFedMembershipRole(acc)
-	}
+	fedRole, err := cacher.GetFedMembershipRole(acc)
 	if err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return nil, nil
@@ -391,7 +385,7 @@ func isFedRulesCleanupOngoing(w http.ResponseWriter) bool {
 	return false
 }
 
-// Be careful. This function is only for between-clusters joining/leaving APIs
+// Be careful. This function is only for between-clusters joining/leaving/polling/csp_support APIs
 func isNoAuthFedOpAllowed(expectedFedRole string, w http.ResponseWriter, r *http.Request, acc *access.AccessControl) bool {
 	fedRole, err := cacher.GetFedMembershipRole(acc)
 	if err != nil || (expectedFedRole != FedRoleAny && fedRole != expectedFedRole) {
@@ -854,6 +848,16 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 
 	if user == nil || (user.Role != api.UserRoleFedAdmin && user.Role != api.UserRoleFedReader && !user.ExtraPermits.HasPermFed()) {
 		return "", common.ErrObjectAccessDenied
+	}
+
+	var remoteRolePermits share.CLUSRemoteRolePermits
+	if user.RemoteRolePermits == nil {
+		if user.Role == api.UserRoleFedAdmin {
+			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleAdmin}
+		} else if user.Role == api.UserRoleFedReader {
+			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleReader}
+		}
+		user.RemoteRolePermits = &remoteRolePermits
 	}
 
 	reqTokenLock.Lock()
@@ -1999,6 +2003,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedLeaveReq,
 	masterCluster api.RESTFedMasterClusterInfo, jointCluster api.RESTFedJointClusterInfo) (share.CLUSFedMembership, int, int, error) {
 
+	var code int = api.RESTErrFedOperationFailed
+	var httpStatus int = http.StatusInternalServerError
 	var membership share.CLUSFedMembership
 
 	if masterCluster.ID == "" || jointCluster.ID == "" {
@@ -2035,6 +2041,8 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 				} else {
 					go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 				}
+				httpStatus = http.StatusOK
+				code = 0
 			} else {
 				err99 = err
 			}
@@ -2048,7 +2056,7 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 	// after leaving federation, standalone NV reports its usage to CSP
 	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
 
-	return membership, http.StatusOK, 0, err99
+	return membership, httpStatus, code, err99
 }
 
 func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -3348,9 +3356,24 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	forbidden := false
 	regScanTest := false
 	txnID := ""
-	if accCaller.IsFedReader() || accCaller.HasPermFed() {
-		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") ||
-			(method == http.MethodPost && (request == "/v1/vulasset" || request == "/v1/assetvul")) {
+	if accCaller.IsFedReader() || accCaller.HasPermFedForReadOnly() {
+		allowedPost := false
+		if method == http.MethodPost {
+			exportURIs := utils.NewSetFromStringSlice([]string{
+				"/v1/file/group",
+				"/v1/file/admission",
+				"/v1/file/waf",
+				"/v1/file/dlp",
+				"/v1/file/compliance/profile",
+				"/v1/file/vulnerability/profile",
+				"/v1/vulasset",
+				"/v1/assetvul",
+			})
+			if exportURIs.Contains(request) {
+				allowedPost = true
+			}
+		}
+		if method == http.MethodGet || (method == http.MethodPatch && request == "/v1/auth") || allowedPost {
 			// forward is allowed
 			// In fedReader user sessions, controller needs to update cluster state as well. So the acc needs to have write permissions for that purpose.
 			acc = access.NewFedAdminAccessControl()

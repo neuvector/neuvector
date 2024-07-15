@@ -69,7 +69,6 @@ type scanInfo struct {
 	brief                          *api.RESTScanBrief // Stats of filtered entries
 	filteredTime                   time.Time
 	idns                           []api.RESTIDName
-	modules                        []*share.ScanModule
 	signatureVerifiers             []string
 	signatureVerificationTimestamp string
 }
@@ -488,7 +487,6 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		info.baseOS = report.Namespace
 		info.version = report.Version
 		info.cveDBCreateTime = report.CVEDBCreateTime
-		info.modules = report.Modules
 		if report.SignatureInfo != nil {
 			info.signatureVerifiers = report.SignatureInfo.Verifiers
 			info.signatureVerificationTimestamp = report.SignatureInfo.VerificationTimestamp
@@ -524,6 +522,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 	if ok && dbAssetVul != nil {
 		dbAssetVul.Vuls = report.Vuls
+		dbAssetVul.Modules = report.Modules
 
 		if len(info.idns) > 0 {
 			b, err := json.Marshal(info.idns)
@@ -533,6 +532,8 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		}
 
 		db.PopulateAssetVul(dbAssetVul)
+		report.Vuls = nil
+		report.Modules = nil
 	}
 
 	// all controller should call auditUpdate to record the log, the leader will take action
@@ -1418,7 +1419,7 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 
 		sdb := scanUtils.GetScannerDB()
 
-		reportVuls, err := db.GetVulnerability(id)
+		reportVuls, reportModules, err := db.GetVulnerabilityModule(id)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1426,8 +1427,8 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 		localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 		vpf.FilterVulTraits(localVulTraits, info.idns)
 		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, localVulTraits, showTag, false)
-		modules := make([]*api.RESTScanModule, len(info.modules))
-		for i, m := range info.modules {
+		modules := make([]*api.RESTScanModule, len(reportModules))
+		for i, m := range reportModules {
 			modules[i] = scanUtils.ScanModule2REST(m)
 		}
 		return vuls, modules, nil

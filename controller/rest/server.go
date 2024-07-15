@@ -2031,32 +2031,37 @@ func handlerServerUserList(w http.ResponseWriter, r *http.Request, ps httprouter
 	users := global.ORCH.ListUsers()
 
 	var resp api.RESTUsersData
-	resp.Users = make([]*api.RESTUser, len(users))
-	for i, user := range users {
-		globalRole, roleDomains, permits, permitsDomains := rbac2UserRole(user.RBAC, user.RBAC2)
+	resp.Users = make([]*api.RESTUser, 0, len(users))
+	for _, user := range users {
+		gRole, roleDomains, gExtraPermits, permitsDomains, _ := rbac2UserRole(user.RBAC, user.RBAC2)
 
 		var extraPermitsDomains []api.RESTPermitsAssigned
 		if len(permitsDomains) > 0 {
 			extraPermitsDomains = make([]api.RESTPermitsAssigned, len(permitsDomains))
-			for i, permitsDomains := range permitsDomains {
+			for i, assignedPermits := range permitsDomains {
+				var supportScope uint8 = access.CONST_PERM_SUPPORT_DOMAIN
+				if len(assignedPermits.Domains) == 1 && assignedPermits.Domains[0] == "" {
+					supportScope = access.CONST_PERM_SUPPORT_GLOBAL
+				}
 				extraPermitsDomains[i] = api.RESTPermitsAssigned{
-					Permits: access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_DOMAIN, permitsDomains.Permits),
-					Domains: permitsDomains.Domains,
+					Permits: access.GetTopLevelPermitsList(supportScope, assignedPermits.Permits),
+					Domains: assignedPermits.Domains,
 				}
 			}
 		}
 
-		u := &api.RESTUser{
-			Fullname:            user.Name,
-			Server:              server,
-			Username:            user.Name,
-			Role:                globalRole,
-			RoleDomains:         roleDomains,
-			ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, permits),
-			ExtraPermitsDomains: extraPermitsDomains,
+		if gRole != "" || len(roleDomains) > 0 || !gExtraPermits.IsEmpty() || len(permitsDomains) > 0 {
+			u := &api.RESTUser{
+				Fullname:            user.Name,
+				Server:              server,
+				Username:            user.Name,
+				Role:                gRole,
+				RoleDomains:         roleDomains,
+				ExtraPermits:        access.GetTopLevelPermitsList(access.CONST_PERM_SUPPORT_GLOBAL, gExtraPermits),
+				ExtraPermitsDomains: extraPermitsDomains,
+			}
+			resp.Users = append(resp.Users, u)
 		}
-
-		resp.Users[i] = u
 	}
 
 	sort.Slice(resp.Users, func(i, j int) bool { return resp.Users[i].Fullname < resp.Users[j].Fullname })

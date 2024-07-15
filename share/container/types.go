@@ -161,6 +161,7 @@ type ContainerMetaExtra struct {
 	MappedPorts map[share.CLUSProtoPort]*share.CLUSMappedPort
 	Networks    utils.Set
 	LogPath     string
+	Healthcheck []string
 }
 
 func ConnectDocker(endpoint string, sys *system.SystemTools) (Runtime, error) {

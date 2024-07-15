@@ -60,6 +60,9 @@ const (
 	K8sResReplicationControllers  = "replicationcontrollers"
 	K8sResReplicasets             = "replicasets"
 	K8sResServices                = "services"
+	k8sResNamespaces              = "namespaces"
+	k8sResConfigMaps              = "configmaps"
+	k8sResSecrets                 = "secrets"
 	K8sResStatefulSets            = "statefulsets"
 	K8sResRoles                   = "roles"
 	K8sResRolebindings            = "rolebindings"
@@ -102,6 +105,8 @@ const (
 	nvCrdCompProfileRoleBinding = nvCrdCompProfileRole
 	NvScannerRole               = "neuvector-binding-scanner"
 	NvScannerRoleBinding        = NvScannerRole
+	NvSecretRole                = "neuvector-binding-secret"
+	nvSecretRoleBinding         = NvSecretRole
 	NvAdminRoleBinding          = "neuvector-admin"
 	nvViewRoleBinding           = "neuvector-binding-view"
 )
@@ -740,8 +745,8 @@ type kubernetes struct {
 	rbacCache map[k8sSubjectObjRef]map[string]string // k8s user -> (domain -> nv reserved role). it's updated after rbacEvaluateUser() call
 
 	// for Rancher SSO only.
-	permitsCache     map[k8sObjectRef]share.NvPermissions                // k8s (cluster)role -> nv permissions.
-	permitsRbacCache map[k8sSubjectObjRef]map[string]share.NvPermissions // k8s user -> (domain -> nv permissions). it's updated after rbacEvaluateUser() call
+	permitsCache     map[k8sObjectRef]share.NvPermissions                   // k8s (cluster)role -> nv permissions.
+	permitsRbacCache map[k8sSubjectObjRef]map[string]share.NvFedPermissions // k8s user -> (domain -> extra nv permissions). it's updated after rbacEvaluateUser() call
 }
 
 func newKubernetesDriver(platform, flavor, network string) *kubernetes {
@@ -752,7 +757,7 @@ func newKubernetesDriver(platform, flavor, network string) *kubernetes {
 		userCache:        make(map[k8sSubjectObjRef]utils.Set),
 		rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
 		permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
-		permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvPermissions),
+		permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvFedPermissions),
 	}
 	return d
 }

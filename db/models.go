@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/doug-martin/goqu/v9"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -89,11 +91,12 @@ type DbAssetVul struct {
 	W_service_group  string
 	W_workload_image string
 
-  CVE_critical int
+	CVE_critical int
 	CVE_high     int
 	CVE_medium   int
 	CVE_low      int
 	Vuls         []*share.ScanVulnerability
+	Modules      []*share.ScanModule
 	Scanned_at   string
 
 	N_os         string
@@ -158,6 +161,7 @@ const (
 	Table_vulassets  = "vulassets"
 	Table_assetvuls  = "assetvuls"
 	Table_querystats = "querystats"
+	Table_bench      = "bench"
 )
 
 var dbHandle *sql.DB = nil
@@ -216,6 +220,11 @@ func CreateVulAssetDb(useLocal bool) error {
 	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_w_service_group_idx on %s (w_service_group)", Table_assetvuls, Table_assetvuls))
 	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_name_idx on %s (name)", Table_assetvuls, Table_assetvuls))
 	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_type_idx on %s (type)", Table_assetvuls, Table_assetvuls))
+
+	// bench table
+	columns = getBenchSchema()
+	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", Table_bench, strings.Join(columns, ",")))
+	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_assetid_idx on %s (assetid)", Table_bench, Table_bench))
 
 	for _, oneSql := range statements {
 		_, err = dbHandle.Exec(oneSql)
@@ -288,7 +297,7 @@ func getAssetvulSchema() []string {
 		"w_domain TEXT", "w_applications TEXT", "policy_mode TEXT", "w_service_group TEXT", "w_image TEXT",
 		"cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "scanned_at TEXT",
 		"n_os TEXT", "n_kernel TEXT", "n_cpus INTEGER", "n_memory INTEGER",
-		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB"}
+		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB", "modulesb BLOB"}
 
 	return schema
 }
@@ -348,22 +357,116 @@ func convertToJSON(input interface{}) (string, error) {
 	return string(jsonData), nil
 }
 
+const (
+	COL_VULS    = 0x01
+	COL_MODULES = 0x02
+	// COL_ENVS    = 0x04
+)
+
 func GetVulnerability(assetid string) ([]*share.ScanVulnerability, error) {
-	vulsb, err := getVulsBytes(assetid)
+	mapsb, err := getBytesColumns(assetid, COL_VULS)
 	if err != nil {
 		return nil, err
 	}
-	return UnzipVuls(vulsb)
+	return UnzipVuls(mapsb[COL_VULS])
+}
+
+func GetVulnerabilityModule(assetid string) ([]*share.ScanVulnerability, []*share.ScanModule, error) {
+	mapsb, err := getBytesColumns(assetid, COL_VULS|COL_MODULES)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	vuls, err := UnzipVuls(mapsb[COL_VULS])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	modules, err := UnzipModules(mapsb[COL_MODULES])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return vuls, modules, nil
+}
+
+func unzipAndDecode(data []byte, target interface{}) error {
+	uzb := utils.GunzipBytes(data)
+	if uzb == nil {
+		return errors.New("failed to unzip data")
+	}
+	buf := bytes.NewBuffer(uzb)
+	dec := gob.NewDecoder(buf)
+	if err := dec.Decode(target); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UnzipModules(sb []byte) ([]*share.ScanModule, error) {
+	var modules []*share.ScanModule
+
+	if len(sb) == 0 {
+		return modules, nil
+	}
+
+	err := unzipAndDecode(sb, &modules)
+	return modules, err
 }
 
 func UnzipVuls(vulsb []byte) ([]*share.ScanVulnerability, error) {
-	var Vuls []*share.ScanVulnerability
-	if uzb := utils.GunzipBytes(vulsb); uzb != nil {
-		buf := bytes.NewBuffer(uzb)
-		dec := gob.NewDecoder(buf)
-		if err := dec.Decode(&Vuls); err != nil {
-			return nil, err
+	var vuls []*share.ScanVulnerability
+
+	if len(vulsb) == 0 {
+		return vuls, nil
+	}
+
+	err := unzipAndDecode(vulsb, &vuls)
+	return vuls, err
+}
+
+func getBytesColumns(assetid string, columnFlags int) (map[int][]byte, error) {
+	if dbHandle == nil {
+		return nil, errors.New("db is not initialized")
+	}
+
+	dialect := goqu.Dialect("sqlite3")
+	db := dbHandle
+
+	results := make(map[int][]byte, 0)
+	columns := []interface{}{}
+	paramMaps := make([]int, 0)
+	if columnFlags&COL_VULS != 0 {
+		columns = append(columns, "vulsb")
+		paramMaps = append(paramMaps, COL_VULS)
+	}
+	if columnFlags&COL_MODULES != 0 {
+		columns = append(columns, "modulesb")
+		paramMaps = append(paramMaps, COL_MODULES)
+	}
+
+	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"assetid": assetid}).Prepared(true).ToSQL()
+	rows, err := db.Query(statement, args...)
+	if err != nil {
+		return results, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		params := make([]*[]byte, len(columns))
+		scanArgs := make([]interface{}, len(columns))
+		for i := range params {
+			scanArgs[i] = &params[i]
+		}
+		err = rows.Scan(scanArgs...)
+		if err != nil {
+			return results, err
+		}
+		for i, param := range params {
+			if param != nil {
+				key := paramMaps[i]
+				results[key] = *param
+			}
 		}
 	}
-	return Vuls, nil
+	return results, nil
 }

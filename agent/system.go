@@ -209,8 +209,6 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 		}
 		pInfo := policy.WorkloadIPPolicyInfo{
 			RuleMap: make(map[string]*dp.DPPolicyIPRule),
-			AppMap: c.appMap,
-			PortMap: c.portMap,
 			Policy: dp.DPWorkloadIPPolicy{
 				WlID:        wlID,
 				WorkloadMac: nil,

@@ -81,7 +81,7 @@ func isAgentContainer(id string) bool {
 func getHostIPs() {
 	gInfo.linkStates = getHostLinks()
 	addrs := getHostAddrs()
-	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Network)
+	Host.Ifaces, gInfo.hostIPs, gInfo.jumboFrameMTU, gInfo.ciliumCNI = parseHostAddrs(addrs, Host.Platform, Host.Flavor, Host.Network)
 	if tun := global.ORCH.GetHostTunnelIP(addrs); tun != nil {
 		Host.TunnelIP = tun
 	}
@@ -370,7 +370,7 @@ func main() {
 	}
 
 	// Set global objects at the very first
-	platform, flavor, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
+	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize")
 		if err == global.ErrEmptyContainerList {
@@ -477,6 +477,7 @@ func main() {
 
 	Host.Platform = platform
 	Host.Flavor = flavor
+	Host.CloudPlatform = cloudPlatform
 	Host.Network = network
 	Host.CapDockerBench = (global.RT.String() == container.RuntimeDocker)
 	Host.CapKubeBench = global.ORCH.SupportKubeCISBench()
@@ -620,24 +621,11 @@ func main() {
 	dpStatusChan := make(chan bool, 2)
 	dp.Open(dpTaskCallback, dpStatusChan, errRestartChan)
 
-	// Benchmark
-	bench = newBench(Host.Platform, Host.Flavor)
-	go bench.BenchLoop()
-
-	if Host.CapDockerBench {
-		bench.RerunDocker(false)
-	} else {
-		// If the older version write status into the cluster, clear it.
-		bench.ResetDockerStatus()
-	}
-	if !Host.CapKubeBench {
-		// If the older version write status into the cluster, clear it.
-		bench.ResetKubeStatus()
-	}
-
-	bPassiveContainerDetect := global.RT.String() == container.RuntimeCriO
+	// bench initialized before the probe
+	bench = newBench(Host.Platform, Host.Flavor, Host.CloudPlatform)
 
 	// Probe
+	bPassiveContainerDetect := global.RT.String() == container.RuntimeCriO
 	probeTaskChan := make(chan *probe.ProbeMessage, 256) // increase to avoid underflow
 	fsmonTaskChan := make(chan *fsmon.MonitorMessage, 8)
 	faEndChan := make(chan bool, 1)
@@ -673,6 +661,7 @@ func main() {
 		os.Exit(-2)
 	}
 
+	// File monitor
 	fmonConfig := fsmon.FileMonitorConfig{
 		ProfileEnable:  agentEnv.systemProfiles,
 		IsAufs:         global.RT.GetStorageDriver() == "aufs",
@@ -692,6 +681,20 @@ func main() {
 
 	prober.SetFileMonitor(fileWatcher)
 
+	// Benchmark
+	go bench.BenchLoop()
+	if Host.CapDockerBench {
+		bench.RerunDocker(false)
+	} else {
+		// If the older version write status into the cluster, clear it.
+		bench.ResetDockerStatus()
+	}
+	if !Host.CapKubeBench {
+			// If the older version write status into the cluster, clear it.
+		bench.ResetKubeStatus()
+	}
+
+	// Workload scans
 	scanUtil = scanUtils.NewScanUtil(global.SYS)
 
 	// grpc need to be put after probe (grpc requests like sessionList, ProbeSummary require probe ready),

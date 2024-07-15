@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -433,7 +434,7 @@ func new_k8s_unittest() *k8s_unittest {
 			roleCache:        make(map[k8sObjectRef]string),
 			rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
 			permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
-			permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvPermissions),
+			permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvFedPermissions),
 		},
 	}
 }
@@ -506,27 +507,111 @@ func (r *tRbacRancherSSO) updateK8sRbacResource(obj interface{}, op string) {
 	}
 }
 
-func (r *tRbacRancherSSO) checkK8sUserRoles(userName string, expectDomainRoles map[string]string, expectDomainPerms map[string]share.NvPermissions) {
+func (r *tRbacRancherSSO) compareDomainPermits(scope, userName string, expectDomainPerms map[string]share.NvPermissions, actualDomainPerms map[string]share.NvFedPermissions) bool {
+
+	// Test: check user's mapped permissions
+	if len(expectDomainPerms) > 0 {
+		for d, expectedPermits := range expectDomainPerms {
+			var actualPermits share.NvPermissions
+			if actual, ok := actualDomainPerms[d]; ok {
+				if scope == "local" {
+					actualPermits = actual.Local
+				} else if scope == "remote" {
+					actualPermits = actual.Remote
+				}
+			}
+			if expectedPermits != actualPermits {
+				r.t.Logf("<< %s >>\n", r.caseName)
+				var dDisplay string
+				if d == "" {
+					dDisplay = "global domain"
+				} else {
+					dDisplay = fmt.Sprintf("domain %s", d)
+				}
+				r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
+				r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, expectedPermits, dDisplay)
+				r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
+				return false
+			}
+		}
+	} else {
+		for d, actual := range actualDomainPerms {
+			var actualPermits share.NvPermissions
+			if scope == "local" {
+				actualPermits = actual.Local
+			} else if scope == "remote" {
+				actualPermits = actual.Remote
+			}
+			if !actualPermits.IsEmpty() {
+				r.t.Logf("<< %s >>\n", r.caseName)
+				var dDisplay string
+				if d == "" {
+					dDisplay = "global domain"
+				} else {
+					dDisplay = fmt.Sprintf("domain %s", d)
+				}
+				r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
+				r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, share.NvPermissions{}, dDisplay)
+				r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (r *tRbacRancherSSO) checkK8sUserRoles(userName string, expectDomainRoles map[string]string,
+	expectLocalDomainPerms, expectRemoteDomainPerms map[string]share.NvPermissions) {
 
 	// Test: check user's mapped role/permissions
 	if thisDomainRoles, thisDomainPerms, err := r.d.GetUserRoles(userName, SUBJECT_USER); err == nil {
 		if !reflect.DeepEqual(thisDomainRoles, expectDomainRoles) {
-			r.t.Logf("[ %s ]\n", r.caseName)
-			r.t.Errorf("[%d] Unexpected role rbac - cache: %+v", r.caseID, r.d.rbacCache)
+			r.t.Logf("<< %s >>\n", r.caseName)
+			r.t.Errorf("[%d] Unexpected role rbac for user %s - cache: %+v", r.caseID, userName, r.d.rbacCache)
 			r.t.Logf("[%d]   Expect: %+v\n", r.caseID, expectDomainRoles)
 			r.t.Logf("[%d]   Actual: %+v\n", r.caseID, thisDomainRoles)
 		}
-		if !reflect.DeepEqual(thisDomainPerms, expectDomainPerms) {
-			r.t.Logf("[ %s ]\n", r.caseName)
-			r.t.Errorf("[%d] Unexpected perms rbac - cache: %+v", r.caseID, r.d.rbacCache)
-			r.t.Logf("[%d]   Expect: %+v\n", r.caseID, expectDomainPerms)
-			r.t.Logf("[%d]   Actual: %+v\n", r.caseID, thisDomainPerms)
-		}
-	} else if expectDomainRoles == nil && expectDomainPerms == nil {
-		// User not found. expected error
+		r.compareDomainPermits("local", userName, expectLocalDomainPerms, thisDomainPerms)
+		r.compareDomainPermits("remote", userName, expectRemoteDomainPerms, thisDomainPerms)
 	} else {
-		r.t.Logf("[ %s ]\n", r.caseName)
+		r.t.Logf("<< %s >>\n", r.caseName)
 		r.t.Errorf("[%d] Unexpected result - user %s not found: %s", r.caseID, userName, err)
+	}
+	r.caseID += 1
+	log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRoles map[string]string,
+	actualDomainPerms, expectDomainPerms map[string]share.NvFedPermissions) {
+
+	for d, expectedRole := range expectDomainRoles {
+		if actualRole, _ := actualDomainRoles[d]; expectedRole != actualRole {
+			r.t.Logf("<< %s >>\n", r.caseName)
+			var dDisplay string
+			if d == "" {
+				dDisplay = "global domain"
+			} else {
+				dDisplay = fmt.Sprintf("domain %s", d)
+			}
+			r.t.Errorf("[%d] Unexpected role for %s:", r.caseID, dDisplay)
+			r.t.Logf("[%d]   Expect: role %s\n", r.caseID, expectedRole)
+			r.t.Logf("[%d]   Actual: role %s\n", r.caseID, actualRole)
+		}
+	}
+	for d, expectedPermits := range expectDomainPerms {
+		if actualPermits, _ := actualDomainPerms[d]; expectedPermits != actualPermits {
+			r.t.Logf("<< %s >>\n", r.caseName)
+			var dDisplay string
+			if d == "" {
+				dDisplay = "global domain"
+			} else {
+				dDisplay = fmt.Sprintf("domain %s", d)
+			}
+			r.t.Errorf("[%d] Unexpected permits for %s:", r.caseID, dDisplay)
+			r.t.Logf("[%d]   Expect: permits %+v\n", r.caseID, expectedPermits)
+			r.t.Logf("[%d]   Actual: permits %+v\n", r.caseID, actualPermits)
+		}
 	}
 	r.caseID += 1
 	log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
@@ -606,6 +691,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL,
 				WriteValue: share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL,
 			}},
+			nil,
 		)
 
 		//------ [2] add another nv custom permissions objCR2
@@ -662,11 +748,12 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
-		//------ [3] objCR1 is updated to have global reader role in k8s.
-		// Because objCR1(referenced by objCRB1) has nv write permission, global reader role is moved to PERM_FED permission
-		objCR1.Rules = append(objCR1.Rules, rbacv1.PolicyRule{
+		//------ [3] objCR1 is updated to have global reader(fedReader) role in k8s.
+		// Because objCR1(referenced by objCRB1) has nv write permission, global reader role is moved to PERMS_FED_READ permission
+		objCR1.Rules = append(objCR1.Rules, rbacv1.PolicyRule{ // it's a fedReader role
 			Verbs:     []string{"get"},
 			APIGroups: []string{"read-only.neuvector.api.io"},
 			Resources: []string{"*"},
@@ -674,11 +761,11 @@ func TestRBACRancherSSO(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCR1, update_rbac)
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName1,
-			map[string]string{"": ""},
+			map[string]string{"": api.UserRoleFedReader},
 			map[string]share.NvPermissions{"": {
-				ReadValue:  share.PERMS_CLUSTER_READ | share.PERM_FED,
 				WriteValue: share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [4] objCR1 is updated to have global admin role in k8s.
@@ -693,6 +780,7 @@ func TestRBACRancherSSO(t *testing.T) {
 		rbacRancherSSO.checkK8sUserRoles(userName1,
 			map[string]string{"": api.UserRoleFedAdmin},
 			nil,
+			nil,
 		)
 
 		//------ [5] delete objCRB1 in k8s. now only objCRB2 is for user 'u-cpjv2'
@@ -704,6 +792,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [6] add back objCRB1 in k8s
@@ -711,6 +800,7 @@ func TestRBACRancherSSO(t *testing.T) {
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName1,
 			map[string]string{"": api.UserRoleFedAdmin},
+			nil,
 			nil,
 		)
 
@@ -723,6 +813,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [8] add back modified objCR1 in k8s
@@ -752,6 +843,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_REG_SCAN | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [9] add nv custom permissions objCR9(rancher cluster role)
@@ -806,6 +898,7 @@ func TestRBACRancherSSO(t *testing.T) {
 		rbacRancherSSO.checkK8sUserRoles(userName1,
 			map[string]string{"": api.UserRoleAdmin},
 			nil,
+			nil,
 		)
 
 		//------ [10] delete objCR9 in k8s
@@ -817,6 +910,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_REG_SCAN | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [11] delete objCRB9 in k8s
@@ -828,6 +922,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_REG_SCAN | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [12] add back objCR9 in k8s
@@ -839,6 +934,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_REG_SCAN | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 
 		//------ [13] add objCRB13 but it binds to different user "u-abcef-2" in k8s
@@ -869,6 +965,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				ReadValue:  share.PERM_REG_SCAN | share.PERM_ADM_CONTROL | share.PERM_AUTHORIZATION | share.PERM_AUDIT_EVENTS,
 				WriteValue: share.PERM_REG_SCAN | share.PERM_AUTHORIZATION,
 			}},
+			nil,
 		)
 		rbacRancherSSO.updateK8sRbacResource(objCRB13, delete_rbac)
 
@@ -938,6 +1035,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: share.PERMS_COMPLIANCE & share.PERMS_DOMAIN_WRITE,
 				},
 			},
+			nil,
 		)
 
 		//------ [15] add objCR15/objRB15 (ns: test-project-ns-15) for userName1 in k8s
@@ -1004,6 +1102,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: share.PERMS_COMPLIANCE & share.PERMS_DOMAIN_WRITE,
 				},
 			},
+			nil,
 		)
 
 		//------ [16] add objCR16/objRB16 (ns: test-project-ns-15) for userName1 in k8s
@@ -1066,6 +1165,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: share.PERMS_COMPLIANCE & share.PERMS_DOMAIN_WRITE,
 				},
 			},
+			nil,
 		)
 
 		//------ [17] delete objCR15 for userName1 (ns: test-project-ns-15) in k8s in k8s
@@ -1087,6 +1187,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: 0,
 				},
 			},
+			nil,
 		)
 
 		//------ [18] add back objCR15 for userName1 (ns: test-project-ns-15) in k8s in k8s
@@ -1107,6 +1208,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: share.PERMS_COMPLIANCE & share.PERMS_DOMAIN_WRITE,
 				},
 			},
+			nil,
 		)
 
 		//------ [19] delete objRB15 for userName1 (ns: test-project-ns-15) in k8s in k8s
@@ -1128,6 +1230,7 @@ func TestRBACRancherSSO(t *testing.T) {
 					WriteValue: 0,
 				},
 			},
+			nil,
 		)
 	}
 
@@ -1180,7 +1283,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"*"},
+					Resources: []string{"*"}, // it's a fedReader role
 				},
 			},
 		}
@@ -1208,11 +1311,11 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName1,
-			map[string]string{"": ""}, // because it has write permissions, fedReader role on global domain is converted to fed read permission on global domain
+			map[string]string{"": api.UserRoleFedReader},
 			map[string]share.NvPermissions{"": {
-				ReadValue:  share.PERMS_FED_READ,
 				WriteValue: share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL,
 			}},
+			nil,
 		)
 
 		//------ [2] objCR1 is updated(append) to have nv admin role on global domain
@@ -1227,6 +1330,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			map[string]string{
 				"": api.UserRoleFedAdmin, // because it's "cattle-globalrole-gr-xxxxxxx" k8s clusterrole
 			},
+			nil,
 			nil,
 		)
 
@@ -1275,6 +1379,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				"": api.UserRoleFedAdmin,
 			},
 			nil,
+			nil,
 		)
 
 		//------ [4] delete objCRB1(nv fedAdmin role on global domain) in k8s. now only objCRB2(nv admin role on global domain) is for user 'u-cpjv2-1'
@@ -1284,6 +1389,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			map[string]string{
 				"": api.UserRoleAdmin,
 			},
+			nil,
 			nil,
 		)
 
@@ -1338,6 +1444,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				"": api.UserRoleAdmin,
 			},
 			nil,
+			nil,
 		)
 
 		//------ [6] delete objCRB2(nv admin role on global domain) in k8s and reset objCR1/objCRB1 ti without "get/*" rule in objCR1
@@ -1375,6 +1482,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 					ReadValue: share.PERM_EVENTS, // PERM_VULNERABILITY is not supported in non-global domain
 				},
 			},
+			nil,
 		)
 
 		//------ [7] add objCRB1 back for user "u-cpjv2-1"
@@ -1391,6 +1499,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 					ReadValue: share.PERM_EVENTS, // PERM_VULNERABILITY is not supported in non-global domain
 				},
 			},
+			nil,
 		)
 	}
 
@@ -1466,6 +1575,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			map[string]share.NvPermissions{"": {
 				ReadValue: share.PERM_REG_SCAN | share.PERM_ADM_CONTROL,
 			}},
+			nil,
 		)
 
 		//------ [2] add 2nd rancher cluster role that has fedReader role on global domain
@@ -1516,6 +1626,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				"": api.UserRoleFedReader,
 			},
 			nil,
+			nil,
 		)
 
 		//------ [3] add 3rd rancher cluster role that has write permission on global domain
@@ -1559,16 +1670,18 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB3, update_rbac)
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName1,
-			map[string]string{"": ""},
+			map[string]string{
+				"": api.UserRoleFedReader,
+			},
 			map[string]share.NvPermissions{"": {
-				ReadValue:  share.PERMS_FED_READ,
 				WriteValue: share.PERM_CICD_SCAN,
 			}},
+			nil,
 		)
 
 		//------ [4] add 4th rancher cluster role that has admin role on global domain
 		// it's not "cattle-globalrole-gr-xxxxxxx" k8s clusterrole & user "u-william-1" is mapped to fedReader role + admin role + some write permision
-		// global domain is "admin" & PERM_FED permission(not fedReader role) is moved to permissions
+		// global domain is "admin" & PERMS_FED_READ permission(not fedReader role) is moved to permissions
 		crName4 := "rt-abc14-9"
 		objCR4 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1611,7 +1724,10 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				"": api.UserRoleAdmin,
 			},
 			map[string]share.NvPermissions{"": {
-				ReadValue: share.PERM_FED,
+				ReadValue: share.PERMS_FED_READ,
+			}},
+			map[string]share.NvPermissions{"": {
+				ReadValue: share.PERMS_CLUSTER_READ,
 			}},
 		)
 
@@ -1663,10 +1779,11 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				"": api.UserRoleFedAdmin,
 			},
 			nil,
+			nil,
 		)
 
 		//------ [6] delete k8s cluster role binding objCRB5 that maps fedAdmin role on global domain.
-		// then global domain is "admin" & PERM_FED permission(from objCR2/objCRB2)
+		// then global domain is "admin" & PERMS_FED_READ permission(from objCR2/objCRB2)
 		rbacRancherSSO.updateK8sRbacResource(objCRB5, delete_rbac)
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName1,
@@ -1674,7 +1791,10 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				"": api.UserRoleAdmin,
 			},
 			map[string]share.NvPermissions{"": {
-				ReadValue: share.PERM_FED,
+				ReadValue: share.PERMS_FED_READ,
+			}},
+			map[string]share.NvPermissions{"": {
+				ReadValue: share.PERMS_CLUSTER_READ,
 			}},
 		)
 
@@ -1688,6 +1808,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			map[string]string{
 				"": api.UserRoleFedReader,
 			},
+			nil,
 			nil,
 		)
 	}
@@ -1821,9 +1942,10 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 					WriteValue: share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL,
 				},
 				"test-project-ns-15": {
-					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
 					WriteValue: share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
-				}},
+				},
+			},
+			nil,
 		)
 	}
 
@@ -1941,7 +2063,9 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 				},
 				"nv-2": {
 					ReadValue: share.PERMS_RUNTIME_POLICIES,
-				}},
+				},
+			},
+			nil,
 		)
 	}
 
@@ -2076,6 +2200,7 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 					WriteValue: share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
 				},
 			},
+			nil,
 		)
 
 		//------ [2] delete objCR1 and then create another objR3/objRB3 for the same user "u-cpjv2-1" on the same "test-project-ns-15" namespace
@@ -2127,6 +2252,7 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 					WriteValue: share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
 				},
 			},
+			nil,
 		)
 
 		//------ [3] create another objR4/objRB4 for the same user "u-cpjv2-1" on different namespace
@@ -2180,8 +2306,1067 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 					WriteValue: (share.PERM_RUNTIME_SCAN_BASIC | share.PERM_WORKLOAD_BASIC | share.PERM_INFRA_BASIC) & share.PERMS_DOMAIN_WRITE,
 				},
 			},
+			nil,
 		)
 	}
 
 	postTest()
+}
+
+func removeRedundant(domainRole map[string]string, domainPermits map[string]share.NvFedPermissions, fedRole string) (
+	map[string]string, map[string]share.NvFedPermissions) {
+
+	allDomainRoles := make(map[string]share.NvReservedUserRole, len(domainRole))
+	reservedRoleMapping := map[string]share.NvReservedUserRole{
+		api.UserRoleAdmin:     share.UserRoleAdmin,
+		api.UserRoleReader:    share.UserRoleReader,
+		api.UserRoleFedAdmin:  share.UserRoleFedAdmin,
+		api.UserRoleFedReader: share.UserRoleFedReader,
+	}
+
+	for d, role := range domainRole {
+		m := reservedRoleMapping[role]
+		allDomainRoles[d] = allDomainRoles[d] | m
+	}
+
+	return RemoveRedundant(allDomainRoles, domainPermits, fedRole)
+}
+
+func TestConsolidateNvRolePermits(t *testing.T) {
+	preTest()
+
+	//_k8sFlavor = share.FlavorRancher
+	//global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
+	d := new_k8s_unittest()
+	//IsRancherFlavor()
+
+	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+		t:        t,
+		d:        d,
+		caseName: "TestConsolidateNvRolePermits",
+		caseID:   1,
+	}
+
+	{
+		//------ [1]
+		domainRole := map[string]string{
+			"":         api.UserRoleFedAdmin,
+			"domain-1": api.UserRoleFedAdmin,
+			"domain-2": api.UserRoleFedReader,
+			"domain-3": api.UserRoleAdmin,
+			"domain-4": api.UserRoleReader,
+		}
+		domainPermits := map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-11": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+		}
+		expectDomainRoles := map[string]string{
+			"": api.UserRoleFedAdmin,
+		}
+		expectDomainPerms := map[string]share.NvFedPermissions{}
+		// only "":fedAdmin is kept
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+		//------ [2]
+		domainRole["domain-1"] = api.UserRoleFedAdmin
+		domainRole["domain-2"] = api.UserRoleFedReader
+		domainRole["domain-3"] = api.UserRoleAdmin
+		domainPermits["domain-11"] = share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_FED_READ},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_FED_READ},
+		}
+		// only "":fedAdmin is kept
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+		//------ [3]
+		domainRole = map[string]string{
+			"":         api.UserRoleAdmin,
+			"domain-1": api.UserRoleFedReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-3": api.UserRoleReader,
+			"domain-4": api.UserRoleFedAdmin,
+		}
+		domainPermits = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-11": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_FED_READ},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_FED_READ},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_CLUSTER_READ},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_WRITE},
+			},
+			"domain-13": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_DOMAIN_WRITE},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_WRITE},
+			},
+		}
+
+		expectDomainRoles = map[string]string{
+			"": api.UserRoleAdmin,
+		}
+		expectDomainPerms = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+			},
+		}
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+		//------ [4]
+		domainRole = map[string]string{
+			"":         api.UserRoleFedReader,
+			"domain-1": api.UserRoleFedReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-3": api.UserRoleReader,
+			"domain-4": api.UserRoleFedAdmin,
+		}
+		domainPermits = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-11": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+		}
+
+		expectDomainRoles = map[string]string{
+			"":         api.UserRoleFedReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-4": api.UserRoleAdmin,
+		}
+		expectDomainPerms = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+			},
+		}
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+		//------ [5]
+		domainRole = map[string]string{
+			"":         api.UserRoleReader,
+			"domain-1": api.UserRoleFedReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-3": api.UserRoleReader,
+			"domain-4": api.UserRoleFedAdmin,
+		}
+		domainPermits = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-11": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+		}
+
+		expectDomainRoles = map[string]string{
+			"":         api.UserRoleReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-4": api.UserRoleAdmin,
+		}
+		expectDomainPerms = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+			},
+		}
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+		//------ [6]
+		domainRole = map[string]string{
+			"":         api.UserRoleNone,
+			"domain-1": api.UserRoleFedReader,
+			"domain-2": api.UserRoleAdmin,
+			"domain-3": api.UserRoleReader,
+			"domain-4": api.UserRoleFedAdmin,
+		}
+		domainPermits = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-11": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			},
+		}
+
+		expectDomainRoles = map[string]string{
+			"":         api.UserRoleNone,
+			"domain-2": api.UserRoleAdmin,
+			"domain-4": api.UserRoleAdmin,
+		}
+		expectDomainPerms = map[string]share.NvFedPermissions{
+			"": share.NvFedPermissions{
+				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+			},
+			"domain-12": share.NvFedPermissions{
+				Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+			},
+		}
+		domainRole, domainPermits = removeRedundant(domainRole, domainPermits, api.FedRoleMaster)
+		rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+	}
+
+	postTest()
+}
+
+func TestRancherMultiplePrinciples(t *testing.T) {
+	preTest()
+
+	_k8sFlavor = share.FlavorRancher
+	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
+	d := new_k8s_unittest()
+	IsRancherFlavor()
+
+	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+		t:        t,
+		d:        d,
+		caseName: "TestRancherMultiplePrinciples",
+		caseID:   1,
+	}
+
+	//------ [1]
+	allDomainRoles := map[string]share.NvReservedUserRole{
+		"":         share.UserRoleFedAdmin | share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
+		"domain-1": share.UserRoleAdmin | share.UserRoleReader,
+		"domain-2": share.UserRoleFedReader | share.UserRoleReader,
+		"domain-3": share.UserRoleAdmin,
+		"domain-4": share.UserRoleReader,
+		"domain-5": 0,
+	}
+	domainPermits := map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles := map[string]string{
+		"": api.UserRoleFedAdmin,
+	}
+	expectDomainPerms := map[string]share.NvFedPermissions{}
+
+	domainRole, domainPermits := RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [2]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"":         share.UserRoleFedAdmin | share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
+		"domain-1": share.UserRoleAdmin | share.UserRoleReader,
+		"domain-2": share.UserRoleFedReader | share.UserRoleReader,
+		"domain-3": share.UserRoleAdmin,
+		"domain-4": share.UserRoleReader,
+		"domain-5": 0,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleAdmin,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleJoint)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [3]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleAdmin,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_FED_READ, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_READ, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+		},
+	}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [4]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleAdmin,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleJoint)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [5]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": share.UserRoleFedReader | share.UserRoleReader,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleFedReader,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+		},
+	}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [6]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": share.UserRoleFedReader | share.UserRoleReader,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleReader,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+		},
+	}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleJoint)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [7]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": 0,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleNone,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+		},
+	}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	//------ [8]
+	allDomainRoles = map[string]share.NvReservedUserRole{
+		"": 0,
+	}
+	domainPermits = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-11": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
+		},
+	}
+
+	expectDomainRoles = map[string]string{
+		"": api.UserRoleNone,
+	}
+	expectDomainPerms = map[string]share.NvFedPermissions{
+		"": share.NvFedPermissions{
+			Local: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
+		},
+		"domain-12": share.NvFedPermissions{
+			Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
+		},
+	}
+
+	domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleJoint)
+	rbacRancherSSO.verifyNvRolePermits(domainRole, expectDomainRoles, domainPermits, expectDomainPerms)
+
+	postTest()
+}
+
+func TestRBACRancherSSOFedPermit(t *testing.T) {
+	preTest()
+
+	_k8sFlavor = share.FlavorRancher
+	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
+	d := new_k8s_unittest()
+	IsRancherFlavor()
+
+	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+		t:        t,
+		d:        d,
+		caseName: "TestRBACRancherSSOFedPermit",
+		caseID:   1,
+	}
+	crKind := "ClusterRole"
+	userKind := "User"
+	rbacApiGroup := "rbac.authorization.k8s.io"
+
+	{
+		//------ [1] add nv custom permissions objCR1(rancher cluster role) that has fed & some write permissions
+		userName1 := "u-cpjv2-1"
+		crName1 := "rt-wbz96-1"
+		objCR1 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName1,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.reg-scan"},
+				},
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.ci-scan"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"nv-perm.admctrl"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR1, update_rbac)
+
+		// create a objCRB1 between custom permissions objCR1 and user 'u-cpjv2-1'
+		objCRB1 := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "crb-w3pkgod7le-1",
+				UID:  genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName1,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
+
+		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
+		crName2 := "rt-abcde-2"
+		objCR2 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName2,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.reg-scan"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR2, update_rbac)
+
+		objRB2 := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rb-bcdefghij-16",
+				Namespace: "test-project-ns-15",
+				UID:       genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName2,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
+
+		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
+		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
+		crName3 := "rt-abcde-3"
+		objCR3 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName3,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.all-permissions"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR3, update_rbac)
+
+		objRB3 := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rb-bcdefghij-36",
+				Namespace: "test-project-ns-25",
+				UID:       genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName3,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objRB3, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName1,
+			map[string]string{
+				"":                   "",
+				"test-project-ns-25": api.UserRoleReader,
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_ADM_CONTROL | share.PERM_FED,
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_CICD_SCAN | share.PERM_ADM_CONTROL,
+				},
+				"test-project-ns-15": {
+					WriteValue: share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
+				},
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue: share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_ADM_CONTROL,
+				},
+			},
+		)
+	}
+
+	{
+		//------ [2] add nv custom permissions objCR1(rancher cluster role) that has fed & some write permissions
+		userName1 := "u-cpjv2-1"
+		crName1 := "rt-wbz96-1"
+		objCR1 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName1,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.reg-scan"}, // "nv-perm.fed" in the next rule also applies to this rule; but "*" verbs in the next rule doesn't affect this rule
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR1, update_rbac)
+
+		// create a objCRB1 between custom permissions objCR1 and user 'u-cpjv2-1'
+		objCRB1 := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "crb-w3pkgod7le-1",
+				UID:  genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName1,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
+
+		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
+		crName2 := "rt-abcde-2"
+		objCR2 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName2,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "*"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.events"},
+				},
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.audit-events"},
+				},
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"nv-perm.security-events"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.ci-scan"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"nv-perm.admctrl"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR2, update_rbac)
+
+		objRB2 := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rb-bcdefghij-16",
+				Namespace: "test-project-ns-15",
+				UID:       genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName2,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
+
+		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
+		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
+		crName3 := "rt-abcde-3"
+		objCR3 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName3,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.reg-scan"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"neuvector.api.io"}, // not supported
+					Resources: []string{"nv-perm.compliance", "nv-perm.all-permissions", "*"},
+				},
+				{
+					Verbs:     []string{"*", "get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.allall-permissions"}, // not supported for namespaces
+				},
+				{
+					Verbs:     []string{"*", "get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"authentication"}, // not supported for namespaces
+				},
+				{
+					Verbs:     []string{"*", "create", "delete", "get", "list", "patch", "update", "watch", "post"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.authorization"},
+				},
+				{
+					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "post"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.config"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR3, update_rbac)
+
+		objRB3 := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rb-bcdefghij-36",
+				Namespace: "test-project-ns-25",
+				UID:       genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName1,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName3,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objRB3, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName1,
+			map[string]string{
+				"": "",
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED,
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED,
+				},
+				"test-project-ns-15": {
+					ReadValue: share.PERM_EVENTS | share.PERMS_SECURITY_EVENTS | share.PERM_AUDIT_EVENTS,
+				},
+				"test-project-ns-25": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHORIZATION | share.PERM_SYSTEM_CONFIG,
+					WriteValue: share.PERM_AUTHORIZATION,
+				},
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES,
+					WriteValue: share.PERMS_RUNTIME_POLICIES,
+				},
+			},
+		)
+	}
+
+	{
+		//------ [3] about "nv-perm.fed" for global domain
+		userName31 := "u-cpjv2-31"
+		crName31 := "rt-wbz96-31"
+		objCR31 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName31,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.reg-scan"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"neuvector.api.io", "*"}, // unsupported apiGroup
+					Resources: []string{"nv-perm.compliance"},
+				},
+				{
+					Verbs:     []string{"*", "get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.authentication"},
+				},
+				{
+					Verbs:     []string{"get", "post"},
+					APIGroups: []string{"read-only.neuvector.api.io"},
+					Resources: []string{"nv-perm.authorization"},
+				},
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.config"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
+
+		// create a objCRB1 between custom permissions objCR1 and user 'u-cpjv2-31'
+		objCRB1 := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "crb-w3pkgod7le-31",
+				UID:  genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName31,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName31,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName31,
+			map[string]string{
+				"": "",
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION | share.PERM_AUTHORIZATION | share.PERM_SYSTEM_CONFIG | share.PERM_FED,
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION | share.PERM_FED,
+				},
+			},
+			map[string]share.NvPermissions{
+				"": {
+					ReadValue:  share.PERM_REG_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION | share.PERM_AUTHORIZATION | share.PERM_SYSTEM_CONFIG,
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION,
+				},
+			},
+		)
+
+		//------ [4]
+		objCR31.Rules[0].Resources = []string{"nv-perm.all-permissions"}
+		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName31,
+			map[string]string{
+				"": api.UserRoleFedReader,
+			},
+			map[string]share.NvPermissions{
+				"": {
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION | share.PERM_FED,
+				},
+			},
+			map[string]share.NvPermissions{
+				"": {
+					WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_AUTHENTICATION,
+				},
+			},
+		)
+
+		//------ [5]
+		objCR31.Rules[0].Verbs = []string{"*"}
+		objCR31.Rules[len(objCR31.Rules)-1].Verbs = []string{"*"}
+
+		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName31,
+			map[string]string{
+				"": api.UserRoleFedAdmin,
+			},
+			nil,
+			nil,
+		)
+	}
 }

@@ -4038,6 +4038,8 @@ paths:
       responses:
         '200':
           description: Success
+          schema:
+            $ref: '#/definitions/RESTVulnerabilityProfileEntryConfigData'
   /v1/vulnerability/profile/{name}/entry/{id}:
     patch:
       tags:
@@ -6836,6 +6838,9 @@ definitions:
       bootstrap_password_command:
         type: string
         description: kubectl command for retrieving bootstrap password of default admin user
+      k8s_rbac_alert_message:
+        type: string
+        description: alert message when k8s role/rolebinding neuvector-binding-secret is not correctly configured
   RESTEventsData:
     type: object
     required:
@@ -8116,7 +8121,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -8370,7 +8375,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -8763,7 +8768,7 @@ definitions:
         example: myregistry
       registry_type:
         type: string
-        example: docker
+        example: "Docker Registry"
       registry:
         type: string
         example: https://registry.hub.docker.com/
@@ -11448,6 +11453,12 @@ definitions:
         description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
         items:
           $ref: '#/definitions/RESTPermitsAssigned'
+      remote_role_permissions:
+        type: object
+        description: role/permissions on managed clusters in fed. only for Rancher SSO
+        properties:
+          user:
+            $ref: '#/definitions/RESTRemoteRolePermits'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11529,10 +11540,15 @@ definitions:
         description: role on global domain
         example: admin
       extra_permissions:
-        description: extra permissions(other than 'role') on global domain. only for Rancher SSO
+        description: extra permissions(other than 'role') extra permissions(other than 'Role') on global domain. only for Rancher SSO
         type: array
         items:
           $ref: '#/definitions/RESTRolePermission'
+      remote_permissions:
+        description: permissions on managed clusters in fed. only for Rancher SSO
+        type: object
+        items:
+          $ref: '#/definitions/RESTRemoteRolePermits'
       timeout:
         type: integer
         format: uint32
@@ -11564,9 +11580,15 @@ definitions:
               example: ["domain1", "domain2"]
       extra_permissions_domains:
         type: array
-        description: list of extra permissions(other than specified in 'role_domains') on namespaces. only for Rancher SSO
+        description: list of extra permissions(other than 'role_domains') for namespaces on managed clusters in fed. only for Rancher SSO
         items:
           $ref: '#/definitions/RESTPermitsAssigned'
+      remote_role_permissions:
+        type: object
+        description: role/permissions on managed clusters in fed. only for Rancher SSO
+        properties:
+          user:
+            $ref: '#/definitions/RESTRemoteRolePermits'
       last_login_timestamp:
         type: integer
         format: int64
@@ -11602,6 +11624,40 @@ definitions:
         items:
           type: string
         example: ["domain1", "domain2"]
+  RESTRemoteRolePermits:
+    type: object
+    required:
+      - role
+    properties:
+      role:
+        type: string
+        description: global role on managed clusters in fed
+        example: admin
+      role_domains:
+        type: object
+        description: role -> domains on managed clusters in fed
+        properties:
+          key:
+            description: role
+            type: string
+          value:
+            type: object
+            description: array of domains
+            additionalProperties:
+              type: array
+              items:
+                type: string
+              example: ["domain1", "domain2"]
+      extra_permissions:
+        description: extra permissions(other than 'role') for global domain on managed clusters in fed. only for Rancher SSO
+        type: array
+        items:
+          $ref: '#/definitions/RESTRolePermission'
+      extra_permissions_domains:
+        type: array
+        description: list of extra permissions(other than 'role_domains') for namespaces on managed clusters in fed. only for Rancher SSO
+        items:
+          $ref: '#/definitions/RESTPermitsAssigned'
   RESTUserData:
     type: object
     required:

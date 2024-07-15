@@ -542,67 +542,42 @@ func CheckGroupMetric() {
 	for lgrpname, grpmet := range groupMetricMap {
 		var vioMet uint8 = 0
 		if grpcache, ok := groupCacheMap[lgrpname]; ok {
-
+			cctx.ConnLog.WithFields(log.Fields{
+				"GroupSessCurIn":    grpmet.GroupSessCurIn,
+				"GroupSessIn12":     grpmet.GroupSessIn12,
+				"GroupByteIn12":     grpmet.GroupByteIn12,
+			}).Debug()
 			grpSessCurIn := grpmet.GroupSessCurIn//active session count
-			grpSessRateIn1 := uint32(grpmet.GroupSessIn1/(1*MetSlotInterval))//session per second
-			grpBandwidthIn1 := uint32(grpmet.GroupByteIn1*8/uint64(1*MetSlotInterval)/1000000)//mbps
 			grpSessRateIn12 := uint32(grpmet.GroupSessIn12/(12*MetSlotInterval))//session per second
 			grpBandwidthIn12 := uint32(grpmet.GroupByteIn12*8/uint64(12*MetSlotInterval)/1000000)//mbps
-			grpSessRateIn60 := uint32(grpmet.GroupSessIn60/(60*MetSlotInterval))//session per second
-			grpBandwidthIn60 := uint32(grpmet.GroupByteIn60*8/uint64(60*MetSlotInterval)/1000000)//mbps
-			grpSessRateInVio := grpSessRateIn1
-			grpBandwidthInVio := grpBandwidthIn1
+
 			if grpcache.group.GrpSessCur > 0 && grpSessCurIn > grpcache.group.GrpSessCur {
 				vioMet |= sessCurInViolation
-				grpmet.GroupSessCurIn = 0//reset
 			}
-			//try past 5sec, 60sec and 300sec to see whether
-			//there is any violation
-			if grpcache.group.GrpSessRate > 0 {
-				if grpSessRateIn1 > grpcache.group.GrpSessRate {
-					vioMet |= sessionInViolation
-					grpSessRateInVio = grpSessRateIn1
-					grpmet.GroupSessIn1 = 0//reset
-					grpmet.GroupSessIn12 = 0
-					grpmet.GroupSessIn60 = 0
-				} else if grpSessRateIn12 > grpcache.group.GrpSessRate {
-					vioMet |= sessionInViolation
-					grpSessRateInVio = grpSessRateIn12
-					grpmet.GroupSessIn1 = 0//reset
-					grpmet.GroupSessIn12 = 0
-					grpmet.GroupSessIn60 = 0
-				} else if grpSessRateIn60 > grpcache.group.GrpSessRate {
-					vioMet |= sessionInViolation
-					grpSessRateInVio = grpSessRateIn60
-					grpmet.GroupSessIn1 = 0//reset
-					grpmet.GroupSessIn12 = 0
-					grpmet.GroupSessIn60 = 0
-				}
+			//try past 60sec to see whether there is any violation
+			if grpcache.group.GrpSessRate > 0 && grpSessRateIn12 > grpcache.group.GrpSessRate {
+				vioMet |= sessionInViolation
 			}
-			if grpcache.group.GrpBandWidth > 0 {
-				if grpBandwidthIn1 > grpcache.group.GrpBandWidth {
-					vioMet |= bandwidInViolation
-					grpBandwidthInVio = grpBandwidthIn1
-					grpmet.GroupByteIn1 = 0//reset
-					grpmet.GroupByteIn12 = 0
-					grpmet.GroupByteIn60 = 0
-				} else if grpBandwidthIn12 > grpcache.group.GrpBandWidth {
-					vioMet |= bandwidInViolation
-					grpBandwidthInVio = grpBandwidthIn12
-					grpmet.GroupByteIn1 = 0//reset
-					grpmet.GroupByteIn12 = 0
-					grpmet.GroupByteIn60 = 0
-				} else if grpBandwidthIn60 > grpcache.group.GrpBandWidth {
-					vioMet |= bandwidInViolation
-					grpBandwidthInVio = grpBandwidthIn60
-					grpmet.GroupByteIn1 = 0//reset
-					grpmet.GroupByteIn12 = 0
-					grpmet.GroupByteIn60 = 0
-				}
+			if grpcache.group.GrpBandWidth > 0 && grpBandwidthIn12 > grpcache.group.GrpBandWidth {
+				vioMet |= bandwidInViolation
 			}
+			cctx.ConnLog.WithFields(log.Fields{
+				"vioMet":           vioMet,
+				"grpSessCurIn":     grpSessCurIn,
+				"grpSessRateIn12":  grpSessRateIn12,
+				"grpBandwidthIn12": grpBandwidthIn12,
+			}).Debug()
 			if vioMet > 0 {
 				groupMetricViolationEvent(share.CLUSEvGroupMetricViolation, lgrpname, vioMet,
-					grpSessCurIn, grpSessRateInVio, grpBandwidthInVio)
+					grpSessCurIn, grpSessRateIn12, grpBandwidthIn12)
+			}
+			grpmet.GroupSessCurIn = 0//reset
+			grpmet.GroupSessIn12 = 0
+			grpmet.GroupByteIn12 = 0
+			for _, cwlmet := range grpmet.WlMetric {
+				cwlmet.WlSessCurIn = 0
+				cwlmet.WlSessIn12 = 0
+				cwlmet.WlByteIn12 = 0
 			}
 		}
 	}
@@ -645,80 +620,54 @@ func calGrpMet(lgrpname, epWL string, cache *workloadCache, grpcache *groupCache
 				exceedMax = true
 			}
 			if wlmetric, exst := grpMet.WlMetric[epWL]; exst {
-				wlmetric.WlSessCurIn = conn.EpSessCurIn
-				wlmetric.WlSessIn1 = conn.EpSessIn1
-				wlmetric.WlByteIn1 = conn.EpByteIn1
-				wlmetric.WlSessIn12 = conn.EpSessIn12
-				wlmetric.WlByteIn12 = conn.EpByteIn12
-				wlmetric.WlSessIn60 = conn.EpSessIn60
-				wlmetric.WlByteIn60 = conn.EpByteIn60
+				if conn.EpSessCurIn > wlmetric.WlSessCurIn {
+					wlmetric.WlSessCurIn = conn.EpSessCurIn
+				}
+				if conn.EpSessIn12 > wlmetric.WlSessIn12 {
+					wlmetric.WlSessIn12 = conn.EpSessIn12
+				}
+				if conn.EpByteIn12 > wlmetric.WlByteIn12 {
+					wlmetric.WlByteIn12 = conn.EpByteIn12
+				}
 			} else {
 				if !exceedMax {
 					wlmet := &share.CLUSWlMetric {
 						WlID: epWL,
 						WlSessCurIn: conn.EpSessCurIn,
-						WlSessIn1:  conn.EpSessIn1,
-						WlByteIn1:  conn.EpByteIn1,
-						WlSessIn12: conn.EpSessIn12,
-						WlByteIn12: conn.EpByteIn12,
-						WlSessIn60: conn.EpSessIn60,
-						WlByteIn60: conn.EpByteIn60,
+						WlSessIn12:  conn.EpSessIn12,
+						WlByteIn12:  conn.EpByteIn12,
 					}
 					grpMet.WlMetric[epWL] = wlmet
 				}
 			}
 			//reset group metric
 			grpMet.GroupSessCurIn = 0
-			grpMet.GroupSessIn1 = 0
-			grpMet.GroupByteIn1 = 0
 			grpMet.GroupSessIn12 = 0
 			grpMet.GroupByteIn12 = 0
-			grpMet.GroupSessIn60 = 0
-			grpMet.GroupByteIn60 = 0
 			for _, cwlmet := range grpMet.WlMetric {
 				grpMet.GroupSessCurIn += cwlmet.WlSessCurIn
-				grpMet.GroupSessIn1 += cwlmet.WlSessIn1
-				grpMet.GroupByteIn1 += cwlmet.WlByteIn1
 				grpMet.GroupSessIn12 += cwlmet.WlSessIn12
 				grpMet.GroupByteIn12 += cwlmet.WlByteIn12
-				grpMet.GroupSessIn60 += cwlmet.WlSessIn60
-				grpMet.GroupByteIn60 += cwlmet.WlByteIn60
 			}
 			if exceedMax {
 				var avGrpSessCurIn float32
-				var avGrpSessIn1 float32
-				var avGrpByteIn1 float64
 				var avGrpSessIn12 float32
 				var avGrpByteIn12 float64
-				var avGrpSessIn60 float32
-				var avGrpByteIn60 float64
 
 				avGrpSessCurIn = float32(grpMet.GroupSessCurIn) / float32(CalWlMetMax)
-				avGrpSessIn1 = float32(grpMet.GroupSessIn1) / float32(CalWlMetMax)
-				avGrpByteIn1 = float64(grpMet.GroupByteIn1) / float64(CalWlMetMax)
 				avGrpSessIn12 = float32(grpMet.GroupSessIn12) / float32(CalWlMetMax)
 				avGrpByteIn12 = float64(grpMet.GroupByteIn12) / float64(CalWlMetMax)
-				avGrpSessIn60 = float32(grpMet.GroupSessIn60) / float32(CalWlMetMax)
-				avGrpByteIn60 = float64(grpMet.GroupByteIn60) / float64(CalWlMetMax)
 
 				grpMet.GroupSessCurIn = uint32(avGrpSessCurIn * float32(memcnt))
-				grpMet.GroupSessIn1 = uint32(avGrpSessIn1 * float32(memcnt))
-				grpMet.GroupByteIn1 = uint64(avGrpByteIn1 * float64(memcnt))
 				grpMet.GroupSessIn12 = uint32(avGrpSessIn12 * float32(memcnt))
 				grpMet.GroupByteIn12 = uint64(avGrpByteIn12 * float64(memcnt))
-				grpMet.GroupSessIn60 = uint32(avGrpSessIn60 * float32(memcnt))
-				grpMet.GroupByteIn60 = uint64(avGrpByteIn60 * float64(memcnt))
 			}
 		} else {
 			grpMetric := &share.CLUSGroupMetric {
 				GroupName: lgrpname,
 				GroupSessCurIn: conn.EpSessCurIn,
-				GroupSessIn1: conn.EpSessIn1,
-				GroupByteIn1: conn.EpByteIn1,
 				GroupSessIn12: conn.EpSessIn12,
 				GroupByteIn12: conn.EpByteIn12,
-				GroupSessIn60: conn.EpSessIn60,
-				GroupByteIn60: conn.EpByteIn60,
 			}
 			if grpMetric.WlMetric == nil {
 				grpMetric.WlMetric = make(map[string]*share.CLUSWlMetric)
@@ -726,12 +675,8 @@ func calGrpMet(lgrpname, epWL string, cache *workloadCache, grpcache *groupCache
 			wlmet := &share.CLUSWlMetric {
 				WlID: epWL,
 				WlSessCurIn: conn.EpSessCurIn,
-				WlSessIn1:  conn.EpSessIn1,
-				WlByteIn1:  conn.EpByteIn1,
-				WlSessIn12: conn.EpSessIn12,
-				WlByteIn12: conn.EpByteIn12,
-				WlSessIn60: conn.EpSessIn60,
-				WlByteIn60: conn.EpByteIn60,
+				WlSessIn12:  conn.EpSessIn12,
+				WlByteIn12:  conn.EpByteIn12,
 			}
 			grpMetric.WlMetric[epWL] = wlmet
 			groupMetricMap[lgrpname] = grpMetric
@@ -740,11 +685,9 @@ func calGrpMet(lgrpname, epWL string, cache *workloadCache, grpcache *groupCache
 }
 
 func isCalGrpMet(grpcache *groupCache) bool {
-	if (grpcache.group.CfgType == share.Learned ||
-		grpcache.group.CfgType == share.UserCreated) &&
-		!grpcache.group.Reserved && grpcache.group.MonMetric &&
-		(grpcache.group.GrpSessCur > 0 || grpcache.group.GrpSessRate > 0 ||
-		grpcache.group.GrpBandWidth > 0) {
+	if  grpcache.group.MonMetric && (grpcache.group.GrpSessCur > 0 || grpcache.group.GrpSessRate > 0 ||
+		grpcache.group.GrpBandWidth > 0) && (grpcache.group.CfgType == share.Learned ||
+		grpcache.group.CfgType == share.UserCreated) &&	!grpcache.group.Reserved {
 		return true
 	}
 	return false
@@ -786,9 +729,10 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 		if !preQualifyConnect(conn) {
 			continue
 		}
-		if !policyApplyIngress {
+		if conn.Ingress {
 			CalculateGroupMetric(conn)
 		}
+
 		var ca, sa *nodeAttr
 		var stip *serverTip
 		var add bool
@@ -848,11 +792,11 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 			"linkLocal":      conn.LinkLocal,
 			"fqdn":           conn.FQDN,
 			"nbe":            conn.Nbe,
+			"EpSessCurIn":    conn.EpSessCurIn,
+			"EpSessIn12":     conn.EpSessIn12,
+			"EpByteIn12":     conn.EpByteIn12,
 		}).Debug()
 
-		if policyApplyIngress {
-			CalculateGroupMetric(conn)
-		}
 		addConnectToGraph(conn, ca, sa, stip)
 
 		//add additional conversation link between sidecar and app
