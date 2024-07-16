@@ -425,6 +425,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			if cache.scanBrief != nil {
+				r.CriticalVuls = cache.scanBrief.CriticalVuls
 				r.HighVuls = cache.scanBrief.HighVuls
 				r.MedVuls = cache.scanBrief.MedVuls
 			}
@@ -452,6 +453,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 			}
 			r.PolicyMode, _ = getWorkloadPerGroupPolicyMode(cache)
 			if cache.scanBrief != nil {
+				r.CriticalVuls = cache.scanBrief.CriticalVuls
 				r.HighVuls = cache.scanBrief.HighVuls
 				r.MedVuls = cache.scanBrief.MedVuls
 			}
