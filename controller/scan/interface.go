@@ -57,10 +57,11 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 	if vpf != nil && vpf.GetUpdatedTime().After(c.filteredTime) {
 		key := share.CLUSRegistryImageDataKey(rs.config.Name, id)
 		if report := clusHelper.GetScanReport(key); report != nil {
-			var highs, meds []string
+			var criticals, highs, meds []string
 			localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
 			alives := vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
-			highs, meds, _, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
+			criticals, highs, meds, _, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
+			c.criticalVuls = len(criticals)
 			c.highVuls = len(highs)
 			c.medVuls = len(meds)
 			c.filteredTime = time.Now()
@@ -211,35 +212,38 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 
 	for _, s := range sumMap {
 		summary := &nvsysadmission.ScannedImageSummary{
-			ImageID:         s.summary.ImageID,
-			BaseOS:          s.summary.BaseOS,
-			Registry:        s.summary.Registry,
-			RegName:         s.summary.RegName,
-			Digest:          s.summary.Digest,
-			Author:          s.summary.Author,
-			ScannedAt:       s.summary.ScannedAt,
-			Result:          int32(s.summary.Result),
-			HighVuls:        s.cache.highVuls,
-			MedVuls:         s.cache.medVuls,
-			HighVulsWithFix: s.cache.highVulsWithFix,
-			VulScore:        s.cache.vulScore,
-			VulNames:        utils.NewSet(),
-			Scanned:         true,
-			Signed:          false, // scanned.Signed, // [2019.Apr] set as false until we can accurately tell it
-			RunAsRoot:       s.summary.RunAsRoot,
-			EnvVars:         make(map[string]string, len(s.cache.envs)),
-			Labels:          make(map[string]string, len(s.cache.labels)),
-			SecretsCnt:      len(s.cache.secrets),
-			SetIDPermCnt:    len(s.cache.setIDPerm),
-			Verifiers:       s.cache.signatureVerifiers,
+			ImageID:             s.summary.ImageID,
+			BaseOS:              s.summary.BaseOS,
+			Registry:            s.summary.Registry,
+			RegName:             s.summary.RegName,
+			Digest:              s.summary.Digest,
+			Author:              s.summary.Author,
+			ScannedAt:           s.summary.ScannedAt,
+			Result:              int32(s.summary.Result),
+			CriticalVuls:        s.cache.criticalVuls,
+			HighVuls:            s.cache.highVuls,
+			MedVuls:             s.cache.medVuls,
+			CriticalVulsWithFix: s.cache.criticalVulsWithFix,
+			HighVulsWithFix:     s.cache.highVulsWithFix,
+			VulScore:            s.cache.vulScore,
+			VulNames:            utils.NewSet(),
+			Scanned:             true,
+			Signed:              false, // scanned.Signed, // [2019.Apr] set as false until we can accurately tell it
+			RunAsRoot:           s.summary.RunAsRoot,
+			EnvVars:             make(map[string]string, len(s.cache.envs)),
+			Labels:              make(map[string]string, len(s.cache.labels)),
+			SecretsCnt:          len(s.cache.secrets),
+			SetIDPermCnt:        len(s.cache.setIDPerm),
+			Verifiers:           s.cache.signatureVerifiers,
 		}
 
 		summary.VulNames = s.vulNames
 		summary.Modules = s.modules
 
 		if s.cache.vulInfo != nil {
-			summary.HighVulInfo = s.cache.vulInfo[share.VulnSeverityHigh]
-			summary.MediumVulInfo = s.cache.vulInfo[share.VulnSeverityMedium]
+			summary.CriticalVulInfo, _ = s.cache.vulInfo[share.VulnSeverityCritical]
+			summary.HighVulInfo, _ = s.cache.vulInfo[share.VulnSeverityHigh]
+			summary.MediumVulInfo, _ = s.cache.vulInfo[share.VulnSeverityMedium]
 		}
 		summary.LowVulInfo = s.cache.lowVulInfo
 		for _, envVar := range s.cache.envs {
@@ -284,7 +288,7 @@ func image2RESTSummary(rs *Registry, id string, sum *share.CLUSRegistryImageSumm
 		s.Author = sum.Author
 		if cache != nil {
 			refreshScanCache(rs, id, sum, cache, vpf)
-
+			s.CriticalVuls = cache.criticalVuls
 			s.HighVuls = cache.highVuls
 			s.MedVuls = cache.medVuls
 			s.Envs = cache.envs

@@ -504,8 +504,8 @@ func webhookAudit(act *actionDesc, arg interface{}) {
 			rlog.Name == api.EventNameAdmCtrlK8sReqDenied {
 			title = fmt.Sprintf("%s", rlog.Name)
 		} else if rlog.Level != api.LogLevelERR {
-			title = fmt.Sprintf("%s: high %d medium %d", rlog.Name,
-				rlog.HighCnt, rlog.MediumCnt)
+			title = fmt.Sprintf("%s: critical: %d high %d medium %d", rlog.Name,
+				rlog.CriticalCnt, rlog.HighCnt, rlog.MediumCnt)
 		} else {
 			title = fmt.Sprintf("%s error:  %s", rlog.Name, rlog.Error)
 		}
@@ -626,12 +626,25 @@ func logAudit(arg interface{}) {
 				rlog.Name == api.EventNameHostScanReport ||
 				rlog.Name == api.EventNameRegistryScanReport ||
 				rlog.Name == api.EventNamePlatformScanReport) &&
-			(len(rlog.HighVuls) > 0 || len(rlog.MediumVuls) > 0) {
+			(len(rlog.CriticalVuls) > 0 || len(rlog.HighVuls) > 0 || len(rlog.MediumVuls) > 0) {
 			go func() {
+				for _, v := range rlog.CriticalVuls {
+					l := *rlog
+					l.CriticalVuls = []string{v}
+					l.HighVuls = []string{}
+					l.MediumVuls = []string{}
+					l.CriticalCnt = 1
+					l.HighCnt = 0
+					l.MediumCnt = 0
+					fillVulAudit(&l, v)
+					sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
+				}
 				for _, v := range rlog.HighVuls {
 					l := *rlog
+					l.CriticalVuls = []string{}
 					l.HighVuls = []string{v}
 					l.MediumVuls = []string{}
+					l.CriticalCnt = 0
 					l.HighCnt = 1
 					l.MediumCnt = 0
 					fillVulAudit(&l, v)
@@ -639,8 +652,10 @@ func logAudit(arg interface{}) {
 				}
 				for _, v := range rlog.MediumVuls {
 					l := *rlog
+					l.CriticalVuls = []string{}
 					l.HighVuls = []string{}
 					l.MediumVuls = []string{v}
+					l.CriticalCnt = 0
 					l.HighCnt = 0
 					l.MediumCnt = 1
 					fillVulAudit(&l, v)
@@ -658,19 +673,34 @@ func logAudit(arg interface{}) {
 				rlog.Name == api.EventNamePlatformScanReport) {
 			go func() {
 				for _, llog := range rlog.Layers {
-					if len(llog.HighVuls) > 0 || len(llog.MediumVuls) > 0 {
+					if len(llog.CriticalVuls) > 0 || len(llog.HighVuls) > 0 || len(llog.MediumVuls) > 0 {
 						// copy the fields of the layer
 						rlog.ImageLayerDigest = llog.ImageLayerDigest
 						rlog.Cmds = llog.Cmds
+						rlog.CriticalVuls = llog.CriticalVuls
 						rlog.HighVuls = llog.HighVuls
 						rlog.MediumVuls = llog.MediumVuls
+						rlog.CriticalCnt = llog.CriticalCnt
 						rlog.HighCnt = llog.HighCnt
 						rlog.MediumCnt = llog.MediumCnt
 						if systemConfigCache.SingleCVEPerSyslog {
+							for _, v := range rlog.CriticalVuls {
+								l := *rlog
+								l.CriticalVuls = []string{v}
+								l.HighVuls = []string{}
+								l.MediumVuls = []string{}
+								l.CriticalCnt = 1
+								l.HighCnt = 0
+								l.MediumCnt = 0
+								fillVulAudit(&l, v)
+								sendSyslog(&l, l.Level, api.CategoryAudit, "audit")
+							}
 							for _, v := range rlog.HighVuls {
 								l := *rlog
+								l.CriticalVuls = []string{}
 								l.HighVuls = []string{v}
 								l.MediumVuls = []string{}
+								l.CriticalCnt = 0
 								l.HighCnt = 1
 								l.MediumCnt = 0
 								fillVulAudit(&l, v)
@@ -678,8 +708,10 @@ func logAudit(arg interface{}) {
 							}
 							for _, v := range rlog.MediumVuls {
 								l := *rlog
+								l.CriticalVuls = []string{}
 								l.HighVuls = []string{}
 								l.MediumVuls = []string{v}
+								l.CriticalCnt = 0
 								l.HighCnt = 0
 								l.MediumCnt = 1
 								fillVulAudit(&l, v)
@@ -1046,10 +1078,10 @@ func admCtrlUpdate(event string, clog *api.Audit) {
 	responseRuleLookup(&desc)
 }
 
-func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set, fixedHighsInfo []scanUtils.FixedVulInfo) {
+func auditUpdate(id, event string, objType share.ScanObjectType, clog *api.Audit, vuls utils.Set, fixedCriticalsInfo []scanUtils.FixedVulInfo, fixedHighsInfo []scanUtils.FixedVulInfo) {
 	desc := eventDesc{id: id, event: event,
 		name: clog.Name, level: clog.Level, vuls: vuls,
-		cve_high: clog.HighCnt, cve_med: clog.MediumCnt, cve_high_fixed_info: fixedHighsInfo,
+		cve_critical: clog.CriticalCnt, cve_high: clog.HighCnt, cve_med: clog.MediumCnt, cve_critical_fixed_info: fixedCriticalsInfo, cve_high_fixed_info: fixedHighsInfo,
 		items: clog.Items, arg: clog}
 	if objType != share.ScanObjectType_CONTAINER {
 		desc.noQuar = true
@@ -1748,6 +1780,8 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 				if t, err := time.Parse(api.RESTTimeFomat, v); err == nil {
 					rlog.AggregationFrom = t.Unix()
 				}
+			case nvsysadmission.AuditLogPropCriticalVulsCnt:
+				rlog.CriticalCnt, _ = strconv.Atoi(v)
 			case nvsysadmission.AuditLogPropHighVulsCnt:
 				rlog.HighCnt, _ = strconv.Atoi(v)
 			case nvsysadmission.AuditLogPropMedVulsCnt:
@@ -1769,7 +1803,10 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 		rlog.WorkloadID = audit.WorkloadID
 
 		for k, v := range audit.Props {
-			if v == share.VulnSeverityHigh {
+			if v == share.VulnSeverityCritical {
+				rlog.CriticalCnt++
+				rlog.CriticalVuls = append(rlog.CriticalVuls, k)
+			} else if v == share.VulnSeverityHigh {
 				rlog.HighCnt++
 				rlog.HighVuls = append(rlog.HighVuls, k)
 			} else if v == share.VulnSeverityMedium {
@@ -1887,7 +1924,7 @@ func scanReport2BenchLog(id string, objType share.ScanObjectType, report *share.
 	return &clog
 }
 
-func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, highs, meds []string, layerHighs, layerMeds map[string][]string, regName string) *api.Audit {
+func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, criticals, highs, meds []string, layerCriticals, layerHighs, layerMeds map[string][]string, regName string) *api.Audit {
 	clog := api.Audit{
 		LogCommon: api.LogCommon{
 			ReportedAt:        api.RESTTimeString(report.ScannedAt),
@@ -1896,6 +1933,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		},
 		BaseOS:          report.Namespace,
 		CVEDBVersion:    report.Version,
+		CriticalVuls:    make([]string, 0),
 		HighVuls:        make([]string, 0),
 		MediumVuls:      make([]string, 0),
 		Platform:        report.Platform,
@@ -1941,8 +1979,10 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		clog.Name = api.EventNamePlatformScanReport
 	}
 
+	clog.CriticalVuls = criticals
 	clog.HighVuls = highs
 	clog.MediumVuls = meds
+	clog.CriticalCnt = len(criticals)
 	clog.HighCnt = len(highs)
 	clog.MediumCnt = len(meds)
 	if systemConfigCache.SingleCVEPerSyslog {
@@ -1962,6 +2002,10 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 			var lc api.Audit
 			lc.ImageLayerDigest = l.Digest
 			lc.Cmds = l.Cmds
+			if h, ok := layerCriticals[l.Digest]; ok {
+				lc.CriticalVuls = h
+				lc.CriticalCnt = len(h)
+			}
 			if h, ok := layerHighs[l.Digest]; ok {
 				lc.HighVuls = h
 				lc.HighCnt = len(h)
@@ -1989,7 +2033,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	} else if report.Error != share.ScanErrorCode_ScanErrNone {
 		clog.Level = api.LogLevelERR
 		clog.Error = scanUtils.ScanErrorToStr(report.Error)
-	} else if clog.HighCnt > 0 {
+	} else if clog.HighCnt > 0 || clog.CriticalCnt > 0 {
 		clog.Level = api.LogLevelCRIT
 	} else if clog.MediumCnt > 0 {
 		clog.Level = api.LogLevelWARNING

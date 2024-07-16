@@ -38,32 +38,34 @@ const (
 )
 
 type ScannedImageSummary struct {
-	ImageID         string
-	BaseOS          string
-	Registry        string
-	RegName         string
-	Digest          string
-	Author          string
-	ScannedAt       time.Time
-	Result          int32
-	CriticalVuls    int
-	HighVuls        int
-	MedVuls         int
-	HighVulsWithFix int
-	VulScore        float32
-	VulNames        utils.Set
-	Scanned         bool
-	Signed          bool
-	Verifiers       []string
-	RunAsRoot       bool
-	EnvVars         map[string]string
-	Labels          map[string]string
-	HighVulInfo     map[string]share.CLUSScannedVulInfo // key is vul name
-	MediumVulInfo   map[string]share.CLUSScannedVulInfo // key is vul name
-	LowVulInfo      []share.CLUSScannedVulInfoSimple    // only care about score
-	SetIDPermCnt    int                                 // setuid and set gid from image scan
-	SecretsCnt      int                                 // secrets from image scan
-	Modules         []*share.ScanModule
+	ImageID             string
+	BaseOS              string
+	Registry            string
+	RegName             string
+	Digest              string
+	Author              string
+	ScannedAt           time.Time
+	Result              int32
+	CriticalVuls        int
+	HighVuls            int
+	MedVuls             int
+	CriticalVulsWithFix int
+	HighVulsWithFix     int
+	VulScore            float32
+	VulNames            utils.Set
+	Scanned             bool
+	Signed              bool
+	Verifiers           []string
+	RunAsRoot           bool
+	EnvVars             map[string]string
+	Labels              map[string]string
+	CriticalVulInfo     map[string]share.CLUSScannedVulInfo // key is vul name
+	HighVulInfo         map[string]share.CLUSScannedVulInfo // key is vul name
+	MediumVulInfo       map[string]share.CLUSScannedVulInfo // key is vul name
+	LowVulInfo          []share.CLUSScannedVulInfoSimple    // only care about score
+	SetIDPermCnt        int                                 // setuid and set gid from image scan
+	SecretsCnt          int                                 // secrets from image scan
+	Modules             []*share.ScanModule
 }
 
 type K8sContainerType string
@@ -338,8 +340,20 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVECriticalCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
 			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
 				Name:       share.CriteriaKeyCVEHighCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVEHighCountNoCritical,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
@@ -350,8 +364,20 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
+			share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
 			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
 				Name:       share.CriteriaKeyCVEHighWithFixCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:       share.CriteriaKeyCVEHighWithFixCountNoCritical,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
@@ -559,8 +585,18 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVECriticalCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyCVEHighCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVEHighCountNoCritical,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
@@ -569,8 +605,18 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
+			share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
 				Name:     share.CriteriaKeyCVEHighWithFixCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+				Name:     share.CriteriaKeyCVEHighWithFixCountNoCritical,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},

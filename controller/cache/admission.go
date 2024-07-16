@@ -73,38 +73,46 @@ var initFedRole string
 var reservedRegs = make(map[string][]string)
 
 var critDisplayName map[string]string = map[string]string{
-	share.CriteriaKeyImageRegistry:       "image registry",
-	share.CriteriaKeyK8sGroups:           "user groups",
-	share.CriteriaKeyMountVolumes:        "mount volumes",
-	share.CriteriaKeyEnvVars:             "environment variables",
-	share.CriteriaKeyCVENames:            "CVE names",
-	share.CriteriaKeyCVEHighCount:        "count of high severity CVE",
-	share.CriteriaKeyCVEMediumCount:      "count of medium severity CVE",
-	share.CriteriaKeyCVEHighWithFixCount: "count of high severity CVE with fix",
-	share.CriteriaKeyCVEScoreCount:       "CVE score",
-	share.CriteriaKeyImageScanned:        "image scanned",
-	share.CriteriaKeyRunAsPrivileged:     "run as privileged",
-	share.CriteriaKeyRunAsRoot:           "run as root",
-	share.CriteriaKeyImageCompliance:     "image compliance violations",
-	share.CriteriaKeyEnvVarSecrets:       "environment variables with secrets",
-	share.CriteriaKeyImageNoOS:           "image without OS information",
-	share.CriteriaKeySharePidWithHost:    "share host's PID namespaces",
-	share.CriteriaKeyShareIpcWithHost:    "share host's IPC namespaces",
-	share.CriteriaKeyShareNetWithHost:    "share host's network",
-	share.CriteriaKeyAllowPrivEscalation: "allow privilege escalation",
-	share.CriteriaKeyPspCompliance:       "PSP best practice violation",
-	share.CriteriaKeyRequestLimit:        "resource limitation",
-	share.CriteriaKeyCustomPath:          "custom path violation",
-	share.CriteriaKeySaBindRiskyRole:     "service account bounds high risk role violation",
-	share.CriteriaKeyImageVerifiers:      "image verifiers",
-	share.CriteriaKeyStorageClassName:    "StorageClass name",
+	share.CriteriaKeyImageRegistry:                 "image registry",
+	share.CriteriaKeyK8sGroups:                     "user groups",
+	share.CriteriaKeyMountVolumes:                  "mount volumes",
+	share.CriteriaKeyEnvVars:                       "environment variables",
+	share.CriteriaKeyCVENames:                      "CVE names",
+	share.CriteriaKeyCVECriticalCount:              "count of critical severity CVE",
+	share.CriteriaKeyCVEHighCount:                  "count of high and critical severity CVE",
+	share.CriteriaKeyCVEHighCountNoCritical:        "count of high severity CVE, not including critical severity CVE",
+	share.CriteriaKeyCVEMediumCount:                "count of medium severity CVE",
+	share.CriteriaKeyCVECriticalWithFixCount:       "count of critical severity CVE with fix",
+	share.CriteriaKeyCVEHighWithFixCount:           "count of high and critical severity CVE with fix",
+	share.CriteriaKeyCVEHighWithFixCountNoCritical: "count of high severity CVE with fix, not including critical severity CVE with fix",
+	share.CriteriaKeyCVEScoreCount:                 "CVE score",
+	share.CriteriaKeyImageScanned:                  "image scanned",
+	share.CriteriaKeyRunAsPrivileged:               "run as privileged",
+	share.CriteriaKeyRunAsRoot:                     "run as root",
+	share.CriteriaKeyImageCompliance:               "image compliance violations",
+	share.CriteriaKeyEnvVarSecrets:                 "environment variables with secrets",
+	share.CriteriaKeyImageNoOS:                     "image without OS information",
+	share.CriteriaKeySharePidWithHost:              "share host's PID namespaces",
+	share.CriteriaKeyShareIpcWithHost:              "share host's IPC namespaces",
+	share.CriteriaKeyShareNetWithHost:              "share host's network",
+	share.CriteriaKeyAllowPrivEscalation:           "allow privilege escalation",
+	share.CriteriaKeyPspCompliance:                 "PSP best practice violation",
+	share.CriteriaKeyRequestLimit:                  "resource limitation",
+	share.CriteriaKeyCustomPath:                    "custom path violation",
+	share.CriteriaKeySaBindRiskyRole:               "service account bounds high risk role violation",
+	share.CriteriaKeyImageVerifiers:                "image verifiers",
+	share.CriteriaKeyStorageClassName:              "StorageClass name",
 }
 
 var critDisplayName2 map[string]string = map[string]string{ // for criteria that have sub-criteria
-	share.CriteriaKeyCVEHighCount:        "more than %s high severity CVEs that were reported before %s days ago",
-	share.CriteriaKeyCVEMediumCount:      "more than %s medium severity CVEs that were reported before %s days ago",
-	share.CriteriaKeyCVEHighWithFixCount: "more than %s high severity CVEs with fix that were reported before %s days ago",
-	share.CriteriaKeyCVEScoreCount:       "more than %s CVEs whose score >= %s",
+	share.CriteriaKeyCVECriticalCount:              "more than %s critical severity CVEs that were reported before %s days ago",
+	share.CriteriaKeyCVEHighCount:                  "more than %s high and critical severity CVEs that were reported before %s days ago",
+	share.CriteriaKeyCVEHighCountNoCritical:        "more than %s high severity CVEs that were reported before %s days ago",
+	share.CriteriaKeyCVEMediumCount:                "more than %s medium severity CVEs that were reported before %s days ago",
+	share.CriteriaKeyCVECriticalWithFixCount:       "more than %s critical severity CVEs with fix that were reported before %s days ago",
+	share.CriteriaKeyCVEHighWithFixCount:           "more than %s high and critical severity CVEs with fix that were reported before %s days ago",
+	share.CriteriaKeyCVEHighWithFixCountNoCritical: "more than %s high severity CVEs with fix that were reported before %s days ago",
+	share.CriteriaKeyCVEScoreCount:                 "more than %s CVEs whose score >= %s",
 }
 
 var predefinedRiskyRoles map[string]string = map[string]string{
@@ -695,7 +703,7 @@ func isNumericCriterionMet(crt *share.CLUSAdmRuleCriterion, v1 interface{}, v2 i
 	return false, true
 }
 
-func isCveCountCriterionMet(crt *share.CLUSAdmRuleCriterion, checkWithFix bool, highVulsWithFix int, vulInfo map[string]share.CLUSScannedVulInfo) (bool, bool) {
+func isCveCountCriterionMet(crt *share.CLUSAdmRuleCriterion, checkWithFix bool, vulsWithFix int, vulInfo map[string]share.CLUSScannedVulInfo) (bool, bool) {
 	cveCount := 0
 	if len(crt.SubCriteria) > 0 {
 		for _, sc := range crt.SubCriteria {
@@ -725,8 +733,8 @@ func isCveCountCriterionMet(crt *share.CLUSAdmRuleCriterion, checkWithFix bool, 
 				log.WithFields(log.Fields{"name": sc.Name, "op": sc.Op}).Error("unsupported op")
 			}
 		}
-	} else if checkWithFix { // for cveHighWithFixCount
-		cveCount = highVulsWithFix
+	} else if checkWithFix { // for cveHighWithFixCount, cveHighWithFixCountNoCritical, cveCriticalWithFixCount
+		cveCount = vulsWithFix
 	} else { // for cveHighCount, cveMediumCount
 		cveCount = len(vulInfo)
 	}
@@ -1313,6 +1321,21 @@ func pssViolations(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmContain
 	return []string{} // invalid policy
 }
 
+// to recollect critical and high vulnerabilities to use in legacy admission control rules
+func mergeVulnMaps(highVulns, criticalVulns map[string]share.CLUSScannedVulInfo) map[string]share.CLUSScannedVulInfo {
+	mergedVulns := make(map[string]share.CLUSScannedVulInfo)
+
+	for k, v := range highVulns {
+		mergedVulns[k] = v
+	}
+
+	for k, v := range criticalVulns {
+		mergedVulns[k] = v
+	}
+
+	return mergedVulns
+}
+
 // For criteria of same type, apply 'and' for all negative matches until the first positive match;
 //
 //	apply 'or' after the first positive match;
@@ -1397,14 +1420,22 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			met, positive = isSetCriterionMet(crt, c.ImageRegistry)
 		//case share.CriteriaKeyBaseImage: //-> is base image available?
 		//	met, positive = isStringCriterionMet(crt, scannedImage.BaseName)
-		case share.CriteriaKeyCVEHighCount:
+		case share.CriteriaKeyCVECriticalCount:
+			met, positive = isCveCountCriterionMet(crt, false, 0, scannedImage.CriticalVulInfo)
+		case share.CriteriaKeyCVEHighCountNoCritical:
 			met, positive = isCveCountCriterionMet(crt, false, 0, scannedImage.HighVulInfo)
+		case share.CriteriaKeyCVEHighCount:
+			met, positive = isCveCountCriterionMet(crt, false, 0, mergeVulnMaps(scannedImage.HighVulInfo, scannedImage.CriticalVulInfo))
 		case share.CriteriaKeyCVEMediumCount:
 			met, positive = isCveCountCriterionMet(crt, false, 0, scannedImage.MediumVulInfo)
-		case share.CriteriaKeyCVEHighWithFixCount:
+		case share.CriteriaKeyCVECriticalWithFixCount:
+			met, positive = isCveCountCriterionMet(crt, true, scannedImage.CriticalVulsWithFix, scannedImage.CriticalVulInfo)
+		case share.CriteriaKeyCVEHighWithFixCountNoCritical:
 			met, positive = isCveCountCriterionMet(crt, true, scannedImage.HighVulsWithFix, scannedImage.HighVulInfo)
+		case share.CriteriaKeyCVEHighWithFixCount:
+			met, positive = isCveCountCriterionMet(crt, true, scannedImage.HighVulsWithFix+scannedImage.CriticalVulsWithFix, mergeVulnMaps(scannedImage.HighVulInfo, scannedImage.CriticalVulInfo))
 		case share.CriteriaKeyCVEScoreCount:
-			met, positive = isCveScoreCountCriterionMet(crt, scannedImage.HighVulInfo, scannedImage.MediumVulInfo, scannedImage.LowVulInfo)
+			met, positive = isCveScoreCountCriterionMet(crt, mergeVulnMaps(scannedImage.HighVulInfo, scannedImage.CriticalVulInfo), scannedImage.MediumVulInfo, scannedImage.LowVulInfo)
 		case share.CriteriaKeyCVEScore:
 			met, positive = isNumericCriterionMet(crt, &scannedImage.VulScore, &crt.Value)
 		case share.CriteriaKeyImageScanned:
