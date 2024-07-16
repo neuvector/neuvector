@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mitchellh/pointerstructure"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -244,57 +245,65 @@ func NewWebHook(url, target string) *Webhook {
 	return w
 }
 
+func getFieldStringValue(elog interface{}, fieldName string) (string, error) {
+	var value string
+	var ok bool
+
+	field, err := pointerstructure.Get(elog, fieldName)
+	if err != nil {
+		return value, fmt.Errorf("invalid fieldName: %s", fieldName)
+	}
+	value, ok = field.(string)
+
+	if ok {
+		return value, nil
+	} else {
+		return value, fmt.Errorf("fieldName: %s is not string", fieldName)
+	}
+}
+
 func getDetailInfoFromLog(elog interface{}) string {
-	details := ""
-	v := reflect.ValueOf(elog).Elem()
-
-	if field := v.FieldByName("ClusterName"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("cluster: %s, ", field.String())
+	var builder strings.Builder
+	fieldOrder := []string{
+		"/LogCommon/ClusterName",
+		"/WorkloadDomain",
+		"/WorkloadImage",
+		"/ClientWLDomain",
+		"/ClientDomain",
+		"/ClientWLImage",
+		"/ClientImage",
+		"/ServerWLDomain",
+		"/ServerDomain",
+		"/ServerWLImage",
+		"/ServerImage",
+		"/LogCommon/HostName",
+		"/LogCommon/ReportedAt",
 	}
 
-	// For Audit, Incident, Event
-	if field := v.FieldByName("WorkloadDomain"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("namespace: %s, ", field.String())
+	fieldNames := map[string]string{
+		"/LogCommon/ClusterName": "cluster",
+		"/WorkloadDomain":        "namespace",
+		"/WorkloadImage":         "image",
+		"/ClientWLDomain":        "client namespace",
+		"/ClientDomain":          "client namespace",
+		"/ClientWLImage":         "client image",
+		"/ClientImage":           "client image",
+		"/ServerWLDomain":        "server namespace",
+		"/ServerDomain":          "server namespace",
+		"/ServerWLImage":         "server image",
+		"/ServerImage":           "server image",
+		"/LogCommon/HostName":    "node",
+		"/LogCommon/ReportedAt":  "time",
 	}
 
-	if field := v.FieldByName("WorkloadImage"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("image: %s, ", field.String())
+	for _, fieldName := range fieldOrder {
+		value, err := getFieldStringValue(elog, fieldName)
+		if err == nil {
+			builder.WriteString(fmt.Sprintf("%s: %s, ", fieldNames[fieldName], value))
+		}
 	}
 
-	// For Audit, Incident, Event
-	if field := v.FieldByName("ClientWLDomain"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("client namespace: %s, ", field.String())
-	} else if field := v.FieldByName("ClientDomain"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("client namespace: %s, ", field.String())
-	}
-
-	if field := v.FieldByName("ClientWLImage"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("client image: %s, ", field.String())
-	} else if field := v.FieldByName("ClientImage"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("client image: %s, ", field.String())
-	}
-
-	if field := v.FieldByName("ServerWLDomain"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("server namespace: %s, ", field.String())
-	} else if field := v.FieldByName("ServerDomain"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("server namespace: %s, ", field.String())
-	}
-
-	if field := v.FieldByName("ServerWLImage"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("server image: %s, ", field.String())
-	} else if field := v.FieldByName("ServerImage"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("server image: %s, ", field.String())
-	}
-
-	// Common part
-	if field := v.FieldByName("HostName"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("node: %s, ", field.String())
-	}
-
-	if field := v.FieldByName("ReportedAt"); field.IsValid() && field.Kind() == reflect.String {
-		details += fmt.Sprintf("time: %s, ", field.String())
-	}
-
+	details := builder.String()
 	if len(details) > 0 {
 		details = details[:len(details)-2]
 	}
