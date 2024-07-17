@@ -135,7 +135,7 @@ func UpdateHostContainers(id string, containers int) error {
 }
 
 // for REST[asset]AssetView, used in /v1/assetvul
-func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]string, queryFilter *VulQueryFilter) (*api.RESTAssetView, error) {
+func GetMatchedAssets(vulMap map[string]*DbVulAsset, allowed map[string]utils.Set, queryFilter *VulQueryFilter) (*api.RESTAssetView, error) {
 	var err error
 	assetView := &api.RESTAssetView{}
 
@@ -145,22 +145,22 @@ func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]stri
 	}
 
 	// part 1: assets
-	assetView.Workloads, err = getWorkloadAssetView(vulMap, assetsMap[AssetWorkload], queryFilter, cvePackages)
+	assetView.Workloads, err = getWorkloadAssetView(vulMap, allowed[AssetWorkload].ToStringSlice(), queryFilter, cvePackages)
 	if err != nil {
 		return nil, err
 	}
 
-	assetView.Nodes, err = getHostAssetView(vulMap, assetsMap[AssetNode], queryFilter, cvePackages)
+	assetView.Nodes, err = getHostAssetView(vulMap, allowed[AssetNode].ToStringSlice(), queryFilter, cvePackages)
 	if err != nil {
 		return nil, err
 	}
 
-	assetView.Images, err = getImageAssetView(vulMap, assetsMap[AssetImage], queryFilter, cvePackages)
+	assetView.Images, err = getImageAssetView(vulMap, allowed[AssetImage].ToStringSlice(), queryFilter, cvePackages)
 	if err != nil {
 		return nil, err
 	}
 
-	assetView.Platforms, err = getPlatformAssetView(vulMap, assetsMap[AssetPlatform], queryFilter, cvePackages)
+	assetView.Platforms, err = getPlatformAssetView(vulMap, allowed[AssetPlatform].ToStringSlice(), queryFilter, cvePackages)
 	if err != nil {
 		return nil, err
 	}
