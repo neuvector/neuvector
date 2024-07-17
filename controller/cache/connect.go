@@ -687,7 +687,9 @@ func calGrpMet(lgrpname, epWL string, cache *workloadCache, grpcache *groupCache
 func isCalGrpMet(grpcache *groupCache) bool {
 	if  grpcache.group.MonMetric && (grpcache.group.GrpSessCur > 0 || grpcache.group.GrpSessRate > 0 ||
 		grpcache.group.GrpBandWidth > 0) && (grpcache.group.CfgType == share.Learned ||
-		grpcache.group.CfgType == share.UserCreated) &&	!grpcache.group.Reserved {
+		grpcache.group.CfgType == share.UserCreated || 	grpcache.group.CfgType == share.GroundCfg ||
+		grpcache.group.CfgType == share.FederalCfg) &&	grpcache.group.Kind == share.GroupKindContainer &&
+		!grpcache.group.Reserved {
 		return true
 	}
 	return false
