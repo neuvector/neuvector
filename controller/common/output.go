@@ -304,7 +304,7 @@ func getDetailInfoFromLog(elog interface{}) string {
 	}
 
 	details := builder.String()
-	if len(details) > 0 {
+	if len(details) > 2 {
 		details = details[:len(details)-2]
 	}
 	return details
