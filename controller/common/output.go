@@ -304,6 +304,8 @@ func getDetailInfoFromLog(elog interface{}) string {
 	}
 
 	details := builder.String()
+	// Check if len is > 2 to avoid the potential panic when the length of details is less than 2
+	// This ensures we safely remove the last comma and space from the details string
 	if len(details) > 2 {
 		details = details[:len(details)-2]
 	}
