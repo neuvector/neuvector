@@ -2,16 +2,22 @@ package db
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/alitto/pond"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -822,11 +828,12 @@ func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 		"w_service_group": assetVul.W_service_group,
 		"w_image":         assetVul.W_workload_image,
 
-		"cve_high":   assetVul.CVE_high,
-		"cve_medium": assetVul.CVE_medium,
-		"cve_low":    assetVul.CVE_low,
-		"cve_count":  assetVul.CVE_high + assetVul.CVE_medium + assetVul.CVE_low,
-		"scanned_at": assetVul.Scanned_at,
+		"cve_critical": assetVul.CVE_critical,
+		"cve_high":     assetVul.CVE_high,
+		"cve_medium":   assetVul.CVE_medium,
+		"cve_low":      assetVul.CVE_low,
+		"cve_count":    assetVul.CVE_high + assetVul.CVE_medium + assetVul.CVE_low + assetVul.CVE_critical,
+		"scanned_at":   assetVul.Scanned_at,
 
 		"n_os":     assetVul.N_os,
 		"n_kernel": assetVul.N_kernel,
@@ -839,6 +846,16 @@ func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 		"idns":         assetVul.Idns,
 		"vulsb":        vulsBytes,
 		"modulesb":     modulesBytes,
+
+		"I_created_at":      assetVul.I_created_at,
+		"I_scanned_at":      assetVul.I_scanned_at,
+		"I_digest":          assetVul.I_digest,
+		"I_base_os":         assetVul.I_base_os,
+		"I_repository_name": assetVul.I_repository_name,
+		"I_repository_url":  assetVul.I_repository_url,
+		"I_size":            assetVul.I_size,
+		"I_images":          assetVul.I_images,
+		"I_tag":             assetVul.I_tag,
 	}
 
 	return record
@@ -902,4 +919,359 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 			}
 		}
 	})
+}
+
+func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
+	q := &AssetQueryFilter{
+		Filters: &api.AssetQueryFilterViewModel{},
+	}
+
+	q.QueryToken = r.URL.Query().Get("token")
+	q.QueryStart = getQueryParamInteger(r, startQueryParam, defaultStart)
+	q.QueryCount = getQueryParamInteger(r, rowQueryParam, defaultRowCount)
+	q.Debug = getQueryParamInteger(r, "debug", defaultDebugMode)
+
+	if r.Method == http.MethodPost {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		bodyStr := string(body)
+		if len(bodyStr) > 0 {
+			if err := json.Unmarshal(body, &q.Filters); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if r.Method == http.MethodGet {
+		q.Filters.OrderByColumn = r.URL.Query().Get("orderbyColumn")
+		q.Filters.OrderByType = r.URL.Query().Get("orderby")
+
+		q.Filters.OrderByColumn = validateOrDefault(q.Filters.OrderByColumn, []string{"repository", "imageid", "imageid", "createdat", "os", "size", "scannedat", "cvecount"}, "repository")
+		q.Filters.OrderByType = validateOrDefault(q.Filters.OrderByType, []string{"asc", "desc"}, "asc")
+
+		q.Filters.QuickFilter = r.URL.Query().Get("qf")
+	}
+
+	return q, nil
+}
+
+func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter) (int, []*api.AssetCVECount, error) {
+	dialect := goqu.Dialect("sqlite3")
+	db := dbHandle
+
+	columns := []interface{}{"type", "assetid", "name",
+		"cve_critical", "cve_high", "cve_medium", "cve_low",
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_repository_name", "I_repository_url", "I_size", "I_images"}
+
+	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"type": "image"}).Prepared(true).ToSQL()
+	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("CreateImageAssetSession, fetch assets")
+	rows, err := db.Query(statement, args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+
+	queryToken := queryFilter.QueryToken
+
+	err = CreateSessionAssetTable(queryToken, true)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	assetCount := 0
+	for rows.Next() {
+		asset := &DbAssetVul{}
+
+		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
+			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
+			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os,
+			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_images)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		if !allowed[AssetImage].Contains(asset.AssetID) {
+			continue
+		}
+
+		//
+		var images []share.CLUSImage
+		err = json.Unmarshal([]byte(asset.I_images), &images)
+		if err != nil {
+			log.WithFields(log.Fields{"I_images": asset.I_images, "err": err}).Error("invalid I_images data")
+			continue
+		}
+
+		// asset.AssetID2 = asset.AssetID
+
+		// insert into session table
+		for _, imgObj := range images {
+			assetCount++
+			asset.Name = imgObj.Repo
+			asset.I_tag = imgObj.Tag
+
+			// get cve count as it is VPF dependent
+			criticalCount, highCount, medCount, err := funcGetImageCVECount(asset.I_repository_name, asset.AssetID)
+			if err == nil {
+				asset.CVE_critical = criticalCount
+				asset.CVE_high = highCount
+				asset.CVE_medium = medCount
+			}
+
+			_, err = insertSessionAssetRecord(memoryDbHandle, queryToken, asset)
+			if err != nil {
+				return 0, nil, err
+			}
+		}
+	}
+
+	// do summary - top5 and others
+	sessionTable := formatSessionTempTableName(queryToken)
+	statement, args, _ = dialect.From(sessionTable).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(goqu.Ex{"type": "image"}).Order(goqu.C("cve_count").Desc()).Prepared(true).ToSQL()
+
+	rows, err = memoryDbHandle.Query(statement, args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+
+	tops := make([]*api.AssetCVECount, 0)
+	other := &api.AssetCVECount{
+		DisplayName: "others",
+		ID:          "",
+	}
+	for rows.Next() {
+		record := &api.AssetCVECount{}
+		err = rows.Scan(&record.ID, &record.DisplayName, &record.Critical, &record.High, &record.Medium, &record.Low)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		if len(tops) < 5 {
+			tops = append(tops, record)
+		} else {
+			other.Critical += record.Critical
+			other.High += record.High
+			other.Medium += record.Medium
+			other.Low += record.Low
+		}
+	}
+
+	tops = append(tops, other) // the 6th record is for other
+
+	return assetCount, tops, nil
+}
+
+func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul) (int, error) {
+	tableName := formatSessionTempTableName(sessionToken)
+
+	record := getCompiledAssetVulRecord(assetVul)
+
+	dialect := goqu.Dialect("sqlite3")
+	ds := dialect.Insert(tableName).Rows(record)
+	sql, args, _ := ds.Prepared(true).ToSQL()
+
+	result, err := db.Exec(sql, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	lastInsertID, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(lastInsertID), nil
+}
+
+func DupAssetSessionTableToFile(sessionToken string) error {
+	dialect := goqu.Dialect("sqlite3")
+	sessionDb, err := createSessionFileDb(sessionToken)
+	if err != nil {
+		return err
+	}
+	defer sessionDb.Close()
+
+	err = createSessionAssetTable(sessionDb, sessionToken)
+	if err != nil {
+		return err
+	}
+
+	columns := []interface{}{"type", "assetid", "name",
+		"cve_critical", "cve_high", "cve_medium", "cve_low",
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os",
+		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
+
+	tableName := formatSessionTempTableName(sessionToken)
+	statement, args, _ := dialect.From(tableName).Select(columns...).Prepared(true).ToSQL()
+	rows, err := memoryDbHandle.Query(statement, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		asset := &DbAssetVul{}
+
+		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
+			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
+			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os,
+			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_tag)
+		if err != nil {
+			return err
+		}
+
+		_, err := insertSessionAssetRecord(sessionDb, sessionToken, asset)
+		if err != nil {
+			return err
+		}
+	}
+
+	// update the queryState.FileDb_Ready = 1 in the nvdb.db
+	err = setFileDbState(sessionToken, 1)
+	if err != nil {
+		return err
+	}
+
+	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
+	time.Sleep(30 * time.Second)
+	deleteSessionTempTableInMemDb(sessionToken)
+
+	return nil
+}
+
+func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetViewV2, int, error) {
+
+	getOrderColumn := func(queryFilter *AssetQueryFilter) []exp.OrderedExpression {
+		if queryFilter.Filters.OrderByColumn == "cvecount" {
+			if queryFilter.Filters.OrderByType == "desc" {
+				return []exp.OrderedExpression{goqu.C("cve_critical").Desc(), goqu.C("cve_high").Desc(), goqu.C("cve_medium").Desc()}
+			}
+			return []exp.OrderedExpression{goqu.C("cve_critical").Asc(), goqu.C("cve_high").Asc(), goqu.C("cve_medium").Asc()}
+		}
+
+		column := "name"
+		switch queryFilter.Filters.OrderByColumn {
+		case "repository":
+			column = "name"
+		case "imageid":
+			column = "assetid"
+		case "createdat":
+			column = "I_created_at"
+		case "os":
+			column = "I_base_os"
+		case "size":
+			column = "I_size"
+		case "scannedat":
+			column = "I_scanned_at"
+		}
+
+		if queryFilter.Filters.OrderByType == "desc" { // asc, desc
+			return []exp.OrderedExpression{goqu.I(column).Desc()}
+		}
+		return []exp.OrderedExpression{goqu.I(column).Asc()}
+	}
+
+	buildWhereClause := func(queryFilter *AssetQueryFilter) exp.ExpressionList {
+		if queryFilter.Filters.QuickFilter != "" {
+			repo_exp := goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			id_exp := goqu.C("assetid").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			os_exp := goqu.C("I_base_os").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			createat_exp := goqu.C("I_created_at").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			scanned_exp := goqu.C("I_scanned_at").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+
+			repo_name_exp := goqu.C("I_repository_name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			repo_url_exp := goqu.C("I_repository_url").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+
+			return goqu.Or(repo_exp, id_exp, os_exp, createat_exp, scanned_exp, repo_name_exp, repo_url_exp)
+		}
+
+		return goqu.And(goqu.Ex{})
+	}
+
+	columns := []interface{}{"assetid", "name",
+		"cve_critical", "cve_high", "cve_medium",
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os",
+		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
+
+	sessionToken := queryFilter.QueryToken
+	start := queryFilter.QueryStart
+	row := queryFilter.QueryCount
+
+	sessionTemp := formatSessionTempTableName(sessionToken)
+
+	dialect := goqu.Dialect("sqlite3")
+	var statement string
+	var args []interface{}
+	if row == -1 {
+		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
+	} else {
+		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+	}
+
+	queryStat, err := GetQueryStat(sessionToken)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// fetch data
+	var db *sql.DB
+	if queryStat.FileDBReady == 1 {
+		db, err = openSessionFileDb(sessionToken)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer db.Close() // close it after done
+	} else {
+		db = memoryDbHandle
+	}
+
+	log.WithFields(log.Fields{"statement": statement, "args": args, "db-file": queryStat.FileDBReady}).Debug("fetch assets")
+
+	// execute the query
+	rows, err := db.Query(statement, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	assets := make([]*api.RESTImageAssetViewV2, 0)
+	for rows.Next() {
+		asset := &api.RESTImageAssetViewV2{}
+
+		err = rows.Scan(&asset.ID, &asset.Name,
+			&asset.Critical, &asset.High, &asset.Medium,
+			&asset.CreatedAt, &asset.ScannedAt, &asset.Digest, &asset.BaseOS,
+			&asset.RegName, &asset.Registry, &asset.Size, &asset.Tag)
+		if err != nil {
+			return nil, 0, err
+		}
+		asset.Registry = fmt.Sprintf("%s%s:%s", asset.Registry, asset.Name, asset.Tag)
+
+		assets = append(assets, asset)
+	}
+
+	// expected behavior
+	// 1. when no quick filter, return all assets count
+	// 2. has quick filter, return the matched assets count
+	quickFilterMatched := 0
+	sql, _, _ := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(buildWhereClause(queryFilter)).ToSQL()
+
+	rows, err = db.Query(sql)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&quickFilterMatched)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return assets, quickFilterMatched, nil
 }

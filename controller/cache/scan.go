@@ -497,7 +497,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 		localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
 		alives = vpf.FilterVulTraits(localVulTraits, info.idns)
 		criticals, highs, meds, lows, fixedCriticalsInfo, fixedHighsInfo = scanUtils.GatherVulTrait(localVulTraits)
-    brief := fillScanBrief(info, len(criticals), len(highs), len(meds))
+		brief := fillScanBrief(info, len(criticals), len(highs), len(meds))
 		info.brief = brief
 		info.filteredTime = time.Now()
 
@@ -531,7 +531,10 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 			}
 		}
 
-		db.PopulateAssetVul(dbAssetVul)
+		err := db.PopulateAssetVul(dbAssetVul)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("Failed to poulate asset to db")
+		}
 		report.Vuls = nil
 		report.Modules = nil
 	}

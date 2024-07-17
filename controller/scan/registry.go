@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -175,6 +176,7 @@ func registryInit() {
 		regMap[config.Name] = newRegistry(config)
 		regUnlock()
 	}
+	db.SetGetCVECountFunc(GetImageCVECount)
 }
 
 func becomeScanner() {
@@ -478,7 +480,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			}
 
 			criticals, highs, meds, lows, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, localVulTraits, alives)
-      if info, ok := c.vulInfo[share.VulnSeverityCritical]; ok {
+			if info, ok := c.vulInfo[share.VulnSeverityCritical]; ok {
 				fixedCriticalsInfo = make([]scanUtils.FixedVulInfo, 0, len(info))
 				for _, v := range info {
 					// ks is in format "{vul name}::{package name}"
@@ -557,7 +559,10 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 				dbAssetVul.Idns = string(b)
 			}
 
-			db.PopulateAssetVul(dbAssetVul)
+			err = db.PopulateAssetVul(dbAssetVul)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("Failed to poulate asset to db")
+			}
 			report.Vuls = nil
 			report.Modules = nil
 		}
@@ -1911,16 +1916,43 @@ func IsRegistryImageScanned(id string) bool {
 }
 
 func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, criticals, highs, meds, lows []string) *db.DbAssetVul {
+	b, _ := json.Marshal(sum.Images)
+
 	d := &db.DbAssetVul{
-		Type:         db.AssetImage,
-		AssetID:      sum.ImageID,
-		CVE_critical: c.criticalVuls,
-		CVE_high:     c.highVuls,
-		CVE_medium:   c.medVuls,
-		CVE_low:      len(lows),
+		Type:              db.AssetImage,
+		AssetID:           sum.ImageID,
+		CVE_critical:      c.criticalVuls,
+		CVE_high:          c.highVuls,
+		CVE_medium:        c.medVuls,
+		CVE_low:           len(lows),
+		I_created_at:      sum.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		I_scanned_at:      sum.ScannedAt.Format("2006-01-02T15:04:05Z"),
+		I_digest:          sum.Digest,
+		I_base_os:         sum.BaseOS,
+		I_repository_name: sum.RegName,
+		I_repository_url:  sum.Registry,
+		I_size:            sum.Size,
+		I_images:          string(b),
 	}
 	if len(sum.Images) > 0 {
 		d.Name = fmt.Sprintf("%s:%s", sum.Images[0].Repo, sum.Images[0].Tag)
 	}
 	return d
+}
+
+func GetImageCVECount(name, id string) (int, int, int, error) {
+	var rs *Registry
+	if name == common.RegistryRepoScanName {
+		rs = repoScanRegistry
+	} else if name == common.RegistryFedRepoScanName {
+		rs = repoFedScanRegistry
+	} else if rs, _ = regMapLookup(name); rs == nil {
+		return 0, 0, 0, errors.New("registry not found")
+	}
+
+	if c, ok := rs.cache[id]; ok {
+		return c.criticalVuls, c.highVuls, c.medVuls, nil
+	}
+
+	return 0, 0, 0, errors.New("id not found")
 }

@@ -79,6 +79,14 @@ type VulQueryFilter struct {
 	Filters                        *api.VulQueryFilterViewModel
 }
 
+type AssetQueryFilter struct {
+	QueryToken string
+	QueryStart int
+	QueryCount int
+	Debug      int
+	Filters    *api.AssetQueryFilterViewModel
+}
+
 type DbAssetVul struct {
 	Db_ID   int
 	Type    string
@@ -107,6 +115,16 @@ type DbAssetVul struct {
 
 	P_version string
 	P_base_os string
+
+	I_repository_name string
+	I_repository_url  string
+	I_base_os         string
+	I_size            int64
+	I_created_at      string
+	I_scanned_at      string
+	I_digest          string
+	I_images          string
+	I_tag             string
 
 	Idns string
 }
@@ -170,7 +188,7 @@ var memoryDbHandle *sql.DB = nil
 var funcGetCveRecord func(string, string, string) *DbVulAsset
 var funcGetCVEList func([]byte, string) []string
 var funcFillVulPackages func(*sync.Mutex, map[string]map[string]utils.Set, []byte, string, *[]string, map[string]*int) error
-
+var funcGetImageCVECount func(string, string) (int, int, int, error) // funcGetImageCVECount
 var memdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
@@ -209,11 +227,11 @@ func CreateVulAssetDb(useLocal bool) error {
 	// statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_name_idx on %s (name)", Table_vulassets, Table_vulassets))
 
 	// querystats table
-	columns := []string{"id INTEGER NOT NULL PRIMARY KEY", "token TEXT", "create_timestamp INTEGER", "login_type TEXT", "login_id TEXT", "login_name TEXT", "data1 TEXT", "data2 TEXT", "data3 TEXT", "filedb_ready INTEGER"}
+	columns := []string{"id INTEGER NOT NULL PRIMARY KEY", "token TEXT", "create_timestamp INTEGER", "login_type TEXT", "login_id TEXT", "login_name TEXT", "data1 TEXT", "data2 TEXT", "data3 TEXT", "filedb_ready INTEGER", "type INTEGER"}
 	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS querystats (%s)", strings.Join(columns, ",")))
 
 	// assetvuls table
-	columns = getAssetvulSchema()
+	columns = getAssetvulSchema(true)
 	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", Table_assetvuls, strings.Join(columns, ",")))
 	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_assetid_idx on %s (assetid)", Table_assetvuls, Table_assetvuls))
 	statements = append(statements, fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_w_domain_idx on %s (w_domain)", Table_assetvuls, Table_assetvuls))
@@ -281,6 +299,10 @@ func SetFillVulPackagesFunc(funcObj func(*sync.Mutex, map[string]map[string]util
 	funcFillVulPackages = funcObj
 }
 
+func SetGetCVECountFunc(getImageCVECount func(string, string) (int, int, int, error)) {
+	funcGetImageCVECount = getImageCVECount
+}
+
 func getVulassetSchema() []string {
 	schema := []string{"id INTEGER NOT NULL PRIMARY KEY", "name TEXT", "severity TEXT", "description TEXT", "packages TEXT",
 		"link TEXT", "score INTEGER", "vectors TEXT", "score_v3 INTEGER", "vectors_v3 TEXT",
@@ -292,12 +314,19 @@ func getVulassetSchema() []string {
 	return schema
 }
 
-func getAssetvulSchema() []string {
-	schema := []string{"id INTEGER NOT NULL PRIMARY KEY", "type TEXT", "assetid TEXT UNIQUE", "name TEXT",
+func getAssetvulSchema(uniqueAssetId bool) []string {
+	assetIdColumn := "assetid TEXT"
+	if uniqueAssetId {
+		assetIdColumn = "assetid TEXT UNIQUE"
+	}
+
+	schema := []string{"id INTEGER NOT NULL PRIMARY KEY", "type TEXT", assetIdColumn, "name TEXT",
 		"w_domain TEXT", "w_applications TEXT", "policy_mode TEXT", "w_service_group TEXT", "w_image TEXT",
-		"cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "scanned_at TEXT",
+		"cve_critical INTEGER", "cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "scanned_at TEXT",
 		"n_os TEXT", "n_kernel TEXT", "n_cpus INTEGER", "n_memory INTEGER",
-		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB", "modulesb BLOB"}
+		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB", "modulesb BLOB",
+		"I_created_at TEXT", "I_scanned_at TEXT", "I_digest TEXT", "I_base_os TEXT",
+		"I_repository_name TEXT", "I_repository_url TEXT", "I_size INTEGER", "I_tag TEXT", "I_images TEXT"}
 
 	return schema
 }
