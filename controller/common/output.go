@@ -300,6 +300,8 @@ func getDetailInfoFromLog(elog interface{}) string {
 		value, err := getFieldStringValue(elog, fieldName)
 		if err == nil {
 			builder.WriteString(fmt.Sprintf("%s: %s, ", fieldNames[fieldName], value))
+		} else {
+			log.WithFields(log.Fields{"err": err, "elog": elog}).Debug("Error when get detail info from elog")
 		}
 	}
 
@@ -324,9 +326,12 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
-			logheader := fmt.Sprintf("*%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			var logheader string
+			//  := fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			if comment != "" {
-				logheader += fmt.Sprintf(", Comment: %s*", comment)
+				logheader = fmt.Sprintf("*%s: %s level, Comment: %s*", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
+			} else {
+				logheader = fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			}
 
 			logheader += fmt.Sprintf("\n_%s_", title)
