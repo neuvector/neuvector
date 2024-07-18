@@ -22,6 +22,7 @@ It has these top-level messages:
 	ScannerRegisterData
 	ScannerDeregisterData
 	ControllerCaps
+	ScannerAvailable
 	CLUSFilePacket
 	CLUSAdmissionRequest
 	CLUSAdmissionResponse

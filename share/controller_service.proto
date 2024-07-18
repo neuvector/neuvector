@@ -48,12 +48,17 @@ message ControllerCaps {
     bool CriticalVul = 1;
 }
 
+message ScannerAvailable {
+    bool Visible = 1;
+}
+
 service ControllerScanService {
   rpc ScannerRegister(ScannerRegisterData) returns (RPCVoid);
   rpc ScannerRegisterStream(stream ScannerRegisterData) returns (RPCVoid);
   rpc ScannerDeregister(ScannerDeregisterData) returns (RPCVoid);
   rpc SubmitScanResult(ScanResult) returns (RPCVoid);
   rpc GetCaps(RPCVoid) returns (ControllerCaps);
+  rpc HealthCheck(ScannerRegisterData) returns (ScannerAvailable);
 }
 
 message CLUSFilePacket {
