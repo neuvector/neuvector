@@ -282,7 +282,7 @@ func (ss *ScanService) SubmitScanResult(ctx context.Context, result *share.ScanR
 
 func (s *ScanService) GetCaps(ctx context.Context, v *share.RPCVoid) (*share.ControllerCaps, error) {
 	return &share.ControllerCaps{
-		CriticalVul: true,
+		CriticalVul: false,
 	}, nil
 }
 
