@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"reflect"
@@ -1439,6 +1440,13 @@ func InitContext(ctx *Context) {
 	searchRegistries = utils.NewSet()
 
 	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
+		if parsedReg, err := url.Parse(reg); parsedReg.Host != "" {
+			reg = parsedReg.Host
+		} else if err != nil {
+			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
+			continue
+		}
+
 		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
 		if !searchRegistries.Contains(k) {
 			searchRegistries.Add(k)
