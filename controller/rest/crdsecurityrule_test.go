@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"sigs.k8s.io/yaml"
@@ -280,89 +279,4 @@ func TestParseCrdSecurityRule(t *testing.T) {
 	}
 
 	postTest()
-}
-
-var mockBaseComplianceTags = map[string]share.TagDetails{
-	"HIPPA": share.TagDetails{
-		"HIPPA-1": share.TagDetail{
-			ID:          "HIPPA-1",
-			Title:       "Mock title for HIPPA-1",
-			Description: "Mock description for HIPPA-1",
-		},
-		"HIPPA-2": share.TagDetail{
-			ID:          "HIPPA-2",
-			Title:       "Mock title for HIPPA-2",
-			Description: "Mock description for HIPPA-2",
-		},
-	},
-	"PCI": share.TagDetails{
-		"PCI-1": share.TagDetail{
-			ID:          "PCI-1",
-			Title:       "Mock title for PCI-1",
-			Description: "Mock description for PCI-1",
-		},
-	},
-}
-
-var mockCRDComplianceTags = map[string]share.TagDetails{
-	"HIPPA": share.TagDetails{
-		"HIPPA-1": share.TagDetail{
-			ID:          "HIPPA-1",
-			Title:       "Mock title for HIPPA-1",
-			Description: "Mock description for HIPPA-1",
-		},
-		"HIPPA-3": share.TagDetail{
-			ID:          "HIPPA-3",
-			Title:       "Mock title for HIPPA-3",
-			Description: "Mock description for HIPPA-3",
-		},
-	},
-	"PCIv4": share.TagDetails{
-		"PCIv4-1": share.TagDetail{
-			ID:          "PCIv4-1",
-			Title:       "Mock title for PCIv4-1",
-			Description: "Mock description for PCIv4-1",
-		},
-	},
-}
-
-var mockExpectedComplianceTags = map[string]share.TagDetails{
-	"HIPPA": share.TagDetails{
-		"HIPPA-1": share.TagDetail{
-			ID:          "HIPPA-1",
-			Title:       "Mock title for HIPPA-1",
-			Description: "Mock description for HIPPA-1",
-		},
-		"HIPPA-2": share.TagDetail{
-			ID:          "HIPPA-2",
-			Title:       "Mock title for HIPPA-2",
-			Description: "Mock description for HIPPA-2",
-		},
-		"HIPPA-3": share.TagDetail{
-			ID:          "HIPPA-3",
-			Title:       "Mock title for HIPPA-3",
-			Description: "Mock description for HIPPA-3",
-		},
-	},
-	"PCI": share.TagDetails{
-		"PCI-1": share.TagDetail{
-			ID:          "PCI-1",
-			Title:       "Mock title for PCI-1",
-			Description: "Mock description for PCI-1",
-		},
-	},
-	"PCIv4": share.TagDetails{
-		"PCIv4-1": share.TagDetail{
-			ID:          "PCIv4-1",
-			Title:       "Mock title for PCIv4-1",
-			Description: "Mock description for PCIv4-1",
-		},
-	},
-}
-
-func TestMergeComplianceTags(t *testing.T) {
-	mergeComplianceTag := MergeComplianceTags(mockBaseComplianceTags, mockCRDComplianceTags)
-	if diff := cmp.Diff(mergeComplianceTag, mockExpectedComplianceTags); diff != "" {
-		t.Errorf("mergeComplianceTag mismatch (-want +got):\n%s", diff)
-	}
 }

@@ -32,6 +32,7 @@ var (
 	defaultCISVersion         = "cis-1.8.0"
 	catchDescription          = regexp.MustCompile(`^(.*?) \([^)]*\)$`)
 	complianceMetas           []api.RESTBenchMeta
+	complianceProfileMetas    []api.RESTProfileBenchMeta
 	complianceMetaMap         = make(map[string]api.RESTBenchMeta)
 	imageBenchMetas           []api.RESTBenchMeta
 	imageBenchMetaMap         = make(map[string]api.RESTBenchMeta)
@@ -2840,6 +2841,7 @@ func InitComplianceMeta(platform, flavor, cloudPlatform string) ([]api.RESTBench
 
 	if isUpdateComplianceMetaMap {
 		updateMetasFromMap(&complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
+		updateProfileMetasFromMap(&complianceProfileMetas, complianceMetaMap)
 	}
 
 	return complianceMetas, complianceMetaMap
@@ -2855,9 +2857,19 @@ func GetComplianceMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 
 	if isUpdateComplianceMetaMap {
 		updateMetasFromMap(&complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
+		updateProfileMetasFromMap(&complianceProfileMetas, complianceMetaMap)
 	}
 
 	return complianceMetas, complianceMetaMap
+}
+
+func GetComplianceProfileMeta() []api.RESTProfileBenchMeta {
+	if isUpdateComplianceMetaMap {
+		updateMetasFromMap(&complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
+		updateProfileMetasFromMap(&complianceProfileMetas, complianceMetaMap)
+	}
+
+	return complianceProfileMetas
 }
 
 func InitImageBenchMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
@@ -2903,6 +2915,30 @@ func updateMetasFromMap(slice *[]api.RESTBenchMeta, metaMap map[string]api.RESTB
 	}
 	sort.Slice(*slice, func(i, j int) bool { return (*slice)[i].TestNum < (*slice)[j].TestNum })
 	*updateFlag = false
+}
+
+func updateProfileMetasFromMap(slice *[]api.RESTProfileBenchMeta, metaMap map[string]api.RESTBenchMeta) {
+	*slice = make([]api.RESTProfileBenchMeta, 0, len(metaMap))
+	for _, item := range metaMap {
+		var tags []string
+		for compliance, _ := range item.RESTBenchCheck.Tags {
+			tags = append(tags, compliance)
+		}
+		*slice = append(*slice, api.RESTProfileBenchMeta{
+			RESTProfileBenchCheck: api.RESTProfileBenchCheck{
+				TestNum:     item.RESTBenchCheck.TestNum,
+				Type:        item.RESTBenchCheck.Type,
+				Category:    item.RESTBenchCheck.Category,
+				Scored:      item.RESTBenchCheck.Scored,
+				Profile:     item.RESTBenchCheck.Profile,
+				Automated:   item.RESTBenchCheck.Automated,
+				Description: item.RESTBenchCheck.Description,
+				Remediation: item.RESTBenchCheck.Remediation,
+				Tags:        tags,
+			},
+		})
+	}
+	sort.Slice(*slice, func(i, j int) bool { return (*slice)[i].TestNum < (*slice)[j].TestNum })
 }
 
 func PrepareBackup() {

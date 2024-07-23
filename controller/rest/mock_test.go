@@ -403,26 +403,22 @@ func (m *mockCache) GetProcessProfile(group string, acc *access.AccessControl) (
 func (m *mockCache) GetComplianceProfile(name string, acc *access.AccessControl) (*api.RESTComplianceProfile, map[string][]string, error) {
 	if cp, ok := m.cps[name]; ok {
 		filter := make(map[string][]string)
-		existingTags := make(map[string]map[string]bool)
 		// First create user override entries
 		for _, e := range cp.Entries {
-			var compliances []string
-			for compliance := range e.Tags {
-				compliances = append(compliances, compliance)
-				existingTags[e.TestNum][compliance] = true
-			}
-			filter[e.TestNum] = compliances
+			filter[e.TestNum] = e.Tags
 		}
 
 		// Add checks that are not in the override list
 		_, metaMap := scanUtils.InitComplianceMeta("", "", "")
 		for _, m := range metaMap {
 			if _, ok := filter[m.TestNum]; !ok {
-				for compliance := range m.Tags {
-					if _, ok := existingTags[m.TestNum][compliance]; !ok {
-						filter[m.TestNum] = append(filter[m.TestNum], compliance)
+				var tags []string
+				for _, tagMap := range m.Tags {
+					for complianceTag, _ := range tagMap {
+						tags = append(tags, complianceTag)
 					}
 				}
+				filter[m.TestNum] = tags
 			}
 		}
 

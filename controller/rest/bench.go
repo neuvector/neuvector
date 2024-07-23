@@ -30,6 +30,21 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 			Message:        make([]string, 0),
 			Group:          item.Group,
 		}
+
+		// update the Tags with compliance profile
+		if _, ok := cpf.filter[r.TestNum]; ok {
+			filteredTags := make(map[string]share.TagDetails)
+			for _, compliance := range cpf.filter[r.TestNum] {
+				if tagDetails, ok := metaMap[item.TestNum].Tags[compliance]; ok {
+					filteredTags[compliance] = tagDetails
+				} else {
+					filteredTags[compliance] = share.TagDetails{}
+				}
+			}
+			r.Tags = filteredTags
+		} else {
+			r.Tags = map[string]share.TagDetails{}
+		}
 	} else {
 		// Could be custom check
 		r = &api.RESTBenchItem{
@@ -50,6 +65,16 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 			r.Category = api.BenchCategoryDocker
 		case share.BenchKubeMaster, share.BenchKubeWorker:
 			r.Category = api.BenchCategoryKube
+		}
+
+		if tags, ok := cpf.filter[r.TestNum]; ok {
+			filteredTags := make(map[string]share.TagDetails)
+			for _, compliance := range tags {
+				filteredTags[compliance] = share.TagDetails{}
+			}
+			r.Tags = filteredTags
+		} else {
+			r.Tags = map[string]share.TagDetails{}
 		}
 	}
 
@@ -85,13 +110,6 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 	if len(r.Message) > 0 {
 		allMessages := strings.Join(r.Message, ", ")
 		r.Description = fmt.Sprintf("%s - %s", r.Description, allMessages)
-	}
-
-	// add tags
-	if _, ok := cpf.filter[r.TestNum]; ok {
-		r.Tags = metaMap[r.TestNum].Tags
-	} else {
-		r.Tags = map[string]share.TagDetails{}
 	}
 
 	return r

@@ -7,7 +7,6 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/share"
 )
 
 func TestComplianceProfileConfig(t *testing.T) {
@@ -65,14 +64,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		Name: "default",
 		Entries: &[]*api.RESTComplianceProfileEntry{
 			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1"},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: map[string]share.TagDetails{
-				"PCI": share.TagDetails{},
-			}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.2", Tags: map[string]share.TagDetails{
-				"HIPAA": share.TagDetails{},
-				"PCI":   share.TagDetails{},
-				"GDPR":  share.TagDetails{},
-			}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCI"}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.2", Tags: []string{"PCI", "HIPAA", "PCI"}},
 		},
 	}
 	data = api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -110,20 +103,10 @@ func TestComplianceProfileConfig(t *testing.T) {
 	cfg = api.RESTComplianceProfileConfig{
 		Name: "default",
 		Entries: &[]*api.RESTComplianceProfileEntry{
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: map[string]share.TagDetails{
-				"PCI": share.TagDetails{},
-			}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: map[string]share.TagDetails{
-				"HIPAA": share.TagDetails{},
-				"PCI":   share.TagDetails{},
-			}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: map[string]share.TagDetails{
-				"NIST": share.TagDetails{},
-				"PCI":  share.TagDetails{},
-			}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: map[string]share.TagDetails{
-				"GDPR": share.TagDetails{},
-			}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: []string{"PCI"}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCI", "HIPAA"}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: []string{"NIST", "PCI"}},
+			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"GDPR"}},
 		},
 	}
 	data = api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -145,9 +128,7 @@ func TestComplianceProfileConfig(t *testing.T) {
 	}
 
 	// Add an entry
-	e := api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: map[string]share.TagDetails{
-		"NIST": share.TagDetails{},
-	}}
+	e := api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: []string{"NIST"}}
 	edata := api.RESTComplianceProfileEntryConfigData{Config: &e}
 	body, _ = json.Marshal(edata)
 
@@ -162,11 +143,7 @@ func TestComplianceProfileConfig(t *testing.T) {
 	}
 
 	// Modify the entry
-	e = api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: map[string]share.TagDetails{
-		"PCI":  share.TagDetails{},
-		"GDPR": share.TagDetails{},
-		"NIST": share.TagDetails{},
-	}}
+	e = api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: []string{"PCI", "GDPR", "NIST"}}
 	edata = api.RESTComplianceProfileEntryConfigData{Config: &e}
 	body, _ = json.Marshal(edata)
 
@@ -186,7 +163,7 @@ func TestComplianceProfileConfig(t *testing.T) {
 	}
 
 	// Make the entry empty
-	e = api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: map[string]share.TagDetails{}}
+	e = api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: []string{}}
 	edata = api.RESTComplianceProfileEntryConfigData{Config: &e}
 	body, _ = json.Marshal(edata)
 
@@ -262,9 +239,7 @@ func TestComplianceProfileNegative(t *testing.T) {
 		cfg := api.RESTComplianceProfileConfig{
 			Name: "default",
 			Entries: &[]*api.RESTComplianceProfileEntry{
-				&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: map[string]share.TagDetails{
-					"PCPI": share.TagDetails{},
-				}},
+				&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCPI"}},
 			},
 		}
 		data := api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -277,9 +252,7 @@ func TestComplianceProfileNegative(t *testing.T) {
 	}
 
 	{
-		e := api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: map[string]share.TagDetails{
-			"NISTY": share.TagDetails{},
-		}}
+		e := api.RESTComplianceProfileEntry{TestNum: "K.1.2.1", Tags: []string{"NISTY"}}
 		edata := api.RESTComplianceProfileEntryConfigData{Config: &e}
 		body, _ := json.Marshal(edata)
 

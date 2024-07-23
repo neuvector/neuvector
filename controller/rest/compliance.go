@@ -35,10 +35,7 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	// Remove Metas replace with new [] get it dynamically
-	metas, _ := scanUtils.GetComplianceMeta()
-
-	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
+	resp := api.RESTListData{List: &api.RESTList{Compliance: scanUtils.GetComplianceProfileMeta()}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
 }
 
@@ -135,7 +132,7 @@ func handlerGetAvaiableComplianceFilter(w http.ResponseWriter, r *http.Request, 
 			}
 
 			// Add user new selections to ensure we have count the filter correct
-			for compliance, _ := range entry.Tags {
+			for _, compliance := range entry.Tags {
 				complianceFilterMap[compliance]++
 			}
 		}
@@ -198,36 +195,23 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
 	_, metaMap := scanUtils.GetComplianceMeta()
-	meta, ok := metaMap[re.TestNum]
-	if !ok {
+	if _, ok := metaMap[re.TestNum]; !ok {
 		return errors.New("Unknonwn compliance ID")
 	}
 
-	complianceMeta := map[string]share.TagDetails{}
-	for compliance, complianceDetails := range meta.Tags {
-		complianceMeta[compliance] = complianceDetails
-	}
-
-	resultTags := map[string]share.TagDetails{}
-	for compliance, complianceDetails := range re.Tags {
-		existInTagMap := false
-		if _, ok := complianceMeta[compliance]; ok {
-			existInTagMap = true
-		}
-
-		if existInTagMap {
-			resultTags[compliance] = complianceDetails
-		} else {
-			switch compliance {
-			case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST, api.ComplianceTemplatePCIv4, api.ComplianceTemplateDISA:
-				resultTags[compliance] = share.TagDetails{}
-			default:
-				return errors.New("Invalid compliance profile template values")
-			}
+	// Make sure empty tags is allowed
+	tagSet := utils.NewSet()
+	for _, t := range re.Tags {
+		switch t {
+		case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST, api.ComplianceTemplatePCIv4, api.ComplianceTemplateDISA:
+			tagSet.Add(t)
+		default:
+			return errors.New("Invalid compliance profile template values")
 		}
 	}
-
-	ccp.Entries[re.TestNum] = share.CLUSComplianceProfileEntry{TestNum: re.TestNum, Tags: resultTags}
+	tags := tagSet.ToStringSlice()
+	sort.Strings(tags)
+	ccp.Entries[re.TestNum] = share.CLUSComplianceProfileEntry{TestNum: re.TestNum, Tags: tags}
 	return nil
 }
 

@@ -517,9 +517,9 @@ type RESTEULAData struct {
 }
 
 type RESTList struct {
-	Application  []string        `json:"application,omitempty"`
-	RegistryType []string        `json:"registry_type,omitempty"`
-	Compliance   []RESTBenchMeta `json:"compliance,omitempty"`
+	Application  []string               `json:"application,omitempty"`
+	RegistryType []string               `json:"registry_type,omitempty"`
+	Compliance   []RESTProfileBenchMeta `json:"compliance,omitempty"`
 }
 
 type RESTListData struct {
@@ -2607,11 +2607,27 @@ type RESTBenchCheck struct {
 	Automated   bool                        `json:"automated"`
 	Description string                      `json:"description"`
 	Remediation string                      `json:"remediation"`
-	Tags        map[string]share.TagDetails `json:"tags,omitempty"`
+	Tags        map[string]share.TagDetails `json:"tags"`
+}
+
+type RESTProfileBenchCheck struct {
+	TestNum     string   `json:"test_number"`
+	Category    string   `json:"category"`
+	Type        string   `json:"type"`
+	Profile     string   `json:"profile"`
+	Scored      bool     `json:"scored"`
+	Automated   bool     `json:"automated"`
+	Description string   `json:"description"`
+	Remediation string   `json:"remediation"`
+	Tags        []string `json:"tags"`
 }
 
 type RESTBenchMeta struct {
 	RESTBenchCheck
+}
+
+type RESTProfileBenchMeta struct {
+	RESTProfileBenchCheck
 }
 
 type RESTBenchItem struct {
@@ -2649,7 +2665,7 @@ type RESTComplianceAsset struct {
 	Message     []string                    `json:"message"`
 	Remediation string                      `json:"remediation"`
 	Group       string                      `json:"group"`
-	Tags        map[string]share.TagDetails `json:"tags,omitempty"`
+	Tags        map[string]share.TagDetails `json:"tags"`
 	Workloads   []string                    `json:"workloads"`
 	Nodes       []string                    `json:"nodes"`
 	Images      []string                    `json:"images"`
@@ -2677,8 +2693,8 @@ const (
 )
 
 type RESTComplianceProfileEntry struct {
-	TestNum string                      `json:"test_number"`
-	Tags    map[string]share.TagDetails `json:"tags,omitempty"`
+	TestNum string   `json:"test_number"`
+	Tags    []string `json:"tags"`
 }
 
 type RESTComplianceProfile struct {
