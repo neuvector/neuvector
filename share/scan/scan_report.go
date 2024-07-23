@@ -392,9 +392,12 @@ func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {
 	}
 
 	if v.Severity == "" {
-		if v.Score >= 9 || v.ScoreV3 >= 9 {
-			v.Severity = share.VulnSeverityCritical
-		} else if v.Score >= 7 || v.ScoreV3 >= 7 {
+		// NVSHAS-8242: temporary reversion
+		// if v.Score >= 9 || v.ScoreV3 >= 9 {
+		// 	v.Severity = share.VulnSeverityCritical
+		// } else
+
+		if v.Score >= 7 || v.ScoreV3 >= 7 {
 			v.Severity = share.VulnSeverityHigh
 		} else if v.Score >= 4 || v.ScoreV3 >= 4 {
 			v.Severity = share.VulnSeverityMedium
@@ -527,9 +530,10 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 			pkgName:  v.PackageName, pkgVer: v.PackageVersion, fixVer: v.FixedVersion,
 		}
 
-		if v.Score >= 9 || v.ScoreV3 >= 9 {
-			traits[i].severity = vulnSeverityCritical
-		}
+		// NVSHAS-8242: temporary reversion
+		// if v.Score >= 9 || v.ScoreV3 >= 9 {
+		// 	traits[i].severity = vulnSeverityCritical
+		// }
 	}
 	return traits
 }
