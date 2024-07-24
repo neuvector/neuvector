@@ -3963,6 +3963,13 @@ type VulQueryFilterViewModel struct {
 	DebugCVEName     string `json:"debugcve"`
 }
 
+type AssetQueryFilterViewModel struct {
+	Type          string `json:"type"`
+	QuickFilter   string `json:"quickFilter"`
+	OrderByColumn string `json:"orderbyColumn"`
+	OrderByType   string `json:"orderby"`
+}
+
 type UserAccessControl struct {
 	LoginName           string
 	LoginID             string
@@ -3977,10 +3984,12 @@ type UserAccessControl struct {
 }
 
 type QuerySessionRequest struct {
+	Type         int // 0=vul, 1=asset
 	QueryToken   string
 	CreationTime int64
 	UserAccess   *UserAccessControl
 	Filters      *VulQueryFilterViewModel
+	FiltersAsset *AssetQueryFilterViewModel
 }
 
 type RESTAssetView struct {
@@ -3989,7 +3998,7 @@ type RESTAssetView struct {
 	Platforms []*RESTPlatformAssetView    `json:"platforms"`
 	Images    []*RESTImageAssetView       `json:"images"`
 	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
-	QueryStat *RESTScanAssetQueryStats    `json:"summary"`
+	QueryStat *RESTVulQueryStats          `json:"summary"`
 }
 
 type RESTWorkloadAssetView struct {
@@ -4042,12 +4051,40 @@ type RESTImageAssetView struct {
 	Vulnerabilities []string `json:"vulnerabilities"`
 }
 
-type RESTScanAssetQueryStats struct {
+type RESTImageAssetViewV2 struct {
+	ID        string `json:"image_id"`
+	Name      string `json:"repository"`
+	Critical  int    `json:"critical,omitempty"`
+	High      int    `json:"high"`
+	Medium    int    `json:"medium"`
+	CreatedAt string `json:"created_at"`
+	ScannedAt string `json:"scanned_at"`
+	Digest    string `json:"digest"`
+	BaseOS    string `json:"base_os"`
+	RegName   string `json:"reg_name"`
+	Registry  string `json:"repo_url"`
+	Size      int    `json:"size"`
+	Tag       string `json:"tag"`
+}
+
+type RESTVulQueryStats struct {
 	TotalRecordCount        int                     `json:"total_records"`
 	TotalMatchedRecordCount int                     `json:"total_matched_records"`
 	QueryToken              string                  `json:"query_token"`
 	PerfStats               []string                `json:"debug_perf_stats"`
 	Summary                 *VulAssetSessionSummary `json:"summary"`
+}
+
+// for asset pagination
+type RESTAssetQueryStats struct {
+	TotalRecordCount int                  `json:"total_records"`
+	QueryToken       string               `json:"query_token"`
+	PerfStats        []string             `json:"debug_perf_stats"`
+	Summary          *AssetSessionSummary `json:"summary"`
+}
+
+type AssetSessionSummary struct {
+	TopImages []*AssetCVECount `json:"top_images"`
 }
 
 type VulAssetSessionSummary struct {
@@ -4057,7 +4094,7 @@ type VulAssetSessionSummary struct {
 }
 
 type VulAssetCountDist struct {
-	Critical   int `json:"critical"`
+	Critical   int `json:"critical,omitempty"`
 	High       int `json:"high"`
 	Medium     int `json:"medium"`
 	Low        int `json:"low"`
@@ -4070,7 +4107,7 @@ type VulAssetCountDist struct {
 type AssetCVECount struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
-	Critical    int    `json:"critical"`
+	Critical    int    `json:"critical,omitempty"`
 	High        int    `json:"high"`
 	Medium      int    `json:"medium"`
 	Low         int    `json:"low"`

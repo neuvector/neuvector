@@ -1690,10 +1690,12 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.DELETE("/v1/scan/registry/:name/scan", handlerRegistryStop)
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
-	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
-	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
-	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
-	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
+	r.GET("/v1/scan/asset", handlerAssetVulnerability)      // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)           // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)               // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)                 // skip API document
+	r.POST("/v1/scan/asset/images", handlerAssetViewCreate) // skip API document
+	r.GET("/v1/scan/asset/images", handlerAssetViewGet)     // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
