@@ -1460,10 +1460,11 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 					atomic.StoreInt32(&watchFailedFlag, 1)
 				}
 
-				if scb != nil {
-					scb(ConnStateDisconnected, e)
-				}
+				// Ignore io.EOF per https://github.com/kubernetes/client-go/issues/623
 				if !strings.HasSuffix(e.Error(), io.EOF.Error()) {
+					if scb != nil {
+						scb(ConnStateDisconnected, e)
+					}
 					log.WithFields(log.Fields{"resource": rt, "error": e}).Error("Watch failure")
 					time.Sleep(kubeWatchRetry)
 				}
