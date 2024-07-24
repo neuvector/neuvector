@@ -1442,7 +1442,7 @@ func initCertificates() error {
 				}
 
 				if newcert.OldCert != nil {
-					if expiryDate, err := getExpiryDate([]byte(oldcert.Cert)); err != nil {
+					if expiryDate, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
 						log.WithError(err).Error("failed to get cert's expiry time.")
 					} else {
 						oldExpiryDate = &expiryDate
@@ -1899,7 +1899,6 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 			defer tlsMutex.RUnlock()
 			return tlsCertificate, nil
 		}
-		config.Certificates = []tls.Certificate{*tlsCertificate}
 	}
 
 	server := &http.Server{
@@ -1987,7 +1986,6 @@ func startFedRestServer(fedPingInterval uint32) {
 					defer tlsMutex.RUnlock()
 					return tlsCertificate, nil
 				}
-				server.TLSConfig.Certificates = []tls.Certificate{*tlsCertificate}
 			}
 		}
 		for i := 0; i < 5; i++ {
