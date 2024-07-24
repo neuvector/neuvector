@@ -581,7 +581,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 	if w.status != http.StatusUnauthorized {
 		t.Errorf("Login should fail, server not enable: status=%v.", w.status)
 	}
-	if _, authz := lookupShadowUser(saml.Name, "", username, "", "", "", make(map[string][]string), share.NvPermissions{}, nil); authz {
+	if _, authz := lookupShadowUser(saml.Name, "", username, "", "", "", make(map[string][]string), share.NvPermissions{}, nil, nil); authz {
 		t.Errorf("No shadow user should be created.")
 	}
 

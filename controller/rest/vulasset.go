@@ -422,7 +422,7 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 
 	// apply cve based filter (last modified time)
 	start := time.Now()
-	vulMap, assetsMap, err := db.GetSessionMatchedVuls(allowed, queryFilter.QueryToken, queryFilter.Filters.LastModifiedTime)
+	vulMap, err := db.GetSessionMatchedVuls(allowed, queryFilter.QueryToken, queryFilter.Filters.LastModifiedTime)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return
@@ -430,9 +430,9 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start)
 	perfStat.PerfStats = append(perfStat.PerfStats, fmt.Sprintf("1/2, get vul from db, took=%v", elapsed))
 
-	// apply asset filtering to get data from [assetvuls] table, only return matched assets
+	// get assets
 	start = time.Now()
-	resp, err := db.GetMatchedAssets(vulMap, assetsMap, queryFilter) // queryFilter *VulQueryFilter
+	resp, err := db.GetMatchedAssets(vulMap, allowed, queryFilter)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return

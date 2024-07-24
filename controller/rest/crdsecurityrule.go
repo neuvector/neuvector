@@ -97,15 +97,26 @@ func group2RESTConfig(group *api.RESTGroup) *api.RESTCrdGroupConfig {
 		Comment:  group.Comment,
 		Criteria: &criteria,
 	}
+	if !group.Reserved && group.Kind == share.GroupKindContainer {
+		r.MonMetric = &group.MonMetric
+		r.GrpSessCur = &group.GrpSessCur
+		r.GrpSessRate = &group.GrpSessRate
+		r.GrpBandWidth = &group.GrpBandWidth
+	}
+
 	return &r
 }
 
 func crdConfig2GroupConfig(group *api.RESTCrdGroupConfig) *api.RESTGroupConfig {
 	r := api.RESTGroupConfig{
-		Name:     group.Name,
-		Criteria: group.Criteria,
-		CfgType:  api.CfgTypeGround,
-		Comment:  &group.Comment,
+		Name:         group.Name,
+		Criteria:     group.Criteria,
+		CfgType:      api.CfgTypeGround,
+		Comment:      &group.Comment,
+		MonMetric:    group.MonMetric,
+		GrpSessCur:   group.GrpSessCur,
+		GrpSessRate:  group.GrpSessRate,
+		GrpBandWidth: group.GrpBandWidth,
 	}
 	if r.Criteria != nil {
 		entries := *r.Criteria
@@ -215,6 +226,25 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 				cg.CfgType = share.GroundCfg // update its type
 				updateKV = true
 			}
+			if cg.Kind == share.GroupKindContainer && !cg.Reserved {
+				if group.MonMetric != nil && cg.MonMetric != *group.MonMetric {
+					cg.MonMetric = *group.MonMetric
+					updateKV = true
+				}
+				if group.GrpSessCur != nil && cg.GrpSessCur != *group.GrpSessCur {
+					cg.GrpSessCur = *group.GrpSessCur
+					updateKV = true
+				}
+				if group.GrpSessRate != nil && cg.GrpSessRate != *group.GrpSessRate {
+					cg.GrpSessRate = *group.GrpSessRate
+					updateKV = true
+				}
+				if group.GrpBandWidth != nil && cg.GrpBandWidth != *group.GrpBandWidth {
+					cg.GrpBandWidth = *group.GrpBandWidth
+					updateKV = true
+				}
+
+			}
 			if updateKV {
 				clusHelper.PutGroupTxn(txn, cg)
 			}
@@ -257,6 +287,21 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 					if ct.Key == share.CriteriaKeyAddress {
 						cg.Kind = share.GroupKindAddress
 					}
+				}
+				if cg.Kind == share.GroupKindContainer && !cg.Reserved {
+					if group.MonMetric != nil {
+						cg.MonMetric = *group.MonMetric
+					}
+					if group.GrpSessCur != nil {
+						cg.GrpSessCur = *group.GrpSessCur
+					}
+					if group.GrpSessRate != nil {
+						cg.GrpSessRate = *group.GrpSessRate
+					}
+					if group.GrpBandWidth != nil {
+						cg.GrpBandWidth = *group.GrpBandWidth
+					}
+
 				}
 			}
 
@@ -342,6 +387,23 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 					cg.Domain = ct.Value
 				}
 			}
+
+			if cg.Kind == share.GroupKindContainer && !cg.Reserved {
+				if group.MonMetric != nil {
+					cg.MonMetric = *group.MonMetric
+				}
+				if group.GrpSessCur != nil {
+					cg.GrpSessCur = *group.GrpSessCur
+				}
+				if group.GrpSessRate != nil {
+					cg.GrpSessRate = *group.GrpSessRate
+				}
+				if group.GrpBandWidth != nil {
+					cg.GrpBandWidth = *group.GrpBandWidth
+				}
+
+			}
+
 			clusHelper.PutGroupTxn(txn, cg)
 			groupsInCR = append(groupsInCR, group.Name)
 		}
@@ -1681,6 +1743,12 @@ func (h *nvCrdHandler) parseCrdGroup(crdgroupCfg *api.RESTCrdGroupConfig, curGro
 	var err int
 	var retMsg string
 	groupCfg := crdConfig2GroupConfig(crdgroupCfg)
+	if owner != "target" {
+		groupCfg.MonMetric = nil
+		groupCfg.GrpSessCur = nil
+		groupCfg.GrpSessRate = nil
+		groupCfg.GrpBandWidth = nil
+	}
 	isLearnedGroupName := strings.HasPrefix(groupCfg.Name, api.LearnedGroupPrefix)
 	if reviewType == share.ReviewTypeImportGroup {
 		if isLearnedGroupName {

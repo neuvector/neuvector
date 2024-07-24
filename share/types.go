@@ -163,10 +163,12 @@ const (
 )
 
 const (
-	EventCondTypeName           string = "name"
-	EventCondTypeCVEName        string = "cve-name"
-	EventCondTypeCVEHigh        string = "cve-high"
-	EventCondTypeCVEMedium      string = "cve-medium"
+	EventCondTypeName    string = "name"
+	EventCondTypeCVEName string = "cve-name"
+	// EventCondTypeCVECritical        string = "cve-critical" // NVSHAS-8242: temporary reversion
+	EventCondTypeCVEHigh   string = "cve-high"
+	EventCondTypeCVEMedium string = "cve-medium"
+	// EventCondTypeCVECriticalWithFix string = "cve-critical-with-fix" // NVSHAS-8242: temporary reversion
 	EventCondTypeCVEHighWithFix string = "cve-high-with-fix"
 	EventCondTypeLevel          string = "level"
 	EventCondTypeProc           string = "process"

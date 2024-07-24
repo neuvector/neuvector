@@ -150,6 +150,26 @@ func (ss *ScanService) ScannerRegister(ctx context.Context, data *share.ScannerR
 	}
 }
 
+// HealthCheck checks if the scanner is in the list of controller Consul key-value pairs and if the controller is alive
+// This function follows the logic from how scannerRegister function puts the scanner into the KV store to retrieve it.
+func (ss *ScanService) HealthCheck(ctx context.Context, data *share.ScannerRegisterData) (*share.ScannerAvailable, error) {
+	visible := false
+	scannerID := data.ID
+	if data.RPCServer == "127.0.0.1" {
+		// If scanner running in container, the ID should already by controller's ID.
+		// This is to cover the case while scanner is not running in container.
+		scannerID = Ctrler.ID
+	}
+
+	clusHelper := kv.GetClusterHelper()
+	s := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
+	if s != nil {
+		visible = true
+	}
+
+	return &share.ScannerAvailable{Visible: visible}, nil
+}
+
 func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	log.WithFields(log.Fields{
 		"id": data.ID, "version": data.CVEDBVersion, "create": data.CVEDBCreateTime, "server": data.RPCServer, "entries": len(data.CVEDB),

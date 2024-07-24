@@ -2000,6 +2000,22 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
 			targetGroupDlpWAF = true
 		}
+		if cg.Kind == share.GroupKindContainer && !cg.Reserved {
+			if group.MonMetric != nil {
+				cg.MonMetric = *group.MonMetric
+			}
+			if group.GrpSessCur != nil {
+				cg.GrpSessCur = *group.GrpSessCur
+			}
+			if group.GrpSessRate != nil {
+				cg.GrpSessRate = *group.GrpSessRate
+			}
+			if group.GrpBandWidth != nil {
+				cg.GrpBandWidth = *group.GrpBandWidth
+			}
+
+		}
+
 		clusHelper.PutGroupTxn(txn, cg)
 		updatedGroups.Add(cg.Name)
 	}

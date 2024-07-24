@@ -560,26 +560,34 @@ type RESTPermitsAssigned struct {
 	Domains []string              `json:"domains"` // all domains in this slice have the same permissions assigned
 }
 
+type RESTRemoteRolePermits struct {
+	Role                string                `json:"role"`                                // global role on managed clusters in fed
+	RoleDomains         map[string][]string   `json:"role_domains,omitempty"`              // role -> domains on managed clusters in fed
+	ExtraPermits        []*RESTRolePermission `json:"extra_permissions,omitempty"`         // extra permissions(other than 'RoleDomains') for global domain on managed clusters in fed. only for Rancher SSO
+	ExtraPermitsDomains []RESTPermitsAssigned `json:"extra_permissions_domains,omitempty"` // list of extra permissions(other than 'RoleDomains') for namespaces on managed clusters in fed. only for Rancher SSO
+}
+
 type RESTUser struct {
-	Fullname              string                `json:"fullname"`
-	Server                string                `json:"server"`
-	Username              string                `json:"username"`
-	Password              string                `json:"password,cloak"`
-	EMail                 string                `json:"email"`
-	Role                  string                `json:"role"`
-	ExtraPermits          []*RESTRolePermission `json:"extra_permissions,omitempty"` // extra permissions(other than 'Role') on global domain. only for Rancher SSO
-	Timeout               uint32                `json:"timeout"`
-	Locale                string                `json:"locale"`
-	DefaultPWD            bool                  `json:"default_password"`                    // If the user is using default password
-	ModifyPWD             bool                  `json:"modify_password"`                     // if the password should be modified
-	RoleDomains           map[string][]string   `json:"role_domains,omitempty"`              // role -> domains
-	ExtraPermitsDomains   []RESTPermitsAssigned `json:"extra_permissions_domains,omitempty"` // list of extra permissions(other than 'RoleDomains') on namespaces. only for Rancher SSO
-	LastLoginTimeStamp    int64                 `json:"last_login_timestamp"`
-	LastLoginAt           string                `json:"last_login_at"`
-	LoginCount            uint32                `json:"login_count"`
-	BlockedForFailedLogin bool                  `json:"blocked_for_failed_login"`     // if the user is blocked for too mnay failed login
-	BlockedForPwdExpired  bool                  `json:"blocked_for_password_expired"` // if the user is blocked for expired password
-	PwdResettable         bool                  `json:"password_resettable"`          // if the user's password can be reset by the current login user
+	Fullname              string                 `json:"fullname"`
+	Server                string                 `json:"server"`
+	Username              string                 `json:"username"`
+	Password              string                 `json:"password,cloak"`
+	EMail                 string                 `json:"email"`
+	Role                  string                 `json:"role"`
+	ExtraPermits          []*RESTRolePermission  `json:"extra_permissions,omitempty"` // extra permissions(other than 'Role') on global domain. only for Rancher SSO
+	Timeout               uint32                 `json:"timeout"`
+	Locale                string                 `json:"locale"`
+	DefaultPWD            bool                   `json:"default_password"`                    // If the user is using default password
+	ModifyPWD             bool                   `json:"modify_password"`                     // if the password should be modified
+	RoleDomains           map[string][]string    `json:"role_domains,omitempty"`              // role -> domains
+	ExtraPermitsDomains   []RESTPermitsAssigned  `json:"extra_permissions_domains,omitempty"` // list of extra permissions(other than 'RoleDomains') on namespaces. only for Rancher SSO
+	RemoteRolePermits     *RESTRemoteRolePermits `json:"remote_role_permissions,omitempty"`   // permissions on managed clusters in fed. only for Rancher SSO
+	LastLoginTimeStamp    int64                  `json:"last_login_timestamp"`
+	LastLoginAt           string                 `json:"last_login_at"`
+	LoginCount            uint32                 `json:"login_count"`
+	BlockedForFailedLogin bool                   `json:"blocked_for_failed_login"`     // if the user is blocked for too mnay failed login
+	BlockedForPwdExpired  bool                   `json:"blocked_for_password_expired"` // if the user is blocked for expired password
+	PwdResettable         bool                   `json:"password_resettable"`          // if the user's password can be reset by the current login user
 }
 
 type RESTUserConfig struct {
@@ -1246,6 +1254,10 @@ type RESTCrdGroupConfig struct {
 	Name         string               `json:"name"`
 	Comment      string               `json:"comment"`
 	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
+	MonMetric    *bool                `json:"mon_metric,omitempty"`
+	GrpSessCur   *uint32              `json:"grp_sess_cur,omitempty"`
+	GrpSessRate  *uint32              `json:"grp_sess_rate,omitempty"`
+	GrpBandWidth *uint32              `json:"grp_band_width,omitempty"`
 }
 
 type RESTGroupsData struct {
@@ -2167,6 +2179,7 @@ const ScanStatusUnsupported string = "unsupported"
 
 type RESTScanBrief struct {
 	Status           string `json:"status"`
+	CriticalVuls     int    `json:"critical"`
 	HighVuls         int    `json:"high"`
 	MedVuls          int    `json:"medium"`
 	Result           string `json:"result"`
@@ -2175,6 +2188,10 @@ type RESTScanBrief struct {
 	BaseOS           string `json:"base_os"`
 	CVEDBVersion     string `json:"scanner_version"`
 	CVEDBCreateTime  string `json:"cvedb_create_time"`
+}
+
+func (sb *RESTScanBrief) CVECount() int {
+	return sb.CriticalVuls + sb.HighVuls + sb.MedVuls
 }
 
 type RESTScanPlatformSummary struct {
@@ -4040,6 +4057,7 @@ type VulAssetSessionSummary struct {
 }
 
 type VulAssetCountDist struct {
+	Critical   int `json:"critical"`
 	High       int `json:"high"`
 	Medium     int `json:"medium"`
 	Low        int `json:"low"`
@@ -4052,6 +4070,7 @@ type VulAssetCountDist struct {
 type AssetCVECount struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
+	Critical    int    `json:"critical"`
 	High        int    `json:"high"`
 	Medium      int    `json:"medium"`
 	Low         int    `json:"low"`

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -2559,9 +2558,9 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 				continue
 			}
 			linkName := updateLink.Link.Attrs().Name
-			isUp := (updateLink.IfInfomsg.Flags&syscall.IFF_UP != 0) && (updateLink.IfInfomsg.Flags&syscall.IFF_RUNNING != 0)
+			curState := updateLink.Link.Attrs().OperState == netlink.OperUp
 			if prevState, exists := gInfo.linkStates[linkName]; exists {
-				if (prevState && isUp) || (!prevState && !isUp) {
+				if prevState == curState {
 					continue
 				}
 			}

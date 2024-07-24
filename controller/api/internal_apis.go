@@ -187,6 +187,7 @@ type RESTExposedEndpoint struct {
 	PodName        string                         `json:"pod_name"`
 	Service        string                         `json:"service"`
 	ThreatSeverity string                         `json:"severity"`
+	CriticalVuls   int                            `json:"critical"`
 	HighVuls       int                            `json:"high"`
 	MedVuls        int                            `json:"medium"`
 	PolicyMode     string                         `json:"policy_mode"`

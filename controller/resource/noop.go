@@ -95,7 +95,7 @@ func (d *noop) GetAuthServerAlias() string {
 	return ""
 }
 
-func (d *noop) GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvPermissions, error) {
+func (d *noop) GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvFedPermissions, error) {
 	return nil, nil, ErrMethodNotSupported
 }
 
