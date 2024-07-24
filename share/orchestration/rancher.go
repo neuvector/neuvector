@@ -75,7 +75,8 @@ func (d *rancher) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	meta *container.ContainerMeta, nets map[string]*container.Network,
 ) {
 	// In 'default' mode, the interface is plugged by docker, not Rancher.
-	if !d.isDeployedBy(meta) || meta.NetMode == "default" {
+	// In docker version 26, after start a normal container the network_mode becomes 'bridge' instead of 'default'
+	if !d.isDeployedBy(meta) || meta.NetMode == "default" || meta.NetMode == "bridge" {
 		baseDriver.SetIPAddrScope(ports, meta, nets)
 		return
 	}
