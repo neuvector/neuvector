@@ -2398,7 +2398,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
 	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
-	if fedRole == api.FedRoleJoint && fedUserRoles.Contains(user.Role) {
+	if fedRole == api.FedRoleJoint && (fedUserRoles.Contains(user.Role) || user.ExtraPermits.HasPermFed()) {
 		rc = userInvalidRequest
 	} else {
 		// Login user accounting
@@ -2415,6 +2415,42 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 		}
 		return
+	}
+
+	if len(user.AcceptedAlerts) > 0 {
+		if (fedRole == api.FedRoleMaster && (fedUserRoles.Contains(user.Role) || user.ExtraPermits.HasPermFed())) ||
+			(fedRole == api.FedRoleJoint && (user.Role == api.UserRoleAdmin || user.Role == api.UserRoleReader)) {
+			var ids map[string]bool
+			if fedRole == api.FedRoleMaster {
+				ids = cacher.GetFedJoinedClusterIdMap(accReadAll)
+			} else {
+				if m := cacher.GetFedMasterCluster(accReadAll); m.ID != "" {
+					ids = map[string]bool{
+						m.ID: true,
+					}
+				}
+			}
+			if len(ids) > 0 {
+				acceptedAlerts := utils.NewSetFromStringSlice(user.AcceptedAlerts)
+				for id := range ids {
+					s := cacher.GetFedJoinedClusterStatus(id, accReadAll)
+					if s.SwitchToUnreachable > 0 {
+						if elapsed := time.Since(s.LastConnectedTime); elapsed > (time.Duration(_teleFreq) * time.Minute) {
+							key, _ := getFedDisconnectAlert(fedRole, id, accReadAll)
+							if acceptedAlerts.Contains(key) {
+								acceptedAlerts.Remove(key)
+							}
+						}
+					}
+				}
+				if acceptedAlerts.Cardinality() != len(user.AcceptedAlerts) {
+					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+						user.AcceptedAlerts = acceptedAlerts.ToStringSlice()
+						clusHelper.PutUserRev(user, rev)
+					}
+				}
+			}
+		}
 	}
 
 	resp := api.RESTTokenData{
