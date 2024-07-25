@@ -648,17 +648,17 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -705,17 +705,17 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"create", "delete"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.authentication"},
+					Resources: []string{"authentication"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "modify"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.authorization"},
+					Resources: []string{"authorization"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.audit-events"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"auditevents"},
 				},
 			},
 		}
@@ -826,12 +826,12 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -856,17 +856,17 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				{
 					Verbs:     []string{"create"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -979,23 +979,23 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.admctrl"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"admissioncontrol"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.security-events"},
+					Resources: []string{"securityevents"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.compliance"},
+					Resources: []string{"compliance"},
 				},
 			},
 		}
@@ -1059,7 +1059,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.compliance"},
+					Resources: []string{"compliance"},
 				},
 			},
 		}
@@ -1115,13 +1115,13 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.vulnerability"}, // supported in global only
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"neuvectorvulnerability"}, // supported in global only
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.events"}, // supported in global & domain
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"events"}, // supported in global & domain
 				},
 			},
 		}
@@ -1268,21 +1268,21 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"}, // it's a fedReader role
 				},
 			},
@@ -1344,7 +1344,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1403,13 +1403,13 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.vulnerability"}, // supported in global only
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"neuvectorvulnerability"}, // supported in global only
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.events"}, // supported in global & domain
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"events"}, // supported in global & domain
 				},
 			},
 		}
@@ -1458,17 +1458,17 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -1537,13 +1537,13 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.reg-scan"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -1589,11 +1589,11 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				rbacv1.PolicyRule{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.fed"},
+					Resources: []string{"federation"},
 				},
 				rbacv1.PolicyRule{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1642,7 +1642,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				rbacv1.PolicyRule{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 			},
 		}
@@ -1691,7 +1691,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1741,13 +1741,13 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
+					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.fed"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -1847,22 +1847,22 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -1902,12 +1902,12 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 			},
 		}
@@ -1983,12 +1983,12 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 			},
 		}
@@ -2026,8 +2026,8 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 			},
 		}
@@ -2105,17 +2105,17 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 			},
 		}
@@ -2156,12 +2156,12 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 			},
 		}
@@ -2216,8 +2216,8 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-scan"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimescan"},
 				},
 			},
 		}
@@ -2267,7 +2267,7 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.rt-scan"},
+					Resources: []string{"runtimescan"},
 				},
 			},
 		}
@@ -2859,27 +2859,27 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.fed"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -2907,7 +2907,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 
 		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
-		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
+		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR2
 		crName2 := "rt-abcde-2"
 		objCR2 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2918,17 +2918,17 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.fed"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -2956,8 +2956,8 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
 
 		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
-		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
-		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
+		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR3
+		// get/cluster means domain reader for namespace test-project-ns-25
 		crName3 := "rt-abcde-3"
 		objCR3 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2967,18 +2967,18 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.all-permissions"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"cluster"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.fed"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -3030,7 +3030,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 
 	{
 		//------ [2] add nv custom permissions objCR1(rancher cluster role) that has fed & some write permissions
-		userName1 := "u-cpjv2-1"
+		userName1 := "u-cpjv2-12"
 		crName1 := "rt-wbz96-1"
 		objCR1 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3041,17 +3041,17 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"}, // "nv-perm.fed" in the next rule also applies to this rule; but "*" verbs in the next rule doesn't affect this rule
+					Resources: []string{"registryscan"}, // "federation" in the next rule also applies to this rule; but "*" verbs in the next rule doesn't affect this rule
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.fed"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -3079,7 +3079,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 
 		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
-		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
+		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR2
 		crName2 := "rt-abcde-2"
 		objCR2 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3090,32 +3090,32 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.events"},
+					Resources: []string{"events"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.audit-events"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"auditevents"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.security-events"},
+					Resources: []string{"securityevents"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.ci-scan"},
+					Resources: []string{"ciscan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"nv-perm.admctrl"},
+					Resources: []string{"admissioncontrol"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.fed"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -3143,8 +3143,8 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
 
 		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
-		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
-		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
+		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR3
+		// get/cluster means domain reader for namespace test-project-ns-25
 		crName3 := "rt-abcde-3"
 		objCR3 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3154,43 +3154,43 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.reg-scan"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"neuvector.api.io"}, // not supported
-					Resources: []string{"nv-perm.compliance", "nv-perm.all-permissions", "*"},
+					Resources: []string{"compliance", "cluster", "*"},
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.allall-permissions"}, // not supported for namespaces
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"neuvectorcluster"}, // not supported for namespaces
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"authentication"}, // not supported for namespaces
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"nvauthentication"}, // not supported for namespaces
 				},
 				{
 					Verbs:     []string{"*", "create", "delete", "get", "list", "patch", "update", "watch", "post"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.authorization"},
+					Resources: []string{"authorization"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "post"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.config"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"systemconfig"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.fed"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
@@ -3245,7 +3245,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 	}
 
 	{
-		//------ [3] about "nv-perm.fed" for global domain
+		//------ [3] about "federation" for global domain
 		userName31 := "u-cpjv2-31"
 		crName31 := "rt-wbz96-31"
 		objCR31 := &rbacv1.ClusterRole{
@@ -3257,44 +3257,44 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.reg-scan"},
+					Resources: []string{"registryscan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.rt-policy"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"runtimepolicy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"neuvector.api.io", "*"}, // unsupported apiGroup
-					Resources: []string{"nv-perm.compliance"},
+					Resources: []string{"compliance"},
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.authentication"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"authentication"},
 				},
 				{
 					Verbs:     []string{"get", "post"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"nv-perm.authorization"},
+					Resources: []string{"authorization"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.config"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"systemconfig"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"api.neuvector.com"},
-					Resources: []string{"nv-perm.fed"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
 				},
 			},
 		}
 		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
 
-		// create a objCRB1 between custom permissions objCR1 and user 'u-cpjv2-31'
-		objCRB1 := &rbacv1.ClusterRoleBinding{
+		// create a objCRB31 between custom permissions objCR1 and user 'u-cpjv2-31'
+		objCRB31 := &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "crb-w3pkgod7le-31",
 				UID:  genGuid(),
@@ -3312,7 +3312,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				Name:     crName31,
 			},
 		}
-		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
+		rbacRancherSSO.updateK8sRbacResource(objCRB31, update_rbac)
 
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName31,
@@ -3334,7 +3334,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		)
 
 		//------ [4]
-		objCR31.Rules[0].Resources = []string{"nv-perm.all-permissions"}
+		objCR31.Rules[0].Resources = []string{"cluster"}
 		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
 
 		// Test: check updated role
@@ -3369,4 +3369,88 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			nil,
 		)
 	}
+
+	{
+		//------ [6] about "federation" for global domain
+		userName61 := "u-cpjv2-61"
+		crName61 := "rt-wbz96-61"
+		objCR61 := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName61,
+				UID:  genGuid(),
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"*"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"permission.neuvector.com"},
+					Resources: []string{"federation"},
+				},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR61, update_rbac)
+
+		// create a objCRB61 between custom permissions objCR1 and user 'u-cpjv2-61'
+		objCRB61 := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "crb-w3pkgod7le-61",
+				UID:  genGuid(),
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     userKind,
+					APIGroup: rbacApiGroup,
+					Name:     userName61,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacApiGroup,
+				Kind:     crKind,
+				Name:     crName61,
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCRB61, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName61,
+			map[string]string{
+				"": api.UserRoleFedReader,
+			},
+			map[string]share.NvPermissions{"": {
+				WriteValue: share.PERM_FED,
+			}},
+			nil,
+		)
+
+		//------ [7]
+		objCR61.Rules = []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"*"},
+				APIGroups: []string{"permission.neuvector.com"},
+				Resources: []string{"*"},
+			},
+			{
+				Verbs:     []string{"get"},
+				APIGroups: []string{"permission.neuvector.com"},
+				Resources: []string{"federation"},
+			},
+		}
+		rbacRancherSSO.updateK8sRbacResource(objCR61, update_rbac)
+
+		// Test: check updated role
+		rbacRancherSSO.checkK8sUserRoles(userName61,
+			map[string]string{
+				"": api.UserRoleAdmin,
+			},
+			map[string]share.NvPermissions{"": {
+				ReadValue: share.PERM_FED,
+			}},
+			nil,
+		)
+	}
+
 }
