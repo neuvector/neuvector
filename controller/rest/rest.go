@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"reflect"
@@ -77,6 +78,7 @@ var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
 var defaultRegistries utils.Set
+var searchRegistries utils.Set
 
 const (
 	_fedRestServerStopped_ = iota
@@ -1152,7 +1154,15 @@ func getAgentWorkloadFromFilter(filters []restFieldFilter, acc *access.AccessCon
 func initDefaultRegistries() {
 	// all on lower-case
 	dockerRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
-	defaultRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
+
+	// if a flag was provided for search registries, use those,
+	// otherwise use the default docker registries
+	if len(searchRegistries.ToSlice()) > 0 {
+		defaultRegistries = searchRegistries
+	} else {
+		defaultRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
+	}
+
 	regNames := global.RT.GetDefaultRegistries()
 	for _, reg := range regNames {
 		k := fmt.Sprintf("https://%s/", reg)
@@ -1257,6 +1267,7 @@ type Context struct {
 	Messenger          cluster.MessengerInterface
 	Cacher             cache.CacheInterface
 	Scanner            scan.ScanInterface
+	SearchRegistries   string
 	FedPort            uint
 	RESTPort           uint
 	PwdValidUnit       uint
@@ -1425,6 +1436,23 @@ func InitContext(ctx *Context) {
 	if err := initJWTSignKey(); err != nil {
 		log.WithError(err).Error("failed to initialize JWT sign key.")
 	}
+
+	searchRegistries = utils.NewSet()
+
+	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
+		if parsedReg, err := url.Parse(reg); err != nil {
+			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
+			continue
+		} else if parsedReg.Host != "" {
+			reg = parsedReg.Host
+		}
+
+		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
+		if !searchRegistries.Contains(k) {
+			searchRegistries.Add(k)
+		}
+	}
+
 	initHttpClients()
 }
 

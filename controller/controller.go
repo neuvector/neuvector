@@ -247,6 +247,7 @@ func main() {
 	grpcPort := flag.Uint("grpc_port", 0, "Cluster GRPC port")
 	internalSubnets := flag.String("n", "", "Predefined internal subnets")
 	persistConfig := flag.Bool("pc", false, "Persist configurations")
+	searchRegistries := flag.String("search_registries", "", "Comma separated list of search registries for shortnames")
 	admctrlPort := flag.Uint("admctrl_port", 20443, "Admission Webhook server port")
 	crdvalidatectrlPort := flag.Uint("crdvalidatectrl_port", 30443, "general crd Webhook server port")
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
@@ -815,6 +816,7 @@ func main() {
 		FedPort:            *fedPort,
 		PwdValidUnit:       *pwdValidUnit,
 		TeleNeuvectorURL:   *teleNeuvectorEP,
+		SearchRegistries:   *searchRegistries,
 		TeleFreq:           *telemetryFreq,
 		NvAppFullVersion:   nvAppFullVersion,
 		NvSemanticVersion:  nvSemanticVersion,
