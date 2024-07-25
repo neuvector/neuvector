@@ -2017,6 +2017,37 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		NvCrdSchemaErrors:        acceptable[4],
 	}
 
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
+		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
+		otherAlerts := map[string]string{}
+		// _fedClusterLeft(206), _fedClusterDisconnected(204)
+		//disconnectedStates := utils.NewSet(_fedClusterLeft, _fedClusterDisconnected)
+		var ids map[string]bool
+		if fedRole == api.FedRoleMaster {
+			ids = cacher.GetFedJoinedClusterIdMap(acc)
+		} else {
+			if m := cacher.GetFedMasterCluster(acc); m.ID != "" {
+				ids = map[string]bool{
+					m.ID: true,
+				}
+			}
+		}
+		if len(ids) > 0 {
+			for id, _ := range ids {
+				s := cacher.GetFedJoinedClusterStatus(id, acc)
+				if elapsed := time.Since(s.LastConnectedTime); s.LastConnectedTime.IsZero() || elapsed > (time.Duration(_teleFreq)*time.Minute) {
+					key, alert := getFedDisconnectAlert(fedRole, id, acc)
+					if !acceptedAlerts.Contains(key) {
+						// this alert has not been accepted yet. put it in the response
+						otherAlerts[key] = alert
+					}
+				}
+			}
+			resp.AcceptableAlerts.OtherAlerts = otherAlerts
+		}
+	}
+
 	var acceptedManagerAlerts []string
 	for _, key := range []string{share.AlertNvNewVerAvailable, share.AlertNvInMultiVersions, share.AlertCveDbTooOld} {
 		if acceptedAlerts.Contains(key) {
@@ -2617,4 +2648,18 @@ func validateCertificate(certificate string) error {
 	// 	return errors.New("Invalid certificate, certificate doesn't contain a public key")
 	// }
 	return nil
+}
+
+func getFedDisconnectAlert(fedRole, id string, acc *access.AccessControl) (string, string) {
+	var alert string
+	if fedRole == api.FedRoleMaster {
+		clusterInfo := cacher.GetFedJoinedCluster(id, acc)
+		alert = fmt.Sprintf("Managed cluster %s is disconnected from primary cluster", clusterInfo.Name)
+	} else {
+		alert = "This cluster is disconnected from primary cluster"
+	}
+	b := md5.Sum([]byte(alert))
+	key := hex.EncodeToString(b[:])
+
+	return key, alert
 }

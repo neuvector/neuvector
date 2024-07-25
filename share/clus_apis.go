@@ -2340,10 +2340,11 @@ type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
 }
 
 type CLUSFedClusterStatus struct {
-	Status            int       `json:"status"` // status of a joint cluster
-	CspType           TCspType  `json:"csp_type"`
-	Nodes             int       `json:"nodes"`               // total nodes count in this cluster
-	LastConnectedTime time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
+	Status              int       `json:"status"`                // status of a joint cluster
+	SwitchToUnreachable int       `json:"switch_to_unreachable"` // counts of connected -> disconnected
+	CspType             TCspType  `json:"csp_type"`
+	Nodes               int       `json:"nodes"`               // total nodes count in this cluster
+	LastConnectedTime   time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
 }
 
 type CLUSFedJoinedClusterList struct { // only available on master cluster
