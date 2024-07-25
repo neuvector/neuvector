@@ -1440,11 +1440,11 @@ func InitContext(ctx *Context) {
 	searchRegistries = utils.NewSet()
 
 	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
-		if parsedReg, err := url.Parse(reg); parsedReg.Host != "" {
-			reg = parsedReg.Host
-		} else if err != nil {
+		if parsedReg, err := url.Parse(reg); err != nil {
 			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
 			continue
+		} else if parsedReg.Host != "" {
+			reg = parsedReg.Host
 		}
 
 		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
