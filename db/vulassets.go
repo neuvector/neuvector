@@ -293,7 +293,7 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 	vulAsset.Skip = !keep
 }
 
-func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, error) {
+func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
@@ -305,23 +305,30 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 
 	queryStat, err := GetQueryStat(sessionToken)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	db := memoryDbHandle
 	if queryStat.FileDBReady == 1 {
 		db, err = openSessionFileDb(sessionToken)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		defer db.Close() // close it after done
 	}
 
 	rows, err := db.Query(statement, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
+
+	workloadSet := utils.NewSet()
+	nodeSet := utils.NewSet()
+	imageSet := utils.NewSet()
+	platformSet := utils.NewSet()
+
+	assets := make(map[string][]string, 0)
 
 	records := make(map[string]*DbVulAsset)
 	for rows.Next() {
@@ -330,16 +337,36 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 			&vulasset.Vectors, &vulasset.ScoreV3, &vulasset.VectorsV3, &vulasset.PublishedTS, &vulasset.LastModTS,
 			&vulasset.Workloads, &vulasset.Nodes, &vulasset.Images, &vulasset.Platforms)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// this fitler (CVE based) is specific to asset view
 		if (LastModifiedTime == 0) || vulasset.LastModTS > LastModifiedTime {
 			records[vulasset.Name] = vulasset
+
+			addAssetsToSet(vulasset.Workloads, workloadSet)
+			addAssetsToSet(vulasset.Nodes, nodeSet)
+			addAssetsToSet(vulasset.Images, imageSet)
+			addAssetsToSet(vulasset.Platforms, platformSet)
 		}
 	}
 
-	return records, nil
+	assets[AssetWorkload] = allowed[AssetWorkload].Intersect(workloadSet).ToStringSlice()
+	assets[AssetNode] = allowed[AssetNode].Intersect(nodeSet).ToStringSlice()
+	assets[AssetImage] = allowed[AssetImage].Intersect(imageSet).ToStringSlice()
+	assets[AssetPlatform] = allowed[AssetPlatform].Intersect(platformSet).ToStringSlice()
+
+	return records, assets, nil
+}
+
+func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
+	items := make([]string, 0)
+	err := json.Unmarshal([]byte(assetsIDStr), &items)
+	if err == nil {
+		for _, v := range items {
+			assetSet.Add(v)
+		}
+	}
 }
 
 func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
@@ -383,6 +410,38 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 }
 
 func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+	getOrderColumn := func(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
+		column := "name"
+		if filters.OrderByColumn == "name" || filters.OrderByColumn == "score" || filters.OrderByColumn == "score_v3" || filters.OrderByColumn == "published_timestamp" {
+			column = filters.OrderByColumn
+		}
+
+		if filters.OrderByColumn == "impact" {
+			column = "impact_weight"
+		}
+
+		if filters.OrderByType == "desc" { // asc, desc
+			return goqu.I(column).Desc()
+		}
+		return goqu.I(column).Asc()
+	}
+
+	buildQuickFilterWhereClause := func(queryFilter *VulQueryFilter) exp.ExpressionList {
+		if queryFilter.Filters.QuickFilter != "" {
+			nameExp := goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+
+			scoreColumn := "score_str"
+			if queryFilter.Filters.ScoreType == "v3" {
+				scoreColumn = "scorev3_str"
+			}
+
+			scoreExp := goqu.C(scoreColumn).Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			return goqu.Or(nameExp, scoreExp)
+		}
+
+		return goqu.And(goqu.Ex{})
+	}
+
 	sessionToken := requesetQuery.QueryToken
 	start := requesetQuery.QueryStart
 	row := requesetQuery.QueryCount
@@ -399,7 +458,7 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 		return nil, nil, err
 	}
 
-	queryFilter := &api.QuerySessionRequest{}
+	queryFilter := &VulQueryFilter{}
 	err = json.Unmarshal([]byte(queryStat.Data1), &queryFilter)
 	if err != nil {
 		return nil, nil, err
@@ -502,7 +561,7 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	tStart = time.Now()
 	assets := allAssets.ToStringSlice()
 	expAssets := goqu.Ex{"assetid": assets}
-	columns = []interface{}{"id", "type", "assetid", "idns", "vulsb"}
+	columns = []interface{}{"idns", "vulsb"}
 
 	statement, args, _ = dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
 	rows, err = dbHandle.Query(statement, args...)
@@ -517,11 +576,9 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 
 	var nAssets int
 	for rows.Next() {
-		var dbID int
-		var assetType, assetid string
 		var vulsBytes []byte
 		var idnsStr string
-		err = rows.Scan(&dbID, &assetType, &assetid, &idnsStr, &vulsBytes)
+		err = rows.Scan(&idnsStr, &vulsBytes)
 		if err != nil {
 			pool.StopAndWait()
 			return nil, nil, err
@@ -604,6 +661,20 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func CreateSessionAssetTable(sessionToken string, memoryDb bool) error {
+	db := dbHandle
+	if memoryDb {
+		db = memoryDbHandle
+	}
+
+	err := createSessionAssetTable(db, sessionToken)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -738,6 +809,20 @@ func createSessionVulAssetTable(db *sql.DB, sessionToken string) error {
 	return nil
 }
 
+func createSessionAssetTable(db *sql.DB, sessionToken string) error {
+	tableName := formatSessionTempTableName(sessionToken)
+
+	columns := getAssetvulSchema(false)
+	sql := fmt.Sprintf("CREATE TABLE %s (%s);", tableName, strings.Join(columns, ","))
+
+	_, err := db.Exec(sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func populateSession(db *sql.DB, sessionToken string, vulAssets []*DbVulAsset) error {
 	tableName := formatSessionTempTableName(sessionToken)
 
@@ -803,6 +888,20 @@ func fillCVERecordV2(record *DbVulAsset) error {
 func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*api.AssetCVECount, error) {
 	allowedAssets := []string{}
 
+	buildWhereClause := func(assetType string, allowedID []string) exp.ExpressionList {
+		part1_type := goqu.Ex{
+			"type": assetType,
+		}
+
+		part2_allowed := goqu.Ex{}
+		if len(allowedID) > 0 {
+			part2_allowed = goqu.Ex{
+				"assetid": allowedID,
+			}
+		}
+		return goqu.And(part1_type, part2_allowed)
+	}
+
 	if assetType == AssetImage || assetType == AssetNode {
 		allowedAssets = allowed[assetType].ToStringSlice()
 	} else {
@@ -816,7 +915,7 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From("assetvuls").Select("assetid", "name", "cve_high", "cve_medium", "cve_low").Where(buildTopAssetWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
 
 	db := dbHandle
 	rows, err := db.Query(statement, args...)
@@ -826,7 +925,9 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	defer rows.Close()
 
 	for rows.Next() {
-		record := &api.AssetCVECount{}
+		record := &api.AssetCVECount{
+			Critical: -1,
+		}
 		err = rows.Scan(&record.ID, &record.DisplayName, &record.High, &record.Medium, &record.Low)
 
 		if err != nil {
@@ -850,54 +951,6 @@ func DeleteAssetByID(assetType string, assetid string) error {
 		return err
 	}
 	return nil
-}
-
-// sql builder
-func buildTopAssetWhereClause(assetType string, allowedID []string) exp.ExpressionList {
-	part1_typeImage := goqu.Ex{
-		"type": assetType,
-	}
-
-	part2_allowed := goqu.Ex{}
-	if len(allowedID) > 0 {
-		part2_allowed = goqu.Ex{
-			"assetid": allowedID,
-		}
-	}
-
-	return goqu.And(part1_typeImage, part2_allowed)
-}
-
-func getOrderColumn(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
-	column := "name"
-	if filters.OrderByColumn == "name" || filters.OrderByColumn == "score" || filters.OrderByColumn == "score_v3" || filters.OrderByColumn == "published_timestamp" {
-		column = filters.OrderByColumn
-	}
-
-	if filters.OrderByColumn == "impact" {
-		column = "impact_weight"
-	}
-
-	if filters.OrderByType == "desc" { // asc, desc
-		return goqu.I(column).Desc()
-	}
-	return goqu.I(column).Asc()
-}
-
-func buildQuickFilterWhereClause(queryFilter *VulQueryFilter) exp.ExpressionList {
-	if queryFilter.Filters.QuickFilter != "" {
-		nameExp := goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
-
-		scoreColumn := "score_str"
-		if queryFilter.Filters.ScoreType == "v3" {
-			scoreColumn = "scorev3_str"
-		}
-
-		scoreExp := goqu.C(scoreColumn).Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
-		return goqu.Or(nameExp, scoreExp)
-	}
-
-	return goqu.And(goqu.Ex{})
 }
 
 func shouleRetry(err error) bool {
