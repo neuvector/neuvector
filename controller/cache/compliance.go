@@ -101,12 +101,12 @@ func buildComplianceFilter(ccp *share.CLUSComplianceProfile) map[string][]string
 	}
 
 	// Add checks that are not in the override list
-	_, metaMap := scanUtils.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
 
 	for _, m := range metaMap {
 		if _, ok := filter[m.TestNum]; !ok {
 			var complianceTags []string
-			for compliance, _ := range m.Tags {
+			for _, compliance := range m.Tags {
 				complianceTags = append(complianceTags, compliance)
 			}
 			filter[m.TestNum] = complianceTags

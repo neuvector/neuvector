@@ -34,8 +34,10 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespAccessDenied(w, login)
 		return
 	}
+	// Remove Metas replace with new [] get it dynamically
+	metas, _ := scanUtils.GetComplianceMeta(scanUtils.V1)
 
-	resp := api.RESTListData{List: &api.RESTList{Compliance: scanUtils.GetComplianceProfileMeta()}}
+	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
 }
 
@@ -121,13 +123,13 @@ func handlerGetAvaiableComplianceFilter(w http.ResponseWriter, r *http.Request, 
 	availableFilters := []string{}
 	var complianceFilterMap map[string]int
 	profiles := cacher.GetAllComplianceProfiles(acc)
-	metas, metaMap := scanUtils.GetComplianceMeta()
+	metas, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
 	complianceFilterMap = scanUtils.GetComplianceFilterMap(metas, complianceFilterMap)
 
 	for _, profile := range profiles {
 		for _, entry := range profile.Entries {
 			// Remove the exisiting one before user profile update.
-			for compliance, _ := range metaMap[entry.TestNum].Tags {
+			for _, compliance := range metaMap[entry.TestNum].Tags {
 				complianceFilterMap[compliance]--
 			}
 
@@ -194,7 +196,7 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
-	_, metaMap := scanUtils.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
 	if _, ok := metaMap[re.TestNum]; !ok {
 		return errors.New("Unknonwn compliance ID")
 	}

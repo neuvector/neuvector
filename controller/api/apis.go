@@ -517,9 +517,9 @@ type RESTEULAData struct {
 }
 
 type RESTList struct {
-	Application  []string               `json:"application,omitempty"`
-	RegistryType []string               `json:"registry_type,omitempty"`
-	Compliance   []RESTProfileBenchMeta `json:"compliance,omitempty"`
+	Application  []string        `json:"application,omitempty"`
+	RegistryType []string        `json:"registry_type,omitempty"`
+	Compliance   []RESTBenchMeta `json:"compliance,omitempty"`
 }
 
 type RESTListData struct {
@@ -2607,7 +2607,8 @@ type RESTBenchCheck struct {
 	Automated   bool                        `json:"automated"`
 	Description string                      `json:"description"`
 	Remediation string                      `json:"remediation"`
-	Tags        map[string]share.TagDetails `json:"tags"`
+	Tags        []string                    `json:"tags,omitempty"`
+	TagsV2      map[string]share.TagDetails `json:"tags_v2,omitempty"` // TagsV2 provide compliance details for each compliance tag
 }
 
 type RESTProfileBenchCheck struct {

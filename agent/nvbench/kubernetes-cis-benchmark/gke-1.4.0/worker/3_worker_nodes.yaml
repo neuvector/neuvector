@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/var/lib/kube-proxy/kubeconfig"
@@ -45,9 +45,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -72,9 +72,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=""
@@ -103,9 +103,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"           
           if [ -f "$file" ]; then
@@ -132,9 +132,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
@@ -158,9 +158,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--authorization-mode=AlwaysAllow' >/dev/null 2>&1; then
@@ -184,9 +184,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
@@ -212,9 +212,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--read-only-port' >/dev/null 2>&1; then
@@ -339,9 +339,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--tls-cert-file' >/dev/null 2>&1; then
@@ -375,9 +375,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_KUBELET_CMD" '--rotate-certificates=false' >/dev/null 2>&1; then
@@ -400,9 +400,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          HIPAA: {}
-          PCI: {}
-          GDPR: {}
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=""

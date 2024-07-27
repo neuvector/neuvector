@@ -1606,24 +1606,7 @@ type TagDetail struct {
 	CIS_Sub_Control string `yaml:"cis-sub-control"`
 }
 
-// TagDetails maps compliance item IDs to their corresponding details.
-//
-// The map uses the compliance item ID as the key, with the value being a struct
-// containing the following fields:
-// - CIS_Sub_Control: A string representing the CIS sub-control identifier.
-// - description: A string providing a detailed description of the compliance item.
-// - id: A string representing the unique identifier of the compliance item.
-// - title: A string providing a short title or summary of the compliance item.
-//
-// Example:
-//
-//	"compliance_item_id_123": {
-//	    "CIS_Sub_Control": "1.1",
-//	    "description": "Ensure mounting of cramfs filesystems is disabled",
-//	    "id": "compliance_item_id_123",
-//	    "title": "Disable cramfs filesystem"
-//	},
-type TagDetails map[string]TagDetail
+type TagDetails []TagDetail
 
 type CLUSComplianceProfileEntry struct {
 	TestNum string   `json:"test_num"`
