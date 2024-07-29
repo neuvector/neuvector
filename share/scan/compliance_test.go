@@ -10,8 +10,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/neuvector/neuvector/controller/api"
 )
 
@@ -35,6 +33,7 @@ var (
 		MetaMap:   make(map[string]api.RESTBenchMeta),
 		MetasV2:   &[]api.RESTBenchMeta{},
 		MetaMapV2: make(map[string]api.RESTBenchMeta),
+		FilterMap: make(map[string]int),
 	}
 
 	mockPrimeImageBenchConfig = &UpdateConfigParams{
@@ -77,6 +76,10 @@ var mockLoadItems = map[string]api.RESTBenchCheck{
 var expectedTags = map[string]map[string]bool{
 	"I.4.1": {"Mock3": true},
 	"I.4.6": {"Mock1": true, "Mock2": true, "Mock4": true},
+}
+
+var expectedFilterMapAfterfLoadConfig = map[string]int{
+	"Mock3": 1, "Mock1": 1, "Mock2": 1, "Mock4": 1,
 }
 
 type TagsValidator struct {
@@ -142,55 +145,6 @@ func TestTagConsistance(t *testing.T) {
 	}
 }
 
-func TestGetComplianceFilterMap(t *testing.T) {
-	// Reset the once variable and the availableFilter map before running the test
-	var mockComplianceFilterMap map[string]int
-	mockMetas := []api.RESTBenchMeta{
-		{
-			RESTBenchCheck: api.RESTBenchCheck{
-				TestNum: "1.1.1",
-				Tags: []string{
-					"HIPAA",
-				},
-			},
-		},
-		{
-			RESTBenchCheck: api.RESTBenchCheck{
-				TestNum: "1.1.2",
-				Tags: []string{
-					"PCI",
-				},
-			},
-		},
-		{
-			RESTBenchCheck: api.RESTBenchCheck{
-				TestNum: "1.1.3",
-				Tags: []string{
-					"HIPAA",
-				},
-			},
-		},
-	}
-
-	expected := map[string]int{"HIPAA": 2, "PCI": 1}
-	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
-	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should match the expected values")
-
-	// Call the function again to ensure it doesn't run the initialization code again
-	mockMetas = []api.RESTBenchMeta{
-		{
-			RESTBenchCheck: api.RESTBenchCheck{
-				TestNum: "1.1.1",
-				Tags: []string{
-					"HIPAA",
-				},
-			},
-		},
-	}
-	mockComplianceFilterMap = GetComplianceFilterMap(mockMetas, mockComplianceFilterMap)
-	assert.Equal(t, expected, mockComplianceFilterMap, "The available filters should not change after the first call")
-}
-
 func getComplianceMetaForTest(remediationFolder string, items map[string]api.RESTBenchCheck, params *UpdateConfigParams) {
 	GetK8sCISMeta(remediationFolder, items)
 	PrepareBenchMeta(items, params.MetaMapV2)
@@ -210,10 +164,22 @@ func isSameExceptTags(meta1, meta2 api.RESTBenchMeta) bool {
 
 func isIdenticalTags(meta, mockMeta api.RESTBenchMeta, isV2 bool) bool {
 	if isV2 {
-		if len(meta.RESTBenchCheck.Tags) != len(mockMeta.RESTBenchCheck.Tags) {
+		if len(meta.RESTBenchCheck.TagsV2) != len(mockMeta.RESTBenchCheck.TagsV2) {
 			return false
 		}
 
+		for key, val1 := range meta.RESTBenchCheck.TagsV2 {
+			val2, ok := mockMeta.RESTBenchCheck.TagsV2[key]
+			if !ok || !reflect.DeepEqual(val1, val2) {
+				return false
+			}
+		}
+		return true
+
+	} else {
+		if len(meta.RESTBenchCheck.Tags) != len(mockMeta.RESTBenchCheck.Tags) {
+			return false
+		}
 		counts := make(map[string]int)
 
 		for _, item := range meta.RESTBenchCheck.Tags {
@@ -227,18 +193,6 @@ func isIdenticalTags(meta, mockMeta api.RESTBenchMeta, isV2 bool) bool {
 			counts[item]--
 		}
 
-		return true
-	} else {
-		if len(meta.RESTBenchCheck.TagsV2) != len(mockMeta.RESTBenchCheck.TagsV2) {
-			return false
-		}
-
-		for key, val1 := range meta.RESTBenchCheck.TagsV2 {
-			val2, ok := mockMeta.RESTBenchCheck.TagsV2[key]
-			if !ok || !reflect.DeepEqual(val1, val2) {
-				return false
-			}
-		}
 		return true
 	}
 }
@@ -456,18 +410,19 @@ func TestLoadCreateEmpty(t *testing.T) {
 	os.Remove(primeConfig)
 }
 
-func areSlicesEqual(slice1, slice2 []string) bool {
-	if len(slice1) != len(slice2) {
-		return false
+func verifyFilterMapUpdate(t *testing.T, actualFilterMap, expectedFilterMap map[string]int) {
+	// Check if the actualFilterMap is updated correctly
+	if len(actualFilterMap) != len(expectedFilterMap) {
+		t.Errorf("actualFilterMap is not updated correctly, expected length %d, got %d",
+			len(expectedFilterMap), len(actualFilterMap))
 	}
 
-	for i := range slice1 {
-		if slice1[i] != slice2[i] {
-			return false
+	for key, actualValue := range actualFilterMap {
+		expectedValue, ok := expectedFilterMap[key]
+		if !ok || !reflect.DeepEqual(actualValue, expectedValue) {
+			t.Errorf("FilterMap[%v] is not updated correctly, expected %v, got %v", key, expectedValue, actualValue)
 		}
 	}
-
-	return true
 }
 
 func TestLoadCreateExisting(t *testing.T) {
@@ -477,6 +432,13 @@ func TestLoadCreateExisting(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	primeConfig := filepath.Join(dir, "mock.yml")
+
+	PrepareBenchMeta(mockLoadItems, mockPrimeComplianceMetaConfig.MetaMapV2)
+	updateComplianceMetasFromMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.MetaMap, mockPrimeComplianceMetaConfig.MetasV2, mockPrimeComplianceMetaConfig.MetaMapV2)
+	updatecComplianceFilterMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.FilterMap)
+
+	// Check if the FilterMap is empty
+	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, map[string]int{})
 
 	// Run Load in a goroutine and use a channel to wait for it to finish setup
 	doneComplianceMeta := make(chan bool)
@@ -503,6 +465,9 @@ func TestLoadCreateExisting(t *testing.T) {
 
 	<-doneComplianceMeta
 	<-doneImageBench
+
+	// Check the prime config update the filerfmap correctly
+	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, expectedFilterMapAfterfLoadConfig)
 
 	// Check mockPrimeComplianceMetaConfig is updated correctly
 	for _, meta := range *mockPrimeComplianceMetaConfig.Metas {

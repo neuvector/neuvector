@@ -44,8 +44,9 @@ var (
 	complianceMetas   []api.RESTBenchMeta
 	complianceMetaMap = make(map[string]api.RESTBenchMeta)
 	// image bench only return Tags []string
-	imageBenchMetas   []api.RESTBenchMeta
-	imageBenchMetaMap = make(map[string]api.RESTBenchMeta)
+	imageBenchMetas     []api.RESTBenchMeta
+	imageBenchMetaMap   = make(map[string]api.RESTBenchMeta)
+	complianceFilterMap = make(map[string]int)
 
 	once                      sync.Once
 	backupCISItems            = make(map[string]api.RESTBenchCheck)
@@ -2804,6 +2805,7 @@ type UpdateConfigParams struct {
 	MetaMap   map[string]api.RESTBenchMeta
 	MetasV2   *[]api.RESTBenchMeta
 	MetaMapV2 map[string]api.RESTBenchMeta
+	FilterMap map[string]int
 }
 
 type Config struct {
@@ -2847,15 +2849,9 @@ type PrimeCISBenchmarkConfig struct {
 	CISChecksWithTags []CISCheckWithTags `yaml:"checks"`
 }
 
-func GetComplianceFilterMap(metas []api.RESTBenchMeta, complianceFilterMap map[string]int) map[string]int {
-	if complianceFilterMap == nil {
-		complianceFilterMap = make(map[string]int)
-		for _, meta := range metas {
-			for _, compliance := range meta.Tags {
-				complianceFilterMap[compliance]++
-			}
-		}
-	}
+func GetComplianceFilterMap() map[string]int {
+	complianceRWMutex.RLock()
+	defer complianceRWMutex.RUnlock()
 	return complianceFilterMap
 }
 
@@ -2871,6 +2867,7 @@ func InitComplianceMeta(platform, flavor, cloudPlatform string) {
 	PrepareBenchMeta(cisItems, complianceMetaMapV2)
 	PrepareBenchMeta(dockerImageCISItems, complianceMetaMapV2)
 	updateComplianceMetasFromMap(&complianceMetas, complianceMetaMap, &complianceMetasV2, complianceMetaMapV2)
+	updatecComplianceFilterMap(&complianceMetas, complianceFilterMap)
 }
 
 // version V2 Return the Tags map[string]share.TagDetails
@@ -2920,6 +2917,18 @@ func GetImageBenchMeta() ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
 	imageBenchRWMutex.RLock()
 	defer imageBenchRWMutex.RUnlock()
 	return imageBenchMetas, imageBenchMetaMap
+}
+
+func updatecComplianceFilterMap(metas *[]api.RESTBenchMeta, filterMap map[string]int) {
+	for key := range filterMap {
+		delete(filterMap, key)
+	}
+	for _, meta := range *metas {
+		for _, compliance := range meta.Tags {
+			filterMap[compliance]++
+		}
+	}
+	fmt.Println(filterMap)
 }
 
 func updateComplianceMetasFromMap(metas *[]api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, metasV2 *[]api.RESTBenchMeta, metaMapV2 map[string]api.RESTBenchMeta) {
@@ -3149,6 +3158,7 @@ func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 		}
 	}
 	updateComplianceMetasFromMap(params.Metas, params.MetaMap, params.MetasV2, params.MetaMapV2)
+	updatecComplianceFilterMap(params.Metas, params.FilterMap)
 }
 
 func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigParams) {
@@ -3268,6 +3278,7 @@ func UpdateComplianceConfigs() {
 		MetaMap:   complianceMetaMap,
 		MetasV2:   &complianceMetasV2,
 		MetaMapV2: complianceMetaMapV2,
+		FilterMap: complianceFilterMap,
 	}
 	imageBenchMetaConfig := &UpdateConfigParams{
 		Metas:   &imageBenchMetas,

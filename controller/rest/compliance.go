@@ -121,10 +121,9 @@ func handlerGetAvaiableComplianceFilter(w http.ResponseWriter, r *http.Request, 
 	}
 
 	availableFilters := []string{}
-	var complianceFilterMap map[string]int
 	profiles := cacher.GetAllComplianceProfiles(acc)
-	metas, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
-	complianceFilterMap = scanUtils.GetComplianceFilterMap(metas, complianceFilterMap)
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
+	complianceFilterMap := scanUtils.GetComplianceFilterMap()
 
 	for _, profile := range profiles {
 		for _, entry := range profile.Entries {
