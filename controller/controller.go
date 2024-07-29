@@ -767,6 +767,7 @@ func main() {
 		RestConfigFunc:           rest.RestConfig,
 		CreateQuerySessionFunc:   rest.CreateQuerySession,
 		DeleteQuerySessionFunc:   rest.DeleteQuerySession,
+		NotifyCertChange:         nil, // To be filled later
 	}
 	cacher = cache.Init(&cctx, Ctrler.Leader, lead, restoredFedRole)
 	cache.ScannerChangeNotify(Ctrler.Leader)
@@ -841,6 +842,9 @@ func main() {
 
 	// init rest server context before listening KV object store, as federation server can be started from there.
 	rest.InitContext(&rctx)
+
+	// Assign callback so cert manager can receive cert changes.
+	cctx.NotifyCertChange = rest.CertManager.NotifyChanges
 
 	// Registry cluster event handlers
 	cluster.RegisterLeadChangeWatcher(leadChangeHandler, lead)
