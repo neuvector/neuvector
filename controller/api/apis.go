@@ -2607,28 +2607,12 @@ type RESTBenchCheck struct {
 	Automated   bool                        `json:"automated"`
 	Description string                      `json:"description"`
 	Remediation string                      `json:"remediation"`
-	Tags        []string                    `json:"tags,omitempty"`
+	Tags        []string                    `json:"tags,omitempty"`    // Tags provide list of compliance that related to the cis test item.
 	TagsV2      map[string]share.TagDetails `json:"tags_v2,omitempty"` // TagsV2 provide compliance details for each compliance tag
-}
-
-type RESTProfileBenchCheck struct {
-	TestNum     string   `json:"test_number"`
-	Category    string   `json:"category"`
-	Type        string   `json:"type"`
-	Profile     string   `json:"profile"`
-	Scored      bool     `json:"scored"`
-	Automated   bool     `json:"automated"`
-	Description string   `json:"description"`
-	Remediation string   `json:"remediation"`
-	Tags        []string `json:"tags"`
 }
 
 type RESTBenchMeta struct {
 	RESTBenchCheck
-}
-
-type RESTProfileBenchMeta struct {
-	RESTProfileBenchCheck
 }
 
 type RESTBenchItem struct {

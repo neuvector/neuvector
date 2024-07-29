@@ -20,8 +20,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-// TODO
-// add image bench in
 func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter, metaMap map[string]api.RESTBenchMeta, tagVersion string) *api.RESTBenchItem {
 	var r *api.RESTBenchItem
 
