@@ -2331,33 +2331,30 @@ type RESTVulnerabilityAssetDataV2 struct {
 }
 
 type RESTWorkloadAsset struct {
-	ID          string   `json:"id"`
-	Domains     []string `json:"domains,omitempty"`
-	DisplayName string   `json:"display_name"`
-	PolicyMode  string   `json:"policy_mode"`
-	Service     string   `json:"service"`
-	Image       string   `json:"image"`
+	ID          string `json:"id"`
+	Domain      string `json:"domain"`
+	DisplayName string `json:"display_name"`
+	PolicyMode  string `json:"policy_mode"`
+	Service     string `json:"service"`
+	Image       string `json:"image"`
 }
 
 type RESTHostAsset struct {
-	ID          string   `json:"id"`
-	Domains     []string `json:"domains"`
-	DisplayName string   `json:"display_name"`
-	PolicyMode  string   `json:"policy_mode"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	PolicyMode  string `json:"policy_mode"`
 }
 
 type RESTPlatformAsset struct {
-	ID          string   `json:"id"`
-	Domains     []string `json:"domains"`
-	DisplayName string   `json:"display_name"`
-	PolicyMode  string   `json:"policy_mode"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	PolicyMode  string `json:"policy_mode"`
 }
 
 type RESTImageAsset struct {
-	ID          string   `json:"id"`
-	Domains     []string `json:"domains"`
-	DisplayName string   `json:"display_name"`
-	PolicyMode  string   `json:"policy_mode"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	PolicyMode  string `json:"policy_mode"`
 }
 
 type RESTScanReportData struct {
