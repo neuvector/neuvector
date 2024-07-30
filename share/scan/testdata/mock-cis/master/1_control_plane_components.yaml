@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
@@ -44,9 +44,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -70,9 +70,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
@@ -99,9 +99,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -125,9 +125,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
@@ -154,9 +154,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -180,9 +180,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
@@ -209,9 +209,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -235,9 +235,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # Initialize counters and non-compliant files list
@@ -278,9 +278,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # Initialize counters and non-compliant files list

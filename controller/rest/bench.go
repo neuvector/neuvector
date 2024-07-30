@@ -20,7 +20,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter, metaMap map[string]api.RESTBenchMeta) *api.RESTBenchItem {
+func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter, metaMap map[string]api.RESTBenchMeta, tagVersion string) *api.RESTBenchItem {
 	var r *api.RESTBenchItem
 
 	if c, ok := metaMap[item.TestNum]; ok {
@@ -30,6 +30,31 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 			Message:        make([]string, 0),
 			Group:          item.Group,
 		}
+
+		// update the Tags with compliance profile
+		// if tagVersion == V2, return with TagV2: map[string]share.TagDetails{}, otherwise Tag: []string
+		if tagVersion == scanUtils.V2 {
+			if _, ok := cpf.filter[r.TestNum]; ok {
+				filteredTags := make(map[string]share.TagDetails)
+				for _, compliance := range cpf.filter[r.TestNum] {
+					if tagDetails, ok := metaMap[item.TestNum].TagsV2[compliance]; ok {
+						filteredTags[compliance] = tagDetails
+					} else {
+						filteredTags[compliance] = share.TagDetails{}
+					}
+				}
+				r.TagsV2 = filteredTags
+			} else {
+				r.TagsV2 = map[string]share.TagDetails{}
+			}
+		} else {
+			if _, ok := cpf.filter[r.TestNum]; ok {
+				r.Tags = metaMap[r.TestNum].Tags
+			} else {
+				r.Tags = []string{}
+			}
+		}
+
 	} else {
 		// Could be custom check
 		r = &api.RESTBenchItem{
@@ -50,6 +75,24 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 			r.Category = api.BenchCategoryDocker
 		case share.BenchKubeMaster, share.BenchKubeWorker:
 			r.Category = api.BenchCategoryKube
+		}
+
+		// update the Tags with compliance profile
+		// if tagVersion == V2, return with TagV2: map[string]share.TagDetails{}, otherwise Tag: []string
+		if tagVersion == scanUtils.V2 {
+			if tags, ok := cpf.filter[r.TestNum]; ok {
+				filteredTags := make(map[string]share.TagDetails)
+				for _, compliance := range tags {
+					filteredTags[compliance] = share.TagDetails{}
+				}
+				r.TagsV2 = filteredTags
+			} else {
+				if _, ok := cpf.filter[r.TestNum]; ok {
+					r.Tags = metaMap[r.TestNum].Tags
+				} else {
+					r.Tags = []string{}
+				}
+			}
 		}
 	}
 
@@ -85,13 +128,6 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 	if len(r.Message) > 0 {
 		allMessages := strings.Join(r.Message, ", ")
 		r.Description = fmt.Sprintf("%s - %s", r.Description, allMessages)
-	}
-
-	// add tags
-	if _, ok := cpf.filter[r.TestNum]; ok {
-		r.Tags = metaMap[r.TestNum].Tags
-	} else {
-		r.Tags = make([]map[string][]api.TagDetail, 0)
 	}
 
 	return r
@@ -687,11 +723,11 @@ func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, c
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
 
-	_, metaMap := scanUtils.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
 
 	// Add check tags
 	for _, item := range r.Items {
-		if ritem := bench2REST(bench, item, cpf, metaMap); ritem != nil {
+		if ritem := bench2REST(bench, item, cpf, metaMap, scanUtils.V1); ritem != nil {
 			rpt.Items = append(rpt.Items, ritem)
 		}
 	}
@@ -733,6 +769,7 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	}
 }
 
+// add V2 to support new type
 func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfileFilter) *api.RESTBenchReport {
 	var r share.CLUSBenchReport
 
@@ -754,18 +791,20 @@ func decodeCISReport(bench share.BenchType, value []byte, cpf *complianceProfile
 		return nil
 	}
 
+	// add omit empty tag detals
 	rpt := api.RESTBenchReport{
 		RunAtTimeStamp: r.RunAt.Unix(),
 		RunAt:          api.RESTTimeString(r.RunAt),
 		Version:        r.Version,
 		Items:          make([]*api.RESTBenchItem, 0),
 	}
-
-	_, metaMap := scanUtils.GetComplianceMeta()
+	// v2
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V2)
 
 	// Add check tags
 	for _, item := range r.Items {
-		if ritem := bench2REST(bench, item, cpf, metaMap); ritem != nil {
+		if ritem := bench2REST(bench, item, cpf, metaMap, scanUtils.V2); ritem != nil {
+			// rpt.ItemV2
 			rpt.Items = append(rpt.Items, ritem)
 		}
 	}
@@ -795,7 +834,8 @@ func addCompAsset(all map[string]*compAsset, comp *api.RESTBenchItem) *compAsset
 				Message:     comp.Message,
 				Remediation: comp.Remediation,
 				Group:       comp.Group,
-				Tags:        comp.Tags,
+				// with V2
+				Tags: comp.TagsV2,
 			},
 			wls:       utils.NewSet(),
 			nodes:     utils.NewSet(),

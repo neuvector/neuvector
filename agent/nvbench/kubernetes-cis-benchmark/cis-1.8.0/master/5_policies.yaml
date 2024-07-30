@@ -14,7 +14,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -31,7 +31,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -45,7 +45,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -59,7 +59,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -72,7 +72,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -89,7 +89,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -103,7 +103,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -117,7 +117,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -131,7 +131,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -145,7 +145,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -160,7 +160,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -174,7 +174,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -188,7 +188,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -206,7 +206,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -221,7 +221,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -237,7 +237,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -252,7 +252,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -267,7 +267,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -282,7 +282,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -297,7 +297,7 @@ groups:
         scored: false
         profile: Level 2
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -313,7 +313,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -328,7 +328,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -343,7 +343,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -359,7 +359,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -373,7 +373,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -387,7 +387,7 @@ groups:
         scored: false
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -404,7 +404,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -419,7 +419,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -437,7 +437,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -451,7 +451,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -469,7 +469,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -486,7 +486,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -501,7 +501,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -519,7 +519,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -534,7 +534,7 @@ groups:
         scored: false
         profile: Level 2
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"

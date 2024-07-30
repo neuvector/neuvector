@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
@@ -45,9 +45,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
@@ -73,9 +73,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
@@ -103,9 +103,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
@@ -131,9 +131,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
@@ -161,9 +161,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
@@ -189,9 +189,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -219,9 +219,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -247,9 +247,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           valid_permission=true
@@ -299,9 +299,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           valid_ownership=true
@@ -365,9 +365,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/var/lib/etcd"
@@ -393,9 +393,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if [ -f "$file" ]; then
@@ -419,9 +419,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/kubeconfig"
@@ -450,9 +450,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/kubeconfig"
@@ -478,9 +478,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
@@ -513,9 +513,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/scheduler-kubeconfig/kubeconfig')
@@ -547,9 +547,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
@@ -582,9 +582,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           files=$(find $(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/static-pod-resources") -type f -wholename '*/configmaps/controller-manager-kubeconfig/kubeconfig')
@@ -616,9 +616,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           cert_path="/etc/kubernetes/static-pod-certs"
@@ -671,9 +671,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           cert_path="/etc/kubernetes/static-pod-certs"
@@ -711,9 +711,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           cert_path="/etc/kubernetes/static-pod-certs"
@@ -754,9 +754,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output_kube=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | \
@@ -782,9 +782,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output_ocp=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-apiserver/configmaps/config | grep --color "basic-auth")
@@ -804,9 +804,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output_1=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.apiServerArguments //empty')
@@ -831,9 +831,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
 
@@ -868,9 +868,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq '.kubeletClientInfo //empty' )
@@ -904,9 +904,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           kubelet_cert_authority=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["kubelet-certificate-authority"] // empty')
@@ -929,9 +929,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # TODO
@@ -953,9 +953,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."authorization-mode"' // empty)
@@ -974,8 +974,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           # Verify the APIPriorityAndFairness feature-gate
@@ -1005,8 +1005,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
@@ -1025,8 +1025,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq '.apiServerArguments."enable-admission-plugins" //empty')
@@ -1045,8 +1045,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
@@ -1067,8 +1067,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
@@ -1089,8 +1089,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
@@ -1112,8 +1112,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
+          HIPAA: []
+          PCI: []
         audit: |
           check="$id  - $description"
           admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
@@ -1133,9 +1133,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           admission_plugins=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data."config.yaml"' | jq -r '.apiServerArguments."enable-admission-plugins" // empty')
@@ -1159,9 +1159,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output_k8s=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/endpoints | jq -r '.subsets[].ports[].port')
@@ -1179,9 +1179,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
 
@@ -1206,8 +1206,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # TODO
@@ -1228,8 +1228,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # TODO
@@ -1251,8 +1251,8 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq -r '.spec.observedConfig.apiServerArguments."audit-log-path" // empty')
@@ -1273,7 +1273,7 @@ groups:
         scored: true
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' |  jq -r '.apiServerArguments["audit-log-maxbackup"][]? //empty')
@@ -1292,9 +1292,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           audit_log_maxsize=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["audit-log-maxsize"][]?')
@@ -1315,9 +1315,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           min_request_timeout=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["min-request-timeout"][]?')
@@ -1339,9 +1339,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -1357,9 +1357,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           config_data=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.serviceAccountPublicKeyFiles //empty')
@@ -1381,9 +1381,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           etcd_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-certfile"]?')
@@ -1407,9 +1407,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           tls_certfile=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments."tls-cert-file"[]?')
@@ -1432,9 +1432,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.servingInfo.clientCA //empty')
@@ -1454,9 +1454,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-apiserver/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.apiServerArguments["etcd-cafile"] //empty')
@@ -1476,9 +1476,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/openshiftapiservers/cluster -o=jsonpath='{range .items[0].status.conditions[?(@.type=="Encrypted")]}{.reason}{"\n"}{.message}{"\n"}')
@@ -1498,9 +1498,9 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # TODO
@@ -1524,7 +1524,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/apis/operator.openshift.io/v1/kubeapiservers/cluster | jq '.spec.unsupportedConfigOverrides //empty')
@@ -1545,7 +1545,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
 
@@ -1569,9 +1569,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["use-service-account-credentials"][]')
@@ -1590,9 +1590,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["service-account-private-key-file"][]')
@@ -1612,9 +1612,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           output=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["root-ca-file"][]')
@@ -1633,9 +1633,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           secure_port=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-controller-manager/configmaps/config | jq -r '.data["config.yaml"]' | jq -r '.extendedArguments["secure-port"][] // empty')
@@ -1661,7 +1661,7 @@ groups:
         scored: true
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           liveness_probe=$(curl -ks -H "Authorization: Bearer $OC_TOKEN" https://kubernetes.default/api/v1/namespaces/openshift-kube-scheduler/configmaps/kube-scheduler-pod | jq -r '.data."pod.yaml"' | jq -r '.spec.containers[].livenessProbe.httpGet.path')
@@ -1680,7 +1680,7 @@ groups:
         scored: true
         profile: Level 1
         automated: true
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"

@@ -1,8 +1,8 @@
 package scan
 
 import (
-	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -10,22 +10,45 @@ import (
 	"log"
 	"os"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/neuvector/neuvector/controller/api"
 )
 
 var (
-	mockComplianceMetas           []api.RESTBenchMeta
-	mockLoadMetas                 []api.RESTBenchMeta
-	backupMockLoadMetas           []api.RESTBenchMeta
-	mockComplianceMetaMap         = make(map[string]api.RESTBenchMeta)
-	backupMockLoadMetaMap         = make(map[string]api.RESTBenchMeta)
-	mockLoadMetaMap               = make(map[string]api.RESTBenchMeta)
-	mockCISItems                  = make(map[string]api.RESTBenchCheck)
-	mockCISItemsPathFail          = make(map[string]api.RESTBenchCheck)
-	isUpdateMockComplianceMetaMap = false
-	isUpdateMockLoadMetaMap       = false
+	complianceMetaConfig = &UpdateConfigParams{
+		Metas:     &[]api.RESTBenchMeta{},
+		MetaMap:   make(map[string]api.RESTBenchMeta),
+		MetasV2:   &[]api.RESTBenchMeta{},
+		MetaMapV2: make(map[string]api.RESTBenchMeta),
+	}
+
+	mockComplianceMetaConfig = &UpdateConfigParams{
+		Metas:     &[]api.RESTBenchMeta{},
+		MetaMap:   make(map[string]api.RESTBenchMeta),
+		MetasV2:   &[]api.RESTBenchMeta{},
+		MetaMapV2: make(map[string]api.RESTBenchMeta),
+	}
+
+	mockPrimeComplianceMetaConfig = &UpdateConfigParams{
+		Metas:     &[]api.RESTBenchMeta{},
+		MetaMap:   make(map[string]api.RESTBenchMeta),
+		MetasV2:   &[]api.RESTBenchMeta{},
+		MetaMapV2: make(map[string]api.RESTBenchMeta),
+		FilterMap: make(map[string]int),
+	}
+
+	mockPrimeImageBenchConfig = &UpdateConfigParams{
+		Metas:   &[]api.RESTBenchMeta{},
+		MetaMap: make(map[string]api.RESTBenchMeta),
+	}
+
+	mockCISItems = make(map[string]api.RESTBenchCheck)
+
+	// V2 Return the Tags map[string]share.TagDetails
+	mockComplianceMetasV2   []api.RESTBenchMeta
+	mockComplianceMetaMapV2 = make(map[string]api.RESTBenchMeta)
+	// Return the Tags []string
+	mockComplianceMetas   []api.RESTBenchMeta
+	mockComplianceMetaMap = make(map[string]api.RESTBenchMeta)
 )
 
 // For Load Prime data
@@ -55,6 +78,10 @@ var expectedTags = map[string]map[string]bool{
 	"I.4.6": {"Mock1": true, "Mock2": true, "Mock4": true},
 }
 
+var expectedFilterMapAfterfLoadConfig = map[string]int{
+	"Mock3": 1, "Mock1": 1, "Mock2": 1, "Mock4": 1,
+}
+
 type TagsValidator struct {
 	Tags []string `json:"Tags"`
 }
@@ -66,19 +93,9 @@ func TestSetup(t *testing.T) {
 	for key, value := range backupCISItems {
 		mockCISItems[key] = DeepCopyRESTBenchCheck(value)
 		cisItems[key] = DeepCopyRESTBenchCheck(value)
-		mockCISItemsPathFail[key] = DeepCopyRESTBenchCheck(value)
 	}
-
-	for key, value := range mockLoadItems {
-		backupMeta := api.RESTBenchMeta{RESTBenchCheck: DeepCopyRESTBenchCheck(value)}
-		backupMockLoadMetaMap[key] = backupMeta
-		backupMockLoadMetas = append(backupMockLoadMetas, backupMeta)
-	}
-
-	PrepareBenchMeta(mockLoadItems, &mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	if isUpdateMockLoadMetaMap {
-		updateMetasFromMap(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	}
+	PrepareBenchMeta(mockLoadItems, mockComplianceMetaConfig.MetaMapV2)
+	updateComplianceMetasFromMap(mockComplianceMetaConfig.Metas, mockComplianceMetaConfig.MetaMap, mockComplianceMetaConfig.MetasV2, mockComplianceMetaConfig.MetaMapV2)
 }
 
 func TestTagConsistance(t *testing.T) {
@@ -108,10 +125,8 @@ func TestTagConsistance(t *testing.T) {
 		mockTagCount := make(map[string]int)
 		cisItemTagCount := make(map[string]int)
 
-		for _, tags := range cisItems[id].Tags {
-			for tag, _ := range tags {
-				cisItemTagCount[tag]++
-			}
+		for tag, _ := range cisItems[id].TagsV2 {
+			cisItemTagCount[tag]++
 		}
 
 		for _, tag := range value.Tags {
@@ -130,66 +145,215 @@ func TestTagConsistance(t *testing.T) {
 	}
 }
 
-func getMetaMapForTest(remediationFolder string, items map[string]api.RESTBenchCheck, metas []api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) ([]api.RESTBenchMeta, map[string]api.RESTBenchMeta) {
+func getComplianceMetaForTest(remediationFolder string, items map[string]api.RESTBenchCheck, params *UpdateConfigParams) {
 	GetK8sCISMeta(remediationFolder, items)
-	PrepareBenchMeta(items, &metas, metaMap, updateFlag)
-	if *updateFlag {
-		updateMetasFromMap(&metas, metaMap, updateFlag)
+	PrepareBenchMeta(items, params.MetaMapV2)
+	updateComplianceMetasFromMap(params.Metas, params.MetaMap, params.MetasV2, params.MetaMapV2)
+}
+
+func isSameExceptTags(meta1, meta2 api.RESTBenchMeta) bool {
+	return meta1.RESTBenchCheck.TestNum == meta2.RESTBenchCheck.TestNum &&
+		meta1.RESTBenchCheck.Type == meta2.RESTBenchCheck.Type &&
+		meta1.RESTBenchCheck.Category == meta2.RESTBenchCheck.Category &&
+		meta1.RESTBenchCheck.Scored == meta2.RESTBenchCheck.Scored &&
+		meta1.RESTBenchCheck.Profile == meta2.RESTBenchCheck.Profile &&
+		meta1.RESTBenchCheck.Automated == meta2.RESTBenchCheck.Automated &&
+		meta1.RESTBenchCheck.Description == meta2.RESTBenchCheck.Description &&
+		meta1.RESTBenchCheck.Remediation == meta2.RESTBenchCheck.Remediation
+}
+
+func isIdenticalTags(meta, mockMeta api.RESTBenchMeta, isV2 bool) bool {
+	if isV2 {
+		if len(meta.RESTBenchCheck.TagsV2) != len(mockMeta.RESTBenchCheck.TagsV2) {
+			return false
+		}
+
+		for key, val1 := range meta.RESTBenchCheck.TagsV2 {
+			val2, ok := mockMeta.RESTBenchCheck.TagsV2[key]
+			if !ok || !reflect.DeepEqual(val1, val2) {
+				return false
+			}
+		}
+		return true
+
+	} else {
+		if len(meta.RESTBenchCheck.Tags) != len(mockMeta.RESTBenchCheck.Tags) {
+			return false
+		}
+		counts := make(map[string]int)
+
+		for _, item := range meta.RESTBenchCheck.Tags {
+			counts[item]++
+		}
+
+		for _, item := range mockMeta.RESTBenchCheck.Tags {
+			if counts[item] == 0 {
+				return false
+			}
+			counts[item]--
+		}
+
+		return true
+	}
+}
+
+func checkMetaConfig(t *testing.T, complianceMetaConfig, mockComplianceMetaConfig *UpdateConfigParams) {
+	if len(*complianceMetaConfig.Metas) != len(*mockComplianceMetaConfig.Metas) {
+		t.Errorf("Length of complianceMetaConfig.Metas and mockComplianceMetaConfig.Metas should be the same")
 	}
 
-	return metas, metaMap
+	if len(*complianceMetaConfig.MetasV2) != len(*mockComplianceMetaConfig.MetasV2) {
+		t.Errorf("Length of complianceMetaConfig.MetasV2 and mockComplianceMetaConfig.MetasV2 should be the same")
+	}
+
+	if len(complianceMetaConfig.MetaMap) != len(mockComplianceMetaConfig.MetaMap) {
+		t.Errorf("Length of complianceMetaConfig.MetaMap and mockComplianceMetaConfig.MetaMap should be the same")
+	}
+
+	if len(complianceMetaConfig.MetaMapV2) != len(mockComplianceMetaConfig.MetaMapV2) {
+		t.Errorf("Length of complianceMetaConfig.MetaMapV2 and mockComplianceMetaConfig.MetaMapV2 should be the same")
+	}
+
+	for i := range *complianceMetaConfig.Metas {
+		if !isSameExceptTags((*complianceMetaConfig.Metas)[i], (*mockComplianceMetaConfig.Metas)[i]) {
+			t.Errorf("complianceMetaConfig.Metas[%d] and mockComplianceMetaConfig.Metas[%d] should be the identical", i, i)
+		}
+		if !isIdenticalTags((*complianceMetaConfig.Metas)[i], (*mockComplianceMetaConfig.Metas)[i], false) {
+			t.Errorf("Tags for complianceMetaConfig.Metas[%d] and mockComplianceMetaConfig.Metas[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].RESTBenchCheck.Tags, (*mockComplianceMetaConfig.MetasV2)[i].RESTBenchCheck.Tags)
+		}
+	}
+
+	for i := range *complianceMetaConfig.MetasV2 {
+		if !isSameExceptTags((*complianceMetaConfig.MetasV2)[i], (*mockComplianceMetaConfig.MetasV2)[i]) {
+			t.Errorf("complianceMetaConfig.MetasV2[%d] and mockComplianceMetaConfig.MetasV2[%d] should be the identical", i, i)
+		}
+		if !isIdenticalTags((*complianceMetaConfig.MetasV2)[i], (*mockComplianceMetaConfig.MetasV2)[i], true) {
+			t.Errorf("Tags for complianceMetaConfig.MetasV2[%d] and mockComplianceMetaConfig.MetasV2[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].RESTBenchCheck.Tags, (*mockComplianceMetaConfig.MetasV2)[i].RESTBenchCheck.Tags)
+		}
+	}
+
+	for key, meta := range complianceMetaConfig.MetaMap {
+		mockMeta, ok := mockComplianceMetaConfig.MetaMap[key]
+		if !ok {
+			t.Errorf("metaMapV2 should contain key %s", key)
+		}
+
+		if !isSameExceptTags(meta, mockMeta) {
+			t.Errorf("complianceMetaConfig.MetaMap[%s] and mockComplianceMetaConfig.MetaMap[%s] should be identical except for Tags", key, key)
+		}
+
+		if !isIdenticalTags(meta, mockMeta, false) {
+			t.Errorf("Tags for complianceMetaConfig.MetaMap[%s] and mockComplianceMetaConfig.MetaMap[%s] should be the same, got %v and %v", key, key, meta.RESTBenchCheck.Tags, mockMeta.RESTBenchCheck.Tags)
+		}
+	}
+
+	for key, meta := range complianceMetaConfig.MetaMapV2 {
+		mockMeta, ok := mockComplianceMetaConfig.MetaMapV2[key]
+		if !ok {
+			t.Errorf("metaMapV2 should contain key %s", key)
+		}
+
+		if !isSameExceptTags(meta, mockMeta) {
+			t.Errorf("complianceMetaConfig.MetaMapV2[%s] and mockComplianceMetaConfig.MetaMapV2[%s] should be identical except for Tags", key, key)
+		}
+
+		if !isIdenticalTags(meta, mockMeta, false) {
+			t.Errorf("Tags for complianceMetaConfig.MetaMapV2[%s] and mockComplianceMetaConfig.MetaMapV2[%s] should be the same, got %v and %v", key, key, meta.RESTBenchCheck.Tags, mockMeta.RESTBenchCheck.Tags)
+		}
+	}
+}
+
+func TestComplianceMetaUpdate(t *testing.T) {
+	remediationFolder = filepath.Join(".", "testdata", "mock-cis")
+	complianceMetaConfig = &UpdateConfigParams{
+		Metas:     &complianceMetas,
+		MetaMap:   complianceMetaMap,
+		MetasV2:   &complianceMetasV2,
+		MetaMapV2: complianceMetaMapV2,
+	}
+	mockComplianceMetaConfig = &UpdateConfigParams{
+		Metas:     &mockComplianceMetas,
+		MetaMap:   mockComplianceMetaMap,
+		MetasV2:   &mockComplianceMetasV2,
+		MetaMapV2: mockComplianceMetaMapV2,
+	}
+
+	getComplianceMetaForTest(remediationFolder, cisItems, complianceMetaConfig)
+	getComplianceMetaForTest(remediationFolder, mockCISItems, mockComplianceMetaConfig)
+	checkMetaConfig(t, mockComplianceMetaConfig, complianceMetaConfig)
+
+	remediationFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
+	getComplianceMetaForTest(remediationFolder, cisItems, complianceMetaConfig)
+	getComplianceMetaForTest(remediationFolder, mockCISItems, mockComplianceMetaConfig)
+	checkMetaConfig(t, mockComplianceMetaConfig, complianceMetaConfig)
 }
 
 func TestGetComplianceMeta(t *testing.T) {
-	remediationFolder = filepath.Join(".", "testdata", "mock-cis")
-	metas, metaMap := getMetaMapForTest(remediationFolder, cisItems, complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
-	mockMetas, mockMetaMap := getMetaMapForTest(remediationFolder, mockCISItems, mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
+	metas, metaMap := GetComplianceMeta(V1)
+	metasV2, metaMapV2 := GetComplianceMeta(V2)
 
-	if diff := cmp.Diff(mockMetas, metas); diff != "" {
-		t.Errorf("mockMetas metas (-want +got):\n%s", diff)
+	if len(metas) != len(metasV2) {
+		t.Errorf("metas and metasV2 should have the same length")
 	}
 
-	if diff := cmp.Diff(mockMetaMap, metaMap); diff != "" {
-		t.Errorf("mockMetaMap mismatch (-want +got):\n%s", diff)
+	if len(metaMap) != len(metaMapV2) {
+		t.Errorf("metaMap and metaMapV2 should have the same length")
 	}
 
-	// After update, we need to make sure we close the update flag
-	if isUpdateComplianceMetaMap {
-		t.Error("isUpdateComplianceMetaMap is not update properly")
+	for i := range metas {
+		if !isSameExceptTags(metas[i], metasV2[i]) {
+			t.Errorf("metas[%d] and metasV2[%d] should be the same except for Tags", i, i)
+		}
+
+		if len(metas[i].RESTBenchCheck.Tags) != len(metasV2[i].RESTBenchCheck.TagsV2) {
+			t.Errorf("Tags length for metas[%d] and metasV2[%d] should be the same", i, i)
+		}
+
+		if len(metas[i].RESTBenchCheck.TagsV2) != 0 {
+			t.Errorf("TagsV2 length for metas[%d] should be 0", i)
+		}
+
+		if len(metasV2[i].RESTBenchCheck.Tags) != 0 {
+			t.Errorf("Tags length for metasV2[%d] should be 0", i)
+		}
 	}
 
-	if isUpdateMockComplianceMetaMap {
-		t.Error("isUpdateMockComplianceMetaMap is not update properly")
-	}
+	for key, meta := range metaMap {
+		metaV2, ok := metaMapV2[key]
+		if !ok {
+			t.Errorf("metaMapV2 should contain key %s", key)
+		}
 
-	// Test when the path is not exist
-	remediationFolder = filepath.Join(".", "testdata", "mock-cis-notexist")
-	metas, metaMap = getMetaMapForTest(remediationFolder, cisItems, complianceMetas, complianceMetaMap, &isUpdateComplianceMetaMap)
+		if !isSameExceptTags(meta, metaV2) {
+			t.Errorf("metaMap[%s] and metaMapV2[%s] should be the same except for Tags", key, key)
+		}
 
-	PrepareBenchMeta(mockCISItems, &mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
-	updateMetasFromMap(&mockComplianceMetas, mockComplianceMetaMap, &isUpdateMockComplianceMetaMap)
+		if len(meta.RESTBenchCheck.Tags) != len(metaV2.RESTBenchCheck.TagsV2) {
+			t.Errorf("Tags length for metaMap[%s] and metaMapV2[%s] should be the same", key, key)
+		}
 
-	if diff := cmp.Diff(mockComplianceMetas, metas); diff != "" {
-		t.Errorf("mockMetas metas (-want +got):\n%s", diff)
-	}
+		if len(meta.RESTBenchCheck.TagsV2) != 0 {
+			t.Errorf("TagsV2 length for meta should be 0")
+		}
 
-	if diff := cmp.Diff(mockComplianceMetaMap, metaMap); diff != "" {
-		t.Errorf("mockMetaMap mismatch (-want +got):\n%s", diff)
-	}
-
-	// After update, we need to make sure we close the update flag
-	if isUpdateComplianceMetaMap {
-		t.Error("isUpdateComplianceMetaMap is not update properly")
-	}
-
-	if isUpdateMockComplianceMetaMap {
-		t.Error("isUpdateMockComplianceMetaMap is not update properly")
+		if len(metaV2.RESTBenchCheck.Tags) != 0 {
+			t.Errorf("Tags length for metaV2 should be 0")
+		}
 	}
 }
 
-func getMetaMapForLoadTest(metas *[]api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, updateFlag *bool) {
-	if *updateFlag {
-		updateMetasFromMap(metas, metaMap, updateFlag)
+func TestGetImageBenchMeta(t *testing.T) {
+	metas, metaMap := InitImageBenchMeta()
+	for i := range metas {
+		if len(metas[i].RESTBenchCheck.TagsV2) != 0 {
+			t.Errorf("TagsV2 length for metas[%d] should be 0", i)
+		}
+	}
+
+	for _, meta := range metaMap {
+		if len(meta.RESTBenchCheck.TagsV2) != 0 {
+			t.Errorf("TagsV2 length for meta should be 0")
+		}
 	}
 }
 
@@ -204,9 +368,8 @@ func TestLoadCreateEmpty(t *testing.T) {
 	// Run Load in a goroutine and use a channel to wait for it to finish setup
 	done := make(chan bool)
 	go func() {
-		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
+		LoadConfig(primeConfig, mockPrimeComplianceMetaConfig, true)
 		close(done)
-		fmt.Println("stop the channel")
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -219,26 +382,50 @@ func TestLoadCreateEmpty(t *testing.T) {
 	file.Close()
 	<-done
 
-	getMetaMapForLoadTest(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	for _, meta := range mockLoadMetas {
-		if len(meta.Tags) != 0 {
-			t.Error("Expected Tag in metas to be empty")
+	for _, meta := range *mockPrimeComplianceMetaConfig.Metas {
+		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
+			t.Error("Expected Tag and TagsV2 in metas to be empty")
 		}
 	}
 
-	for _, meta := range mockLoadMetaMap {
-		if len(meta.Tags) != 0 {
-			t.Error("Expected Tag in metas to be empty")
+	for _, meta := range *mockPrimeComplianceMetaConfig.MetasV2 {
+		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
+			t.Error("Expected Tag and TagsV2 in metas to be empty")
+		}
+	}
+
+	for _, meta := range mockPrimeComplianceMetaConfig.MetaMap {
+		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
+			t.Error("Expected Tag and TagsV2 in metas to be empty")
+		}
+	}
+
+	for _, meta := range mockPrimeComplianceMetaConfig.MetaMapV2 {
+		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
+			t.Error("Expected Tag and TagsV2 in metas to be empty")
 		}
 	}
 
 	// Clean up and stop Load
 	os.Remove(primeConfig)
+}
 
+func verifyFilterMapUpdate(t *testing.T, actualFilterMap, expectedFilterMap map[string]int) {
+	// Check if the actualFilterMap is updated correctly
+	if len(actualFilterMap) != len(expectedFilterMap) {
+		t.Errorf("actualFilterMap is not updated correctly, expected length %d, got %d",
+			len(expectedFilterMap), len(actualFilterMap))
+	}
+
+	for key, actualValue := range actualFilterMap {
+		expectedValue, ok := expectedFilterMap[key]
+		if !ok || !reflect.DeepEqual(actualValue, expectedValue) {
+			t.Errorf("FilterMap[%v] is not updated correctly, expected %v, got %v", key, expectedValue, actualValue)
+		}
+	}
 }
 
 func TestLoadCreateExisting(t *testing.T) {
-	TestSetup(t)
 	dir, err := os.MkdirTemp("", "testdata")
 	if err != nil {
 		log.Fatal(err)
@@ -246,12 +433,24 @@ func TestLoadCreateExisting(t *testing.T) {
 	defer os.RemoveAll(dir)
 	primeConfig := filepath.Join(dir, "mock.yml")
 
+	PrepareBenchMeta(mockLoadItems, mockPrimeComplianceMetaConfig.MetaMapV2)
+	updateComplianceMetasFromMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.MetaMap, mockPrimeComplianceMetaConfig.MetasV2, mockPrimeComplianceMetaConfig.MetaMapV2)
+	updatecComplianceFilterMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.FilterMap)
+
+	// Check if the FilterMap is empty
+	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, map[string]int{})
+
 	// Run Load in a goroutine and use a channel to wait for it to finish setup
-	done := make(chan bool)
+	doneComplianceMeta := make(chan bool)
 	go func() {
-		LoadConfig(primeConfig, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-		close(done)
-		fmt.Println("XXX done", mockLoadMetaMap)
+		LoadConfig(primeConfig, mockPrimeComplianceMetaConfig, true)
+		close(doneComplianceMeta)
+	}()
+
+	doneImageBench := make(chan bool)
+	go func() {
+		LoadConfig(primeConfig, mockPrimeImageBenchConfig, false)
+		close(doneImageBench)
 	}()
 
 	// Give some time for fsnotify to start watching
@@ -264,19 +463,24 @@ func TestLoadCreateExisting(t *testing.T) {
 	// Create the file && Write Situation
 	os.WriteFile(primeConfig, content, 0644)
 
-	<-done
-	getMetaMapForLoadTest(&mockLoadMetas, mockLoadMetaMap, &isUpdateMockLoadMetaMap)
-	fmt.Println("XXX getMetaMapForLoadTest", mockLoadMetaMap)
+	<-doneComplianceMeta
+	<-doneImageBench
 
-	// Iterate over the slice of Meta structs
-	for _, meta := range mockLoadMetas {
-		// Check if the current meta ID is one we're interested in
+	// Check the prime config update the filerfmap correctly
+	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, expectedFilterMapAfterfLoadConfig)
+
+	// Check mockPrimeComplianceMetaConfig is updated correctly
+	for _, meta := range *mockPrimeComplianceMetaConfig.Metas {
+		if meta.TagsV2 != nil {
+			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeComplianceMetaConfig.Metas")
+		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
+				t.Errorf("Expected meta.Tags in mockPrimeComplianceMetaConfig is the same size as expectedTag")
+			}
+			for _, compliance := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {
@@ -284,14 +488,84 @@ func TestLoadCreateExisting(t *testing.T) {
 		}
 	}
 
-	for _, meta := range mockLoadMetaMap {
-		// Check if the current meta ID is one we're interested in
+	for _, meta := range mockPrimeComplianceMetaConfig.MetaMap {
+		if meta.TagsV2 != nil {
+			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeComplianceMetaConfig.MetaMap")
+		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for _, tag := range meta.Tags {
-				for compliance, _ := range tag {
-					if _, found := expectedTags[meta.TestNum][compliance]; !found {
-						t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-					}
+			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
+				t.Errorf("Expected meta.Tags in mockPrimeComplianceMetaConfig is the same size as expectedTag")
+			}
+			for _, compliance := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
+				}
+			}
+		} else {
+			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
+		}
+	}
+
+	for _, meta := range *mockPrimeComplianceMetaConfig.MetasV2 {
+		if meta.Tags != nil {
+			t.Errorf("Expected meta.Tags is the should be nil in mockPrimeComplianceMetaConfig.MetasV2")
+		}
+		if _, ok := expectedTags[meta.TestNum]; ok {
+			for compliance, _ := range meta.TagsV2 {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
+				}
+			}
+		} else {
+			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
+		}
+	}
+
+	for _, meta := range mockPrimeComplianceMetaConfig.MetaMapV2 {
+		if meta.Tags != nil {
+			t.Errorf("Expected meta.Tags is the should be nil in mockPrimeComplianceMetaConfig.MetaMapV2")
+		}
+		if _, ok := expectedTags[meta.TestNum]; ok {
+			for compliance, _ := range meta.TagsV2 {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
+				}
+			}
+		} else {
+			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
+		}
+	}
+
+	// Check mockPrimeImageBenchConfig is updated correctly
+	for _, meta := range *mockPrimeImageBenchConfig.Metas {
+		if meta.TagsV2 != nil {
+			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeImageBenchConfig.Metas")
+		}
+		if _, ok := expectedTags[meta.TestNum]; ok {
+			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
+				t.Errorf("Expected meta.Tags in mockPrimeImageBenchConfig is the same size as expectedTag")
+			}
+			for _, compliance := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
+				}
+			}
+		} else {
+			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
+		}
+	}
+
+	for _, meta := range mockPrimeImageBenchConfig.MetaMap {
+		if meta.TagsV2 != nil {
+			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeImageBenchConfig.MetaMap")
+		}
+		if _, ok := expectedTags[meta.TestNum]; ok {
+			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
+				t.Errorf("Expected meta.Tags in mockPrimeImageBenchConfig is the same size as expectedTag")
+			}
+			for _, compliance := range meta.Tags {
+				if _, found := expectedTags[meta.TestNum][compliance]; !found {
+					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
 			}
 		} else {

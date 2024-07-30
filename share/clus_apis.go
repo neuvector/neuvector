@@ -1597,6 +1597,15 @@ type CLUSAuditLog struct {
 
 const SnifferIdAgentField = 12
 
+type TagDetail struct {
+	ID              string `yaml:"id" json:"id"`
+	Title           string `yaml:"title" json:"title"`
+	Description     string `yaml:"description" json:"description"`
+	CIS_Sub_Control string `yaml:"cis-sub-control"`
+}
+
+type TagDetails []TagDetail
+
 type CLUSComplianceProfileEntry struct {
 	TestNum string   `json:"test_num"`
 	Tags    []string `json:"tags"`

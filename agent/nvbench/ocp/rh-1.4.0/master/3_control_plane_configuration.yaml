@@ -14,7 +14,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -42,8 +42,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -75,8 +75,8 @@ groups:
         profile: Level 2
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           # TODO
