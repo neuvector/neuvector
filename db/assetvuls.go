@@ -500,18 +500,12 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 		defer rows.Close()
 
 		for rows.Next() {
-			var domain string
 			as := &api.RESTWorkloadAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode, &as.Service, &as.Image)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.Domain, &as.PolicyMode, &as.Service, &as.Image)
 
 			if err != nil {
 				return nil, err
 			}
-
-			if domain != "" {
-				as.Domains = []string{domain}
-			}
-
 			records[as.ID] = as
 		}
 		break
@@ -525,7 +519,7 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 }
 
 func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
-	columns := []interface{}{"assetid", "name", "w_domain", "policy_mode"}
+	columns := []interface{}{"assetid", "name", "policy_mode"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -549,15 +543,10 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 		defer rows.Close()
 
 		for rows.Next() {
-			var domain string
 			as := &api.RESTHostAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
 			if err != nil {
 				return nil, err
-			}
-
-			if domain != "" {
-				as.Domains = []string{domain}
 			}
 			records[as.ID] = as
 		}
@@ -572,7 +561,7 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 }
 
 func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, error) {
-	columns := []interface{}{"assetid", "name", "w_domain", "policy_mode"}
+	columns := []interface{}{"assetid", "name", "policy_mode"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -596,17 +585,11 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 		defer rows.Close()
 
 		for rows.Next() {
-			var domain string
 			as := &api.RESTPlatformAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
 			if err != nil {
 				return nil, err
 			}
-
-			if domain != "" {
-				as.Domains = []string{domain}
-			}
-
 			records[as.ID] = as
 		}
 		break
@@ -620,7 +603,7 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 }
 
 func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error) {
-	columns := []interface{}{"assetid", "name", "w_domain", "policy_mode"}
+	columns := []interface{}{"assetid", "name", "policy_mode"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -644,15 +627,10 @@ func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error)
 		defer rows.Close()
 
 		for rows.Next() {
-			var domain string
 			as := &api.RESTImageAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &domain, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
 			if err != nil {
 				return nil, err
-			}
-
-			if domain != "" {
-				as.Domains = []string{domain}
 			}
 			records[as.ID] = as
 		}
