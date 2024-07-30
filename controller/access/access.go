@@ -865,7 +865,7 @@ func CompileUriPermitsMapping() {
 				"v1/list/compliance",
 				"v1/compliance/profile",
 				"v1/compliance/profile/*",
-				"/v1/compliance/available_filter",
+				"v1/compliance/available_filter",
 			},
 			CONST_API_AUDIT_EVENTS: []string{
 				"v1/log/audit",
