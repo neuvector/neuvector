@@ -33,6 +33,7 @@ const (
 )
 
 const globalRolePrefix string = "cattle-globalrole-"
+const nvPermRscPrefix string = "nv-perm."
 
 const constNvNamespace string = "{nv}"
 
@@ -410,14 +411,17 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 	if k8sFlavor == share.FlavorRancher {
 		var nvRole string
 		for rsc, verbs := range r2v {
-			// resource "cluster"/"namespace" is equivalent to "*"
-			if rsc == "*" || rsc == "cluster" || rsc == "namespace" {
+			// resource "nv-perm.all-permissions"/"cluster"/"namespace" are equivalent to "*"
+			if rsc == "*" || rsc == "nv-perm.all-permissions" || rsc == "cluster" || rsc == "namespace" {
 				if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 					nvRole = api.UserRoleAdmin
 				} else if readVerbs.Intersect(verbs).Cardinality() != 0 && nvRole == api.UserRoleNone {
 					nvRole = api.UserRoleReader
 				}
 			} else {
+				if strings.HasPrefix(rsc, nvPermRscPrefix) {
+					rsc = rsc[len(nvPermRscPrefix):]
+				}
 				if v, ok := nvPermitsValueSSO[rsc]; ok {
 					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 						nvPermits.Union(v)
@@ -429,6 +433,8 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 		}
 		// Now nvRole & nvPermits could be non-empty value
 
+		// "nv-perm.all-permissions" is equivalent to "cluster"/"namespace"
+		// "nv-perm.fed" is equivalent to "federation"
 		// When SSO happens on NV master cluster,
 		// 1. * verb on  * or cluster 							  resource in Rancher Global  Role maps to fedAdmin
 		// 2. * verb on  "*, federation" or "cluster, federation" resource in Rancher Cluster Role maps to fedAdmin
