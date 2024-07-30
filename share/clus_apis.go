@@ -1111,8 +1111,6 @@ type CLUSGroupMetric struct {
 type CLUSWlMetric struct {
 	WlID        string `json:"wlid"`
 	WlSessCurIn uint32 `json:"wl_sess_cur_in"`
-	WlSessIn1   uint32 `json:"wl_sess_in1"`
-	WlByteIn1   uint64 `json:"wl_byte_in1"`
 	WlSessIn12  uint32 `json:"wl_sess_in12"`
 	WlByteIn12  uint64 `json:"wl_byte_in12"`
 }
