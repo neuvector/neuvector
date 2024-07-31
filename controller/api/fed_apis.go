@@ -39,13 +39,14 @@ const (
 // 3. A master cluster with joint cluster(s) cannot join other federation
 // 4. A master cluster without any joint cluster can join another federation. At the same time it becomes joint cluster of another federation.
 type RESTFedMasterClusterInfo struct {
-	Disabled bool                     `json:"disabled"`
-	Name     string                   `json:"name"` // cluster name
-	ID       string                   `json:"id"`
-	Secret   string                   `json:"secret"` // used for encryoting/decrypting join_ticket issued by the master cluster. never export
-	User     string                   `json:"user"`   // the user who promoets this cluster to master cluster in federation
-	Status   string                   `json:"status"` // ex: FedStatusClusterSynced/FedStatusClusterOutOfSync (see above)
-	RestInfo share.CLUSRestServerInfo `json:"rest_info"`
+	Disabled    bool                     `json:"disabled"`
+	Name        string                   `json:"name"` // cluster name
+	ID          string                   `json:"id"`
+	Secret      string                   `json:"secret"`       // used for encryoting/decrypting join_ticket issued by the master cluster. never export
+	User        string                   `json:"user"`         // the user who promoets this cluster to master cluster in federation
+	Status      string                   `json:"status"`       // ex: FedStatusClusterSynced/FedStatusClusterOutOfSync (see above)
+	RestVersion string                   `json:"rest_version"` // from kv.GetRestVer()
+	RestInfo    share.CLUSRestServerInfo `json:"rest_info"`
 }
 
 type RESTFedJointClusterInfo struct {
@@ -53,8 +54,9 @@ type RESTFedJointClusterInfo struct {
 	Name          string                   `json:"name"` // cluster name
 	ID            string                   `json:"id"`
 	Secret        string                   `json:"secret"`
-	User          string                   `json:"user"`   // the user who joins this cluster to federation
-	Status        string                   `json:"status"` // ex: FedStatusClusterSynced/FedStatusClusterOutOfSync (see above)
+	User          string                   `json:"user"`         // the user who joins this cluster to federation
+	Status        string                   `json:"status"`       // ex: FedStatusClusterSynced/FedStatusClusterOutOfSync (see above)
+	RestVersion   string                   `json:"rest_version"` // joint cluster's kv.GetRestVer()
 	RestInfo      share.CLUSRestServerInfo `json:"rest_info"`
 	ProxyRequired bool                     `json:"proxy_required"` // a joint cluster may be reachable without proxy even master cluster is configured to use proxy. decided when it joins fed.
 }
