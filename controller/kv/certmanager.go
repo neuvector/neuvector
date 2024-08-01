@@ -135,6 +135,11 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 
 		// Check if certificate is expired.  If it is, renew it with PutRev.
 		block, _ = pem.Decode([]byte(data.Cert))
+		if block == nil {
+			logctx.WithError(err).Info("the certificate is ill-formatted. Try to create a new one.")
+			shouldrenew = true
+			goto end
+		}
 		x509Cert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			logctx.WithError(err).Info("failed to parse certificate. Try to create a new one.")
