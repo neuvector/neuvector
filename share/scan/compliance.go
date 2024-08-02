@@ -2928,7 +2928,6 @@ func updatecComplianceFilterMap(metas *[]api.RESTBenchMeta, filterMap map[string
 			filterMap[compliance]++
 		}
 	}
-	fmt.Println(filterMap)
 }
 
 func updateComplianceMetasFromMap(metas *[]api.RESTBenchMeta, metaMap map[string]api.RESTBenchMeta, metasV2 *[]api.RESTBenchMeta, metaMapV2 map[string]api.RESTBenchMeta) {
