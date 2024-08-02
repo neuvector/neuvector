@@ -49,7 +49,7 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 			}
 		} else {
 			if _, ok := cpf.filter[r.TestNum]; ok {
-				r.Tags = metaMap[r.TestNum].Tags
+				r.Tags = cpf.filter[r.TestNum]
 			} else {
 				r.Tags = []string{}
 			}
@@ -88,7 +88,7 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 				r.TagsV2 = filteredTags
 			} else {
 				if _, ok := cpf.filter[r.TestNum]; ok {
-					r.Tags = metaMap[r.TestNum].Tags
+					r.Tags = cpf.filter[r.TestNum]
 				} else {
 					r.Tags = []string{}
 				}
