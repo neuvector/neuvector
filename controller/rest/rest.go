@@ -1937,6 +1937,7 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0), // disable http/2
+		ErrorLog:     newHttpServerErrorWriter(),
 	}
 	for {
 		if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
@@ -1986,6 +1987,7 @@ func startFedRestServer(fedPingInterval uint32) {
 		TLSConfig: config,
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
+		ErrorLog: newHttpServerErrorWriter(),
 	}
 
 	atomic.StoreUint64(&fedRestServerState, _fedRestServerRunning_)
