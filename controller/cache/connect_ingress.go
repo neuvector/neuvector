@@ -223,7 +223,7 @@ func connectPAIToGlobal(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTi
 			stip.wlPort = uint16(conn.ServerPort)
 			sa.workload = true
 			return true
-		} else if conn.Nbe {
+		} else if conn.Nbe || conn.NbeSns {
 			if alive {
 				conn.ServerWL = wl
 				stip.wlPort = uint16(conn.ServerPort)

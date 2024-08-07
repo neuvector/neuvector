@@ -843,6 +843,9 @@ void dpi_session_log(dpi_session_t *sess, DPMsgSession *dps, DPMonitorMetric *dp
         if (sess->policy_desc.flags & POLICY_DESC_CHK_NBE) {
             dps->Flags |= DPSESS_FLAG_CHK_NBE;
         }
+        if (sess->policy_desc.flags & POLICY_DESC_NBE_SNS) {
+            dps->Flags |= DPSESS_FLAG_NBE_SNS;
+        }
     } else {
         dps->EtherType = ETH_P_IPV6;
         memcpy(dps->ClientIP, &c->ip.ip6, 16);
@@ -963,6 +966,9 @@ static void dpi_session_log_from_pkt(dpi_packet_t *p, int to_server, dpi_policy_
         }
         if (desc->flags & POLICY_DESC_CHK_NBE) {
             dps->Flags |= DPSESS_FLAG_CHK_NBE;
+        }
+        if (desc->flags & POLICY_DESC_NBE_SNS) {
+            dps->Flags |= DPSESS_FLAG_NBE_SNS;
         }
     } else {
         struct ip6_hdr *ip6h = (struct ip6_hdr *)(p->pkt + p->l3);

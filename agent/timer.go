@@ -610,6 +610,7 @@ func conn2CLUS(c *dp.Connection) *share.CLUSConnection {
 		EpSessIn12:   c.EpSessIn12,
 		EpByteIn12:   c.EpByteIn12,
 		Nbe:          c.Nbe,
+		NbeSns:       c.NbeSns,
 	}
 }
 

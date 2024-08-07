@@ -213,6 +213,10 @@ func dpMsgConnection(msg []byte) {
 			// connection cross namespace
 			cc.Nbe = true
 		}
+		if (conn.Flags & C.DPCONN_FLAG_NBE_SNS) != 0 {
+			// connection cross same namespace
+			cc.NbeSns = true
+		}
 
 		conns[i] = &ConnectionData{
 			EPMAC: net.HardwareAddr(C.GoBytes(unsafe.Pointer(&conn.EPMAC[0]), 6)),

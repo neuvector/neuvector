@@ -146,6 +146,7 @@ message CLUSConnection {
 	uint32 EpSessIn12 = 35;
 	uint64 EpByteIn12 = 36;
 	bool Nbe = 37;
+	bool NbeSns = 38;
 }
 
 message CLUSConnectionArray {
