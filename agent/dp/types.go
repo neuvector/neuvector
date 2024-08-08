@@ -55,6 +55,7 @@ type Connection struct {
 	EpSessIn12   uint32
 	EpByteIn12   uint64
 	Nbe          bool
+	NbeSns       bool
 }
 
 type ConnectionData struct {

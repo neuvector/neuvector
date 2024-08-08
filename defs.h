@@ -199,6 +199,7 @@ typedef struct {
 #define DPSESS_FLAG_TMP_OPEN      0x0100 // temp open connection
 #define DPSESS_FLAG_UWLIP         0x0200 // uwl connection
 #define DPSESS_FLAG_CHK_NBE       0x0400 // check nbe
+#define DPSESS_FLAG_NBE_SNS       0x0800 // same ns nbe
 
 #define DP_POLICY_APPLY_EGRESS  0x1
 #define DP_POLICY_APPLY_INGRESS 0x2
@@ -419,6 +420,7 @@ typedef struct {
 #define DPCONN_FLAG_TMP_OPEN      0x0040
 #define DPCONN_FLAG_UWLIP         0x0080
 #define DPCONN_FLAG_CHK_NBE       0x0100
+#define DPCONN_FLAG_NBE_SNS       0x0200
 
 typedef struct {
     uint8_t  EPMAC[6];
