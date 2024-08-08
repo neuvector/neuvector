@@ -21,6 +21,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -2114,6 +2115,223 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 	resp.AcceptedAlerts = acceptedManagerAlerts
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")
+}
+
+func getAlertGroup(alerts []string, alertType api.AlertType, acceptedAlerts utils.Set) (*api.RESTNvAlertGroup, error) {
+	alertGroup := &api.RESTNvAlertGroup{
+		Type: alertType,
+	}
+
+	if len(alerts) > 0 {
+		for _, alert := range alerts {
+			b := md5.Sum([]byte(alert))
+			key := hex.EncodeToString(b[:])
+			if !acceptedAlerts.Contains(key) {
+				alertGroup.Data = append(alertGroup.Data, &api.RESTNvAlert{
+					ID:      key,
+					Message: alert,
+				})
+			}
+		}
+	}
+
+	if len(alertGroup.Data) > 0 {
+		return alertGroup, nil
+	}
+
+	return alertGroup, errors.New("no alert is retrieved")
+}
+
+func getInternalCertExpireAlert(certFilePath string) (string, error) {
+	expireThresholds := []time.Duration{30 * 24 * time.Hour, 90 * 24 * time.Hour, 180 * 24 * time.Hour}
+	// Check ca certificate expiration
+	for i, expireThreshold := range expireThresholds {
+		certExpired, err := IsCertNearExpired(certFilePath, expireThreshold)
+		if err != nil {
+			return "", err
+		}
+		if !certExpired {
+			continue
+		}
+
+		var certExpiredMsg string
+		switch i {
+		case 0:
+			if strings.Contains(certFilePath, "ca.cert") {
+				certExpiredMsg = "Internal CA certificate will be expired in 30 days."
+			} else {
+				certExpiredMsg = "Internal certificate will be expired in 30 days."
+			}
+		case 1:
+			if strings.Contains(certFilePath, "ca.cert") {
+				certExpiredMsg = "Internal CA certificate will be expired in 90 days."
+			} else {
+				certExpiredMsg = "Internal certificate will be expired in 90 days."
+			}
+		case 2:
+			if strings.Contains(certFilePath, "ca.cert") {
+				certExpiredMsg = "Internal CA certificate will be expired in 180 days."
+			} else {
+				certExpiredMsg = "Internal certificate will be expired in 180 days."
+			}
+		}
+		return certExpiredMsg, nil
+	}
+
+	return "", errors.New("no nearly expired internal certificate is detected")
+}
+
+func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	var resp api.RESTNvAlerts = api.RESTNvAlerts{
+		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
+	}
+	var clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts []string
+	if k8sPlatform {
+		clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts =
+			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
+		if checkCrdSchemaFunc != nil {
+			var leader bool
+			if lead := atomic.LoadUint32(&_isLeader); lead == 1 {
+				leader = true
+			}
+			nvCrdSchemaAlerts = checkCrdSchemaFunc(leader, false, false, cctx.CspType)
+		}
+	}
+
+	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
+	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+		json.Unmarshal(value, &nvUpgradeInfo)
+	}
+
+	empty := share.CLUSCheckUpgradeVersion{}
+	if nvUpgradeInfo.MinUpgradeVersion != empty {
+		resp.NvUpgradeInfo.MinUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
+		}
+	}
+	if nvUpgradeInfo.MaxUpgradeVersion != empty {
+		resp.NvUpgradeInfo.MaxUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
+		}
+	}
+	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
+		resp.NvUpgradeInfo = nil
+	}
+
+	var accepted []string
+	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
+		accepted = user.AcceptedAlerts
+	}
+	if user, _, _ := clusHelper.GetUserRev(login.fullname, acc); user != nil {
+		accepted = append(accepted, user.AcceptedAlerts...)
+	}
+	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
+	resp.AcceptableAlerts = &api.RESTNvAcceptableAlerts{}
+	if clusterRoleAlertGroup, err := getAlertGroup(clusterRoleAlerts, api.RBAC, acceptedAlerts); err == nil {
+		resp.AcceptableAlerts.ClusterRoleAlerts = clusterRoleAlertGroup
+	}
+	if clusterRoleBindingAlertGroup, err := getAlertGroup(clusterRoleBindingAlerts, api.RBAC, acceptedAlerts); err == nil {
+		resp.AcceptableAlerts.ClusterRoleAlerts = clusterRoleBindingAlertGroup
+	}
+	if RoleAlertGroup, err := getAlertGroup(roleAlerts, api.RBAC, acceptedAlerts); err == nil {
+		resp.AcceptableAlerts.RoleAlerts = RoleAlertGroup
+	}
+	if RoleBindingAlertGroup, err := getAlertGroup(roleBindingAlerts, api.RBAC, acceptedAlerts); err == nil {
+		resp.AcceptableAlerts.RoleBindingAlerts = RoleBindingAlertGroup
+	}
+	if NvCrdSchemaAlertGroup, err := getAlertGroup(nvCrdSchemaAlerts, api.RBAC, acceptedAlerts); err == nil {
+		resp.AcceptableAlerts.NvCrdSchemaAlerts = NvCrdSchemaAlertGroup
+	}
+
+	certAlerts := &api.RESTNvAlertGroup{
+		Type: api.TlsCertificate,
+	}
+	internalCaCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCACert)
+	if internalCaCertExpireAlert, err := getInternalCertExpireAlert(internalCaCertFile); err == nil {
+		b := md5.Sum([]byte(internalCaCertExpireAlert))
+		key := hex.EncodeToString(b[:])
+		if !acceptedAlerts.Contains(key) {
+			certAlerts.Data = append(certAlerts.Data, &api.RESTNvAlert{
+				ID:      key,
+				Message: internalCaCertExpireAlert,
+			})
+		}
+	}
+	internalCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCert)
+	if internalCertExpireAlert, err := getInternalCertExpireAlert(internalCertFile); err == nil {
+		b := md5.Sum([]byte(internalCertExpireAlert))
+		key := hex.EncodeToString(b[:])
+		if !acceptedAlerts.Contains(key) {
+			certAlerts.Data = append(certAlerts.Data, &api.RESTNvAlert{
+				ID:      key,
+				Message: internalCertExpireAlert,
+			})
+		}
+	}
+	if len(certAlerts.Data) > 0 {
+		resp.AcceptableAlerts.CertificateAlerts = certAlerts
+	}
+
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
+		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
+		otherAlerts := &api.RESTNvAlertGroup{
+			Type: api.RBAC,
+		}
+		// _fedClusterLeft(206), _fedClusterDisconnected(204)
+		//disconnectedStates := utils.NewSet(_fedClusterLeft, _fedClusterDisconnected)
+		var ids map[string]bool
+		if fedRole == api.FedRoleMaster {
+			ids = cacher.GetFedJoinedClusterIdMap(acc)
+		} else {
+			if m := cacher.GetFedMasterCluster(acc); m.ID != "" {
+				ids = map[string]bool{
+					m.ID: true,
+				}
+			}
+		}
+		if len(ids) > 0 {
+			for id, _ := range ids {
+				s := cacher.GetFedJoinedClusterStatus(id, acc)
+				if elapsed := time.Since(s.LastConnectedTime); s.LastConnectedTime.IsZero() || elapsed > (time.Duration(_teleFreq)*time.Minute) {
+					key, alert := getFedDisconnectAlert(fedRole, id, acc)
+					if !acceptedAlerts.Contains(key) {
+						// this alert has not been accepted yet. put it in the response
+						otherAlerts.Data = append(otherAlerts.Data, &api.RESTNvAlert{
+							ID:      key,
+							Message: alert,
+						})
+					}
+				}
+			}
+			if len(otherAlerts.Data) > 0 {
+				resp.AcceptableAlerts.OtherAlerts = otherAlerts
+			}
+		}
+	}
+
+	var acceptedManagerAlerts []string
+	for _, key := range []string{share.AlertNvNewVerAvailable, share.AlertNvInMultiVersions, share.AlertCveDbTooOld} {
+		if acceptedAlerts.Contains(key) {
+			// this manager-generated alert key has been accepted. put it in the response
+			acceptedManagerAlerts = append(acceptedManagerAlerts, key)
+		}
+	}
+	resp.AcceptedAlerts = acceptedManagerAlerts
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get system alerts")
 }
 
 func configLog(ev share.TLogEvent, login *loginSession, msg string) {
