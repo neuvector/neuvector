@@ -1759,6 +1759,8 @@ type RESTSystemConfigConfig struct {
 	RegistryHttpsProxyEnable  *bool                            `json:"registry_https_proxy_status,omitempty"`
 	RegistryHttpProxy         *RESTProxy                       `json:"registry_http_proxy,omitempty"`
 	RegistryHttpsProxy        *RESTProxy                       `json:"registry_https_proxy,omitempty"`
+	RegistryHttpProxyCfg      *RESTProxyConfig                 `json:"registry_http_proxy_cfg,omitempty"`
+	RegistryHttpsProxyCfg     *RESTProxyConfig                 `json:"registry_https_proxy_cfg,omitempty"`
 	IBMSAEpEnabled            *bool                            `json:"ibmsa_ep_enabled,omitempty"`
 	IBMSAEpDashboardURL       *string                          `json:"ibmsa_ep_dashboard_url,omitempty"`
 	XffEnabled                *bool                            `json:"xff_enabled,omitempty"`
@@ -1830,10 +1832,12 @@ type RESTSystemConfigAuthCfgV2 struct {
 }
 
 type RESTSystemConfigProxyCfgV2 struct {
-	RegistryHttpProxyEnable  *bool      `json:"registry_http_proxy_status,omitempty"`
-	RegistryHttpsProxyEnable *bool      `json:"registry_https_proxy_status,omitempty"`
-	RegistryHttpProxy        *RESTProxy `json:"registry_http_proxy,omitempty"`
-	RegistryHttpsProxy       *RESTProxy `json:"registry_https_proxy,omitempty"`
+	RegistryHttpProxyEnable  *bool            `json:"registry_http_proxy_status,omitempty"`
+	RegistryHttpsProxyEnable *bool            `json:"registry_https_proxy_status,omitempty"`
+	RegistryHttpProxy        *RESTProxy       `json:"registry_http_proxy,omitempty"`
+	RegistryHttpsProxy       *RESTProxy       `json:"registry_https_proxy,omitempty"`
+	RegistryHttpProxyCfg     *RESTProxyConfig `json:"registry_http_proxy_cfg,omitempty"`
+	RegistryHttpsProxyCfg    *RESTProxyConfig `json:"registry_https_proxy_cfg,omitempty"`
 }
 
 type RESTSystemConfigMiscCfgV2 struct {
@@ -1876,6 +1880,12 @@ type RESTSystemRequest struct {
 
 type RESTSystemRequestData struct {
 	Request *RESTSystemRequest `json:"request"`
+}
+
+type RESTProxyConfig struct {
+	URL      *string `json:"url"`
+	Username *string `json:"username"`
+	Password *string `json:"password,cloak"`
 }
 
 // If more log servers needed, they can be defined as servers.
@@ -1981,10 +1991,12 @@ type RESTSystemConfigAutoscale struct {
 }
 
 type RESTSystemConfigProxyV2 struct {
-	RegistryHttpProxyEnable  bool      `json:"registry_http_proxy_status"`
-	RegistryHttpsProxyEnable bool      `json:"registry_https_proxy_status"`
-	RegistryHttpProxy        RESTProxy `json:"registry_http_proxy"`
-	RegistryHttpsProxy       RESTProxy `json:"registry_https_proxy"`
+	RegistryHttpProxyEnable  bool            `json:"registry_http_proxy_status"`
+	RegistryHttpsProxyEnable bool            `json:"registry_https_proxy_status"`
+	RegistryHttpProxy        RESTProxy       `json:"registry_http_proxy"`
+	RegistryHttpsProxy       RESTProxy       `json:"registry_https_proxy"`
+	RegistryHttpProxyCfg     RESTProxyConfig `json:"registry_http_proxy_cfg"`
+	RegistryHttpsProxyCfg    RESTProxyConfig `json:"registry_https_proxy_cfg"`
 }
 
 type RESTSystemConfigIBMSAV2 struct {
