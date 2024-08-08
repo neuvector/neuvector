@@ -1,623 +1,260 @@
 package resource
 
 import (
-	"fmt"
-	"os"
-	"reflect"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
-	orchAPI "github.com/neuvector/neuvector/share/orchestration"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-}
-
-func preTest() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.FatalLevel)
-}
-
-func postTest() {
-	log.SetLevel(log.DebugLevel)
-}
-
-func TestRBAC(t *testing.T) {
-	preTest()
-
-	d := Register(share.PlatformKubernetes, "", "").(*kubernetes)
-
-	// Add an admin cluster role
-	rt := K8sRscTypeClusRole
-	r := &k8sRole{uid: "1", name: "edit", domain: "", nvRole: api.UserRoleAdmin}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
+/*
+	func preTestDebug() {
+		log.SetOutput(os.Stdout)
+		log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+		log.SetLevel(log.DebugLevel)
 	}
 
-	// Add an view cluster role
-	rt = K8sRscTypeClusRole
-	r = &k8sRole{uid: "2", name: "view", domain: "", nvRole: api.UserRoleReader}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
+	func preTest() {
+		log.SetOutput(os.Stdout)
+		log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+		log.SetLevel(log.FatalLevel)
 	}
 
-	// Add an admin role in ns1
-	rt = k8sRscTypeRole
-	r = &k8sRole{uid: "3", name: "ns1-dev", domain: "ns1", nvRole: api.UserRoleAdmin}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
+	func postTest() {
+		log.SetLevel(log.DebugLevel)
 	}
 
-	// Add a reader role in ns2
-	rt = k8sRscTypeRole
-	r = &k8sRole{uid: "4", name: "ns2-dev", domain: "ns2", nvRole: api.UserRoleAdmin}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
-	}
-	rt = k8sRscTypeRole
-	r = &k8sRole{uid: "4", name: "ns2-audit", domain: "ns2", nvRole: api.UserRoleReader}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
+	type k8s_unittest struct {
+		*kubernetes
 	}
 
-	// Create a binding between admin cluster role to 'mike'
-	rt = K8sRscTypeClusRoleBinding
-	rb := &k8sRoleBinding{
-		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
-		},
+	type tRbacRancherSSO struct {
+		t        *testing.T
+		d        *k8s_unittest
+		caseName string
+		caseID   int
 	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check mike is cluster admin
-	rbac, _, _ := d.GetUserRoles("mike", SUBJECT_USER)
-	expect := map[string]string{"": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Update the role binding with more users - k8s won't create new object, same uid!
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check new role
-	rbac, _, _ = d.GetUserRoles("jane", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Update the role binding with less users - k8s won't create new object, same uid!
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check jane is cluster admin
-	rbac, _, _ = d.GetUserRoles("jane", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	// Test: check mike is gone
-	rbac, _, _ = d.GetUserRoles("mike", SUBJECT_USER)
-	if rbac != nil {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", nil)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	//->
-	// Bind 'jane' to a reader cluster role - k8s rejects if binding name is same but role changes
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "12", name: "reader", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check jane is cluster admin
-	rbac, _, _ = d.GetUserRoles("jane", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Bind 'jane' to a reader role in ns2
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "13", name: "ns2-reader", domain: "ns2", role: k8sObjectRef{name: "ns2-audit", domain: "ns2"},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check jane is cluster admin
-	rbac, _, _ = d.GetUserRoles("jane", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Bind 'gary' as cluster reader
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Bind 'gary' as ns1 admin with cluster role
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check gary is cluster reader and ns1 admin
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Modify role binding for 'gary' from ns1 to ns2 - k8s will create a new binding if namespace is different
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check gary is cluster reader and admin of ns1 and ns2
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin, "ns2": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Remove gary's admin role binding in ns2
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, nil, old)
-	}
-
-	// Test: check gary is cluster reader and admin of ns1
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Bind 'gary' as ns2 admin with role
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, rb, old)
-	}
-
-	// Test: check gary is cluster reader and ns1 and ns2 admin
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin, "ns2": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Change role that binds to gary from admin to reader
-	rt = k8sRscTypeRole
-	r = &k8sRole{uid: "3", name: "ns2-dev", domain: "ns2", nvRole: api.UserRoleReader}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
-	}
-
-	// Test: check gary is cluster reader, ns1 admin and ns2 reader (hidden)
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader, "ns1": api.UserRoleAdmin}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Change cluster role that binds to gary from admin to reader
-	rt = k8sRscTypeRole
-	r = &k8sRole{uid: "1", name: "edit", domain: "", nvRole: api.UserRoleReader}
-	if ev, old := d.updateResourceCache(rt, r.uid, r); ev != "" {
-		d.cbResourceRole(rt, ev, r, old)
-	}
-
-	// Test: check gary is cluster reader, ns1 reader (hidden) and ns2 reader (hidden)
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": api.UserRoleReader}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Remove gary's admin role binding in ns2
-	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, nil, old)
-	}
-
-	// Test: check gary is ns1 and ns2 reader
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	expect = map[string]string{"": "", "ns1": api.UserRoleReader, "ns2": api.UserRoleReader}
-	if !reflect.DeepEqual(rbac, expect) {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", expect)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	log.Debug("--")
-
-	// Remove gary's role binding in ns1
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, nil, old)
-	}
-
-	// Remove gary's role binding in ns2
-	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
-		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
-	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
-		d.cbResourceRoleBinding(rt, ev, nil, old)
-	}
-
-	// Test: check gary is gone
-	rbac, _, _ = d.GetUserRoles("gary", SUBJECT_USER)
-	if rbac != nil {
-		t.Errorf("Unexpected rbac - cache: %+v", d.rbacCache)
-		t.Logf("  Expect: %+v\n", nil)
-		t.Logf("  Actual: %+v\n", rbac)
-	}
-
-	postTest()
-}
-
-type k8s_unittest struct {
-	*kubernetes
-}
-
-type tRbacRancherSSO struct {
-	t        *testing.T
-	d        *k8s_unittest
-	caseName string
-	caseID   int
-}
 
 const (
+
 	update_rbac = "update"
 	delete_rbac = "delete"
+
 )
 
-func (d *k8s_unittest) GetResource(rt, namespace, name string) (interface{}, error) {
-	switch rt {
-	case RscTypeNamespace:
-		if namespace == "" && name == "cattle-system" {
-			return nil, nil
+	func (d *k8s_unittest) GetResource(rt, namespace, name string) (interface{}, error) {
+		switch rt {
+		case RscTypeNamespace:
+			if namespace == "" && name == "cattle-system" {
+				return nil, nil
+			}
+		case RscTypeService:
+			if namespace == "cattle-system" && name == "rancher" {
+				return nil, nil
+			}
 		}
-	case RscTypeService:
-		if namespace == "cattle-system" && name == "rancher" {
-			return nil, nil
+		return nil, ErrResourceNotSupported
+	}
+
+	func new_k8s_unittest() *k8s_unittest {
+		return &k8s_unittest{
+			kubernetes: &kubernetes{
+				noop:             newNoopDriver(share.PlatformKubernetes, share.FlavorRancher, ""),
+				watchers:         make(map[string]*resourceWatcher),
+				userCache:        make(map[k8sSubjectObjRef]utils.Set),
+				roleCache:        make(map[k8sObjectRef]string),
+				rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
+				permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
+				permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvFedPermissions),
+			},
 		}
 	}
-	return nil, ErrResourceNotSupported
-}
 
-func new_k8s_unittest() *k8s_unittest {
-	return &k8s_unittest{
-		kubernetes: &kubernetes{
-			noop:             newNoopDriver(share.PlatformKubernetes, share.FlavorRancher, ""),
-			watchers:         make(map[string]*resourceWatcher),
-			userCache:        make(map[k8sSubjectObjRef]utils.Set),
-			roleCache:        make(map[k8sObjectRef]string),
-			rbacCache:        make(map[k8sSubjectObjRef]map[string]string),
-			permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
-			permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvFedPermissions),
-		},
-	}
-}
-
-func register_k8s_unittest(platform, flavor, network string) orchAPI.ResourceDriver {
-	return new_k8s_unittest()
-}
-
-func genGuid() types.UID {
-	objUID, _ := utils.GetGuid()
-	return types.UID(objUID)
-}
-
-func (r *tRbacRancherSSO) updateK8sRbacResource(obj interface{}, op string) {
-	var ok bool
-	var rt string
-	var name string
-	var objR *rbacv1.Role
-	var objCR *rbacv1.ClusterRole
-	var objRB *rbacv1.RoleBinding
-	var objCRB *rbacv1.ClusterRoleBinding
-	var id string
-	var res interface{}
-
-	if objR, ok = obj.(*rbacv1.Role); ok {
-		rt = k8sRscTypeRole
-		name = objR.Name
-		id, res = xlateRole(objR)
-	} else if objCR, ok = obj.(*rbacv1.ClusterRole); ok {
-		rt = K8sRscTypeClusRole
-		name = objCR.Name
-		id, res = xlateClusRole(objCR)
-	} else if objRB, ok = obj.(*rbacv1.RoleBinding); ok {
-		rt = k8sRscTypeRoleBinding
-		name = objRB.Name
-		id, res = xlateRoleBinding(objRB)
-	} else if objCRB, ok = obj.(*rbacv1.ClusterRoleBinding); ok {
-		rt = K8sRscTypeClusRoleBinding
-		name = objCRB.Name
-		id, res = xlateClusRoleBinding(objCRB)
-	} else {
-		r.t.Errorf("[%d] invalid obj", r.caseID)
-		return
+	func register_k8s_unittest(platform, flavor, network string) orchAPI.ResourceDriver {
+		return new_k8s_unittest()
 	}
 
-	if ok {
-		if res == nil {
-			r.t.Errorf("[%d] xlate %s(%s) failed", r.caseID, rt, name)
+	func genGuid() types.UID {
+		objUID, _ := utils.GetGuid()
+		return types.UID(objUID)
+	}
+
+	func (r *tRbacRancherSSO) updateK8sRbacResource(obj interface{}, op string) {
+		var ok bool
+		var rt string
+		var name string
+		var objR *rbacv1.Role
+		var objCR *rbacv1.ClusterRole
+		var objRB *rbacv1.RoleBinding
+		var objCRB *rbacv1.ClusterRoleBinding
+		var id string
+		var res interface{}
+
+		if objR, ok = obj.(*rbacv1.Role); ok {
+			rt = k8sRscTypeRole
+			name = objR.Name
+			id, res = xlateRole(objR)
+		} else if objCR, ok = obj.(*rbacv1.ClusterRole); ok {
+			rt = K8sRscTypeClusRole
+			name = objCR.Name
+			id, res = xlateClusRole(objCR)
+		} else if objRB, ok = obj.(*rbacv1.RoleBinding); ok {
+			rt = k8sRscTypeRoleBinding
+			name = objRB.Name
+			id, res = xlateRoleBinding(objRB)
+		} else if objCRB, ok = obj.(*rbacv1.ClusterRoleBinding); ok {
+			rt = K8sRscTypeClusRoleBinding
+			name = objCRB.Name
+			id, res = xlateClusRoleBinding(objCRB)
 		} else {
-			var ev string
-			var old interface{}
-			if op == update_rbac {
-				ev, old = r.d.updateResourceCache(rt, id, res)
-			} else {
-				ev, old = r.d.deleteResourceCache(rt, id)
-			}
-			if ev != "" {
-				switch rt {
-				case k8sRscTypeRole, K8sRscTypeClusRole:
-					r.d.cbResourceRole(rt, ev, res, old)
-				case k8sRscTypeRoleBinding, K8sRscTypeClusRoleBinding:
-					r.d.cbResourceRoleBinding(rt, ev, res, old)
-				}
-			} else {
-				r.t.Errorf("[%d] empty event for %s(%s)", r.caseID, rt, name)
-			}
+			r.t.Errorf("[%d] invalid obj", r.caseID)
+			return
 		}
-	} else {
-		r.t.Errorf("[%d] type conversion(%s) failed", r.caseID, rt)
+
+		if ok {
+			if res == nil {
+				r.t.Errorf("[%d] xlate %s(%s) failed", r.caseID, rt, name)
+			} else {
+				var ev string
+				var old interface{}
+				if op == update_rbac {
+					ev, old = r.d.updateResourceCache(rt, id, res)
+				} else {
+					ev, old = r.d.deleteResourceCache(rt, id)
+				}
+				if ev != "" {
+					switch rt {
+					case k8sRscTypeRole, K8sRscTypeClusRole:
+						r.d.cbResourceRole(rt, ev, res, old)
+					case k8sRscTypeRoleBinding, K8sRscTypeClusRoleBinding:
+						r.d.cbResourceRoleBinding(rt, ev, res, old)
+					}
+				} else {
+					r.t.Errorf("[%d] empty event for %s(%s)", r.caseID, rt, name)
+				}
+			}
+		} else {
+			r.t.Errorf("[%d] type conversion(%s) failed", r.caseID, rt)
+		}
 	}
-}
 
 func (r *tRbacRancherSSO) compareDomainPermits(scope, userName string, expectDomainPerms map[string]share.NvPermissions, actualDomainPerms map[string]share.NvFedPermissions) bool {
 
-	// Test: check user's mapped permissions
-	if len(expectDomainPerms) > 0 {
-		for d, expectedPermits := range expectDomainPerms {
-			var actualPermits share.NvPermissions
-			if actual, ok := actualDomainPerms[d]; ok {
+		// Test: check user's mapped permissions
+		if len(expectDomainPerms) > 0 {
+			for d, expectedPermits := range expectDomainPerms {
+				var actualPermits share.NvPermissions
+				if actual, ok := actualDomainPerms[d]; ok {
+					if scope == "local" {
+						actualPermits = actual.Local
+					} else if scope == "remote" {
+						actualPermits = actual.Remote
+					}
+				}
+				if expectedPermits != actualPermits {
+					r.t.Logf("<< %s >>\n", r.caseName)
+					var dDisplay string
+					if d == "" {
+						dDisplay = "global domain"
+					} else {
+						dDisplay = fmt.Sprintf("domain %s", d)
+					}
+					r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
+					r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, expectedPermits, dDisplay)
+					r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
+					return false
+				}
+			}
+		} else {
+			for d, actual := range actualDomainPerms {
+				var actualPermits share.NvPermissions
 				if scope == "local" {
 					actualPermits = actual.Local
 				} else if scope == "remote" {
 					actualPermits = actual.Remote
 				}
-			}
-			if expectedPermits != actualPermits {
-				r.t.Logf("<< %s >>\n", r.caseName)
-				var dDisplay string
-				if d == "" {
-					dDisplay = "global domain"
-				} else {
-					dDisplay = fmt.Sprintf("domain %s", d)
+				if !actualPermits.IsEmpty() {
+					r.t.Logf("<< %s >>\n", r.caseName)
+					var dDisplay string
+					if d == "" {
+						dDisplay = "global domain"
+					} else {
+						dDisplay = fmt.Sprintf("domain %s", d)
+					}
+					r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
+					r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, share.NvPermissions{}, dDisplay)
+					r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
+					return false
 				}
-				r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
-				r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, expectedPermits, dDisplay)
-				r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
-				return false
 			}
 		}
-	} else {
-		for d, actual := range actualDomainPerms {
-			var actualPermits share.NvPermissions
-			if scope == "local" {
-				actualPermits = actual.Local
-			} else if scope == "remote" {
-				actualPermits = actual.Remote
-			}
-			if !actualPermits.IsEmpty() {
-				r.t.Logf("<< %s >>\n", r.caseName)
-				var dDisplay string
-				if d == "" {
-					dDisplay = "global domain"
-				} else {
-					dDisplay = fmt.Sprintf("domain %s", d)
-				}
-				r.t.Errorf("[%d] Unexpected %s permits rbac for user %s - cache: %+v", r.caseID, scope, userName, r.d.permitsRbacCache)
-				r.t.Logf("[%d]   Expect: %s permits %+v for %s\n", r.caseID, scope, share.NvPermissions{}, dDisplay)
-				r.t.Logf("[%d]   Actual: %s permits %+v for %s\n", r.caseID, scope, actualPermits, dDisplay)
-				return false
-			}
-		}
-	}
 
-	return true
-}
+		return true
+	}
 
 func (r *tRbacRancherSSO) checkK8sUserRoles(userName string, expectDomainRoles map[string]string,
-	expectLocalDomainPerms, expectRemoteDomainPerms map[string]share.NvPermissions) {
 
-	// Test: check user's mapped role/permissions
-	if thisDomainRoles, thisDomainPerms, err := r.d.GetUserRoles(userName, SUBJECT_USER); err == nil {
-		if !reflect.DeepEqual(thisDomainRoles, expectDomainRoles) {
+		expectLocalDomainPerms, expectRemoteDomainPerms map[string]share.NvPermissions) {
+
+		// Test: check user's mapped role/permissions
+		if thisDomainRoles, thisDomainPerms, err := r.d.GetUserRoles(userName, SUBJECT_USER); err == nil {
+			if !reflect.DeepEqual(thisDomainRoles, expectDomainRoles) {
+				r.t.Logf("<< %s >>\n", r.caseName)
+				r.t.Errorf("[%d] Unexpected role rbac for user %s - cache: %+v", r.caseID, userName, r.d.rbacCache)
+				r.t.Logf("[%d]   Expect: %+v\n", r.caseID, expectDomainRoles)
+				r.t.Logf("[%d]   Actual: %+v\n", r.caseID, thisDomainRoles)
+			}
+			r.compareDomainPermits("local", userName, expectLocalDomainPerms, thisDomainPerms)
+			r.compareDomainPermits("remote", userName, expectRemoteDomainPerms, thisDomainPerms)
+		} else {
 			r.t.Logf("<< %s >>\n", r.caseName)
-			r.t.Errorf("[%d] Unexpected role rbac for user %s - cache: %+v", r.caseID, userName, r.d.rbacCache)
-			r.t.Logf("[%d]   Expect: %+v\n", r.caseID, expectDomainRoles)
-			r.t.Logf("[%d]   Actual: %+v\n", r.caseID, thisDomainRoles)
+			r.t.Errorf("[%d] Unexpected result - user %s not found: %s", r.caseID, userName, err)
 		}
-		r.compareDomainPermits("local", userName, expectLocalDomainPerms, thisDomainPerms)
-		r.compareDomainPermits("remote", userName, expectRemoteDomainPerms, thisDomainPerms)
-	} else {
-		r.t.Logf("<< %s >>\n", r.caseName)
-		r.t.Errorf("[%d] Unexpected result - user %s not found: %s", r.caseID, userName, err)
+		r.caseID += 1
+		log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
 	}
-	r.caseID += 1
-	log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
-}
 
 func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRoles map[string]string,
-	actualDomainPerms, expectDomainPerms map[string]share.NvFedPermissions) {
 
-	for d, expectedRole := range expectDomainRoles {
-		if actualRole, _ := actualDomainRoles[d]; expectedRole != actualRole {
-			r.t.Logf("<< %s >>\n", r.caseName)
-			var dDisplay string
-			if d == "" {
-				dDisplay = "global domain"
-			} else {
-				dDisplay = fmt.Sprintf("domain %s", d)
-			}
-			r.t.Errorf("[%d] Unexpected role for %s:", r.caseID, dDisplay)
-			r.t.Logf("[%d]   Expect: role %s\n", r.caseID, expectedRole)
-			r.t.Logf("[%d]   Actual: role %s\n", r.caseID, actualRole)
-		}
-	}
-	for d, expectedPermits := range expectDomainPerms {
-		if actualPermits, _ := actualDomainPerms[d]; expectedPermits != actualPermits {
-			r.t.Logf("<< %s >>\n", r.caseName)
-			var dDisplay string
-			if d == "" {
-				dDisplay = "global domain"
-			} else {
-				dDisplay = fmt.Sprintf("domain %s", d)
-			}
-			r.t.Errorf("[%d] Unexpected permits for %s:", r.caseID, dDisplay)
-			r.t.Logf("[%d]   Expect: permits %+v\n", r.caseID, expectedPermits)
-			r.t.Logf("[%d]   Actual: permits %+v\n", r.caseID, actualPermits)
-		}
-	}
-	r.caseID += 1
-	log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
-}
+		actualDomainPerms, expectDomainPerms map[string]share.NvFedPermissions) {
 
-func TestRBACRancherSSO(t *testing.T) {
+		for d, expectedRole := range expectDomainRoles {
+			if actualRole, _ := actualDomainRoles[d]; expectedRole != actualRole {
+				r.t.Logf("<< %s >>\n", r.caseName)
+				var dDisplay string
+				if d == "" {
+					dDisplay = "global domain"
+				} else {
+					dDisplay = fmt.Sprintf("domain %s", d)
+				}
+				r.t.Errorf("[%d] Unexpected role for %s:", r.caseID, dDisplay)
+				r.t.Logf("[%d]   Expect: role %s\n", r.caseID, expectedRole)
+				r.t.Logf("[%d]   Actual: role %s\n", r.caseID, actualRole)
+			}
+		}
+		for d, expectedPermits := range expectDomainPerms {
+			if actualPermits, _ := actualDomainPerms[d]; expectedPermits != actualPermits {
+				r.t.Logf("<< %s >>\n", r.caseName)
+				var dDisplay string
+				if d == "" {
+					dDisplay = "global domain"
+				} else {
+					dDisplay = fmt.Sprintf("domain %s", d)
+				}
+				r.t.Errorf("[%d] Unexpected permits for %s:", r.caseID, dDisplay)
+				r.t.Logf("[%d]   Expect: permits %+v\n", r.caseID, expectedPermits)
+				r.t.Logf("[%d]   Actual: permits %+v\n", r.caseID, actualPermits)
+			}
+		}
+		r.caseID += 1
+		log.WithFields(log.Fields{"caseID": r.caseID}).Debug("-------------------------------------------------------------------------------------------------------------------------------------")
+	}
+*/
+func TestRBACRancherSSOv2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -628,7 +265,7 @@ func TestRBACRancherSSO(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSO",
+		caseName: "TestRBACRancherSSOv2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -648,17 +285,17 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -705,17 +342,17 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"create", "delete"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"authentication"},
+					Resources: []string{"nv-perm.authentication"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "modify"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"authorization"},
+					Resources: []string{"nv-perm.authorization"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"auditevents"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.audit-events"},
 				},
 			},
 		}
@@ -826,12 +463,12 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -856,17 +493,17 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				{
 					Verbs:     []string{"create"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -979,23 +616,23 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"admissioncontrol"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"securityevents"},
+					Resources: []string{"nv-perm.security-events"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"compliance"},
+					Resources: []string{"nv-perm.compliance"},
 				},
 			},
 		}
@@ -1059,7 +696,7 @@ func TestRBACRancherSSO(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"compliance"},
+					Resources: []string{"nv-perm.compliance"},
 				},
 			},
 		}
@@ -1115,13 +752,13 @@ func TestRBACRancherSSO(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"neuvectorvulnerability"}, // supported in global only
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.vulnerability"}, // supported in global only
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"events"}, // supported in global & domain
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.events"}, // supported in global & domain
 				},
 			},
 		}
@@ -1237,7 +874,7 @@ func TestRBACRancherSSO(t *testing.T) {
 	postTest()
 }
 
-func TestRBACRancherSSOFedAdminReader(t *testing.T) {
+func TestRBACRancherSSOFedAdminReaderV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -1248,7 +885,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOFedAdminReader",
+		caseName: "TestRBACRancherSSOFedAdminReaderV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -1268,21 +905,21 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"}, // it's a fedReader role
 				},
 			},
@@ -1344,7 +981,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1403,13 +1040,13 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"neuvectorvulnerability"}, // supported in global only
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.vulnerability"}, // supported in global only
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"events"}, // supported in global & domain
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.events"}, // supported in global & domain
 				},
 			},
 		}
@@ -1458,17 +1095,17 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -1507,7 +1144,7 @@ func TestRBACRancherSSOFedAdminReader(t *testing.T) {
 }
 
 // for testing "admin permission on local cluster" + "reader permission on all managed clusters(i.e. fedReader)" in Rancher Cluster Role case
-func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
+func TestRBACRancherSSOMixedClusterRoleV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -1518,7 +1155,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOMixedClusterRole",
+		caseName: "TestRBACRancherSSOMixedClusterRoleV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -1537,13 +1174,13 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"registryscan"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -1589,11 +1226,11 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				rbacv1.PolicyRule{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"federation"},
+					Resources: []string{"nv-perm.fed"},
 				},
 				rbacv1.PolicyRule{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1642,7 +1279,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				rbacv1.PolicyRule{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 			},
 		}
@@ -1691,7 +1328,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 			},
@@ -1741,13 +1378,13 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
+					APIGroups: []string{"api.neuvector.com"},
 					Resources: []string{"*"},
 				},
 				rbacv1.PolicyRule{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -1816,7 +1453,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 	postTest()
 }
 
-func TestRBACRancherSSOAdmin(t *testing.T) {
+func TestRBACRancherSSOAdminV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -1827,7 +1464,7 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOAdmin",
+		caseName: "TestRBACRancherSSOAdminV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -1847,22 +1484,22 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -1902,12 +1539,12 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 			},
 		}
@@ -1952,7 +1589,7 @@ func TestRBACRancherSSOAdmin(t *testing.T) {
 	postTest()
 }
 
-func TestRBACRancherSSOProjectRoles(t *testing.T) {
+func TestRBACRancherSSOProjectRolesV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -1963,7 +1600,7 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOProjectRoles",
+		caseName: "TestRBACRancherSSOProjectRolesV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -1983,12 +1620,12 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 			},
 		}
@@ -2026,8 +1663,8 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 			},
 		}
@@ -2073,7 +1710,7 @@ func TestRBACRancherSSOProjectRoles(t *testing.T) {
 }
 
 // Rancher doesn't leverage k8s Role. This test case is just for NV's testing assuming Rancher leverages k8s Role for namespaced role
-func TestRBACRancherSSOK8srole(t *testing.T) {
+func TestRBACRancherSSOK8sroleV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -2084,7 +1721,7 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOK8srole",
+		caseName: "TestRBACRancherSSOK8sroleV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -2105,17 +1742,17 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 			},
 		}
@@ -2156,12 +1793,12 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 			},
 		}
@@ -2216,8 +1853,8 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimescan"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-scan"},
 				},
 			},
 		}
@@ -2267,7 +1904,7 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"runtimescan"},
+					Resources: []string{"nv-perm.rt-scan"},
 				},
 			},
 		}
@@ -2313,26 +1950,28 @@ func TestRBACRancherSSOK8srole(t *testing.T) {
 	postTest()
 }
 
+/*
 func removeRedundant(domainRole map[string]string, domainPermits map[string]share.NvFedPermissions, fedRole string) (
-	map[string]string, map[string]share.NvFedPermissions) {
 
-	allDomainRoles := make(map[string]share.NvReservedUserRole, len(domainRole))
-	reservedRoleMapping := map[string]share.NvReservedUserRole{
-		api.UserRoleAdmin:     share.UserRoleAdmin,
-		api.UserRoleReader:    share.UserRoleReader,
-		api.UserRoleFedAdmin:  share.UserRoleFedAdmin,
-		api.UserRoleFedReader: share.UserRoleFedReader,
+		map[string]string, map[string]share.NvFedPermissions) {
+
+		allDomainRoles := make(map[string]share.NvReservedUserRole, len(domainRole))
+		reservedRoleMapping := map[string]share.NvReservedUserRole{
+			api.UserRoleAdmin:     share.UserRoleAdmin,
+			api.UserRoleReader:    share.UserRoleReader,
+			api.UserRoleFedAdmin:  share.UserRoleFedAdmin,
+			api.UserRoleFedReader: share.UserRoleFedReader,
+		}
+
+		for d, role := range domainRole {
+			m := reservedRoleMapping[role]
+			allDomainRoles[d] = allDomainRoles[d] | m
+		}
+
+		return RemoveRedundant(allDomainRoles, domainPermits, fedRole)
 	}
-
-	for d, role := range domainRole {
-		m := reservedRoleMapping[role]
-		allDomainRoles[d] = allDomainRoles[d] | m
-	}
-
-	return RemoveRedundant(allDomainRoles, domainPermits, fedRole)
-}
-
-func TestConsolidateNvRolePermits(t *testing.T) {
+*/
+func TestConsolidateNvRolePermitsV2(t *testing.T) {
 	preTest()
 
 	//_k8sFlavor = share.FlavorRancher
@@ -2343,7 +1982,7 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestConsolidateNvRolePermits",
+		caseName: "TestConsolidateNvRolePermitsV2",
 		caseID:   1,
 	}
 
@@ -2549,7 +2188,7 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 	postTest()
 }
 
-func TestRancherMultiplePrinciples(t *testing.T) {
+func TestRancherMultiplePrinciplesV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -2560,7 +2199,7 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRancherMultiplePrinciples",
+		caseName: "TestRancherMultiplePrinciplesV2",
 		caseID:   1,
 	}
 
@@ -2828,7 +2467,7 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 	postTest()
 }
 
-func TestRBACRancherSSOFedPermit(t *testing.T) {
+func TestRBACRancherSSOFedPermitV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
@@ -2839,7 +2478,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
-		caseName: "TestRBACRancherSSOFedPermit",
+		caseName: "TestRBACRancherSSOFedPermitV2",
 		caseID:   1,
 	}
 	crKind := "ClusterRole"
@@ -2859,27 +2498,27 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"federation"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -2907,7 +2546,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 
 		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
-		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR2
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
 		crName2 := "rt-abcde-2"
 		objCR2 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2918,17 +2557,17 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"federation"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -2956,8 +2595,8 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
 
 		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
-		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR3
-		// get/cluster means domain reader for namespace test-project-ns-25
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
+		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
 		crName3 := "rt-abcde-3"
 		objCR3 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2967,18 +2606,18 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"cluster"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.all-permissions"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"federation"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -3030,7 +2669,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 
 	{
 		//------ [2] add nv custom permissions objCR1(rancher cluster role) that has fed & some write permissions
-		userName1 := "u-cpjv2-12"
+		userName1 := "u-cpjv2-1"
 		crName1 := "rt-wbz96-1"
 		objCR1 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3041,17 +2680,17 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"}, // "federation" in the next rule also applies to this rule; but "*" verbs in the next rule doesn't affect this rule
+					Resources: []string{"nv-perm.reg-scan"}, // "nv-perm.fed" in the next rule also applies to this rule; but "*" verbs in the next rule doesn't affect this rule
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -3079,7 +2718,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 
 		// add objRB2 which binds objCR2 to the same user "u-cpjv2-1" for namespace test-project-ns-15 in k8s.
-		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR2
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR2
 		crName2 := "rt-abcde-2"
 		objCR2 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3090,32 +2729,32 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "*"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"events"},
+					Resources: []string{"nv-perm.events"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"auditevents"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.audit-events"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"*"},
-					Resources: []string{"securityevents"},
+					Resources: []string{"nv-perm.security-events"},
 				},
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"ciscan"},
+					Resources: []string{"nv-perm.ci-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"*"},
-					Resources: []string{"admissioncontrol"},
+					Resources: []string{"nv-perm.admctrl"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -3143,8 +2782,8 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		rbacRancherSSO.updateK8sRbacResource(objRB2, update_rbac)
 
 		// add objRB3 which binds objCR3 to the same user "u-cpjv2-1" for namespace test-project-ns-25 in k8s.
-		// because fed permission is not supported for namespaces yet, "federation" is ignored in objCR3
-		// get/cluster means domain reader for namespace test-project-ns-25
+		// because fed permission is not supported for namespaces yet, "nv-perm.fed" is ignored in objCR3
+		// get/nv-perm.all-permissions means domain reader for namespace test-project-ns-25
 		crName3 := "rt-abcde-3"
 		objCR3 := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3154,43 +2793,43 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"registryscan"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"neuvector.api.io"}, // not supported
-					Resources: []string{"compliance", "cluster", "*"},
+					Resources: []string{"nv-perm.compliance", "nv-perm.all-permissions", "*"},
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"neuvectorcluster"}, // not supported for namespaces
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.allall-permissions"}, // not supported for namespaces
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"nvauthentication"}, // not supported for namespaces
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"authentication"}, // not supported for namespaces
 				},
 				{
 					Verbs:     []string{"*", "create", "delete", "get", "list", "patch", "update", "watch", "post"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"authorization"},
+					Resources: []string{"nv-perm.authorization"},
 				},
 				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch", "post"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"systemconfig"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.config"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
@@ -3245,7 +2884,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 	}
 
 	{
-		//------ [3] about "federation" for global domain
+		//------ [3] about "nv-perm.fed" for global domain
 		userName31 := "u-cpjv2-31"
 		crName31 := "rt-wbz96-31"
 		objCR31 := &rbacv1.ClusterRole{
@@ -3257,44 +2896,44 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"registryscan"},
+					Resources: []string{"nv-perm.reg-scan"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"runtimepolicy"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.rt-policy"},
 				},
 				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"neuvector.api.io", "*"}, // unsupported apiGroup
-					Resources: []string{"compliance"},
+					Resources: []string{"nv-perm.compliance"},
 				},
 				{
 					Verbs:     []string{"*", "get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"authentication"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.authentication"},
 				},
 				{
 					Verbs:     []string{"get", "post"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
-					Resources: []string{"authorization"},
+					Resources: []string{"nv-perm.authorization"},
 				},
 				{
 					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"systemconfig"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.config"},
 				},
 				{
 					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
+					APIGroups: []string{"api.neuvector.com"},
+					Resources: []string{"nv-perm.fed"},
 				},
 			},
 		}
 		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
 
-		// create a objCRB31 between custom permissions objCR1 and user 'u-cpjv2-31'
-		objCRB31 := &rbacv1.ClusterRoleBinding{
+		// create a objCRB1 between custom permissions objCR1 and user 'u-cpjv2-31'
+		objCRB1 := &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "crb-w3pkgod7le-31",
 				UID:  genGuid(),
@@ -3312,7 +2951,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 				Name:     crName31,
 			},
 		}
-		rbacRancherSSO.updateK8sRbacResource(objCRB31, update_rbac)
+		rbacRancherSSO.updateK8sRbacResource(objCRB1, update_rbac)
 
 		// Test: check updated role
 		rbacRancherSSO.checkK8sUserRoles(userName31,
@@ -3334,7 +2973,7 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 		)
 
 		//------ [4]
-		objCR31.Rules[0].Resources = []string{"cluster"}
+		objCR31.Rules[0].Resources = []string{"nv-perm.all-permissions"}
 		rbacRancherSSO.updateK8sRbacResource(objCR31, update_rbac)
 
 		// Test: check updated role
@@ -3369,88 +3008,4 @@ func TestRBACRancherSSOFedPermit(t *testing.T) {
 			nil,
 		)
 	}
-
-	{
-		//------ [6] about "federation" for global domain
-		userName61 := "u-cpjv2-61"
-		crName61 := "rt-wbz96-61"
-		objCR61 := &rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: crName61,
-				UID:  genGuid(),
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					Verbs:     []string{"get"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"*"},
-				},
-				{
-					Verbs:     []string{"*"},
-					APIGroups: []string{"permission.neuvector.com"},
-					Resources: []string{"federation"},
-				},
-			},
-		}
-		rbacRancherSSO.updateK8sRbacResource(objCR61, update_rbac)
-
-		// create a objCRB61 between custom permissions objCR1 and user 'u-cpjv2-61'
-		objCRB61 := &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "crb-w3pkgod7le-61",
-				UID:  genGuid(),
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:     userKind,
-					APIGroup: rbacApiGroup,
-					Name:     userName61,
-				},
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: rbacApiGroup,
-				Kind:     crKind,
-				Name:     crName61,
-			},
-		}
-		rbacRancherSSO.updateK8sRbacResource(objCRB61, update_rbac)
-
-		// Test: check updated role
-		rbacRancherSSO.checkK8sUserRoles(userName61,
-			map[string]string{
-				"": api.UserRoleFedReader,
-			},
-			map[string]share.NvPermissions{"": {
-				WriteValue: share.PERM_FED,
-			}},
-			nil,
-		)
-
-		//------ [7]
-		objCR61.Rules = []rbacv1.PolicyRule{
-			{
-				Verbs:     []string{"*"},
-				APIGroups: []string{"permission.neuvector.com"},
-				Resources: []string{"*"},
-			},
-			{
-				Verbs:     []string{"get"},
-				APIGroups: []string{"permission.neuvector.com"},
-				Resources: []string{"federation"},
-			},
-		}
-		rbacRancherSSO.updateK8sRbacResource(objCR61, update_rbac)
-
-		// Test: check updated role
-		rbacRancherSSO.checkK8sUserRoles(userName61,
-			map[string]string{
-				"": api.UserRoleAdmin,
-			},
-			map[string]share.NvPermissions{"": {
-				ReadValue: share.PERM_FED,
-			}},
-			nil,
-		)
-	}
-
 }

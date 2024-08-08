@@ -51,27 +51,29 @@ func isValidCallback(callback *CertManagerCallback) bool {
 }
 
 type CertManager struct {
-	callbacks map[string]*CertManagerCallback
-	mutex     sync.RWMutex
-	config    CertManagerConfig
+	callbacks  map[string]*CertManagerCallback
+	mutex      sync.Mutex // Protect callbacks and other shared configs.
+	config     CertManagerConfig
+	notifyChan chan string
 }
 
 func NewCertManager(config CertManagerConfig) *CertManager {
 	return &CertManager{
-		callbacks: make(map[string]*CertManagerCallback),
-		config:    config,
+		callbacks:  make(map[string]*CertManagerCallback),
+		config:     config,
+		notifyChan: make(chan string),
 	}
 }
 
+// Main go routine of cert manager.
 func (c *CertManager) Run(ctx context.Context) error {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
 	ticker := time.NewTicker(c.config.ExpiryCheckPeriod)
 	for {
 		select {
 		case <-ticker.C:
 			c.CheckAndRenewCerts()
+		case cn := <-c.notifyChan:
+			c.UpdateCerts(cn)
 		case <-ctx.Done():
 			goto end
 		}
@@ -81,6 +83,7 @@ end:
 	return nil
 }
 
+// Utility function.  Retry consul API until it succeeds or retry number is reached.
 func RetryOnCASError(retry int, fn func() error) error {
 	steps := 0
 	sleeptime := DefaultSleepTime
@@ -132,6 +135,11 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 
 		// Check if certificate is expired.  If it is, renew it with PutRev.
 		block, _ = pem.Decode([]byte(data.Cert))
+		if block == nil {
+			logctx.WithError(err).Info("the certificate is ill-formatted. Try to create a new one.")
+			shouldrenew = true
+			goto end
+		}
 		x509Cert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			logctx.WithError(err).Info("failed to parse certificate. Try to create a new one.")
@@ -222,8 +230,14 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 	})
 }
 
+// Check and renew certificates.
+// This is supposed to be called by one go routine.
 func (c *CertManager) CheckAndRenewCerts() error {
 	log.Debug("CheckAndRenewCerts() starts.")
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	for cn, callback := range c.callbacks {
 		c.checkAndRotateCert(cn, callback)
 	}
@@ -248,4 +262,39 @@ func (c *CertManager) Unregister(cn string) error {
 	defer c.mutex.Unlock()
 	delete(c.callbacks, cn)
 	return nil
+}
+
+// Notify cert manager that a change is detected.
+func (c *CertManager) NotifyChanges(cn string) error {
+	log.WithFields(log.Fields{
+		"cn": cn,
+	}).Debug("Changes detected in certificate")
+	c.notifyChan <- cn
+	return nil
+}
+
+// Update certificate based on data in consul
+func (c *CertManager) UpdateCerts(cn string) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	callback, ok := c.callbacks[cn]
+	if !ok {
+		return fmt.Errorf("no suitable callback for: %s", cn)
+	}
+
+	return RetryOnCASError(DefaultRetryNumber, func() error {
+		data, index, err := clusHelper.GetObjectCertRev(cn)
+		if err != nil && err != cluster.ErrKeyNotFound {
+			// This function assumes the previous certificate should be there.  If not, return an error.
+			return fmt.Errorf("failed to get certificate: %w", err)
+		}
+
+		if callback.lastModifyIndex != index {
+			callback.lastModifyIndex = index
+			// Changed by others or initial start
+			callback.NotifyNewCert(nil, data)
+		}
+		return nil
+	})
 }

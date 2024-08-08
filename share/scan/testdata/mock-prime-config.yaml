@@ -1,9 +1,9 @@
 checks:
 - id: I.4.1
   tags: 
-    - Mock3: []
+    Mock3: []
 - id: I.4.6
   tags:
-  - Mock1: []
-  - Mock2: []
-  - Mock4: []
+    Mock1: []
+    Mock2: []
+    Mock4: []

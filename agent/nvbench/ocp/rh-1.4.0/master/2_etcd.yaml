@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -42,9 +42,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -68,9 +68,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -95,9 +95,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -123,9 +123,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -149,9 +149,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
@@ -175,9 +175,9 @@ groups:
         profile: Level 2
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"

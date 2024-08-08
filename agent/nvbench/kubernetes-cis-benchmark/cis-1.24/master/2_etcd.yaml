@@ -15,9 +15,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--cert-file' >/dev/null 2>&1; then
@@ -50,9 +50,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--client-cert-auth' >/dev/null 2>&1; then
@@ -73,9 +73,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--auto-tls=true' >/dev/null 2>&1; then
@@ -98,9 +98,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--peer-cert-file' >/dev/null 2>&1; then
@@ -135,9 +135,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--peer-client-cert-auth=true' >/dev/null 2>&1; then
@@ -158,9 +158,9 @@ groups:
         profile: Level 1
         automated: true
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--peer-auto-tls=true' >/dev/null 2>&1; then
@@ -182,9 +182,9 @@ groups:
         profile: Level 2
         automated: false
         tags:
-          - HIPAA: []
-          - PCI: []
-          - GDPR: []
+          HIPAA: []
+          PCI: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_ETCD_CMD" '--trusted-ca-file' >/dev/null 2>&1; then

@@ -14,7 +14,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -29,7 +29,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -43,7 +43,7 @@ groups:
         scored: false
         profile: Level 1
         automated: false
-        tags: []
+        tags: {}
         audit: |
           check="$id  - $description"
           manual "$check"
@@ -61,8 +61,8 @@ groups:
         profile: Level 1
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--audit-policy-file' >/dev/null 2>&1; then
@@ -82,8 +82,8 @@ groups:
         profile: Level 2
         automated: false
         tags:
-          - HIPAA: []
-          - GDPR: []
+          HIPAA: []
+          GDPR: []
         audit: |
           check="$id  - $description"
           manual "$check"

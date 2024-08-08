@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+
 	"github.com/neuvector/neuvector/share"
 )
 
@@ -36,7 +38,8 @@ func (o *RESTConversation) GetDomain(f share.GetAccessObjectFunc) ([]string, []s
 }
 
 // NOTE: This is a special case. Only read is authorized, but there is no data structure associated
-//       with the write action. We use this object to authorize again.
+//
+//	with the write action. We use this object to authorize again.
 func (o *RESTWorkloadBrief) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
 	return []string{o.Domain}, nil
 }
@@ -80,4 +83,47 @@ func (o *Violation) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) 
 
 func (o *Audit) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
 	return []string{o.WorkloadDomain}, nil
+}
+
+// temporarily revert critical cve logic
+func (c VulAssetCountDist) MarshalJSON() ([]byte, error) {
+	type Alias VulAssetCountDist
+	alias := struct {
+		Alias
+		Critical *int `json:"critical,omitempty"`
+	}{
+		Alias: (Alias)(c),
+	}
+	if c.Critical >= 0 {
+		alias.Critical = &c.Critical
+	}
+	return json.Marshal(alias)
+}
+
+func (c AssetCVECount) MarshalJSON() ([]byte, error) {
+	type Alias AssetCVECount
+	alias := struct {
+		Alias
+		Critical *int `json:"critical,omitempty"`
+	}{
+		Alias: (Alias)(c),
+	}
+	if c.Critical >= 0 {
+		alias.Critical = &c.Critical
+	}
+	return json.Marshal(alias)
+}
+
+func (c RESTImageAssetViewV2) MarshalJSON() ([]byte, error) {
+	type Alias RESTImageAssetViewV2
+	alias := struct {
+		Alias
+		Critical *int `json:"critical,omitempty"`
+	}{
+		Alias: (Alias)(c),
+	}
+	if c.Critical >= 0 {
+		alias.Critical = &c.Critical
+	}
+	return json.Marshal(alias)
 }

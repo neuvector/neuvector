@@ -759,7 +759,7 @@ func CompileUriPermitsMapping() {
 				"v1/scan/platform/platform",
 				"v1/scan/asset",
 				"v1/vulasset",
-				// "scanasset5", // TODO: local dev only
+				"v1/scan/asset/images",
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry",
@@ -865,6 +865,7 @@ func CompileUriPermitsMapping() {
 				"v1/list/compliance",
 				"v1/compliance/profile",
 				"v1/compliance/profile/*",
+				"v1/compliance/available_filter",
 			},
 			CONST_API_AUDIT_EVENTS: []string{
 				"v1/log/audit",
@@ -951,8 +952,7 @@ func CompileUriPermitsMapping() {
 				"v1/scan/platform/platform",
 				"v1/vulasset",
 				"v1/assetvul",
-				// "scanasset5",     // TODO: local dev only
-				// "scanassetview1", // TODO: local dev only
+				"v1/scan/asset/images",
 			},
 			CONST_API_REG_SCAN: []string{
 				"v1/scan/registry/*/scan",

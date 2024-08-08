@@ -1195,6 +1195,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/platform/platform",
 			"v1/scan/asset",
 			"v1/vulasset",
+			"v1/scan/asset/images",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry",
@@ -1299,6 +1300,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/list/compliance",
 			"v1/compliance/profile",
 			"v1/compliance/profile/*",
+			"v1/compliance/available_filter",
 		},
 		CONST_API_AUDIT_EVENTS: []string{
 			"v1/log/audit",
@@ -1385,6 +1387,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/platform/platform",
 			"v1/vulasset",
 			"v1/assetvul",
+			"v1/scan/asset/images",
 		},
 		CONST_API_REG_SCAN: []string{
 			"v1/scan/registry/*/scan",

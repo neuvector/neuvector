@@ -1460,10 +1460,11 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 					atomic.StoreInt32(&watchFailedFlag, 1)
 				}
 
-				if scb != nil {
-					scb(ConnStateDisconnected, e)
-				}
+				// Ignore io.EOF per https://github.com/kubernetes/client-go/issues/623
 				if !strings.HasSuffix(e.Error(), io.EOF.Error()) {
+					if scb != nil {
+						scb(ConnStateDisconnected, e)
+					}
 					log.WithFields(log.Fields{"resource": rt, "error": e}).Error("Watch failure")
 					time.Sleep(kubeWatchRetry)
 				}
@@ -1967,13 +1968,29 @@ func IsRancherFlavor() bool {
 				share.PERMS_SECURITY_EVENTS_ID,
 				share.PERM_FED_ID,
 			})
+			permIDtoCRD := map[string]string{
+				share.PERM_REG_SCAN_ID:          "registryscan",
+				share.PERM_CICD_SCAN_ID:         "ciscan",
+				share.PERM_ADM_CONTROL_ID:       "admissioncontrol",
+				share.PERM_AUDIT_EVENTS_ID:      "auditevents",
+				share.PERM_EVENTS_ID:            "events",
+				share.PERM_AUTHENTICATION_ID:    "authentication",
+				share.PERM_AUTHORIZATION_ID:     "authorization",
+				share.PERM_SYSTEM_CONFIG_ID:     "systemconfig",
+				share.PERM_VULNERABILITY_ID:     "vulnerability",
+				share.PERMS_RUNTIME_SCAN_ID:     "runtimescan",
+				share.PERMS_RUNTIME_POLICIES_ID: "runtimepolicy",
+				share.PERMS_COMPLIANCE_ID:       "compliance",
+				share.PERMS_SECURITY_EVENTS_ID:  "securityevents",
+				share.PERM_FED_ID:               "federation",
+			}
 			for _, svcname := range svcnames {
 				if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
 					log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
-					// For Rancher SSO only: nv permission string -> nv permission uint32 value
-					nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality())
+					// For Rancher SSO only: nv permission crd kind -> nv permission uint32 value
+					nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality()+len(permIDtoCRD))
 					for _, option := range access.PermissionOptions {
-						if nvPermitsRscSSO.Contains(option.ID) {
+						if crdKind, ok := permIDtoCRD[option.ID]; ok || nvPermitsRscSSO.Contains(option.ID) {
 							var readPermits uint32
 							var writePermits uint32
 							if len(option.ComplexPermits) > 0 {
@@ -1993,14 +2010,21 @@ func IsRancherFlavor() bool {
 									writePermits |= option.Value
 								}
 							}
-							optionID := strings.ReplaceAll(option.ID, "_", "-")
-							nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+							if ok {
+								nvPermitsValueSSO[crdKind] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+								nvPermitsRscSSO.Add(crdKind)
+							}
+							if nvPermitsRscSSO.Contains(option.ID) {
+								optionID := strings.ReplaceAll(option.ID, "_", "-")
+								nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+							}
 						}
 					}
 
-					nvRscMapSSO = map[string]utils.Set{ // apiGroup -> nv-perm resources
+					nvRscMapSSO = map[string]utils.Set{ // apiGroup -> neuvector permission resources
 						"read-only.neuvector.api.io": nvPermitsRscSSO,
 						"api.neuvector.com":          nvPermitsRscSSO,
+						"permission.neuvector.com":   nvPermitsRscSSO,
 						"*":                          nvPermitsRscSSO,
 					}
 

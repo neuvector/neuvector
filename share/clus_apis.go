@@ -1597,6 +1597,15 @@ type CLUSAuditLog struct {
 
 const SnifferIdAgentField = 12
 
+type TagDetail struct {
+	ID              string `yaml:"id" json:"id"`
+	Title           string `yaml:"title" json:"title"`
+	Description     string `yaml:"description" json:"description"`
+	CIS_Sub_Control string `yaml:"cis-sub-control"`
+}
+
+type TagDetails []TagDetail
+
 type CLUSComplianceProfileEntry struct {
 	TestNum string   `json:"test_num"`
 	Tags    []string `json:"tags"`
@@ -2034,6 +2043,7 @@ const (
 const (
 	CLUSRootCAKey = "rootCA"
 	CLUSJWTKey    = "neuvector-jwt-signing"
+	CLUSTLSCert   = "neuvector"
 )
 
 func CLUSObjectCertKey(cn string) string {
@@ -2340,10 +2350,11 @@ type CLUSFedSettings struct { // stored on each cluster (master & joint cluster)
 }
 
 type CLUSFedClusterStatus struct {
-	Status            int       `json:"status"` // status of a joint cluster
-	CspType           TCspType  `json:"csp_type"`
-	Nodes             int       `json:"nodes"`               // total nodes count in this cluster
-	LastConnectedTime time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
+	Status              int       `json:"status"`                // status of a joint cluster
+	SwitchToUnreachable int       `json:"switch_to_unreachable"` // counts of connected -> disconnected
+	CspType             TCspType  `json:"csp_type"`
+	Nodes               int       `json:"nodes"`               // total nodes count in this cluster
+	LastConnectedTime   time.Time `json:"last_connected_time"` // only for master's connection status on joint cluster
 }
 
 type CLUSFedJoinedClusterList struct { // only available on master cluster

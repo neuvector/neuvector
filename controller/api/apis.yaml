@@ -8418,6 +8418,24 @@ definitions:
         type: string
         format: password
         example: password
+    description: Define proxy settings.
+  RESTProxyConfig:
+    type: object
+    required:
+      - url
+      - username
+    properties:
+      url:
+        type: string
+        example: ""
+      username:
+        type: string
+        example: username
+      password:
+        type: string
+        format: password
+        example: password
+    description: Define proxy settings, similar to RESTProxy, but allow users to perform partial update on RESTProxy. When both exist, this config will take precedence over RESTProxy.
   RESTSystemConfigAutoscale:
     type: object
     required:
@@ -8526,6 +8544,10 @@ definitions:
         $ref: '#/definitions/RESTProxy'
       registry_https_proxy:
         $ref: '#/definitions/RESTProxy'
+      registry_http_proxy_cfg:
+        $ref: '#/definitions/RESTProxyConfig'
+      registry_https_proxy_cfg:
+        $ref: '#/definitions/RESTProxyConfig'
   RESTSystemConfigIBMSAVCfg2:
     type: object
     properties:
@@ -10985,6 +11007,10 @@ definitions:
         $ref: '#/definitions/RESTProxy'
       registry_https_proxy:
         $ref: '#/definitions/RESTProxy'
+      registry_http_proxy_cfg:
+        $ref: '#/definitions/RESTProxyConfig'
+      registry_https_proxy_cfg:
+        $ref: '#/definitions/RESTProxyConfig'
   RESTSystemConfigSyslogV2:
     type: object
     required:

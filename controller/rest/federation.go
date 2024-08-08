@@ -857,6 +857,13 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 		} else if user.Role == api.UserRoleFedReader {
 			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleReader}
 		}
+		/* fed access for namespaces is not supported yet
+		if user.ExtraPermits.HasPermFed() {
+			extraPermits := user.ExtraPermits
+			extraPermits.FilterPermits(access.AccessDomainGlobal, "remote", api.FedRoleMaster)
+			remoteRolePermits.ExtraPermits = map[string]share.NvPermissions{access.AccessDomainGlobal: extraPermits}
+		}
+		*/
 		user.RemoteRolePermits = &remoteRolePermits
 	}
 
@@ -1109,24 +1116,32 @@ func updateClusterState(id, masterClusterID string, status int, cspUsage *share.
 		return true
 	}
 
+	// _fedClusterConnected(200), _fedClusterJoined(201), _fedClusterOutOfSync(202), _fedClusterSynced(203)
+	connectedStates := utils.NewSet(_fedClusterConnected, _fedClusterJoined, _fedClusterOutOfSync, _fedClusterSynced)
 	changed := false
 	cached := cacher.GetFedJoinedClusterStatus(id, acc)
-	if masterClusterID != "" {
-		// _fedClusterConnected(200), _fedClusterJoined(201), _fedClusterOutOfSync(202), _fedClusterSynced(203)
-		connectedStates := utils.NewSet(200, 201, 202, 203)
-		if connectedStates.Contains(status) {
-			now := time.Now()
-			duration := time.Duration(cctx.CspPauseInterval*15) * time.Second
-			if cached.LastConnectedTime.IsZero() || cached.Status != status || now.After(cached.LastConnectedTime.Add(duration)) {
-				cached.LastConnectedTime = now
-				changed = true
-			}
+	if connectedStates.Contains(status) {
+		now := time.Now()
+		duration := time.Duration(cctx.CspPauseInterval*15) * time.Second
+		if cached.LastConnectedTime.IsZero() || cached.Status != status || now.After(cached.LastConnectedTime.Add(duration)) {
+			cached.LastConnectedTime = now
+			cached.SwitchToUnreachable = 0
+			changed = true
 		}
 	}
 	if cached.Status != status {
-		if cached.Status == _fedClusterJoinPending && (status == _fedClusterLeft || status == _fedClusterDisconnected) {
+		clusterUnreachable := false
+		if status == _fedClusterLeft || status == _fedClusterDisconnected {
+			clusterUnreachable = true
+		}
+		if cached.Status == _fedClusterJoinPending && clusterUnreachable {
 			// do not change joint cluster status
 		} else {
+			if clusterUnreachable {
+				if connectedStates.Contains(cached.Status) && cached.SwitchToUnreachable == 0 {
+					cached.SwitchToUnreachable++
+				}
+			}
 			cached.Status = status
 			changed = true
 		}

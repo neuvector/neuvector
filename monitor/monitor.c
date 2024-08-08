@@ -30,6 +30,7 @@
 #define ENV_CTRL_SERVER_PORT   "CTRL_SERVER_PORT"
 #define ENV_FED_SERVER_PORT    "FED_SERVER_PORT"
 #define ENV_CTRL_PATH_DEBUG    "CTRL_PATH_DEBUG"
+#define ENV_CTRL_SEARCH_REGS   "CTRL_SEARCH_REGISTRIES"
 #define ENV_CTRL_NOT_RM_NSGRPS "CTRL_NOT_PRUNE_NSGROUPS"
 #define ENV_CTRL_EN_ICMP_POL   "CTRL_EN_ICMP_POLICY"
 #define ENV_DEBUG_LEVEL        "DEBUG_LEVEL"
@@ -213,7 +214,7 @@ static pid_t fork_exec(int i)
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period;
+    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     char *custom_check_control;
     int a;
@@ -340,6 +341,10 @@ static pid_t fork_exec(int i)
                 args[a ++] = "-d";
                 g_debugOpa = 1;
             }
+        }
+        if ((search_regs = getenv(ENV_CTRL_SEARCH_REGS)) != NULL) {
+            args[a ++] = "-search_registries";
+            args[a ++] = search_regs;
         }
         if ((join = getenv(ENV_CLUSTER_JOIN)) != NULL) {
             args[a ++] = "-j";

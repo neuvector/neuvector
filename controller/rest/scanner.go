@@ -865,3 +865,11 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 		restRespSuccess(w, r, resp, acc, login, nil, "Get scan cache data")
 	}
 }
+
+func handlerAssetViewCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	createAssetSession(w, r)
+}
+
+func handlerAssetViewGet(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	getAssetSession(w, r)
+}

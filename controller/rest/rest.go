@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"reflect"
@@ -51,6 +52,11 @@ import (
 const retryClusterMax int = 3
 const clusterLockWait = time.Duration(time.Second * 20)
 
+const DEFAULT_JWTCERT_VALIDITY_DAYS = 90
+const DEFAULT_TLSCERT_VALIDITY_DAYS = 365
+const DEFAULT_CERTMANAGER_EXPIRY_CHECK_PERIOD = time.Minute * 30
+const DEFAULT_CERTMANAGER_RENEW_THRESHOLD = time.Hour * 24 * 30
+
 type ApiVersion int
 
 const (
@@ -77,6 +83,7 @@ var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
 var defaultRegistries utils.Set
+var searchRegistries utils.Set
 
 const (
 	_fedRestServerStopped_ = iota
@@ -113,6 +120,8 @@ var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
 var checkCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 
 var CertManager *kv.CertManager
+var tlsMutex sync.RWMutex
+var tlsCertificate *tls.Certificate
 
 var restErrMessage = []string{
 	api.RESTErrNotFound:              "URL not found",
@@ -1152,7 +1161,15 @@ func getAgentWorkloadFromFilter(filters []restFieldFilter, acc *access.AccessCon
 func initDefaultRegistries() {
 	// all on lower-case
 	dockerRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
-	defaultRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
+
+	// if a flag was provided for search registries, use those,
+	// otherwise use the default docker registries
+	if len(searchRegistries.ToSlice()) > 0 {
+		defaultRegistries = searchRegistries
+	} else {
+		defaultRegistries = utils.NewSet("https://docker.io/", "https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/")
+	}
+
 	regNames := global.RT.GetDefaultRegistries()
 	for _, reg := range regNames {
 		k := fmt.Sprintf("https://%s/", reg)
@@ -1257,6 +1274,7 @@ type Context struct {
 	Messenger          cluster.MessengerInterface
 	Cacher             cache.CacheInterface
 	Scanner            scan.ScanInterface
+	SearchRegistries   string
 	FedPort            uint
 	RESTPort           uint
 	PwdValidUnit       uint
@@ -1268,7 +1286,6 @@ type Context struct {
 	CspPauseInterval   uint   // in minutes
 	CustomCheckControl string // disable / strict / loose
 	CheckCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
-	CertManager        *kv.CertManager
 }
 
 var cctx *Context
@@ -1282,46 +1299,56 @@ func getExpiryDate(certPEM []byte) (time.Time, error) {
 	return cert.NotAfter, nil
 }
 
-func initJWTSignKey() error {
-	ExpiryCheckPeriod := time.Minute * 30
-	RenewThreshold := time.Hour * 24 * 30
-	JWTCertValidityPeriodDay := 90 // 90 days.
+func initCertificates() error {
+	expiryCheckPeriod := DEFAULT_CERTMANAGER_EXPIRY_CHECK_PERIOD
+	renewThreshold := DEFAULT_CERTMANAGER_RENEW_THRESHOLD
+
+	jwtCertValidityPeriodDay := DEFAULT_JWTCERT_VALIDITY_DAYS
+	tlsCertValidityPeriodDay := DEFAULT_TLSCERT_VALIDITY_DAYS
 
 	if envvar := os.Getenv("CERT_EXPIRY_CHECK_PERIOD"); envvar != "" {
 		if v, err := time.ParseDuration(envvar); err == nil {
-			ExpiryCheckPeriod = v
+			expiryCheckPeriod = v
 		} else {
 			log.WithError(err).Warn("failed to load ExpiryCheckPeriod")
 		}
 	}
 	if envvar := os.Getenv("CERT_RENEW_THRESHOLD"); envvar != "" {
 		if v, err := time.ParseDuration(envvar); err == nil {
-			RenewThreshold = v
+			renewThreshold = v
 		} else {
 			log.WithError(err).Warn("failed to load RenewThreshold")
 		}
 	}
 	if envvar := os.Getenv("JWTCERT_VALIDITY_PERIOD_DAY"); envvar != "" {
 		if v, err := strconv.Atoi(envvar); err == nil {
-			JWTCertValidityPeriodDay = v
+			jwtCertValidityPeriodDay = v
 		} else {
 			log.WithError(err).Warn("failed to load JWTCertValidityPeriodDay")
 		}
 	}
 
+	if envvar := os.Getenv("TLSCERT_VALIDITY_PERIOD_DAY"); envvar != "" {
+		if v, err := strconv.Atoi(envvar); err == nil {
+			tlsCertValidityPeriodDay = v
+		} else {
+			log.WithError(err).Warn("failed to load TLSCertValidityPeriodDay")
+		}
+	}
+
 	log.WithFields(log.Fields{
-		"period":              ExpiryCheckPeriod,
-		"threshold":           RenewThreshold,
-		"validity_length_day": JWTCertValidityPeriodDay,
+		"period":              expiryCheckPeriod,
+		"threshold":           renewThreshold,
+		"validity_length_day": jwtCertValidityPeriodDay,
 	}).Info("cert manager is configured.")
 
 	CertManager = kv.NewCertManager(kv.CertManagerConfig{
-		RenewThreshold:    RenewThreshold,
-		ExpiryCheckPeriod: ExpiryCheckPeriod,
+		RenewThreshold:    renewThreshold,
+		ExpiryCheckPeriod: expiryCheckPeriod,
 	})
 	CertManager.Register(share.CLUSJWTKey, &kv.CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
-			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: JWTCertValidityPeriodDay}, x509.ExtKeyUsageAny)
+			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: jwtCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
 			}
@@ -1382,6 +1409,67 @@ func initJWTSignKey() error {
 			}).Info("new certificate is loaded")
 		},
 	})
+
+	tlsCertNotfound := false
+	if _, err := os.Stat(defaultSSLCertFile); errors.Is(err, os.ErrNotExist) {
+		tlsCertNotfound = true
+	}
+
+	if _, err := os.Stat(defaultSSLKeyFile); errors.Is(err, os.ErrNotExist) {
+		tlsCertNotfound = true
+	}
+
+	if tlsCertNotfound {
+		CertManager.Register(share.CLUSTLSCert, &kv.CertManagerCallback{
+			NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
+				cert, key, err := kv.GenTlsKeyCert(share.CLUSTLSCert, "", "", kv.ValidityPeriod{Day: tlsCertValidityPeriodDay}, x509.ExtKeyUsageServerAuth)
+				if err != nil {
+					return nil, fmt.Errorf("failed to generate tls key/cert: %w", err)
+				}
+				return &share.CLUSX509Cert{
+					CN:   share.CLUSTLSCert,
+					Key:  string(key),
+					Cert: string(cert),
+				}, nil
+			},
+			NotifyNewCert: func(oldcert *share.CLUSX509Cert, newcert *share.CLUSX509Cert) {
+				tlsMutex.Lock()
+				defer tlsMutex.Unlock()
+
+				var oldExpiryDate *time.Time
+				var newExpiryDate *time.Time
+				var err error
+
+				tlsCert, err := tls.X509KeyPair([]byte(newcert.Cert), []byte(newcert.Key))
+				if err != nil {
+					log.WithError(err).Error("failed to parse key.")
+					return
+				}
+
+				if expiryDate, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+					log.WithError(err).Error("failed to get cert's expiry time.")
+				} else {
+					newExpiryDate = &expiryDate
+				}
+
+				if newcert.OldCert != nil {
+					if expiryDate, err := getExpiryDate([]byte(newcert.Cert)); err != nil {
+						log.WithError(err).Error("failed to get cert's expiry time.")
+					} else {
+						oldExpiryDate = &expiryDate
+					}
+				}
+
+				tlsCertificate = &tlsCert
+
+				log.WithFields(log.Fields{
+					"cn":            share.CLUSTLSCert,
+					"newExpiryDate": newExpiryDate,
+					"oldExpiryDate": oldExpiryDate,
+				}).Info("new certificate is loaded")
+			},
+		})
+	}
 	// Create and setup certificate.
 	CertManager.CheckAndRenewCerts()
 	go CertManager.Run(context.TODO())
@@ -1422,9 +1510,26 @@ func InitContext(ctx *Context) {
 		_teleFreq = 60
 	}
 
-	if err := initJWTSignKey(); err != nil {
-		log.WithError(err).Error("failed to initialize JWT sign key.")
+	if err := initCertificates(); err != nil {
+		log.WithError(err).Error("failed to initialize keys/certificates.")
 	}
+
+	searchRegistries = utils.NewSet()
+
+	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
+		if parsedReg, err := url.Parse(reg); err != nil {
+			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
+			continue
+		} else if parsedReg.Host != "" {
+			reg = parsedReg.Host
+		}
+
+		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
+		if !searchRegistries.Contains(k) {
+			searchRegistries.Add(k)
+		}
+	}
+
 	initHttpClients()
 }
 
@@ -1690,10 +1795,12 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.DELETE("/v1/scan/registry/:name/scan", handlerRegistryStop)
 	r.GET("/v1/scan/registry/:name/image/:id", handlerRegistryImageReport)
 	r.GET("/v1/scan/registry/:name/layers/:id", handlerRegistryLayersReport)
-	r.GET("/v1/scan/asset", handlerAssetVulnerability) // skip API document
-	r.POST("/v1/vulasset", handlerVulAssetCreate)      // skip API document
-	r.GET("/v1/vulasset", handlerVulAssetGet)          // skip API document
-	r.POST("/v1/assetvul", handlerAssetVul)            // skip API document
+	r.GET("/v1/scan/asset", handlerAssetVulnerability)      // skip API document
+	r.POST("/v1/vulasset", handlerVulAssetCreate)           // skip API document
+	r.GET("/v1/vulasset", handlerVulAssetGet)               // skip API document
+	r.POST("/v1/assetvul", handlerAssetVul)                 // skip API document
+	r.POST("/v1/scan/asset/images", handlerAssetViewCreate) // skip API document
+	r.GET("/v1/scan/asset/images", handlerAssetViewGet)     // skip API document
 
 	// Sigstore Configuration
 	r.GET("/v1/scan/sigstore/root_of_trust", handlerSigstoreRootOfTrustGetAll)
@@ -1716,7 +1823,8 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.GET("/v1/custom_check/:group", handlerCustomCheckShow)
 	r.GET("/v1/custom_check", handlerCustomCheckList)
 	r.PATCH("/v1/custom_check/:group", handlerCustomCheckConfig)
-	r.GET("/v1/compliance/profile", handlerComplianceProfileList) // Only default is accepted, so not POST/DELETE
+	r.GET("/v1/compliance/available_filter", handlerGetAvaiableComplianceFilter) // Skip API document, use internally
+	r.GET("/v1/compliance/profile", handlerComplianceProfileList)                // Only default is accepted, so not POST/DELETE
 	r.GET("/v1/compliance/profile/:name", handlerComplianceProfileShow)
 	r.PATCH("/v1/compliance/profile/:name", handlerComplianceProfileConfig)
 	r.PATCH("/v1/compliance/profile/:name/entry/:check", handlerComplianceProfileEntryConfig)
@@ -1806,6 +1914,22 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 		PreferServerCipherSuites: true,
 		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
 	}
+
+	// tlsCertificate is only generated when default location has no files
+	// so we can check if tlsCertificate is nil to see if we should adopt dynamically generated certificate.
+	certFileName := defaultSSLCertFile
+	keyFileName := defaultSSLKeyFile
+	if tlsCertificate != nil {
+		// When provide certificate from memory, certFileName and keyFileName have to be empty strings.
+		certFileName = ""
+		keyFileName = ""
+		config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			tlsMutex.RLock()
+			defer tlsMutex.RUnlock()
+			return tlsCertificate, nil
+		}
+	}
+
 	server := &http.Server{
 		Addr:      addr,
 		Handler:   restLogger{r},
@@ -1813,9 +1937,10 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0), // disable http/2
+		ErrorLog:     newHttpServerErrorWriter(),
 	}
 	for {
-		if err := server.ListenAndServeTLS(defaultSSLCertFile, defaultSSLKeyFile); err != nil {
+		if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {
 			if err == http.ErrServerClosed {
 				if cfgmapRetryTimer != nil {
 					cfgmapRetryTimer.Stop()
@@ -1862,19 +1987,37 @@ func startFedRestServer(fedPingInterval uint32) {
 		TLSConfig: config,
 		// ReadTimeout:  time.Duration(5) * time.Second,
 		// WriteTimeout: time.Duration(35) * time.Second,
+		ErrorLog: newHttpServerErrorWriter(),
 	}
 
 	atomic.StoreUint64(&fedRestServerState, _fedRestServerRunning_)
 
 	log.WithFields(log.Fields{"port": _fedPort}).Info("Start fed REST server")
 	go func() {
+		// The certificate used by fed rest server will be in the order below:
+		// 1. fed-ssl-cert.key
+		// 2. ssl-cert.key
+		// 3. tlsCertificate, which is generated in memory and stored in consul.
 		keyFileName := defFedSSLKeyFile
 		certFileName := defFedSSLCertFile
 		_, err1 := os.Stat(keyFileName)
 		_, err2 := os.Stat(certFileName)
 		if os.IsNotExist(err1) || os.IsNotExist(err2) {
-			keyFileName = defaultSSLKeyFile
 			certFileName = defaultSSLCertFile
+			keyFileName = defaultSSLKeyFile
+
+			// tlsCertificate is only generated when default location has no files
+			// so we can check if tlsCertificate is nil to see if we should adopt dynamically generated certificate.
+			if tlsCertificate != nil {
+				// When provide certificate from memory, certFileName and keyFileName have to be empty strings.
+				certFileName = ""
+				keyFileName = ""
+				config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+					tlsMutex.RLock()
+					defer tlsMutex.RUnlock()
+					return tlsCertificate, nil
+				}
+			}
 		}
 		for i := 0; i < 5; i++ {
 			if err := server.ListenAndServeTLS(certFileName, keyFileName); err != nil {

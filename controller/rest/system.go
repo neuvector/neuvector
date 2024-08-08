@@ -330,6 +330,16 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						RegistryHttpsProxyEnable: rconf.RegistryHttpsProxyEnable,
 						RegistryHttpProxy:        rconf.RegistryHttpProxy,
 						RegistryHttpsProxy:       rconf.RegistryHttpsProxy,
+						RegistryHttpProxyCfg: api.RESTProxyConfig{
+							URL:      &rconf.RegistryHttpProxy.URL,
+							Username: &rconf.RegistryHttpProxy.Username,
+							Password: &rconf.RegistryHttpProxy.Password,
+						},
+						RegistryHttpsProxyCfg: api.RESTProxyConfig{
+							URL:      &rconf.RegistryHttpsProxy.URL,
+							Username: &rconf.RegistryHttpsProxy.Username,
+							Password: &rconf.RegistryHttpsProxy.Password,
+						},
 					},
 					IBMSA: api.RESTSystemConfigIBMSAV2{
 						IBMSAEpEnabled:      rconf.IBMSAEpEnabled,
@@ -1391,31 +1401,75 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				cconf.XffEnabled = *rc.XffEnabled
 			}
 
-			// registry proxy
-			if rc.RegistryHttpProxy != nil {
-				if rc.RegistryHttpProxy.URL != "" {
-					if _, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
-						return kick, err
+			// registry proxy.  RegistryHttpProxyCfg will take precedence.
+			if rc.RegistryHttpProxyCfg != nil {
+				if rc.RegistryHttpProxyCfg.URL != nil {
+					if *rc.RegistryHttpProxyCfg.URL != "" {
+						if _, err := url.ParseRequestURI(*rc.RegistryHttpProxyCfg.URL); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
+							return kick, err
+						}
 					}
+					cconf.RegistryHttpProxy.URL = *rc.RegistryHttpProxyCfg.URL
 				}
-				cconf.RegistryHttpProxy.URL = rc.RegistryHttpProxy.URL
-				cconf.RegistryHttpProxy.Username = rc.RegistryHttpProxy.Username
-				cconf.RegistryHttpProxy.Password = rc.RegistryHttpProxy.Password
-			}
-			if rc.RegistryHttpsProxy != nil {
-				if rc.RegistryHttpsProxy.URL != "" {
-					if _, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
-						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTPS proxy setting")
-						return kick, err
+
+				if rc.RegistryHttpProxyCfg.Username != nil {
+					cconf.RegistryHttpProxy.Username = *rc.RegistryHttpProxyCfg.Username
+				}
+
+				if rc.RegistryHttpProxyCfg.Password != nil {
+					cconf.RegistryHttpProxy.Password = *rc.RegistryHttpProxyCfg.Password
+				}
+			} else {
+				if rc.RegistryHttpProxy != nil {
+					if rc.RegistryHttpProxy.URL != "" {
+						if _, err := url.ParseRequestURI(rc.RegistryHttpProxy.URL); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
+							return kick, err
+						}
 					}
+					cconf.RegistryHttpProxy.URL = rc.RegistryHttpProxy.URL
+					cconf.RegistryHttpProxy.Username = rc.RegistryHttpProxy.Username
+					cconf.RegistryHttpProxy.Password = rc.RegistryHttpProxy.Password
 				}
-				cconf.RegistryHttpsProxy.URL = rc.RegistryHttpsProxy.URL
-				cconf.RegistryHttpsProxy.Username = rc.RegistryHttpsProxy.Username
-				cconf.RegistryHttpsProxy.Password = rc.RegistryHttpsProxy.Password
 			}
+
+			if rc.RegistryHttpsProxyCfg != nil {
+				if rc.RegistryHttpsProxyCfg.URL != nil {
+					if *rc.RegistryHttpsProxyCfg.URL != "" {
+						if _, err := url.ParseRequestURI(*rc.RegistryHttpsProxyCfg.URL); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("Invalid HTTP proxy setting")
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTP proxy setting")
+							return kick, err
+						}
+					}
+					cconf.RegistryHttpsProxy.URL = *rc.RegistryHttpsProxyCfg.URL
+				}
+
+				if rc.RegistryHttpsProxyCfg.Username != nil {
+					cconf.RegistryHttpsProxy.Username = *rc.RegistryHttpsProxyCfg.Username
+				}
+
+				if rc.RegistryHttpsProxyCfg.Password != nil {
+					cconf.RegistryHttpsProxy.Password = *rc.RegistryHttpsProxyCfg.Password
+				}
+			} else {
+				if rc.RegistryHttpsProxy != nil {
+					if rc.RegistryHttpsProxy.URL != "" {
+						if _, err := url.ParseRequestURI(rc.RegistryHttpsProxy.URL); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("Invalid HTTPS proxy setting")
+							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Invalid HTTPS proxy setting")
+							return kick, err
+						}
+					}
+					cconf.RegistryHttpsProxy.URL = rc.RegistryHttpsProxy.URL
+					cconf.RegistryHttpsProxy.Username = rc.RegistryHttpsProxy.Username
+					cconf.RegistryHttpsProxy.Password = rc.RegistryHttpsProxy.Password
+				}
+			}
+
 			if rc.RegistryHttpProxyEnable != nil {
 				cconf.RegistryHttpProxy.Enable = *rc.RegistryHttpProxyEnable
 			}
@@ -1604,6 +1658,8 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.RegistryHttpsProxyEnable = configV2.ProxyCfg.RegistryHttpsProxyEnable
 				config.RegistryHttpProxy = configV2.ProxyCfg.RegistryHttpProxy
 				config.RegistryHttpsProxy = configV2.ProxyCfg.RegistryHttpsProxy
+				config.RegistryHttpProxyCfg = configV2.ProxyCfg.RegistryHttpProxyCfg
+				config.RegistryHttpsProxyCfg = configV2.ProxyCfg.RegistryHttpsProxyCfg
 			}
 			if configV2.Webhooks != nil {
 				config.Webhooks = configV2.Webhooks
@@ -2015,6 +2071,37 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		RoleErrors:               acceptable[2],
 		RoleBindingErrors:        acceptable[3],
 		NvCrdSchemaErrors:        acceptable[4],
+	}
+
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
+		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
+		otherAlerts := map[string]string{}
+		// _fedClusterLeft(206), _fedClusterDisconnected(204)
+		//disconnectedStates := utils.NewSet(_fedClusterLeft, _fedClusterDisconnected)
+		var ids map[string]bool
+		if fedRole == api.FedRoleMaster {
+			ids = cacher.GetFedJoinedClusterIdMap(acc)
+		} else {
+			if m := cacher.GetFedMasterCluster(acc); m.ID != "" {
+				ids = map[string]bool{
+					m.ID: true,
+				}
+			}
+		}
+		if len(ids) > 0 {
+			for id, _ := range ids {
+				s := cacher.GetFedJoinedClusterStatus(id, acc)
+				if elapsed := time.Since(s.LastConnectedTime); s.LastConnectedTime.IsZero() || elapsed > (time.Duration(_teleFreq)*time.Minute) {
+					key, alert := getFedDisconnectAlert(fedRole, id, acc)
+					if !acceptedAlerts.Contains(key) {
+						// this alert has not been accepted yet. put it in the response
+						otherAlerts[key] = alert
+					}
+				}
+			}
+			resp.AcceptableAlerts.OtherAlerts = otherAlerts
+		}
 	}
 
 	var acceptedManagerAlerts []string
@@ -2617,4 +2704,18 @@ func validateCertificate(certificate string) error {
 	// 	return errors.New("Invalid certificate, certificate doesn't contain a public key")
 	// }
 	return nil
+}
+
+func getFedDisconnectAlert(fedRole, id string, acc *access.AccessControl) (string, string) {
+	var alert string
+	if fedRole == api.FedRoleMaster {
+		clusterInfo := cacher.GetFedJoinedCluster(id, acc)
+		alert = fmt.Sprintf("Managed cluster %s is disconnected from primary cluster", clusterInfo.Name)
+	} else {
+		alert = "This cluster is disconnected from primary cluster"
+	}
+	b := md5.Sum([]byte(alert))
+	key := hex.EncodeToString(b[:])
+
+	return key, alert
 }

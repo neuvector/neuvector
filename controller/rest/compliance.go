@@ -34,9 +34,8 @@ func handlerComplianceList(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespAccessDenied(w, login)
 		return
 	}
-
 	// Remove Metas replace with new [] get it dynamically
-	metas, _ := scanUtils.GetComplianceMeta()
+	metas, _ := scanUtils.GetComplianceMeta(scanUtils.V1)
 
 	resp := api.RESTListData{List: &api.RESTList{Compliance: metas}}
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get compliance meta list")
@@ -112,6 +111,44 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 	}
 }
 
+func handlerGetAvaiableComplianceFilter(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	availableFilters := []string{}
+	profiles := cacher.GetAllComplianceProfiles(acc)
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
+	complianceFilterMap := scanUtils.GetComplianceFilterMap()
+
+	for _, profile := range profiles {
+		for _, entry := range profile.Entries {
+			// Remove the exisiting one before user profile update.
+			for _, compliance := range metaMap[entry.TestNum].Tags {
+				complianceFilterMap[compliance]--
+			}
+
+			// Add user new selections to ensure we have count the filter correct
+			for _, compliance := range entry.Tags {
+				complianceFilterMap[compliance]++
+			}
+		}
+	}
+
+	for compliance, complianceCount := range complianceFilterMap {
+		if complianceCount > 0 {
+			availableFilters = append(availableFilters, compliance)
+		}
+	}
+
+	resp := api.RESTAvaiableComplianceFilter{AvailableFilter: availableFilters}
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get avaiable compliance filter")
+}
+
 func handlerComplianceProfileList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -158,7 +195,7 @@ func handlerComplianceProfileShow(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.RESTComplianceProfileEntry) error {
-	_, metaMap := scanUtils.GetComplianceMeta()
+	_, metaMap := scanUtils.GetComplianceMeta(scanUtils.V1)
 	if _, ok := metaMap[re.TestNum]; !ok {
 		return errors.New("Unknonwn compliance ID")
 	}
@@ -167,7 +204,7 @@ func configComplianceProfileEntry(ccp *share.CLUSComplianceProfile, re *api.REST
 	tagSet := utils.NewSet()
 	for _, t := range re.Tags {
 		switch t {
-		case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST:
+		case api.ComplianceTemplatePCI, api.ComplianceTemplateGDPR, api.ComplianceTemplateHIPAA, api.ComplianceTemplateNIST, api.ComplianceTemplatePCIv4, api.ComplianceTemplateDISA:
 			tagSet.Add(t)
 		default:
 			return errors.New("Invalid compliance profile template values")

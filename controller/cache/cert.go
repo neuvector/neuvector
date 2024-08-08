@@ -10,7 +10,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -38,8 +38,19 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		cnCrd:               &keyCertFileInfo{resource.NvCrdSvcName, crdKeyPath, crdCertPath, true},
 	}
 
+	certmanagerCerts := map[string]bool{
+		share.CLUSJWTKey:  true,
+		share.CLUSTLSCert: true,
+	}
+
 	if pathInfo, ok := pathInfoMap[cn]; !ok {
-		log.WithFields(log.Fields{"cn": cn}).Debug("unsupported")
+		if _, ok := certmanagerCerts[cn]; ok {
+			if cctx.NotifyCertChange != nil {
+				cctx.NotifyCertChange(cn)
+			}
+		} else {
+			log.WithFields(log.Fields{"cn": cn}).Debug("unsupported")
+		}
 	} else if pathInfo.k8sEnvOnly && localDev.Host.Platform != share.PlatformKubernetes {
 		// do nothing if it's webhook cert key change on non-k8s env
 	} else {

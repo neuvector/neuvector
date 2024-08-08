@@ -126,7 +126,7 @@ var ocReaderVerbs utils.Set = utils.NewSet(
 // ns reader:   in {"read-only.neuvector.api.io", "*"}		"*"				in {"get"}  // clusterrole(with rolebinding) or role
 var nvReadVerbSSO utils.Set = utils.NewSet("get")                                                          // for view in SSO role/permissions mapping
 var nvWriteVerbSSO utils.Set = utils.NewSet("create", "delete", "get", "list", "patch", "update", "watch") // for modify in SSO role/permissions mapping
-var nvRscMapSSO map[string]utils.Set                                                                       // key is apiGroup, value is (nv-perm) resources
+var nvRscMapSSO map[string]utils.Set                                                                       // key is apiGroup, value is nv permission resources
 var nvPermitsValueSSO map[string]share.NvPermissions                                                       // for Rancher SSO
 
 var appRoleVerbs utils.Set = utils.NewSet("get", "list", "update", "watch")
@@ -411,15 +411,17 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 	if k8sFlavor == share.FlavorRancher {
 		var nvRole string
 		for rsc, verbs := range r2v {
-			// resource "nv-perm.all-permissions" is equivalent to "*"
-			if rsc == "*" || rsc == "nv-perm.all-permissions" {
+			// resource "nv-perm.all-permissions"/"cluster"/"namespace" are equivalent to "*"
+			if rsc == "*" || rsc == "nv-perm.all-permissions" || rsc == "cluster" || rsc == "namespace" {
 				if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 					nvRole = api.UserRoleAdmin
 				} else if readVerbs.Intersect(verbs).Cardinality() != 0 && nvRole == api.UserRoleNone {
 					nvRole = api.UserRoleReader
 				}
-			} else if strings.HasPrefix(rsc, nvPermRscPrefix) {
-				rsc = rsc[len(nvPermRscPrefix):]
+			} else {
+				if strings.HasPrefix(rsc, nvPermRscPrefix) {
+					rsc = rsc[len(nvPermRscPrefix):]
+				}
 				if v, ok := nvPermitsValueSSO[rsc]; ok {
 					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 						nvPermits.Union(v)
@@ -431,19 +433,21 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 		}
 		// Now nvRole & nvPermits could be non-empty value
 
+		// "nv-perm.all-permissions" is equivalent to "cluster"/"namespace"
+		// "nv-perm.fed" is equivalent to "federation"
 		// When SSO happens on NV master cluster,
-		// 1. * verb on  * or nv-perm.all-permissions 								resource in Rancher Global  Role maps to fedAdmin
-		// 2. * verb on  "*, nv-perm.fed" or "nv-perm.all-permissions, nv-perm.fed" resource in Rancher Cluster Role maps to fedAdmin
-		// 3. * verb on  * or nv-perm.all-permissions 								resource in Rancher Cluster Role maps to admin
-		// 4. * verb on  * or nv-perm.all-permissions								resource in Rancher Project Role maps to admin (namespace)
+		// 1. * verb on  * or cluster 							  resource in Rancher Global  Role maps to fedAdmin
+		// 2. * verb on  "*, federation" or "cluster, federation" resource in Rancher Cluster Role maps to fedAdmin
+		// 3. * verb on  * or cluster 							  resource in Rancher Cluster Role maps to admin
+		// 4. * verb on  * or cluster or namespace  	          resource in Rancher Project Role maps to admin (namespace)
 		// When SSO happens on NV non-master cluster,
-		// 1. * verb on  * or nv-perm.all-permissions	resource in Rancher Cluster Role maps to admin
-		// 2. * verb on  * or nv-perm.all-permissions	resource in Rancher Project Role maps to namespace admin
-		// 3. nv-perm.fed resource is ignored
+		// 1. * verb on  * or cluster	                          resource in Rancher Cluster Role maps to admin
+		// 2. * verb on  * or cluster or namespace                resource in Rancher Project Role maps to namespace admin
+		// 3. federation resource is ignored
 		// Rancher's Global/Cluster/Project Roles are represented by k8s clusterrole.
 		// Unlike for Global Role, from k8s clusterrole name we we cannot tell it's for Rancher Cluster Role or Project Role.
-		// Rancher Cluster Role supports nv-perm.fed resource but Rancher Project Role doesn't(yet)
-		// So we treat every non-GlobalRole k8s clusterrole the same in this function (i.e. nv-perm.fed resource is not ignored in this function).
+		// Rancher Cluster Role supports federation resource but Rancher Project Role doesn't(yet)
+		// So we treat every non-GlobalRole k8s clusterrole the same in this function (i.e. federation resource is not ignored in this function).
 		// The actual user role/permission will be adjusted in rbacEvaluateUser() by leveraging k8s (cluster)rolebinding to know it's Project/Nameapce Role or not
 		if strings.HasPrefix(rbacRoleName, globalRolePrefix) {
 			if nvRole == api.UserRoleAdmin {
