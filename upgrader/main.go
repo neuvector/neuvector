@@ -173,10 +173,10 @@ func main() {
 					EnvVars: []string{"FRESH_INSTALL"},
 				},
 				&cli.BoolFlag{
-					Name:    "disable-rotation",
+					Name:    "enable-rotation",
 					Value:   false,
-					Usage:   "When this is specified, this program will skip the whole logic to rotate certificate.",
-					EnvVars: []string{"DISABLE_ROTATION"},
+					Usage:   "When this is specified, this program will rotate NV internal certificate.",
+					EnvVars: []string{"ENABLE_ROTATION"},
 				},
 			},
 			Action: PostSyncHook,

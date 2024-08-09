@@ -25,7 +25,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const WaitSyncTimeout = time.Minute * 5
+const (
+	WaitSyncTimeout                     = time.Minute * 5
+	INTERNAL_SECRET_ROTATION_ANNOTATION = "internal-cert-rotation"
+)
 
 type InternalSecretController struct {
 	informerFactory informers.SharedInformerFactory
@@ -105,6 +108,19 @@ func ReloadCert(cacert []byte, cert []byte, key []byte) error {
 // 1. The initial add.  It might have certs filled depending on timing, but no guarantee.
 // 2. The following update.  This should have certs all the time.
 func (c *InternalSecretController) ReloadSecret(secret *v1.Secret) (bool, error) {
+	if secret.Annotations[INTERNAL_SECRET_ROTATION_ANNOTATION] == "" {
+		log.Info("internal certificate is not ready yet.")
+		return false, nil
+	}
+
+	if secret.Annotations[INTERNAL_SECRET_ROTATION_ANNOTATION] != "enabled" {
+		log.Info("internal certificate rotation is disabled. Use built-in certs.")
+		if c.initialized == 0 {
+			atomic.SwapInt32(&c.initialized, 1)
+		}
+		return true, nil
+	}
+
 	cacert := secret.Data[ACTIVE_SECRET_PREFIX+CACERT_FILENAME]
 	cert := secret.Data[ACTIVE_SECRET_PREFIX+CERT_FILENAME]
 	key := secret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME]

@@ -225,6 +225,10 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 		newjob.Spec.Template.Spec.Containers[0].Command = append(newjob.Spec.Template.Spec.Containers[0].Command, "--fresh-install")
 	}
 
+	if os.Getenv("ENABLE_ROTATION") != "" {
+		newjob.Spec.Template.Spec.Containers[0].Command = append(newjob.Spec.Template.Spec.Containers[0].Command, "--enable-rotation")
+	}
+
 	unstructedJob, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&newjob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert target job: %w", err)
@@ -315,9 +319,7 @@ func PreSyncHook(ctx *cli.Context) error {
 	if secret, err = GetK8sSecret(timeoutCtx, client, namespace, secretName); err != nil {
 		// The secret is supposed to be created by helm.
 		// If the secret is not created yet, it can be automatically retried by returning error.
-		if err != nil {
-			return fmt.Errorf("failed to find source secret: %w", err)
-		}
+		return fmt.Errorf("failed to find source secret: %w", err)
 	}
 	secretUID := string(secret.UID)
 

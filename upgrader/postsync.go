@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -38,7 +37,8 @@ import (
 )
 
 const (
-	UPGRADER_LEASE_NAME = "neuvector-cert-upgrader"
+	UPGRADER_LEASE_NAME                 = "neuvector-cert-upgrader"
+	INTERNAL_SECRET_ROTATION_ANNOTATION = "internal-cert-rotation"
 )
 
 type ContainerStatus map[string]string
@@ -57,59 +57,6 @@ func GetRemoteCert(host string, port string, config *tls.Config) (*x509.Certific
 		return nil, errors.New("no remote certificate is available")
 	}
 	return certs[0], nil
-}
-
-// Check if a legacy internal cert is still being used.
-func containLegacyDefaultInternalCerts(ctx *cli.Context, client dynamic.Interface, namespace string) (bool, error) {
-	item, err := client.Resource(
-		schema.GroupVersionResource{
-			Resource: "pods",
-			Version:  "v1",
-		},
-	).Namespace(namespace).List(ctx.Context, metav1.ListOptions{
-		LabelSelector: ControllerPodLabelSelector,
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to find controller pods: %w", err)
-	}
-
-	var pods corev1.PodList
-	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(item.UnstructuredContent(), &pods)
-	if err != nil {
-		return false, fmt.Errorf("failed to read pod list: %w", err)
-	}
-
-	for _, pod := range pods.Items {
-		log.WithFields(log.Fields{
-			"pod": pod.Status.PodIP,
-		}).Info("Getting consul certs")
-
-		// Check consul port to make sure consul is already up.
-		cert, err := GetRemoteCert(pod.Status.PodIP, ControllerConsulPort, &tls.Config{InsecureSkipVerify: true})
-		if err != nil {
-			return false, fmt.Errorf("failed to get remote certs from %s: %w", pod.Status.PodIP, err)
-		}
-
-		// Convert cert back to pem for comparison
-		var b bytes.Buffer
-		err = pem.Encode(&b, &pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: cert.Raw,
-		})
-		if err != nil {
-			return false, fmt.Errorf("failed to convert remote cert to PEM: %w", err)
-		}
-
-		log.Infof("Issuer Name: %s\n", cert.Issuer)
-		log.Infof("Expiry: %s \n", cert.NotAfter.Format("2006-January-02"))
-		log.Infof("Common Name: %s \n", cert.Issuer.CommonName)
-		if b.String() == LegacyCert {
-			log.Info("It's legacy cert.")
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // Wait until a resource rolls out completely.
@@ -544,28 +491,26 @@ func IsCertNearExpired(data []byte, renewThreshold time.Duration) (bool, error) 
 	return false, nil
 }
 
-// Check if we should upgrade internal certs. Currently the only criteria is:
-// - If the certificate's expiry date + expiry-cert-threshold < now.
-func ShouldUpgradeInternalCert(ctx context.Context, secret *corev1.Secret, renewThreshold time.Duration) (bool, bool, error) {
+func (ic *InternalCertUpgrader) ShouldUpgradeInternalCert(ctx context.Context, secret *corev1.Secret) (bool, bool, error) {
 	if secret == nil || len(secret.Data) == 0 {
 		// No internal certificate.  We should upgrade it.
 		return true, true, nil
 	}
 	log.WithFields(log.Fields{
-		"threshold": renewThreshold,
+		"threshold": ic.renewThreshold,
 	}).Info("Checking CA certificate")
 
 	// Check if the current certificate meets the criteria.
-	caexpired, err := IsCertNearExpired(secret.Data[DEST_SECRET_PREFIX+CACERT_FILENAME], renewThreshold)
+	caexpired, err := IsCertNearExpired(secret.Data[DEST_SECRET_PREFIX+CACERT_FILENAME], ic.renewThreshold)
 	if err != nil {
 		return false, false, err
 	}
 
 	log.WithFields(log.Fields{
-		"threshold": renewThreshold,
+		"threshold": ic.renewThreshold,
 	}).Info("Checking certificate")
 
-	certexpired, err := IsCertNearExpired(secret.Data[DEST_SECRET_PREFIX+CERT_FILENAME], renewThreshold)
+	certexpired, err := IsCertNearExpired(secret.Data[DEST_SECRET_PREFIX+CERT_FILENAME], ic.renewThreshold)
 	if err != nil {
 		return false, false, err
 	}
@@ -579,47 +524,15 @@ type CertConfig struct {
 	RSAKeyLength           int
 }
 
-// This function is meant to be called during pre-install/pre-upgrade/pre-sync hook.
-// If it's a fresh-install, create an internal certificate that we can use directly.
-// If it's a upgrade, leave it as it is.
-// Post-upgrade/post-sync hook should deal with it.
-func InitializeInternalSecret(ctx context.Context,
-	client dynamic.Interface,
-	namespace string,
-	secretName string,
-	freshInstall bool,
-	certOnly bool,
-	secret *corev1.Secret,
-	config CertConfig) (*corev1.Secret, error) {
-	var err error
+func (ic *InternalCertUpgrader) GenerateSecret() (cacert []byte, cert []byte, key []byte, err error) {
 
 	// Note: We always upgrade cacert/cert/key together.
 	// This is to reduce the attack surface, so after cert-upgrader creates these certs, ca key will be discarded and attacker can't initialize
 
-	if len(secret.Data) != 0 {
-		log.Info("Updating internal secret.")
-	} else {
-		log.Info("Creating internal secret.")
-		// Default secret is initialized using default certs. It will be updated later.
-		secret.Data = map[string][]byte{
-			NEW_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
-			NEW_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
-			NEW_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
-
-			DEST_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
-			DEST_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
-			DEST_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
-
-			ACTIVE_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
-			ACTIVE_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
-			ACTIVE_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
-		}
-	}
-
 	log.WithFields(log.Fields{
-		"CACertValidityDuration": config.CACertValidityDuration,
-		"CertValidityDuration":   config.CertValidityDuration,
-		"RSAKeyLength":           config.RSAKeyLength,
+		"CACertValidityDuration": ic.CACertValidityDuration,
+		"CertValidityDuration":   ic.CertValidityDuration,
+		"RSAKeyLength":           ic.RSAKeyLength,
 	}).Info("Creating new cert/key...")
 
 	cacert, cakey, err := kv.GenerateCAWithRSAKey(
@@ -632,29 +545,30 @@ func InitializeInternalSecret(ctx context.Context,
 				CommonName:   "NeuVector",
 			},
 			NotBefore:             time.Now().Add(time.Hour * -1), // Give it some room for timing skew.
-			NotAfter:              time.Now().Add(config.CACertValidityDuration),
+			NotAfter:              time.Now().Add(ic.CACertValidityDuration),
 			IsCA:                  true,
 			BasicConstraintsValid: true,
-		}, config.RSAKeyLength)
+		}, ic.RSAKeyLength)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate ca cert: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to generate ca cert: %w", err)
 	}
+
 	capair, err := tls.X509KeyPair(cacert, cakey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load ca key pair: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load ca key pair: %w", err)
 	}
 
 	log.WithFields(log.Fields{
 		"cert":     string(cacert),
-		"validity": config.CACertValidityDuration,
+		"validity": ic.CACertValidityDuration,
 	}).Debug("New cacert is created.")
 
 	ca, err := x509.ParseCertificate(capair.Certificate[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ca cert: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to parse ca cert: %w", err)
 	}
 
-	cert, key, err := kv.GenerateTLSCertWithRSAKey(
+	cert, key, err = kv.GenerateTLSCertWithRSAKey(
 		&x509.Certificate{
 			SerialNumber: big.NewInt(5030),
 			Subject: pkix.Name{
@@ -666,85 +580,367 @@ func InitializeInternalSecret(ctx context.Context,
 				CommonName:         "NeuVector",
 			},
 			NotBefore:             time.Now().Add(time.Hour * -1), // Give it some room for timing skew.
-			NotAfter:              time.Now().Add(config.CertValidityDuration),
+			NotAfter:              time.Now().Add(ic.CertValidityDuration),
 			SubjectKeyId:          []byte{1, 2, 3, 4, 6},
 			ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 			KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
 			IsCA:                  false,
 			BasicConstraintsValid: true,
 			DNSNames:              []string{"NeuVector"},
-		}, config.RSAKeyLength, ca, capair.PrivateKey)
+		}, ic.RSAKeyLength, ca, capair.PrivateKey)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate TLS certificate: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to generate TLS certificate: %w", err)
 	}
 
 	log.WithFields(log.Fields{
 		"cert":     string(cert),
-		"validity": config.CertValidityDuration,
+		"validity": ic.CertValidityDuration,
 	}).Debug("New cert is created.")
 
-	// At this point, we have these keys/certs in PEM format:
-	// 1. cacert in cacert, cakey
-	// 2. internal certs in cert/key.
-	// Time to change the secret.
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
+	return cacert, cert, key, nil
+}
+
+func (ic *InternalCertUpgrader) IsRotationEnabledOnSecret(secret *corev1.Secret) bool {
+	if secret == nil {
+		return false
+	}
+	if secret.Annotations[INTERNAL_SECRET_ROTATION_ANNOTATION] == "enabled" {
+		return true
+	}
+	return false
+}
+
+// Generate certificate for fresh install
+func (ic *InternalCertUpgrader) GenerateInitialSecretForFreshInstall(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	if secret != nil && len(secret.Data) > 0 {
+		// Do not change the certificate.
+		log.Info("All controller coming from the same replica set, but secret is already initialized.  Node failure or controllers are scaled to zero?")
+		return nil, false, nil
 	}
 
-	if freshInstall {
-		// Fresh install case.  We should apply to NEW_SECRET_NAME, DEST_SECRET_NAME and ACTIVE_SECRET_NAME
-		secret.Data[NEW_SECRET_PREFIX+CACERT_FILENAME] = cacert
-		secret.Data[NEW_SECRET_PREFIX+CERT_FILENAME] = cert
-		secret.Data[NEW_SECRET_PREFIX+KEY_FILENAME] = key
+	cacert, cert, key, err := ic.GenerateSecret()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate certificate: %w", err)
+	}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				INTERNAL_SECRET_ROTATION_ANNOTATION: "enabled",
+			},
+		},
+		Data: map[string][]byte{
+			NEW_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			NEW_SECRET_PREFIX + CERT_FILENAME:   cert,
+			NEW_SECRET_PREFIX + KEY_FILENAME:    key,
 
-		secret.Data[DEST_SECRET_PREFIX+CACERT_FILENAME] = cacert
-		secret.Data[DEST_SECRET_PREFIX+CERT_FILENAME] = cert
-		secret.Data[DEST_SECRET_PREFIX+KEY_FILENAME] = key
+			DEST_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			DEST_SECRET_PREFIX + CERT_FILENAME:   cert,
+			DEST_SECRET_PREFIX + KEY_FILENAME:    key,
 
-		secret.Data[ACTIVE_SECRET_PREFIX+CACERT_FILENAME] = cacert
-		secret.Data[ACTIVE_SECRET_PREFIX+CERT_FILENAME] = cert
-		secret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME] = key
+			ACTIVE_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			ACTIVE_SECRET_PREFIX + CERT_FILENAME:   cert,
+			ACTIVE_SECRET_PREFIX + KEY_FILENAME:    key,
+		},
+	}, false, nil
+}
+
+// Generate certificate for upgrade from previously generated cert in post-5.4
+func (ic *InternalCertUpgrader) GenerateInitialSecretForUpgradeFromPost54WithRotationEnabled(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	cacert, cert, key, err := ic.GenerateSecret()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate certificate: %w", err)
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				INTERNAL_SECRET_ROTATION_ANNOTATION: "enabled",
+			},
+		},
+		Data: map[string][]byte{
+			NEW_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			NEW_SECRET_PREFIX + CERT_FILENAME:   cert,
+			NEW_SECRET_PREFIX + KEY_FILENAME:    key,
+
+			DEST_SECRET_PREFIX + CACERT_FILENAME: secret.Data[DEST_SECRET_PREFIX+CACERT_FILENAME],
+			DEST_SECRET_PREFIX + CERT_FILENAME:   secret.Data[DEST_SECRET_PREFIX+CERT_FILENAME],
+			DEST_SECRET_PREFIX + KEY_FILENAME:    secret.Data[DEST_SECRET_PREFIX+KEY_FILENAME],
+
+			ACTIVE_SECRET_PREFIX + CACERT_FILENAME: secret.Data[ACTIVE_SECRET_PREFIX+CACERT_FILENAME],
+			ACTIVE_SECRET_PREFIX + CERT_FILENAME:   secret.Data[ACTIVE_SECRET_PREFIX+CERT_FILENAME],
+			ACTIVE_SECRET_PREFIX + KEY_FILENAME:    secret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME],
+		},
+	}, true, nil
+}
+
+// Generate certificate for upgrade from built-in cert in post-5.4
+func (ic *InternalCertUpgrader) GenerateInitialSecretForUpgradeFromPost54WithRotationDisabled(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	cacert, cert, key, err := ic.GenerateSecret()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate certificate: %w", err)
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				INTERNAL_SECRET_ROTATION_ANNOTATION: "enabled",
+			},
+		},
+		Data: map[string][]byte{
+			NEW_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			NEW_SECRET_PREFIX + CERT_FILENAME:   cert,
+			NEW_SECRET_PREFIX + KEY_FILENAME:    key,
+
+			DEST_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
+			DEST_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
+			DEST_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
+
+			ACTIVE_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
+			ACTIVE_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
+			ACTIVE_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
+		},
+	}, true, nil
+}
+
+// Generate initial secret for post-5.4.
+func (ic *InternalCertUpgrader) GenerateInitialSecretForUpgradePost54(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	if !ic.enableRotation {
+		// No upgrade path here.  Keep the secret intact.
+		log.Info("Rotation is not enabled. Do not touch the existing certificate.")
+		return nil, false, nil
+	}
+
+	if ic.IsRotationEnabledOnSecret(secret) {
+		log.Info("the certificate exists.  Rotate from it.")
+		// The certificate is generated before.  In this case we should rotate from the certificate to the one we just generated.
+		return ic.GenerateInitialSecretForUpgradeFromPost54WithRotationEnabled(ctx, secret)
 	} else {
-		// Upgrade case.  We should only provide NEW_SECRET and keep others intact
-		secret.Data[NEW_SECRET_PREFIX+CACERT_FILENAME] = cacert
-		secret.Data[NEW_SECRET_PREFIX+CERT_FILENAME] = cert
-		secret.Data[NEW_SECRET_PREFIX+KEY_FILENAME] = key
+		log.Info("the existing certificate is empty.  Rotate from built-in certificates.")
+		// The certificate is not generated before.  We should rotate from the built-in one to the new one.
+		return ic.GenerateInitialSecretForUpgradeFromPost54WithRotationDisabled(ctx, secret)
 	}
+}
+
+// Generate initial secret for upgrade from pre-5.4, where the secret doesn't exist.
+func (ic *InternalCertUpgrader) GenerateInitialSecretForUpgradePre54(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	if !ic.enableRotation {
+		log.Info("Rotation is not enabled. Creating an empty secret.")
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					INTERNAL_SECRET_ROTATION_ANNOTATION: "disabled",
+				},
+			},
+		}, false, nil
+	}
+
+	cacert, cert, key, err := ic.GenerateSecret()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate certificate: %w", err)
+	}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				INTERNAL_SECRET_ROTATION_ANNOTATION: "enabled",
+			},
+		},
+		Data: map[string][]byte{
+			NEW_SECRET_PREFIX + CACERT_FILENAME: cacert,
+			NEW_SECRET_PREFIX + CERT_FILENAME:   cert,
+			NEW_SECRET_PREFIX + KEY_FILENAME:    key,
+
+			DEST_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
+			DEST_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
+			DEST_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
+
+			ACTIVE_SECRET_PREFIX + CACERT_FILENAME: []byte(LegacyCaCert),
+			ACTIVE_SECRET_PREFIX + CERT_FILENAME:   []byte(LegacyCert),
+			ACTIVE_SECRET_PREFIX + KEY_FILENAME:    []byte(LegacyKey),
+		},
+	}, true, nil
+
+}
+
+// Generate initial secret based on below factors:
+//
+// 1. If it's a fresh install, which is determined in the init container of controllers, which creates this job.
+//
+// 2. If the secret already exists.
+//
+// 3. If the rotation is enabled.
+//
+// 4. If the rotation is marked as enabled before.
+func (ic *InternalCertUpgrader) GenerateInitialSecret(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+	if ic.freshInstall {
+		log.Info("It's a fresh install.  Generate initial secret for fresh install")
+		return ic.GenerateInitialSecretForFreshInstall(ctx, secret)
+	}
+
+	if secret != nil && secret.Annotations[INTERNAL_SECRET_ROTATION_ANNOTATION] != "" {
+		log.Info("It's an upgrade from post-5.4.  Generate initial secret for it")
+		return ic.GenerateInitialSecretForUpgradePost54(ctx, secret)
+	} else {
+		log.Info("It's an upgrade from pre-5.4.  Generate initial secret for it")
+		return ic.GenerateInitialSecretForUpgradePre54(ctx, secret)
+	}
+}
+
+func (ic *InternalCertUpgrader) UpdateInitialSecretIfRequired(ctx context.Context, secret *corev1.Secret) (newSecret *corev1.Secret, needRotation bool, err error) {
+
+	// Check if cert-upgrader should still need to do its job.
+	if inprogress := IsUpgradeInProgress(ctx, secret); inprogress {
+		// There were interrupted jobs.  We should reuse the certificate created.
+		// While we don't need to regenerate new certs, we should guide caller to resume rotation.
+		log.Info("Cert rollout is still in progress.  Resuming.")
+		return nil, true, nil
+	}
+
+	check, err := ic.ShouldCheckAndUpdateInitialSecret(ctx, secret)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to deterimine whether we should update secret: %w", err)
+	}
+
+	if !check {
+		log.Info("No need to check secret")
+		return nil, false, nil
+	}
+	newsecret, needRotation, err := ic.GenerateInitialSecret(ctx, secret)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate new secret: %w", err)
+	}
+
+	if newsecret == nil {
+		// No change.  No need to update secret and perform rotation.
+		log.Info("No need to update secret")
+		return nil, false, nil
+	}
+
+	newsecret.Name = ic.secretName
 
 	// If there is other instance running at the same time, this function is expected to cause conflict.
 	var ret *corev1.Secret
-	if ret, err = UpdateSecret(ctx, client, namespace, secret); err != nil {
-		return nil, fmt.Errorf("failed to write dst secret: %w", err)
+	if ret, err = UpdateSecret(ctx, ic.client, ic.namespace, newsecret); err != nil {
+		return nil, false, fmt.Errorf("failed to update initial secret: %w", err)
 	}
+
 	log.WithFields(log.Fields{
-		"secret": secretName,
+		"secret": ic.secretName,
 	}).Info("Secret is updated")
 
-	return ret, nil
+	return ret, needRotation, nil
 }
 
-// In post sync hook, we did a few things.
-// 1. Check if the internal certs is already created.
-// 2. Create it if it doesn't exist, trigger a rolling update on controller and exit. (fresh install case)
-// 3. If it exists, examine the content.  If it's ok, just exit.  (upgrade from old, upgrade from new and reinstall)
-// 4. If the cert is in the progress of upgrade, try to finish it. (Interrupted upgrade)
-// 5. If the cert is not in progress, but its content is not ok, update it and trigger upgrade. (upgrade from old, upgrade from new and reinstall)
-//
-// Note: It's supposed to be only one cert-upgrader job (post sync job) running at all time.
-//
-// empty => create secret => if secret is created and this is for fresh install, trigger rolling update and exit.
-// not empty => do rolling update per its state.
+func (ic *InternalCertUpgrader) ShouldCheckAndUpdateInitialSecret(ctx context.Context, secret *corev1.Secret) (bool, error) {
+	upgradeCA, upgradeCert, err := ic.ShouldUpgradeInternalCert(ctx, secret)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if we should upgrade internal cert: %w", err)
+	}
+
+	if !upgradeCA && !upgradeCert {
+		log.Info("Certificate is up-to-date")
+		return false, nil
+	}
+	return true, nil
+}
+
+func (ic *InternalCertUpgrader) StartSecretWatcher(ctx context.Context, cancel context.CancelFunc) error {
+	// Start watcher, so when `neuvector-internal-certs` secret is deleted, cert-upgrader will stop
+	watcher, err := ic.client.Resource(schema.GroupVersionResource{
+		Resource: "secrets",
+		Version:  "v1",
+	}).Namespace(ic.namespace).Watch(ctx, metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(metav1.ObjectNameField, ic.secretName).String(),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to watch secret (%s): %w", ic.secretName, err)
+	}
+
+	go func() {
+		for event := range watcher.ResultChan() {
+			switch event.Type {
+			case watch.Deleted:
+				log.Info("Internal cert is deleted. Upgrader should stop.")
+				cancel()
+				return
+			default:
+			}
+		}
+	}()
+	return nil
+}
+
+func (ic *InternalCertUpgrader) TriggerRotation(ctx context.Context) (err error) {
+
+	log.Info("Getting initial secret")
+
+	var secret *corev1.Secret
+	if secret, err = GetK8sSecret(ctx, ic.client, ic.namespace, ic.secretName); err != nil {
+		if !k8sError.IsNotFound(err) {
+			return fmt.Errorf("failed to find source secret: %w", err)
+		}
+	}
+
+	log.Info("Updating initial secret if required")
+
+	_, needRotation, err := ic.UpdateInitialSecretIfRequired(ctx, secret)
+	if err != nil {
+		return fmt.Errorf("failed to check/update initial secret: %w", err)
+	}
+
+	if !needRotation {
+		log.Info("No need to perform rotation in stage.")
+		return nil
+	}
+
+	log.WithFields(log.Fields{
+		"needRotation": needRotation,
+	}).Info("Starts certificate rotation")
+
+	// Now we can create/update internal certs.
+	log.Infof("Deploying internal secrets with retry: %+v", retry.DefaultRetry)
+	err = retry.OnError(retry.DefaultRetry,
+		func(error) bool {
+			// Retry on all errors...returning error will make this job restart.
+			return true
+		},
+		func() error {
+			// The main logic.
+			err = UpgradeInternalCerts(ctx, ic.client, ic.namespace, ic.secretName, ic.rolloutTimeout)
+			if err != nil {
+				return fmt.Errorf("failed to upgrade internal certs: %w", err)
+			}
+
+			return nil
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create internal certs: %w", err)
+	}
+
+	return nil
+}
+
+type InternalCertUpgrader struct {
+	namespace              string
+	secretName             string
+	client                 dynamic.Interface
+	rolloutTimeout         time.Duration
+	renewThreshold         time.Duration
+	CACertValidityDuration time.Duration
+	CertValidityDuration   time.Duration
+	RSAKeyLength           int
+	enableRotation         bool
+	freshInstall           bool
+}
+
+// Trigger the main logic of internal cert rotation.
 func PostSyncHook(ctx *cli.Context) error {
 	namespace := ctx.String("pod-namespace")
 	kubeconfig := ctx.String("kube-config")
-	secretName := ctx.String("internal-secret-name")
-	freshInstall := ctx.Bool("fresh-install")
-	renewThreshold := ctx.Duration("expiry-cert-threshold")
 	timeout := ctx.Duration("timeout")
-	waitDeploymentTimeout := ctx.Duration("rollout-timeout")
-	disableRotation := ctx.Bool("disable-rotation")
 
+	// This flag is assigned by controller's init containers when all init containers coming from the same replica set.
 	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
 	defer cancel()
 
@@ -766,125 +962,34 @@ func PostSyncHook(ctx *cli.Context) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Start watcher, so when `neuvector-internal-certs` secret is deleted, cert-upgrader will stop
-	watcher, err := client.Resource(schema.GroupVersionResource{
-		Resource: "secrets",
-		Version:  "v1",
-	}).Namespace(namespace).Watch(timeoutCtx, metav1.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(metav1.ObjectNameField, secretName).String(),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to watch secret (%s): %w", secretName, err)
-	}
-
-	go func() {
-		for event := range watcher.ResultChan() {
-			switch event.Type {
-			case watch.Deleted:
-				log.Info("Internal cert is deleted. Upgrader should stop.")
-				cancel()
-				return
-			default:
-			}
-		}
-	}()
-
-	// Initialization phase.
-
-	// 1. Check if internal cert exists.
-	var secret *corev1.Secret
-	var retSecret *corev1.Secret
-	if secret, err = GetK8sSecret(timeoutCtx, client, namespace, secretName); err != nil {
-		if !k8sError.IsNotFound(err) {
-			return fmt.Errorf("failed to find source secret: %w", err)
-		}
-	}
-
-	noInitialSecret := (secret == nil || len(secret.Data) == 0)
-
-	// Check if we should update cert.  If not, exit
-
-	// We create/update the secret in below scenario:
-	// 1. Secret is not there.
-	// 2. An option is given to force update the secret.
-	// 3. Secret is not up-to-date, say it's expired, and no upgrade is in progress.
-
-	// Check if cert-upgrader should still need to do its job.  If so, exit.
-	if inprogress := IsUpgradeInProgress(timeoutCtx, secret); inprogress {
-		// There was interrupted jobs.  We should reuse the certificate created.
-		// Note: It's guaranteed in init containers that only one instance of Job will be running.
-		log.Info("Cert rollout is still in progress.  This instance should take over.")
-	} else {
-		certOnly := false
-		if upgradeCA, upgradeCert, err := ShouldUpgradeInternalCert(ctx.Context, secret, renewThreshold); err != nil {
-			return fmt.Errorf("failed to check if we should upgrade internal cert: %w", err)
-		} else if !upgradeCA && !upgradeCert {
-			log.Info("Certificate is up-to-date")
-			return nil
-		} else {
-			certOnly = !upgradeCA && upgradeCert
-			log.Info("We should update internal certificate")
-		}
-
-		if retSecret, err = InitializeInternalSecret(timeoutCtx, client, namespace, secretName, freshInstall, certOnly, secret, CertConfig{
-			CACertValidityDuration: ctx.Duration("ca-cert-validity-period"),
-			CertValidityDuration:   ctx.Duration("cert-validity-period"),
-			RSAKeyLength:           ctx.Int("rsa-key-length"),
-		}); err != nil {
-			return fmt.Errorf("failed to initialize internal secret: %w", err)
-		}
-	}
-
-	// Fastpath if it's a fresh install and the secret is created.
-	// We just trigger controller's rolling update and exit.
-	// Otherwise, go through the full rolling update.
-
-	// Here we check three conditions:
-	// 1. No secret was created initially and we created a secret above.
-	//    This is to support job resume. Only the first job can go through fash path.
-	// 2. It's a fresh install because it's still doing rolling update.
-	if noInitialSecret && retSecret != nil && freshInstall {
-		log.Info("This is fresh install.  Everything is done.")
-		// Everything is good now.  Exit.
-		return nil
-	}
-
-	if disableRotation {
-		log.Info("Rotation is disabled. Finishing.")
-		return nil
+	ic := InternalCertUpgrader{
+		namespace:              namespace,
+		secretName:             ctx.String("internal-secret-name"),
+		client:                 client,
+		rolloutTimeout:         ctx.Duration("rollout-timeout"),
+		renewThreshold:         ctx.Duration("expiry-cert-threshold"),
+		CACertValidityDuration: ctx.Duration("ca-cert-validity-period"),
+		CertValidityDuration:   ctx.Duration("cert-validity-period"),
+		RSAKeyLength:           ctx.Int("rsa-key-length"),
+		enableRotation:         ctx.Bool("enable-rotation"),
+		freshInstall:           ctx.Bool("fresh-install"),
 	}
 
 	log.WithFields(log.Fields{
-		"noInitialSecret": noInitialSecret,
-		"retSecret":       retSecret != nil,
-		"freshInstall":    freshInstall,
-	}).Info("Starts slowpath")
+		"upgrader": ic,
+	}).Info("initial cert upgrader is initialized")
 
-	// Now we can create/update internal certs.
-	log.Infof("Deploying internal secrets with retry: %+v", retry.DefaultRetry)
-	err = retry.OnError(retry.DefaultRetry,
-		func(error) bool {
-			// Retry on all errors...returning error will make this job restart, which will lead to a retry anyway.
-			return true
-		},
-		func() error {
-			// The main logic.
+	log.Info("Setting up secret watcher")
 
-			// Now we have certs ready. It's time to do rolling update.
-			err = UpgradeInternalCerts(timeoutCtx, client, namespace, secretName, waitDeploymentTimeout)
-			if err != nil {
-				return fmt.Errorf("failed to upgrade internal certs: %w", err)
-			}
-
-			return nil
-		})
+	err = ic.StartSecretWatcher(timeoutCtx, cancel)
 	if err != nil {
-		if k8sError.IsAlreadyExists(err) {
-			log.WithError(err).Debug("failed to create resource. Other init container created it. Can be safely ignored.")
-		}
-		return fmt.Errorf("failed to create internal certs: %w", err)
+		return fmt.Errorf("failed to start secret watcher: %w", err)
 	}
 
+	log.Info("Starting handling cert rotation")
+
+	if err := ic.TriggerRotation(timeoutCtx); err != nil {
+		return fmt.Errorf("failed to trigger rotation: %w", err)
+	}
 	return nil
 }
