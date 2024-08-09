@@ -404,7 +404,7 @@ func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAll
 }
 
 /////
-func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup string, rootpid int, process []*share.CLUSProcessProfileEntry) bool {
+func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup string, rootpid int, ppe_list []*share.CLUSProcessProfileEntry) bool {
 	if !fa.bEnabled {
 		log.Debug("FA: not supported")
 		return false
@@ -439,35 +439,43 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup
 
 	//
 	var list []string
-	for _, proc := range process {
-		// log.WithFields(log.Fields{"name": proc.Name, "path": proc.Path, "action": proc.Action, "id": id}).Debug("FA: ")
-		if proc.Path != "" {
-			clean := filepath.Clean(proc.Path)
+	for _, ppe := range ppe_list {
+		// log.WithFields(log.Fields{"name": ppe.Name, "path": ppe.Path, "action": ppe.Action, "id": id}).Debug("FA: ")
+		if ppe.Path != "" {
+			clean := filepath.Clean(ppe.Path)
 			if clean == "." || clean == "/" {
-				log.WithFields(log.Fields{"name": proc.Name, "path": proc.Path, "clean": clean, "id": id}).Debug("FA: invalid path")
+				log.WithFields(log.Fields{"name": ppe.Name, "path": ppe.Path, "clean": clean, "id": id}).Debug("FA: invalid path")
 				continue
 			}
 
-			if clean != proc.Path {
-				log.WithFields(log.Fields{"name": proc.Name, "path": proc.Path, "clean": clean, "id": id}).Debug("FA: clean path")
+			if clean != ppe.Path {
+				log.WithFields(log.Fields{"name": ppe.Name, "path": ppe.Path, "clean": clean, "id": id}).Debug("FA: clean path")
 			}
 
-			proc.Path = clean
+			ppe.Path = clean
 		}
 
 		list = nil
-		if proc.Name == "*" && (proc.Path == "*" || proc.Path == "/*") {
+		if ppe.Name == "*" && (ppe.Path == "*" || ppe.Path == "/*") {
 			// special entry: all files
 			list = append(list, "*:*")
-		} else if proc.Path == "" || strings.HasSuffix(proc.Path, "*") || strings.HasSuffix(proc.Name, "/*") {
+		} else if ppe.Path == "" || strings.HasSuffix(ppe.Path, "*") || strings.HasSuffix(ppe.Name, "/*") {
 			// recursive case + app matching
-			list = append(list, fmt.Sprintf("%s:%s", proc.Name, proc.Path))
-		} else if index := strings.Index(proc.Path, "/*/"); index > -1 {
-			list = append(list, fmt.Sprintf("%s:%s", proc.Name, proc.Path))
+			list = append(list, fmt.Sprintf("%s:%s", ppe.Name, ppe.Path))
+		} else if index := strings.Index(ppe.Path, "/*/"); index > -1 {
+			list = append(list, fmt.Sprintf("%s:%s", ppe.Name, ppe.Path))
 		} else {
-			list = append(list, proc.Path)
+			list = append(list, ppe.Path)
 		}
-		fa.mergeMonitorRuleList(root, list, proc.Action == share.PolicyActionAllow, proc.AllowFileUpdate == false)
+
+		updateAlert := true
+		if ppe.Action == share.PolicyActionAllow {
+			if ppe.AllowFileUpdate || ppe.CfgType != share.Learned {
+				updateAlert = false // allowing modified file
+			}
+		}
+
+		fa.mergeMonitorRuleList(root, list, ppe.Action == share.PolicyActionAllow, updateAlert)
 	}
 
 	////
