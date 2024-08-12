@@ -3196,11 +3196,15 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 			bPass = true
 			ppe.Action = share.PolicyActionAllow
-			if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
-				if bModified {
-					bPass = false
-					ppe.Action = negativeResByMode(mode)
-					ppe.Uuid = share.CLUSReservedUuidAnchorMode
+			if ppe.CfgType != share.Learned {
+				// user allows the process manually
+			} else {
+				if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
+					if bModified {
+						bPass = false
+						ppe.Action = negativeResByMode(mode)
+						ppe.Uuid = share.CLUSReservedUuidAnchorMode
+					}
 				}
 			}
 		case share.PolicyActionDeny:

@@ -23,7 +23,7 @@ static int policy_match_ipv4_fqdn_code(dpi_fqdn_hdl_t *fqdn_hdl, uint32_t ip, dp
 static bool _dpi_policy_implicit_default(dpi_policy_hdl_t *hdl, dpi_policy_desc_t *desc);
 static void _dpi_policy_chk_unknown_ip(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_t dip,
                                     uint8_t iptype, dpi_policy_desc_t **pol_desc);
-static void _dpi_policy_chk_nbe(dpi_packet_t *p, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc);
+static void _dpi_policy_chk_nbe(dpi_packet_t *p, uint32_t sip, uint32_t dip, int is_ingress, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc);
 
 /*
  * -----------------------------------------------------
@@ -652,7 +652,7 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                  hdl, proto, DBG_IPV4_TUPLE(sip), DBG_IPV4_TUPLE(dip), dport, app, is_ingress, to_server);
     dpi_policy_lookup_by_key(hdl, sip, dip, dport, proto, app, is_ingress, desc, p);
 
-    _dpi_policy_chk_nbe(p, hdl, &desc);
+    _dpi_policy_chk_nbe(p, sip, dip, is_ingress, hdl, &desc);
 
     if ((desc->flags & POLICY_DESC_INTERNAL)) {
         if (is_ingress) {
@@ -719,16 +719,13 @@ exit:
     return 0;
 }
 
-static void _dpi_policy_chk_nbe(dpi_packet_t *p, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc)
+static void _dpi_policy_chk_nbe(dpi_packet_t *p, uint32_t sip, uint32_t dip, int is_ingress, dpi_policy_hdl_t *hdl, dpi_policy_desc_t **pol_desc)
 {
     if (hdl == NULL || pol_desc == NULL) return;
+    if (!p || !p->ep) return;
 
     dpi_policy_desc_t *desc = *pol_desc;
     if (desc->action == DP_POLICY_ACTION_CHECK_NBE) {
-
-        if (!p || !p->ep) {
-            return;
-        }
         //if ns_boundary is enforced, we need to adjust
         //action for corresponding policy mode
         if (p->ep->nbe) {
@@ -748,6 +745,27 @@ static void _dpi_policy_chk_nbe(dpi_packet_t *p, dpi_policy_hdl_t *hdl, dpi_poli
         } else {
             //if ns_boundary is not enforced, allow traffic
             desc->action = DP_POLICY_ACTION_ALLOW;
+        }
+    } else {
+        //for traffic between 2 EPs in same domain that enabled
+        //namespace boundary enoforcement, we need to mark NBE flag
+        if (p->ep->nbe) {
+            if (is_ingress) {
+                bool is_internal = dpi_is_ip4_internal(sip);
+
+                if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_INGRESS)) {
+                    if (desc->action == DP_POLICY_ACTION_DENY) {
+                        desc->flags |= POLICY_DESC_NBE_SNS;
+                    }
+                }
+            } else {
+                int is_internal = dpi_is_ip4_internal(dip);
+                if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS)) {
+                    if (desc->action == DP_POLICY_ACTION_DENY) {
+                        desc->flags |= POLICY_DESC_NBE_SNS;
+                    }
+                }
+            }
         }
     }
 }

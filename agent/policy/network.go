@@ -1174,7 +1174,25 @@ func policy_chk_nbe(pInfo *WorkloadIPPolicyInfo, conn *dp.Connection, policyId u
 			action = C.DP_POLICY_ACTION_ALLOW
 		}
 		chg = true
-	}
+	} else {
+        //for traffic between 2 EPs in same domain that enabled
+        //namespace boundary enoforcement, we need to mark NBE flag
+        if isNbe {
+            if conn.Ingress {
+                if !conn.ExternalPeer && (pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_INGRESS == 0) {
+                    if action == C.DP_POLICY_ACTION_DENY {
+						conn.NbeSns = true
+                    }
+                }
+            } else {
+                if !conn.ExternalPeer && (pInfo.Policy.ApplyDir&C.DP_POLICY_APPLY_EGRESS == 0) {
+                    if action == C.DP_POLICY_ACTION_DENY {
+						conn.NbeSns = true
+                    }
+                }
+            }
+        }
+    }
 	return id, action, chg
 }
 func (e *Engine) HostNetworkPolicyLookup(wl string, conn *dp.Connection) (uint32, uint8, bool) {

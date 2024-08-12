@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mitchellh/pointerstructure"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -244,6 +245,75 @@ func NewWebHook(url, target string) *Webhook {
 	return w
 }
 
+func getFieldStringValue(elog interface{}, fieldName string) (string, error) {
+	var value string
+	var ok bool
+
+	field, err := pointerstructure.Get(elog, fieldName)
+	if err != nil {
+		return value, fmt.Errorf("invalid fieldName: %s", fieldName)
+	}
+	value, ok = field.(string)
+
+	if ok {
+		return value, nil
+	} else {
+		return value, fmt.Errorf("fieldName: %s is not string", fieldName)
+	}
+}
+
+func getDetailInfoFromLog(elog interface{}) string {
+	var builder strings.Builder
+	fieldOrder := []string{
+		"/LogCommon/ClusterName",
+		"/WorkloadDomain",
+		"/WorkloadImage",
+		"/ClientWLDomain",
+		"/ClientDomain",
+		"/ClientWLImage",
+		"/ClientImage",
+		"/ServerWLDomain",
+		"/ServerDomain",
+		"/ServerWLImage",
+		"/ServerImage",
+		"/LogCommon/HostName",
+		"/LogCommon/ReportedAt",
+	}
+
+	fieldNames := map[string]string{
+		"/LogCommon/ClusterName": "cluster",
+		"/WorkloadDomain":        "namespace",
+		"/WorkloadImage":         "image",
+		"/ClientWLDomain":        "client namespace",
+		"/ClientDomain":          "client namespace",
+		"/ClientWLImage":         "client image",
+		"/ClientImage":           "client image",
+		"/ServerWLDomain":        "server namespace",
+		"/ServerDomain":          "server namespace",
+		"/ServerWLImage":         "server image",
+		"/ServerImage":           "server image",
+		"/LogCommon/HostName":    "node",
+		"/LogCommon/ReportedAt":  "time",
+	}
+
+	for _, fieldName := range fieldOrder {
+		value, err := getFieldStringValue(elog, fieldName)
+		if err == nil {
+			builder.WriteString(fmt.Sprintf("%s: %s, ", fieldNames[fieldName], value))
+		} else {
+			log.WithFields(log.Fields{"err": err, "elog": elog}).Debug("Error when get detail info from elog")
+		}
+	}
+
+	details := builder.String()
+	// Check if len is > 2 to avoid the potential panic when the length of details is less than 2
+	// This ensures we safely remove the last comma and space from the details string
+	if len(details) > 2 {
+		details = details[:len(details)-2]
+	}
+	return details
+}
+
 func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comment string, proxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"title": title}).Debug()
 
@@ -256,12 +326,20 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			// Prefix category
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			// Prefix category and title with styles
+			var logheader string
+			//  := fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			if comment != "" {
-				logText = fmt.Sprintf("*%s: %s level, Comment: %s*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment, title, logText)
+				logheader = fmt.Sprintf("*%s: %s level, Comment: %s*", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
 			} else {
-				logText = fmt.Sprintf("*%s: %s level*\n_%s_\n>>> %s", strings.Title(category), strings.ToUpper(LevelToString(level)), title, logText)
+				logheader = fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			}
 
+			logheader += fmt.Sprintf("\n_%s_", title)
+			if detail := getDetailInfoFromLog(elog); detail != "" {
+				logheader += fmt.Sprintf("\n_%s_", detail)
+			}
+
+			logText = fmt.Sprintf("%s\n>>> %s", logheader, logText)
 			fields := make(map[string]string)
 			fields["text"] = logText
 			fields["username"] = fmt.Sprintf("NeuVector - %s", cluster)
@@ -269,13 +347,15 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 		case api.WebhookTypeTeams:
 			ctype = ctypeJSON
 			fields := make(map[string]string)
-			if comment != "" {
-				fields["title"] = fmt.Sprintf("%s: %s level, Comment: %s", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
-			} else {
-				fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
-			}
 
-			fields["title"] = fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			logheader := fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			if comment != "" {
+				logheader += fmt.Sprintf(", Comment: %s", comment)
+			}
+			if detail := getDetailInfoFromLog(elog); detail != "" {
+				logheader += fmt.Sprintf("\n%s", detail)
+			}
+			fields["title"] = logheader
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, category, logText)
 			fields["text"] = fmt.Sprintf("%s\n> %s", title, logText)
 			data, _ = json.Marshal(fields)

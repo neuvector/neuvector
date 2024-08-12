@@ -36,6 +36,7 @@ typedef struct dpi_policy_desc_ {
 #define POLICY_DESC_TMP_OPEN       0x0200
 #define POLICY_DESC_UWLIP          0x0400
 #define POLICY_DESC_CHK_NBE        0x0800
+#define POLICY_DESC_NBE_SNS        0x1000
     uint16_t hdl_ver;
     uint32_t order;
 } dpi_policy_desc_t;

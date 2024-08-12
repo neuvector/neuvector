@@ -2720,6 +2720,10 @@ int dp_ctrl_connect_report(DPMsgSession *log, DPMonitorMetric *metric, int count
             if (FLAGS_TEST(log->Flags, DPSESS_FLAG_CHK_NBE)) {
                 FLAGS_SET(conn->Flags, DPCONN_FLAG_CHK_NBE);
             }
+            if (FLAGS_TEST(log->Flags, DPSESS_FLAG_NBE_SNS)) {
+                FLAGS_SET(conn->Flags, DPCONN_FLAG_NBE_SNS);
+            }
+
             conn->FirstSeenAt = conn->LastSeenAt = get_current_time() - log->Idle;
             conn->Bytes = log->ClientBytes + log->ServerBytes;
             conn->Sessions = count_session;
