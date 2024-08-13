@@ -3564,6 +3564,21 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/system/alerts:
+    get:
+      tags:
+        - System
+      summary: System alerts
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTNvAlerts'
   /v1/system/config/webhook:
     post:
       tags:
@@ -11113,6 +11128,73 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigV2'
       fed_config:
         $ref: '#/definitions/RESTFedSystemConfig'
+  RESTUpgradeInfo:
+    type: object
+    properties:
+      version:
+        type: string
+        example: "v5.3.0"
+      release_date:
+        type: string
+        example: "2023-10-12T00:41:38.00Z"
+      tag:
+        type: string
+        example: "v5.3.0"
+  RESTCheckUpgradeInfo:
+    type: object
+    properties:
+      min_upgrade_version:
+        $ref: '#/definitions/RESTUpgradeInfo'
+      max_upgrade_version:
+        $ref: '#/definitions/RESTUpgradeInfo'
+  RESTNvAlert:
+    type: object
+    properties:
+      id:
+        type: string
+        example: "d08afddc9f4516b68a82d7ff4da20fb3"
+      message:
+        type: string
+        example: "Managed cluster cluster.local-42 is disconnected from primary cluster"
+  RESTNvAlertGroup:
+    type: object
+    properties:
+      type:
+        type: string
+        example: "RBAC"
+      data:
+        type: array
+        items:
+          $ref: '#/definitions/RESTNvAlert'
+  RESTNvAcceptableAlerts:
+    type: object
+    properties:
+      clusterrole_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      clusterrolebinding_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      role_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      rolebinding_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      neuvector_crd_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      certificate_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+      other_alerts:
+        $ref: '#/definitions/RESTNvAlertGroup'
+  RESTNvAlerts:
+    type: object
+    properties:
+      neuvector_upgrade_info:
+        $ref: '#/definitions/RESTCheckUpgradeInfo'
+      acceptable_alerts:
+        $ref: '#/definitions/RESTNvAcceptableAlerts'
+      accepted_alerts:
+        type: array
+        items:
+          type: string
+        example: ["Managed cluster cluster.local-42 is disconnected from primary cluster", "Internal CA certificate will be expired in 180 days"]
   RESTSystemConfigConfig:
     type: object
     properties:
