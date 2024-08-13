@@ -38,6 +38,8 @@ const (
 	dstYaml             = "/usr/local/bin/scripts/cis_yamls/"
 	srcHostBenchSh      = srcTmpl + "host.tmpl"
 	dstHostBenchSh      = dstSh + "host.sh"
+	journalScript       = srcSh + "journal.tmpl"
+	journalScriptSh     = dstSh + "journal.sh"
 	srcContainerBenchSh = srcTmpl + "container.tmpl"
 	dstContainerBenchSh = dstSh + "container.sh"
 	kube100MasterTmpl   = srcTmpl + "kube_master_1_0_0.tmpl"
@@ -60,6 +62,7 @@ const (
 	kube160YAMLFolder   = dstYaml + "cis-1.6.0/"
 	kube123YAMLFolder   = dstYaml + "cis-1.23/"
 	kube124YAMLFolder   = dstYaml + "cis-1.24/"
+	k3s180YAMLFolder    = dstYaml + "cis-k3s-1.8.0/"
 	kube180YAMLFolder   = dstYaml + "cis-1.8.0/"
 	rh140YAMLFolder     = dstYaml + "rh-1.4.0/"
 	gke140YAMLFolder    = dstYaml + "gke-1.4.0/"
@@ -81,6 +84,8 @@ const (
 	containerTimerStart = time.Second * 10
 	kubeTimerStart      = time.Second * 10
 	scriptTimerStart    = time.Second * 1
+	cmdK3sServer        = "k3s-server"
+	cmdK3sAgent         = "k3s-agent"
 	cmdKubeApiServer    = "kube-apiserver"
 	cmdKubeManager      = "kube-controller-manager"
 	cmdKubeScheduler    = "kube-scheduler"
@@ -138,6 +143,7 @@ type Bench struct {
 	dockerCISVer    string
 	taskScanner     *TaskScanner
 	cisYAMLMode     bool
+	isK3s           bool
 }
 
 type DockerReplaceOpts struct {
@@ -319,6 +325,11 @@ func (b *Bench) BenchLoop() {
 						workerScript = kubeOC43WorkerTmpl
 						remediation = kubeOC43Remediation
 					}
+				} else if b.isK3s {
+					b.kubeCISVer = "1.8.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = k3s180YAMLFolder
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
@@ -438,9 +449,11 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 
 	b.replaceKubeCisCmd(masterScript, masterScriptSh)
 	b.replaceKubeCisCmd(workerScript, workerScriptSh)
+	b.replaceKubeCisCmd(journalScript, journalScriptSh)
 
 	defer os.Remove(masterScriptSh)
 	defer os.Remove(workerScriptSh)
+	defer os.Remove(journalScriptSh)
 
 	var errMaster, errWorker error
 	var out []byte
@@ -549,7 +562,20 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	}
 
 	_, b.isKubeMaster = b.kubeCisCmds[cmdKubeApiServer]
+	if !b.isKubeMaster {
+		if _, b.isKubeMaster = b.kubeCisCmds[cmdK3sServer]; b.isKubeMaster {
+			b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
+			b.isK3s = true
+		}
+	}
+
 	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
+	if !b.isKubeWorker {
+		if _, b.isKubeWorker = b.kubeCisCmds[cmdK3sAgent]; b.isKubeWorker {
+			b.kubeCisCmds[cmdKubelet] = cmdKubelet
+			b.isK3s = true
+		}
+	}
 
 	var sched bool
 
@@ -1253,9 +1279,51 @@ func (b *Bench) checkRequiredHostProgs(progs []string) error {
 	return nil
 }
 
+func (b *Bench) readJournal() (string, error) {
+	args := []string{system.NSActRun, "-f", journalScriptSh,
+		"-m", global.SYS.GetMountNamespacePath(1), "-n", global.SYS.GetNetNamespacePath(1)}
+	var errb, outb bytes.Buffer
+
+	cmd := exec.Command(system.ExecNSTool, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+	b.childCmd = cmd
+
+	err := cmd.Start()
+	if err != nil {
+		return "", err
+	}
+	pgid := cmd.Process.Pid
+	global.SYS.AddToolProcess(pgid, 1, "host-bench", journalScriptSh)
+	err = cmd.Wait()
+	global.SYS.RemoveToolProcess(pgid, false)
+	out := outb.Bytes()
+
+	b.childCmd = nil
+	if err != nil || len(out) == 0 {
+		if err == nil {
+			err = fmt.Errorf("Error executing read Journal scripts")
+		}
+		return "", err
+	}
+
+	result := string(out)
+	return result, nil
+}
+
 func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder string) ([]byte, error) {
 	if !b.bEnable {
 		return nil, fmt.Errorf("Session ended")
+	}
+
+	var journalStr string
+	var journalErr error
+	if b.isK3s {
+		journalStr, journalErr = b.readJournal()
+		if journalErr != nil {
+			log.WithFields(log.Fields{"error": journalErr}).Error("Error while read the journal")
+		}
 	}
 
 	var errb, outb bytes.Buffer
@@ -1271,8 +1339,8 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 			config = remediationFolder + "worker"
 		}
 	}
-
-	cmd = exec.Command("sh", script, config)
+	// Read the journal string for K3s to check if some of the command arguments are set correctly.
+	cmd = exec.Command("sh", script, config, journalStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb

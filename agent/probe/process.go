@@ -110,6 +110,8 @@ var kubeProcs map[string]int = map[string]int{
 	"kubelet":        1,
 	"kube-apiserver": 1,
 	"hyperkube":      1,
+	"k3s-agent":      1, // represent the worker node in k3s
+	"k3s-server":     1, // represent the master node in k3s
 }
 
 //var linuxShells utils.Set = utils.NewSet("sh", "dash", "bash", "rbash")
@@ -3279,7 +3281,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	c.rootPid = rootPid
 	c.bPrivileged = bPrivileged
 	if healthCheck != nil {
-		c.healthCheck = healthCheck		// no override
+		c.healthCheck = healthCheck // no override
 	}
 	allPids := c.outsider.Union(c.children)
 	allPids.Add(rootPid) // all collections: add rootPid as a pivot point

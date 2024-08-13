@@ -1,0 +1,544 @@
+version: cis-k3s-1.8
+id: 5
+title: 5 - Policies
+type: master
+groups:
+  - id: 5.1
+    title: 5.1 - RBAC and Service Accounts
+    checks:
+      - id: K.5.1.1
+        description: Ensure that the cluster-admin role is only used where required
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run kubectl get clusterrolebindings -o=custom-columns=NAME:.metadata.name,ROLE:.roleRef.name,SUBJECT:.subjects[*].name, Review each principal listed and ensure that cluster-admin privilege is required for it."
+        remediation: 'Identify all clusterrolebindings to the cluster-admin role.
+          Check if they are used and if they need this role or if they could use a
+          role with fewer privileges. Where possible, first bind users to a lower
+          privileged role and then remove the clusterrolebinding to the cluster-admin
+          role : kubectl delete clusterrolebinding [name]'
+      - id: K.5.1.2
+        description: Minimize access to secrets (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have get, list or watch access to secrets objects in the Kubernetes API."
+        remediation: Where possible, remove get, list and watch access to secret objects
+          in the cluster.
+      - id: K.5.1.3
+        description: Minimize wildcard use in Roles and ClusterRoles (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Retrieve the roles defined across each namespaces in the cluster and review for wildcards kubectl get roles --all-namespaces -o yaml Retrieve the cluster roles defined in the cluster and review for wildcards kubectl get clusterroles -o yaml"
+        remediation: Where possible replace any use of wildcards in clusterroles and
+          roles with specific objects or actions.
+      - id: K.5.1.4
+        description: Minimize access to create pods (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have create access to pod objects in the Kubernetes API."
+        remediation: Where possible, remove create access to pod objects in the cluster.
+      - id: K.5.1.5
+        description: Ensure that default service accounts are not actively used. (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "     * For each namespace in the cluster, review the rights assigned to the default service account and ensure that it has no roles or cluster roles bound to it apart from the defaults. Additionally ensure that the automountServiceAccountToken: false setting is in place for each default service account."
+        remediation: 'Create explicit service accounts wherever a Kubernetes workload
+          requires specific access to the Kubernetes API server. Modify the configuration
+          of each default service account to include this value automountServiceAccountToken:
+          false'
+      - id: K.5.1.6
+        description: Ensure that Service Account Tokens are only mounted where necessary
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review pod and service account objects in the cluster and ensure that the option below is set, unless the resource explicitly requires this access. automountServiceAccountToken: false"
+        remediation: Modify the definition of pods and service accounts which do not
+          need to mount service account tokens to disable it.
+      - id: K.5.1.7
+        description: Avoid use of system:masters group (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review a list of all credentials which have access to the cluster and ensure that the group system:masters is not used."
+        remediation: Remove the system:masters group from all users in the cluster.
+      - id: K.5.1.8
+        description: Limit use of the Bind, Impersonate and Escalate permissions in
+          the Kubernetes cluster (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have access to cluster roles or roles which provide the impersonate, bind or escalate privileges."
+        remediation: Where possible, remove the impersonate, bind and escalate rights
+          from subjects.
+      - id: K.5.1.9
+        description: Minimize access to create persistent volumes (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have create access to PersistentVolume objects in the Kubernetes API."
+        remediation: Where possible, remove create access to PersistentVolume objects
+          in the cluster.
+      - id: K.5.1.10
+        description: Minimize access to the proxy sub-resource of nodes (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have access to the proxy sub-resource of node objects in the Kubernetes API."
+        remediation: Where possible, remove access to the proxy sub-resource of node
+          objects.
+      - id: K.5.1.11
+        description: Minimize access to the approval sub-resource of certificatesigningrequests
+          objects (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have access to update the approval sub-resource of certificatesigningrequest objects in the Kubernetes API."
+        remediation: Where possible, remove access to the approval sub-resource of
+          certificatesigningrequest objects.
+      - id: K.5.1.12
+        description: Minimize access to webhook configuration objects (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have access to validatingwebhookconfigurations or mutatingwebhookconfigurations objects in the Kubernetes API."              
+        remediation: Where possible, remove the impersonate, bind and escalate rights
+          from subjects.
+      - id: K.5.1.13
+        description: Minimize access to the service account token creation (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the users who have access to create the token sub-resource of serviceaccount objects in the Kubernetes API."
+        remediation: Where possible, remove access to the token sub-resource of serviceaccount
+          objects.
+  - id: 5.2
+    title: 5.2 - Pod Security Standards
+    checks:
+      - id: K.5.2.1
+        description: Ensure that the cluster has at least one active policy control
+          mechanism in place (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run get pods -A -o=jsonpath={range .items[*]}{@.metadata.name}:{@..securityContext}\n{end}"
+          manual "      * It will produce an inventory of all the privileged use on the cluster, if any (please, refer to a sample below). Further grepping can be done to automate each specific violation detection.calico-kube-controllers-57b57c56f-jtmk4: {} << No Elevated Privileges calico-node-c4xv4: {} {privileged:true} {privileged:true} {privileged:true} {privileged:true} << Violates 5.2.2 dashboard-metrics-scraper-7bc864c59-2m2xw: {seccompProfile:{type:RuntimeDefault}} {allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,runAsGroup:2001,ru nAsUser:1001}"
+        remediation: Ensure that either Pod Security Admission or an external policy
+          control system is in place for every namespace which contains user workloads.
+      - id: K.5.2.2
+        description: Minimize the admission of privileged containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run get pods -A -o=jsonpath={range .items[*]}{@.metadata.name}:{@..securityContext}\n{end}"
+          manual "      * It will produce an inventory of all the privileged use on the cluster, if any (please, refer to a sample below). Further grepping can be done to automate each specific violation detection.calico-kube-controllers-57b57c56f-jtmk4: {} << No Elevated Privileges calico-node-c4xv4: {} {privileged:true} {privileged:true} {privileged:true} {privileged:true} << Violates 5.2.2 dashboard-metrics-scraper-7bc864c59-2m2xw: {seccompProfile:{type:RuntimeDefault}} {allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,runAsGroup:2001,ru nAsUser:1001}"
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of privileged containers.
+      - id: K.5.2.3
+        description: Minimize the admission of containers wishing to share the host
+          process ID namespace (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of hostPID containers"
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of hostPID containers.
+      - id: K.5.2.4
+        description: Minimize the admission of containers wishing to share the host
+          IPC namespace (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of hostIPC containers."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of hostIPC containers.
+      - id: K.5.2.5
+        description: Minimize the admission of containers wishing to share the host
+          network namespace (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of hostNetwork containers"
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of hostNetwork containers..
+      - id: K.5.2.6
+        description: Minimize the admission of containers with allowPrivilegeEscalation
+          (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of containers which allow privilege escalation."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of containers with .spec.allowPrivilegeEscalationset
+          to true.
+      - id: K.5.2.7
+        description: Minimize the admission of root containers (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy restricts the use of root containers by setting MustRunAsNonRoot or MustRunAs with the range of UIDs not including 0."
+        remediation: Create a policy for each namespace in the cluster, ensuring that
+          either MustRunAsNonRoot or MustRunAs with the range of UIDs not including
+          0, is set.
+      - id: K.5.2.8
+        description: Minimize the admission of containers with the NET_RAW capability
+          (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that at least one policy disallows the admission of containers with the NET_RAW capability."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of containers with the NET_RAW capability.
+      - id: K.5.2.9
+        description: Minimize the admission of containers with added capabilities
+          (Automated)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that policies are present which prevent allowedCapabilities to be set to anything other than an empty array."
+        remediation: Ensure that allowedCapabilities is not present in policies for
+          the cluster unless it is set to an empty array.
+      - id: K.5.2.10
+        description: Minimize the admission of containers with capabilities assigned
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that at least one policy requires that capabilities are dropped by all containers."
+        remediation: Review the use of capabilities in applications running on your
+          cluster. Where a namespace contains applications which do not require any
+          Linux capabilities to operate consider adding a policy which forbids the
+          admission of containers which do not drop all capabilities.
+      - id: K.5.2.11
+        description: Minimize the admission of Windows HostProcess Containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of hostProcess containers."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of hostProcess containers.
+      - id: K.5.2.12
+        description: Minimize the admission of HostPath volumes (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of containers with hostPath volumes."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of containers which use hostPath volumes.
+      - id: K.5.2.13
+        description: Minimize the admission of containers which use HostPorts (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: true
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * List the policies in use for each namespace in the cluster, ensure that each policy disallows the admission of containers which have hostPort sections."
+        remediation: Add policies to each namespace in the cluster which has user
+          workloads to restrict the admission of containers which use hostPort sections.
+  - id: 5.3
+    title: 5.3 - Network Policies and CNI
+    checks:
+      - id: K.5.3.1
+        description: Ensure that the CNI in use supports Network Policies (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the documentation of CNI plugin in use by the cluster, and confirm that it supports Ingress and Egress network policies."
+        remediation: If the CNI plugin in use does not support network policies, consideration
+          should be given to making use of a different plugin, or finding an alternate
+          mechanism for restricting traffic in the Kubernetes cluster.
+      - id: K.5.3.2
+        description: Ensure that all Namespaces have Network Policies defined (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run kubectl get networkpolicy --all-namespaces , Ensure that each namespace defined in the cluster has at least one Network Policy."
+        remediation: Follow the documentation and create NetworkPolicy objects as
+          you need them.
+  - id: 5.4
+    title: 5.4 - Secrets Management
+    checks:
+      - id: K.5.4.1
+        description: Prefer using secrets as files over secrets as environment variables
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run the following command to find references to objects which use environment variables defined from secrets. kubectl get all -o jsonpath='{range .items[?(@..secretKeyRef)]} {.kind} {.metadata.name} {\"\\\\n\"}{end}' -A"
+        remediation: If possible, rewrite application code to read secrets from mounted
+          secret files, rather than from environment variables.
+      - id: K.5.4.2
+        description: Consider external secret storage (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review your secrets management implementation."
+        remediation: Refer to the secrets management options offered by your cloud
+          provider or a third-party secrets management solution.
+  - id: 5.5
+    title: 5.5 - Extensible Admission Control
+    checks:
+      - id: K.5.5.1
+        description: Configure Image Provenance using ImagePolicyWebhook admission
+          controller (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the pod definitions in your cluster and verify that image provenance is configured as appropriate."
+        remediation: Follow the Kubernetes documentation and setup image provenance.
+  - id: 5.7
+    title: 5.7 - General Policies
+    checks:
+      - id: K.5.7.1
+        description: Create administrative boundaries between resources using namespaces
+          (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 1
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run kubectl get namespaces . Ensure that these namespaces are the ones you need and are adequately administered as per your requirements."
+        remediation: Follow the documentation and create namespaces for objects in
+          your deployment as you need them.
+      - id: K.5.7.2
+        description: Ensure that the seccomp profile is set to docker/default in your
+          pod definitions (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Use security context to enable the docker/default seccomp profile in your pod definitions."
+        remediation: |
+          Use security context to enable the docker/default seccomp profile in your pod definitions. 
+          An example is as below:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+      - id: K.5.7.3
+        description: Apply Security Context to Your Pods and Containers (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Review the pod definitions in your cluster and verify that you have security contexts defined as appropriate."
+        remediation: Follow the Kubernetes documentation and apply security contexts
+          to your pods. For a suggested list of security contexts, you may refer to
+          the CIS Security Benchmark for Docker Containers.
+      - id: K.5.7.4
+        description: The default namespace should not be used (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags: {}
+        audit: |
+          check="$id  - $description"
+          manual "$check"
+          manual "      * Run this command in default namespace.  kubectl get \$(kubectl api-resources --verbs=list --namespaced=true -o name | paste -sd, -) --ignore-not-found -n default . The only entries there should be system managed resources such as the kubernetes service"
+        remediation: Ensure that namespaces are created to allow for appropriate segregation
+          of Kubernetes resources and that all new resources are created in a specific
+          namespace.

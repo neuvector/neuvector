@@ -21,6 +21,14 @@ export PATH="$PATH:$BASE_IMAGE_BIN_PATH/usr/bin:$BASE_IMAGE_BIN_PATH/bin"
 export LD_LIBRARY_PATH="$BASE_IMAGE_BIN_PATH/bin:$LD_LIBRARY_PATH"
 CONFIG_PREFIX="<<<.Replace_configPrefix_path>>>"
 
+# For k3s read journal case
+KUBE_APISERVER_CMD=""
+KUBE_CONTROLLER_MANAGER_CMD=""
+KUBE_SCHEDULER_CMD=""
+ETCD_CMD=""
+KUBE_PROXY_CMD=""
+KUBELET_CMD=""
+
 yell "# ------------------------------------------------------------------------------
 # Kubernetes CIS benchmark
 #
@@ -35,7 +43,7 @@ yell "# ------------------------------------------------------------------------
 run_check() {
   local RUN_FOLDER=$1
 
-  find $RUN_FOLDER -type f -name "*.yaml" | sort | while read -r YAML_FILE; do
+  for YAML_FILE in $(find "$RUN_FOLDER" -type f -name "*.yaml" | sort); do
     # Get the number of groups
     NUM_GROUPS=$(yq e '.groups | length' "$YAML_FILE")
 
@@ -62,13 +70,13 @@ run_check() {
             profile=$(yq e ".groups[$group_index].checks[$check_index].profile" "$YAML_FILE")
             scored=$(yq e ".groups[$group_index].checks[$check_index].scored" "$YAML_FILE")
 
-            if [ "$profile" == "Level 2" ]; then
+            if [ "$profile" = "Level 2" ]; then
                 level2=$id
             else
                 level2=""
             fi
 
-            if [ "$scored" == false ]; then
+            if [ "$scored" = false ]; then
                 not_scored=$id
             else
                 not_scored=""
@@ -84,9 +92,59 @@ run_check() {
 
 # Input folder
 folder=$1
+JOURNAL_LOG=$2
 
-# Check if folder ends with 'master' or 'worker'
-if echo "$folder" | grep -q 'master$'; then
+# In k3s, there is no specific YAML file for API server configuration as in Kubernetes.
+# Instead, k3s components are configured through various mechanisms.
+# The primary configuration file is /etc/rancher/k3s/config.yaml.
+# If /etc/rancher/k3s/config.yaml does not exist, NV will use the configuration files in the /etc/rancher/k3s/config.yaml.d directory.
+if echo "$folder" | grep -q 'k3s'; then
+    CONFIG_FILE="$CONFIG_PREFIX/etc/rancher/k3s/config.yaml"
+    CONFIG_DIR="$CONFIG_PREFIX/etc/rancher/k3s/config.yaml.d"
+    CONFIG_FILES=""
+
+    # Check if the main configuration file exists and add it to the list
+    if [ -f "$CONFIG_FILE" ]; then
+        CONFIG_FILES="$CONFIG_FILE"
+    fi
+
+    # Check if the configuration directory exists and add its files to the list
+    if [ -d "$CONFIG_DIR" ]; then
+        for file in "$CONFIG_DIR"/*.yaml; do
+            if [ -e "$file" ]; then
+                CONFIG_FILES="$CONFIG_FILES $file"
+            fi
+        done
+    fi
+    # Parse the journal string as different command with argument, the order will be the following
+    # kube-apiserver, kube-controller-manager, kube-scheduler, etcd, kube-proxy, kubelet
+    # Process each line in the string and assign to a capitalized variable with _CMD suffix
+
+    i=1
+    OLD_IFS=$IFS
+
+    # Change IFS to "@@@"
+    IFS="@@@"
+    for status in $JOURNAL_LOG; do
+        # Check if the status is not empty
+        if [ -n "$status" ]; then
+            # Assign each part to a respective variable
+            case $i in
+                1) KUBE_APISERVER_CMD="$status" ;;
+                2) KUBE_CONTROLLER_MANAGER_CMD="$status" ;;
+                3) KUBE_SCHEDULER_CMD="$status" ;;
+                4) ETCD_CMD="$status" ;;
+                5) KUBE_PROXY_CMD="$status" ;;
+                6) KUBELET_CMD="$status" ;;
+            esac
+            i=$((i + 1))
+        fi
+    done
+
+    # Restore the original IFS value
+    IFS=$OLD_IFS
+
+elif echo "$folder" | grep -q 'master$'; then
     # Check if it is a Kubernetes master node
     if ps -ef | grep "$CIS_APISERVER_CMD" 2>/dev/null | grep -v "grep" >/dev/null 2>&1; then
         info "Kubernetes Master Node Security Configuration"
