@@ -1604,6 +1604,7 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
 	r.GET("/v1/system/rbac", handlerSystemGetRBAC)       // skip API document
+	r.GET("/v1/system/alerts", handlerSystemGetAlerts)
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
@@ -2245,4 +2246,35 @@ func getRequestApiVersion(r *http.Request) ApiVersion {
 		return ApiVersion2
 	}
 	return ApiVersion1
+}
+
+func IsCertNearExpired(certPath string, expireThresholdDay int) (bool, error) {
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read certificate file %s: %v", certPath, err)
+	}
+
+	// Decode the PEM block
+	block, _ := pem.Decode(certPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return false, errors.New("failed to decode certificate")
+	}
+
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse certificate: %v", err)
+	}
+
+	// Check the expiration date
+	expireThreshold := time.Duration(expireThresholdDay) * 24 * time.Hour
+	if time.Now().After(cert.NotAfter.Add(-expireThreshold)) {
+		log.WithFields(log.Fields{
+			"expiry":             cert.NotAfter,
+			"expireThresholdDay": expireThresholdDay,
+		}).Debug("nearly expired certificate is detected")
+		return true, nil
+	}
+
+	return false, nil
 }

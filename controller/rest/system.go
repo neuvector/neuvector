@@ -21,6 +21,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -1987,19 +1988,36 @@ func handlerMeterList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	log.WithFields(log.Fields{"entries": len(resp.Meters)}).Debug()
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get meter list")
 }
-
-func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
-	defer r.Body.Close()
-
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
+func getNvUpgradeInfo() *api.RESTCheckUpgradeInfo {
+	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
+	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+		json.Unmarshal(value, &nvUpgradeInfo)
 	}
 
-	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
-		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
+	empty := share.CLUSCheckUpgradeVersion{}
+	upgradeInfo := &api.RESTCheckUpgradeInfo{}
+	if nvUpgradeInfo.MinUpgradeVersion != empty {
+		upgradeInfo.MinUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
+		}
 	}
+	if nvUpgradeInfo.MaxUpgradeVersion != empty {
+		upgradeInfo.MaxUpgradeVersion = &api.RESTUpgradeInfo{
+			Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
+			ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
+			Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
+		}
+	}
+	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
+		return nil
+	}
+
+	return upgradeInfo
+}
+
+func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]string, []string, []string, []string, []string, map[string]string, utils.Set) {
 	var clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors []string
 	if k8sPlatform {
 		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors =
@@ -2013,30 +2031,6 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		}
 	}
 
-	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
-	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
-		json.Unmarshal(value, &nvUpgradeInfo)
-	}
-
-	empty := share.CLUSCheckUpgradeVersion{}
-	if nvUpgradeInfo.MinUpgradeVersion != empty {
-		resp.NvUpgradeInfo.MinUpgradeVersion = &api.RESTUpgradeInfo{
-			Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
-			ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
-			Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
-		}
-	}
-	if nvUpgradeInfo.MaxUpgradeVersion != empty {
-		resp.NvUpgradeInfo.MaxUpgradeVersion = &api.RESTUpgradeInfo{
-			Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
-			ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
-			Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
-		}
-	}
-	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
-		resp.NvUpgradeInfo = nil
-	}
-
 	var accepted []string
 	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
 		accepted = user.AcceptedAlerts
@@ -2045,38 +2039,11 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 		accepted = append(accepted, user.AcceptedAlerts...)
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
-	var acceptable [5]map[string]string
-	var acceptableAlerts api.RESTK8sNvAcceptableAlerts
-	for i, alerts := range [][]string{clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors} {
-		if len(alerts) > 0 {
-			acceptable[i] = make(map[string]string, 0)
-			for _, alert := range alerts {
-				b := md5.Sum([]byte(alert))
-				key := hex.EncodeToString(b[:])
-				if !acceptedAlerts.Contains(key) {
-					// this alert has not been accepted yet. put it in the response
-					acceptable[i][key] = alert
-				}
-			}
-		}
-	}
-	acceptableAlerts.ClusterRoleErrors = acceptable[0]
-	acceptableAlerts.ClusterRoleBindingErrors = acceptable[1]
-	acceptableAlerts.RoleErrors = acceptable[2]
-	acceptableAlerts.RoleBindingErrors = acceptable[3]
-	acceptableAlerts.NvCrdSchemaErrors = acceptable[4]
-	resp.AcceptableAlerts = &api.RESTK8sNvAcceptableAlerts{
-		ClusterRoleErrors:        acceptable[0],
-		ClusterRoleBindingErrors: acceptable[1],
-		RoleErrors:               acceptable[2],
-		RoleBindingErrors:        acceptable[3],
-		NvCrdSchemaErrors:        acceptable[4],
-	}
 
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	var otherAlerts map[string]string
 	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
 		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
-		otherAlerts := map[string]string{}
 		// _fedClusterLeft(206), _fedClusterDisconnected(204)
 		//disconnectedStates := utils.NewSet(_fedClusterLeft, _fedClusterDisconnected)
 		var ids map[string]bool
@@ -2100,10 +2067,13 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 					}
 				}
 			}
-			resp.AcceptableAlerts.OtherAlerts = otherAlerts
 		}
 	}
 
+	return clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors, otherAlerts, acceptedAlerts
+}
+
+func getAcceptedAlerts(acceptedAlerts utils.Set) []string {
 	var acceptedManagerAlerts []string
 	for _, key := range []string{share.AlertNvNewVerAvailable, share.AlertNvInMultiVersions, share.AlertCveDbTooOld} {
 		if acceptedAlerts.Contains(key) {
@@ -2111,9 +2081,202 @@ func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.
 			acceptedManagerAlerts = append(acceptedManagerAlerts, key)
 		}
 	}
-	resp.AcceptedAlerts = acceptedManagerAlerts
+
+	return acceptedManagerAlerts
+}
+
+func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
+		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
+	}
+
+	// populate neuvector_upgrade_info
+	if nvUpgradeInfo := getNvUpgradeInfo(); nvUpgradeInfo != nil {
+		resp.NvUpgradeInfo = nvUpgradeInfo
+	} else {
+		resp.NvUpgradeInfo = nil
+	}
+
+	// populate acceptable_alerts
+	clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts, otherAlerts, acceptedAlerts := getAcceptableAlerts(acc, login)
+	var acceptable [5]map[string]string
+	for i, alerts := range [][]string{clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts} {
+		if len(alerts) > 0 {
+			acceptable[i] = make(map[string]string, 0)
+			for _, alert := range alerts {
+				b := md5.Sum([]byte(alert))
+				key := hex.EncodeToString(b[:])
+				if !acceptedAlerts.Contains(key) {
+					// this alert has not been accepted yet. put it in the response
+					acceptable[i][key] = alert
+				}
+			}
+		}
+	}
+	resp.AcceptableAlerts = &api.RESTK8sNvAcceptableAlerts{
+		ClusterRoleErrors:        acceptable[0],
+		ClusterRoleBindingErrors: acceptable[1],
+		RoleErrors:               acceptable[2],
+		RoleBindingErrors:        acceptable[3],
+		NvCrdSchemaErrors:        acceptable[4],
+	}
+	if otherAlerts != nil {
+		resp.AcceptableAlerts.OtherAlerts = otherAlerts
+	}
+
+	// populate accepted_alerts
+	if acceptedManagerAlerts := getAcceptedAlerts(acceptedAlerts); len(acceptedManagerAlerts) > 0 {
+		resp.AcceptedAlerts = acceptedManagerAlerts
+	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")
+}
+
+func getAlertGroup(alerts []string, alertType api.AlertType, acceptedAlerts utils.Set) *api.RESTNvAlertGroup {
+	alertGroup := &api.RESTNvAlertGroup{
+		Type: alertType,
+	}
+
+	if len(alerts) > 0 {
+		for _, alert := range alerts {
+			b := md5.Sum([]byte(alert))
+			key := hex.EncodeToString(b[:])
+			if !acceptedAlerts.Contains(key) {
+				alertGroup.Data = append(alertGroup.Data, &api.RESTNvAlert{
+					ID:      key,
+					Message: alert,
+				})
+			}
+		}
+	}
+
+	if len(alertGroup.Data) > 0 {
+		return alertGroup
+	}
+
+	return nil
+}
+
+func getInternalCertExpireAlert(certFilePath string) (string, error) {
+	expireThresholdDays := []int{30, 90, 180}
+	// Check ca certificate expiration
+	for _, expireThresholdDay := range expireThresholdDays {
+		certExpired, err := IsCertNearExpired(certFilePath, expireThresholdDay)
+		if err != nil {
+			return "", err
+		}
+		if !certExpired {
+			continue
+		}
+
+		var certExpiredMsg string
+		if strings.Contains(certFilePath, "ca.cert") {
+			certExpiredMsg = fmt.Sprintf("Internal CA certificate will be expired in %d days", expireThresholdDay)
+		} else {
+			certExpiredMsg = fmt.Sprintf("Internal certificate will be expired in %d days", expireThresholdDay)
+		}
+
+		return certExpiredMsg, nil
+	}
+
+	return "", nil
+}
+
+func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	var resp api.RESTNvAlerts = api.RESTNvAlerts{
+		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
+	}
+	
+	// populate neuvector_upgrade_info
+	if nvUpgradeInfo := getNvUpgradeInfo(); nvUpgradeInfo != nil {
+		resp.NvUpgradeInfo = nvUpgradeInfo
+	} else {
+		resp.NvUpgradeInfo = nil
+	}
+
+	// populate acceptable_alerts
+	clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts, otherAlerts, acceptedAlerts := getAcceptableAlerts(acc, login)
+	resp.AcceptableAlerts = &api.RESTNvAcceptableAlerts{}
+	if clusterRoleAlertGroup := getAlertGroup(clusterRoleAlerts, api.AlertTypeRBAC, acceptedAlerts); clusterRoleAlertGroup != nil {
+		resp.AcceptableAlerts.ClusterRoleAlerts = clusterRoleAlertGroup
+	}
+	if clusterRoleBindingAlertGroup := getAlertGroup(clusterRoleBindingAlerts, api.AlertTypeRBAC, acceptedAlerts); clusterRoleBindingAlertGroup != nil {
+		resp.AcceptableAlerts.ClusterRoleBindingAlerts = clusterRoleBindingAlertGroup
+	}
+	if RoleAlertGroup := getAlertGroup(roleAlerts, api.AlertTypeRBAC, acceptedAlerts); RoleAlertGroup != nil {
+		resp.AcceptableAlerts.RoleAlerts = RoleAlertGroup
+	}
+	if RoleBindingAlertGroup := getAlertGroup(roleBindingAlerts, api.AlertTypeRBAC, acceptedAlerts); RoleBindingAlertGroup != nil {
+		resp.AcceptableAlerts.RoleBindingAlerts = RoleBindingAlertGroup
+	}
+	if NvCrdSchemaAlertGroup := getAlertGroup(nvCrdSchemaAlerts, api.AlertTypeRBAC, acceptedAlerts); NvCrdSchemaAlertGroup != nil {
+		resp.AcceptableAlerts.NvCrdSchemaAlerts = NvCrdSchemaAlertGroup
+	}
+	if otherAlerts != nil {
+		otherAlertGroup := &api.RESTNvAlertGroup{
+			Type: api.AlertTypeRBAC,
+		}
+		for id, msg := range otherAlerts {
+			otherAlertGroup.Data = append(otherAlertGroup.Data, &api.RESTNvAlert{
+				ID:      id,
+				Message: msg,
+			})
+		}
+		if len(otherAlertGroup.Data) > 0 {
+			resp.AcceptableAlerts.OtherAlerts = otherAlertGroup
+		}		
+	}
+	certAlertGroup := &api.RESTNvAlertGroup{
+		Type: api.AlertTypeTlsCertificate,
+	}
+	internalCaCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCACert)
+	if internalCaCertExpireAlert, err := getInternalCertExpireAlert(internalCaCertFile); err == nil && internalCaCertExpireAlert != "" {
+		b := md5.Sum([]byte(internalCaCertExpireAlert))
+		key := hex.EncodeToString(b[:])
+		if !acceptedAlerts.Contains(key) {
+			certAlertGroup.Data = append(certAlertGroup.Data, &api.RESTNvAlert{
+				ID:      key,
+				Message: internalCaCertExpireAlert,
+			})
+		}
+	}
+	internalCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCert)
+	if internalCertExpireAlert, err := getInternalCertExpireAlert(internalCertFile); err == nil && internalCertExpireAlert != "" {
+		b := md5.Sum([]byte(internalCertExpireAlert))
+		key := hex.EncodeToString(b[:])
+		if !acceptedAlerts.Contains(key) {
+			certAlertGroup.Data = append(certAlertGroup.Data, &api.RESTNvAlert{
+				ID:      key,
+				Message: internalCertExpireAlert,
+			})
+		}
+	}
+	if len(certAlertGroup.Data) > 0 {
+		resp.AcceptableAlerts.CertificateAlerts = certAlertGroup
+	}
+
+	// populate accepted_alerts
+	if acceptedManagerAlerts := getAcceptedAlerts(acceptedAlerts); len(acceptedManagerAlerts) > 0 {
+		resp.AcceptedAlerts = acceptedManagerAlerts
+	}
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get system alerts")
 }
 
 func configLog(ev share.TLogEvent, login *loginSession, msg string) {
