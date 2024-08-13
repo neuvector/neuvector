@@ -622,7 +622,8 @@ type RESTSelfUserData struct {
 	PwdDaysUntilExpire  int                              `json:"password_days_until_expire"`  // negative means password never expires
 	PwdHoursUntilExpire int                              `json:"password_hours_until_expire"` // the hours part beyond PwdDaysUntilExpire, 0 ~ 23
 	GlobalPermits       []*RESTRolePermission            `json:"global_permissions,omitempty"`
-	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"` // domain -> permissions
+	DomainPermits       map[string][]*RESTRolePermission `json:"domain_permissions,omitempty"`        // domain -> permissions
+	RemoteGlobalPermits []*RESTRolePermission            `json:"remote_global_permissions,omitempty"` // for accessing managed clusters on primary cluster's UI
 }
 
 type RESTUserConfigData struct {
