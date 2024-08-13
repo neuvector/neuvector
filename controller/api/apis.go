@@ -1471,6 +1471,7 @@ type RESTAgentConfig struct {
 	Debug            *[]string `json:"debug,omitempty"`
 	DisableNvProtect *bool     `json:"disable_nvprotect,omitempty"`
 	DisableKvCCtl    *bool     `json:"disable_kvcctl,omitempty"`
+	SyslogLevel      *string   `json:"syslog_level,omitempty"`
 }
 
 type RESTAgentConfigData struct {

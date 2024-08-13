@@ -515,6 +515,10 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 			cconf.DisableKvCongestCtl = *rconf.Config.DisableKvCCtl
 		}
 
+		if rconf.Config.SyslogLevel != nil {
+			cconf.SyslogLevel = *rconf.Config.SyslogLevel
+		}
+
 		if !acc.Authorize(&cconf, nil) {
 			restRespAccessDenied(w, login)
 			return

@@ -1073,9 +1073,14 @@ func SetLogLevel(level log.Level) {
 	}
 
 	switch level {
+	case log.PanicLevel:
+	case log.FatalLevel:
+	case log.ErrorLevel:
+	case log.WarnLevel:
 	case log.InfoLevel:
 		clusterCfg.Debug = false
 	case log.DebugLevel:
+	case log.TraceLevel:
 		clusterCfg.Debug = true
 	default:
 		log.WithFields(log.Fields{"level": level}).Error("Not supported")
@@ -1089,5 +1094,4 @@ func SetLogLevel(level log.Level) {
 			curLogLevel = level
 		}
 	*/
-	return
 }
