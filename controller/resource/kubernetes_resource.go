@@ -1951,7 +1951,7 @@ func IsRancherFlavor() bool {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 	} else {
 		if len(nvRscMapSSO) == 0 {
-			svcnames := []string{"cattle-cluster-agent", "rancher"}
+			svcnames := []string{"cattle-cluster-agent", "rancher", "rancher-prime"}
 			nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
 				share.PERM_REG_SCAN_ID,
 				share.PERM_CICD_SCAN_ID,
