@@ -899,6 +899,12 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 				tokenData := api.RESTTokenData{}
 				if err = json.Unmarshal(data, &tokenData); err == nil {
 					cacher.SetFedJoinedClusterToken(clusterID, login.id, tokenData.Token.Token)
+
+					// apikey - timer to expire the login session
+					if login.loginType == loginTypeApikey {
+						login.timer = time.AfterFunc(time.Second*time.Duration(user.Timeout), func() { login.expire() })
+					}
+
 					return tokenData.Token.Token, nil
 				} else {
 					log.WithFields(log.Fields{"cluster": rc.RestInfo.Server, "proxyUsed": proxyUsed, "error": err}).Error("unmarshal token")
@@ -3470,7 +3476,19 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 	body, _ := io.ReadAll(r.Body)
-	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
+
+	var user *share.CLUSUser
+	if login.loginType == loginTypeApikey {
+		wrapUser, err := wrapApiKeyAsUser(login)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteUnauthorized, "Unable to authenticate")
+			return
+		}
+		user = wrapUser
+	} else {
+		user, _, _ = clusHelper.GetUserRev(login.fullname, acc)
+	}
+
 	remoteExport := false
 
 	for _, refreshToken := range []bool{false, true} {
@@ -3588,4 +3606,21 @@ func handlerFedClusterForwardDelete(w http.ResponseWriter, r *http.Request, ps h
 	defer r.Body.Close()
 
 	handlerFedClusterForward(w, r, ps, http.MethodDelete)
+}
+
+func wrapApiKeyAsUser(login *loginSession) (*share.CLUSUser, error) {
+	apikey, _, err := clusHelper.GetApikeyRev(login.fullname, access.NewReaderAccessControl())
+	if err != nil {
+		return nil, err
+	}
+
+	user := &share.CLUSUser{}
+	user.Fullname = apikey.Name
+	user.Username = apikey.Name
+	user.Locale = apikey.Locale
+	user.Timeout = 300
+	user.Role = apikey.Role
+	login.fullname = login.fullname + " (API Key)"
+
+	return user, nil
 }

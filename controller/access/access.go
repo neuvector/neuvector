@@ -1868,7 +1868,7 @@ func (acc *AccessControl) GetRoleDomains() map[string][]string {
 }
 
 func ContainsNonSupportRole(role string) bool {
-	var roles = utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader, api.UserRoleIBMSA, api.UserRoleImportStatus)
+	var roles = utils.NewSet(api.UserRoleIBMSA, api.UserRoleImportStatus)
 	return roles.Contains(role)
 }
 
