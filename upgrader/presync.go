@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/neuvector/neuvector/share/k8sutils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -20,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
 )
 
@@ -306,6 +309,35 @@ func PreSyncHook(ctx *cli.Context) error {
 	client, err := NewK8sClient(kubeconfig)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client: %w", err)
+	}
+
+	log.Info("Checking k8s permissions")
+
+	// Check if required permissions are there.
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to read in-cluster config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to get k8s config: %w", err)
+	}
+
+	for _, res := range k8sutils.UpgraderPresyncRequiredPermissions {
+		capable, err := k8sutils.CanI(clientset, res, namespace)
+		if err != nil {
+			return err
+		}
+		if !capable {
+			if os.Getenv("NO_FALLBACK") == "" {
+				log.Warn("required permission is missing...skip the certificate generation/rotation")
+				os.Exit(0)
+			} else {
+				log.Error("required permission is missing...ending now")
+				os.Exit(-2)
+			}
+		}
 	}
 
 	log.Info("Getting helm values check sum")
