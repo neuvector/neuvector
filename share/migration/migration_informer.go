@@ -16,6 +16,7 @@ import (
 
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/healthz"
+	"github.com/neuvector/neuvector/share/k8sutils"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
@@ -37,6 +38,7 @@ type InternalSecretController struct {
 	secretName      string
 	lastRevision    string
 	reloadFuncs     []func([]byte, []byte, []byte) error
+	clientset       *kubernetes.Clientset
 	initialized     int32
 }
 
@@ -313,24 +315,34 @@ func NewInternalSecretController(informerFactory informers.SharedInformerFactory
 	return c, nil
 }
 
-func InitializeInternalSecretController(ctx context.Context, reloadFuncs []func([]byte, []byte, []byte) error) error {
-	var err error
+func InitializeInternalSecretController(ctx context.Context, reloadFuncs []func([]byte, []byte, []byte) error) (capable bool, err error) {
 	var config *rest.Config
-	config, err = rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("failed to read in-cluster config: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("failed to get k8s config: %w", err)
-	}
 
 	var namespace string
 	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		namespace = string(data)
 	} else {
 		log.WithError(err).Warn("failed to open namespace file.")
+	}
+
+	config, err = rest.InClusterConfig()
+	if err != nil {
+		return false, fmt.Errorf("failed to read in-cluster config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return false, fmt.Errorf("failed to get k8s config: %w", err)
+	}
+
+	for _, res := range k8sutils.SecretInformerRequiredPermissions {
+		capable, err := k8sutils.CanI(clientset, res, namespace)
+		if err != nil {
+			return false, err
+		}
+		if !capable {
+			return false, nil
+		}
 	}
 
 	// Allow overriding via POD_NAMESPACE variable for testing
@@ -342,16 +354,16 @@ func InitializeInternalSecretController(ctx context.Context, reloadFuncs []func(
 
 	controller, err := NewInternalSecretController(factory, namespace, "neuvector-internal-certs", reloadFuncs)
 	if err != nil {
-		return fmt.Errorf("failed to create internal secret controller: %w", err)
+		return false, fmt.Errorf("failed to create internal secret controller: %w", err)
 	}
 
 	// This function will wait until the secret is synced.
 	err = controller.Run(ctx.Done())
 	if err != nil {
-		return fmt.Errorf("failed to run internal secret controller: %w", err)
+		return false, fmt.Errorf("failed to run internal secret controller: %w", err)
 	}
 
 	log.Info("cache is synced and internal cert is ready")
 
-	return nil
+	return true, nil
 }

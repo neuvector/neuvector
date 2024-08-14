@@ -144,6 +144,8 @@ var ctrlerSubjectsWanted []string = []string{"controller"}
 var scannerSubjecstWanted []string = []string{"updater", "controller"}
 var secretSubjecstWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
 var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
+var jobCreationSubjecstWanted []string = []string{"controller"}
+var certUpgraderSubjecstWanted []string = []string{"cert-upgrader"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
 
@@ -281,6 +283,48 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 			},
 		},
 	},
+	NvJobCreationRole: &k8sRbacRoleInfo{
+		name:      NvJobCreationRole,
+		namespace: constNvNamespace,
+		rules: []*k8sRbacRoleRuleInfo{
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "batch",
+				resources: utils.NewSet(K8sResJobs),
+				verbs:     utils.NewSet("create", "get", "delete"),
+			},
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "batch",
+				resources: utils.NewSet(K8sResCronjobs, K8sResCronjobsFinalizer),
+				verbs:     utils.NewSet("update", "patch"),
+			},
+		},
+	},
+	NvCertUpgraderRole: &k8sRbacRoleInfo{
+		name:      NvCertUpgraderRole,
+		namespace: constNvNamespace,
+		rules: []*k8sRbacRoleRuleInfo{
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "",
+				resources: utils.NewSet(k8sResSecrets),
+				verbs:     utils.NewSet("get", "update", "watch", "list"),
+			},
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "",
+				resources: utils.NewSet(K8sResPods),
+				verbs:     utils.NewSet("get", "list"),
+			},
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "apps",
+				resources: utils.NewSet(K8sResDeployments, K8sResDaemonsets),
+				verbs:     utils.NewSet("get", "list", "watch"),
+			},
+			&k8sRbacRoleRuleInfo{
+				apiGroup:  "batch",
+				resources: utils.NewSet(K8sResCronjobs),
+				verbs:     utils.NewSet("update"),
+			},
+		},
+	},
 	k8sClusterRoleView: &k8sRbacRoleInfo{
 		k8sReserved:   true,
 		name:          k8sClusterRoleView,
@@ -349,6 +393,16 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 		namespace: constNvNamespace,
 		subjects:  secretSubjecstWanted,
 		rbacRole:  rbacRolesWanted[NvSecretRole],
+	},
+	NvJobCreationRoleBinding: &k8sRbacBindingInfo{
+		namespace: constNvNamespace,
+		subjects:  jobCreationSubjecstWanted,
+		rbacRole:  rbacRolesWanted[NvJobCreationRole],
+	},
+	NvCertUpgraderRoleBinding: &k8sRbacBindingInfo{
+		namespace: constNvNamespace,
+		subjects:  certUpgraderSubjecstWanted,
+		rbacRole:  rbacRolesWanted[NvCertUpgraderRole],
 	},
 	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
 		namespace: constNvNamespace,

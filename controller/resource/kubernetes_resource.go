@@ -51,6 +51,7 @@ const (
 	K8sApiVersionV1Beta1          = "v1beta1"
 	K8sApiVersionV1Beta2          = "v1beta2"
 	K8sResCronjobs                = "cronjobs"
+	K8sResCronjobsFinalizer       = "cronjobs/finalizers"
 	K8sResDaemonsets              = "daemonsets"
 	K8sResDeployments             = "deployments"
 	K8sResDeploymentConfigs       = "deploymentconfigs"
@@ -109,6 +110,10 @@ const (
 	nvSecretRoleBinding         = NvSecretRole
 	NvAdminRoleBinding          = "neuvector-admin"
 	nvViewRoleBinding           = "neuvector-binding-view"
+	NvJobCreationRole           = "neuvector-binding-job-creation"
+	NvJobCreationRoleBinding    = NvJobCreationRole
+	NvCertUpgraderRole          = "neuvector-binding-cert-upgrader"
+	NvCertUpgraderRoleBinding   = NvCertUpgraderRole
 )
 
 const (

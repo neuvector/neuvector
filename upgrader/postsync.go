@@ -11,12 +11,14 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
 	"errors"
 
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/share/k8sutils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	appv1 "k8s.io/api/apps/v1"
@@ -30,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
@@ -949,6 +953,30 @@ func PostSyncHook(ctx *cli.Context) error {
 	client, err := NewK8sClient(kubeconfig)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client: %w", err)
+	}
+
+	log.Info("Checking k8s permissions")
+
+	// Check if required permissions are there.
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to read in-cluster config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to get k8s config: %w", err)
+	}
+
+	for _, res := range k8sutils.UpgraderPostsyncRequiredPermissions {
+		capable, err := k8sutils.CanI(clientset, res, namespace)
+		if err != nil {
+			return err
+		}
+		if !capable {
+			log.Error("required permission is missing...ending now")
+			os.Exit(-2)
+		}
 	}
 
 	log.Info("Initializing lock")
