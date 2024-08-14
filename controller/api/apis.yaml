@@ -5873,10 +5873,10 @@ definitions:
         example: "831010404316"
       access_key_id:
         type: string
-        example: AKIAIHUHS4BTYUDKVV4Q
+        example: "<access key id from AWS>"
       secret_access_key:
         type: string
-        example: D7XGZO34AMUfTbunL
+        example: "<secret access key from AWS>"
       region:
         type: string
         example: us-west-2
