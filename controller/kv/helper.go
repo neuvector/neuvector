@@ -44,7 +44,7 @@ type ClusterHelper interface {
 
 	GetInstallationID() (string, error)
 
-	GetAllControllers() []*share.CLUSController
+	GetAllControllers() ([]*share.CLUSController, error)
 	GetAllEnforcers() []*share.CLUSAgent
 
 	SetCtrlState(key string) error
@@ -573,26 +573,30 @@ func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {
 			json.Unmarshal(value, &agent)
 			all = append(all, &agent)
 		} else {
-			log.WithFields(log.Fields{"error": err}).Debug("")
+			log.WithFields(log.Fields{"error": err}).Debug()
 		}
 	}
 	return all
 }
 
-func (m clusterHelper) GetAllControllers() []*share.CLUSController {
+func (m clusterHelper) GetAllControllers() ([]*share.CLUSController, error) {
 	store := share.CLUSControllerStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
 	all := make([]*share.CLUSController, 0)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+		return all, err
+	}
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			var ctrl share.CLUSController
 			json.Unmarshal(value, &ctrl)
 			all = append(all, &ctrl)
 		} else {
-			log.WithFields(log.Fields{"error": err}).Debug("")
+			log.WithFields(log.Fields{"error": err}).Debug()
 		}
 	}
-	return all
+	return all, nil
 }
 
 func (m clusterHelper) SetCtrlState(key string) error {
@@ -2204,9 +2208,12 @@ func (m clusterHelper) DeleteAdmissionRuleTxn(txn *cluster.ClusterTransact, admT
 func (m clusterHelper) GetCrdSecurityRuleRecord(crdKind, crdName string) *share.CLUSCrdSecurityRule {
 	key := share.CLUSCrdKey(crdKind, crdName)
 	if value, _, _ := m.get(key); len(value) > 0 {
-		var state share.CLUSCrdSecurityRule
-		json.Unmarshal(value, &state)
-		return &state
+		var secRule share.CLUSCrdSecurityRule
+		json.Unmarshal(value, &secRule)
+		if secRule.Rules == nil {
+			secRule.Rules = make(map[string]uint32)
+		}
+		return &secRule
 	}
 	return nil
 }

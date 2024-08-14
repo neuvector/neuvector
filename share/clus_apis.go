@@ -28,6 +28,7 @@ const CLUSLockUserKey string = CLUSLockStore + "user"
 const CLUSLockPolicyKey string = CLUSLockStore + "policy"
 const CLUSLockServerKey string = CLUSLockStore + "server"
 const CLUSLockUpgradeKey string = CLUSLockStore + "upgrade"
+const CLUSLockRestoreKey string = CLUSLockStore + "restore"
 const CLUSLockAdmCtrlKey string = CLUSLockStore + "adm_ctrl"
 const CLUSLockFedKey string = CLUSLockStore + "federation"
 const CLUSLockScannerKey string = CLUSLockStore + "scanner"
@@ -167,6 +168,7 @@ const CLUSCtrlConfigLoadedKey string = CLUSStateStore + "ctrl_cfg_load"
 const CLUSCtrlDistLockStore string = CLUSStateStore + "dist_lock/"
 const CLUSCtrlUsageReportStore string = CLUSStateStore + "usage_report/"
 const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
+const CLUSKvRestoreKey string = CLUSStateStore + "kv_restore"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
 
@@ -701,6 +703,11 @@ type CLUSScanConfig struct {
 type CLUSCtrlVersion struct {
 	CtrlVersion string `json:"version"`
 	KVVersion   string `json:"kv_version"`
+}
+
+type CLUSKvRestore struct {
+	StartAt  time.Time `json:"start_at"`
+	CtrlerID string    `json:"controller_id"`
 }
 
 type CLUSSyslogConfig struct {

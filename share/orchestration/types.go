@@ -58,7 +58,7 @@ type ResourceDriver interface {
 	GetUserRoles(username string, subjType uint8) (map[string]string, map[string]share.NvFedPermissions, error)
 	ListUsers() []UserRBAC
 	RegisterResource(rt string) error
-	ListResource(rt string) ([]interface{}, error)
+	ListResource(rt, namespace string) ([]interface{}, error)
 	StartWatchResource(rt, ns string, wcb WatchCallback, scb StateCallback) error
 	StopWatchResource(rt string) error
 	StopWatchAllResources() error

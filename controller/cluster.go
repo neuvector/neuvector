@@ -90,16 +90,20 @@ func waitConfigLoaded(isNewCluster bool) {
 }
 
 func leadChangeHandler(newLead, oldLead string) {
-	log.WithFields(log.Fields{"newLead": newLead, "oldLead": oldLead}).Info()
+	var isNewLead bool
+	if newLead != "" {
+		isNewLead = (newLead == Ctrler.ClusterIP)
+	}
+	log.WithFields(log.Fields{"isNewLead": isNewLead, "newLead": newLead, "oldLead": oldLead, "exiting": exitingFlag}).Info()
 
 	if atomic.LoadInt32(&exitingFlag) != 0 {
 		return
 	}
 
+	Ctrler.Leader = isNewLead
 	if newLead == "" {
 		leadFailTime = time.Now()
 		clusterFailed = true
-		Ctrler.Leader = false
 		cluster.PauseAllWatchers(true)
 
 		cache.LeadChangeNotify(false, "")
@@ -112,8 +116,6 @@ func leadChangeHandler(newLead, oldLead string) {
 		// It is possible that the lead is gone, so everyone has to report lead lost event.
 		recordLeadChangeEvent(share.CLUSEvControllerLeadLost, "", oldLead)
 	} else {
-		Ctrler.Leader = (newLead == Ctrler.ClusterIP)
-
 		// update self ctrl key
 		connStatus, connLastError := GetOrchConnStatus()
 
@@ -125,16 +127,28 @@ func leadChangeHandler(newLead, oldLead string) {
 		})
 		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
 		if err := cluster.Put(key, value); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
+			log.WithFields(log.Fields{"error": err}).Error()
 		}
 
 		if Ctrler.Leader {
-			// This is used when upgrade from version that has no config-loaded flag
-			setConfigLoaded()
-			rest.HandleAdminUserUpdate()
+			emptyKvFound := false
+			if ver := kv.GetControlVersion(); ver.CtrlVersion == "" && ver.KVVersion == "" {
+				emptyKvFound = true
+				log.WithFields(log.Fields{"emptyKvFound": emptyKvFound}).Info()
+			}
 
-			// Only the lead backup config to the disk. When self becomes lead, run a full backup.
-			kv.GetConfigHelper().BackupAll()
+			if emptyKvFound {
+				kv.GetConfigHelper().Restore()
+				kv.ValidateWebhookCert()
+				setConfigLoaded()
+			} else {
+				// This is used when upgrade from version that has no config-loaded flag
+				setConfigLoaded()
+				rest.HandleAdminUserUpdate()
+
+				// Only the lead backup config to the disk. When self becomes lead, run a full backup.
+				kv.GetConfigHelper().BackupAll()
+			}
 		}
 
 		cache.LeadChangeNotify(Ctrler.Leader, newLead)
@@ -172,7 +186,7 @@ func leadChangeHandler(newLead, oldLead string) {
 func ctlrMemberUpdateHandler(nType cluster.ClusterNotifyType, memberAddr string, member string) {
 	log.WithFields(log.Fields{
 		"type": cluster.ClusterNotifyName[nType], "member": memberAddr,
-	}).Info("")
+	}).Info()
 
 	if nType == cluster.ClusterNotifyAdd {
 		if !ClusterConnected {

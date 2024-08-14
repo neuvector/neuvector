@@ -885,6 +885,12 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 			if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
 				ctr.Privileged = *c.SecurityContext.Privileged
 			}
+			if memory, ok := c.Resources.Requests["memory"]; ok {
+				ctr.RequestMemory = memory.String()
+			}
+			if memory, ok := c.Resources.Limits["memory"]; ok {
+				ctr.LimitMemory = memory.String()
+			}
 			r.Containers = append(r.Containers, ctr)
 		}
 		if r.SA = o.Spec.ServiceAccountName; r.SA == "" {
@@ -1319,15 +1325,15 @@ func (d *kubernetes) RegisterResource(rt string) error {
 	return err
 }
 
-func (d *kubernetes) ListResource(rt string) ([]interface{}, error) {
+func (d *kubernetes) ListResource(rt, namespace string) ([]interface{}, error) {
 	if rt == RscTypeRBAC {
 		return nil, ErrResourceNotSupported
 	} else {
-		return d.listResource(rt)
+		return d.listResource(rt, namespace)
 	}
 }
 
-func (d *kubernetes) listResource(rt string) ([]interface{}, error) {
+func (d *kubernetes) listResource(rt, namespace string) ([]interface{}, error) {
 	log.WithFields(log.Fields{"resource": rt}).Debug()
 
 	maker, err := d.discoverResource(rt)
@@ -1343,7 +1349,7 @@ func (d *kubernetes) listResource(rt string) ([]interface{}, error) {
 
 	objs := maker.newList()
 	d.lock.Lock()
-	err = d.client.List(context.Background(), k8s.AllNamespaces, objs)
+	err = d.client.List(context.Background(), namespace, objs)
 	d.lock.Unlock()
 	if err != nil {
 		return nil, err
@@ -2136,4 +2142,28 @@ func RetrieveBootstrapPassword() string {
 	}
 
 	return bootstrapPwd
+}
+
+func GetNvControllerPodsNumber() {
+	var requestMemory string
+	var limitMemory string
+	var podsIP []string
+
+	pods, err := global.ORCH.ListResource(RscTypePod, NvAdmSvcNamespace)
+	if err == nil {
+		for _, obj := range pods {
+			if pod, ok := obj.(*Pod); ok && pod != nil {
+				if v, ok := pod.Labels["app"]; ok && v == "neuvector-controller-pod" {
+					for _, ctr := range pod.Containers {
+						if ctr.RequestMemory != requestMemory || ctr.LimitMemory != limitMemory {
+							requestMemory = ctr.RequestMemory
+							limitMemory = ctr.LimitMemory
+						}
+					}
+					podsIP = append(podsIP, pod.IPNet.String())
+				}
+			}
+		}
+	}
+	log.WithFields(log.Fields{"pods": strings.Join(podsIP, ","), "requests": requestMemory, "limits": limitMemory, "err": err}).Info()
 }

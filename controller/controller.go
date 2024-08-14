@@ -144,20 +144,25 @@ func getLocalInfo(selfID string, pid2ID map[int]string) error {
 // It's likely all controllers starts together and this is a new cluster.
 func likelyNewCluster() bool {
 	clusHelper := kv.GetClusterHelper()
-	all := clusHelper.GetAllControllers()
+	all, err := clusHelper.GetAllControllers()
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	}
 
 	if len(all) <= 1 {
 		return true
 	}
 
 	var oldest *share.CLUSController
+	ips := utils.NewSet()
 	for _, c := range all {
+		ips.Add(c.ClusterIP)
 		if oldest == nil || c.StartedAt.Before(oldest.StartedAt) {
 			oldest = c
 		}
 	}
 
-	log.WithFields(log.Fields{"oldest": oldest.ID}).Info()
+	log.WithFields(log.Fields{"oldest": oldest.ID, "all": ips.ToStringSlice()}).Info()
 
 	if oldest.ID == Ctrler.ID {
 		return true
@@ -453,8 +458,8 @@ func main() {
 		global.ORCH.SetIPAddrScope(Ctrler.Ifaces, &meta, networks)
 	}
 
-	log.WithFields(log.Fields{"host": Host}).Info("")
-	log.WithFields(log.Fields{"ctrler": Ctrler}).Info("")
+	log.WithFields(log.Fields{"host": Host}).Info()
+	log.WithFields(log.Fields{"ctrler": Ctrler}).Info()
 
 	// Other objects
 	timerWheel = utils.NewTimerWheel()
@@ -580,6 +585,9 @@ func main() {
 	// important because the new leader maybe just started and does not possess the graph data.
 
 	isNewCluster := likelyNewCluster()
+	if platform == share.PlatformKubernetes {
+		resource.GetNvControllerPodsNumber()
+	}
 
 	log.WithFields(log.Fields{"ctrler": Ctrler, "lead": lead, "self": self, "new-cluster": isNewCluster,
 		"noDefAdmin": *noDefAdmin, "cspEnv": *cspEnv}).Info()
@@ -594,7 +602,14 @@ func main() {
 		log.WithError(err).Warn("installation id is not readable. Will retry later.")
 	}
 
-	if Ctrler.Leader {
+	emptyKvFound := false
+	ver := kv.GetControlVersion()
+	if ver.CtrlVersion == "" && ver.KVVersion == "" {
+		emptyKvFound = true
+	}
+	log.WithFields(log.Fields{"emptyKvFound": emptyKvFound, "ver": ver}).Info()
+
+	if Ctrler.Leader || emptyKvFound {
 		// See [NVSHAS-5490]:
 		// clusterHelper.AcquireLock() may fail with error "failed to create session: Unexpected response code: 500 (Missing node registration)".
 		// It indicates that the node is not yet registered in the catalog.
@@ -643,7 +658,7 @@ func main() {
 	// upgrade case, (not new cluster), the new controller (not a lead) should upgrade
 	// the KV so it can behave correctly. The old lead won't be affected, in theory.
 	crossCheckCRD := false
-	if Ctrler.Leader || !isNewCluster {
+	if Ctrler.Leader || !isNewCluster || emptyKvFound {
 		nvImageVersion := Version
 		if strings.HasPrefix(nvImageVersion, "interim/") {
 			// it's daily dev build image
@@ -978,7 +993,7 @@ func main() {
 
 func amendStubRtInfo() error {
 	podname := Ctrler.Name
-	objs, err := global.ORCH.ListResource(resource.RscTypeNamespace)
+	objs, err := global.ORCH.ListResource(resource.RscTypeNamespace, "")
 	if err == nil {
 		for _, obj := range objs {
 			if domain := obj.(*resource.Namespace); domain != nil {
