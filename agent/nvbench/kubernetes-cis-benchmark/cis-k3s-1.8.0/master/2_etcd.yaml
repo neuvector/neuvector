@@ -31,10 +31,8 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Follow the etcd service documentation and configure TLS encryption.
-          Then, edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config
-          on the master node and set the below parameters.  --cert-file=</path/to/ca-file>
-          --key-file=</path/to/key-file>
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates cert and key files for etcd. These are located in /var/lib/rancher/k3s/server/tls/etcd/. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use custom cert and key files.        
   - id: 2.2
     title: ''
     checks:
@@ -57,8 +55,8 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config
-          on the master node and set the below parameter. --client-cert-auth="true"
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s sets the --client-cert-auth parameter to true. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to disable client certificate authentication.        
   - id: 2.3
     title: ''
     checks:
@@ -81,9 +79,8 @@ groups:
           else
               warn "$check"
           fi    
-        remediation: Edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config
-          on the master node and either remove the --auto-tls parameter or set it
-          to false. --auto-tls=false
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s does not set the --auto-tls parameter. If this check fails, edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config on the master node and either remove the --auto-tls parameter or set it to false. client-transport-security: auto-tls: false
   - id: 2.4
     title: ''
     checks:
@@ -112,11 +109,8 @@ groups:
           else
               warn "$check"
           fi    
-        remediation: Follow the etcd service documentation and configure peer TLS
-          encryption as appropriate for your etcd cluster. Then, edit the etcd pod
-          specification file /var/lib/rancher/k3s/server/db/etcd/config on the master node
-          and set the below parameters.  --peer-cert-file=</path/to/peer-cert-file>
-          --peer-key-file=</path/to/peer-key-file>
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates peer cert and key files for etcd. These are located in /var/lib/rancher/k3s/server/tls/etcd/. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use custom peer cert and key files.
   - id: 2.5
     title: ''
     checks:
@@ -140,8 +134,8 @@ groups:
           else
               warn "$check"
           fi    
-        remediation: Edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config
-          on the master node and set the below parameter. --peer-client-cert-auth=true
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s sets the --peer-cert-auth parameter to true. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to disable peer client certificate authentication.
   - id: 2.6
     title: ''
     checks:
@@ -164,9 +158,8 @@ groups:
           else
               warn "$check"
           fi      
-        remediation: Edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config
-          on the master node and either remove the --peer-auto-tls parameter or set
-          it to false. --peer-auto-tls=false
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s does not set the --peer-auto-tls parameter. If this check fails, edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config on the master node and either remove the --peer-auto-tls parameter or set it to false. peer-transport-security: auto-tls: false
   - id: 2.7
     title: ''
     checks:
@@ -190,7 +183,5 @@ groups:
           else
               warn "$check"
           fi    
-        remediation: Follow the etcd documentation and create a dedicated certificate
-          authority setup for the etcd service. Then, edit the etcd pod specification
-          file /var/lib/rancher/k3s/server/db/etcd/config on the master node and set the
-          below parameter. --trusted-ca-file=</path/to/ca-file>
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates a unique certificate authority for etcd. This is located at /var/lib/rancher/k3s/server/tls/etcd/peer-ca.crt. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use a shared certificate authority.

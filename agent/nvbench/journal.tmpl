@@ -17,7 +17,7 @@ JOURNAL_LOG=$(journalctl -D /var/log/journal -u k3s)
 kube_apiserver_cmd=$(fetch_kube_cmd "$CIS_APISERVER_CMD")
 kube_controller_manager_cmd=$(fetch_kube_cmd "$CIS_MANAGER_CMD")
 kube_scheduler_cmd=$(fetch_kube_cmd "$CIS_SCHEDULER_CMD")
-etcd_cmd=$(fetch_kube_cmd "$CIS_ETCD_CMD")
+etcd_cmd=$(echo "$CIS_ETCD_CMD" | grep -m1 'Managed etcd cluster' )
 kube_proxy_cmd=$(fetch_kube_cmd "$CIS_PROXY_CMD")
 kubelet_cmd=$(fetch_kube_cmd "$CIS_KUBELET_CMD")
 

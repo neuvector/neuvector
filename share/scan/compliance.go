@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -30,6 +31,7 @@ var (
 	kube123           = "cis-1.23"
 	kube124           = "cis-1.24"
 	kube180           = "cis-1.8.0"
+	k3s180            = "cis-k3s-1.8.0"
 	rh140             = "rh-1.4.0"
 	gke140            = "gke-1.4.0"
 	aks140            = "aks-1.4.0"
@@ -3040,6 +3042,8 @@ func GetCISFolder(platform, flavor, cloudPlatform string) {
 			} else {
 				cisVersion = defaultCISVersion
 			}
+		} else if strings.Contains(k8sVer, "k3s") {
+			cisVersion = k3s180
 		} else {
 			kVer, err := version.NewVersion(k8sVer)
 			if err != nil {

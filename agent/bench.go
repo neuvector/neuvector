@@ -561,17 +561,20 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 		b.kubeCisCmds[cmd] = cmdRemap
 	}
 
+	// Check if the node is a Kubernetes master
 	_, b.isKubeMaster = b.kubeCisCmds[cmdKubeApiServer]
-	if !b.isKubeMaster {
+
+	// Check if the node is a Kubernetes worker
+	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
+
+	k8sVer, _ := global.ORCH.GetVersion(false, false)
+
+	// Only fall back to K3s detection if the node is neither a master nor a worker
+	if !b.isKubeMaster && !b.isKubeWorker && strings.Contains(k8sVer, "k3s") {
 		if _, b.isKubeMaster = b.kubeCisCmds[cmdK3sServer]; b.isKubeMaster {
 			b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
 			b.isK3s = true
-		}
-	}
-
-	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
-	if !b.isKubeWorker {
-		if _, b.isKubeWorker = b.kubeCisCmds[cmdK3sAgent]; b.isKubeWorker {
+		} else if _, b.isKubeWorker = b.kubeCisCmds[cmdK3sAgent]; b.isKubeWorker {
 			b.kubeCisCmds[cmdKubelet] = cmdKubelet
 			b.isK3s = true
 		}
@@ -1319,6 +1322,7 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 
 	var journalStr string
 	var journalErr error
+	// Read the journal string for K3s to check if some of the command arguments are set correctly.
 	if b.isK3s {
 		journalStr, journalErr = b.readJournal()
 		if journalErr != nil {
@@ -1339,7 +1343,7 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 			config = remediationFolder + "worker"
 		}
 	}
-	// Read the journal string for K3s to check if some of the command arguments are set correctly.
+	// journalStr only works for k3s cases, k8s cases will not be affected
 	cmd = exec.Command("sh", script, config, journalStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
