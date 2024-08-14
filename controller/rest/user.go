@@ -382,9 +382,17 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	resp.GlobalPermits, resp.DomainPermits, _ = access.GetUserPermissions(user.Role, user.RoleDomains, user.ExtraPermits, user.ExtraPermitsDomains)
 
 	// collect all top-level permissions from role/extraPermits for global domain on remote managed clsuters
-	role := user.RemoteRolePermits.DomainRole[access.AccessDomainGlobal]
-	extraPermits := user.RemoteRolePermits.ExtraPermits[access.AccessDomainGlobal]
-	resp.RemoteGlobalPermits, _, _ = access.GetUserPermissions(role, nil, extraPermits, nil)
+	if user.RemoteRolePermits != nil {
+		role := api.UserRoleNone
+		extraPermits := share.NvPermissions{}
+		if user.RemoteRolePermits.DomainRole != nil {
+			role = user.RemoteRolePermits.DomainRole[access.AccessDomainGlobal]
+		}
+		if user.RemoteRolePermits.ExtraPermits != nil {
+			extraPermits = user.RemoteRolePermits.ExtraPermits[access.AccessDomainGlobal]
+		}
+		resp.RemoteGlobalPermits, _, _ = access.GetUserPermissions(role, nil, extraPermits, nil)
+	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
 }
