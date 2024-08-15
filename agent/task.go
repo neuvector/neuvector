@@ -196,22 +196,25 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 	if hasCPath {
 		log.SetLevel(log.DebugLevel)
 	} else {
-		log.SetLevel(log.InfoLevel)
+		if conf.SyslogLevel == "debug" {
+			newDebug.Add("ctrl")
+		}
+		log.SetLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
 	}
 	if hasConn {
 		connLog.Level = log.DebugLevel
 	} else {
-		connLog.Level = log.InfoLevel
+		connLog.Level = share.CLUSGetSyslogLevel(conf.SyslogLevel)
 	}
 
-	prober.SetMonitorTrace(hasMonitorTrace)
-	fileWatcher.SetMonitorTrace(hasMonitorTrace)
+	prober.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
+	fileWatcher.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
 
 	if !agentEnv.runWithController {
 		if hasCluster {
 			cluster.SetLogLevel(log.DebugLevel)
 		} else {
-			cluster.SetLogLevel(log.InfoLevel)
+			cluster.SetLogLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
 		}
 	}
 

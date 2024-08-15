@@ -2869,11 +2869,11 @@ func (p *Probe) HandleProcessPolicyChange(id string, pid int, pg *share.CLUSProc
 	}
 }
 
-func (p *Probe) SetMonitorTrace(bEnable bool) {
+func (p *Probe) SetMonitorTrace(bEnable bool, syslogLevel string) {
 	if bEnable {
 		mLog.Level = log.DebugLevel
 	} else {
-		mLog.Level = log.InfoLevel
+		mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
 	}
 }
 

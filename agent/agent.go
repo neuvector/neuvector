@@ -248,11 +248,11 @@ func main() {
 	var err error
 
 	log.SetOutput(os.Stdout)
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(share.CLUSGetSyslogLevel(gInfo.agentConfig.SyslogLevel))
 	log.SetFormatter(&utils.LogFormatter{Module: "AGT"})
 
 	connLog.Out = os.Stdout
-	connLog.Level = log.InfoLevel
+	connLog.Level = share.CLUSGetSyslogLevel(gInfo.agentConfig.SyslogLevel)
 	connLog.Formatter = &utils.LogFormatter{Module: "AGT"}
 
 	log.WithFields(log.Fields{"version": Version}).Info("START")
@@ -283,16 +283,25 @@ func main() {
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
+	syslog_level := flag.String("syslog_level", share.SyslogLevel_Info, "Syslog level")
 	flag.Parse()
 
+	// debug setting will overrite syslog_level setting
 	if *debug {
 		log.SetLevel(log.DebugLevel)
 		gInfo.agentConfig.Debug = []string{"ctrl"}
+	} else if *syslog_level != "" && *syslog_level != gInfo.agentConfig.SyslogLevel {
+		gInfo.agentConfig.SyslogLevel = *syslog_level
+		log.SetLevel(share.CLUSGetSyslogLevel(gInfo.agentConfig.SyslogLevel))
+		connLog.Level = share.CLUSGetSyslogLevel(gInfo.agentConfig.SyslogLevel)
+		if *syslog_level == share.SyslogLevel_Debug {
+			gInfo.agentConfig.Debug = []string{"ctrl"}
+		}
 	}
 
 	if *debug_level != "" {
 		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, strings.Split(*debug_level, " ")...))
-		if !*debug && levels.Contains("ctrl") {
+		if !*debug && *syslog_level != share.SyslogLevel_Debug && levels.Contains("ctrl") {
 			levels.Remove("ctrl")
 		}
 		gInfo.agentConfig.Debug = levels.ToStringSlice()
@@ -665,7 +674,7 @@ func main() {
 		WalkHelper:           walkerTask,
 	}
 
-	if prober, err = probe.New(&probeConfig); err != nil {
+	if prober, err = probe.New(&probeConfig, gInfo.agentConfig.SyslogLevel); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to probe. Exit!")
 		os.Exit(-2)
 	}
@@ -683,7 +692,7 @@ func main() {
 		EstRule:        cbEstimateFileAlertByGroup,
 	}
 
-	if fileWatcher, err = fsmon.NewFileWatcher(&fmonConfig); err != nil {
+	if fileWatcher, err = fsmon.NewFileWatcher(&fmonConfig, gInfo.agentConfig.SyslogLevel); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to open file monitor!")
 		os.Exit(-2)
 	}

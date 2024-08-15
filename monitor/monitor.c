@@ -59,6 +59,7 @@
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 #define ENV_SET_CUSTOM_BENCH   "CUSTOM_CHECK_CONTROL"
+#define ENV_AGT_SYSLOG_LEVEL   "AGT_SYSLOG_LEVEL"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -216,7 +217,7 @@ static pid_t fork_exec(int i)
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
-    char *custom_check_control;
+    char *custom_check_control, *syslog_level;
     int a;
 
     switch (i) {
@@ -533,6 +534,10 @@ static pid_t fork_exec(int i)
         if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
             args[a++] = "-cbench";
             args[a++] = custom_check_control;
+        }
+        if ((syslog_level = getenv(ENV_AGT_SYSLOG_LEVEL)) != NULL) {
+            args[a ++] = "-syslog_level";
+            args[a ++] = syslog_level;
         }
         args[a] = NULL;
         break;
