@@ -1215,9 +1215,18 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 
 	if forTesting {
 		var actioMsg string = "allowed"
+		var ruleIdMsg string
 		if reqEvalResult.ReqAction == share.AdmCtrlActionDeny {
 			actioMsg = "denied"
 			allowed = false
+
+			ruleScope := ""
+			criticalAssessment := reqEvalResult.CriticalAssessment
+			criticalMatch := criticalAssessment.CriticalMatch
+			if criticalMatch.IsFedRule {
+				ruleScope = "federal "
+			}
+			ruleIdMsg = fmt.Sprintf(" because of %sdeny rule id %d", ruleScope, criticalMatch.RuleID)
 		}
 
 		matchedCount := 0
@@ -1233,7 +1242,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 			matchedResults = append(matchedResults, assessResult.MatchedResults...)
 		}
 
-		statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s.", msgHeader, opDisplay, req.Kind.Kind, actioMsg, unscannedImagesMsg)
+		statusResult.Message = fmt.Sprintf("%s%s of Kubernetes %s is %s%s%s.", msgHeader, opDisplay, req.Kind.Kind, actioMsg, ruleIdMsg, unscannedImagesMsg)
 
 	} else {
 		violatedContainers := make([]string, 0, 4)
