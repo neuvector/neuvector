@@ -571,12 +571,18 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 
 	// Only fall back to K3s detection if the node is neither a master nor a worker
 	if !b.isKubeMaster && !b.isKubeWorker && strings.Contains(k8sVer, "k3s") {
-		if _, b.isKubeMaster = b.kubeCisCmds[cmdK3sServer]; b.isKubeMaster {
-			b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
-			b.isK3s = true
-		} else if _, b.isKubeWorker = b.kubeCisCmds[cmdK3sAgent]; b.isKubeWorker {
+		// use dir := "/proc/1/root/var/lib/rancher/k3s/server" to check if in k3s master
+		dir := "/proc/1/root/var/lib/rancher/k3s/server"
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			b.isKubeWorker = true
 			b.kubeCisCmds[cmdKubelet] = cmdKubelet
 			b.isK3s = true
+		} else if err == nil {
+			b.isKubeMaster = true
+			b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
+			b.isK3s = true
+		} else {
+			log.WithFields(log.Fields{"error": err, "directory": dir}).Error("Error checking directory")
 		}
 	}
 

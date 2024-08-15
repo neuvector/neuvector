@@ -479,10 +479,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-            warn "      * Wrong ownership for the following files:"
-            for f in $incorrect_files; do
-              warn "      * - $f"
-            done
+            warn "      * Wrong ownership for the following files: $incorrect_files"
           fi
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chown -R root:root /var/lib/rancher/k3s/server/tls
@@ -515,10 +512,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-            warn "      * Wrong permissions for the following files:"
-            for f in $incorrect_files; do
-              warn "      * - $f"
-            done
+            warn "      * Wrong permissions for the following files: $incorrect_files"
           fi              
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chmod -R 600 /var/lib/rancher/k3s/server/tls/*.crt
@@ -551,10 +545,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-            warn "      * Wrong permissions for the following files:"
-            for f in $incorrect_files; do
-              warn "      * - $f"
-            done
+            warn "      * Wrong permissions for the following files: $incorrect_files"
           fi
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chmod -R 600 /var/lib/rancher/k3s/server/tls/*.key
