@@ -3101,7 +3101,7 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 		}
 	}
 	if errCount > 0 {
-		log.Printf("CRD validate fail : %s\n", errMsg)
+		log.Printf("CRD validate fail : %s", errMsg)
 	}
 
 	return crdCfgRet, errCount, errMsg, recordName
