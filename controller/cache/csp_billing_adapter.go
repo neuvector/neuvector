@@ -84,7 +84,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 		// However, for NV deployment on native docker (as downstream cluster in multi-cluster env), downstream nv reports its enforcer count as node count to master cluster.
 		clusterUsage.nodes = cacher.GetAgentCount(acc, "")
 	} else {
-		if objs, err := global.ORCH.ListResource(resource.RscTypeNode); err == nil {
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNode, ""); err == nil {
 			clusterUsage.nodes = len(objs)
 		} else {
 			clusterUsage.nodes = 1

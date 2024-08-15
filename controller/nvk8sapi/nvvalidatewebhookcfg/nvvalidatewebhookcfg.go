@@ -106,7 +106,7 @@ func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, sel
 	allowedNamespaces = allowedNS
 	allowedNamespacesWild = allowedNsWild
 	defAllowedNamespaces = defAllowedNS
-	if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
+	if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace, ""); len(objs) > 0 {
 		for _, obj := range objs {
 			if nsObj, ok := obj.(*resource.Namespace); nsObj != nil && ok {
 				VerifyK8sNs(admCtrlEnabled, nsObj.Name, nsObj.Labels)
@@ -121,7 +121,7 @@ func UpdateAllowedK8sNs(isLead, admCtrlEnabled bool, newAllowedNS, newAllowedNsW
 	allowedNamespaces = newAllowedNS
 	allowedNamespacesWild = newAllowedNsWild
 	if isLead {
-		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace, ""); len(objs) > 0 {
 			for _, obj := range objs {
 				if nsObj := obj.(*resource.Namespace); nsObj != nil {
 					VerifyK8sNs(admCtrlEnabled, nsObj.Name, nsObj.Labels)

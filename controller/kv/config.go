@@ -258,11 +258,31 @@ func (c *configHelper) NotifyConfigChange(endpoint string) {
 	c.backupTimer.Reset(backupDelayIdle)
 }
 
+func (c *configHelper) isKvRestoring() (string, bool) {
+	var kvRestore share.CLUSKvRestore
+
+	value, _ := cluster.Get(share.CLUSKvRestoreKey)
+	if value != nil {
+		json.Unmarshal(value, &kvRestore)
+		if !kvRestore.StartAt.IsZero() && time.Since(kvRestore.StartAt) < time.Duration(2)*time.Minute {
+			return kvRestore.CtrlerID, true
+		}
+	}
+
+	return "", false
+}
+
 func (c *configHelper) doBackup() error {
 	if !c.persist {
 		return nil
 	}
+
 	log.Debug()
+
+	if id, restoring := c.isKvRestoring(); restoring {
+		log.WithFields(log.Fields{"id": id}).Debug("Restoring is ongoing")
+		return nil
+	}
 
 	// Make a copy of changed sections so we don't hold the lock for too long
 	c.cfgMutex.Lock()
@@ -355,6 +375,30 @@ func (c *configHelper) Restore() (string, bool, error) {
 		}
 
 		return "", false, nil
+	} else {
+		kvRestore := share.CLUSKvRestore{StartAt: time.Now(), CtrlerID: c.id}
+		kvRestoreValue, _ := json.Marshal(&kvRestore)
+		if lock, err := clusHelper.AcquireLock(share.CLUSLockRestoreKey, time.Duration(time.Second)); err == nil {
+			skipRestore := false
+			ver := GetControlVersion()
+			if ver.CtrlVersion == "" && ver.KVVersion == "" {
+				if id, restoring := c.isKvRestoring(); restoring {
+					log.WithFields(log.Fields{"id": id}).Info("Restoring is ongoing")
+					skipRestore = true
+				} else {
+					cluster.Put(share.CLUSKvRestoreKey, kvRestoreValue)
+				}
+			} else {
+				log.WithFields(log.Fields{"ver": ver}).Info("No need")
+				skipRestore = true
+			}
+			clusHelper.ReleaseLock(lock)
+			if skipRestore {
+				return "", false, nil
+			}
+		} else {
+			return "", false, nil
+		}
 	}
 
 	importInfo := fedRulesRevInfo{}
@@ -401,6 +445,8 @@ func (c *configHelper) Restore() (string, bool, error) {
 			clusHelper.PutFedRulesRevision(nil, &fedRulesRev)
 		}
 	}
+
+	cluster.Delete(share.CLUSKvRestoreKey)
 
 	return importInfo.fedRole, importInfo.defAdminRestored, err
 }

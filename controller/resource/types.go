@@ -114,6 +114,8 @@ type Service struct {
 type Container struct {
 	Id            string
 	Name          string
+	RequestMemory string
+	LimitMemory   string
 	Privileged    bool
 	LivenessCmds  []string
 	ReadinessCmds []string

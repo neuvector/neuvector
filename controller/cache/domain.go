@@ -3,10 +3,10 @@ package cache
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -356,7 +356,7 @@ func pruneOrphanGroups() {
 		cacheMutexRUnlock()
 		// now domains contains those k8s namespaces for all groups in nv
 
-		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace); len(objs) > 0 {
+		if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace, ""); len(objs) > 0 {
 			k8sNSs := utils.NewSet()
 			for _, obj := range objs {
 				if nsObj := obj.(*resource.Namespace); nsObj != nil {

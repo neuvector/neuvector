@@ -107,7 +107,7 @@ func (d *noop) RegisterResource(rt string) error {
 	return ErrMethodNotSupported
 }
 
-func (d *noop) ListResource(rt string) ([]interface{}, error) {
+func (d *noop) ListResource(rt, namespace string) ([]interface{}, error) {
 	return nil, ErrMethodNotSupported
 }
 

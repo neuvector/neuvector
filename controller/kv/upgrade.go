@@ -962,6 +962,11 @@ const (
 	_fedClusterUpgradeOngoing = 103 // do not change
 )
 
+func GetControlVersion() share.CLUSCtrlVersion {
+	ver := getControlVersion()
+	return *ver
+}
+
 // check if the request handling cluster can handle request from the requesting cluster
 // for "fed kv version":
 //  1. the request handling cluster & requesting cluster have the same "fed kv version", it means they can handle requests from each other in the same federation

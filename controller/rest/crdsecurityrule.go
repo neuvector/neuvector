@@ -3794,7 +3794,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 	var imported, deleted []string
 
 	recordList := clusHelper.GetCrdSecurityRuleRecordList(kvCrdKind)
-	objs, err = global.ORCH.ListResource(rscType)
+	objs, err = global.ORCH.ListResource(rscType, "")
 	if err != nil {
 		log.WithFields(log.Fields{"rscType": rscType, "err": err}).Error()
 		return err

@@ -468,7 +468,7 @@ func syncMemberStateFromCluster() []*share.CLUSController {
 
 	cs := make([]*share.CLUSController, 0)
 	cids := utils.NewSet()
-	controllers := clusHelper.GetAllControllers()
+	controllers, _ := clusHelper.GetAllControllers()
 	for _, c := range controllers {
 		if n, ok := memberStateMap[c.ClusterIP]; !ok || n.Role != cluster.NodeRoleServer {
 			log.WithFields(log.Fields{"node": c.ClusterIP}).Debug("ctrl is missing")
