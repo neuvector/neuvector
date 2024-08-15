@@ -2041,7 +2041,7 @@ func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]stri
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
 
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
-	var otherAlerts map[string]string
+	otherAlerts := map[string]string{}
 	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
 		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
 		// _fedClusterLeft(206), _fedClusterDisconnected(204)
@@ -2057,7 +2057,7 @@ func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]stri
 			}
 		}
 		if len(ids) > 0 {
-			for id, _ := range ids {
+			for id := range ids {
 				s := cacher.GetFedJoinedClusterStatus(id, acc)
 				if elapsed := time.Since(s.LastConnectedTime); s.LastConnectedTime.IsZero() || elapsed > (time.Duration(_teleFreq)*time.Minute) {
 					key, alert := getFedDisconnectAlert(fedRole, id, acc)
@@ -2083,61 +2083,6 @@ func getAcceptedAlerts(acceptedAlerts utils.Set) []string {
 	}
 
 	return acceptedManagerAlerts
-}
-
-func handlerSystemGetRBAC(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
-	defer r.Body.Close()
-
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	}
-
-	var resp api.RESTK8sNvRbacStatus = api.RESTK8sNvRbacStatus{
-		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
-	}
-
-	// populate neuvector_upgrade_info
-	if nvUpgradeInfo := getNvUpgradeInfo(); nvUpgradeInfo != nil {
-		resp.NvUpgradeInfo = nvUpgradeInfo
-	} else {
-		resp.NvUpgradeInfo = nil
-	}
-
-	// populate acceptable_alerts
-	clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts, otherAlerts, acceptedAlerts := getAcceptableAlerts(acc, login)
-	var acceptable [5]map[string]string
-	for i, alerts := range [][]string{clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts} {
-		if len(alerts) > 0 {
-			acceptable[i] = make(map[string]string, 0)
-			for _, alert := range alerts {
-				b := md5.Sum([]byte(alert))
-				key := hex.EncodeToString(b[:])
-				if !acceptedAlerts.Contains(key) {
-					// this alert has not been accepted yet. put it in the response
-					acceptable[i][key] = alert
-				}
-			}
-		}
-	}
-	resp.AcceptableAlerts = &api.RESTK8sNvAcceptableAlerts{
-		ClusterRoleErrors:        acceptable[0],
-		ClusterRoleBindingErrors: acceptable[1],
-		RoleErrors:               acceptable[2],
-		RoleBindingErrors:        acceptable[3],
-		NvCrdSchemaErrors:        acceptable[4],
-	}
-	if otherAlerts != nil {
-		resp.AcceptableAlerts.OtherAlerts = otherAlerts
-	}
-
-	// populate accepted_alerts
-	if acceptedManagerAlerts := getAcceptedAlerts(acceptedAlerts); len(acceptedManagerAlerts) > 0 {
-		resp.AcceptedAlerts = acceptedManagerAlerts
-	}
-
-	restRespSuccess(w, r, &resp, acc, login, nil, "Get missing Kubernetes RBAC")
 }
 
 func getAlertGroup(alerts []string, alertType api.AlertType, acceptedAlerts utils.Set) *api.RESTNvAlertGroup {
