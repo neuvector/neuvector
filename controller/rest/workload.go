@@ -262,7 +262,21 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cached := cacher.GetAllWorkloads(view, acc)
+	// get POST body
+	idlist := utils.NewSet()
+	if r.Method == http.MethodPost {
+		var idListData api.RESTAssetIDList
+		body, _ := io.ReadAll(r.Body)
+		err := json.Unmarshal(body, &idListData)
+		if err != nil {
+			// TODO: error handling
+			log.WithFields(log.Fields{"error": err}).Error("Request error")
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		}
+		idlist = utils.NewSetFromStringSlice(idListData.IDs)
+	}
+
+	cached := cacher.GetAllWorkloads(view, acc, idlist)
 
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {

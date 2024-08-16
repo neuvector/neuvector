@@ -42,7 +42,7 @@ type CacheInterface interface {
 	GetAgentbyWorkload(wlID string, acc *access.AccessControl) (string, error)
 	GetAgentsbyHost(hostID string, acc *access.AccessControl) ([]string, error)
 
-	GetAllWorkloads(view string, acc *access.AccessControl) []*api.RESTWorkload
+	GetAllWorkloads(view string, acc *access.AccessControl, idlist utils.Set) []*api.RESTWorkload
 	GetAllWorkloadsBrief(view string, acc *access.AccessControl) []*api.RESTWorkloadBrief
 	GetAllWorkloadsDetail(view string, acc *access.AccessControl) []*api.RESTWorkloadDetail
 	GetWorkloadCount(acc *access.AccessControl) (int, int, int)

@@ -1030,6 +1030,9 @@ func CompileUriPermitsMapping() {
 				"v1/file/vulnerability/profile",
 				"v1/file/vulnerability/profile/config",
 			},
+			CONST_API_WORKLOAD: []string{
+				"v2/workload",
+			},
 		}
 
 		apiURIsPATCH := map[int8][]string{

@@ -3389,6 +3389,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				"/v1/file/vulnerability/profile",
 				"/v1/vulasset",
 				"/v1/assetvul",
+				"/v2/workload",
 			})
 			if exportURIs.Contains(request) {
 				allowedPost = true

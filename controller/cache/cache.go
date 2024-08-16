@@ -1206,7 +1206,7 @@ func (m CacheMethod) GetAllAgents(acc *access.AccessControl) []*api.RESTAgent {
 	return agents
 }
 
-func (m CacheMethod) GetAllWorkloads(view string, acc *access.AccessControl) []*api.RESTWorkload {
+func (m CacheMethod) GetAllWorkloads(view string, acc *access.AccessControl, idlist utils.Set) []*api.RESTWorkload {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
@@ -1220,6 +1220,12 @@ func (m CacheMethod) GetAllWorkloads(view string, acc *access.AccessControl) []*
 			}
 			if common.OEMIgnoreWorkload(cache.workload) {
 				continue
+			}
+
+			if idlist.Cardinality() > 0 {
+				if idlist.Contains(cache.workload.ID) == false {
+					continue
+				}
 			}
 
 			if cache.workload.ShareNetNS == "" {

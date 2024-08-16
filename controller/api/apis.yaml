@@ -4345,6 +4345,28 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadsDataV2'
+  /v2/workload:
+    post:
+      tags:
+        - Container
+      summary: Get container list that match the provided ID list
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Container ID list
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAssetIDList'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWorkloadsDataV2'
   /v1/workload/{id}:
     get:
       tags:
@@ -14134,3 +14156,13 @@ definitions:
       write_value:
         type: integer
         format: uint32
+  RESTAssetIDList:
+    type: object
+    required:
+      - ids
+    properties:
+      ids:
+        type: array
+        items:
+          type: string
+          example: "<container id>"

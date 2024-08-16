@@ -1640,7 +1640,8 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.GET("/v1/enforcer/:id/probe_containers", handlerProbeContainerMap) // debug
 	// r.GET("/v1/enforcer/:id/logs", handlerAgentGetLogs)               // debug
 	r.GET("/v1/workload", handlerWorkloadList)
-	r.GET("/v2/workload", handlerWorkloadListV2) // starting from 5.0, rest client should call this api.
+	r.GET("/v2/workload", handlerWorkloadListV2)  // starting from 5.0, rest client should call this api.
+	r.POST("/v2/workload", handlerWorkloadListV2) // starting from 5.0, rest client should call this api.
 	r.GET("/v1/workload/:id", handlerWorkloadShow)
 	r.GET("/v2/workload/:id", handlerWorkloadShowV2) // starting from 5.0, rest client should call this api.
 	r.GET("/v1/workload/:id/stats", handlerWorkloadStats)
