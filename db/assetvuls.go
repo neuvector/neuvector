@@ -216,7 +216,7 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 	}
 
 	columns := []interface{}{"assetid", "name", "w_domain", "w_applications", "policy_mode", "w_service_group",
-		"scanned_at", "idns", "vulsb"}
+		"scanned_at", "idns", "vulsb", "w_image"}
 
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForWorkload(assets, queryFilter.Filters)).Prepared(true).ToSQL()
@@ -237,7 +237,7 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 
 		var assetId, apps, idnsStr string
 		var vulsBytes []byte
-		err = rows.Scan(&assetId, &av.Name, &av.Domain, &apps, &av.PolicyMode, &av.ServiceGroup, &av.ScannedAt, &idnsStr, &vulsBytes)
+		err = rows.Scan(&assetId, &av.Name, &av.Domain, &apps, &av.PolicyMode, &av.ServiceGroup, &av.ScannedAt, &idnsStr, &vulsBytes, &av.Image)
 
 		if err != nil {
 			pool.StopAndWait()
