@@ -283,7 +283,7 @@ func main() {
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
-	syslog_level := flag.String("syslog_level", share.SyslogLevel_Info, "Syslog level")
+	syslog_level := flag.String("enf_syslog_level", share.SyslogLevel_Info, "Enforcer syslog level")
 	flag.Parse()
 
 	// debug setting will overrite syslog_level setting
