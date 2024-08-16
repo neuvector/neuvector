@@ -29,12 +29,13 @@ func TestAccessResource(t *testing.T) {
 	acc := access.NewAccessControl(r, access.AccessOPRead, map[string]string{D1: api.UserRoleAdmin}, nil)
 	accReadAll := access.NewReaderAccessControl()
 
-	wls := cacher.GetAllWorkloads("", accReadAll)
+	idlist := utils.NewSet()
+	wls := cacher.GetAllWorkloads("", accReadAll, idlist)
 	if len(wls) != 2 {
 		t.Errorf("Expecte 2 containers, but returned %d \n", len(wls))
 	}
 
-	wls = cacher.GetAllWorkloads("", acc)
+	wls = cacher.GetAllWorkloads("", acc, idlist)
 	if len(wls) != 1 {
 		t.Errorf("Expected 1 container, but returned %d \n", len(wls))
 	} else if wls[0].ID != "1" {

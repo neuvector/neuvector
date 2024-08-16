@@ -4124,3 +4124,7 @@ type AssetCVECount struct {
 	Medium      int    `json:"medium"`
 	Low         int    `json:"low"`
 }
+
+type RESTAssetIDList struct {
+	IDs []string `json:"ids"`
+}

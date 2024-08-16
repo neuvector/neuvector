@@ -11,6 +11,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
@@ -235,7 +236,14 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
+	var accessOp access.AccessOP
+	if r.Method == http.MethodPost {
+		accessOp = access.AccessOPRead
+	} else {
+		accessOp = ""
+	}
+
+	acc, login := getAccessControl(w, r, accessOp)
 	if acc == nil {
 		return
 	}
@@ -262,7 +270,21 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cached := cacher.GetAllWorkloads(view, acc)
+	// get POST body
+	idlist := utils.NewSet()
+	if r.Method == http.MethodPost {
+		var idListData api.RESTAssetIDList
+		body, _ := io.ReadAll(r.Body)
+		err := json.Unmarshal(body, &idListData)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Request error")
+			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+			return
+		}
+		idlist = utils.NewSetFromStringSlice(idListData.IDs)
+	}
+
+	cached := cacher.GetAllWorkloads(view, acc, idlist)
 
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
