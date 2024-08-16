@@ -4345,7 +4345,6 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTWorkloadsDataV2'
-  /v2/workload:
     post:
       tags:
         - Container
