@@ -1162,7 +1162,6 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/fed/healthcheck",
 		},
 		CONST_API_DEBUG: []string{
-			"v1/fed/member",
 			"v1/meter",
 			"v1/enforcer/*/probe_summary",
 			"v1/enforcer/*/probe_processes",
@@ -1348,6 +1347,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/internal/system",
 		},
 		CONST_API_FED: []string{
+			"v1/fed/member",
 			"v1/fed/join_token",
 			"v1/fed/cluster/*/**",
 			"v1/fed/view/*",

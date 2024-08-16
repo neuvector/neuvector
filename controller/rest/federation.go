@@ -1365,8 +1365,11 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	acc, login := isFedOpAllowed(FedRoleAny, _readerRequired, w, r)
-	if acc == nil || login == nil {
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if !login.hasFedPermission() {
+		restRespAccessDenied(w, login)
 		return
 	}
 
