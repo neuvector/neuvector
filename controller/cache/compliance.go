@@ -199,6 +199,12 @@ type wlMini struct {
 	mode string
 }
 
+type podVuls struct {
+	CriticalVuls int
+	HighVuls int
+	MedVuls int
+}
+
 func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTInternalSystemData {
 	var s api.RESTRiskScoreMetrics
 
@@ -246,6 +252,38 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		s.Groups.Groups++
 	}
 
+	// Calculate pod vulnerabilities
+	podVulsMap := make(map[string]podVuls) // podName => podVuls
+	for _, cache := range wlCacheMap {
+		wl := cache.workload
+		if !acc.Authorize(wl, nil) {
+			continue
+		}
+		if common.OEMIgnoreWorkload(wl) {
+			continue
+		}
+		if cache.platformRole != "" && disableSystem {
+			// skip system containers
+			continue
+		}
+		if !wl.Running || cache.scanBrief == nil {
+			continue
+		}
+
+		// Calculate sum of vulnerabilities for containers in each pod
+		// Do not re-sum existing pod vulnerabilities
+		if wl.ShareNetNS != "" {
+			pv, ok := podVulsMap[cache.podName]
+			if !ok {
+				pv = podVuls{}
+			}
+			pv.CriticalVuls += cache.scanBrief.CriticalVuls
+			pv.HighVuls += cache.scanBrief.HighVuls
+			pv.MedVuls += cache.scanBrief.MedVuls
+			podVulsMap[cache.podName] = pv
+		}
+	}
+
 	// get all running pod
 	epMap := make(map[string]*wlMini) // id ==> plicy mode
 	for _, cache := range wlCacheMap {
@@ -273,8 +311,14 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 			mode = gc.group.PolicyMode
 		}
 
+		// Assign containers' sum of vulnerabilities to pod cache
 		if wl.ShareNetNS == "" {
 			epMap[cache.workload.ID] = &wlMini{mode: mode}
+			if podVuls, ok := podVulsMap[cache.podName]; ok {
+				cache.scanBrief.CriticalVuls = podVuls.CriticalVuls
+				cache.scanBrief.HighVuls = podVuls.HighVuls
+				cache.scanBrief.MedVuls = podVuls.MedVuls
+			}
 		} else {
 			// Only counts app containers, not pod
 			if wl.Privileged {
