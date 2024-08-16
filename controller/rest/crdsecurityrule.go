@@ -357,10 +357,10 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 					}
 				}
 				if cg.PolicyMode == "" {
-					cg.PolicyMode = cacher.GetNewServicePolicyMode()
+					cg.PolicyMode, _ = cacher.GetNewServicePolicyMode()
 				}
 				if cg.ProfileMode == "" {
-					cg.ProfileMode = cg.PolicyMode
+					_, cg.ProfileMode = cacher.GetNewServicePolicyMode()
 				}
 				if cg.BaselineProfile == "" {
 					cg.BaselineProfile = cacher.GetNewServiceProfileBaseline()
@@ -2235,10 +2235,11 @@ targetpass:
 				}
 			}
 		} else {
-			tmp := cacher.GetNewServicePolicyMode()
+			tmp, tmProfile := cacher.GetNewServicePolicyMode()
 			crdCfgRet.PolicyModeCfg = &api.RESTServiceConfig{
 				Name:       crdCfgRet.TargetName,
 				PolicyMode: &tmp,
+				ProfileMode: &tmProfile,
 			}
 		}
 	} else {
@@ -3612,7 +3613,12 @@ func (h *nvCrdHandler) crdGetProfileSecurityLevel(profileName, securityName stri
 
 		// no more related crd record, restore as system default
 		if mode == "" {
-			mode = cacher.GetNewServicePolicyMode()
+			if securityName == "policyMode" {
+				mode, _ = cacher.GetNewServicePolicyMode()
+			}
+			if securityName == "profileMode" {
+				_, mode = cacher.GetNewServicePolicyMode()
+			}
 		}
 	}
 	return mode

@@ -301,6 +301,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 				Config: &api.RESTSystemConfigV2{
 					NewSvc: api.RESTSystemConfigNewSvcV2{
 						NewServicePolicyMode:      rconf.NewServicePolicyMode,
+						NewServiceProfileMode:      rconf.NewServiceProfileMode,
 						NewServiceProfileBaseline: rconf.NewServiceProfileBaseline,
 					},
 					Syslog: api.RESTSystemConfigSyslogV2{
@@ -427,6 +428,12 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
+	if rc.ProfileMode != nil && *rc.ProfileMode == share.PolicyModeEnforce &&
+		licenseAllowEnforce() == false {
+		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+		return
+	}
+	policy_mode := ""
 	if rc.PolicyMode != nil {
 		switch *rc.PolicyMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
@@ -436,11 +443,24 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
-		if err := setServicePolicyModeAll(*rc.PolicyMode, acc); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Fail to set policy mode")
-			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		policy_mode = *rc.PolicyMode
+	}
+	profile_mode := ""
+	if rc.ProfileMode != nil {
+		switch *rc.ProfileMode {
+		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+		default:
+			e := "Invalid profile mode"
+			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
+		profile_mode = *rc.ProfileMode
+	}
+	if err := setServicePolicyModeAll(policy_mode, profile_mode, acc); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Fail to set policy and  profile mode")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return
 	}
 
 	if rc.BaselineProfile != nil {
@@ -1171,6 +1191,18 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 					return kick, errors.New(e)
 				}
 			}
+			// New profile mode
+			if rc.NewServiceProfileMode != nil {
+				switch *rc.NewServiceProfileMode {
+				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+					cconf.NewServiceProfileMode = *rc.NewServiceProfileMode
+				default:
+					e := "Invalid new service profile mode"
+					log.WithFields(log.Fields{"new_service_profile_mode": *rc.NewServiceProfileMode}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return kick, errors.New(e)
+				}
+			}
 			// New baseline profile setting
 			if rc.NewServiceProfileBaseline != nil {
 				blValue := strings.ToLower(*rc.NewServiceProfileBaseline)
@@ -1679,6 +1711,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 			configV2 := rconf.ConfigV2
 			if configV2.SvcCfg != nil {
 				config.NewServicePolicyMode = configV2.SvcCfg.NewServicePolicyMode
+				config.NewServiceProfileMode = configV2.SvcCfg.NewServiceProfileMode
 				config.NewServiceProfileBaseline = configV2.SvcCfg.NewServiceProfileBaseline
 			}
 			if configV2.SyslogCfg != nil {

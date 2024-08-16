@@ -327,6 +327,16 @@ func validateServiceConfig(rg *api.RESTServiceConfig) (int, string) {
 		}
 	}
 
+	if rg.ProfileMode != nil {
+		switch *rg.ProfileMode {
+		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
+		default:
+			e := fmt.Sprintf("Invalid profile mode %s", *rg.ProfileMode)
+			log.WithFields(log.Fields{"profile_mode": *rg.ProfileMode}).Error("Invalide profile mode")
+			return api.RESTErrInvalidRequest, e
+		}
+	}
+
 	return 0, ""
 }
 
@@ -1077,6 +1087,23 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 
+	if rc.ProfileMode != nil {
+		switch *rc.ProfileMode {
+		case share.PolicyModeLearn, share.PolicyModeEvaluate:
+		case share.PolicyModeEnforce:
+			if licenseAllowEnforce() == false {
+				e := "The profile mode is not enabled in the license"
+				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
+			}
+		default:
+			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
+			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return
+		}
+	}
+
 	if rc.BaselineProfile != nil {
 		blValue := strings.ToLower(*rc.BaselineProfile)
 		switch blValue {
@@ -1120,15 +1147,23 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		qualified = true
 
 		var changed bool = false
-		var policyChanged bool = false
+		var profileChanged bool = false
 		var baselineChanged bool
 		if rc.PolicyMode != nil {
 			if cacher.IsGroupPolicyModeChangeable(name) {
-				if grp.PolicyMode != *rc.PolicyMode || grp.ProfileMode != *rc.PolicyMode {
+				if grp.PolicyMode != *rc.PolicyMode {
 					grp.PolicyMode = *rc.PolicyMode
-					grp.ProfileMode = *rc.PolicyMode
 					changed = true
-					policyChanged = true
+				}
+			}
+		}
+
+		if rc.ProfileMode != nil {
+			if cacher.IsGroupPolicyModeChangeable(name) {
+				if grp.ProfileMode != *rc.ProfileMode {
+					grp.ProfileMode = *rc.ProfileMode
+					changed = true
+					profileChanged = true
 				}
 			}
 		}
@@ -1151,7 +1186,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 
 		if changed {
-			if policyChanged || baselineChanged {
+			if profileChanged || baselineChanged {
 				err := configPolicyMode(grp)
 				if err != nil {
 					restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
@@ -1179,8 +1214,8 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 }
 
-func setServicePolicyModeAll(mode string, acc *access.AccessControl) error {
-	log.WithFields(log.Fields{"mode": mode}).Debug()
+func setServicePolicyModeAll(policy_mode, profile_mode string, acc *access.AccessControl) error {
+	log.WithFields(log.Fields{"policy_mode": policy_mode, "profile_mode": profile_mode}).Debug()
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
@@ -1193,16 +1228,22 @@ func setServicePolicyModeAll(mode string, acc *access.AccessControl) error {
 		if isManagedByCRD(name, acc) {
 			continue
 		}
-		if grp.PolicyMode == mode || !cacher.IsGroupPolicyModeChangeable(grp.Name) {
+		if policy_mode == "" && profile_mode == "" {
+			continue
+		}
+		if (grp.PolicyMode == policy_mode && grp.ProfileMode == profile_mode) || !cacher.IsGroupPolicyModeChangeable(grp.Name) {
 			continue
 		}
 
-		grp.PolicyMode = mode
-		grp.ProfileMode = mode
-
-		err = configPolicyMode(grp)
-		if err != nil {
-			return err
+		if policy_mode != "" {
+			grp.PolicyMode = policy_mode
+		}
+		if profile_mode != "" {
+			grp.ProfileMode = profile_mode
+			err = configPolicyMode(grp)
+			if err != nil {
+				return err
+			}
 		}
 		if err := clusHelper.PutGroup(grp, false); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error()
@@ -1583,18 +1624,18 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 
 	rc := rconf.Config
 
-	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
+	if rc.ProfileMode != nil {
+		switch *rc.ProfileMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate:
 		case share.PolicyModeEnforce:
 			if licenseAllowEnforce() == false {
-				e := "The policy mode is not enabled in the license"
-				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
+				e := "The profile mode is not enabled in the license"
+				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
 			}
 		default:
-			e := fmt.Sprintf("Invalid policy mode %s", *rc.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error("Invalide policy mode")
+			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
+			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1629,13 +1670,13 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		qualified = true
 
 		var changed bool = false
-		var policyChanged bool = false
+		var profileChanged bool = false
 		var baselineChanged bool
-		if rc.PolicyMode != nil {
-			if grp.ProfileMode != *rc.PolicyMode && cacher.IsGroupPolicyModeChangeable(name) {
-				grp.ProfileMode = *rc.PolicyMode
+		if rc.ProfileMode != nil {
+			if grp.ProfileMode != *rc.ProfileMode && cacher.IsGroupPolicyModeChangeable(name) {
+				grp.ProfileMode = *rc.ProfileMode
 				changed = true
-				policyChanged = true
+				profileChanged = true
 			}
 		}
 		if rc.BaselineProfile != nil {
@@ -1655,7 +1696,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		}
 
 		if changed {
-			if policyChanged || baselineChanged {
+			if profileChanged || baselineChanged {
 				err := configPolicyMode(grp)
 				if err != nil {
 					restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
@@ -1965,7 +2006,7 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 				CreaterDomains: acc.GetAdminDomains(share.PERMS_RUNTIME_POLICIES),
 			}
 			if utils.DoesGroupHavePolicyMode(group.Name) {
-				cg.PolicyMode = cacher.GetNewServicePolicyMode()
+				cg.PolicyMode, cg.ProfileMode = cacher.GetNewServicePolicyMode()
 				fmt.Println("New learned svc ", group.Name, "set service as ", cg.PolicyMode)
 			}
 			cg.CfgType = share.UserCreated

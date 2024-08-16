@@ -212,8 +212,8 @@ func uniconfControllerDelete(id string, param interface{}) {
 	cluster.Delete(key)
 }
 
-func getNewServicePolicyMode() string {
-	return systemConfigCache.NewServicePolicyMode
+func getNewServicePolicyMode() (string, string) {
+	return systemConfigCache.NewServicePolicyMode, systemConfigCache.NewServiceProfileMode
 }
 
 func getNetServiceStatus() bool {
@@ -232,7 +232,7 @@ func getNewServiceProfileBaseline() string {
 	return systemConfigCache.NewServiceProfileBaseline
 }
 
-func (m CacheMethod) GetNewServicePolicyMode() string {
+func (m CacheMethod) GetNewServicePolicyMode() (string, string) {
 	return getNewServicePolicyMode()
 }
 
@@ -286,6 +286,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 
 	rconf := api.RESTSystemConfig{
 		NewServicePolicyMode:      systemConfigCache.NewServicePolicyMode,
+		NewServiceProfileMode:     systemConfigCache.NewServiceProfileMode,
 		NewServiceProfileBaseline: systemConfigCache.NewServiceProfileBaseline,
 		UnusedGroupAging:          systemConfigCache.UnusedGroupAging,
 		SyslogLevel:               systemConfigCache.SyslogLevel,
