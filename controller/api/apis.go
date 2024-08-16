@@ -4017,6 +4017,7 @@ type RESTWorkloadAssetView struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	Domain          string   `json:"domain"`
+	Image           string   `json:"image"`
 	Applications    []string `json:"applications"`
 	PolicyMode      string   `json:"policy_mode"`
 	ServiceGroup    string   `json:"service_group"`
