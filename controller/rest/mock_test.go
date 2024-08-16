@@ -471,8 +471,8 @@ func (m *mockCache) GetAllControllerRPCEndpoints(acc *access.AccessControl) []*c
 	return []*common.RPCEndpoint{}
 }
 
-func (m *mockCache) GetNewServicePolicyMode() string {
-	return share.PolicyModeLearn
+func (m *mockCache) GetNewServicePolicyMode() (string, string) {
+	return share.PolicyModeLearn, share.PolicyModeLearn
 }
 
 func (m *mockCache) GetNewServiceProfileBaseline() string {

@@ -209,7 +209,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 	var s api.RESTRiskScoreMetrics
 
 	s.Platform, s.K8sVersion, s.OCVersion = m.GetPlatform()
-	s.NewServiceMode = getNewServicePolicyMode()
+	s.NewServiceMode, s.NewProfileMode = getNewServicePolicyMode()
 
 	// Check if count system container/group
 	var disableSystem bool

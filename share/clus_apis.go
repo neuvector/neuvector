@@ -788,6 +788,7 @@ type CLUSWebhook struct {
 
 type CLUSSystemConfig struct {
 	NewServicePolicyMode      string `json:"new_service_policy_mode"`
+	NewServiceProfileMode     string `json:"new_service_profile_mode"`
 	NewServiceProfileBaseline string `json:"new_service_profile_baseline"`
 	UnusedGroupAging          uint8  `json:"unused_group_aging"`
 	CLUSSyslogConfig
