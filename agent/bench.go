@@ -84,8 +84,6 @@ const (
 	containerTimerStart = time.Second * 10
 	kubeTimerStart      = time.Second * 10
 	scriptTimerStart    = time.Second * 1
-	cmdK3sServer        = "k3s-server"
-	cmdK3sAgent         = "k3s-agent"
 	cmdKubeApiServer    = "kube-apiserver"
 	cmdKubeManager      = "kube-controller-manager"
 	cmdKubeScheduler    = "kube-scheduler"
@@ -562,30 +560,31 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 	}
 
 	// Check if the node is a Kubernetes master
-	_, b.isKubeMaster = b.kubeCisCmds[cmdKubeApiServer]
+	_, isKubeMaster := b.kubeCisCmds[cmdKubeApiServer]
 
 	// Check if the node is a Kubernetes worker
-	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
+	_, isKubeWorker := b.kubeCisCmds[cmdKubelet]
 
 	k8sVer, _ := global.ORCH.GetVersion(false, false)
 
-	// Only fall back to K3s detection if the node is neither a master nor a worker
-	if !b.isKubeMaster && !b.isKubeWorker && strings.Contains(k8sVer, "k3s") {
+	// Only fall back to K3s detection if the node is neither a master nor a worker.
+	// if k3s is both server and agent, NeuVector treat it as server
+	if !isKubeMaster && !isKubeWorker && strings.Contains(k8sVer, "k3s") {
 		// use dir := "/proc/1/root/var/lib/rancher/k3s/server" to check if in k3s master
+		// On K3s by default, all servers are also agents.
 		dir := "/proc/1/root/var/lib/rancher/k3s/server"
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			b.isKubeWorker = true
-			b.kubeCisCmds[cmdKubelet] = cmdKubelet
+			isKubeWorker = true
 			b.isK3s = true
 		} else if err == nil {
-			b.isKubeMaster = true
-			b.kubeCisCmds[cmdKubeApiServer] = cmdKubeApiServer
+			isKubeMaster = true
 			b.isK3s = true
 		} else {
 			log.WithFields(log.Fields{"error": err, "directory": dir}).Error("Error checking directory")
 		}
 	}
-
+	b.isKubeMaster = isKubeMaster
+	b.isKubeWorker = isKubeWorker
 	var sched bool
 
 	if b.isKubeMaster {
@@ -1343,7 +1342,10 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 	var config string
 
 	if b.cisYAMLMode {
-		if bench == share.BenchKubeMaster {
+		// On K3s by default, all servers are also agents, thus we let it reads all yamls
+		if bench == share.BenchKubeMaster && b.isK3s {
+			config = remediationFolder
+		} else if bench == share.BenchKubeMaster {
 			config = remediationFolder + "master"
 		} else if bench == share.BenchKubeWorker {
 			config = remediationFolder + "worker"

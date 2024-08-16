@@ -1,11 +1,11 @@
 #!/bin/sh
 
-CIS_APISERVER_CMD="<<<.Replace_apiserver_cmd>>>"
-CIS_MANAGER_CMD="<<<.Replace_manager_cmd>>>"
-CIS_SCHEDULER_CMD="<<<.Replace_scheduler_cmd>>>"
-CIS_ETCD_CMD="<<<.Replace_etcd_cmd>>>"
-CIS_PROXY_CMD="<<<.Replace_proxy_cmd>>>"
-CIS_KUBELET_CMD="<<<.Replace_kubelet_cmd>>>"
+CIS_APISERVER_CMD="kube-apiserver"
+CIS_MANAGER_CMD="kube-controller-manager"
+CIS_SCHEDULER_CMD="kube-scheduler"
+CIS_ETCD_CMD="etcd"
+CIS_PROXY_CMD="kube-proxy"
+CIS_KUBELET_CMD="kubelet"
 
 fetch_kube_cmd() {
     echo "$JOURNAL_LOG" |  grep "Running $1" | tail -n1   | sed "s/[\"']//g"
