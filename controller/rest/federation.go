@@ -1365,13 +1365,14 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
+	acc0, login := getAccessControl(w, r, "")
+	if acc0 == nil {
 		return
-	} else if !login.hasFedPermission() {
+	} else if !login.hasFedPermission() && !acc0.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) {
 		restRespAccessDenied(w, login)
 		return
 	}
+	acc := acc0.BoostPermissions(share.PERM_SYSTEM_CONFIG | share.PERM_FED)
 
 	org, err := cacher.GetFedMember(_clusterStatusMap, acc) // org is type RESTFedMembereshipData
 	if err != nil {
