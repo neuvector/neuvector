@@ -38,6 +38,8 @@ const (
 	dstYaml             = "/usr/local/bin/scripts/cis_yamls/"
 	srcHostBenchSh      = srcTmpl + "host.tmpl"
 	dstHostBenchSh      = dstSh + "host.sh"
+	journalScript       = srcSh + "journal.tmpl"
+	journalScriptSh     = dstSh + "journal.sh"
 	srcContainerBenchSh = srcTmpl + "container.tmpl"
 	dstContainerBenchSh = dstSh + "container.sh"
 	kube100MasterTmpl   = srcTmpl + "kube_master_1_0_0.tmpl"
@@ -60,6 +62,7 @@ const (
 	kube160YAMLFolder   = dstYaml + "cis-1.6.0/"
 	kube123YAMLFolder   = dstYaml + "cis-1.23/"
 	kube124YAMLFolder   = dstYaml + "cis-1.24/"
+	k3s180YAMLFolder    = dstYaml + "cis-k3s-1.8.0/"
 	kube180YAMLFolder   = dstYaml + "cis-1.8.0/"
 	rh140YAMLFolder     = dstYaml + "rh-1.4.0/"
 	gke140YAMLFolder    = dstYaml + "gke-1.4.0/"
@@ -138,6 +141,7 @@ type Bench struct {
 	dockerCISVer    string
 	taskScanner     *TaskScanner
 	cisYAMLMode     bool
+	isK3s           bool
 }
 
 type DockerReplaceOpts struct {
@@ -319,6 +323,11 @@ func (b *Bench) BenchLoop() {
 						workerScript = kubeOC43WorkerTmpl
 						remediation = kubeOC43Remediation
 					}
+				} else if b.isK3s {
+					b.kubeCISVer = "1.8.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = k3s180YAMLFolder
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
@@ -438,9 +447,11 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 
 	b.replaceKubeCisCmd(masterScript, masterScriptSh)
 	b.replaceKubeCisCmd(workerScript, workerScriptSh)
+	b.replaceKubeCisCmd(journalScript, journalScriptSh)
 
 	defer os.Remove(masterScriptSh)
 	defer os.Remove(workerScriptSh)
+	defer os.Remove(journalScriptSh)
 
 	var errMaster, errWorker error
 	var out []byte
@@ -548,9 +559,32 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 		b.kubeCisCmds[cmd] = cmdRemap
 	}
 
-	_, b.isKubeMaster = b.kubeCisCmds[cmdKubeApiServer]
-	_, b.isKubeWorker = b.kubeCisCmds[cmdKubelet]
+	// Check if the node is a Kubernetes master
+	_, isKubeMaster := b.kubeCisCmds[cmdKubeApiServer]
 
+	// Check if the node is a Kubernetes worker
+	_, isKubeWorker := b.kubeCisCmds[cmdKubelet]
+
+	k8sVer, _ := global.ORCH.GetVersion(false, false)
+
+	// Only fall back to K3s detection if the node is neither a master nor a worker.
+	// if k3s is both server and agent, NeuVector treat it as server
+	if !isKubeMaster && !isKubeWorker && strings.Contains(k8sVer, "k3s") {
+		// use dir := "/proc/1/root/var/lib/rancher/k3s/server" to check if in k3s master
+		// On K3s by default, all servers are also agents.
+		dir := "/proc/1/root/var/lib/rancher/k3s/server"
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			isKubeWorker = true
+			b.isK3s = true
+		} else if err == nil {
+			isKubeMaster = true
+			b.isK3s = true
+		} else {
+			log.WithFields(log.Fields{"error": err, "directory": dir}).Error("Error checking directory")
+		}
+	}
+	b.isKubeMaster = isKubeMaster
+	b.isKubeWorker = isKubeWorker
 	var sched bool
 
 	if b.isKubeMaster {
@@ -1253,9 +1287,52 @@ func (b *Bench) checkRequiredHostProgs(progs []string) error {
 	return nil
 }
 
+func (b *Bench) readJournal() (string, error) {
+	args := []string{system.NSActRun, "-f", journalScriptSh,
+		"-m", global.SYS.GetMountNamespacePath(1), "-n", global.SYS.GetNetNamespacePath(1)}
+	var errb, outb bytes.Buffer
+
+	cmd := exec.Command(system.ExecNSTool, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+	b.childCmd = cmd
+
+	err := cmd.Start()
+	if err != nil {
+		return "", err
+	}
+	pgid := cmd.Process.Pid
+	global.SYS.AddToolProcess(pgid, 1, "host-bench", journalScriptSh)
+	err = cmd.Wait()
+	global.SYS.RemoveToolProcess(pgid, false)
+	out := outb.Bytes()
+
+	b.childCmd = nil
+	if err != nil || len(out) == 0 {
+		if err == nil {
+			err = fmt.Errorf("Error executing read Journal scripts")
+		}
+		return "", err
+	}
+
+	result := string(out)
+	return result, nil
+}
+
 func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder string) ([]byte, error) {
 	if !b.bEnable {
 		return nil, fmt.Errorf("Session ended")
+	}
+
+	var journalStr string
+	var journalErr error
+	// Read the journal string for K3s to check if some of the command arguments are set correctly.
+	if b.isK3s {
+		journalStr, journalErr = b.readJournal()
+		if journalErr != nil {
+			log.WithFields(log.Fields{"error": journalErr}).Error("Error while read the journal")
+		}
 	}
 
 	var errb, outb bytes.Buffer
@@ -1265,14 +1342,17 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 	var config string
 
 	if b.cisYAMLMode {
-		if bench == share.BenchKubeMaster {
+		// On K3s by default, all servers are also agents, thus we let it reads all yamls
+		if bench == share.BenchKubeMaster && b.isK3s {
+			config = remediationFolder
+		} else if bench == share.BenchKubeMaster {
 			config = remediationFolder + "master"
 		} else if bench == share.BenchKubeWorker {
 			config = remediationFolder + "worker"
 		}
 	}
-
-	cmd = exec.Command("sh", script, config)
+	// journalStr only works for k3s cases, k8s cases will not be affected
+	cmd = exec.Command("sh", script, config, journalStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb

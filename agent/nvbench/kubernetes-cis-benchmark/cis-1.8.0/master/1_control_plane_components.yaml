@@ -1108,10 +1108,10 @@ groups:
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--request-timeout' >/dev/null 2>&1; then
               requestTimeout=$(get_argument_value "$CIS_APISERVER_CMD" '--request-timeout')
-              warn "$check"
-              warn "      * request-timeout: $requestTimeout"
-          else
               pass "$check"
+              pass "      * request-timeout: $requestTimeout"
+          else
+              warn "$check"
           fi        
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           and set the below parameter as appropriate and if needed. For example, --request-timeout=300s
@@ -1129,10 +1129,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_APISERVER_CMD" '--service-account-lookup=false' >/dev/null 2>&1; then
-              warn "$check"
-          else
+          if check_argument "$CIS_APISERVER_CMD" '--service-account-lookup=true' >/dev/null 2>&1; then
               pass "$check"
+          else
+              warn "$check"
           fi        
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the below parameter. --service-account-lookup=true

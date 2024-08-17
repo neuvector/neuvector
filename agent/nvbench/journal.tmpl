@@ -1,0 +1,25 @@
+#!/bin/sh
+
+CIS_APISERVER_CMD="kube-apiserver"
+CIS_MANAGER_CMD="kube-controller-manager"
+CIS_SCHEDULER_CMD="kube-scheduler"
+CIS_ETCD_CMD="etcd"
+CIS_PROXY_CMD="kube-proxy"
+CIS_KUBELET_CMD="kubelet"
+
+fetch_kube_cmd() {
+    echo "$JOURNAL_LOG" |  grep "Running $1" | tail -n1   | sed "s/[\"']//g"
+}
+
+JOURNAL_LOG=$(journalctl -D /var/log/journal -u k3s)
+
+# Read logs for each component
+kube_apiserver_cmd=$(fetch_kube_cmd "$CIS_APISERVER_CMD")
+kube_controller_manager_cmd=$(fetch_kube_cmd "$CIS_MANAGER_CMD")
+kube_scheduler_cmd=$(fetch_kube_cmd "$CIS_SCHEDULER_CMD")
+etcd_cmd=$(echo "$CIS_ETCD_CMD" | grep -m1 'Managed etcd cluster' )
+kube_proxy_cmd=$(fetch_kube_cmd "$CIS_PROXY_CMD")
+kubelet_cmd=$(fetch_kube_cmd "$CIS_KUBELET_CMD")
+
+# Combine the output, use @@@ as dialmeter
+echo "$kube_apiserver_cmd@@@$kube_controller_manager_cmd@@@$kube_scheduler_cmd@@@$etcd_cmd@@@$kube_proxy_cmd@@@$kubelet_cmd"

@@ -1,0 +1,187 @@
+version: cis-k3s-1.8
+id: 2
+title: 2 - etcd
+type: master
+groups:
+  - id: 2.1
+    title: ''
+    checks:
+      - id: K.2.1
+        description: Ensure that the --cert-file and --key-file arguments are set
+          as appropriate (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          etcdconf=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/k3s/server/db/etcd/config")
+          output=$(grep -A 4 'client-transport-security' $etcdconf | grep -E 'cert-file|key-file')
+          if [ -n "$output" ]; then
+            cfile=$(echo "$output" | grep 'cert-file' | awk '{print $2}')
+            kfile=$(echo "$output" | grep 'key-file' | awk '{print $2}')
+            pass "$check"
+            pass "      * cert-file: $cfile"
+            pass "      * key-file: $kfile"
+          else
+              warn "$check"
+          fi        
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates cert and key files for etcd. These are located in /var/lib/rancher/k3s/server/tls/etcd/. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use custom cert and key files.        
+  - id: 2.2
+    title: ''
+    checks:
+      - id: K.2.2
+        description: Ensure that the --client-cert-auth argument is set to true (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(grep -A 4 'client-transport-security' $etcdconf | grep 'client-cert-auth' | awk '{print $2}')
+          if [ $output = true ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi        
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s sets the --client-cert-auth parameter to true. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to disable client certificate authentication.        
+  - id: 2.3
+    title: ''
+    checks:
+      - id: K.2.3
+        description: Ensure that the --auto-tls argument is not set to true (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(grep 'auto-tls' $etcdconf | awk '{print $2}')
+          if [ $output = true ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi    
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s does not set the --auto-tls parameter. If this check fails, edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config on the master node and either remove the --auto-tls parameter or set it to false. client-transport-security: auto-tls: false
+  - id: 2.4
+    title: ''
+    checks:
+      - id: K.2.4
+        description: Ensure that the --peer-cert-file and --peer-key-file arguments
+          are set as appropriate (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          etcdconf=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/k3s/server/db/etcd/config")
+          output=$(grep -A 4 'peer-transport-security' $etcdconf | grep -E 'cert-file|key-file')
+          if [ -n "$output" ]; then
+            cfile=$(echo "$output" | grep 'cert-file' | awk '{print $2}')
+            kfile=$(echo "$output" | grep 'key-file' | awk '{print $2}')
+            pass "$check"
+            pass "      * peer-cert-file: $cfile"
+            pass "      * peer-key-file: $kfile"
+          else
+              warn "$check"
+          fi    
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates peer cert and key files for etcd. These are located in /var/lib/rancher/k3s/server/tls/etcd/. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use custom peer cert and key files.
+  - id: 2.5
+    title: ''
+    checks:
+      - id: K.2.5
+        description: Ensure that the --peer-client-cert-auth argument is set to true
+          (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(grep -A 4 'peer-transport-security' $etcdconf | grep 'client-cert-auth' | awk '{print $2}')
+          if [ $output = true ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi    
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s sets the --peer-cert-auth parameter to true. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to disable peer client certificate authentication.
+  - id: 2.6
+    title: ''
+    checks:
+      - id: K.2.6
+        description: Ensure that the --peer-auto-tls argument is not set to true (Automated)
+        type: master
+        category: kubernetes
+        scored: true
+        profile: Level 1
+        automated: true
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(grep 'peer-auto-tls' $etcdconf | awk '{print $2}')
+          if [ $output = true ]; then
+              pass "$check"
+          else
+              warn "$check"
+          fi      
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s does not set the --peer-auto-tls parameter. If this check fails, edit the etcd pod specification file /var/lib/rancher/k3s/server/db/etcd/config on the master node and either remove the --peer-auto-tls parameter or set it to false. peer-transport-security: auto-tls: false
+  - id: 2.7
+    title: ''
+    checks:
+      - id: K.2.7
+        description: Ensure that a unique Certificate Authority is used for etcd (Manual)
+        type: master
+        category: kubernetes
+        scored: false
+        profile: Level 2
+        automated: false
+        tags:
+          HIPAA: []
+          PCI: []
+          GDPR: []
+        audit: |
+          check="$id  - $description"
+          output=$(grep -A 4 'client-transport-security' $etcdconf | grep 'trusted-ca-file' | awk '{print $2}')
+          if [ -n "$output" ]; then
+            pass "$check"
+            pass "      * trusted-ca-file: $output"
+          else
+              warn "$check"
+          fi    
+        remediation: |
+          If running on with sqlite or a external DB, etcd checks are Not Applicable. When running with embedded-etcd, K3s generates a unique certificate authority for etcd. This is located at /var/lib/rancher/k3s/server/tls/etcd/peer-ca.crt. If this check fails, ensure that the configuration file /var/lib/rancher/k3s/server/db/etcd/config has not been modified to use a shared certificate authority.

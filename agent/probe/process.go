@@ -110,6 +110,7 @@ var kubeProcs map[string]int = map[string]int{
 	"kubelet":        1,
 	"kube-apiserver": 1,
 	"hyperkube":      1,
+	"k3s":            1, // check if in k3s env
 }
 
 //var linuxShells utils.Set = utils.NewSet("sh", "dash", "bash", "rbash")
@@ -1310,7 +1311,7 @@ func (p *Probe) handleProcExec(pid int, bInit bool) (bKubeProc bool) {
 
 	//////
 	if proc != nil {
-		if _, ok := kubeProcs[proc.name]; ok {
+		if p.isKubeProcess(proc) {
 			return p.informKubeBench(proc)
 		}
 	}
@@ -1575,6 +1576,19 @@ func (p *Probe) buildProcessMap(pids utils.Set) map[int]*procInternal {
 	return procMap
 }
 
+func (p *Probe) isKubeProcess(proc *procInternal) bool {
+	// TODO: Need to use cmdline or exe name to distinguish the process, not process name
+	executable := filepath.Base(proc.path)
+	if _, ok := kubeProcs[proc.name]; ok {
+		return true
+	}
+
+	if _, ok := kubeProcs[executable]; ok {
+		return true
+	}
+	return false
+}
+
 // at the beginning, build the container process tree once by snapshot
 func (p *Probe) initReadProcesses() bool {
 	log.Debug("")
@@ -1584,7 +1598,7 @@ func (p *Probe) initReadProcesses() bool {
 	p.pidProcMap = p.buildProcessMap(p.pidSet)
 	for _, proc := range p.pidProcMap {
 		p.newProcesses.Add(proc)
-		if _, ok := kubeProcs[proc.name]; ok {
+		if p.isKubeProcess(proc) {
 			foundKube = p.informKubeBench(proc)
 		} else {
 			p.inspectProcess.Add(proc)
@@ -3279,7 +3293,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	c.rootPid = rootPid
 	c.bPrivileged = bPrivileged
 	if healthCheck != nil {
-		c.healthCheck = healthCheck		// no override
+		c.healthCheck = healthCheck // no override
 	}
 	allPids := c.outsider.Union(c.children)
 	allPids.Add(rootPid) // all collections: add rootPid as a pivot point

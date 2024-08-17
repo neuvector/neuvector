@@ -53,3 +53,29 @@ append_prefix() {
   # Concatenate and return the result
   echo "$prefix/$file"
 }
+
+#get an argument value from command line
+get_argument_value_from_journal() {
+    CMD="$1"
+    OPTION="$2"
+
+    echo "$CMD" |
+    sed \
+        -e 's/\-\-/\n--/g' \
+        |
+    grep "^${OPTION}" |
+    sed \
+        -e "s/^${OPTION}=//g"
+}
+
+#check whether an argument exist in command line
+check_argument_from_journal() {
+    CMD="$1"
+    OPTION="$2"
+
+    echo "$CMD" |
+    sed \
+        -e 's/\-\-/\n--/g' \
+        |
+    grep "^${OPTION}"
+}
