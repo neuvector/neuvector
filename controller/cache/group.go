@@ -353,13 +353,17 @@ func isNeuvectorContainerGroup(group string) bool {
 	if dot := strings.LastIndex(group, "."); dot != -1 {
 		if group[dot+1:] == localDev.Ctrler.Domain {
 			name := group[:dot]
-			if name == "nv.neuvector-manager-pod" ||
-				name == "nv.neuvector-scanner-pod" ||
-				name == "nv.neuvector-controller-pod" ||
-				name == "nv.neuvector-enforcer-pod" ||
-				name == "nv.neuvector-updater-pod" ||
-				name == "nv.neuvector-csp-pod" ||
-				name == "nv.neuvector-registry-adapter-pod" {
+			nvContainers := map[string]interface{}{
+				"nv.neuvector-manager-pod":          nil,
+				"nv.neuvector-scanner-pod":          nil,
+				"nv.neuvector-controller-pod":       nil,
+				"nv.neuvector-enforcer-pod":         nil,
+				"nv.neuvector-updater-pod":          nil,
+				"nv.neuvector-csp-pod":              nil,
+				"nv.neuvector-registry-adapter-pod": nil,
+				"nv.neuvector-cert-upgrader-pod":    nil,
+			}
+			if _, ok := nvContainers[name]; ok {
 				return true
 			}
 		}

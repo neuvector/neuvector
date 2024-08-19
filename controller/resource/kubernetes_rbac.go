@@ -140,12 +140,13 @@ var updaterSubjectWanted string = "updater"
 var enforcerSubjectWanted string = "enforcer"
 var scannerSubjectWanted string = "scanner"
 var regAdapterSubjectWanted string = "registry-adapter"
+var certUpgraderSubjectWanted string = "cert-upgrader"
 var ctrlerSubjectsWanted []string = []string{"controller"}
-var scannerSubjecstWanted []string = []string{"updater", "controller"}
-var secretSubjecstWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
-var enforcerSubjecstWanted []string = []string{"enforcer", "controller"}
-var jobCreationSubjecstWanted []string = []string{"controller"}
-var certUpgraderSubjecstWanted []string = []string{"cert-upgrader"}
+var scannerSubjectsWanted []string = []string{"updater", "controller"}
+var secretSubjectsWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
+var enforcerSubjectsWanted []string = []string{"enforcer", "controller"}
+var jobCreationSubjectsWanted []string = []string{"controller"}
+var certUpgraderSubjectsWanted []string = []string{"cert-upgrader"}
 
 var _k8sFlavor string // share.FlavorRancher or share.FlavorOpenShift
 
@@ -386,27 +387,27 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	},
 	NvScannerRoleBinding: &k8sRbacBindingInfo{ // for updater pod
 		namespace: constNvNamespace,
-		subjects:  scannerSubjecstWanted,
+		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvScannerRole],
 	},
 	nvSecretRoleBinding: &k8sRbacBindingInfo{
 		namespace: constNvNamespace,
-		subjects:  secretSubjecstWanted,
+		subjects:  secretSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvSecretRole],
 	},
 	NvJobCreationRoleBinding: &k8sRbacBindingInfo{
 		namespace: constNvNamespace,
-		subjects:  jobCreationSubjecstWanted,
+		subjects:  jobCreationSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvJobCreationRole],
 	},
 	NvCertUpgraderRoleBinding: &k8sRbacBindingInfo{
 		namespace: constNvNamespace,
-		subjects:  certUpgraderSubjecstWanted,
+		subjects:  certUpgraderSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvCertUpgraderRole],
 	},
 	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
 		namespace: constNvNamespace,
-		subjects:  scannerSubjecstWanted,
+		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[k8sClusterRoleAdmin],
 	},
 }
@@ -1936,36 +1937,33 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 
 func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	cacheEventFunc = objFunc
-	nvControllerSA := ctrlerSubjectWanted
+	// controller pod runs as "controller" sa if it's deployed with least privilge enabled
 	filePath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	if data, err := os.ReadFile(filePath); err == nil {
 		if sa, err := GetSaFromJwtToken(string(data)); err == nil {
-			nvControllerSA = sa
+			ctrlerSubjectWanted = sa
+			ctrlerSubjectsWanted[0] = ctrlerSubjectWanted
+			jobCreationSubjectsWanted[0] = ctrlerSubjectWanted
 		}
 	} else {
 		log.WithFields(log.Fields{"filePath": filePath, "error": err}).Error()
 	}
-	if nvControllerSA != ctrlerSubjectWanted {
-		ctrlerSubjectWanted = nvControllerSA
-		ctrlerSubjectsWanted[0] = ctrlerSubjectWanted
-		scannerSubjecstWanted[0] = ctrlerSubjectWanted
-		scannerSubjecstWanted[1] = updaterSubjectWanted
-		enforcerSubjecstWanted[0] = ctrlerSubjectWanted
-		enforcerSubjecstWanted[1] = enforcerSubjectWanted
-		secretSubjecstWanted[0] = ctrlerSubjectWanted
-		secretSubjecstWanted[1] = enforcerSubjectWanted
-		secretSubjecstWanted[2] = scannerSubjectWanted
-		secretSubjecstWanted[3] = regAdapterSubjectWanted
-	}
+
+	getNeuvectorSvcAccount()
+
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
 
 	return
 }
 
 func getSubjectsString(ns string, subjects []string) string {
-	fullSubjects := make([]string, len(subjects))
-	for i, s := range subjects {
-		fullSubjects[i] = fmt.Sprintf("%s:%s", ns, s)
+	subjectSet := utils.NewSet()
+	fullSubjects := make([]string, 0, len(subjects))
+	for _, s := range subjects {
+		if s != "" && !subjectSet.Contains(s) {
+			fullSubjects = append(fullSubjects, fmt.Sprintf("%s:%s", ns, s))
+			subjectSet.Add(s)
+		}
 	}
 	return strings.Join(fullSubjects, ", ")
 }
@@ -1984,11 +1982,7 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 	roleErrors := emptySlice
 	roleBindingErrors := emptySlice
 
-	resInfo := map[string]string{ // resource object name : resource type
-		"neuvector-updater-pod":  RscTypeCronJob,
-		"neuvector-enforcer-pod": RscTypeDaemonSet,
-	}
-	getNeuvectorSvcAccount(resInfo)
+	getNeuvectorSvcAccount()
 
 	// check neuvector-updater-pod cronjob exists in k8s or not. if it exists, check rolebinding neuvector-binding-scanner / neuvector-admin
 	// rolebinding neuvector-binding-scanner is preferred in 5.2(+)
