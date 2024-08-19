@@ -1882,7 +1882,7 @@ func AdjustAdmResForOC() {
 				},
 			}}
 		rbacRoleBindingsWanted[nvOperatorsRoleBinding] = &k8sRbacBindingInfo{
-			subjects: enforcerSubjectstWanted,
+			subjects: enforcerSubjectsWanted,
 			rbacRole: rbacRolesWanted[nvOperatorsRole],
 		}
 	}
@@ -2096,7 +2096,7 @@ func getNeuvectorSvcAccount() {
 		"neuvector-enforcer-pod":         RscTypeDaemonSet,
 		"neuvector-scanner-pod":          RscTypeDeployment,
 		"neuvector-registry-adapter-pod": RscTypeDeployment,
-		"neuvector-cert-upgrader-pod":    RscTypeDeployment,
+		"neuvector-cert-upgrader-pod":    RscTypeCronJob,
 	}
 
 	for objName, rt := range resInfo {
@@ -2107,21 +2107,28 @@ func getNeuvectorSvcAccount() {
 			continue
 		}
 		switch objName {
-		case "neuvector-updater-pod": // get updater cronjob service account
+		case "neuvector-updater-pod", "neuvector-cert-upgrader-pod":
 			if cronjobObj, ok := obj.(*CronJob); ok {
-				updaterSubjectWanted = cronjobObj.SA
-				sa = updaterSubjectWanted
-				scannerSubjectstWanted[0] = updaterSubjectWanted
-				scannerSubjectstWanted[1] = ctrlerSubjectWanted
+				sa = cronjobObj.SA
+
+				switch objName {
+				case "neuvector-updater-pod":
+					updaterSubjectWanted = sa
+					scannerSubjectsWanted[0] = updaterSubjectWanted
+					scannerSubjectsWanted[1] = ctrlerSubjectWanted
+				case "neuvector-cert-upgrader-pod":
+					certUpgraderSubjectWanted = sa
+					certUpgraderSubjectsWanted[0] = certUpgraderSubjectWanted
+				}
 			}
 		case "neuvector-enforcer-pod": // get enforcer daemonset service account
 			if dsObj, ok := obj.(*DaemonSet); ok {
 				enforcerSubjectWanted = dsObj.SA
 				sa = enforcerSubjectWanted
-				enforcerSubjectstWanted[0] = enforcerSubjectWanted
-				enforcerSubjectstWanted[1] = ctrlerSubjectWanted
+				enforcerSubjectsWanted[0] = enforcerSubjectWanted
+				enforcerSubjectsWanted[1] = ctrlerSubjectWanted
 			}
-		case "neuvector-scanner-pod", "neuvector-registry-adapter-pod", "neuvector-cert-upgrader-pod":
+		case "neuvector-scanner-pod", "neuvector-registry-adapter-pod":
 			if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
 				sa = "default"
 				spec := o.Spec.Template.Spec
@@ -2135,9 +2142,6 @@ func getNeuvectorSvcAccount() {
 					scannerSubjectWanted = sa
 				case "neuvector-registry-adapter-pod": // get registry-adapter deployment service account
 					regAdapterSubjectWanted = sa
-				case "neuvector-cert-upgrader-pod": // get cert-upgrader deployment service account
-					certUpgraderSubjectWanted = sa
-					certUpgraderSubjectsWanted[0] = certUpgraderSubjectWanted
 				}
 			}
 		}

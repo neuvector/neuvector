@@ -142,9 +142,9 @@ var scannerSubjectWanted string = "scanner"
 var regAdapterSubjectWanted string = "registry-adapter"
 var certUpgraderSubjectWanted string = "cert-upgrader"
 var ctrlerSubjectsWanted []string = []string{"controller"}
-var scannerSubjectstWanted []string = []string{"updater", "controller"}
+var scannerSubjectsWanted []string = []string{"updater", "controller"}
 var secretSubjectsWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
-var enforcerSubjectstWanted []string = []string{"enforcer", "controller"}
+var enforcerSubjectsWanted []string = []string{"enforcer", "controller"}
 var jobCreationSubjectsWanted []string = []string{"controller"}
 var certUpgraderSubjectsWanted []string = []string{"cert-upgrader"}
 
@@ -387,7 +387,7 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	},
 	NvScannerRoleBinding: &k8sRbacBindingInfo{ // for updater pod
 		namespace: constNvNamespace,
-		subjects:  scannerSubjectstWanted,
+		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvScannerRole],
 	},
 	nvSecretRoleBinding: &k8sRbacBindingInfo{
@@ -407,7 +407,7 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 	},
 	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
 		namespace: constNvNamespace,
-		subjects:  scannerSubjectstWanted,
+		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[k8sClusterRoleAdmin],
 	},
 }
