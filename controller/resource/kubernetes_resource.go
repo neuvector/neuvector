@@ -941,7 +941,7 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 
 func xlateDeployment(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
-		if o.GetNamespace() != NvAdmSvcNamespace || o.GetName() != "neuvector-scanner-pod" {
+		if o.GetNamespace() != NvAdmSvcNamespace {
 			return "", nil
 		}
 		r := &Deployment{
@@ -1008,7 +1008,7 @@ func xlateStatefulSet(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCronJob(obj metav1.Object) (string, interface{}) {
-	var r CronJob = CronJob{
+	var r *CronJob = &CronJob{
 		UID:    string(obj.GetUID()),
 		Name:   obj.GetName(),
 		Domain: obj.GetNamespace(),
@@ -1882,7 +1882,7 @@ func AdjustAdmResForOC() {
 				},
 			}}
 		rbacRoleBindingsWanted[nvOperatorsRoleBinding] = &k8sRbacBindingInfo{
-			subjects: enforcerSubjecstWanted,
+			subjects: enforcerSubjectstWanted,
 			rbacRole: rbacRolesWanted[nvOperatorsRole],
 		}
 	}
@@ -2089,8 +2089,16 @@ func CreateNvCrdObject(rt string) (interface{}, error) {
 	return maker.newObject(), nil
 }
 
-func getNeuvectorSvcAccount(resInfo map[string]string) {
+func getNeuvectorSvcAccount() {
 	// controller's sa is known by k8s token, not by deployment resource
+	resInfo := map[string]string{ // resource object name : resource type
+		"neuvector-updater-pod":          RscTypeCronJob,
+		"neuvector-enforcer-pod":         RscTypeDaemonSet,
+		"neuvector-scanner-pod":          RscTypeDeployment,
+		"neuvector-registry-adapter-pod": RscTypeDeployment,
+		"neuvector-cert-upgrader-pod":    RscTypeDeployment,
+	}
+
 	for objName, rt := range resInfo {
 		var sa string
 		obj, err := global.ORCH.GetResource(rt, NvAdmSvcNamespace, objName)
@@ -2101,26 +2109,46 @@ func getNeuvectorSvcAccount(resInfo map[string]string) {
 		switch objName {
 		case "neuvector-updater-pod": // get updater cronjob service account
 			if cronjobObj, ok := obj.(*CronJob); ok {
-				sa = cronjobObj.SA
-				if updaterSubjectWanted != sa {
-					updaterSubjectWanted = sa
-					scannerSubjecstWanted[0] = ctrlerSubjectWanted
-					scannerSubjecstWanted[1] = updaterSubjectWanted
-				}
+				updaterSubjectWanted = cronjobObj.SA
+				sa = updaterSubjectWanted
+				scannerSubjectstWanted[0] = updaterSubjectWanted
+				scannerSubjectstWanted[1] = ctrlerSubjectWanted
 			}
 		case "neuvector-enforcer-pod": // get enforcer daemonset service account
 			if dsObj, ok := obj.(*DaemonSet); ok {
-				sa = dsObj.SA
-				if enforcerSubjectWanted != sa {
-					enforcerSubjectWanted = sa
-					enforcerSubjecstWanted[0] = ctrlerSubjectWanted
-					enforcerSubjecstWanted[1] = enforcerSubjectWanted
+				enforcerSubjectWanted = dsObj.SA
+				sa = enforcerSubjectWanted
+				enforcerSubjectstWanted[0] = enforcerSubjectWanted
+				enforcerSubjectstWanted[1] = ctrlerSubjectWanted
+			}
+		case "neuvector-scanner-pod", "neuvector-registry-adapter-pod", "neuvector-cert-upgrader-pod":
+			if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
+				sa = "default"
+				spec := o.Spec.Template.Spec
+				if spec.ServiceAccountName != "" {
+					sa = spec.ServiceAccountName
+				} else if spec.DeprecatedServiceAccount != "" {
+					sa = spec.DeprecatedServiceAccount
+				}
+				switch objName {
+				case "neuvector-scanner-pod": // get scanner deployment service account
+					scannerSubjectWanted = sa
+				case "neuvector-registry-adapter-pod": // get registry-adapter deployment service account
+					regAdapterSubjectWanted = sa
+				case "neuvector-cert-upgrader-pod": // get cert-upgrader deployment service account
+					certUpgraderSubjectWanted = sa
+					certUpgraderSubjectsWanted[0] = certUpgraderSubjectWanted
 				}
 			}
 		}
 		log.WithFields(log.Fields{"name": objName, "sa": sa}).Info()
 		continue
 	}
+
+	secretSubjectsWanted[0] = enforcerSubjectWanted
+	secretSubjectsWanted[1] = ctrlerSubjectWanted
+	secretSubjectsWanted[2] = scannerSubjectWanted
+	secretSubjectsWanted[3] = regAdapterSubjectWanted
 }
 
 func xlatePersistentVolumeClaim(obj metav1.Object) (string, interface{}) {
