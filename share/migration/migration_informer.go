@@ -253,7 +253,8 @@ func (c *InternalSecretController) secretUpdate(old, new interface{}) {
 	// Note: There is no guarantee that oldSecret will be available, but for checking it's enough.
 	if reflect.DeepEqual(oldSecret.Data[ACTIVE_SECRET_PREFIX+CACERT_FILENAME], newSecret.Data[ACTIVE_SECRET_PREFIX+CACERT_FILENAME]) &&
 		reflect.DeepEqual(oldSecret.Data[ACTIVE_SECRET_PREFIX+CERT_FILENAME], newSecret.Data[ACTIVE_SECRET_PREFIX+CERT_FILENAME]) &&
-		reflect.DeepEqual(oldSecret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME], newSecret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME]) {
+		reflect.DeepEqual(oldSecret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME], newSecret.Data[ACTIVE_SECRET_PREFIX+KEY_FILENAME]) &&
+		reflect.DeepEqual(oldSecret.Annotations, newSecret.Annotations) {
 
 		log.WithField("rev", newSecret.ResourceVersion).Debug("Internal certs has been applied before.")
 		healthz.UpdateStatus("cert.revision", newSecret.ResourceVersion)
