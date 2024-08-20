@@ -515,6 +515,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 				})
 				if err != nil {
 					log.WithError(err).Warn("failed to update scanner settings")
+					// Note: grpc-go doesn't support errors.Is().  See https://github.com/grpc/grpc-go/issues/3616
+					if strings.HasSuffix(err.Error(), "context canceled") || strings.HasSuffix(err.Error(), "context deadline exceeded") {
+						return err
+					}
 				}
 				return nil
 			})

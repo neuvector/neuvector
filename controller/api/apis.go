@@ -1771,8 +1771,8 @@ type RESTSystemConfigConfig struct {
 	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
 	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
 	RemoteRepositories        *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
-	EnableTLSVerification     *bool                            `json:"enable_tls_verification"`
-	GlobalCaCerts             *[]string                        `json:"cacerts"`
+	EnableTLSVerification     *bool                            `json:"enable_tls_verification,omitempty"`
+	GlobalCaCerts             *[]string                        `json:"cacerts,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
