@@ -70,6 +70,7 @@ func TestOktaSAMLUnsignedAuthnRequest(t *testing.T) {
 			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
 		},
 	)
+	assert.Nil(t, err)
 
 	// Verify if it's consistent with Authn request for Okta.
 	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
@@ -162,6 +163,7 @@ ma7nkie3ORja96UTROAZ77o=
 			"ID": "_ec47ec78-a7f4-458d-86ad-f8e5dc85eb8a",
 		},
 	)
+	assert.Nil(t, err)
 
 	// Verify if it's consistent with Authn request for Okta.
 	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)

@@ -103,6 +103,7 @@ It has these top-level messages:
 	ScanAppPackage
 	ScanAppRequest
 	ScanAwsLambdaRequest
+	ScannerSettings
 	ScanImageRequest
 	SigstoreRootOfTrust
 	SigstoreVerifier

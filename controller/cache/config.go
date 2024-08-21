@@ -1,17 +1,25 @@
 package cache
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/httpclient"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -21,6 +29,8 @@ type webhookCache struct {
 	url      string
 	useProxy bool
 }
+
+const DefaultScannerConfigUpdateTimeout = time.Minute * 5
 
 var systemConfigCache share.CLUSSystemConfig = common.DefaultSystemConfig
 var fedSystemConfigCache share.CLUSSystemConfig = share.CLUSSystemConfig{CfgType: share.FederalCfg}
@@ -288,6 +298,8 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 		NoTelemetryReport:         systemConfigCache.NoTelemetryReport,
+		EnableTLSVerification:     systemConfigCache.EnableTLSVerification,
+		GlobalCaCerts:             systemConfigCache.GlobalCaCerts,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -453,6 +465,68 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleDlpRuleCalculation(true)
 		}
 		automodeConfigUpdate(cfg, systemConfigCache)
+
+		// Setup default TLS config.
+
+		// If GlobalCaCerts is not empty, create a CertPool and assign it to tls.Config.
+		// It will replace the default CertPool which comes from system/container image.
+		var pool *x509.CertPool
+		if len(cfg.GlobalCaCerts) > 0 {
+			pool = x509.NewCertPool()
+			for _, cacert := range cfg.GlobalCaCerts {
+				if ok := pool.AppendCertsFromPEM([]byte(cacert)); !ok {
+					log.WithFields(log.Fields{"cacert": cacert}).Warn("failed to parse ca cert")
+				}
+			}
+		}
+
+		// Use configured proxy if available, otherwise use container runtime's settings
+		// Note: at the time of writing, these settings are only available in docker.
+		httpProxy := httpclient.ParseProxy(&cfg.RegistryHttpProxy)
+		httpsProxy := httpclient.ParseProxy(&cfg.RegistryHttpsProxy)
+
+		// NoProxy is empty for now.
+		httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
+			TLSconfig: &tls.Config{
+				InsecureSkipVerify: !cfg.EnableTLSVerification,
+				RootCAs:            pool,
+			},
+		}, httpProxy, httpsProxy, "")
+
+		go func() {
+			scannerConfigTimeout := DefaultScannerConfigUpdateTimeout
+			if envvar := os.Getenv("SCANNER_CONFIG_UPDATE_TIMEOUT"); envvar != "" {
+				if v, err := time.ParseDuration(envvar); err == nil {
+					scannerConfigTimeout = v
+				} else {
+					log.WithError(err).Warn("failed to load scannerConfigTimeout")
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), scannerConfigTimeout)
+			defer cancel()
+			err := rpc.RunTaskForEachScanner(func(client share.ScannerServiceClient) error {
+				_, err := client.SetScannerSettings(ctx, &share.ScannerSettings{
+					EnableTLSVerification: cfg.EnableTLSVerification,
+					CACerts:               strings.Join(cfg.GlobalCaCerts, "\n"),
+					HttpProxy:             httpclient.GetHttpProxy(),
+					HttpsProxy:            httpclient.GetHttpsProxy(),
+					NoProxy:               "",
+				})
+				if err != nil {
+					log.WithError(err).Warn("failed to update scanner settings")
+					// Note: grpc-go doesn't support errors.Is().  See https://github.com/grpc/grpc-go/issues/3616
+					if strings.HasSuffix(err.Error(), "context canceled") || strings.HasSuffix(err.Error(), "context deadline exceeded") {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				log.WithError(err).Warn("failed to run RunTaskForEachScanner")
+			}
+		}()
+
 	case cluster.ClusterNotifyDelete:
 		// Triggered at configuration import
 		cfg = common.DefaultSystemConfig

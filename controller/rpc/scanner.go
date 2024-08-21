@@ -90,6 +90,43 @@ func getScannerServiceClient(sid string, forScan bool) (share.ScannerServiceClie
 	}
 }
 
+func getAllAvailabeScanners() map[string]share.CLUSScanner {
+	scanMutex.RLock()
+	defer scanMutex.RUnlock()
+
+	ret := map[string]share.CLUSScanner{}
+
+	for id, scanner := range scanners {
+		if scanner != nil && scanner.scanner != nil {
+			ret[id] = *scanner.scanner
+		}
+	}
+
+	return ret
+}
+
+// This function performs a task on all scanners.
+// This would take a while if the task is time-consuming.
+func RunTaskForEachScanner(cb func(share.ScannerServiceClient) error) error {
+	activeScanners := getAllAvailabeScanners()
+
+	for id, scanner := range activeScanners {
+		endpoint := getScannerEndpoint(&scanner)
+		if cluster.GetGRPCClientEndpoint(endpoint) == "" {
+			cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper)
+		}
+
+		c, err := cluster.GetGRPCClient(endpoint, nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to connect to scanner %s: %w", id, err)
+		}
+		if err = cb(c.(share.ScannerServiceClient)); err != nil {
+			return fmt.Errorf("failed to run task for scanner client %s: %w", id, err)
+		}
+	}
+	return nil
+}
+
 // scanner can handle multiple requests at a time. It's OK not to check then schedule without lock.
 func getAvaliableScanner() string {
 	var s *scannerAct

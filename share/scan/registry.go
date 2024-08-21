@@ -31,7 +31,7 @@ func NewRegClient(url, token, username, password, proxy string, trace httptrace.
 	log.WithFields(log.Fields{"url": url}).Debug("")
 
 	// Ignore errors
-	hub, _, _ := registry.NewInsecure(url, token, username, password, proxy, trace)
+	hub, _, _ := registry.New(url, token, username, password, proxy, trace)
 	return &RegClient{Registry: hub}
 }
 
@@ -338,7 +338,7 @@ func (rc *RegClient) Alive() (uint, error) {
 // GetCosignSignatureTagFromDigest takes an image digest and returns the default tag
 // used by Cosign to store signature data for the given digest.
 //
-// Example transition
+// # Example transition
 //
 // Given Image Digest: sha256:5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16
 //
