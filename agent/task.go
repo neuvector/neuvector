@@ -12,6 +12,7 @@ import (
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/probe"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/fsmon"
@@ -172,6 +173,26 @@ func configKvCongestCtl(enable bool) {
 func taskConfigAgent(conf *share.CLUSAgentConfig) {
 	log.WithFields(log.Fields{"config": conf}).Debug("")
 
+	// Log level configuration will override the debug config during runtime,
+	// because the CLI only allows one command to be run each time.
+	if conf.LogLevel != "" && conf.LogLevel != share.LogLevel_Debug {
+		if conf.LogLevel != gInfo.agentConfig.LogLevel {
+			log.SetLevel(share.CLUSGetLogLevel(conf.LogLevel))
+			connLog.Level = share.CLUSGetLogLevel(conf.LogLevel)
+			prober.SetMonitorTrace(false, conf.LogLevel)
+			fileWatcher.SetMonitorTrace(false, conf.LogLevel)
+			if !agentEnv.runWithController {
+				cluster.SetLogLevel(share.CLUSGetLogLevel(conf.LogLevel))
+			}
+			cats := make([]string, 0)
+			gInfo.agentConfig.Debug = cats
+			debug := &dp.DPDebug{Categories: cats}
+			dp.DPCtrlConfigAgent(debug)
+			gInfo.agentConfig.LogLevel = conf.LogLevel	
+		}
+		return
+	}
+
 	// debug
 	var hasCPath, hasConn, hasCluster, hasMonitorTrace bool
 	if conf.Debug == nil {
@@ -196,25 +217,22 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 	if hasCPath {
 		log.SetLevel(log.DebugLevel)
 	} else {
-		if conf.SyslogLevel == "debug" {
-			newDebug.Add("ctrl")
-		}
-		log.SetLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
+		log.SetLevel(log.InfoLevel)
 	}
 	if hasConn {
 		connLog.Level = log.DebugLevel
 	} else {
-		connLog.Level = share.CLUSGetSyslogLevel(conf.SyslogLevel)
+		connLog.Level = log.InfoLevel
 	}
 
-	prober.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
-	fileWatcher.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
+	prober.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
+	fileWatcher.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
 
 	if !agentEnv.runWithController {
 		if hasCluster {
 			cluster.SetLogLevel(log.DebugLevel)
 		} else {
-			cluster.SetLogLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
+			cluster.SetLogLevel(log.InfoLevel)
 		}
 	}
 
@@ -235,6 +253,7 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 
 		debug := &dp.DPDebug{Categories: cats}
 		dp.DPCtrlConfigAgent(debug)
+		gInfo.agentConfig.LogLevel = share.LogLevel_Debug
 	}
 
 	//////

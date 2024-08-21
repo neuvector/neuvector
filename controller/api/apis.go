@@ -1472,7 +1472,7 @@ type RESTAgentConfig struct {
 	Debug            *[]string `json:"debug,omitempty"`
 	DisableNvProtect *bool     `json:"disable_nvprotect,omitempty"`
 	DisableKvCCtl    *bool     `json:"disable_kvcctl,omitempty"`
-	SyslogLevel      *string   `json:"syslog_level,omitempty"`
+	LogLevel         *string   `json:"log_level,omitempty"`
 }
 
 type RESTAgentConfigData struct {
@@ -1492,7 +1492,8 @@ type RESTControllerCounterData struct {
 }
 
 type RESTControllerConfig struct {
-	Debug *[]string `json:"debug,omitempty"`
+	Debug    *[]string `json:"debug,omitempty"`
+	LogLevel *string   `json:"log_level,omitempty"`
 }
 
 type RESTControllerConfigData struct {

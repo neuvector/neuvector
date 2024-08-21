@@ -1262,11 +1262,12 @@ type CLUSAgentConfig struct {
 	Debug                []string `json:"debug,omitempty"`
 	DisableNvProtectMode bool     `json:"disable_nvprotect"`
 	DisableKvCongestCtl  bool     `json:"disable_kvcctl"`
-	SyslogLevel          string   `json:"syslog_level,omitempty"`
+	LogLevel             string   `json:"log_level,omitempty"`
 }
 
 type CLUSControllerConfig struct {
-	Debug []string `json:"debug,omitempty"`
+	Debug    []string `json:"debug,omitempty"`
+	LogLevel string   `json:"log_level,omitempty"`
 }
 
 type CLUSVolume struct {
@@ -1713,34 +1714,25 @@ const (
 )
 
 const (
-	SyslogLevel_Panic = "panic"
-	SyslogLevel_Fatal = "fatal"
-	SyslogLevel_Error = "error"
-	SyslogLevel_Warn  = "warn"
-	SyslogLevel_Info  = "info"
-	SyslogLevel_Debug = "debug"
-	SyslogLevel_Trace = "trace"
+	LogLevel_Error = "error"
+	LogLevel_Warn  = "warn"
+	LogLevel_Info  = "info"
+	LogLevel_Debug = "debug"
 )
 
-func CLUSGetSyslogLevel(syslogLevel string) log.Level {
-	switch syslogLevel {
-	case SyslogLevel_Panic:
-		return log.PanicLevel
-	case SyslogLevel_Fatal:
-		return log.FatalLevel
-	case SyslogLevel_Error:
+func CLUSGetLogLevel(logLevel string) log.Level {
+	switch logLevel {
+	case LogLevel_Error:
 		return log.ErrorLevel
-	case SyslogLevel_Warn:
+	case LogLevel_Warn:
 		return log.WarnLevel
-	case SyslogLevel_Debug:
+	case LogLevel_Info:
+		return log.InfoLevel
+	case LogLevel_Debug:
 		return log.DebugLevel
-	case SyslogLevel_Trace:
-		return log.TraceLevel
-	case SyslogLevel_Info:
 	default:
 		return log.InfoLevel
 	}
-	return log.InfoLevel
 }
 
 type CLUSCustomCheck struct {

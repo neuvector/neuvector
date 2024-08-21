@@ -113,6 +113,11 @@ func setControllerDebug(debug []string, debugCPath bool) {
 	} else {
 		cctx.K8sResLog.Level = log.InfoLevel
 	}
+
+	if debugCPath || hasCPath || hasConn || hasMutex ||
+		hasScan || hasCluster || hasK8sMonitor {
+		common.CtrlLogLevel = share.LogLevel_Debug
+	}
 }
 
 func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -133,7 +138,21 @@ func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte)
 		cacheMutexUnlock()
 
 		if id == localDev.Ctrler.ID {
-			setControllerDebug(cconf.Debug, false)
+			// Log level configuration will override the debug config during runtime,
+			// because the CLI only allows one command to be run each time.
+			if cconf.LogLevel != "" && cconf.LogLevel != share.LogLevel_Debug {
+				if cconf.LogLevel != common.CtrlLogLevel {
+					log.SetLevel(share.CLUSGetLogLevel(cconf.LogLevel))
+					cctx.ConnLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cctx.ScanLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cctx.MutexLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cluster.SetLogLevel(share.CLUSGetLogLevel(cconf.LogLevel))
+					cctx.K8sResLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					common.CtrlLogLevel = cconf.LogLevel
+				}
+			} else {
+				setControllerDebug(cconf.Debug, false)
+			}
 		}
 
 		log.WithFields(log.Fields{"config": cconf, "id": id}).Debug("")

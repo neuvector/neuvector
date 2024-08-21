@@ -146,7 +146,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	internalSubnets:  make(map[string]share.CLUSSubnet),
 	containerConfig:  make(map[string]*share.CLUSWorkloadConfig),
 	policyMode:       defaultPolicyMode,
-	agentConfig:      share.CLUSAgentConfig{Debug: make([]string, 0), SyslogLevel: "info"},
+	agentConfig:      share.CLUSAgentConfig{Debug: make([]string, 0), LogLevel: "info"},
 	hostIPs:          utils.NewSet(),
 	tapProxymesh:     defaultTapProxymesh,
 	jumboFrameMTU:    false,

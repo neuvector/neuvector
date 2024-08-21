@@ -222,10 +222,10 @@ type FileMonitorConfig struct {
 	EstRule        EstimateRuleSrcCallback
 }
 
-func NewFileWatcher(config *FileMonitorConfig, syslogLevel string) (*FileWatch, error) {
+func NewFileWatcher(config *FileMonitorConfig, logLevel string) (*FileWatch, error) {
 	// for file monitor
 	mLog.Out = os.Stdout
-	mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+	mLog.Level = share.CLUSGetLogLevel(logLevel)
 	mLog.Formatter = &utils.LogFormatter{Module: "AGT"}
 	if config.EnableTrace {
 		mLog.SetLevel(log.DebugLevel)
@@ -972,11 +972,11 @@ func (w *FileWatch) GetProbeData() *FmonProbeData {
 	return &probeData
 }
 
-func (w *FileWatch) SetMonitorTrace(bEnable bool, syslogLevel string) {
+func (w *FileWatch) SetMonitorTrace(bEnable bool, logLevel string) {
 	if bEnable {
 		mLog.Level = log.DebugLevel
 	} else {
-		mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+		mLog.Level = share.CLUSGetLogLevel(logLevel)
 	}
 }
 
