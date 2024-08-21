@@ -471,7 +471,7 @@ func (m CacheMethod) GetFedJoinedClusterNameList(acc *access.AccessControl) []st
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		list := make([]string, 0, len(fedJoinedClustersCache))
 		for _, c := range fedJoinedClustersCache {
 			list = append(list, c.cluster.Name)
@@ -497,7 +497,7 @@ func (m CacheMethod) GetFedJoinedClusterStatus(id string, acc *access.AccessCont
 	fedCacheMutexRLock()
 	defer fedCacheMutexRUnlock()
 
-	if acc.Authorize(&fedMembershipCache, nil) {
+	if acc.Authorize(&fedMembershipCache, nil) || acc.HasPermFed() {
 		if s, ok := fedJoinedClusterStatusCache[id]; ok {
 			return s
 		}
