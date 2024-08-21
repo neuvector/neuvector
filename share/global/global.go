@@ -80,7 +80,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 // Get the container platform and the cloud provider in getContainerPlatform
 func getContainerPlatform(c *container.ContainerMeta) (string, string) {
 	var platform, cloudPlatform string
-
+	platform = share.PlatformDocker
 	// Check for specific platform labels and conditions
 	if _, ok := c.Labels[container.RancherKeyContainerSystem]; ok {
 		platform = share.PlatformRancher
