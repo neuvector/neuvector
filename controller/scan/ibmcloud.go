@@ -40,18 +40,12 @@ type authToken struct {
 
 func (r *ibmcloud) newApiClient(password, ibmTokenUrl string) error {
 	var err error
-	r.apiClient, err = newHttpClient(r.proxy, false)
-	if err != nil {
-		return err
-	}
+	r.apiClient = newHttpClient(r.proxy)
 	if err = r.aquireToken(password, ibmTokenUrl); err == nil {
 		return nil
 	}
 	if strings.Contains(err.Error(), "x509:") {
-		r.apiClient, err = newHttpClient(r.proxy, true)
-		if err != nil {
-			return err
-		}
+		r.apiClient = newHttpClient(r.proxy)
 		return r.aquireToken(password, ibmTokenUrl)
 	} else {
 		return err

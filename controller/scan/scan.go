@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/httpclient"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
@@ -325,37 +326,20 @@ func Init(ctx *Context, leader bool) ScanInterface {
 	return smd
 }
 
-func parseProxy(proxy *share.CLUSProxy) string {
-	if proxy != nil && proxy.Enable {
-		url, err := url.Parse(proxy.URL)
-		if err != nil {
-			return ""
-		}
-		if proxy.Username != "" {
-			return fmt.Sprintf("%s://%s:%s@%s:%s/",
-				url.Scheme, proxy.Username, proxy.Password, url.Hostname(), url.Port())
-		} else {
-			return fmt.Sprintf("%s://%s:%s/",
-				url.Scheme, url.Hostname(), url.Port())
-		}
-	}
-	return ""
-}
-
 func UpdateProxy(httpProxy, httpsProxy *share.CLUSProxy) {
 	log.WithFields(log.Fields{"http": httpProxy, "https": httpsProxy}).Debug()
 
 	// This can be called before InitContext is called
 	if smd == nil {
 		smd = &scanMethod{
-			httpProxy:  parseProxy(httpProxy),
-			httpsProxy: parseProxy(httpsProxy),
+			httpProxy:  httpclient.ParseProxy(httpProxy),
+			httpsProxy: httpclient.ParseProxy(httpsProxy),
 		}
 
 		// It is startup state if smd is nil, let registry init to handle proxy settings
 	} else {
-		smd.httpProxy = parseProxy(httpProxy)
-		smd.httpsProxy = parseProxy(httpsProxy)
+		smd.httpProxy = httpclient.ParseProxy(httpProxy)
+		smd.httpsProxy = httpclient.ParseProxy(httpsProxy)
 
 		var getFed bool
 		// when proxy setting changes, do nothing for fed registry on non-master cluster

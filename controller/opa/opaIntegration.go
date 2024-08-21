@@ -1,7 +1,6 @@
 package opa
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,7 +44,6 @@ type OpaEvalResultV1 struct {
 	Result EvaluationResultV1 `json:"result"`
 }
 
-var UseOPA_HTTPS = false
 var isRestoring = false
 var opaCacheDoc map[string]string = make(map[string]string)
 var opaCachePolicy map[string]string = make(map[string]string)
@@ -96,16 +94,9 @@ func IsOpaRestarted() bool {
 }
 
 func StartOpaServer() *exec.Cmd {
-	var cmd *exec.Cmd
-	if UseOPA_HTTPS {
-		// https
-		// opa run --server --log-level debug --tls-cert-file public.crt --tls-private-key-file private.key --addr=:8181
-		cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--tls-cert-file", "./opa_binary/opa_cert/public.crt", "--tls-private-key-file", "./opa_binary/opa_cert/private.key", "--addr=:8181", "--disable-telemetry")
-	} else {
-		// http
-		// cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--addr=:8181")
-		cmd = exec.Command("/usr/local/bin/opa", "run", "--server", "--ignore=.*", "--addr=:8181", "--log-level=error", "--disable-telemetry")
-	}
+	// http
+	// cmd = exec.Command("./opa_binary/opa_linux_amd64_static", "run", "--server", "--ignore=.*", "--addr=:8181")
+	cmd := exec.Command("/usr/local/bin/opa", "run", "--server", "--ignore=.*", "--addr=:8181", "--log-level=error", "--disable-telemetry")
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -126,14 +117,7 @@ func StartOpaServer() *exec.Cmd {
 }
 
 func getOpaHTTPClient() *http.Client {
-	if UseOPA_HTTPS {
-		transCfg := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
-		}
-		return &http.Client{Transport: transCfg}
-	} else {
-		return &http.Client{}
-	}
+	return &http.Client{}
 }
 
 func addObject(key string, contentType string, data string) bool {

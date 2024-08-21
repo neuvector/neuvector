@@ -25,6 +25,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/httpclient"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -133,6 +134,7 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			Enable:           cs.Enable,
 			DefaultRole:      cs.OIDC.DefaultRole,
 			GroupMappedRoles: cs.OIDC.GroupMappedRoles,
+			UseProxy:         cs.OIDC.UseProxy,
 		}
 		return &rs
 	}
@@ -892,11 +894,27 @@ func validateOIDCServer(cs *share.CLUSServer) error {
 		issuer = issuer[:q]
 	}
 
-	auth, token, jwks, userInfo, err := remoteAuther.OIDCDiscover(issuer)
+	accReadAll := access.NewReaderAccessControl()
+	sc := cacher.GetSystemConfig(accReadAll)
+	if sc == nil {
+		return errors.New("Failed to read system config")
+	}
+
+	var proxy string
+	var err error
+	if coidc.UseProxy {
+		proxy, err = httpclient.GetProxy(issuer)
+		if err != nil {
+			log.WithError(err).Warn("failed to get proxy.")
+			// continue
+		}
+	}
+
+	auth, token, jwks, userInfo, err := remoteAuther.OIDCDiscover(issuer, proxy)
 	if err != nil {
 		if strings.HasSuffix(issuer, "/") {
 			issuer = issuer[:len(issuer)-1]
-			auth, token, jwks, userInfo, err = remoteAuther.OIDCDiscover(issuer)
+			auth, token, jwks, userInfo, err = remoteAuther.OIDCDiscover(issuer, proxy)
 		}
 
 		if err != nil {
@@ -989,6 +1007,10 @@ func updateOIDCServer(cs *share.CLUSServer, oidc *api.RESTServerOIDCConfig, acc 
 	}
 	if oidc.GroupClaim != nil {
 		coidc.GroupClaim = *oidc.GroupClaim
+	}
+
+	if oidc.UseProxy != nil {
+		coidc.UseProxy = *oidc.UseProxy
 	}
 
 	return nil

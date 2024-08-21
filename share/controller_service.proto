@@ -46,6 +46,7 @@ message ScannerDeregisterData {
 
 message ControllerCaps {
     bool CriticalVul = 1;
+    bool ScannerSettings = 2;
 }
 
 message ScannerAvailable {
@@ -59,6 +60,7 @@ service ControllerScanService {
   rpc SubmitScanResult(ScanResult) returns (RPCVoid);
   rpc GetCaps(RPCVoid) returns (ControllerCaps);
   rpc HealthCheck(ScannerRegisterData) returns (ScannerAvailable);
+  rpc GetScannerSettings(RPCVoid) returns (ScannerSettings);
 }
 
 message CLUSFilePacket {

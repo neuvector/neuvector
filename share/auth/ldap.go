@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/neuvector/neuvector/share/httpclient"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/ldap.v2"
 )
@@ -22,9 +23,9 @@ type LDAPClient struct {
 	ServerName         string
 	UserFilter         string
 	Port               int
-	InsecureSkipVerify bool
-	UseSSL             bool
-	SkipTLS            bool
+	InsecureSkipVerify bool // Skip TLS authentication
+	UseSSL             bool // Use SSL/TLS to connect to LDAP server
+	SkipTLS            bool // Do not fallback to TLS
 	Timeout            time.Duration
 }
 
@@ -42,15 +43,23 @@ func (lc *LDAPClient) Connect() error {
 
 			// Reconnect with TLS
 			if !lc.SkipTLS {
-				err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+				sharedConfig := httpclient.GetTLSConfig()
+				err = l.StartTLS(&tls.Config{
+					InsecureSkipVerify: sharedConfig.InsecureSkipVerify,
+					ServerName:         lc.Host,
+					RootCAs:            sharedConfig.RootCAs,
+				})
 				if err != nil {
 					return err
 				}
 			}
 		} else {
+			sharedConfig := httpclient.GetTLSConfig()
+
 			l, err = ldap.DialTLS("tcp", address, &tls.Config{
-				InsecureSkipVerify: lc.InsecureSkipVerify,
-				ServerName:         lc.ServerName,
+				InsecureSkipVerify: sharedConfig.InsecureSkipVerify,
+				ServerName:         lc.Host,
+				RootCAs:            sharedConfig.RootCAs,
 			})
 			if err != nil {
 				return err

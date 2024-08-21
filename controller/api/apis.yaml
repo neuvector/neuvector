@@ -8490,6 +8490,17 @@ definitions:
         type: integer
         format: uint32
         example: 3
+  RESTSystemConfigTls:
+    type: object
+    properties:
+      enable_tls_verification:
+        type: boolean
+        example: false
+      cacerts:
+        type: array
+        items:
+          type: string
+        example: ["-----BEGIN CERTIFICATE-----...", "-----BEGIN CERTIFICATE-----..."]
   RESTSystemConfigAutoscaleConfig:
     type: object
     properties:
@@ -10118,6 +10129,9 @@ definitions:
       default_role:
         type: string
         example: admin
+      use_proxy:
+        type: boolean
+        example: false
       role_groups:
         type: object
         properties:
@@ -10165,6 +10179,9 @@ definitions:
       default_role:
         type: string
         example: admin
+      use_proxy:
+        type: boolean
+        example: false
       role_groups:
         type: object
         properties:
@@ -11135,6 +11152,8 @@ definitions:
         $ref: '#/definitions/RESTSystemConfigModeAutoV2'
       scanner_autoscale:
         $ref: '#/definitions/RESTSystemConfigAutoscale'
+      tls_cfg:
+        $ref: '#/definitions/RESTSystemConfigTls'
   RESTSystemConfigData:
     type: object
     properties:
@@ -11352,6 +11371,8 @@ definitions:
           $ref: '#/definitions/RESTRemoteRepository'
       misc_cfg:
         $ref: '#/definitions/RESTSystemConfigMiscCfgV2'
+      tls_cfg:
+        $ref: '#/definitions/RESTSystemConfigTls'
   RESTFedSystemConfigConfig:
     type: object
     properties:
