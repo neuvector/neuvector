@@ -90,7 +90,7 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 	&api.RESTRolePermitOptionInternal{
 		ID:             share.PERM_SYSTEM_CONFIG_ID,
 		Value:          share.PERM_SYSTEM_CONFIG,
-		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
+		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
@@ -210,7 +210,7 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 	&api.RESTRolePermitOptionInternal{
 		ID:             share.PERMS_COMPLIANCE_ID,
 		Value:          share.PERMS_COMPLIANCE,
-		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
+		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
