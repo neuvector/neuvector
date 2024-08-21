@@ -140,11 +140,14 @@ func (c *InternalSecretController) ReloadSecret(secret *v1.Secret) (bool, error)
 		// If file is not found, the container may have just been initialized.
 	}
 
-	if reflect.DeepEqual(oldcacert, cacert) && reflect.DeepEqual(oldcert, cert) && reflect.DeepEqual(oldkey, key) {
-		// It's possible that controller restarts after cert is rolled out, so flip the flag in this case.
-		atomic.SwapInt32(&c.initialized, 1)
-		log.Debug("Internal certificate is not changed")
-		return false, nil
+	// If internal certificate exists, and it's the same as the certificate defined in the secret,
+	// it's possible that controller process restarts after cert is rolled out, so flip the flag in this case.
+	if oldcacert != nil && oldcert != nil && oldkey != nil {
+		if reflect.DeepEqual(oldcacert, cacert) && reflect.DeepEqual(oldcert, cert) && reflect.DeepEqual(oldkey, key) {
+			atomic.SwapInt32(&c.initialized, 1)
+			log.Debug("Internal certificate is not changed")
+			return false, nil
+		}
 	}
 
 	if err := ReloadCert(cacert, cert, key); err != nil {
@@ -158,6 +161,8 @@ func (c *InternalSecretController) ReloadSecret(secret *v1.Secret) (bool, error)
 		atomic.SwapInt32(&c.initialized, 1)
 		return true, nil
 	}
+
+	// If it was initialized before, reload the certificates.
 
 	recoverCerts := func() {
 		if err := ReloadCert(oldcacert, oldcert, oldkey); err != nil {
