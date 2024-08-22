@@ -227,7 +227,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 	}
 
 	if v2SchemaError != nil {
-		log.WithFields(log.Fields{"name": name, "tag": tag, "error": err.Error()}).Error("could not build v2 image info, trying v1")
+		log.WithFields(log.Fields{"name": name, "tag": tag, "error": v2SchemaError.Error()}).Error("could not build v2 image info, trying v1")
 		// get schema v1
 		manV1, err := rc.Manifest(ctx, name, tag)
 		if err != nil {
