@@ -357,7 +357,14 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 	state, err := cacher.GetAdmissionState(acc)
 	if err != nil {
-		restRespNotFoundLogAccessDenied(w, login, err)
+		if login.hasFedPermission() {
+			resp := api.RESTAdmissionConfigData{
+				K8sEnv: k8sPlatform,
+			}
+			restRespSuccess(w, r, &resp, acc, login, nil, "")
+		} else {
+			restRespNotFoundLogAccessDenied(w, login, err)
+		}
 		return
 	}
 
@@ -617,7 +624,14 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	if acc == nil {
 		return
 	} else if !acc.Authorize(&share.CLUSAdmissionState{}, nil) {
-		restRespAccessDenied(w, login)
+		if login.hasFedPermission() {
+			resp := &api.RESTAdmissionConfigData{
+				K8sEnv: k8sPlatform,
+			}
+			restRespSuccess(w, r, &resp, acc, login, nil, "Get admission control rule options")
+		} else {
+			restRespAccessDenied(w, login)
+		}
 		return
 	}
 
