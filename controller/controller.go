@@ -212,29 +212,30 @@ func getConfigKvData(key string) ([]byte, bool) {
 func main() {
 	var joinAddr, advAddr, bindAddr string
 	var err error
+	debug := false
 
 	log.SetOutput(os.Stdout)
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(share.CLUSGetLogLevel(common.CtrlLogLevel))
 	log.SetFormatter(&utils.LogFormatter{Module: "CTL"})
 
 	connLog := log.New()
 	connLog.Out = os.Stdout
-	connLog.Level = log.InfoLevel
+	connLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 	connLog.Formatter = &utils.LogFormatter{Module: "CTL"}
 
 	scanLog := log.New()
 	scanLog.Out = os.Stdout
-	scanLog.Level = log.InfoLevel
+	scanLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 	scanLog.Formatter = &utils.LogFormatter{Module: "CTL"}
 
 	mutexLog := log.New()
 	mutexLog.Out = os.Stdout
-	mutexLog.Level = log.InfoLevel
+	mutexLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 	mutexLog.Formatter = &utils.LogFormatter{Module: "CTL"}
 
 	k8sResLog = log.New()
 	k8sResLog.Out = os.Stdout
-	k8sResLog.Level = log.InfoLevel
+	k8sResLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 	k8sResLog.Formatter = &utils.LogFormatter{Module: "CTL"}
 
 	log.WithFields(log.Fields{"version": Version}).Info("START")
@@ -244,7 +245,7 @@ func main() {
 	adv := flag.String("a", "", "Cluster advertise address")
 	bind := flag.String("b", "", "Cluster bind address")
 	rtSock := flag.String("u", "", "Container socket URL")
-	debug := flag.Bool("d", false, "Enable control path debug")
+	log_level := flag.String("log_level", share.LogLevel_Info, "Controller log level")
 	restPort := flag.Uint("p", api.DefaultControllerRESTAPIPort, "REST API server port")
 	fedPort := flag.Uint("fed_port", 11443, "Fed REST API server port")
 	rpcPort := flag.Uint("rpc_port", 0, "Cluster server RPC port")
@@ -270,11 +271,21 @@ func main() {
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	flag.Parse()
 
-	if *debug {
-		log.SetLevel(log.DebugLevel)
-		scanLog.SetLevel(log.DebugLevel)
-		k8sResLog.SetLevel(log.DebugLevel)
-		ctrlEnv.debugCPath = true
+	// default log_level is LogLevel_Info
+	if *log_level == share.LogLevel_Debug ||
+	   *log_level == share.LogLevel_Warn || 
+	   *log_level == share.LogLevel_Error {
+		common.CtrlLogLevel = *log_level
+		log.SetLevel(share.CLUSGetLogLevel(common.CtrlLogLevel))
+		scanLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
+		k8sResLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
+		if *log_level == share.LogLevel_Debug {
+			debug = true
+			ctrlEnv.debugCPath = true
+		} else {
+			connLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
+			mutexLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
+		}
 	}
 	if *join != "" {
 		// Join addresses might not be all ready. Accept whatever input is, resolve them
@@ -550,7 +561,7 @@ func main() {
 		RPCPort:       *rpcPort,
 		LANPort:       *lanPort,
 		DataCenter:    cluster.DefaultDataCenter,
-		EnableDebug:   *debug,
+		EnableDebug:   debug,
 	}
 	self, lead, err := clusterStart(clusterCfg)
 	if err != nil {
@@ -920,8 +931,8 @@ func main() {
 			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 		}
 		go rest.CleanupSessCfgCache()
-		go rest.AdmissionRestServer(*admctrlPort, false, *debug)
-		go rest.CrdValidateRestServer(*crdvalidatectrlPort, false, *debug)
+		go rest.AdmissionRestServer(*admctrlPort, false, debug)
+		go rest.CrdValidateRestServer(*crdvalidatectrlPort, false, debug)
 	}
 
 	go rest.FedPollingClient(Ctrler.Leader, purgeFedRulesOnJoint)

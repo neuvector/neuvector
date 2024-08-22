@@ -32,6 +32,9 @@ const ReservedUserNameIBMSA string = "~nv.reserved.ibmsa"
 
 const ScanPlatformID = "platform"
 
+const DefaultCtrlLogLevel string = "info"
+var CtrlLogLevel string = DefaultCtrlLogLevel
+
 type LocalDevice struct {
 	Host   *share.CLUSHost
 	Ctrler *share.CLUSController

@@ -458,7 +458,7 @@ func (p *Probe) delayProcReportService() {
 	}
 }
 
-func New(pc *ProbeConfig, syslogLevel string) (*Probe, error) {
+func New(pc *ProbeConfig, logLevel string) (*Probe, error) {
 	log.Info()
 	p := &Probe{
 		bProfileEnable:       pc.ProfileEnable,
@@ -503,7 +503,7 @@ func New(pc *ProbeConfig, syslogLevel string) (*Probe, error) {
 
 	// for process
 	mLog.Out = os.Stdout
-	mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+	mLog.Level = share.CLUSGetLogLevel(logLevel)
 	mLog.Formatter = &utils.LogFormatter{Module: "AGT"}
 	if pc.EnableTrace {
 		mLog.SetLevel(log.DebugLevel)

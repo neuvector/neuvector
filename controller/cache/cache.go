@@ -1029,7 +1029,8 @@ func (m CacheMethod) GetControllerConfig(id string, acc *access.AccessControl) (
 		}
 
 		return &api.RESTControllerConfig{
-			Debug: &cache.config.Debug,
+			Debug:    &cache.config.Debug,
+			LogLevel: &cache.config.LogLevel,
 		}, nil
 	}
 	return nil, common.ErrObjectNotFound
@@ -1090,7 +1091,8 @@ func (m CacheMethod) GetAgentConfig(id string, acc *access.AccessControl) (*api.
 		}
 
 		return &api.RESTAgentConfig{
-			Debug: &cache.config.Debug,
+			Debug:    &cache.config.Debug,
+			LogLevel: &cache.config.LogLevel,
 		}, nil
 	}
 	return nil, common.ErrObjectNotFound
