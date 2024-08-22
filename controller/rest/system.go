@@ -231,7 +231,14 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster || fedRole == api.FedRoleJoint {
 			if cconf := cacher.GetFedSystemConfig(acc); cconf == nil {
 				if scope == share.ScopeFed {
-					restRespAccessDenied(w, login)
+					if login.hasFedPermission() {
+						resp := api.RESTSystemConfigData{
+							FedConfig: &api.RESTFedSystemConfig{},
+						}
+						restRespSuccess(w, r, &resp, acc, login, nil, "")
+					} else {
+						restRespAccessDenied(w, login)
+					}
 					return
 				}
 			} else {
@@ -2191,7 +2198,7 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 	var resp api.RESTNvAlerts = api.RESTNvAlerts{
 		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
 	}
-	
+
 	// populate neuvector_upgrade_info
 	if nvUpgradeInfo := getNvUpgradeInfo(); nvUpgradeInfo != nil {
 		resp.NvUpgradeInfo = nvUpgradeInfo
@@ -2229,7 +2236,7 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 		if len(otherAlertGroup.Data) > 0 {
 			resp.AcceptableAlerts.OtherAlerts = otherAlertGroup
-		}		
+		}
 	}
 	certAlertGroup := &api.RESTNvAlertGroup{
 		Type: api.AlertTypeTlsCertificate,

@@ -18,7 +18,14 @@ func handlerApplicationList(w http.ResponseWriter, r *http.Request, ps httproute
 	if acc == nil {
 		return
 	} else if !acc.Authorize(&share.CLUSApplicationListDummy{}, nil) {
-		restRespAccessDenied(w, login)
+		if login.hasFedPermission() {
+			resp := api.RESTListData{
+				List: &api.RESTList{},
+			}
+			restRespSuccess(w, r, &resp, acc, login, nil, "")
+		} else {
+			restRespAccessDenied(w, login)
+		}
 		return
 	}
 
