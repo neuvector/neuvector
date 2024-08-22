@@ -101,8 +101,6 @@ func getContainerPlatform(c *container.ContainerMeta) (string, string) {
 		cloudPlatform = share.CloudAKS
 	}
 
-	// log.WithFields(log.Fields{"container": c, "cloudPlatform": cloudPlatform}).Info("XXXXX Determined platform and cloudPlatform in getContainerPlatform")
-
 	return platform, cloudPlatform
 }
 
