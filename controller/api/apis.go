@@ -13,6 +13,7 @@ const RESTMaskedValue string = "The value is masked"
 const RESTAPIKeyHeader string = "X-Auth-Apikey"
 
 const RESTNvPageDashboard string = "dashboard"
+const RESTNvPageNavigationBar string = "navbar"
 
 // Don't modify value or reorder
 const RESTErrNotFound int = 1
