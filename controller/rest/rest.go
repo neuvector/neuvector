@@ -373,7 +373,7 @@ func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
 	}
 	restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
 	log.WithFields(log.Fields{"roles": login.domainRoles, "permits": login.extraDomainPermits, "nvPage": login.nvPage}).Error("Object access denied")
-	if login.nvPage != api.RESTNvPageDashboard {
+	if login.nvPage != api.RESTNvPageDashboard && login.nvPage != api.RESTNvPageNavigationBar {
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
 	}
 }
