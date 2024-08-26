@@ -315,6 +315,9 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		if wl.ShareNetNS == "" {
 			epMap[cache.workload.ID] = &wlMini{mode: mode}
 			if podVuls, ok := podVulsMap[cache.podName]; ok {
+				if cache.scanBrief == nil {
+					cache.scanBrief = &api.RESTScanBrief{}
+				}
 				cache.scanBrief.CriticalVuls = podVuls.CriticalVuls
 				cache.scanBrief.HighVuls = podVuls.HighVuls
 				cache.scanBrief.MedVuls = podVuls.MedVuls
