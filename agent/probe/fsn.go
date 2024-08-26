@@ -611,7 +611,9 @@ func (fsn *FileNotificationCtr) GetUpperFileInfo(id, file string) (*fileInfo, bo
 				}
 
 				finfo.fileType = file_added
-				root.files[file] = finfo
+				if root.files != nil {
+					root.files[file] = finfo
+				}
 				// mLog.WithFields(log.Fields{"id": id, "file": file}).Debug("FSN: patch")
 				return finfo, true // patch missing event
 			}
