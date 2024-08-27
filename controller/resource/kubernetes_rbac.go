@@ -443,10 +443,10 @@ func adjustNvRolePermits(rbacRoleName, nvRole string, nvPermits share.NvPermissi
 	}
 
 	if nvRole != nvRoleIn {
-		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "role_in": nvRoleIn, "role_adjusted": nvRole}).Debug()
+		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "role_in": nvRoleIn, "role_adjusted": nvRole, "permits_in": nvPermitsIn}).Debug()
 	}
 	if nvPermits != nvPermitsIn {
-		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "permits_in": nvPermitsIn, "permits_adjusted": nvPermits}).Debug()
+		log.WithFields(log.Fields{"k8sRole": rbacRoleName, "role_in": nvRoleIn, "permits_in": nvPermitsIn, "permits_adjusted": nvPermits}).Debug()
 	}
 
 	return nvRole, nvPermits
