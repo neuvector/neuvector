@@ -208,6 +208,21 @@ static int checkImplicitEnableFlag(char *enable)
     return 0;
 }
 
+static void getLogLevel(char **logLevel) {
+    if ((strcmp(*logLevel, "error") == 0) ||
+        (strcmp(*logLevel, "warn") == 0) ||
+        (strcmp(*logLevel, "info") == 0) ||
+        (strcmp(*logLevel, "debug") == 0)) {
+        return;
+    } else {
+        if (checkImplicitEnableFlag(*logLevel) == 1) {
+            *logLevel = "debug";
+        } else {
+            *logLevel = "info";
+        }
+    }
+}
+
 static pid_t fork_exec(int i)
 {
     pid_t pid;
@@ -337,8 +352,8 @@ static pid_t fork_exec(int i)
         }
 */
         if ((log_level = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
-            if (checkImplicitEnableFlag(log_level) == 1) {
-                log_level = "debug";
+            getLogLevel(&log_level);
+            if (strcmp(log_level, "debug") == 0) {
                 g_debugOpa = 1;
             }
             args[a ++] = "-log_level";
@@ -494,9 +509,7 @@ static pid_t fork_exec(int i)
             args[a ++] = url;
         }
         if ((log_level = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
-            if (checkImplicitEnableFlag(log_level) == 1) {
-                log_level = "debug";
-            }
+            getLogLevel(&log_level);
             args[a ++] = "-log_level";
             args[a ++] = log_level;
         }

@@ -272,9 +272,7 @@ func main() {
 	flag.Parse()
 
 	// default log_level is LogLevel_Info
-	if *log_level == share.LogLevel_Debug ||
-	   *log_level == share.LogLevel_Warn || 
-	   *log_level == share.LogLevel_Error {
+	if *log_level != "" && *log_level != common.CtrlLogLevel {
 		common.CtrlLogLevel = *log_level
 		log.SetLevel(share.CLUSGetLogLevel(common.CtrlLogLevel))
 		scanLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
