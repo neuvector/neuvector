@@ -1074,6 +1074,7 @@ type CLUSController struct {
 	Leader            bool   `json:"leader"`
 	OrchConnStatus    string `json:"orch_conn_status"`
 	OrchConnLastError string `json:"orch_conn_last_error"`
+	ReadPrimeConfig   bool   `json:"read_prime_config"`
 }
 
 type CLUSProtoPort struct {

@@ -1,10 +1,10 @@
 package scan
 
 import (
+	"io"
 	"path/filepath"
 	"reflect"
 	"testing"
-	"time"
 
 	"encoding/json"
 	"log"
@@ -14,13 +14,6 @@ import (
 )
 
 var (
-	complianceMetaConfig = &UpdateConfigParams{
-		Metas:     &[]api.RESTBenchMeta{},
-		MetaMap:   make(map[string]api.RESTBenchMeta),
-		MetasV2:   &[]api.RESTBenchMeta{},
-		MetaMapV2: make(map[string]api.RESTBenchMeta),
-	}
-
 	mockComplianceMetaConfig = &UpdateConfigParams{
 		Metas:     &[]api.RESTBenchMeta{},
 		MetaMap:   make(map[string]api.RESTBenchMeta),
@@ -357,59 +350,6 @@ func TestGetImageBenchMeta(t *testing.T) {
 	}
 }
 
-func TestLoadCreateEmpty(t *testing.T) {
-	dir, err := os.MkdirTemp("", "testdata")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	primeConfig := filepath.Join(dir, "mock.yml")
-
-	// Run Load in a goroutine and use a channel to wait for it to finish setup
-	done := make(chan bool)
-	go func() {
-		LoadConfig(primeConfig, mockPrimeComplianceMetaConfig, true)
-		close(done)
-	}()
-
-	// Give some time for fsnotify to start watching
-	time.Sleep(1 * time.Second)
-	// Create an empty file at primeConfig path
-	file, err := os.Create(primeConfig)
-	if err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-	file.Close()
-	<-done
-
-	for _, meta := range *mockPrimeComplianceMetaConfig.Metas {
-		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
-			t.Error("Expected Tag and TagsV2 in metas to be empty")
-		}
-	}
-
-	for _, meta := range *mockPrimeComplianceMetaConfig.MetasV2 {
-		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
-			t.Error("Expected Tag and TagsV2 in metas to be empty")
-		}
-	}
-
-	for _, meta := range mockPrimeComplianceMetaConfig.MetaMap {
-		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
-			t.Error("Expected Tag and TagsV2 in metas to be empty")
-		}
-	}
-
-	for _, meta := range mockPrimeComplianceMetaConfig.MetaMapV2 {
-		if len(meta.Tags) != 0 || len(meta.TagsV2) != 0 {
-			t.Error("Expected Tag and TagsV2 in metas to be empty")
-		}
-	}
-
-	// Clean up and stop Load
-	os.Remove(primeConfig)
-}
-
 func verifyFilterMapUpdate(t *testing.T, actualFilterMap, expectedFilterMap map[string]int) {
 	// Check if the actualFilterMap is updated correctly
 	if len(actualFilterMap) != len(expectedFilterMap) {
@@ -425,58 +365,68 @@ func verifyFilterMapUpdate(t *testing.T, actualFilterMap, expectedFilterMap map[
 	}
 }
 
-func TestLoadCreateExisting(t *testing.T) {
-	dir, err := os.MkdirTemp("", "testdata")
+func copyFile(src, dst string) error {
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// TestUpdateComplianceConfigs verifies that the complianceMetaConfig is correctly updated using the mock-prime-config.yaml file.
+// It also ensures that the source directory is empty after the update process is completed.
+func TestUpdateComplianceConfigs(t *testing.T) {
+	if ReadPrimeConfig {
+		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
+	}
+
+	dir, err := os.MkdirTemp("", "tmp-testdata")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
-	primeConfig := filepath.Join(dir, "mock.yml")
+	primeConfigFolder = dir
+	defer os.RemoveAll(primeConfigFolder)
 
-	PrepareBenchMeta(mockLoadItems, mockPrimeComplianceMetaConfig.MetaMapV2)
-	updateComplianceMetasFromMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.MetaMap, mockPrimeComplianceMetaConfig.MetasV2, mockPrimeComplianceMetaConfig.MetaMapV2)
-	updatecComplianceFilterMap(mockPrimeComplianceMetaConfig.Metas, mockPrimeComplianceMetaConfig.FilterMap)
+	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
 
-	// Check if the FilterMap is empty
-	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, map[string]int{})
-
-	// Run Load in a goroutine and use a channel to wait for it to finish setup
-	doneComplianceMeta := make(chan bool)
-	go func() {
-		LoadConfig(primeConfig, mockPrimeComplianceMetaConfig, true)
-		close(doneComplianceMeta)
-	}()
-
-	doneImageBench := make(chan bool)
-	go func() {
-		LoadConfig(primeConfig, mockPrimeImageBenchConfig, false)
-		close(doneImageBench)
-	}()
-
-	// Give some time for fsnotify to start watching
-	time.Sleep(1 * time.Second)
-	mock_prime_config := filepath.Join(".", "testdata", "mock-prime-config.yaml")
-	content, err := os.ReadFile(mock_prime_config)
+	// Copy the file
+	err = copyFile(filepath.Join(".", "testdata", "mock-prime-config.yaml"), primeCISConfig)
 	if err != nil {
-		log.Fatalf("Failed to read from file: %v", err)
+		t.Errorf("Error copying file: %v\n", err)
 	}
-	// Create the file && Write Situation
-	os.WriteFile(primeConfig, content, 0644)
 
-	<-doneComplianceMeta
-	<-doneImageBench
+	complianceMetaMapV2 = make(map[string]api.RESTBenchMeta)
+	complianceMetaMap = make(map[string]api.RESTBenchMeta)
+	PrepareBenchMeta(mockLoadItems, complianceMetaMapV2)
+	updateComplianceMetasFromMap(&complianceMetas, complianceMetaMap, &complianceMetasV2, complianceMetaMapV2)
+
+	UpdateComplianceConfigs()
+	updatecComplianceFilterMap(complianceMetaConfig.Metas, complianceMetaConfig.FilterMap)
 
 	// Check the prime config update the filerfmap correctly
-	verifyFilterMapUpdate(t, mockPrimeComplianceMetaConfig.FilterMap, expectedFilterMapAfterfLoadConfig)
+	verifyFilterMapUpdate(t, complianceMetaConfig.FilterMap, expectedFilterMapAfterfLoadConfig)
 
-	// Check mockPrimeComplianceMetaConfig is updated correctly
-	for _, meta := range *mockPrimeComplianceMetaConfig.Metas {
+	// Check complianceMetaConfig is updated correctly
+	for _, meta := range *complianceMetaConfig.Metas {
 		if meta.TagsV2 != nil {
-			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeComplianceMetaConfig.Metas")
+			t.Errorf("Expected meta.TagsV2 is the should be nil in complianceMetaConfig.Metas")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
 			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
-				t.Errorf("Expected meta.Tags in mockPrimeComplianceMetaConfig is the same size as expectedTag")
+				t.Errorf("Expected meta.Tags in complianceMetaConfig is the same size as expectedTag")
 			}
 			for _, compliance := range meta.Tags {
 				if _, found := expectedTags[meta.TestNum][compliance]; !found {
@@ -488,13 +438,13 @@ func TestLoadCreateExisting(t *testing.T) {
 		}
 	}
 
-	for _, meta := range mockPrimeComplianceMetaConfig.MetaMap {
+	for _, meta := range complianceMetaConfig.MetaMap {
 		if meta.TagsV2 != nil {
-			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeComplianceMetaConfig.MetaMap")
+			t.Errorf("Expected meta.TagsV2 is the should be nil in complianceMetaConfig.MetaMap")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
 			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
-				t.Errorf("Expected meta.Tags in mockPrimeComplianceMetaConfig is the same size as expectedTag")
+				t.Errorf("Expected meta.Tags in complianceMetaConfig is the same size as expectedTag")
 			}
 			for _, compliance := range meta.Tags {
 				if _, found := expectedTags[meta.TestNum][compliance]; !found {
@@ -506,9 +456,9 @@ func TestLoadCreateExisting(t *testing.T) {
 		}
 	}
 
-	for _, meta := range *mockPrimeComplianceMetaConfig.MetasV2 {
+	for _, meta := range *complianceMetaConfig.MetasV2 {
 		if meta.Tags != nil {
-			t.Errorf("Expected meta.Tags is the should be nil in mockPrimeComplianceMetaConfig.MetasV2")
+			t.Errorf("Expected meta.Tags is the should be nil in complianceMetaConfig.MetasV2")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
 			for compliance, _ := range meta.TagsV2 {
@@ -521,9 +471,9 @@ func TestLoadCreateExisting(t *testing.T) {
 		}
 	}
 
-	for _, meta := range mockPrimeComplianceMetaConfig.MetaMapV2 {
+	for _, meta := range complianceMetaConfig.MetaMapV2 {
 		if meta.Tags != nil {
-			t.Errorf("Expected meta.Tags is the should be nil in mockPrimeComplianceMetaConfig.MetaMapV2")
+			t.Errorf("Expected meta.Tags is the should be nil in complianceMetaConfig.MetaMapV2")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
 			for compliance, _ := range meta.TagsV2 {
@@ -536,41 +486,16 @@ func TestLoadCreateExisting(t *testing.T) {
 		}
 	}
 
-	// Check mockPrimeImageBenchConfig is updated correctly
-	for _, meta := range *mockPrimeImageBenchConfig.Metas {
-		if meta.TagsV2 != nil {
-			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeImageBenchConfig.Metas")
-		}
-		if _, ok := expectedTags[meta.TestNum]; ok {
-			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
-				t.Errorf("Expected meta.Tags in mockPrimeImageBenchConfig is the same size as expectedTag")
-			}
-			for _, compliance := range meta.Tags {
-				if _, found := expectedTags[meta.TestNum][compliance]; !found {
-					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-				}
-			}
-		} else {
-			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
-		}
+	// Ensure the primeConfigFolder is empty
+	files, err := os.ReadDir(primeConfigFolder)
+	if err != nil {
+		t.Errorf("failed to read directory: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("Files: %v in primeConfigFolder should be removed", files)
 	}
 
-	for _, meta := range mockPrimeImageBenchConfig.MetaMap {
-		if meta.TagsV2 != nil {
-			t.Errorf("Expected meta.TagsV2 is the should be nil in mockPrimeImageBenchConfig.MetaMap")
-		}
-		if _, ok := expectedTags[meta.TestNum]; ok {
-			if len(meta.Tags) != len(expectedTags[meta.TestNum]) {
-				t.Errorf("Expected meta.Tags in mockPrimeImageBenchConfig is the same size as expectedTag")
-			}
-			for _, compliance := range meta.Tags {
-				if _, found := expectedTags[meta.TestNum][compliance]; !found {
-					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
-				}
-			}
-		} else {
-			t.Errorf("Unexpected TestNum %s found", meta.TestNum)
-		}
+	if !ReadPrimeConfig {
+		t.Errorf("Expected ReadPrimeConfig to be true, but get %v", ReadPrimeConfig)
 	}
-	os.Remove(primeConfig)
 }

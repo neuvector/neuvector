@@ -124,6 +124,7 @@ func leadChangeHandler(newLead, oldLead string) {
 			Leader:            Ctrler.Leader,
 			OrchConnStatus:    connStatus,
 			OrchConnLastError: connLastError,
+			ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 		})
 		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
 		if err := cluster.Put(key, value); err != nil {
@@ -397,6 +398,7 @@ func ctlrPutLocalInfo() {
 		Leader:            Ctrler.Leader,
 		OrchConnStatus:    connStatus,
 		OrchConnLastError: connLastError,
+		ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 	})
 	key = share.CLUSControllerKey(Host.ID, Ctrler.ID)
 	if err := cluster.Put(key, value); err != nil {

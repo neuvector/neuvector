@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
 
 	"github.com/hashicorp/go-version"
@@ -26,7 +25,7 @@ const (
 
 var (
 	dstPrefix         = "/usr/local/bin/scripts/cis_yamls/"
-	primeConfigPrefix = "/etc/neuvector/prime/compliance/"
+	primeConfigFolder = "/tmp/compliance/"
 	kube160           = "cis-1.6.0"
 	kube123           = "cis-1.23"
 	kube124           = "cis-1.24"
@@ -59,6 +58,19 @@ var (
 	// RWlock for compliance / imagebench metamap
 	complianceRWMutex sync.RWMutex
 	imageBenchRWMutex sync.RWMutex
+
+	// ReadPrimeConfig indicate if the controller pod read the prime config before
+	ReadPrimeConfig bool
+
+	// update prime cis configs
+	primeCISConfig string
+	// update prime cis docker configs
+	primeDockerConfig = fmt.Sprintf("%s%s.yaml", primeConfigFolder, "cis-docker")
+	// update prime cis docker image configs
+	primeDockerImageConfig = fmt.Sprintf("%s%s.yaml", primeConfigFolder, "cis-docker-image")
+
+	complianceMetaConfig = &UpdateConfigParams{}
+	imageBenchMetaConfig = &UpdateConfigParams{}
 )
 
 var dockerImageCISItems = map[string]api.RESTBenchCheck{
@@ -3065,6 +3077,7 @@ func GetCISFolder(platform, flavor, cloudPlatform string) {
 	}
 
 	remediationFolder = fmt.Sprintf("%s%s/", dstPrefix, cisVersion)
+	primeCISConfig = fmt.Sprintf("%s%s.yaml", primeConfigFolder, cisVersion)
 }
 
 // Read the compliance Tags with map[string]share.TagDetails, then parse it into []string whenever it updated
@@ -3138,7 +3151,7 @@ func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 	var primeCISBenchmarkConfig PrimeCISBenchmarkConfig
 	err = yaml.Unmarshal(fileContent, &primeCISBenchmarkConfig)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+		log.WithFields(log.Fields{"error": err, "primeConfig": primeConfig}).Error("Error unmarshalling YAML file")
 		return
 	}
 
@@ -3162,6 +3175,7 @@ func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 	}
 	updateComplianceMetasFromMap(params.Metas, params.MetaMap, params.MetasV2, params.MetaMapV2)
 	updatecComplianceFilterMap(params.Metas, params.FilterMap)
+	ReadPrimeConfig = true
 }
 
 func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigParams) {
@@ -3175,7 +3189,7 @@ func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 	var primeCISBenchmarkConfig PrimeCISBenchmarkConfig
 	err = yaml.Unmarshal(fileContent, &primeCISBenchmarkConfig)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Error unmarshalling YAML file")
+		log.WithFields(log.Fields{"error": err, "primeConfig": primeConfig}).Error("Error unmarshalling YAML file")
 		return
 	}
 
@@ -3198,6 +3212,7 @@ func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 		}
 	}
 	updatImageBenchMetasFromMap(params.Metas, params.MetaMap)
+	ReadPrimeConfig = true
 }
 
 func LoadConfig(primeConfig string, params *UpdateConfigParams, updateCompliance bool) {
@@ -3207,89 +3222,43 @@ func LoadConfig(primeConfig string, params *UpdateConfigParams, updateCompliance
 		} else {
 			updateImageBenchWithPrimeConfig(primeConfig, params)
 		}
-		return
 	}
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Init watcher error ")
-		return
-	}
-
-	defer watcher.Close()
-	done := make(chan bool)
-
-	if _, err := os.Stat(filepath.Dir(primeConfig)); os.IsNotExist(err) {
-		log.WithFields(log.Fields{"directory": filepath.Dir(primeConfig)}).Info("Directory does not exist, skipping watcher setup")
-		return
-	} else {
-		err = watcher.Add(filepath.Dir(primeConfig))
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to add directory to watcher")
-			return
-		}
-	}
-
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				switch {
-				case event.Op&fsnotify.Create == fsnotify.Create && event.Name == primeConfig:
-					if updateCompliance {
-						updateComplianceWithPrimeConfig(primeConfig, params)
-					} else {
-						updateImageBenchWithPrimeConfig(primeConfig, params)
-					}
-					return
-				case event.Op&fsnotify.Write == fsnotify.Write && event.Name == primeConfig:
-					if updateCompliance {
-						updateComplianceWithPrimeConfig(primeConfig, params)
-					} else {
-						updateImageBenchWithPrimeConfig(primeConfig, params)
-					}
-					return
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok && err == nil {
-					return
-				}
-				log.WithFields(log.Fields{"error": err, "ok": ok}).Error("LoadPrimeConfig error: ")
-				return
-			}
-		}
-	}()
-	<-done
 }
 
 func UpdateComplianceConfigs() {
-	// update prime cis configs
-	primeCISConfig := fmt.Sprintf("%s%s.yaml", primeConfigPrefix, cisVersion)
+	ReadPrimeConfig = false
 
-	// update prime cis docker configs
-	primeDockerConfig := fmt.Sprintf("%s%s.yaml", primeConfigPrefix, "cis-docker")
-
-	// update prime cis docker image configs
-	primeDockerImageConfig := fmt.Sprintf("%s%s.yaml", primeConfigPrefix, "cis-docker-image")
-
-	complianceMetaConfig := &UpdateConfigParams{
+	complianceMetaConfig = &UpdateConfigParams{
 		Metas:     &complianceMetas,
 		MetaMap:   complianceMetaMap,
 		MetasV2:   &complianceMetasV2,
 		MetaMapV2: complianceMetaMapV2,
 		FilterMap: complianceFilterMap,
 	}
-	imageBenchMetaConfig := &UpdateConfigParams{
+	imageBenchMetaConfig = &UpdateConfigParams{
 		Metas:   &imageBenchMetas,
 		MetaMap: imageBenchMetaMap,
 	}
 
-	go LoadConfig(primeCISConfig, complianceMetaConfig, true)
-	go LoadConfig(primeDockerConfig, complianceMetaConfig, true)
-	go LoadConfig(primeDockerImageConfig, complianceMetaConfig, true)
-	go LoadConfig(primeDockerImageConfig, imageBenchMetaConfig, false)
+	defer func() {
+		files, err := os.ReadDir(primeConfigFolder)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Info("Failed to read directory: ")
+		}
+
+		for _, file := range files {
+			if !file.IsDir() {
+				filePath := filepath.Join(primeConfigFolder, file.Name())
+				err = os.Remove(filePath)
+				if err != nil {
+					log.WithFields(log.Fields{"err": err}).Info("Failed to remove file: ")
+				}
+			}
+		}
+	}()
+
+	LoadConfig(primeCISConfig, complianceMetaConfig, true)
+	LoadConfig(primeDockerConfig, complianceMetaConfig, true)
+	LoadConfig(primeDockerImageConfig, complianceMetaConfig, true)
+	LoadConfig(primeDockerImageConfig, imageBenchMetaConfig, false)
 }

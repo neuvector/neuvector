@@ -851,6 +851,7 @@ type RESTController struct {
 	DisconnAt         string            `json:"disconnected_at"`
 	OrchConnStatus    string            `json:"orch_conn_status"`
 	OrchConnLastError string            `json:"orch_conn_last_error"`
+	ReadPrimeConfig   bool              `json:"read_prime_config"`
 }
 
 type RESTControllersData struct {
