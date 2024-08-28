@@ -61,6 +61,7 @@ func (c *orchConn) cbWatcherState(state string, err error) {
 			Leader:            Ctrler.Leader,
 			OrchConnStatus:    OrchConnStatus,
 			OrchConnLastError: OrchConnLastError,
+			ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 		})
 
 		if err != nil {

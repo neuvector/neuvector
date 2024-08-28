@@ -140,6 +140,7 @@ func ctrl2REST(cache *ctrlCache) *api.RESTController {
 		DisconnAt:         api.RESTTimeString(cache.disconnAt),
 		OrchConnStatus:    ctrl.OrchConnStatus,
 		OrchConnLastError: ctrl.OrchConnLastError,
+		ReadPrimeConfig:   ctrl.ReadPrimeConfig,
 	}
 
 	if c.Name == c.ID {
