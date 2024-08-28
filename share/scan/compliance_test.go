@@ -389,6 +389,11 @@ func copyFile(src, dst string) error {
 // TestUpdateComplianceConfigs verifies that the complianceMetaConfig is correctly updated using the mock-prime-config.yaml file.
 // It also ensures that the source directory is empty after the update process is completed.
 func TestUpdateComplianceConfigs(t *testing.T) {
+	complianceMetaMapV2 = make(map[string]api.RESTBenchMeta)
+	complianceMetaMap = make(map[string]api.RESTBenchMeta)
+	PrepareBenchMeta(mockLoadItems, complianceMetaMapV2)
+	updateComplianceMetasFromMap(&complianceMetas, complianceMetaMap, &complianceMetasV2, complianceMetaMapV2)
+
 	if ReadPrimeConfig {
 		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
 	}
@@ -400,6 +405,13 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 	primeConfigFolder = dir
 	defer os.RemoveAll(primeConfigFolder)
 
+	// If the prime file not exist, ReadPrimeConfig should be false
+	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config-not-exist.yaml")
+	UpdateComplianceConfigs()
+	if ReadPrimeConfig {
+		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
+	}
+
 	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
 
 	// Copy the file
@@ -407,11 +419,6 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error copying file: %v\n", err)
 	}
-
-	complianceMetaMapV2 = make(map[string]api.RESTBenchMeta)
-	complianceMetaMap = make(map[string]api.RESTBenchMeta)
-	PrepareBenchMeta(mockLoadItems, complianceMetaMapV2)
-	updateComplianceMetasFromMap(&complianceMetas, complianceMetaMap, &complianceMetasV2, complianceMetaMapV2)
 
 	UpdateComplianceConfigs()
 	updatecComplianceFilterMap(complianceMetaConfig.Metas, complianceMetaConfig.FilterMap)
@@ -495,6 +502,7 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 		t.Errorf("Files: %v in primeConfigFolder should be removed", files)
 	}
 
+	// If the prime file exist, ReadPrimeConfig should be true
 	if !ReadPrimeConfig {
 		t.Errorf("Expected ReadPrimeConfig to be true, but get %v", ReadPrimeConfig)
 	}
