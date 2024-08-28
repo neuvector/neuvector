@@ -300,6 +300,14 @@ func PreSyncHook(ctx *cli.Context) error {
 	secretName := ctx.String("internal-secret-name")
 	timeout := ctx.Duration("timeout")
 
+	log.Info("Getting running namespace")
+
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		namespace = string(data)
+	} else {
+		log.WithError(err).Warn("failed to open namespace file.")
+	}
+
 	log.WithFields(log.Fields{
 		"namespace":  namespace,
 		"kubeconfig": kubeconfig,
