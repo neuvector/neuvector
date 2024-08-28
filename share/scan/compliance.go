@@ -25,7 +25,7 @@ const (
 
 var (
 	dstPrefix         = "/usr/local/bin/scripts/cis_yamls/"
-	primeConfigFolder = "/tmp/compliance/"
+	primeConfigFolder = "/etc/neuvector/prime/compliance/"
 	kube160           = "cis-1.6.0"
 	kube123           = "cis-1.23"
 	kube124           = "cis-1.24"
