@@ -1760,15 +1760,20 @@ func (acc *AccessControl) GetAdminDomains(writePermitsRequired uint32) []string 
 		}
 	}
 
-	list := make([]string, 0)
+	domains := utils.NewSet()
 	for domain, role := range acc.roles {
 		_, writePermits := getRolePermitValues(role, domain)
 		if writePermitsRequired == (writePermits & writePermitsRequired) {
-			list = append(list, domain)
+			domains.Add(domain)
 		}
 	}
-	if len(list) > 0 {
-		return list
+	for domain, perms := range acc.extraPermits {
+		if writePermitsRequired == (perms.WriteValue & writePermitsRequired) {
+			domains.Add(domain)
+		}
+	}
+	if domains.Cardinality() > 0 {
+		return domains.ToStringSlice()
 	} else {
 		return nil
 	}
