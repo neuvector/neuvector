@@ -1339,20 +1339,20 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 	log.WithFields(log.Fields{"type": bench}).Debug("Running Kubernetes CIS bench")
 
 	var cmd *exec.Cmd
-	var config string
+	var configFolder string
 
 	if b.cisYAMLMode {
 		// On K3s by default, all servers are also agents, thus we let it reads all yamls
 		if bench == share.BenchKubeMaster && b.isK3s {
-			config = remediationFolder
+			configFolder = remediationFolder
 		} else if bench == share.BenchKubeMaster {
-			config = remediationFolder + "master"
+			configFolder = remediationFolder + "master"
 		} else if bench == share.BenchKubeWorker {
-			config = remediationFolder + "worker"
+			configFolder = remediationFolder + "worker"
 		}
 	}
 	// journalStr only works for k3s cases, k8s cases will not be affected
-	cmd = exec.Command("sh", script, config, journalStr)
+	cmd = exec.Command("sh", script, configFolder, journalStr)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb

@@ -948,6 +948,14 @@ func PostSyncHook(ctx *cli.Context) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
 	defer cancel()
 
+	log.Info("Getting running namespace")
+
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		namespace = string(data)
+	} else {
+		log.WithError(err).Warn("failed to open namespace file.")
+	}
+
 	log.Info("Creating k8s client")
 
 	client, err := NewK8sClient(kubeconfig)

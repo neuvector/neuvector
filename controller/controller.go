@@ -579,6 +579,12 @@ func main() {
 	}
 	Ctrler.RPCServerPort = uint16(*grpcPort)
 
+	// pre-build compliance map
+	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor, Host.CloudPlatform)
+	scanUtils.InitImageBenchMeta()
+	scanUtils.UpdateComplianceConfigs()
+	Ctrler.ReadPrimeConfig = scanUtils.ReadPrimeConfig
+
 	ctlrPutLocalInfo()
 
 	// In the normal cases, initial deployment, rolling upgrade, if the controller starts as the leader
@@ -737,10 +743,6 @@ func main() {
 	if isNewCluster && *noDefAdmin {
 		checkDefAdminFreq = 0 // do not check default admin's password if it's disabled
 	}
-
-	// pre-build compliance map
-	scanUtils.InitComplianceMeta(Host.Platform, Host.Flavor, Host.CloudPlatform)
-	go scanUtils.UpdateComplianceConfigs()
 
 	// start orchestration connection.
 	// orchConnector should be created before LeadChangeCb is registered.
