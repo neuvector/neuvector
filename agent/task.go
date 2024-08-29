@@ -188,7 +188,7 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 			gInfo.agentConfig.Debug = cats
 			debug := &dp.DPDebug{Categories: cats}
 			dp.DPCtrlConfigAgent(debug)
-			gInfo.agentConfig.LogLevel = conf.LogLevel	
+			gInfo.agentConfig.LogLevel = conf.LogLevel
 		}
 		return
 	}
@@ -258,6 +258,7 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 
 	//////
 	prober.SetNvProtect(conf.DisableNvProtectMode) // default: false (enabled)
+	fileWatcher.SetNVProtectFlag(!conf.DisableNvProtectMode)
 	configKvCongestCtl(!conf.DisableKvCongestCtl)
 }
 
