@@ -3140,19 +3140,21 @@ func PrepareBenchMeta(items map[string]api.RESTBenchCheck, metaMap map[string]ap
 	}
 }
 
-func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigParams) {
+func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigParams) bool {
 	complianceRWMutex.Lock()
 	defer complianceRWMutex.Unlock()
 	fileContent, err := os.ReadFile(primeConfig)
+	successUpdate := false
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error reading file")
+		return successUpdate
 	}
 
 	var primeCISBenchmarkConfig PrimeCISBenchmarkConfig
 	err = yaml.Unmarshal(fileContent, &primeCISBenchmarkConfig)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "primeConfig": primeConfig}).Error("Error unmarshalling YAML file")
-		return
+		return successUpdate
 	}
 
 	for _, check := range primeCISBenchmarkConfig.CISChecksWithTags {
@@ -3170,27 +3172,30 @@ func updateComplianceWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 			params.MetaMapV2[check.ID] = primeMetaData
 		} else {
 			log.WithFields(log.Fields{"check.Id": check.ID}).Info("check.ID is not in metaMap: ")
-			break
+			return successUpdate
 		}
 	}
 	updateComplianceMetasFromMap(params.Metas, params.MetaMap, params.MetasV2, params.MetaMapV2)
 	updatecComplianceFilterMap(params.Metas, params.FilterMap)
-	ReadPrimeConfig = true
+	successUpdate = true
+	return successUpdate
 }
 
-func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigParams) {
+func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigParams) bool {
 	imageBenchRWMutex.Lock()
 	defer imageBenchRWMutex.Unlock()
 	fileContent, err := os.ReadFile(primeConfig)
+	successUpdate := false
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error reading file")
+		return successUpdate
 	}
 
 	var primeCISBenchmarkConfig PrimeCISBenchmarkConfig
 	err = yaml.Unmarshal(fileContent, &primeCISBenchmarkConfig)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "primeConfig": primeConfig}).Error("Error unmarshalling YAML file")
-		return
+		return successUpdate
 	}
 
 	for _, check := range primeCISBenchmarkConfig.CISChecksWithTags {
@@ -3208,21 +3213,23 @@ func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 			params.MetaMap[check.ID] = primeMetaData
 		} else {
 			log.WithFields(log.Fields{"check.Id": check.ID}).Info("check.ID is not in ImageBenchMetaMap: ")
-			break
+			return successUpdate
 		}
 	}
 	updatImageBenchMetasFromMap(params.Metas, params.MetaMap)
-	ReadPrimeConfig = true
+	successUpdate = true
+	return successUpdate
 }
 
-func LoadConfig(primeConfig string, params *UpdateConfigParams, updateCompliance bool) {
+func LoadConfig(primeConfig string, params *UpdateConfigParams, updateCompliance bool) bool {
 	if _, err := os.Stat(primeConfig); err == nil {
 		if updateCompliance {
-			updateComplianceWithPrimeConfig(primeConfig, params)
+			return updateComplianceWithPrimeConfig(primeConfig, params)
 		} else {
-			updateImageBenchWithPrimeConfig(primeConfig, params)
+			return updateImageBenchWithPrimeConfig(primeConfig, params)
 		}
 	}
+	return false
 }
 
 func UpdateComplianceConfigs() {
@@ -3257,8 +3264,10 @@ func UpdateComplianceConfigs() {
 		}
 	}()
 
-	LoadConfig(primeCISConfig, complianceMetaConfig, true)
-	LoadConfig(primeDockerConfig, complianceMetaConfig, true)
-	LoadConfig(primeDockerImageConfig, complianceMetaConfig, true)
-	LoadConfig(primeDockerImageConfig, imageBenchMetaConfig, false)
+	cisConfigLoaded := LoadConfig(primeCISConfig, complianceMetaConfig, true)
+	dockerConfigLoaded := LoadConfig(primeDockerConfig, complianceMetaConfig, true)
+	dockerImageConfigLoaded := LoadConfig(primeDockerImageConfig, complianceMetaConfig, true)
+	dockerImageBenchConfigLoaded := LoadConfig(primeDockerImageConfig, imageBenchMetaConfig, false)
+
+	ReadPrimeConfig = (cisConfigLoaded && dockerConfigLoaded && dockerImageConfigLoaded && dockerImageBenchConfigLoaded)
 }
