@@ -76,7 +76,9 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 func setControllerDebug(debug []string, debugCPath bool) {
 	var hasCPath, hasConn, hasMutex, hasScan, hasCluster, hasK8sMonitor bool
-
+	if len(debug) == 0 && !debugCPath {
+		return
+	}
 	for _, d := range debug {
 		switch d {
 		case "cpath":
