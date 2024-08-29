@@ -388,6 +388,10 @@ func copyFile(src, dst string) error {
 
 // TestUpdateComplianceConfigs verifies that the complianceMetaConfig is correctly updated using the mock-prime-config.yaml file.
 // It also ensures that the source directory is empty after the update process is completed.
+// Cover the following Cases
+// Case 1. if Update is not fully update the the prime config (none of the prime file exist) => ReadPrimeConfig should be false
+// Case 2. if Update is not fully update the the prime config (some of the prime file exist) => ReadPrimeConfig should be false
+// Case 3. if Update is not fully update the the prime config => ReadPrimeConfig should be true
 func TestUpdateComplianceConfigs(t *testing.T) {
 	complianceMetaMapV2 = make(map[string]api.RESTBenchMeta)
 	complianceMetaMap = make(map[string]api.RESTBenchMeta)
@@ -405,13 +409,14 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 	primeConfigFolder = dir
 	defer os.RemoveAll(primeConfigFolder)
 
-	// If the prime file not exist, ReadPrimeConfig should be false
+	// Case 1: None of the prime file exist, ReadPrimeConfig should be false
 	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config-not-exist.yaml")
 	UpdateComplianceConfigs()
 	if ReadPrimeConfig {
 		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
 	}
 
+	// Case 2: Some of the prime file exist, ReadPrimeConfig should be false
 	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
 
 	// Copy the file
@@ -422,7 +427,6 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 
 	UpdateComplianceConfigs()
 	updatecComplianceFilterMap(complianceMetaConfig.Metas, complianceMetaConfig.FilterMap)
-
 	// Check the prime config update the filerfmap correctly
 	verifyFilterMapUpdate(t, complianceMetaConfig.FilterMap, expectedFilterMapAfterfLoadConfig)
 
@@ -502,7 +506,21 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 		t.Errorf("Files: %v in primeConfigFolder should be removed", files)
 	}
 
-	// If the prime file exist, ReadPrimeConfig should be true
+	// Case 2: Some of the prime file exist, ReadPrimeConfig should be false
+	if ReadPrimeConfig {
+		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
+	}
+
+	// Case 3: All of the prime file exist, ReadPrimeConfig should be false
+	primeCISConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
+	primeDockerConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
+	primeDockerImageConfig = filepath.Join(primeConfigFolder, "mock-prime-config.yaml")
+	// Copy the file
+	err = copyFile(filepath.Join(".", "testdata", "mock-prime-config.yaml"), primeCISConfig)
+	if err != nil {
+		t.Errorf("Error copying file: %v\n", err)
+	}
+	UpdateComplianceConfigs()
 	if !ReadPrimeConfig {
 		t.Errorf("Expected ReadPrimeConfig to be true, but get %v", ReadPrimeConfig)
 	}
