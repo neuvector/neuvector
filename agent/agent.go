@@ -686,6 +686,7 @@ func main() {
 		SendReport:     prober.SendAggregateFsMonReport,
 		SendAccessRule: sendLearnedFileAccessRule,
 		EstRule:        cbEstimateFileAlertByGroup,
+		NVProtect:      (!*skip_nvProtect),
 	}
 
 	if fileWatcher, err = fsmon.NewFileWatcher(&fmonConfig, gInfo.agentConfig.LogLevel); err != nil {
