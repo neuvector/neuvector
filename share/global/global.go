@@ -156,6 +156,7 @@ func getPlatform(containers []*container.ContainerMeta) (string, string, string,
 		}
 		// continue parsing flavor and network
 	case "":
+		platform = share.PlatformDocker
 		for _, c := range containers {
 			containerPlatform, containerCloudPlatform := getContainerPlatform(c)
 			// Find the first platform is not docker then update it
