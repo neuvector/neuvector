@@ -190,70 +190,69 @@ func taskConfigAgent(conf *share.CLUSAgentConfig) {
 			dp.DPCtrlConfigAgent(debug)
 			gInfo.agentConfig.LogLevel = conf.LogLevel
 		}
-		return
-	}
-
-	// debug
-	var hasCPath, hasConn, hasCluster, hasMonitorTrace bool
-	if conf.Debug == nil {
-		conf.Debug = make([]string, 0)
-	}
-	newDebug := utils.NewSet()
-	for _, d := range conf.Debug {
-		switch d {
-		case "cpath":
-			hasCPath = true
-			newDebug.Add("ctrl")
-		case "conn":
-			hasConn = true
-		case "cluster":
-			hasCluster = true
-		case "monitor":
-			hasMonitorTrace = true
-		default:
-			newDebug.Add(d)
+	} else {
+		// debug
+		var hasCPath, hasConn, hasCluster, hasMonitorTrace bool
+		if conf.Debug == nil {
+			conf.Debug = make([]string, 0)
 		}
-	}
-	if hasCPath {
-		log.SetLevel(log.DebugLevel)
-	} else {
-		log.SetLevel(log.InfoLevel)
-	}
-	if hasConn {
-		connLog.Level = log.DebugLevel
-	} else {
-		connLog.Level = log.InfoLevel
-	}
-
-	prober.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
-	fileWatcher.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
-
-	if !agentEnv.runWithController {
-		if hasCluster {
-			cluster.SetLogLevel(log.DebugLevel)
+		newDebug := utils.NewSet()
+		for _, d := range conf.Debug {
+			switch d {
+			case "cpath":
+				hasCPath = true
+				newDebug.Add("ctrl")
+			case "conn":
+				hasConn = true
+			case "cluster":
+				hasCluster = true
+			case "monitor":
+				hasMonitorTrace = true
+			default:
+				newDebug.Add(d)
+			}
+		}
+		if hasCPath {
+			log.SetLevel(log.DebugLevel)
 		} else {
-			cluster.SetLogLevel(log.InfoLevel)
+			log.SetLevel(log.InfoLevel)
 		}
-	}
-
-	oldDebug := utils.NewSet()
-	for _, d := range gInfo.agentConfig.Debug {
-		oldDebug.Add(d)
-	}
-	if !oldDebug.Equal(newDebug) {
-		// rebuild debug config because we might add 'ctrl'
-		i := 0
-		cats := make([]string, newDebug.Cardinality())
-		for d := range newDebug.Iter() {
-			cats[i] = d.(string)
-			i++
+		if hasConn {
+			connLog.Level = log.DebugLevel
+		} else {
+			connLog.Level = log.InfoLevel
 		}
 
-		gInfo.agentConfig.Debug = cats
+		prober.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
+		fileWatcher.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
 
-		debug := &dp.DPDebug{Categories: cats}
-		dp.DPCtrlConfigAgent(debug)
-		gInfo.agentConfig.LogLevel = share.LogLevel_Debug
+		if !agentEnv.runWithController {
+			if hasCluster {
+				cluster.SetLogLevel(log.DebugLevel)
+			} else {
+				cluster.SetLogLevel(log.InfoLevel)
+			}
+		}
+
+		oldDebug := utils.NewSet()
+		for _, d := range gInfo.agentConfig.Debug {
+			oldDebug.Add(d)
+		}
+		if !oldDebug.Equal(newDebug) {
+			// rebuild debug config because we might add 'ctrl'
+			i := 0
+			cats := make([]string, newDebug.Cardinality())
+			for d := range newDebug.Iter() {
+				cats[i] = d.(string)
+				i++
+			}
+
+			gInfo.agentConfig.Debug = cats
+
+			debug := &dp.DPDebug{Categories: cats}
+			dp.DPCtrlConfigAgent(debug)
+			gInfo.agentConfig.LogLevel = share.LogLevel_Debug
+		}
 	}
 
 	//////
