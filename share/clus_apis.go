@@ -1459,6 +1459,8 @@ const (
 	CLUSEvCrdSkipped                 // for crd Config import
 	CLUSEvK8sAdmissionWebhookCChange // for admission control
 	CLUSEvGroupMetricViolation       //network metric violation per group level
+	CLUSEvKvRestored                 // kv is restored from pvc
+	CLUSEvScanDataRestored           // scan data is restored from pvc
 )
 
 const (

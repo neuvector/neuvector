@@ -368,6 +368,13 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 		}
 
 	case cluster.ClusterNotifyDelete:
+		if config, _, _ := clusHelper.GetRegistry(name, access.NewFedAdminAccessControl()); config != nil {
+			// after kv data is unexpectedly wiped out, Restore() could be triggered very fast that RegistryConfigHandler(type=delete) is called after Restore() is done.
+			// in this case, do not really delete the restored registry & its scan data
+			smd.scanLog.WithFields(log.Fields{"registry": name}).Info("skip delete because it Still exists in kv")
+			return
+		}
+
 		// when managed cluster is notified that a fed registry kv key is deleted, simply remove that fed registry entry from regMap
 		regLock()
 		reg, ok := regMap[name]
