@@ -159,6 +159,8 @@ const (
 	EventNameScannerAutoScaleDisabled    = "Configuration.ScannerAutoScale.Disabled"
 	EventNameK8sAdmissionWebhookChange   = "Kubenetes.Admission.Webhook.Change" // for admission control
 	EventNameGroupMetricViolation        = "Group.Metric.Violation"
+	EventNameKvRestored                  = "Configuration.Restore"
+	EventNameScanDataRestored            = "Scan.Data.Restore"
 )
 
 // TODO: these are not events but incidents

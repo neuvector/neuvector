@@ -544,7 +544,7 @@ func main() {
 
 	db.CreateVulAssetDb(false)
 
-	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData)
+	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData, evqueue)
 	ruleid.Init()
 
 	// Start cluster
@@ -653,7 +653,22 @@ func main() {
 		// Restore persistent config.
 		// Calling restore is unnecessary if this is not a new cluster installation, but not a big issue,
 		// assuming the PV should have the latest config.
-		restoredFedRole, defAdminRestored, _ = kv.GetConfigHelper().Restore()
+		var restored bool
+		var restoredKvVersion string
+		var errRestore error
+		restoredFedRole, defAdminRestored, restored, restoredKvVersion, errRestore = kv.GetConfigHelper().Restore()
+		if restored && errRestore == nil {
+			clog := share.CLUSEventLog{
+				Event:          share.CLUSEvKvRestored,
+				HostID:         Host.ID,
+				HostName:       Host.Name,
+				ControllerID:   Ctrler.ID,
+				ControllerName: Ctrler.Name,
+				ReportedAt:     time.Now().UTC(),
+				Msg:            fmt.Sprintf("Restored kv version: %s", restoredKvVersion),
+			}
+			evqueue.Append(&clog)
+		}
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
 			// 	we need to clean up fed rules & revisions in kv
