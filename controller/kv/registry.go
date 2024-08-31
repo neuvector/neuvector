@@ -187,6 +187,13 @@ func restoreToCluster(reg, fedRole string) string {
 
 func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 	scanRevs, _, _ := clusHelper.GetFedScanRevisions()
+	if scanRevs.Restoring {
+		if elapsed := time.Since(scanRevs.RestoreAt); elapsed > time.Duration(5)*time.Minute {
+			log.WithFields(log.Fields{"restored_at": scanRevs.RestoreAt}).Info()
+			scanRevs.Restoring = false
+		}
+	}
+
 	if !scanRevs.Restoring {
 		// assign random numbers to RegConfigRev, ScannedRegRevs & ScannedRepoRev on managed clusters so that the first scan data polling is always triggered
 		files, err := os.ReadDir(registryDataDir)
@@ -197,6 +204,7 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 				scanRevs.ScannedRegRevs = make(map[string]uint64)
 			}
 			scanRevs.Restoring = true
+			scanRevs.RestoreAt = time.Now().UTC()
 			clusHelper.PutFedScanRevisions(&scanRevs, nil)
 
 			randRev := uint64(rand.Uint32())
@@ -247,7 +255,6 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 				}
 			}
 
-			success := false
 			restoreResults := strings.Join(restoreResult, ", ")
 			lock, err := clusHelper.AcquireLock(share.CLUSLockFedScanDataKey, clusterLockWait)
 			if err == nil {
@@ -272,7 +279,14 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 					scanRevs.ScannedRepoRev = fedScannedRepoRev
 					if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
 						log.WithFields(log.Fields{"scanRevs": scanRevs}).Info()
-						success = true
+						if len(restoreResult) > 0 {
+							clog := share.CLUSEventLog{
+								Event:      share.CLUSEvScanDataRestored,
+								ReportedAt: time.Now().UTC(),
+								Msg:        fmt.Sprintf("Restored scan data: %s", restoreResults),
+							}
+							evqueue.Append(&clog)
+						}
 						break
 					}
 					retry++
@@ -281,17 +295,13 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 					log.WithFields(log.Fields{"error": err, "restoreResults": restoreResults, "scanRevs": scanRevs}).Error("Failed to update fed scan revisions")
 				}
 			}
-			if success {
-				clog := share.CLUSEventLog{
-					Event:      share.CLUSEvScanDataRestored,
-					ReportedAt: time.Now().UTC(),
-					Msg:        fmt.Sprintf("Restored scan data: %s", restoreResults),
-				}
-				evqueue.Append(&clog)
-			} else {
-				if scanRevs, _, err := clusHelper.GetFedScanRevisions(); err == nil {
+			for i := 0; i < 3; i++ {
+				if scanRevs, rev, err := clusHelper.GetFedScanRevisions(); err == nil {
 					scanRevs.Restoring = false
-					clusHelper.PutFedScanRevisions(&scanRevs, nil)
+					if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
+						break
+					}
+					time.Sleep(time.Second * 2)
 				}
 			}
 		}

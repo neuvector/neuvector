@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -838,6 +839,12 @@ func (m CacheMethod) GetFedScanDataRevisions(getRegScanData, getRepoScanData boo
 	}
 	if getRepoScanData {
 		scanDataRevs.ScannedRepoRev = fedScanDataRevsCache.ScannedRepoRev
+	}
+
+	if fedScanDataRevsCache.Restoring {
+		if elapsed := time.Since(fedScanDataRevsCache.RestoreAt); elapsed > time.Duration(5)*time.Minute {
+			fedScanDataRevsCache.Restoring = false
+		}
 	}
 
 	return scanDataRevs, fedScanDataRevsCache.Restoring
