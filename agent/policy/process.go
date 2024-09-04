@@ -500,6 +500,8 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"nproc", "/usr/bin/nproc"}, // dp
 		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
 		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
 		{"stty", "/usr/bin/stty"}, // python
 
 		{"configure.sh", "*"}, // monitor tool
@@ -509,7 +511,6 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// below entries for debug purpose:
 		{"ip", "/usr/sbin/ip"},
-		{"nslookup", "*"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -553,18 +554,18 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"nproc", "/usr/bin/nproc"}, // dp
 		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
 		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
 		{"stty", "/usr/bin/stty"}, // python
 
 		{"configure.sh", "*"}, // monitor tool
 		{"teardown.sh", "*"},  // monitor tool
-		{"netstat", "*"},      // monitor   <====== NOT
 		{"kill", "*"},
 
 		// below entries for debug purpose
 		{"ip", "/usr/sbin/ip"},
 		{"iptables", "/usr/sbin/xtables-legacy-multi"},      // dp
 		{"iptables-save", "/usr/sbin/xtables-legacy-multi"}, // dp
-		{"nslookup", "*"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -616,22 +617,22 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// bash
 		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
 		{"mv", "/usr/bin/mv"},
-		{"netstat", "*"}, // monitor   <====== NOT
 		{"ss", "/usr/sbin/ss"},
 		{"nproc", "/usr/bin/nproc"}, // dp
 		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
 		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
 		{"stty", "/usr/bin/stty"}, // python
 
 		{"configure.sh", "*"}, // monitor tool
 		{"teardown.sh", "*"},  // monitor tool
 		{"kill", "*"},
 
-		// below entries for debug purpose : docker exec -ti allinone sh
+		// below entries for debug purpose
 		{"ip", "/usr/sbin/ip"},
 		{"iptables", "/usr/sbin/xtables-legacy-multi"},      // dp
 		{"iptables-save", "/usr/sbin/xtables-legacy-multi"}, // dp
-		{"nslookup", "*"},                                   // <====== NOT
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
