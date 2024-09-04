@@ -3247,23 +3247,6 @@ func UpdateComplianceConfigs() {
 		MetaMap: imageBenchMetaMap,
 	}
 
-	defer func() {
-		files, err := os.ReadDir(primeConfigFolder)
-		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Info("Failed to read directory: ")
-		}
-
-		for _, file := range files {
-			if !file.IsDir() {
-				filePath := filepath.Join(primeConfigFolder, file.Name())
-				err = os.Remove(filePath)
-				if err != nil {
-					log.WithFields(log.Fields{"err": err}).Info("Failed to remove file: ")
-				}
-			}
-		}
-	}()
-
 	cisConfigLoaded := LoadConfig(primeCISConfig, complianceMetaConfig, true)
 	dockerConfigLoaded := LoadConfig(primeDockerConfig, complianceMetaConfig, true)
 	dockerImageConfigLoaded := LoadConfig(primeDockerImageConfig, complianceMetaConfig, true)

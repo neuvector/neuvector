@@ -497,15 +497,6 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 		}
 	}
 
-	// Ensure the primeConfigFolder is empty
-	files, err := os.ReadDir(primeConfigFolder)
-	if err != nil {
-		t.Errorf("failed to read directory: %v", err)
-	}
-	if len(files) != 0 {
-		t.Errorf("Files: %v in primeConfigFolder should be removed", files)
-	}
-
 	// Case 2: Some of the prime file exist, ReadPrimeConfig should be false
 	if ReadPrimeConfig {
 		t.Errorf("Expected ReadPrimeConfig to be false, but get %v", ReadPrimeConfig)
