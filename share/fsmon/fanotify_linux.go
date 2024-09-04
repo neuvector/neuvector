@@ -660,7 +660,7 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 		switch filepath.Base(linkPath) { // allowed external calling cmd
 		case "ps", "cat":
 			return true, 0, true, ifile, pInfo
-		case "busybox", "bash": // default shell
+		case "bash": // default shell
 			return true, 0, true, ifile, pInfo
 		case "python3.12", "python": // cli and support: manager and allinone only
 			if _, err := os.Stat(fmt.Sprintf("/proc/%d/root/usr/local/bin/cli", ppid)); os.IsNotExist(err) {
