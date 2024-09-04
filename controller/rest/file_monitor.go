@@ -183,9 +183,9 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	if config.DelFilters != nil {
 		for _, filter := range config.DelFilters {
 			for i, cfilter := range profConf.Filters {
-				if !cfilter.CustomerAdd {
-					continue
-				}
+				//	if !cfilter.CustomerAdd {
+				//		continue
+				//	}
 				if cfilter.Filter == filter.Filter {
 					profConf.Filters = append(profConf.Filters[:i], profConf.Filters[i+1:]...)
 					// delete the rule
