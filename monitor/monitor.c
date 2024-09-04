@@ -645,7 +645,7 @@ static int check_consul_ports(void)
     if (lan_port == NULL) {
         lan_port = DEFAULT_LAN_PORT;
     }
-    sprintf(shbuf,"netstat -lnp|grep '%s\\|%s'",rpc_port, lan_port);
+    sprintf(shbuf,"ss -lnp|grep '%s\\|%s'",rpc_port, lan_port);
 
     fp = popen(shbuf, "r");
     if (fp == NULL) {
