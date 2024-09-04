@@ -2552,7 +2552,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			}
 		}
 		if pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny {
-			if pp.Uuid != share.CLUSReservedUuidAnchorMode {
+			if pp.Uuid != share.CLUSReservedUuidAnchorMode || svcGroup == share.GroupNVProtect {
 				var bParentHostProc bool
 				if c, ok := p.pidContainerMap[proc.ppid]; ok {
 					bParentHostProc = c.id == ""
