@@ -556,6 +556,8 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"uname", "/usr/bin/uname"},
 		{"grep", "/usr/bin/grep"},
 		{"awk", "/usr/bin/gawk"},
+		{"find", "/usr/bin/find"},
+		{"sed", "/usr/bin/sed"},
 		{"stty", "/usr/bin/stty"}, // python
 
 		{"configure.sh", "*"}, // monitor tool
@@ -623,6 +625,8 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"uname", "/usr/bin/uname"},
 		{"grep", "/usr/bin/grep"},
 		{"awk", "/usr/bin/gawk"},
+		{"find", "/usr/bin/find"},
+		{"sed", "/usr/bin/sed"},
 		{"stty", "/usr/bin/stty"}, // python
 
 		{"configure.sh", "*"}, // monitor tool
