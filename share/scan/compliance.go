@@ -3004,12 +3004,11 @@ func DeepCopyRESTBenchCheck(orig api.RESTBenchCheck) api.RESTBenchCheck {
 		Automated:   orig.Automated,
 		Description: orig.Description,
 		Remediation: orig.Remediation,
-		TagsV2:      nil,
+		TagsV2:      make(map[string]share.TagDetails),
 	}
 
 	// Deep copy the Tags map
 	if orig.TagsV2 != nil {
-		copy.TagsV2 = make(map[string]share.TagDetails)
 		for compliance, detailsMap := range orig.TagsV2 {
 			copiedDetails := share.TagDetails{}
 			for _, detail := range detailsMap {
