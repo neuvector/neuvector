@@ -35,15 +35,15 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 		// if tagVersion == V2, return with TagV2: map[string]share.TagDetails{}, otherwise Tag: []string
 		if tagVersion == scanUtils.V2 {
 			if tags, ok := cpf.filter[r.TestNum]; ok {
-				filteredTags := make(map[string]share.TagDetails)
+				filteredTagsV2 := make(map[string]share.TagDetails)
 				for _, compliance := range tags {
 					if tagDetails, ok := metaMap[item.TestNum].TagsV2[compliance]; ok {
-						filteredTags[compliance] = tagDetails
+						filteredTagsV2[compliance] = tagDetails
 					} else {
-						filteredTags[compliance] = share.TagDetails{}
+						filteredTagsV2[compliance] = share.TagDetails{}
 					}
 				}
-				r.TagsV2 = filteredTags
+				r.TagsV2 = filteredTagsV2
 			} else {
 				r.TagsV2 = map[string]share.TagDetails{}
 			}
@@ -81,11 +81,11 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 		// if tagVersion == V2, return with TagV2: map[string]share.TagDetails{}, otherwise Tag: []string
 		if tagVersion == scanUtils.V2 {
 			if tags, ok := cpf.filter[r.TestNum]; ok {
-				filteredTags := make(map[string]share.TagDetails)
+				filteredTagsV2 := make(map[string]share.TagDetails)
 				for _, compliance := range tags {
-					filteredTags[compliance] = share.TagDetails{}
+					filteredTagsV2[compliance] = share.TagDetails{}
 				}
-				r.TagsV2 = filteredTags
+				r.TagsV2 = filteredTagsV2
 			} else {
 				r.TagsV2 = map[string]share.TagDetails{}
 			}
