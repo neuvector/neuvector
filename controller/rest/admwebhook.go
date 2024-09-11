@@ -121,9 +121,9 @@ const (
 )
 
 var sidecarImages = []*ContainerImage{
-	&ContainerImage{registry: "https://gcr.io/", imageRepo: "istio-release/proxyv2"},
-	&ContainerImage{registry: "https://gcr.io/", imageRepo: "linkerd-io/proxy"},
-	&ContainerImage{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
+	{registry: "https://gcr.io/", imageRepo: "istio-release/proxyv2"},
+	{registry: "https://gcr.io/", imageRepo: "linkerd-io/proxy"},
+	{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
 }
 
 /*

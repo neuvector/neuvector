@@ -212,7 +212,7 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 			Name:              UPGRADER_JOB_NAME,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			OwnerReferences: []metav1.OwnerReference{metav1.OwnerReference{
+			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion:         cronjob.GetAPIVersion(),
 				Kind:               cronjob.GetKind(),
 				Name:               cronjob.GetName(),

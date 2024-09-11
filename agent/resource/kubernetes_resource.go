@@ -22,12 +22,12 @@ type k8sResource struct {
 	makers   []*resourceMaker
 }
 
-//----------------------------------------------------------
+// ----------------------------------------------------------
 var resourceMakers map[string]k8sResource = map[string]k8sResource{
-	RscTypeImage: k8sResource{
+	RscTypeImage: {
 		apiGroup: "image.openshift.io",
 		makers: []*resourceMaker{
-			&resourceMaker{
+			{
 				"v1",
 				func() metav1.Object { return new(ocImageStream) },
 				func() metav1.ListInterface { return new(ocImageStreamList) },

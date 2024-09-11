@@ -148,49 +148,49 @@ func getServerlessNameList() []string {
 func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTResponseRuleOptions {
 	if responseRuleOptions == nil {
 		responseRuleOptions = map[string]*api.RESTResponseRuleOptions{
-			share.EventEvent: &api.RESTResponseRuleOptions{
+			share.EventEvent: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getEventNameList(true),
 				Level: getEventLevelList(api.LogLevelList),
 			},
-			share.EventCVEReport: &api.RESTResponseRuleOptions{
+			share.EventCVEReport: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel,
 					share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium,
 					share.EventCondTypeCVEName, share.EventCondTypeCVEHighWithFix},
 				Name:  getCVEReportNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING}),
 			},
-			share.EventRuntime: &api.RESTResponseRuleOptions{
+			share.EventRuntime: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel, share.EventCondTypeProc},
 				Name:  getSecurityEventNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING, api.LogLevelNOTICE, api.LogLevelINFO}),
 			},
 			/*
-				share.EventIncident: &api.RESTResponseRuleOptions{
+				share.EventIncident: {
 					Types: []string{share.EventCondTypeName, share.EventCondTypeLevel, share.EventCondTypeProc},
 					Name:  getSecurityEventNameList(),
 					Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING}),
 				},
-				share.EventViolation: &api.RESTResponseRuleOptions{
+				share.EventViolation: {
 					Types: []string{share.EventCondTypeLevel},
 					Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING}),
 				},
-				share.EventThreat: &api.RESTResponseRuleOptions{
+				share.EventThreat: {
 					Types: []string{share.EventCondTypeLevel},
 					Level: getEventLevelList(api.ThreatLevelList),
 				},
 			*/
-			share.EventServerless: &api.RESTResponseRuleOptions{
+			share.EventServerless: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getServerlessNameList(),
 				Level: getEventLevelList([]string{api.LogLevelWARNING, api.LogLevelINFO}),
 			},
-			share.EventCompliance: &api.RESTResponseRuleOptions{
+			share.EventCompliance: {
 				Types: []string{share.EventCondTypeLevel, share.EventCondTypeName},
 				Name:  getComplianceItemNameList(),
 				Level: getEventLevelList([]string{api.LogLevelWARNING}),
 			},
-			share.EventAdmCtrl: &api.RESTResponseRuleOptions{
+			share.EventAdmCtrl: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getAdmCtrlNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING, api.LogLevelINFO}),
@@ -212,7 +212,7 @@ func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTRespon
 	if !acc.HasGlobalPermissions(share.PERMS_RUNTIME_POLICIES, 0) {
 		if responseRuleOptionsForLocalUsers == nil {
 			responseRuleOptionsForLocalUsers = map[string]*api.RESTResponseRuleOptions{
-				share.EventEvent: &api.RESTResponseRuleOptions{
+				share.EventEvent: {
 					Types: responseRuleOptions[share.EventEvent].Types,
 					Name:  getEventNameList(false),
 					Level: responseRuleOptions[share.EventEvent].Level,

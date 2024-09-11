@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/share/utils"
 
 	"testing"
@@ -27,19 +27,19 @@ func TestParseReqImageName(t *testing.T) {
 		}
 
 		testImages := []*testImage{
-			&testImage{
+			{
 				image:             "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
 				expectedRegistry:  "https://10.1.127.3:5000/",
 				expectedImageRepo: "neuvector/toolbox/selvam_coreos_http",
 				expectedImageTag:  "latest",
 			},
-			&testImage{
+			{
 				image:             "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http:RELEASE",
 				expectedRegistry:  "https://10.1.127.3:5000/",
 				expectedImageRepo: "neuvector/toolbox/selvam_coreos_http",
 				expectedImageTag:  "RELEASE",
 			},
-			&testImage{
+			{
 				image:             "10.1.127.3/library/ubuntu:2.51a",
 				expectedRegistry:  "https://10.1.127.3/",
 				expectedImageRepo: "library/ubuntu",
@@ -60,13 +60,13 @@ func TestParseReqImageName(t *testing.T) {
 	{
 		admContainerInfo := &nvsysadmission.AdmContainerInfo{}
 		testImages := []*testImage{
-			&testImage{
+			{
 				image:             "docker-registry.default.svc:5000/php-demo-test/php-demo:9331d393add1b2bc0f984e31c4ff75d30938ecadc5cdcca433c3ffaff1c42e43",
 				expectedRegistry:  "https://docker-registry.default.svc:5000/",
 				expectedImageRepo: "php-demo-test/php-demo",
 				expectedImageTag:  "9331d393add1b2bc0f984e31c4ff75d30938ecadc5cdcca433c3ffaff1c42e43",
 			},
-			&testImage{
+			{
 				image:             "docker-registry.default.svc:5000/php-demo-test/php-demo@sha256:9331d393add1b2bc0f984e31c4ff75d30938ecadc5cdcca433c3ffaff1c42e43",
 				expectedRegistry:  "https://docker-registry.default.svc:5000/",
 				expectedImageRepo: "php-demo-test/php-demo",

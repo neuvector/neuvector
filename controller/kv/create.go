@@ -93,7 +93,7 @@ func _createAllContainerGroup(name string) {
 		Learned_UNUSED: false,
 		Reserved:       true,
 		Criteria: []share.CLUSCriteriaEntry{
-			share.CLUSCriteriaEntry{Key: share.CriteriaKeyWorkload, Value: "*", Op: share.CriteriaOpEqual},
+			{Key: share.CriteriaKeyWorkload, Value: "*", Op: share.CriteriaOpEqual},
 		},
 		Kind: share.GroupKindContainer,
 	}
@@ -121,16 +121,16 @@ func createDefaultObjects() {
 }
 
 var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
-	share.CLUSResponseRule{
+	{
 		Event:   share.EventRuntime,
 		Actions: []string{share.EventActionWebhook},
 		Disable: true,
 		CfgType: share.UserCreated,
 	},
-	share.CLUSResponseRule{
+	{
 		Event: share.EventRuntime,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeLevel,
 				CondValue: api.LogLevelERR,
 			},
@@ -139,10 +139,10 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 		Disable: true,
 		CfgType: share.UserCreated,
 	},
-	share.CLUSResponseRule{
+	{
 		Event: share.EventRuntime,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameContainerPrivilEscalate,
 			},
@@ -151,10 +151,10 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 		Disable: true,
 		CfgType: share.UserCreated,
 	},
-	share.CLUSResponseRule{
+	{
 		Event: share.EventCVEReport,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeCVEHigh,
 				CondValue: "10",
 			},
@@ -163,10 +163,10 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 		Disable: true,
 		CfgType: share.UserCreated,
 	},
-	share.CLUSResponseRule{
+	{
 		Event: share.EventEvent,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameContainerQuarantined,
 			},
@@ -175,10 +175,10 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 		Disable: true,
 		CfgType: share.UserCreated,
 	},
-	share.CLUSResponseRule{
+	{
 		Event: share.EventCompliance,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeName,
 				CondValue: "D.5.4",
 			},
@@ -190,10 +190,10 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 }
 
 var defaultAdmCtrlResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
-	share.CLUSResponseRule{
+	{
 		Event: share.EventAdmCtrl,
 		Conditions: []share.CLUSEventCondition{
-			share.CLUSEventCondition{
+			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameAdmCtrlK8sReqDenied,
 			},
@@ -236,11 +236,11 @@ func createResponseRules() {
 
 func createDefAdmCtrlRules() {
 	var defaultAdmCtrlK8sAllowRules = []*share.CLUSAdmissionRule{
-		&share.CLUSAdmissionRule{
+		{
 			Category: admission.AdmRuleCatK8s,
 			Comment:  commentDefaultRule1,
 			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
+				{
 					Name:  share.CriteriaKeyNamespace,
 					Op:    share.CriteriaOpContainsAny,
 					Value: "kube-system,kube-public,istio-system",
@@ -251,11 +251,11 @@ func createDefAdmCtrlRules() {
 			RuleType: api.ValidatingExceptRuleType,
 			CfgType:  share.UserCreated,
 		},
-		&share.CLUSAdmissionRule{
+		{
 			Category: admission.AdmRuleCatK8s,
 			Comment:  commentDefaultRule2,
 			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
+				{
 					Name:  share.CriteriaKeyNamespace,
 					Op:    share.CriteriaOpContainsAny,
 					Value: resource.NvAdmSvcNamespace,
@@ -268,11 +268,11 @@ func createDefAdmCtrlRules() {
 		},
 	}
 	var defaultAdmCtrlOpenshiftAllowRules = []*share.CLUSAdmissionRule{
-		&share.CLUSAdmissionRule{
+		{
 			Category: admission.AdmRuleCatK8s,
 			Comment:  commentDefaultRule1,
 			Criteria: []*share.CLUSAdmRuleCriterion{
-				&share.CLUSAdmRuleCriterion{
+				{
 					Name:  share.CriteriaKeyNamespace,
 					Op:    share.CriteriaOpContainsAny,
 					Value: "openshift-node,openshift-sdn",
@@ -421,10 +421,10 @@ func createDefaultServiceMeshMonitor() {
 }
 
 var preDlpRuleSsn = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{
+	{
 		Name: share.DlpRuleNameSsn,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b(?!\\b(\\d)\\1+-?(\\d)\\1+-?(\\d)\\1+\\b)(?!123-?45-?6789|219-?09-?9999|078-?05-?1120)(?!666|000|9\\d{2})\\d{3}-?(?!00)\\d{2}-?(?!0{4})\\d{4}\\b",
@@ -435,10 +435,10 @@ var preDlpRuleSsn = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcAxp = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //american express
+	{ //american express
 		Name: share.DlpRuleNameCcAxp,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b3[47]\\d{2}([ -]?)(?!(\\d)\\2{5}|123456|234567|345678)\\d{6}\\1(?!(\\d)\\3{4}|12345|56789)\\d{5}\\b",
@@ -449,10 +449,10 @@ var preDlpRuleCcAxp = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcDiscover = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //discover
+	{ //discover
 		Name: share.DlpRuleNameCcDiscover,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b6(?:011\\d{2}|5\\d{4}|4[4-9]\\d{3}|22(?:1(?:2[6-9]|[3-9]\\d)|[2-8]\\d{2}|9(?:[01]\\d|2[0-5])))\\d{10}\\b",
@@ -463,10 +463,10 @@ var preDlpRuleCcDiscover = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcMaster = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //master
+	{ //master
 		Name: share.DlpRuleNameCcMaster,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b5([1-5]\\d{2})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
@@ -477,10 +477,10 @@ var preDlpRuleCcMaster = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcVisa = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //visa
+	{ //visa
 		Name: share.DlpRuleNameCcVisa,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b4(\\d{3})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
@@ -491,10 +491,10 @@ var preDlpRuleCcVisa = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcDinerV1 = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //diners track1
+	{ //diners track1
 		Name: share.DlpRuleNameCcDinerV1,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b(36|38)[0-9]{2}(\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
@@ -505,10 +505,10 @@ var preDlpRuleCcDinerV1 = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcDinerV2 = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //diner track2
+	{ //diner track2
 		Name: share.DlpRuleNameCcDinerV2,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b30[0-5][0-9](\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
@@ -519,10 +519,10 @@ var preDlpRuleCcDinerV2 = []*share.CLUSDlpRule{
 }
 
 var preDlpRuleCcJcb = []*share.CLUSDlpRule{
-	&share.CLUSDlpRule{ //jcb
+	{ //jcb
 		Name: share.DlpRuleNameCcJcb,
 		Patterns: []share.CLUSDlpCriteriaEntry{
-			share.CLUSDlpCriteriaEntry{
+			{
 				Key:   "pattern",
 				Op:    share.CriteriaOpRegex,
 				Value: "\\b3[0-9]{3}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}\\b",
@@ -721,7 +721,7 @@ func createDefDlpRuleSensor() {
 var preWafRuleLog4sh = &share.CLUSWafRule{
 	Name: common.GetInternalWafRuleName(share.WafRuleNameLog4sh, share.CLUSWafLog4shSensor),
 	Patterns: []share.CLUSWafCriteriaEntry{
-		share.CLUSWafCriteriaEntry{
+		{
 			Key:     "pattern",
 			Op:      share.CriteriaOpRegex,
 			Context: share.DlpPatternContextHEAD,
@@ -747,7 +747,7 @@ var Log4shWafSensor = &share.CLUSWafSensor{
 var preWafRuleSpring4sh = &share.CLUSWafRule{
 	Name: common.GetInternalWafRuleName(share.WafRuleNameSpr4sh, share.CLUSWafSpr4shSensor),
 	Patterns: []share.CLUSWafCriteriaEntry{
-		share.CLUSWafCriteriaEntry{
+		{
 			Key:     "pattern",
 			Op:      share.CriteriaOpRegex,
 			Context: share.DlpPatternContextBODY,

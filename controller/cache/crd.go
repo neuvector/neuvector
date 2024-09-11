@@ -5,7 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
+	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -60,7 +60,7 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					k8sResInfo := admission.ValidatingWebhookConfigInfo{
 						Name: resource.NvCrdValidatingName,
 						WebhooksInfo: []*admission.WebhookInfo{
-							&admission.WebhookInfo{
+							{
 								Name: resource.NvCrdValidatingWebhookName,
 								ClientConfig: admission.ClientConfig{
 									ClientMode:  state.AdmClientMode,

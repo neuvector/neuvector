@@ -143,9 +143,9 @@ func TestAccessPolicy(t *testing.T) {
 	}
 
 	rhs := []*share.CLUSRuleHead{
-		&share.CLUSRuleHead{ID: r1.ID, CfgType: r1.CfgType},
-		&share.CLUSRuleHead{ID: r2.ID, CfgType: r2.CfgType},
-		&share.CLUSRuleHead{ID: r3.ID, CfgType: r3.CfgType},
+		{ID: r1.ID, CfgType: r1.CfgType},
+		{ID: r2.ID, CfgType: r2.CfgType},
+		{ID: r3.ID, CfgType: r3.CfgType},
 	}
 	policyCache.ruleMap[r1.ID] = &r1
 	policyCache.ruleMap[r2.ID] = &r2

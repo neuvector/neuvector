@@ -1378,7 +1378,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 		k8sResInfo := admission.ValidatingWebhookConfigInfo{
 			Name: resource.NvAdmValidatingName,
 			WebhooksInfo: []*admission.WebhookInfo{
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvAdmValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  crdConfig.AdmClientMode,
@@ -1388,7 +1388,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 					FailurePolicy:  failurePolicy,
 					TimeoutSeconds: resource.DefTimeoutSeconds,
 				},
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvStatusValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  crdConfig.AdmClientMode,

@@ -32,13 +32,13 @@ func TestServiceCreate(t *testing.T) {
 		notScored := false
 
 		cases := map[string]api.RESTServiceConfig{
-			"g1":            api.RESTServiceConfig{"g1", "", nil, nil, nil, nil, nil},
-			"g1.default":    api.RESTServiceConfig{"g1", "default", nil, nil, nil, nil, nil},
-			"external":      api.RESTServiceConfig{"external", "", nil, nil, nil, nil, nil},
-			"nodes":         api.RESTServiceConfig{"nodes", "", nil, nil, nil, nil, nil},
-			"nv.g2.default": api.RESTServiceConfig{"nv.g2", "default", nil, nil, nil, nil, nil},
-			"g2.default":    api.RESTServiceConfig{"g2", "default", nil, &modeMonitor, &modeMonitor, nil, nil},
-			"sys.default":   api.RESTServiceConfig{"sys", "default", nil, nil, nil, nil, &notScored},
+			"g1":            {"g1", "", nil, nil, nil, nil, nil},
+			"g1.default":    {"g1", "default", nil, nil, nil, nil, nil},
+			"external":      {"external", "", nil, nil, nil, nil, nil},
+			"nodes":         {"nodes", "", nil, nil, nil, nil, nil},
+			"nv.g2.default": {"nv.g2", "default", nil, nil, nil, nil, nil},
+			"g2.default":    {"g2", "default", nil, &modeMonitor, &modeMonitor, nil, nil},
+			"sys.default":   {"sys", "default", nil, nil, nil, nil, &notScored},
 		}
 
 		for name, c := range cases {
@@ -55,12 +55,12 @@ func TestServiceCreate(t *testing.T) {
 		}
 
 		cases = map[string]api.RESTServiceConfig{
-			"g1":         api.RESTServiceConfig{"g1", "", nil, nil, nil, nil, nil},
-			"g1.default": api.RESTServiceConfig{"g1", "default", nil, nil, nil, nil, nil},
-			".":          api.RESTServiceConfig{"", "", nil, nil, nil, nil, nil},
-			".default":   api.RESTServiceConfig{"", "default", nil, nil, nil, nil, nil},
-			"g2":         api.RESTServiceConfig{"g2", "", nil, &modeEmpty, &modeEmpty, nil, nil},
-			"g3.default": api.RESTServiceConfig{"g2", "default", nil, &modeWrong, &modeWrong, nil, nil},
+			"g1":         {"g1", "", nil, nil, nil, nil, nil},
+			"g1.default": {"g1", "default", nil, nil, nil, nil, nil},
+			".":          {"", "", nil, nil, nil, nil, nil},
+			".default":   {"", "default", nil, nil, nil, nil, nil},
+			"g2":         {"g2", "", nil, &modeEmpty, &modeEmpty, nil, nil},
+			"g3.default": {"g2", "default", nil, &modeWrong, &modeWrong, nil, nil},
 		}
 
 		for _, c := range cases {
@@ -233,9 +233,9 @@ func TestGroupDelete(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated,
+				{Name: "g1", CfgType: share.UserCreated,
 					Criteria: []share.CLUSCriteriaEntry{
-						share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
+						{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
 					},
 				},
 			},
@@ -269,9 +269,9 @@ func TestGroupDelete(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.Learned,
+				{Name: "g1", CfgType: share.Learned,
 					Criteria: []share.CLUSCriteriaEntry{
-						share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
+						{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
 					},
 				},
 			},
@@ -309,9 +309,9 @@ func TestGroupDelete(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated,
+				{Name: "g1", CfgType: share.UserCreated,
 					Criteria: []share.CLUSCriteriaEntry{
-						share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
+						{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
 					},
 				},
 			},

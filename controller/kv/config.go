@@ -805,7 +805,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 									k8sResInfo := admission.ValidatingWebhookConfigInfo{
 										Name: resource.NvAdmValidatingName,
 										WebhooksInfo: []*admission.WebhookInfo{
-											&admission.WebhookInfo{
+											{
 												Name: resource.NvAdmValidatingWebhookName,
 												ClientConfig: admission.ClientConfig{
 													ClientMode:  state.AdmClientMode,
@@ -815,7 +815,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 												FailurePolicy:  failurePolicy,
 												TimeoutSeconds: state.TimeoutSeconds,
 											},
-											&admission.WebhookInfo{
+											{
 												Name: resource.NvStatusValidatingWebhookName,
 												ClientConfig: admission.ClientConfig{
 													ClientMode:  state.AdmClientMode,

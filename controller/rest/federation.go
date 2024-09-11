@@ -3342,10 +3342,10 @@ func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 var forbiddenFwUrl = map[string][]string{
-	"/v1/fed_auth": []string{http.MethodPost, http.MethodDelete},
+	"/v1/fed_auth": {http.MethodPost, http.MethodDelete},
 }
 var forbiddenFwUrlPrefix = map[string][]string{
-	"/v1/auth/": []string{http.MethodPost, http.MethodDelete},
+	"/v1/auth/": {http.MethodPost, http.MethodDelete},
 }
 
 type tForbiddenFwUrlInfo struct {
@@ -3356,12 +3356,12 @@ type tForbiddenFwUrlInfo struct {
 }
 
 var forbiddenFwUrlRegex []tForbiddenFwUrlInfo = []tForbiddenFwUrlInfo{
-	tForbiddenFwUrlInfo{
+	{
 		url:       "/v1/auth/.*",
 		urlPrefix: "/v1/auth/",
 		verbs:     []string{http.MethodPost, http.MethodDelete},
 	},
-	tForbiddenFwUrlInfo{
+	{
 		url:       "/v1/user/.*/password",
 		urlPrefix: "/v1/user/",
 		verbs:     []string{http.MethodPost},

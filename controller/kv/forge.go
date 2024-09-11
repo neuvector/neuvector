@@ -84,9 +84,9 @@ func forgeKVData() {
 	}
 }
 
-//to test policy calculation oversize issue
-//adjust number of nodes(NODEMAX) and number
-//of workloads per node(WLPERNODEMAX)
+// to test policy calculation oversize issue
+// adjust number of nodes(NODEMAX) and number
+// of workloads per node(WLPERNODEMAX)
 const NODEMAX int = 600
 const WLPERNODEMAX int = 250
 
@@ -135,7 +135,7 @@ func getDefaultGroupPolicyFake() share.CLUSGroupIPPolicy {
 			wlAddr.NatIP = append(wlAddr.NatIP, net.IPv4(hip[0], hip[1], hip[2], hip[3]))
 
 			wlAddr.NatPortApp = []share.CLUSPortApp{
-				share.CLUSPortApp{
+				{
 					Ports:       "any",
 					Application: C.DP_POLICY_APP_ANY,
 				},
@@ -193,7 +193,7 @@ func CalculateIPPolicyFromCacheFake() []share.CLUSGroupIPPolicy {
 			wlAddrTo.NatIP = append(wlAddrTo.NatIP, net.IPv4(hip[0], hip[1], hip[2], hip[3]))
 
 			wlAddrTo.NatPortApp = []share.CLUSPortApp{
-				share.CLUSPortApp{
+				{
 					Ports:       "any",
 					Application: C.DP_POLICY_APP_ANY,
 				},

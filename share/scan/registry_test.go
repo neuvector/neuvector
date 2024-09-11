@@ -20,10 +20,10 @@ func TestCopyLayers1(t *testing.T) {
 
 	imageInfo := &ImageInfo{ID: "test", Cmds: make([]string, 0), Sizes: make(map[string]int64)}
 	manV2 := &manifestV2.Manifest{Layers: []distribution.Descriptor{
-		distribution.Descriptor{Digest: "1", Size: 1},
-		distribution.Descriptor{Digest: "2", Size: 2},
-		distribution.Descriptor{Digest: "3", Size: 3},
-		distribution.Descriptor{Digest: "4", Size: 4},
+		{Digest: "1", Size: 1},
+		{Digest: "2", Size: 2},
+		{Digest: "3", Size: 3},
+		{Digest: "4", Size: 4},
 	}}
 
 	copyV2Layers(imageInfo, manV2, ccmi) // ccmi is nil
@@ -38,10 +38,10 @@ func TestCopyLayers1(t *testing.T) {
 func TestCopyLayers2(t *testing.T) {
 	imageInfo := &ImageInfo{ID: "test", Cmds: make([]string, 0), Sizes: make(map[string]int64)}
 	manV2 := &manifestV2.Manifest{Layers: []distribution.Descriptor{
-		distribution.Descriptor{Digest: "1", Size: 1},
-		distribution.Descriptor{Digest: "2", Size: 2},
-		distribution.Descriptor{Digest: "3", Size: 3},
-		distribution.Descriptor{Digest: "4", Size: 4},
+		{Digest: "1", Size: 1},
+		{Digest: "2", Size: 2},
+		{Digest: "3", Size: 3},
+		{Digest: "4", Size: 4},
 	}}
 	ccmi := &registry.ManifestInfo{
 		Cmds:        []string{"cmd 1", "cmd 2", "cmd 3", "cmd 4", "cmd 5", "cmd 6", "cmd 7"},
@@ -62,9 +62,9 @@ func TestCopyLayers3(t *testing.T) {
 	// This is an error case, where manifest doesn't have enough layers
 	imageInfo := &ImageInfo{ID: "test", Cmds: make([]string, 0), Sizes: make(map[string]int64)}
 	manV2 := &manifestV2.Manifest{Layers: []distribution.Descriptor{
-		distribution.Descriptor{Digest: "1", Size: 1},
-		distribution.Descriptor{Digest: "2", Size: 2},
-		distribution.Descriptor{Digest: "3", Size: 3},
+		{Digest: "1", Size: 1},
+		{Digest: "2", Size: 2},
+		{Digest: "3", Size: 3},
 	}}
 	ccmi := &registry.ManifestInfo{
 		Cmds:        []string{"cmd 1", "cmd 2", "cmd 3", "cmd 4", "cmd 5", "cmd 6", "cmd 7"},
@@ -85,10 +85,10 @@ func TestCopyLayers4(t *testing.T) {
 	// This is an error case, where container config has less non-empty layer count
 	imageInfo := &ImageInfo{ID: "test", Cmds: make([]string, 0), Sizes: make(map[string]int64)}
 	manV2 := &manifestV2.Manifest{Layers: []distribution.Descriptor{
-		distribution.Descriptor{Digest: "1", Size: 1},
-		distribution.Descriptor{Digest: "2", Size: 2},
-		distribution.Descriptor{Digest: "3", Size: 3},
-		distribution.Descriptor{Digest: "4", Size: 4},
+		{Digest: "1", Size: 1},
+		{Digest: "2", Size: 2},
+		{Digest: "3", Size: 3},
+		{Digest: "4", Size: 4},
 	}}
 	ccmi := &registry.ManifestInfo{
 		Cmds:        []string{"cmd 1", "cmd 2", "cmd 3", "cmd 4", "cmd 5", "cmd 6", "cmd 7"},

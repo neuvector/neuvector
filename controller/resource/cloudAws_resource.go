@@ -45,7 +45,7 @@ type AwsSvcResource struct {
 }
 
 var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
-	AwsSvcCloudformation: AwsSvcResource{
+	AwsSvcCloudformation: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -56,19 +56,19 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"ListStackResources":     AwsResLow,
 		},
 	},
-	AwsSvcCloudWatch: AwsSvcResource{
+	AwsSvcCloudWatch: {
 		Sensitivity: AwsResLow,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcCognitoIdentity: AwsSvcResource{
+	AwsSvcCognitoIdentity: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
 			"ListIdentityPools": AwsResLow,
 		},
 	},
-	AwsSvcCognitoSync: AwsSvcResource{
+	AwsSvcCognitoSync: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -76,12 +76,12 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"SetCognitoEvents": AwsResMid,
 		},
 	},
-	AwsSvcDynamodb: AwsSvcResource{
+	AwsSvcDynamodb: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcEc2: AwsSvcResource{
+	AwsSvcEc2: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -90,12 +90,12 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"DescribeVpcs":           AwsResLow,
 		},
 	},
-	AwsSvcEvents: AwsSvcResource{
+	AwsSvcEvents: {
 		Sensitivity: AwsResLow,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcIam: AwsSvcResource{
+	AwsSvcIam: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -109,7 +109,7 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"PassRole":                 AwsResMid,
 		},
 	},
-	AwsSvcIot: AwsSvcResource{
+	AwsSvcIot: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -127,7 +127,7 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"ReplaceTopicRule":         AwsResMid,
 		},
 	},
-	AwsSvcKinesis: AwsSvcResource{
+	AwsSvcKinesis: {
 		Sensitivity: AwsResMid,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -136,29 +136,29 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"PutRecord":      AwsResMid,
 		},
 	},
-	AwsSvcKms: AwsSvcResource{
+	AwsSvcKms: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    false,
 		DetailMap: map[string]string{
 			"ListAliases": AwsResLow,
 		},
 	},
-	AwsSvcLambda: AwsSvcResource{
+	AwsSvcLambda: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcLogs: AwsSvcResource{
+	AwsSvcLogs: {
 		Sensitivity: AwsResLow,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcS3: AwsSvcResource{
+	AwsSvcS3: {
 		Sensitivity: AwsResHigh,
 		AllowAll:    true,
 		DetailMap:   map[string]string{},
 	},
-	AwsSvcSns: AwsSvcResource{
+	AwsSvcSns: {
 		Sensitivity: AwsResMid,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -172,7 +172,7 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"SendMessage":              AwsResMid,
 		},
 	},
-	AwsSvcSqs: AwsSvcResource{
+	AwsSvcSqs: {
 		Sensitivity: AwsResMid,
 		AllowAll:    false,
 		DetailMap: map[string]string{
@@ -180,14 +180,14 @@ var AwsSvcResMap map[string]AwsSvcResource = map[string]AwsSvcResource{
 			"SendMessage": AwsResMid,
 		},
 	},
-	AwsSvcTag: AwsSvcResource{
+	AwsSvcTag: {
 		Sensitivity: AwsResLow,
 		AllowAll:    false,
 		DetailMap: map[string]string{
 			"GetResources": AwsResLow,
 		},
 	},
-	AwsSvcXray: AwsSvcResource{
+	AwsSvcXray: {
 		Sensitivity: AwsResLow,
 		AllowAll:    false,
 		DetailMap: map[string]string{

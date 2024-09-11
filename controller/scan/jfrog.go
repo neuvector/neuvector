@@ -115,7 +115,7 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 				if !strings.Contains(name, "*") {
 					// although repo has no wildcard, we need wait until here so we have the correct subdomain URL
 					r.subdomainURL[dir.Key] = newURL
-					return []*share.CLUSImage{&share.CLUSImage{
+					return []*share.CLUSImage{{
 						RegMod: newURL, Repo: fmt.Sprintf("%s/%s", org, name),
 					}}, nil
 				}
@@ -172,9 +172,9 @@ func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, er
 
 	if !strings.Contains(name, "*") {
 		if org == "" {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: name}}, nil
+			return []*share.CLUSImage{{Repo: name}}, nil
 		} else {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
+			return []*share.CLUSImage{{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
 		}
 	}
 	dirs := make([]jfrogRepo, 0)

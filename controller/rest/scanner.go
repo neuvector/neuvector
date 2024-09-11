@@ -624,7 +624,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 
 			// TODO: for now, set platform policy to "discover" to indicate it's not protected
 			resp.Platforms[platform] = []api.RESTIDName{
-				api.RESTIDName{
+				{
 					ID:          platform,
 					DisplayName: platform,
 					PolicyMode:  share.PolicyModeLearn,
