@@ -6,12 +6,12 @@ import (
 
 func TestParseSocket(t *testing.T) {
 	tests := [][]string{
-		[]string{"tcp://example.com/calico/agent", "tcp://example.com", "calico/agent"},
-		[]string{"tcp://example.com/alpine", "tcp://example.com", "alpine"},
-		[]string{"tcp://example.com/", "tcp://example.com", ""},
-		[]string{"tcp://example.com", "", "tcp://example.com"},
-		[]string{"tcp:/example.com/calico/agent", "", "tcp:/example.com/calico/agent"},
-		[]string{"", "", ""},
+		{"tcp://example.com/calico/agent", "tcp://example.com", "calico/agent"},
+		{"tcp://example.com/alpine", "tcp://example.com", "alpine"},
+		{"tcp://example.com/", "tcp://example.com", ""},
+		{"tcp://example.com", "", "tcp://example.com"},
+		{"tcp:/example.com/calico/agent", "", "tcp:/example.com/calico/agent"},
+		{"", "", ""},
 	}
 
 	for _, test := range tests {

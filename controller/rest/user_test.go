@@ -348,7 +348,7 @@ func TestUserRoleOther(t *testing.T) {
 	cacher = &mockCache{}
 
 	// domainRoles := map[string]string{"ns1": api.UserRoleAdmin, "ns2": api.UserRoleAdmin, "ns3": api.UserRoleReader}
-	roleDomains := map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}, api.UserRoleReader: []string{"ns3"}}
+	roleDomains := map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}, api.UserRoleReader: {"ns3"}}
 
 	data := api.RESTUserData{User: &api.RESTUser{
 		Fullname: "joe", Password: "123456", Role: api.UserRoleReader,
@@ -372,7 +372,7 @@ func TestUserRoleOther(t *testing.T) {
 	// --
 	data = api.RESTUserData{User: &api.RESTUser{
 		Fullname: "joe", Password: "123456", Role: api.UserRoleNone,
-		RoleDomains: map[string][]string{api.UserRoleAdmin: []string{"ns1"}},
+		RoleDomains: map[string][]string{api.UserRoleAdmin: {"ns1"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallWithRole("POST", "/v1/user", body, "", roleDomains)
@@ -388,7 +388,7 @@ func TestUserRoleOther(t *testing.T) {
 	// --
 	data = api.RESTUserData{User: &api.RESTUser{
 		Fullname: "joe", Password: "123456", Role: api.UserRoleNone,
-		RoleDomains: map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}, api.UserRoleReader: []string{"ns3"}},
+		RoleDomains: map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}, api.UserRoleReader: {"ns3"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallWithRole("POST", "/v1/user", body, "", roleDomains)
@@ -399,7 +399,7 @@ func TestUserRoleOther(t *testing.T) {
 	// -- modify other
 	data = api.RESTUserData{User: &api.RESTUser{
 		Fullname: "joe", Password: "123456", Role: api.UserRoleNone,
-		RoleDomains: map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}},
+		RoleDomains: map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallWithRole("POST", "/v1/user", body, "", roleDomains)
@@ -410,7 +410,7 @@ func TestUserRoleOther(t *testing.T) {
 	// config
 	cfgData := api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "joe",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1"}},
 	}}
 	body, _ = json.Marshal(cfgData)
 	w = restCallWithRole("PATCH", "/v1/user/joe", body, "", roleDomains)
@@ -420,7 +420,7 @@ func TestUserRoleOther(t *testing.T) {
 
 	cfgData = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "joe",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns3"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1", "ns3"}},
 	}}
 	body, _ = json.Marshal(cfgData)
 	w = restCallWithRole("PATCH", "/v1/user/joe", body, "", roleDomains)
@@ -431,7 +431,7 @@ func TestUserRoleOther(t *testing.T) {
 	// ciops
 	cfgData = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "joe",
-		RoleDomains: &map[string][]string{api.UserRoleCIOps: []string{"ns4"}},
+		RoleDomains: &map[string][]string{api.UserRoleCIOps: {"ns4"}},
 	}}
 	body, _ = json.Marshal(cfgData)
 	w = restCallWithRole("PATCH", "/v1/user/joe", body, "", roleDomains)
@@ -456,7 +456,7 @@ func TestUserRoleSelf(t *testing.T) {
 
 	// -- make user as global reader & ns1, ns2 admin
 	user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleReader,
-		map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}},
+		map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}},
 	)
 	clusHelper.CreateUser(user1)
 
@@ -476,7 +476,7 @@ func TestUserRoleSelf(t *testing.T) {
 	// Modify self domain role, cannot change other ns
 	data = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "user1",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns3"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1", "ns3"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallToken("PATCH", "/v1/user/user1", body, token1)
@@ -488,7 +488,7 @@ func TestUserRoleSelf(t *testing.T) {
 	// Should return OK if domain roles are not modified.
 	data = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "user1",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1"}, api.UserRoleReader: []string{"ns2"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1"}, api.UserRoleReader: {"ns2"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallToken("PATCH", "/v1/user/user1", body, token1)
@@ -504,7 +504,7 @@ func TestUserRoleSelf(t *testing.T) {
 	// We are a reader on 'ns2', so it cannot touch anything on ns2
 	data = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "user1",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallToken("PATCH", "/v1/user/user1", body, token1)
@@ -516,7 +516,7 @@ func TestUserRoleSelf(t *testing.T) {
 	// Should return OK if domain roles are not modified.
 	data = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "user1",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1"}, api.UserRoleReader: []string{"ns2"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1"}, api.UserRoleReader: {"ns2"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallToken("PATCH", "/v1/user/user1", body, token1)
@@ -529,7 +529,7 @@ func TestUserRoleSelf(t *testing.T) {
 	// Current logic returns ok because we think it's not changed
 	data = api.RESTUserConfigData{Config: &api.RESTUserConfig{
 		Fullname:    "user1",
-		RoleDomains: &map[string][]string{api.UserRoleAdmin: []string{"ns1"}, api.UserRoleReader: []string{"ns2"}},
+		RoleDomains: &map[string][]string{api.UserRoleAdmin: {"ns1"}, api.UserRoleReader: {"ns2"}},
 	}}
 	body, _ = json.Marshal(data)
 	w = restCallToken("PATCH", "/v1/user/user1", body, token1)

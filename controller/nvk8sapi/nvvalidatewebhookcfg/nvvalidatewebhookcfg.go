@@ -511,7 +511,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				if nsSelectorKey != "" && nsSelectorOp != "" {
 					webhooks[i].NamespaceSelector = &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
-							metav1.LabelSelectorRequirement{
+							{
 								Key:      nsSelectorKey,
 								Operator: metav1.LabelSelectorOperator(nsSelectorOp),
 							},
@@ -602,7 +602,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					if nsSelectorKey != "" && nsSelectorOp != "" {
 						webhooks[i].NamespaceSelector = &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
-								metav1.LabelSelectorRequirement{
+								{
 									Key:      nsSelectorKey,
 									Operator: metav1.LabelSelectorOperator(nsSelectorOp),
 								},

@@ -131,7 +131,7 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		rpt.Checks = filterComplianceChecks(rpt.Checks, cpf)
 
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		rpt.Vuls = vpf.FilterVulREST(rpt.Vuls, []api.RESTIDName{api.RESTIDName{DisplayName: fmt.Sprintf("%s:%s", rpt.Repository, rpt.Tag)}}, "")
+		rpt.Vuls = vpf.FilterVulREST(rpt.Vuls, []api.RESTIDName{{DisplayName: fmt.Sprintf("%s:%s", rpt.Repository, rpt.Tag)}}, "")
 
 		rsr.report = rpt
 	}

@@ -362,7 +362,7 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	var asc bool = query.sorts[0].asc
 
-	sortField := []restFieldSort{restFieldSort{tag: "count", asc: asc}}
+	sortField := []restFieldSort{{tag: "count", asc: asc}}
 	restNewSorter(data, sortField).Sort()
 
 	// Copy the result

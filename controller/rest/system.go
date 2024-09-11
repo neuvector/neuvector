@@ -2787,43 +2787,43 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 
 	if importType == share.IMPORT_TYPE_CONFIG {
 		nvCrdInfo := []*resource.NvCrdInfo{
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdSecurityRule,
 				SpecNamesKind: resource.NvSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdClusterSecurityRule,
 				SpecNamesKind: resource.NvClusterSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdAdmCtrlSecurityRule,
 				SpecNamesKind: resource.NvAdmCtrlSecurityRuleKind,
 				LockKey:       share.CLUSLockAdmCtrlKey,
 				KvCrdKind:     resource.NvAdmCtrlSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdDlpSecurityRule,
 				SpecNamesKind: resource.NvDlpSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvDlpSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdWafSecurityRule,
 				SpecNamesKind: resource.NvWafSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvWafSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdVulnProfile,
 				SpecNamesKind: resource.NvVulnProfileSecurityRuleKind,
 				LockKey:       share.CLUSLockVulnKey,
 				KvCrdKind:     resource.NvVulnProfileSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdCompProfile,
 				SpecNamesKind: resource.NvCompProfileSecurityRuleKind,
 				LockKey:       share.CLUSLockCompKey,

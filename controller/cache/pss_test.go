@@ -213,7 +213,7 @@ func TestUsesIllegalVolumeTypes_IllegalSet(t *testing.T) {
 
 	testContainer := getValidTestContainer()
 	testContainer.Volumes = []corev1.Volume{
-		corev1.Volume{
+		{
 			VolumeSource: corev1.VolumeSource{
 				Cinder: &corev1.CinderVolumeSource{},
 			},
