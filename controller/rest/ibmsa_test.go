@@ -63,21 +63,21 @@ func TestIBMSAIntegration(t *testing.T) {
 	{
 		// Custom role with permission
 		dataRoles := []api.RESTUserRoleConfigData{
-			api.RESTUserRoleConfigData{
+			{
 				Config: &api.RESTUserRoleConfig{
 					Name:    "custom-role-1", // has view configuration permission
 					Comment: "modify configuration",
 					Permissions: []*api.RESTRolePermission{
-						&api.RESTRolePermission{ID: "config", Read: true},
+						{ID: "config", Read: true},
 					},
 				},
 			},
-			api.RESTUserRoleConfigData{
+			{
 				Config: &api.RESTUserRoleConfig{
 					Name:    "custom-role-2", // has view/modify configuration permission
 					Comment: "modify configuration",
 					Permissions: []*api.RESTRolePermission{
-						&api.RESTRolePermission{ID: "config", Write: true},
+						{ID: "config", Write: true},
 					},
 				},
 			},
@@ -195,7 +195,7 @@ func TestIBMSAIntegration(t *testing.T) {
 
 	k8sPlatform = true                // so that we could test admission control's handler
 	nvURIs403 := map[string][]string{ // key is http verb, value is URIs with the sme verb
-		"GET": []string{
+		"GET": {
 			"/v1/meter",
 			"/v1/scan/config",
 			"/v1/list/registry_type",
@@ -206,21 +206,21 @@ func TestIBMSAIntegration(t *testing.T) {
 			"/v1/system/config",
 			"/v1/fed/member",
 		},
-		"POST": []string{
+		"POST": {
 			"/v1/debug/controller/sync/:id",
 			"/v1/controller/:id/profiling",
 			"/v1/enforcer/:id/profiling",
 			"/v1/scan/repository",
 			"/v1/sniffer",
 		},
-		"DELETE": []string{
+		"DELETE": {
 			"/v1/conversation_endpoint/:id",
 			"/v1/conversation",
 			"/v1/session",
 		},
 	}
 	nvURIs404 := map[string][]string{ // key is http verb, value is URIs with the sme verb
-		"GET": []string{
+		"GET": {
 			"/v1/controller/:id/config", // this is gets 404 because the specified controller is not found
 			"/v1/log/threat/abc",        // this returns 404 because we don't return 403 for those objects, like Threat, that support domain permission
 			"/v1/user/alex",             // this returns 404 because we don't return 403 for those objects, like CLUSUser, that support domain permission
@@ -285,7 +285,7 @@ func TestIBMSAIntegration(t *testing.T) {
 				Name:    "custom-role-1", // has view/modify authorization permission
 				Comment: "modify rt_scan",
 				Permissions: []*api.RESTRolePermission{
-					&api.RESTRolePermission{ID: "rt_scan", Write: true},
+					{ID: "rt_scan", Write: true},
 				},
 			},
 		}
@@ -298,7 +298,7 @@ func TestIBMSAIntegration(t *testing.T) {
 		// Create user with the custom role
 		userData := api.RESTUserData{User: &api.RESTUser{
 			Fullname: "joe23", Password: "123456", Role: "", RoleDomains: map[string][]string{
-				dataRole.Config.Name: []string{"neuvector-1"},
+				dataRole.Config.Name: {"neuvector-1"},
 			},
 		}}
 		body2, _ := json.Marshal(userData)

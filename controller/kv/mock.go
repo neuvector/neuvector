@@ -93,7 +93,7 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.ScanRpts = make(map[string]*share.CLUSScanReport, 0)
 
 	m.complianceProfiles = map[string]*share.CLUSComplianceProfile{
-		"default": &share.CLUSComplianceProfile{
+		"default": {
 			Name:          "default",
 			DisableSystem: false,
 			Entries:       make(map[string]share.CLUSComplianceProfileEntry),
@@ -444,8 +444,8 @@ func (m *MockCluster) GetProcessProfile(group string) *share.CLUSProcessProfile 
 		HashEnable:   false,
 		Mode:         share.PolicyActionLearn,
 		Process: []*share.CLUSProcessProfileEntry{
-			&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-			&share.CLUSProcessProfileEntry{Name: "sleep", Path: "/bin/sleep", Action: share.PolicyActionAllow},
+			{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+			{Name: "sleep", Path: "/bin/sleep", Action: share.PolicyActionAllow},
 		},
 	}
 }

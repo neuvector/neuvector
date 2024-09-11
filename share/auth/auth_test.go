@@ -55,7 +55,7 @@ func TestOktaSAMLUnsignedAuthnRequest(t *testing.T) {
 	url, err := remoteAuth.SAMLSPGetRedirectURL(&share.CLUSServerSAML{
 		CLUSServerAuth: share.CLUSServerAuth{
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
@@ -145,7 +145,7 @@ ma7nkie3ORja96UTROAZ77o=
 	url, err := remoteAuth.SAMLSPGetRedirectURL(&share.CLUSServerSAML{
 		CLUSServerAuth: share.CLUSServerAuth{
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
@@ -202,7 +202,7 @@ REg3LA3YSyeLxyhwSUOJSHf+yBKLZFrDlbJQ4w==
 	nameid, sessionindex, attrs, err := remoteAuth.SAMLSPAuth(&share.CLUSServerSAML{
 		CLUSServerAuth: share.CLUSServerAuth{
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
@@ -298,7 +298,7 @@ ma7nkie3ORja96UTROAZ77o=
 	url, err := remoteAuth.SAMLSPGetLogoutURL(&share.CLUSServerSAML{
 		CLUSServerAuth: share.CLUSServerAuth{
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),

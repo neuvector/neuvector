@@ -12,19 +12,19 @@ func TestVulnerabilityProfile(t *testing.T) {
 	p := api.RESTVulnerabilityProfile{
 		Name: "default",
 		Entries: []api.RESTVulnerabilityProfileEntry{
-			api.RESTVulnerabilityProfileEntry{
+			{
 				ID: 1, Name: api.VulnerabilityNameRecent, Days: 10, Images: []string{"nginx:*"},
 			},
-			api.RESTVulnerabilityProfileEntry{
+			{
 				ID: 2, Name: "CVE-2021-*", Domains: []string{"dev-*", "prod-*"}, Images: []string{"alpine:3", "node-*:*"},
 			},
-			api.RESTVulnerabilityProfileEntry{
+			{
 				ID: 3, Name: "CVE-2020-6789", Domains: []string{"dev-*"},
 			},
-			api.RESTVulnerabilityProfileEntry{
+			{
 				ID: 4, Name: "CVE-2019-AAAA", Images: []string{"controller:4.0.1", "enforcer:*"},
 			},
-			api.RESTVulnerabilityProfileEntry{
+			{
 				ID: 5, Name: "CVE-2018-*",
 			},
 		},

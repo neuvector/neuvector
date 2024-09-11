@@ -275,255 +275,255 @@ func newJSONAdmContainerInfo(cinfo *AdmContainerInfo) *JSONAdmContainerInfo {
 func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 	if admK8sDenyRuleOptions == nil {
 		subOptions := map[string]*api.RESTAdmissionRuleOption{
-			share.SubCriteriaPublishDays: &api.RESTAdmissionRuleOption{
+			share.SubCriteriaPublishDays: {
 				Name: share.SubCriteriaPublishDays,
 				Ops:  []string{share.CriteriaOpBiggerEqualThan},
 			},
 		}
 		subOptions2 := map[string]*api.RESTAdmissionRuleOption{
-			share.SubCriteriaCount: &api.RESTAdmissionRuleOption{
+			share.SubCriteriaCount: {
 				Name: share.SubCriteriaCount,
 				Ops:  []string{share.CriteriaOpBiggerEqualThan},
 			},
 		}
 		admK8sDenyRuleOptions = map[string]*api.RESTAdmissionRuleOption{
-			share.CriteriaKeyImage: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImage: {
 				Name:     share.CriteriaKeyImage,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyImageRegistry: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageRegistry: {
 				Name:     share.CriteriaKeyImageRegistry,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyNamespace: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyNamespace: {
 				Name:     share.CriteriaKeyNamespace,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyUser: {
 				Name: share.CriteriaKeyUser,
 				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
 					share.CriteriaOpRegex, share.CriteriaOpNotRegex},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyK8sGroups: {
 				Name: share.CriteriaKeyK8sGroups,
 				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
 					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
 					share.CriteriaOpRegex, share.CriteriaOpNotRegex},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyLabels: {
 				Name:     share.CriteriaKeyLabels,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyAnnotations: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyAnnotations: {
 				Name:     share.CriteriaKeyAnnotations,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyMountVolumes: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyMountVolumes: {
 				Name:     share.CriteriaKeyMountVolumes,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyEnvVars: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyEnvVars: {
 				Name:     share.CriteriaKeyEnvVars,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyCVENames: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVENames: {
 				Name:     share.CriteriaKeyCVENames,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVECriticalCount: {
 			// 	Name:       share.CriteriaKeyCVECriticalCount,
 			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc:   api.MatchSrcImage,
 			// 	SubOptions: subOptions,
 			// },
-			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEHighCount: {
 				Name:       share.CriteriaKeyCVEHighCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVEHighCountNoCritical: {
 			// 	Name:       share.CriteriaKeyCVEHighCountNoCritical,
 			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc:   api.MatchSrcImage,
 			// 	SubOptions: subOptions,
 			// },
-			share.CriteriaKeyCVEMediumCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEMediumCount: {
 				Name:       share.CriteriaKeyCVEMediumCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVECriticalWithFixCount: {
 			// 	Name:       share.CriteriaKeyCVECriticalWithFixCount,
 			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc:   api.MatchSrcImage,
 			// 	SubOptions: subOptions,
 			// },
-			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEHighWithFixCount: {
 				Name:       share.CriteriaKeyCVEHighWithFixCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVEHighWithFixCountNoCritical: {
 			// 	Name:       share.CriteriaKeyCVEHighWithFixCountNoCritical,
 			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc:   api.MatchSrcImage,
 			// 	SubOptions: subOptions,
 			// },
-			share.CriteriaKeyCVEScoreCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEScoreCount: {
 				Name:       share.CriteriaKeyCVEScoreCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions2,
 			},
-			/*share.CriteriaKeyCVEScore: &api.RESTAdmissionRuleOption{
+			/*share.CriteriaKeyCVEScore: {
 				Name:     share.CriteriaKeyCVEScore,
 				Ops:      []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},*/
-			share.CriteriaKeyImageScanned: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageScanned: {
 				Name:     share.CriteriaKeyImageScanned,
 				Ops:      []string{share.CriteriaOpEqual},
 				MatchSrc: api.MatchSrcImage,
 				Values:   boolOps,
 			},
-			share.CriteriaKeyRunAsPrivileged: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyRunAsPrivileged: {
 				Name:     share.CriteriaKeyRunAsPrivileged,
 				Ops:      []string{share.CriteriaOpEqual},
 				MatchSrc: api.MatchSrcYaml,
 				Values:   boolOps,
 			},
-			share.CriteriaKeyRunAsRoot: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyRunAsRoot: {
 				Name:     share.CriteriaKeyRunAsRoot,
 				Ops:      []string{share.CriteriaOpEqual},
 				MatchSrc: api.MatchSrcBoth,
 				Values:   boolOps,
 			},
-			/*share.CriteriaKeyBaseImage: &api.RESTAdmissionRuleOption{ //->
+			/*share.CriteriaKeyBaseImage: { //->
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
 			},*/
-			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageSigned: {
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageCompliance: {
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyEnvVarSecrets: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyEnvVarSecrets: {
 				Name:     share.CriteriaKeyEnvVarSecrets,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyImageNoOS: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageNoOS: {
 				Name:     share.CriteriaKeyImageNoOS,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeySharePidWithHost: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeySharePidWithHost: {
 				Name:     share.CriteriaKeySharePidWithHost,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyShareIpcWithHost: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyShareIpcWithHost: {
 				Name:     share.CriteriaKeyShareIpcWithHost,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyShareNetWithHost: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyShareNetWithHost: {
 				Name:     share.CriteriaKeyShareNetWithHost,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyAllowPrivEscalation: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyAllowPrivEscalation: {
 				Name:     share.CriteriaKeyAllowPrivEscalation,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolTrueOp,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyPspCompliance: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyPspCompliance: {
 				Name:     share.CriteriaKeyPspCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolTrueOp,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyRequestLimit: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyRequestLimit: {
 				Name:     share.CriteriaKeyRequestLimit,
 				Ops:      []string{},
 				MatchSrc: api.MatchSrcYaml,
 				SubOptions: map[string]*api.RESTAdmissionRuleOption{
-					share.SubCriteriaCpuRequest: &api.RESTAdmissionRuleOption{
+					share.SubCriteriaCpuRequest: {
 						Name: share.SubCriteriaCpuRequest,
 						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
 					},
-					share.SubCriteriaCpuLimit: &api.RESTAdmissionRuleOption{
+					share.SubCriteriaCpuLimit: {
 						Name: share.SubCriteriaCpuLimit,
 						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
 					},
-					share.SubCriteriaMemoryRequest: &api.RESTAdmissionRuleOption{
+					share.SubCriteriaMemoryRequest: {
 						Name: share.SubCriteriaMemoryRequest,
 						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
 					},
-					share.SubCriteriaMemoryLimit: &api.RESTAdmissionRuleOption{
+					share.SubCriteriaMemoryLimit: {
 						Name: share.SubCriteriaMemoryLimit,
 						Ops:  []string{share.CriteriaOpBiggerThan, share.CriteriaOpLessEqualThan},
 					},
 				},
 			},
-			share.CriteriaKeyModules: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyModules: {
 				Name:     share.CriteriaKeyModules,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyHasPssViolation: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyHasPssViolation: {
 				Name:     share.CriteriaKeyHasPssViolation,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   pssPolicies,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyCustomPath: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCustomPath: {
 				Name:     share.CriteriaKeyCustomPath,
 				Ops:      []string{},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeySaBindRiskyRole: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeySaBindRiskyRole: {
 				Name:     share.CriteriaKeySaBindRiskyRole,
 				Ops:      []string{share.CriteriaOpContainsTagAny},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyImageVerifiers: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageVerifiers: {
 				Name:     share.CriteriaKeyImageVerifiers,
 				Ops:      verifierOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyStorageClassName: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyStorageClassName: {
 				Name:     share.CriteriaKeyStorageClassName,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
@@ -536,150 +536,150 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // for allow rules
 	if admK8sExcptRuleOptions == nil {
 		admK8sExcptRuleOptions = map[string]*api.RESTAdmissionRuleOption{
-			share.CriteriaKeyImage: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImage: {
 				Name:     share.CriteriaKeyImage,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyImageRegistry: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageRegistry: {
 				Name:     share.CriteriaKeyImageRegistry,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyNamespace: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyNamespace: {
 				Name:     share.CriteriaKeyNamespace,
 				Ops:      setOps1,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyUser: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyUser: {
 				Name: share.CriteriaKeyUser,
 				Ops: []string{share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny,
 					share.CriteriaOpRegex, share.CriteriaOpNotRegex},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyK8sGroups: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyK8sGroups: {
 				Name: share.CriteriaKeyK8sGroups,
 				Ops: []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny,
 					share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
 					share.CriteriaOpRegex, share.CriteriaOpNotRegex},
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyLabels: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyLabels: {
 				Name:     share.CriteriaKeyLabels,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyAnnotations: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyAnnotations: {
 				Name:     share.CriteriaKeyAnnotations,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyMountVolumes: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyMountVolumes: {
 				Name:     share.CriteriaKeyMountVolumes,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyEnvVars: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyEnvVars: {
 				Name:     share.CriteriaKeyEnvVars,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			share.CriteriaKeyCVENames: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVENames: {
 				Name:     share.CriteriaKeyCVENames,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalCount: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVECriticalCount: {
 			// 	Name:     share.CriteriaKeyCVECriticalCount,
 			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc: api.MatchSrcImage,
 			// },
-			share.CriteriaKeyCVEHighCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEHighCount: {
 				Name:     share.CriteriaKeyCVEHighCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighCountNoCritical: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVEHighCountNoCritical: {
 			// 	Name:     share.CriteriaKeyCVEHighCountNoCritical,
 			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc: api.MatchSrcImage,
 			// },
-			share.CriteriaKeyCVEMediumCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEMediumCount: {
 				Name:     share.CriteriaKeyCVEMediumCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalWithFixCount: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVECriticalWithFixCount: {
 			// 	Name:     share.CriteriaKeyCVECriticalWithFixCount,
 			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc: api.MatchSrcImage,
 			// },
-			share.CriteriaKeyCVEHighWithFixCount: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyCVEHighWithFixCount: {
 				Name:     share.CriteriaKeyCVEHighWithFixCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
 			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighWithFixCountNoCritical: &api.RESTAdmissionRuleOption{
+			// share.CriteriaKeyCVEHighWithFixCountNoCritical: {
 			// 	Name:     share.CriteriaKeyCVEHighWithFixCountNoCritical,
 			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 			// 	MatchSrc: api.MatchSrcImage,
 			// },
-			/*share.CriteriaKeyCVEScore: &api.RESTAdmissionRuleOption{
+			/*share.CriteriaKeyCVEScore: {
 				Name:     share.CriteriaKeyCVEScore,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},*/
-			share.CriteriaKeyImageScanned: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageScanned: {
 				Name:     share.CriteriaKeyImageScanned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyRunAsPrivileged: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyRunAsPrivileged: {
 				Name:     share.CriteriaKeyRunAsPrivileged,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyRunAsRoot: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyRunAsRoot: {
 				Name:     share.CriteriaKeyRunAsRoot,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcBoth,
 			},
-			/*share.CriteriaKeyBaseImage: &api.RESTAdmissionRuleOption{ //->
+			/*share.CriteriaKeyBaseImage: { //->
 				Name:     share.CriteriaKeyBaseImage,
 				Ops:      []string{share.CriteriaOpEqual, share.CriteriaOpNotEqual},
 				MatchSrc: api.MatchSrcImage,
 			},*/
-			share.CriteriaKeyImageSigned: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageSigned: {
 				Name:     share.CriteriaKeyImageSigned,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyImageCompliance: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageCompliance: {
 				Name:     share.CriteriaKeyImageCompliance,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyEnvVarSecrets: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyEnvVarSecrets: {
 				Name:     share.CriteriaKeyEnvVarSecrets,
 				Ops:      []string{share.CriteriaOpEqual},
 				Values:   boolOps,
 				MatchSrc: api.MatchSrcYaml,
 			},
-			share.CriteriaKeyModules: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyModules: {
 				Name:     share.CriteriaKeyModules,
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			share.CriteriaKeyImageVerifiers: &api.RESTAdmissionRuleOption{
+			share.CriteriaKeyImageVerifiers: {
 				Name:     share.CriteriaKeyImageVerifiers,
 				Ops:      verifierOps,
 				MatchSrc: api.MatchSrcImage,
@@ -692,8 +692,8 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 func GetAdmRuleTypeOptions(ruleType string) *api.RESTAdmCatOptions {
 	if admRuleTypeOptions == nil {
 		admRuleTypeOptions = map[string]*api.RESTAdmCatOptions{
-			api.ValidatingDenyRuleType:   &api.RESTAdmCatOptions{},
-			api.ValidatingExceptRuleType: &api.RESTAdmCatOptions{},
+			api.ValidatingDenyRuleType:   {},
+			api.ValidatingExceptRuleType: {},
 		}
 		for _, admType := range admission.GetAdmissionCtrlTypes(share.PlatformKubernetes) {
 			switch admType {

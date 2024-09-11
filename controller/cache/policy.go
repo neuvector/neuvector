@@ -441,11 +441,11 @@ func getWorkloadBaselineProfile(wlCache *workloadCache) string {
 
 func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 	wlAddr := share.CLUSWorkloadAddr{
-		WlID: wlCache.workload.ID,
-		Domain: wlCache.workload.Domain,
+		WlID:         wlCache.workload.ID,
+		Domain:       wlCache.workload.Domain,
 		PlatformRole: wlCache.platformRole,
-		Ports: wlCache.workload.Ports,
-		Apps: wlCache.workload.Apps,
+		Ports:        wlCache.workload.Ports,
+		Apps:         wlCache.workload.Apps,
 	}
 	if wlCache.workload.ShareNetNS != "" {
 		if wlCache1, ok1 := wlCacheMap[wlCache.workload.ShareNetNS]; ok1 {
@@ -480,7 +480,7 @@ func getWorkloadAddress(wlCache *workloadCache) share.CLUSWorkloadAddr {
 		pp := getMappedPort(wlCache.workload, "any")
 		if pp != "" {
 			wlAddr.NatPortApp = []share.CLUSPortApp{
-				share.CLUSPortApp{
+				{
 					Ports:       pp,
 					Application: C.DP_POLICY_APP_ANY,
 				},
@@ -608,7 +608,7 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 		}
 	} else if ports != "" {
 		wlAddr.LocalPortApp = []share.CLUSPortApp{
-			share.CLUSPortApp{
+			{
 				Ports:       ports,
 				Application: C.DP_POLICY_APP_ANY,
 			},
@@ -617,7 +617,7 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 
 		if pp != "" {
 			wlAddr.NatPortApp = []share.CLUSPortApp{
-				share.CLUSPortApp{
+				{
 					Ports:       pp,
 					Application: C.DP_POLICY_APP_ANY,
 				},
@@ -640,7 +640,7 @@ func getPortApp(ports string, apps []uint32) []share.CLUSPortApp {
 		return portApp
 	} else if ports != "" {
 		portApp := []share.CLUSPortApp{
-			share.CLUSPortApp{
+			{
 				Ports:       ports,
 				Application: C.DP_POLICY_APP_ANY,
 			},
@@ -653,7 +653,7 @@ func getPortApp(ports string, apps []uint32) []share.CLUSPortApp {
 func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, isDst bool) []*share.CLUSWorkloadAddr {
 	if name == api.LearnedExternal {
 		groupAddrs := []*share.CLUSWorkloadAddr{
-			&share.CLUSWorkloadAddr{
+			{
 				WlID:       share.CLUSWLExternal,
 				NatIP:      []net.IP{share.CLUSIPExternal},
 				NatPortApp: getPortApp(ports, apps),
@@ -662,7 +662,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 		return groupAddrs
 	} else if utils.IsGroupNodes(name) {
 		groupAddrs := []*share.CLUSWorkloadAddr{
-			&share.CLUSWorkloadAddr{
+			{
 				WlID:       share.CLUSHostAddrGroup,
 				NatIP:      make([]net.IP, 0),
 				NatPortApp: getPortApp(ports, apps),
@@ -678,10 +678,10 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			groupAddrs[0].NatIP = append(groupAddrs[0].NatIP, []net.IP{utils.IPv4Loopback, nil}...)
 		}
 		return groupAddrs
-	} else if isAllContainerGrp(name){
+	} else if isAllContainerGrp(name) {
 		groupAddrs := []*share.CLUSWorkloadAddr{
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLAllContainer,
+			{
+				WlID: share.CLUSWLAllContainer,
 			},
 		}
 		if isDst {
@@ -774,7 +774,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			ip := net.ParseIP(names[1])
 			if ip != nil {
 				groupAddrs := []*share.CLUSWorkloadAddr{
-					&share.CLUSWorkloadAddr{
+					{
 						WlID:       name,
 						NatIP:      []net.IP{ip},
 						NatPortApp: getPortApp(ports, apps),
@@ -783,7 +783,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 				return groupAddrs
 			} else if hostCache, ok := hostCacheMap[hostID]; ok {
 				groupAddrs := []*share.CLUSWorkloadAddr{
-					&share.CLUSWorkloadAddr{
+					{
 						WlID:       specialEPName(api.LearnedHostPrefix, hostID),
 						NatIP:      make([]net.IP, 0),
 						NatPortApp: getPortApp(ports, apps),
@@ -935,7 +935,7 @@ func getMixedGroupPolicyForIngress() []share.CLUSGroupIPPolicy {
 				WlID:       share.CLUSWLModeGroup,
 				PolicyMode: share.PolicyModeEvaluate + "," + share.PolicyModeEnforce,
 				LocalPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
@@ -960,7 +960,7 @@ func getMixedGroupPolicyForIngress() []share.CLUSGroupIPPolicy {
 				WlID:       share.CLUSWLModeGroup,
 				PolicyMode: share.PolicyModeEnforce,
 				LocalPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
@@ -1013,13 +1013,13 @@ func getMixedGroupPolicy() []share.CLUSGroupIPPolicy {
 				WlID:       share.CLUSWLModeGroup,
 				PolicyMode: share.PolicyModeLearn,
 				LocalPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
 				},
 				NatPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
@@ -1057,13 +1057,13 @@ func getMixedGroupPolicy() []share.CLUSGroupIPPolicy {
 				WlID:       share.CLUSWLModeGroup,
 				PolicyMode: share.PolicyModeEvaluate,
 				LocalPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
 				},
 				NatPortApp: []share.CLUSPortApp{
-					share.CLUSPortApp{
+					{
 						Ports:       "any",
 						Application: C.DP_POLICY_APP_ANY,
 					},
@@ -1119,7 +1119,7 @@ func adjustPolicyRuleHeads() []*share.CLUSRuleHead {
 }
 
 func isAllContainerGrp(name string) bool {
-	if name == api.AllContainerGroup || name == api.FederalGroupPrefix + api.AllContainerGroup {
+	if name == api.AllContainerGroup || name == api.FederalGroupPrefix+api.AllContainerGroup {
 		return true
 	}
 	return false
@@ -1516,24 +1516,24 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 				}
 				nodePolicy[nid] = append(nodePolicy[nid], pol)
 			}
-				//also need to check namespace boundary enforcement
-				var tmpNodePolicyNBE map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
-				for _, addr := range rul.To {
-					if hid, ok := wlNode[addr.WlID]; ok && isDomNBE(addr, addrMap) {
-						t := tmpNodePolicyNBE[hid]
-						t.ID = rul.ID
-						t.From = rul.From
-						t.To = append(t.To, addr)
-						t.Action = rul.Action
-						tmpNodePolicyNBE[hid] = t
-					}
+			//also need to check namespace boundary enforcement
+			var tmpNodePolicyNBE map[string]share.CLUSGroupIPPolicy = make(map[string]share.CLUSGroupIPPolicy)
+			for _, addr := range rul.To {
+				if hid, ok := wlNode[addr.WlID]; ok && isDomNBE(addr, addrMap) {
+					t := tmpNodePolicyNBE[hid]
+					t.ID = rul.ID
+					t.From = rul.From
+					t.To = append(t.To, addr)
+					t.Action = rul.Action
+					tmpNodePolicyNBE[hid] = t
 				}
-				for nid, pol := range tmpNodePolicyNBE {
-					if nodePolicy[nid] == nil {
-						nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
-					}
-					nodePolicy[nid] = append(nodePolicy[nid], pol)
+			}
+			for nid, pol := range tmpNodePolicyNBE {
+				if nodePolicy[nid] == nil {
+					nodePolicy[nid] = make([]share.CLUSGroupIPPolicy, 0)
 				}
+				nodePolicy[nid] = append(nodePolicy[nid], pol)
+			}
 		} else {
 			//if destination group is not container group
 			//use source group to decide which node
@@ -1586,9 +1586,10 @@ func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 	return nil
 }
 
-//each slot's max size after zip is 500k
+// each slot's max size after zip is 500k
 const maxPolicySlots = 512
-//based on cluster size start from different base
+
+// based on cluster size start from different base
 const beginSlotSmall = 16
 const beginSlotMedium = 32
 const beginSlotLarge = 64
@@ -1612,9 +1613,9 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 		beginSlot = beginSlotSuper
 	}
 	log.WithFields(log.Fields{
-			"wlen":           wlen,
-			"beginSlot":      beginSlot,
-			"maxPolicySlots": maxPolicySlots,
+		"wlen":           wlen,
+		"beginSlot":      beginSlot,
+		"maxPolicySlots": maxPolicySlots,
 	}).Debug("begin slots")
 	// deal with case that compressed rule size is > max kv value size (512K)
 	for slots := beginSlot; slots <= maxPolicySlots; slots *= 2 {
@@ -1685,18 +1686,18 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 	return nil, 0, 0, errors.New("Common policy rules are too large")
 }
 
-//per node slot, since resource consuming address map
-//is already dealt with in preparePolicySlotsCommon separately
-//and policy is reorganized for each node, so slot number start small
+// per node slot, since resource consuming address map
+// is already dealt with in preparePolicySlotsCommon separately
+// and policy is reorganized for each node, so slot number start small
 const beginSlotNode = 1
 
 func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte, int, int, error) {
 	//start from different base to save cpu
 	beginSlot := beginSlotNode
 	log.WithFields(log.Fields{
-			"wlen":           wlen,
-			"beginSlot":      beginSlot,
-			"maxPolicySlots": maxPolicySlots,
+		"wlen":           wlen,
+		"beginSlot":      beginSlot,
+		"maxPolicySlots": maxPolicySlots,
 	}).Debug("begin slots")
 	// deal with case that compressed rule size is > max kv value size (512K)
 	for slots := beginSlot; slots <= maxPolicySlots; slots *= 2 {
@@ -1707,7 +1708,7 @@ func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte
 			final_slots = rule_lens
 		}
 		log.WithFields(log.Fields{
-			"wlen":        wlen,
+			"wlen":           wlen,
 			"slots":          slots,
 			"orig_rule_lens": len(rules),
 			"rule_lens":      rule_lens,
@@ -1760,9 +1761,9 @@ func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, er
 		beginSlot = beginSlotSuper
 	}
 	log.WithFields(log.Fields{
-			"wlen":           wlen,
-			"beginSlot":      beginSlot,
-			"maxPolicySlots": maxPolicySlots,
+		"wlen":           wlen,
+		"beginSlot":      beginSlot,
+		"maxPolicySlots": maxPolicySlots,
 	}).Debug("begin slots")
 	// deal with case that compressed rule size is > max kv value size (512K)
 	for slots := beginSlot; slots <= maxPolicySlots; slots *= 2 {
@@ -1912,9 +1913,9 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 		polVer := share.CLUSGroupIPPolicyVer{
 			Key:                  share.PolicyIPRulesVersionID,
 			PolicyIPRulesVersion: verstr,
-			NodeId: 			  nid,
-			CommonSlotNo: 		  len(common_zbs),
-			CommonRulesLen: 	  wlslots,
+			NodeId:               nid,
+			CommonSlotNo:         len(common_zbs),
+			CommonRulesLen:       wlslots,
 			SlotNo:               len(node_zbs),
 			RulesLen:             len(nodRules),
 			WorkloadSlot:         wlslots,

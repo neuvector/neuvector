@@ -46,7 +46,7 @@ var (
 
 // For Load Prime data
 var mockLoadItems = map[string]api.RESTBenchCheck{
-	"I.4.1": api.RESTBenchCheck{
+	"I.4.1": {
 		TestNum:     "I.4.1",
 		Type:        "image",
 		Category:    "image",
@@ -55,7 +55,7 @@ var mockLoadItems = map[string]api.RESTBenchCheck{
 		Automated:   false,
 		Description: "Ensure a user for the container has been created",
 	},
-	"I.4.6": api.RESTBenchCheck{
+	"I.4.6": {
 		TestNum:     "I.4.6",
 		Type:        "image",
 		Category:    "image",

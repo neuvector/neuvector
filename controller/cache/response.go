@@ -49,15 +49,15 @@ type responseActionFunc struct {
 }
 
 var responseFuncs map[string]responseActionFunc = map[string]responseActionFunc{
-	share.EventActivity:   responseActionFunc{logActivity, webhookActivity},
-	share.EventEvent:      responseActionFunc{logEvent, webhookEvent},
-	share.EventCVEReport:  responseActionFunc{logAudit, webhookAudit},
-	share.EventThreat:     responseActionFunc{logThreat, webhookThreat},
-	share.EventIncident:   responseActionFunc{logIncident, webhookIncident},
-	share.EventViolation:  responseActionFunc{logViolation, webhookViolation},
-	share.EventCompliance: responseActionFunc{logAudit, webhookAudit},
-	share.EventAdmCtrl:    responseActionFunc{logAudit, webhookAudit},
-	share.EventServerless: responseActionFunc{logAudit, webhookAudit},
+	share.EventActivity:   {logActivity, webhookActivity},
+	share.EventEvent:      {logEvent, webhookEvent},
+	share.EventCVEReport:  {logAudit, webhookAudit},
+	share.EventThreat:     {logThreat, webhookThreat},
+	share.EventIncident:   {logIncident, webhookIncident},
+	share.EventViolation:  {logViolation, webhookViolation},
+	share.EventCompliance: {logAudit, webhookAudit},
+	share.EventAdmCtrl:    {logAudit, webhookAudit},
+	share.EventServerless: {logAudit, webhookAudit},
 }
 
 type resPolicyCacheType struct {

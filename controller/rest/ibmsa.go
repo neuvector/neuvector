@@ -395,7 +395,7 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 		threadNoteName := fmt.Sprintf("providers/%s/notes/%s", providerID, _ibmFindingThreat) // ends with {findings-type}
 		resp := ibmsaMetadata{
 			Notes: []ibmsaNote{
-				ibmsaNote{
+				{
 					Kind:             "CARD",
 					ProviderID:       providerID,
 					ID:               _ibmFindingCard, // this note id is card id
@@ -413,7 +413,7 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 						BadgeText:        "No security event detected in the last 5 days",
 						//BadgeImage:            "{base64 content of the image associated to the card's badge}",
 						Elements: []ibmsaCardElement{
-							ibmsaCardElement{
+							{
 								Kind:             "NUMERIC",
 								Text:             "Security events count reported",
 								DefaultTimeRange: "4d",
@@ -422,12 +422,12 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 									FindingNoteNames: []string{threadNoteName},
 								},
 							},
-							ibmsaCardElement{
+							{
 								Kind:             "TIME_SERIES",
 								Text:             "Security events count reported",
 								DefaultTimeRange: "4d",
 								ValueTypes: []ibmsaCardValueType2{
-									ibmsaCardValueType2{
+									{
 										Kind:             "FINDING_COUNT",
 										Text:             "Security events",
 										FindingNoteNames: []string{threadNoteName},
@@ -437,7 +437,7 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 						},
 					},
 				},
-				ibmsaNote{
+				{
 					Kind:             "FINDING",
 					ShortDescription: "NeuVector security threat finding",
 					LongDescription:  "NeuVector Container Security",
@@ -450,7 +450,7 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 					Finding: &ibmsaFindingType{
 						Severity: "MEDIUM",
 						NextSteps: []ibmsaRemediationStep{
-							ibmsaRemediationStep{
+							{
 								Title: "Evaluate if server is vulnerable",
 							},
 						},
@@ -712,7 +712,7 @@ func ibmsaPostThreatFinding(f *api.IBMSAFinding) error {
 		Finding: &ibmsaFinding{
 			Certainty: "HIGH",
 			NextSteps: []ibmsaRemediationStep{
-				ibmsaRemediationStep{
+				{
 					Title: fmt.Sprintf("%s - Correlate security events in the NeuVector console to evaluate the scope of the attack", cacher.GetSystemConfigClusterName(accIBMSAPoster)),
 					Url:   "https://docs.neuvector.com",
 				},

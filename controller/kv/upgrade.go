@@ -1216,7 +1216,7 @@ func ValidateWebhookCert() {
 	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
 	certsInfo := []*keyCertInfo{
-		&keyCertInfo{
+		{
 			cn:           share.CLUSRootCAKey,
 			svcName:      share.CLUSRootCAKey,
 			certSvcNames: []string{resource.NvAdmSvcName, resource.NvCrdSvcName}, // for old kv key
@@ -1224,7 +1224,7 @@ func ValidateWebhookCert() {
 			certPath:     AdmCACertPath,
 			k8sEnvOnly:   false,
 		},
-		&keyCertInfo{
+		{
 			cn:           fmt.Sprintf("%s.%s.svc", resource.NvAdmSvcName, resource.NvAdmSvcNamespace),
 			svcName:      resource.NvAdmSvcName,
 			certSvcNames: []string{resource.NvAdmSvcName}, // for old kv key
@@ -1233,7 +1233,7 @@ func ValidateWebhookCert() {
 			store:        share.CLUSConfigAdmissionControlStore,
 			k8sEnvOnly:   true,
 		},
-		&keyCertInfo{
+		{
 			cn:           fmt.Sprintf("%s.%s.svc", resource.NvCrdSvcName, resource.NvAdmSvcNamespace),
 			svcName:      resource.NvCrdSvcName,
 			certSvcNames: []string{resource.NvCrdSvcName}, // for old kv key
@@ -1558,7 +1558,7 @@ func upgradeWebhookConfig() {
 		for {
 			cfg.Webhooks = []share.CLUSWebhook{
 				// WebhookEnable_UNUSED was not used. Always enable the entry.
-				share.CLUSWebhook{Name: api.WebhookDefaultName, Url: cfg.WebhookUrl_UNUSED, Enable: true, Type: api.WebhookTypeSlack},
+				{Name: api.WebhookDefaultName, Url: cfg.WebhookUrl_UNUSED, Enable: true, Type: api.WebhookTypeSlack},
 			}
 			cfg.WebhookUrl_UNUSED = ""
 			cfg.WebhookEnable_UNUSED = false
