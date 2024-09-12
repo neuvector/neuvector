@@ -391,7 +391,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"*", "/usr/lib64/jvm/*"}, // JVM
 
 		// tools
-		{"ps", "/bin/ps"},
+		{"ps", "*"},
 		{"bash", "/usr/bin/bash"},
 		{"uname", "/usr/bin/uname"}, // cli
 		{"echo", "/usr/bin"},
@@ -421,7 +421,7 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"sigstore-interface", "/usr/local/bin/sigstore-interface"},
 
 		// tools
-		{"ps", "/bin/ps"},
+		{"ps", "*"},
 		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
@@ -443,7 +443,7 @@ func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"uname", "/usr/bin/uname"},
 
 		// tools
-		{"ps", "/bin/ps"},
+		{"ps", "*"},
 		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
@@ -462,7 +462,7 @@ func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProf
 		{"adapter", "/usr/local/bin/adapter"},
 
 		// tools
-		{"ps", "/bin/ps"},
+		{"ps", "*"},
 		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
@@ -490,8 +490,8 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getconf", "/usr/bin/getconf"}, // get configuration values
 		{"getent", "/usr/bin/getent"},   // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},     // convert encoding of given files from one encoding to another
-		{"ps", "/bin/ps"},
-		{"cat", "/usr/bin/cat"}, // k8s readiness and openshift operations
+		{"ps", "*"},
+		{"cat", "*"}, // k8s readiness
 
 		// bash
 		{"bash", "/usr/bin/bash"},
@@ -545,7 +545,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"curl", "/usr/bin/curl"},               // cis benchmark
 		{"jq", "/usr/bin/jq"},                   // cis benchmark
 		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
-		{"ps", "/bin/ps"},
+		{"ps", "*"},
 
 		// bash
 		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
@@ -613,8 +613,8 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"curl", "/usr/bin/curl"},               // cis benchmark
 		{"jq", "/usr/bin/jq"},                   // cis benchmark
 		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
-		{"ps", "/bin/ps"},
-		{"cat", "/usr/bin/cat"}, // k8s readiness and openshift operations
+		{"ps", "*"},
+		{"cat", "*"}, // k8s readiness
 
 		// bash
 		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
