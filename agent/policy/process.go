@@ -492,6 +492,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"iconv", "/usr/bin/iconv"},     // convert encoding of given files from one encoding to another
 		{"ps", "*"},
 		{"cat", "*"}, // k8s readiness
+		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
 
 		// bash
 		{"bash", "/usr/bin/bash"},
@@ -615,6 +616,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
 		{"ps", "*"},
 		{"cat", "*"}, // k8s readiness
+		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
 
 		// bash
 		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
