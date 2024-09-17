@@ -680,7 +680,7 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 		pid := ppid
 		for i := 0; i < 8; i++ { // lookup for 8 callers
 			switch filepath.Base(path) {
-			case "agent", "monitor", "controller", "nstools", "pathWalker", "dp", "upgrader", "opa", "yq", "scanner", "adapter":
+			case "agent", "monitor", "controller", "nstools", "pathWalker", "dp", "upgrader", "opa", "yq", "scanner", "scannerTask", "adapter":
 				if filepath.Dir(path) == "/usr/local/bin" {
 					// log.WithFields(log.Fields{"caller": path, "i": i}).Debug("FMON:")
 					return true, 0, true, ifile, pInfo
